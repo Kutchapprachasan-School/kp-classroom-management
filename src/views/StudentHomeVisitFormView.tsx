@@ -51,11 +51,11 @@ export const StudentHomeVisitFormView: React.FC<StudentHomeVisitFormViewProps> =
     HomeVisitRecord['familyIncomeRange']
   >(existing?.familyIncomeRange || '< 10,000 บ./เดือน');
   const [housingType, setHousingType] = useState<HomeVisitRecord['housingType']>(
-    existing?.housingType || 'บ้านเช่า/หอพัก'
+    existing?.housingType || 'อยู่บ้านเช่า'
   );
   const [travelMethod, setTravelMethod] = useState<
     HomeVisitRecord['travelMethod']
-  >(existing?.travelMethod || 'เดินเท้า/รถโดยสาร');
+  >(existing?.travelMethod || 'รถโดยสารประจำทาง/รับจ้าง');
   const [travelDistanceKm, setTravelDistanceKm] = useState<number>(
     existing?.travelDistanceKm || 11.5
   );
@@ -334,31 +334,34 @@ export const StudentHomeVisitFormView: React.FC<StudentHomeVisitFormViewProps> =
             </div>
             <div>
               <label className="block font-semibold text-slate-700 mb-1">
-                ลักษณะที่พักอาศัย
+                ลักษณะที่พักอาศัย (นร.01 ข้อ 3.2)
               </label>
               <select
                 value={housingType}
                 onChange={(e) => setHousingType(e.target.value as any)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200"
               >
-                <option value="บ้านตนเอง">บ้านตนเอง</option>
-                <option value="บ้านเช่า/หอพัก">บ้านเช่า/หอพัก</option>
-                <option value="อาศัยอยู่กับญาติ">อาศัยอยู่กับญาติ</option>
+                <option value="อยู่บ้านตนเอง/เจ้าของบ้าน">อยู่บ้านตนเอง/เจ้าของบ้าน</option>
+                <option value="อยู่บ้านเช่า">อยู่บ้านเช่า (เสียค่าเช่า)</option>
+                <option value="อยู่กับผู้อื่น/อยู่ฟรี">อยู่กับผู้อื่น/อยู่ฟรี</option>
+                <option value="หอพัก">หอพัก</option>
               </select>
             </div>
             <div>
               <label className="block font-semibold text-slate-700 mb-1">
-                การเดินทางมาโรงเรียน
+                การเดินทางมาโรงเรียน (นร.01 ข้อ 5)
               </label>
               <select
                 value={travelMethod}
                 onChange={(e) => setTravelMethod(e.target.value as any)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200"
               >
-                <option value="ผู้ปกครองรับ-ส่ง">ผู้ปกครองรับ-ส่ง</option>
-                <option value="รถรับ-ส่งนักเรียน">รถรับ-ส่งนักเรียน</option>
-                <option value="รถจักรยานยนต์">รถจักรยานยนต์</option>
-                <option value="เดินเท้า/รถโดยสาร">เดินเท้า/รถโดยสาร</option>
+                <option value="เดิน">เดิน</option>
+                <option value="จักรยาน">จักรยาน</option>
+                <option value="รถโรงเรียน">รถโรงเรียน</option>
+                <option value="จักรยานยนต์ส่วนตัว">จักรยานยนต์ส่วนตัว</option>
+                <option value="รถส่วนตัว">รถส่วนตัว</option>
+                <option value="รถโดยสารประจำทาง/รับจ้าง">รถโดยสารประจำทาง/รับจ้าง</option>
               </select>
             </div>
           </div>

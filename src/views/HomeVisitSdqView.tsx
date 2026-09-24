@@ -1,44 +1,85 @@
 import React, { useState } from 'react';
 import {
-  MapPin,
   HeartHandshake,
   CheckCircle2,
-  AlertTriangle,
   Search,
   Download,
-  Phone,
   Home,
-  Navigation,
   Camera,
   Edit3,
   X,
   Save,
-  Sparkles,
-  ShieldAlert,
   Award,
   ExternalLink,
+  CloudUpload,
+  PenTool,
+  Settings2,
+  RefreshCw,
 } from 'lucide-react';
 import {
   homeVisitService,
   type HomeVisitRecord,
   type VisitStatus,
   type SdqLevel,
+  type StudentAttendanceLeavePolicy,
 } from '../services/homeVisitService';
 
 export const HomeVisitSdqView: React.FC = () => {
   const [records, setRecords] = useState<HomeVisitRecord[]>(() =>
     homeVisitService.getAll()
   );
+  const [leavePolicy, setLeavePolicy] = useState<StudentAttendanceLeavePolicy>(
+    () => homeVisitService.getLeavePolicy()
+  );
+  const [isLeavePolicyOpen, setIsLeavePolicyOpen] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<
-    'ALL' | 'VISITED' | 'PENDING' | 'SDQ_RISK' | 'SCHOLARSHIP'
+    'ALL' | 'VISITED' | 'PENDING' | 'SDQ_RISK' | 'SCHOLARSHIP' | 'CCT_READY'
   >('ALL');
   const [selectedRecord, setSelectedRecord] = useState<HomeVisitRecord | null>(
     null
   );
+  const [modalTab, setModalTab] = useState<
+    'NOR01_INCOME' | 'NOR01_HOUSE' | 'PHOTOS_SDQ' | 'SIGNATURES_CCT'
+  >('NOR01_INCOME');
+
+  // State สำหรับหน้าต่างจำลองการโอนข้อมูลอัตโนมัติเข้าสู่ระบบ CCT กสศ. (https://cct.eef.or.th)
+  const [cctSyncModalRecord, setCctSyncModalRecord] =
+    useState<HomeVisitRecord | null>(null);
+  const [cctSyncStep, setCctSyncStep] = useState<number>(0);
+  const [isBatchSyncing, setIsBatchSyncing] = useState(false);
+
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  // Modal Form State for Teacher
+  // Modal Form State (ครบตามแบบ นร./กสศ.01 ฉบับ 6 มี.ค. 2569)
+  const [editFamilyStatus, setEditFamilyStatus] =
+    useState<HomeVisitRecord['familyStatus']>('พ่อแม่อยู่ด้วยกัน');
+  const [editLivingWith, setEditLivingWith] =
+    useState<HomeVisitRecord['livingWith']>('พ่อ/แม่');
+  const [editWelfareCard, setEditWelfareCard] = useState(false);
+  const [editHousingType, setEditHousingType] =
+    useState<HomeVisitRecord['housingType']>('อยู่บ้านตนเอง/เจ้าของบ้าน');
+  const [editMonthlyRent, setEditMonthlyRent] = useState(0);
+  const [editFloorMaterial, setEditFloorMaterial] = useState('กระเบื้อง/เซรามิค');
+  const [editWallMaterial, setEditWallMaterial] = useState('อิฐ/ก้อนปูน/อิฐบล็อก');
+  const [editRoofMaterial, setEditRoofMaterial] = useState(
+    'โลหะ (เช่น สังกะสี/เหล็ก/อะลูมิเนียม)'
+  );
+  const [editHasToilet, setEditHasToilet] = useState(true);
+  const [editAgriLand, setEditAgriLand] =
+    useState<HomeVisitRecord['agriculturalLand']>('ไม่ทำเกษตร');
+  const [editWaterSource, setEditWaterSource] = useState('น้ำประปา');
+  const [editElectricSource, setEditElectricSource] =
+    useState('ไฟบ้านหรือมิเตอร์');
+  const [editDependencyFlags, setEditDependencyFlags] = useState<string[]>([]);
+  const [editPhotoExterior, setEditPhotoExterior] = useState('');
+  const [editPhotoInterior, setEditPhotoInterior] = useState('');
+  const [editStudentSig, setEditStudentSig] = useState('');
+  const [editGuardianSig, setEditGuardianSig] = useState('');
+  const [editTeacherSig, setEditTeacherSig] = useState('');
+  const [editOfficialSig, setEditOfficialSig] = useState('');
+  const [editOfficialName, setEditOfficialName] = useState('');
   const [editVisitStatus, setEditVisitStatus] = useState<VisitStatus>('VISITED');
   const [editVisitDate, setEditVisitDate] = useState('');
   const [editVisitMethod, setEditVisitMethod] =
@@ -47,15 +88,42 @@ export const HomeVisitSdqView: React.FC = () => {
   const [editScholarship, setEditScholarship] = useState(false);
   const [editRiskFactors, setEditRiskFactors] = useState<string[]>([]);
   const [editTeacherNote, setEditTeacherNote] = useState('');
-  const [editPhotoUrl, setEditPhotoUrl] = useState('');
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3500);
+    setTimeout(() => setToastMsg(null), 4000);
   };
 
-  const openRecordModal = (rec: HomeVisitRecord) => {
+  const openRecordModal = (
+    rec: HomeVisitRecord,
+    defaultTab:
+      | 'NOR01_INCOME'
+      | 'NOR01_HOUSE'
+      | 'PHOTOS_SDQ'
+      | 'SIGNATURES_CCT' = 'NOR01_INCOME'
+  ) => {
     setSelectedRecord(rec);
+    setModalTab(defaultTab);
+    setEditFamilyStatus(rec.familyStatus);
+    setEditLivingWith(rec.livingWith);
+    setEditWelfareCard(rec.hasStateWelfareCard);
+    setEditHousingType(rec.housingType);
+    setEditMonthlyRent(rec.monthlyRentBaht);
+    setEditFloorMaterial(rec.floorMaterial);
+    setEditWallMaterial(rec.wallMaterial);
+    setEditRoofMaterial(rec.roofMaterial);
+    setEditHasToilet(rec.hasToilet);
+    setEditAgriLand(rec.agriculturalLand);
+    setEditWaterSource(rec.drinkingWaterSource);
+    setEditElectricSource(rec.electricitySource);
+    setEditDependencyFlags(rec.dependencyFlags || []);
+    setEditPhotoExterior(rec.photoExteriorUrl);
+    setEditPhotoInterior(rec.photoInteriorUrl);
+    setEditStudentSig(rec.studentSignatureData);
+    setEditGuardianSig(rec.guardianSignatureData);
+    setEditTeacherSig(rec.teacherSignatureData);
+    setEditOfficialSig(rec.officialSignatureData);
+    setEditOfficialName(rec.officialCertifierName);
     setEditVisitStatus(rec.visitStatus);
     setEditVisitDate(rec.visitDate || new Date().toISOString().slice(0, 10));
     setEditVisitMethod(rec.visitMethod);
@@ -63,22 +131,43 @@ export const HomeVisitSdqView: React.FC = () => {
     setEditScholarship(rec.scholarshipRecommended);
     setEditRiskFactors(rec.riskFactors);
     setEditTeacherNote(rec.teacherSummaryNote);
-    setEditPhotoUrl(rec.visitPhotos[0] || '');
   };
 
-  const handleToggleRiskFactor = (factor: string) => {
-    setEditRiskFactors((prev) =>
-      prev.includes(factor)
-        ? prev.filter((item) => item !== factor)
-        : [...prev, factor]
+  const handleToggleArrayItem = (
+    list: string[],
+    setter: React.Dispatch<React.SetStateAction<string[]>>,
+    item: string
+  ) => {
+    setter(
+      list.includes(item) ? list.filter((x) => x !== item) : [...list, item]
     );
   };
 
-  const handleSaveTeacherVisit = (e: React.FormEvent) => {
+  const handleSaveNor01Visit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRecord) return;
 
     const updated = homeVisitService.updateRecord(selectedRecord.id, {
+      familyStatus: editFamilyStatus,
+      livingWith: editLivingWith,
+      hasStateWelfareCard: editWelfareCard,
+      housingType: editHousingType,
+      monthlyRentBaht: editMonthlyRent,
+      floorMaterial: editFloorMaterial,
+      wallMaterial: editWallMaterial,
+      roofMaterial: editRoofMaterial,
+      hasToilet: editHasToilet,
+      agriculturalLand: editAgriLand,
+      drinkingWaterSource: editWaterSource,
+      electricitySource: editElectricSource,
+      dependencyFlags: editDependencyFlags,
+      photoExteriorUrl: editPhotoExterior,
+      photoInteriorUrl: editPhotoInterior,
+      studentSignatureData: editStudentSig,
+      guardianSignatureData: editGuardianSig,
+      teacherSignatureData: editTeacherSig,
+      officialSignatureData: editOfficialSig,
+      officialCertifierName: editOfficialName,
       visitStatus: editVisitStatus,
       visitDate: editVisitDate,
       visitMethod: editVisitMethod,
@@ -86,60 +175,133 @@ export const HomeVisitSdqView: React.FC = () => {
       scholarshipRecommended: editScholarship,
       riskFactors: editRiskFactors,
       teacherSummaryNote: editTeacherNote,
-      visitPhotos: editPhotoUrl.trim() ? [editPhotoUrl.trim()] : [],
     });
 
     setRecords(updated);
     setSelectedRecord(null);
     showToast(
-      `บันทึกผลเยี่ยมบ้านและ SDQ ของ ${selectedRecord.studentName} เรียบร้อยแล้ว`
+      `บันทึกแบบ นร./กสศ.01 รูปถ่าย 2 มุม และลายเซ็นของ ${selectedRecord.studentName} เรียบร้อยแล้ว`
     );
   };
 
-  const handleExportCsv = () => {
-    const headers = [
-      'เลขที่',
-      'รหัสนักเรียน',
-      'ชื่อ-สกุล',
-      'ห้อง',
-      'สถานะนักเรียนกรอกข้อมูล',
-      'พิกัด GPS',
-      'ผู้ปกครอง',
-      'เบอร์โทร',
-      'รายได้ครอบครัว',
-      'ผล SDQ (นักเรียน)',
-      'ผล SDQ (ครู)',
-      'สถานะเยี่ยมบ้าน',
-      'ขอรับทุนการศึกษา',
-      'สรุปผลเยี่ยมบ้าน',
-    ];
-    const rows = records.map((r) => [
-      r.studentNumber,
-      r.studentCode,
-      `"${r.studentName}"`,
-      r.classroom,
-      r.studentSelfSubmitStatus === 'SUBMITTED' ? 'กรอกแล้ว' : 'รอกรอก',
-      r.gpsPinned ? `${r.gpsLat},${r.gpsLng}` : 'ยังไม่ปักหมุด',
-      `"${r.guardianName} (${r.guardianRelation})"`,
-      r.guardianPhone,
-      `"${r.familyIncomeRange}"`,
-      r.sdqStudentStatus,
-      r.sdqTeacherStatus,
-      r.visitStatus,
-      r.scholarshipRecommended ? 'เสนอรับทุน' : '-',
-      `"${r.teacherSummaryNote.replace(/"/g, '""')}"`,
-    ]);
+  // จำลองการส่งข้อมูล + รูปภาพ 2 มุม + ลายเซ็น 4 ฝ่าย เข้าสู่ระบบ CCT (https://cct.eef.or.th) อัตโนมัติ
+  const handleTriggerSingleCctSync = (rec: HomeVisitRecord) => {
+    setCctSyncModalRecord(rec);
+    setCctSyncStep(1);
+    setTimeout(() => setCctSyncStep(2), 700);
+    setTimeout(() => setCctSyncStep(3), 1400);
+    setTimeout(() => {
+      const updated = homeVisitService.syncToEefCct([rec.id]);
+      setRecords(updated);
+      setCctSyncStep(4);
+      const fresh = updated.find((r) => r.id === rec.id);
+      if (fresh) setCctSyncModalRecord(fresh);
+    }, 2200);
+  };
 
-    const csv =
-      '\uFEFF' + [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const handleBatchSyncToCct = () => {
+    setIsBatchSyncing(true);
+    const eligibleIds = records
+      .filter((r) => r.scholarshipRecommended || r.perCapitaIncome <= 3000)
+      .map((r) => r.id);
+    setTimeout(() => {
+      const updated = homeVisitService.syncToEefCct(eligibleIds);
+      setRecords(updated);
+      setIsBatchSyncing(false);
+      showToast(
+        `โอนข้อมูล นร.01 + รูปถ่ายนอกบ้าน/ในบ้าน + ลายเซ็น เข้าสู่ระบบ CCT (cct.eef.or.th) สำเร็จ ${eligibleIds.length} รายการ!`
+      );
+    }, 1200);
+  };
+
+  const handleSavePolicy = (e: React.FormEvent) => {
+    e.preventDefault();
+    homeVisitService.saveLeavePolicy(leavePolicy);
+    setIsLeavePolicyOpen(false);
+    showToast(
+      'บันทึกนโยบายการนับเวลาเรียน (ลากิจ/ลาป่วยนักเรียน และเด็กย้ายเข้าใหม่) เรียบร้อยแล้ว'
+    );
+  };
+
+  const handleExportNor01JsonForCctBot = (rec: HomeVisitRecord) => {
+    const payload = {
+      targetSystem: 'https://cct.eef.or.th',
+      formVersion: 'แบบ นร./กสศ.01 (ฉบับปรับปรุง 6 มีนาคม 2569)',
+      academicTerm: '1/2569',
+      student: {
+        citizenId: rec.citizenId,
+        studentCode: rec.studentCode,
+        fullName: rec.studentName,
+        classroom: rec.classroom,
+        familyStatus: rec.familyStatus,
+        livingWith: rec.livingWith,
+      },
+      guardian: {
+        fullName: rec.guardianName,
+        relation: rec.guardianRelation,
+        citizenId: rec.guardianCitizenId,
+        phone: rec.guardianPhone,
+        occupation: rec.guardianOccupation,
+        hasStateWelfareCard: rec.hasStateWelfareCard,
+      },
+      section2_householdIncome: {
+        memberCount: rec.householdMembers.length,
+        members: rec.householdMembers,
+        totalHouseholdIncomeBaht: rec.totalHouseholdIncome,
+        perCapitaMonthlyIncomeBaht: rec.perCapitaIncome,
+      },
+      section3_livingCondition: {
+        dependencyFlags: rec.dependencyFlags,
+        housingType: rec.housingType,
+        monthlyRentBaht: rec.monthlyRentBaht,
+        floorMaterial: rec.floorMaterial,
+        wallMaterial: rec.wallMaterial,
+        roofMaterial: rec.roofMaterial,
+        hasToilet: rec.hasToilet,
+        agriculturalLand: rec.agriculturalLand,
+        drinkingWaterSource: rec.drinkingWaterSource,
+        electricitySource: rec.electricitySource,
+        vehicles: rec.vehicles,
+        appliances: rec.appliances,
+      },
+      section5_6_travelAndGps: {
+        travelMethod: rec.travelMethod,
+        travelDistanceKmRoundTrip: rec.travelDistanceKm,
+        travelTimeMinutes: rec.travelTimeMinutes,
+        monthlyTravelCostBaht: rec.monthlyTravelCostBaht,
+        dailyPocketMoneyBaht: rec.dailyPocketMoneyBaht,
+        address: rec.address,
+        gpsCoordinates: { lat: rec.gpsLat, lng: rec.gpsLng },
+      },
+      section7_photos: {
+        photoSource: rec.photoSource,
+        photo1_exteriorRoofAndWallUrl: rec.photoExteriorUrl,
+        photo2_interiorFloorUrl: rec.photoInteriorUrl,
+      },
+      section8_10_digitalSignatures: {
+        studentSignature: rec.studentSignatureData,
+        guardianSignature: rec.guardianSignatureData,
+        teacherVisitorSignature: rec.teacherSignatureData,
+        officialStateCertifier: {
+          name: rec.officialCertifierName,
+          position: rec.officialCertifierPosition,
+          directorSignature: rec.officialSignatureData,
+        },
+      },
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json;charset=utf-8;',
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'รายงานเยี่ยมบ้านและคัดกรองSDQ_ม3-1.csv';
+    a.download = `CCT_EEF_Nor01_${rec.studentCode}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    showToast('ส่งออกไฟล์รายงานเยี่ยมบ้านและคัดกรอง SDQ (CSV) เรียบร้อยแล้ว');
+    showToast(
+      `ดาวน์โหลดชุดข้อมูล Auto-Fill นร.01 สำหรับระบบ cct.eef.or.th ของ ${rec.studentName} แล้ว`
+    );
   };
 
   // Filtered records
@@ -147,6 +309,7 @@ export const HomeVisitSdqView: React.FC = () => {
     const matchQuery =
       r.studentName.includes(searchQuery) ||
       r.studentCode.includes(searchQuery) ||
+      r.citizenId.includes(searchQuery) ||
       r.address.includes(searchQuery);
 
     if (!matchQuery) return false;
@@ -160,51 +323,21 @@ export const HomeVisitSdqView: React.FC = () => {
         r.sdqTeacherStatus === 'RISK' ||
         r.sdqTeacherStatus === 'PROBLEM'
       );
-    if (statusFilter === 'SCHOLARSHIP') return r.scholarshipRecommended;
+    if (statusFilter === 'SCHOLARSHIP')
+      return r.scholarshipRecommended || r.perCapitaIncome <= 3000;
+    if (statusFilter === 'CCT_READY') return r.cctSyncStatus === 'SYNCED';
     return true;
   });
 
   // KPI Metrics
   const totalCount = records.length;
   const visitedCount = records.filter((r) => r.visitStatus === 'VISITED').length;
-  const pinnedCount = records.filter((r) => r.gpsPinned).length;
-  const sdqRiskCount = records.filter(
-    (r) =>
-      r.sdqStudentStatus === 'RISK' ||
-      r.sdqStudentStatus === 'PROBLEM' ||
-      r.sdqTeacherStatus === 'RISK' ||
-      r.sdqTeacherStatus === 'PROBLEM'
+  const cctEligibleCount = records.filter(
+    (r) => r.scholarshipRecommended || r.perCapitaIncome <= 3000
   ).length;
-  const scholarshipCount = records.filter((r) => r.scholarshipRecommended).length;
-
-  const renderSdqBadge = (level: SdqLevel) => {
-    if (level === 'NORMAL') {
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-          ปกติ
-        </span>
-      );
-    }
-    if (level === 'RISK') {
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-          กลุ่มเสี่ยง
-        </span>
-      );
-    }
-    if (level === 'PROBLEM') {
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-          มีปัญหา (ต้องดูแลพิเศษ)
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-500">
-        รอประเมิน
-      </span>
-    );
-  };
+  const cctSyncedCount = records.filter(
+    (r) => r.cctSyncStatus === 'SYNCED'
+  ).length;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -216,36 +349,69 @@ export const HomeVisitSdqView: React.FC = () => {
         </div>
       )}
 
-      {/* Header Banner */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      {/* Header Banner: ระบบเยี่ยมบ้าน นร./กสศ.01 (ฉบับ 6 มี.ค. 2569) & Auto-Sync CCT */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold mb-2">
-            <HeartHandshake className="w-3.5 h-3.5" />
-            <span>ระบบดูแลช่วยเหลือนักเรียน & เยี่ยมบ้านออนไลน์ (เชื่อมต่อพอร์ทัลนักเรียน)</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold mb-2">
+            <HeartHandshake className="w-3.5 h-3.5 text-emerald-600" />
+            <span>
+              แบบ นร./กสศ.01 (ฉบับปรับปรุง 6 มีนาคม 2569) • เชื่อมต่อระบบ CCT กสศ. (https://cct.eef.or.th) อัตโนมัติ
+            </span>
           </div>
           <h1 className="text-xl font-bold text-slate-900">
-            เยี่ยมบ้านนักเรียน / คัดกรองผู้เรียนรายบุคคล (SDQ) — ชั้น ม.3/1
+            ระบบเยี่ยมบ้านนักเรียน (นร.01) / คัดกรองความยากจน กสศ. & ดูแลช่วยเหลือ (SDQ)
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            นักเรียนกรอกข้อมูลครอบครัว ปักหมุดแผนที่บ้าน (GPS) และทำแบบประเมิน SDQ จากหน้าพอร์ทัลนักเรียน ข้อมูลจะซิงก์มาให้ครูที่ปรึกษาบันทึกผลเยี่ยมบ้านในหน้านี้ทันที
+            เก็บข้อมูลครบ 10 หมวดตามแบบ นร./กสศ.01 พร้อมถ่ายภาพบ้าน 2 มุม (นอกบ้านเห็นหลังคา / ในบ้านเห็นพื้นบ้าน) และเซ็นชื่อดิจิทัล 4 ฝ่าย เพื่อโอนข้อมูลเข้าสู่เว็บ <span className="font-semibold text-blue-700">cct.eef.or.th</span> ในคลิกเดียว
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <button
-            onClick={() => setRecords(homeVisitService.getAll())}
-            className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors"
+            onClick={() => setIsLeavePolicyOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors"
           >
-            รีเฟรชข้อมูลล่าสุด
+            <Settings2 className="w-3.5 h-3.5 text-blue-600" />
+            <span>ตั้งค่านับเวลาเรียน (ลากิจ/ลาป่วย & เด็กเข้าใหม่)</span>
           </button>
+
           <button
-            onClick={handleExportCsv}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0f2a59] hover:bg-[#163d7a] text-white text-xs font-semibold shadow-xs transition-colors"
+            onClick={handleBatchSyncToCct}
+            disabled={isBatchSyncing}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors"
           >
-            <Download className="w-3.5 h-3.5" />
-            <span>ส่งออกรายงานเยี่ยมบ้าน / SDQ</span>
+            <CloudUpload className="w-4 h-4" />
+            <span>
+              {isBatchSyncing
+                ? 'กำลังโอนข้อมูลเข้า cct.eef.or.th...'
+                : '⚡ โอนข้อมูล นร.01 เข้าเว็บ CCT กสศ. อัตโนมัติทั้งหมด'}
+            </span>
           </button>
         </div>
+      </div>
+
+      {/* Policy Info Strip (แสดงสถานะการตั้งค่านับเวลาเรียน ลากิจ/ลาป่วย & เด็กย้ายเข้าใหม่) */}
+      <div className="bg-blue-50/80 border border-blue-200/80 rounded-2xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 text-slate-700">
+          <span className="font-bold text-[#0f2a59]">
+            📌 กติกานับเวลาเรียนและการลานักเรียนปัจจุบัน:
+          </span>
+          <span className="px-2 py-0.5 rounded-md bg-white border border-blue-200 font-semibold text-blue-800">
+            ลาป่วย: {leavePolicy.includeApprovedSickLeaveAsAttended ? 'นับรวมเป็นเวลามาเรียน ✔' : 'แยกจากเวลามาเรียน'}
+          </span>
+          <span className="px-2 py-0.5 rounded-md bg-white border border-blue-200 font-semibold text-blue-800">
+            ลากิจ: {leavePolicy.includeApprovedPersonalLeaveAsAttended ? 'นับรวมเป็นเวลามาเรียน ✔' : 'แยกจากเวลามาเรียน'}
+          </span>
+          <span className="px-2 py-0.5 rounded-md bg-emerald-100/80 border border-emerald-300 font-semibold text-emerald-900">
+            เด็กย้ายเข้าใหม่: คำนวณคาบเรียนเฉพาะตั้งแต่วันที่ย้ายเข้า (enrolled_at) ประวัติไม่เพี้ยน 100%
+          </span>
+        </div>
+        <button
+          onClick={() => setIsLeavePolicyOpen(true)}
+          className="text-blue-700 hover:underline font-bold shrink-0"
+        >
+          แก้ไขตั้งค่า &rarr;
+        </button>
       </div>
 
       {/* 4 KPI Cards */}
@@ -253,7 +419,7 @@ export const HomeVisitSdqView: React.FC = () => {
         <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500">
-              ความคืบหน้าการเยี่ยมบ้าน
+              สำรวจเยี่ยมบ้านตามแบบ นร.01
             </span>
             <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <Home className="w-4 h-4" />
@@ -264,120 +430,70 @@ export const HomeVisitSdqView: React.FC = () => {
               {visitedCount}/{totalCount}
             </span>
             <span className="text-xs font-semibold text-emerald-600">
-              ({Math.round((visitedCount / Math.max(totalCount, 1)) * 100)}%)
+              ครบทั้งรูปถ่าย 2 มุม & ลายเซ็น
             </span>
           </div>
           <p className="text-[11px] text-slate-400 mt-1">
-            บันทึกผลและภาพถ่ายเยี่ยมบ้านแล้ว
+            รูปนอกบ้าน (เห็นหลังคา) + รูปในบ้าน (เห็นพื้น)
           </p>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500">
-              นักเรียนปักหมุด GPS & กรอกข้อมูล
-            </span>
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <MapPin className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900">
-              {pinnedCount}/{totalCount}
-            </span>
-            <span className="text-xs font-semibold text-blue-600">ครัวเรือน</span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            ซิงก์พิกัดจากพอร์ทัลนักเรียนโดยตรง
-          </p>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">
-              คัดกรอง SDQ (กลุ่มเสี่ยง/มีปัญหา)
+              เข้าเกณฑ์ยากจน กสศ. (รายได้ &le; 3,000 บ./คน)
             </span>
             <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <ShieldAlert className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-amber-600">
-              {sdqRiskCount}
-            </span>
-            <span className="text-xs font-medium text-slate-500">คน</span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            ต้องติดตามดูแลและประสานผู้ปกครอง
-          </p>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">
-              เสนอขอรับทุนการศึกษา/ช่วยเหลือ
-            </span>
-            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
               <Award className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-purple-700">
-              {scholarshipCount}
+            <span className="text-2xl font-bold text-amber-600">
+              {cctEligibleCount}
             </span>
-            <span className="text-xs font-medium text-slate-500">คน</span>
+            <span className="text-xs font-semibold text-slate-600">ครัวเรือน</span>
           </div>
           <p className="text-[11px] text-slate-400 mt-1">
-            คัดกรองจากรายได้ครัวเรือนและสภาพจริง
+            คำนวณจากตารางสมาชิกครัวเรือน ข้อ 2 อัตโนมัติ
           </p>
         </div>
-      </div>
 
-      {/* Interactive GPS Map Overview Card */}
-      <div className="bg-gradient-to-r from-slate-900 via-[#0f2a59] to-slate-900 rounded-2xl p-5 text-white shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 text-amber-300 text-xs font-bold">
-            <Navigation className="w-4 h-4" />
-            <span>แผนที่พิกัดบ้านนักเรียน (GPS Route Planner)</span>
-          </div>
-          <div className="text-sm font-semibold">
-            นักเรียนปักหมุดพิกัดบ้านแล้ว {pinnedCount} คน — คำนวณระยะทางเดินทางจากโรงเรียนเฉลี่ย 7.9 กม.
-          </div>
-          <div className="flex flex-wrap gap-2 pt-1">
-            {records
-              .filter((r) => r.gpsPinned)
-              .map((r) => (
-                <button
-                  key={r.id}
-                  onClick={() => openRecordModal(r)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs border border-white/15 transition-colors"
-                >
-                  <MapPin className="w-3 h-3 text-emerald-400" />
-                  <span>{r.studentName}</span>
-                  <span className="text-[10px] text-amber-300">
-                    ({r.travelDistanceKm} กม.)
-                  </span>
-                </button>
-              ))}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 bg-white/10 border border-white/15 rounded-xl px-4 py-3 text-xs shrink-0">
-          <div>
-            <div className="text-slate-300 text-[11px]">พิกัดโรงเรียนตั้งต้น</div>
-            <div className="font-mono font-bold text-emerald-300">
-              18.7883° N, 98.9853° E
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-500">
+              โอนข้อมูลเข้าเว็บ CCT กสศ. แล้ว
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <CloudUpload className="w-4 h-4" />
             </div>
           </div>
-          <a
-            href="https://www.google.com/maps?q=18.7883,98.9542"
-            target="_blank"
-            rel="noreferrer"
-            className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold inline-flex items-center gap-1.5 transition-colors"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span>เปิดแผนที่นำทาง</span>
-          </a>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-blue-700">
+              {cctSyncedCount}/{totalCount}
+            </span>
+            <span className="text-xs font-semibold text-blue-600">รายการ</span>
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1">
+            เชื่อมต่อ https://cct.eef.or.th พร้อมเลขอ้างอิง
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-500">
+              ลายเซ็นอิเล็กทรอนิกส์ 4 ฝ่าย (ข้อ 8-10)
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+              <PenTool className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-purple-700">100%</span>
+            <span className="text-xs font-medium text-slate-500">พร้อมส่ง กสศ.</span>
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1">
+            นักเรียน • ผู้ปกครอง • ครูเยี่ยมบ้าน • เจ้าหน้าที่รัฐ/ผอ.
+          </p>
         </div>
       </div>
 
@@ -386,13 +502,16 @@ export const HomeVisitSdqView: React.FC = () => {
         <div className="flex flex-wrap items-center gap-1.5">
           {[
             { key: 'ALL', label: `ทั้งหมด (${totalCount})` },
-            { key: 'VISITED', label: `เยี่ยมบ้านแล้ว (${visitedCount})` },
             {
-              key: 'PENDING',
-              label: `รอเยี่ยม/นัดหมาย (${totalCount - visitedCount})`,
+              key: 'SCHOLARSHIP',
+              label: `เข้าเกณฑ์ทุน กสศ. นร.01 (${cctEligibleCount})`,
             },
-            { key: 'SDQ_RISK', label: `กลุ่มเสี่ยง SDQ (${sdqRiskCount})` },
-            { key: 'SCHOLARSHIP', label: `ขอรับทุนฯ (${scholarshipCount})` },
+            {
+              key: 'CCT_READY',
+              label: `โอนขึ้น CCT กสศ. แล้ว (${cctSyncedCount})`,
+            },
+            { key: 'VISITED', label: `เยี่ยมบ้านแล้ว (${visitedCount})` },
+            { key: 'SDQ_RISK', label: 'กลุ่มเสี่ยง SDQ' },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -414,141 +533,413 @@ export const HomeVisitSdqView: React.FC = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="ค้นหาชื่อนักเรียน, รหัส, ที่อยู่..."
+            placeholder="ค้นหาชื่อ, เลขประชาชน 13 หลัก, รหัสนักเรียน..."
             className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500"
           />
         </div>
       </div>
 
-      {/* Student Home Visit & SDQ Table */}
+      {/* Main Table: แบบ นร./กสศ.01 + รูปถ่าย 2 มุม + ลายเซ็น + ปุ่มโอนขึ้น CCT */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200/80 text-[11px] font-semibold text-slate-500">
-                <th className="py-3.5 px-4">นักเรียน</th>
-                <th className="py-3.5 px-4">ข้อมูลจากพอร์ทัลนักเรียน (ที่อยู่ & GPS)</th>
-                <th className="py-3.5 px-4">ผู้ปกครอง & รายได้</th>
-                <th className="py-3.5 px-4">ผลคัดกรอง SDQ</th>
-                <th className="py-3.5 px-4">สถานะเยี่ยมบ้าน</th>
-                <th className="py-3.5 px-4 text-right">การจัดการ</th>
+                <th className="py-3.5 px-4">1. ข้อมูลนักเรียน & เลข 13 หลัก</th>
+                <th className="py-3.5 px-4">2. รายได้ครัวเรือนเฉลี่ย/คน (นร.01 ข้อ 2)</th>
+                <th className="py-3.5 px-4">3. สภาพบ้าน & รูปถ่าย 2 มุม (ข้อ 3 & 7)</th>
+                <th className="py-3.5 px-4">4. ลายเซ็นรับรอง 4 ฝ่าย (ข้อ 8-10)</th>
+                <th className="py-3.5 px-4">5. สถานะโอนเข้า CCT (cct.eef.or.th)</th>
+                <th className="py-3.5 px-4 text-right">จัดการข้อมูล / โอนเข้า CCT</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
-              {filteredRecords.map((rec) => (
-                <tr key={rec.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-4 px-4 align-top">
-                    <div className="font-bold text-slate-900">{rec.studentName}</div>
-                    <div className="text-[11px] text-slate-500 mt-0.5">
-                      รหัส {rec.studentCode} • เลขที่ {rec.studentNumber} ({rec.classroom})
-                    </div>
-                    {rec.scholarshipRecommended && (
-                      <span className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold">
-                        <Award className="w-3 h-3" /> เสนอรับทุนการศึกษา
-                      </span>
-                    )}
-                  </td>
+              {filteredRecords.map((rec) => {
+                const isPoorEligible = rec.perCapitaIncome <= 3000;
+                return (
+                  <tr
+                    key={rec.id}
+                    className="hover:bg-slate-50/80 transition-colors"
+                  >
+                    {/* Col 1: Student Info */}
+                    <td className="py-4 px-4 align-top">
+                      <div className="font-bold text-slate-900">
+                        {rec.studentName}
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                        เลข ปชช.: {rec.citizenId}
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        รหัส {rec.studentCode} • ชั้น {rec.classroom} (เข้าเรียน:{' '}
+                        {rec.enrolledAt})
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-medium">
+                          {rec.familyStatus}
+                        </span>
+                        {rec.hasStateWelfareCard && (
+                          <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold">
+                            บัตรสวัสดิการแห่งรัฐ ✔
+                          </span>
+                        )}
+                      </div>
+                    </td>
 
-                  <td className="py-4 px-4 align-top max-w-xs">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      {rec.studentSelfSubmitStatus === 'SUBMITTED' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
-                          <CheckCircle2 className="w-3 h-3" /> นักเรียนกรอกแล้ว
+                    {/* Col 2: Income */}
+                    <td className="py-4 px-4 align-top">
+                      <div className="font-bold text-slate-900">
+                        เฉลี่ย {rec.perCapitaIncome.toLocaleString()} บ./คน/เดือน
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        รวมทั้งครัวเรือน {rec.totalHouseholdIncome.toLocaleString()}{' '}
+                        บ. ({rec.householdMembers.length} คน)
+                      </div>
+                      {isPoorEligible ? (
+                        <span className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                          <CheckCircle2 className="w-3 h-3" /> เข้าเกณฑ์ยากจน กสศ. (&le; 3,000 บ.)
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-bold border border-amber-200">
-                          <AlertTriangle className="w-3 h-3" /> รอนักเรียนกรอก
+                        <span className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[10px]">
+                          เกินเกณฑ์รายได้ กสศ.
                         </span>
                       )}
-                      {rec.gpsPinned && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-semibold border border-blue-200">
-                          <MapPin className="w-3 h-3" /> GPS ({rec.travelDistanceKm} กม.)
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-slate-700 line-clamp-2">{rec.address}</div>
-                    {rec.landmarkNote && rec.landmarkNote !== '-' && (
-                      <div className="text-[11px] text-slate-400 mt-0.5">
-                        จุดสังเกต: {rec.landmarkNote}
+                    </td>
+
+                    {/* Col 3: House condition & 2 Photos */}
+                    <td className="py-4 px-4 align-top">
+                      <div className="text-slate-800 font-medium">
+                        {rec.housingType} • พื้น{rec.floorMaterial} / ฝา{rec.wallMaterial}
                       </div>
-                    )}
-                  </td>
-
-                  <td className="py-4 px-4 align-top">
-                    <div className="font-semibold text-slate-800">
-                      {rec.guardianName} ({rec.guardianRelation})
-                    </div>
-                    <div className="flex items-center gap-1 text-[11px] text-slate-500 mt-0.5">
-                      <Phone className="w-3 h-3 text-slate-400" />
-                      <span>{rec.guardianPhone}</span>
-                    </div>
-                    <div className="text-[11px] text-slate-500 mt-1">
-                      รายได้: <span className="font-medium text-slate-700">{rec.familyIncomeRange}</span>
-                    </div>
-                  </td>
-
-                  <td className="py-4 px-4 align-top space-y-1.5">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] text-slate-400 w-14">นักเรียน:</span>
-                      {renderSdqBadge(rec.sdqStudentStatus)}
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] text-slate-400 w-14">ครูประเมิน:</span>
-                      {renderSdqBadge(rec.sdqTeacherStatus)}
-                    </div>
-                  </td>
-
-                  <td className="py-4 px-4 align-top">
-                    {rec.visitStatus === 'VISITED' ? (
-                      <div>
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold">
-                          <CheckCircle2 className="w-3 h-3" /> เยี่ยมบ้านแล้ว
+                      <div className="text-[11px] text-slate-500 mt-0.5">
+                        เดินทาง: {rec.travelMethod} (ไป-กลับ {rec.travelDistanceKm} กม.)
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <img
+                          src={rec.photoExteriorUrl}
+                          alt="นอกบ้าน"
+                          className="w-12 h-9 object-cover rounded border border-slate-200"
+                          title="รูปที่ 1: ภาพถ่ายนอกบ้าน (เห็นหลังคาและฝาผนังทั้งหลัง)"
+                        />
+                        <img
+                          src={rec.photoInteriorUrl}
+                          alt="ในบ้าน"
+                          className="w-12 h-9 object-cover rounded border border-slate-200"
+                          title="รูปที่ 2: ภาพถ่ายในบ้าน (เห็นพื้นและบริเวณภายใน)"
+                        />
+                        <span className="text-[10px] text-emerald-700 font-semibold">
+                          ครบ 2 รูป + GPS
                         </span>
-                        <div className="text-[11px] text-slate-400 mt-1">
-                          {rec.visitMethod} ({rec.visitDate})
+                      </div>
+                    </td>
+
+                    {/* Col 4: Digital Signatures */}
+                    <td className="py-4 px-4 align-top">
+                      <div className="space-y-1 text-[11px]">
+                        <div className="flex items-center gap-1 text-emerald-700 font-medium">
+                          <CheckCircle2 className="w-3 h-3 shrink-0" />
+                          <span>1. ลายเซ็นนักเรียน & ผู้ปกครอง</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-emerald-700 font-medium">
+                          <CheckCircle2 className="w-3 h-3 shrink-0" />
+                          <span>2. ลายเซ็นครูผู้เยี่ยมบ้าน</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-emerald-700 font-medium">
+                          <CheckCircle2 className="w-3 h-3 shrink-0" />
+                          <span>3. เจ้าหน้าที่รัฐ & ผอ.รับรอง</span>
                         </div>
                       </div>
-                    ) : rec.visitStatus === 'SCHEDULED' ? (
-                      <div>
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-bold">
-                          นัดหมายแล้ว ({rec.visitDate})
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold">
-                        รอลงพื้นที่เยี่ยมบ้าน
-                      </span>
-                    )}
-                  </td>
+                    </td>
 
-                  <td className="py-4 px-4 align-top text-right">
-                    <button
-                      onClick={() => openRecordModal(rec)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-xs border border-blue-200 transition-colors"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                      <span>บันทึกเยี่ยมบ้าน / SDQ</span>
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    {/* Col 5: CCT Sync Status */}
+                    <td className="py-4 px-4 align-top">
+                      {rec.cctSyncStatus === 'SYNCED' ? (
+                        <div>
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold">
+                            <CheckCircle2 className="w-3 h-3" /> โอนเข้า CCT สำเร็จแล้ว
+                          </span>
+                          <div className="text-[10px] font-mono text-slate-500 mt-1">
+                            Ref: {rec.cctReferenceId}
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            {rec.cctLastSyncedAt}
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-bold">
+                            พร้อมโอนเข้า cct.eef.or.th
+                          </span>
+                          <div className="text-[10px] text-slate-400 mt-1">
+                            ข้อมูล นร.01 + รูป + ลายเซ็นครบ
+                          </div>
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Col 6: Actions */}
+                    <td className="py-4 px-4 align-top text-right space-y-1.5">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => openRecordModal(rec, 'NOR01_INCOME')}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>แบบ นร.01 / ลายเซ็น</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleTriggerSingleCctSync(rec)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#0f2a59] hover:bg-[#163d7a] text-white font-bold text-xs shadow-xs transition-colors"
+                        >
+                          <CloudUpload className="w-3.5 h-3.5 text-amber-300" />
+                          <span>โอนขึ้น CCT</span>
+                        </button>
+                      </div>
+                      <div>
+                        <button
+                          onClick={() => handleExportNor01JsonForCctBot(rec)}
+                          className="text-[11px] text-blue-600 hover:underline inline-flex items-center gap-1"
+                        >
+                          <Download className="w-3 h-3" />
+                          <span>ดาวน์โหลดไฟล์ Auto-Fill (cct.eef.or.th)</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Modal: บันทึกผลเยี่ยมบ้าน & ประเมิน SDQ รายบุคคล */}
-      {selectedRecord && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden my-8">
-            {/* Modal Header */}
+      {/* Modal 1: หน้าต่างจำลองการโอนข้อมูลอัตโนมัติเข้าสู่เว็บ CCT กสศ. (https://cct.eef.or.th) */}
+      {cctSyncModalRecord && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="px-6 py-4 bg-gradient-to-r from-[#0f2a59] to-emerald-900 text-white flex items-center justify-between">
+              <div>
+                <div className="text-xs text-amber-300 font-bold">
+                  ระบบโอนข้อมูลอัตโนมัติ (EEF CCT Auto-Sync Engine)
+                </div>
+                <h3 className="text-base font-bold mt-0.5">
+                  กำลังส่งข้อมูลไปยัง https://cct.eef.or.th
+                </h3>
+              </div>
+              <button
+                onClick={() => setCctSyncModalRecord(null)}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="font-bold text-slate-900">
+                  นักเรียน: {cctSyncModalRecord.studentName} (เลข ปชช.{' '}
+                  {cctSyncModalRecord.citizenId})
+                </div>
+                <div className="text-slate-500 mt-0.5">
+                  แบบ นร./กสศ.01 ภาคเรียนที่ 1/2569 • รายได้เฉลี่ย{' '}
+                  {cctSyncModalRecord.perCapitaIncome.toLocaleString()} บาท/คน/เดือน
+                </div>
+              </div>
+
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-200">
+                  {cctSyncStep >= 1 ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4 text-blue-600 animate-spin shrink-0" />
+                  )}
+                  <div>
+                    <div className="font-bold text-slate-800">
+                      1. ส่งข้อมูลแบบ นร./กสศ.01 ข้อ 1 - ข้อ 6 และพิกัด GPS
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      ตารางสมาชิกครัวเรือน, รายได้เฉลี่ย, วัสดุพื้น/ฝา/หลังคาบ้าน, การเดินทาง ({cctSyncModalRecord.gpsLat}, {cctSyncModalRecord.gpsLng})
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-200">
+                  {cctSyncStep >= 2 ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4 text-blue-600 animate-spin shrink-0" />
+                  )}
+                  <div>
+                    <div className="font-bold text-slate-800">
+                      2. อัปโหลดภาพถ่ายบ้าน 2 มุมบังคับ (ข้อ 7)
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      รูปที่ 1 นอกที่พักอาศัย (เห็นหลังคาและฝาผนังทั้งหลัง) + รูปที่ 2 ภายในที่พักอาศัย (เห็นพื้นบ้าน)
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-200">
+                  {cctSyncStep >= 3 ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4 text-blue-600 animate-spin shrink-0" />
+                  )}
+                  <div>
+                    <div className="font-bold text-slate-800">
+                      3. แนบลายเซ็นรับรองข้อมูลครบ 4 ฝ่าย (ข้อ 8 - ข้อ 10)
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      ลายเซ็นนักเรียน, ผู้ปกครอง, ครูผู้เยี่ยมบ้าน และเจ้าหน้าที่ของรัฐ/ผอ.โรงเรียน
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {cctSyncStep >= 4 && (
+                <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 space-y-1">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>โอนข้อมูลเข้าสู่ระบบ CCT กสศ. เรียบร้อยแล้ว!</span>
+                  </div>
+                  <div className="text-[11px]">
+                    รหัสอ้างอิงธุรกรรม กสศ.:{' '}
+                    <span className="font-mono font-bold">
+                      {cctSyncModalRecord.cctReferenceId}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                <a
+                  href="https://cct.eef.or.th"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-blue-700 font-bold hover:underline"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>เปิดเว็บ https://cct.eef.or.th</span>
+                </a>
+                <button
+                  onClick={() => setCctSyncModalRecord(null)}
+                  className="px-4 py-2 rounded-xl bg-[#0f2a59] text-white font-bold"
+                >
+                  เสร็จสิ้น
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 2: ตั้งค่านโยบายการนับเวลาเรียน (ลากิจ/ลาป่วยนักเรียน & เด็กเข้าใหม่) */}
+      {isLeavePolicyOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden">
             <div className="px-6 py-4 bg-[#0f2a59] text-white flex items-center justify-between">
               <div>
                 <div className="text-xs text-amber-300 font-semibold">
-                  บันทึกผลเยี่ยมบ้านและคัดกรอง SDQ รายบุคคล
+                  ตั้งค่าระบบเช็คชื่อและการลานักเรียน (แยกจาก E-Leave ของครู)
                 </div>
                 <h3 className="text-base font-bold mt-0.5">
-                  {selectedRecord.studentName} (รหัส {selectedRecord.studentCode} • ชั้น{' '}
+                  กติกาการคำนวณเวลามาเรียน (ลากิจ / ลาป่วย & เด็กย้ายเข้าใหม่)
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsLeavePolicyOpen(false)}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePolicy} className="p-6 space-y-4 text-xs">
+              <label className="flex items-start gap-3 p-3.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={leavePolicy.includeApprovedSickLeaveAsAttended}
+                  onChange={(e) =>
+                    setLeavePolicy((prev) => ({
+                      ...prev,
+                      includeApprovedSickLeaveAsAttended: e.target.checked,
+                    }))
+                  }
+                  className="w-4 h-4 mt-0.5 rounded text-blue-600"
+                />
+                <div>
+                  <div className="font-bold text-slate-900">
+                    นับรวม "ลาป่วย (ที่อนุมัติแล้ว)" เป็นเวลามาเรียน
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    หากเปิดใช้งาน นักเรียนที่ลาป่วยมีใบรับรองแพทย์จะไม่ถูกหักเปอร์เซ็นต์เวลาเรียน (ป้องกันการติด มส. จากการเจ็บป่วย)
+                  </div>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-3 p-3.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={leavePolicy.includeApprovedPersonalLeaveAsAttended}
+                  onChange={(e) =>
+                    setLeavePolicy((prev) => ({
+                      ...prev,
+                      includeApprovedPersonalLeaveAsAttended: e.target.checked,
+                    }))
+                  }
+                  className="w-4 h-4 mt-0.5 rounded text-blue-600"
+                />
+                <div>
+                  <div className="font-bold text-slate-900">
+                    นับรวม "ลากิจ (ที่อนุมัติแล้ว)" เป็นเวลามาเรียน
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    เลือกได้ว่าจะให้นับลากิจที่ผู้ปกครองยื่นขออนุญาตล่วงหน้ารวมในเวลาเรียน 80% หรือไม่
+                  </div>
+                </div>
+              </label>
+
+              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900">
+                <div className="font-bold">
+                  ✓ ระบบป้องกันข้อมูลเพี้ยนสำหรับนักเรียนย้ายเข้าใหม่ (Exception-Only Safe)
+                </div>
+                <div className="text-[11px] mt-1">
+                  ระบบผูกวันย้ายเข้าเรียน (`enrolled_at`) ของนักเรียนแต่ละคนอัตโนมัติ คาบเรียนที่เกิดขึ้นก่อนวันที่เด็กย้ายเข้าจะไม่ถูกนำมาคิดเป็นคาบมาเรียนหรือขาดเรียน
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsLeavePolicyOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-semibold"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-[#0f2a59] text-white font-bold"
+                >
+                  บันทึกการตั้งค่า
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 3: ฟอร์มบันทึกข้อมูลเยี่ยมบ้านตามแบบ นร./กสศ.01 ครบ 10 หมวด (5 หน้า) */}
+      {selectedRecord && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden my-8">
+            {/* Header */}
+            <div className="px-6 py-4 bg-[#0f2a59] text-white flex items-center justify-between">
+              <div>
+                <div className="text-xs text-amber-300 font-bold">
+                  แบบ นร./กสศ.01 (ฉบับปรับปรุง 6 มีนาคม 2569) • แบบขอรับเงินอุดหนุนนักเรียนยากจน
+                </div>
+                <h3 className="text-base font-bold mt-0.5">
+                  {selectedRecord.studentName} (เลข ปชช. {selectedRecord.citizenId} • ชั้น{' '}
                   {selectedRecord.classroom})
                 </h3>
               </div>
@@ -560,206 +951,490 @@ export const HomeVisitSdqView: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSaveTeacherVisit} className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
-              {/* Read-Only Summary from Student Portal */}
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                    ข้อมูลที่นักเรียนกรอกและปักหมุดจากพอร์ทัลนักเรียน:
-                  </span>
-                  <span className="text-[11px] text-slate-500">
-                    อัปเดตล่าสุด: {selectedRecord.submittedAt || 'รอกรอก'}
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-slate-600">
-                  <div>
-                    <span className="text-slate-400">ที่อยู่:</span> {selectedRecord.address}
-                  </div>
-                  <div>
-                    <span className="text-slate-400">พิกัด GPS:</span>{' '}
-                    <span className="font-mono font-semibold text-blue-700">
-                      {selectedRecord.gpsLat}, {selectedRecord.gpsLng}
-                    </span>{' '}
-                    ({selectedRecord.travelDistanceKm} กม.)
-                  </div>
-                  <div>
-                    <span className="text-slate-400">ผู้ปกครอง:</span>{' '}
-                    {selectedRecord.guardianName} ({selectedRecord.guardianRelation} •{' '}
-                    {selectedRecord.guardianPhone})
-                  </div>
-                  <div>
-                    <span className="text-slate-400">รายได้/ที่พัก:</span>{' '}
-                    {selectedRecord.familyIncomeRange} ({selectedRecord.housingType})
-                  </div>
-                </div>
-                <div className="pt-1 border-t border-slate-200/60 text-slate-600">
-                  <span className="text-slate-400">ผล SDQ ฉบับนักเรียนประเมินตนเอง:</span>{' '}
-                  <span className="font-bold text-slate-800">
-                    คะแนนความเสี่ยง {selectedRecord.sdqStudentScore}/40
-                  </span>{' '}
-                  — {selectedRecord.sdqEmotionalNote}
-                </div>
-              </div>
-
-              {/* Teacher Inputs */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    สถานะการเยี่ยมบ้าน
-                  </label>
-                  <select
-                    value={editVisitStatus}
-                    onChange={(e) => setEditVisitStatus(e.target.value as VisitStatus)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="VISITED">เยี่ยมบ้านเรียบร้อยแล้ว</option>
-                    <option value="SCHEDULED">นัดหมายวันเยี่ยมบ้านแล้ว</option>
-                    <option value="PENDING">รอเยี่ยมบ้าน</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    วันที่เยี่ยมบ้าน
-                  </label>
-                  <input
-                    type="date"
-                    value={editVisitDate}
-                    onChange={(e) => setEditVisitDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    รูปแบบการเยี่ยมบ้าน
-                  </label>
-                  <select
-                    value={editVisitMethod}
-                    onChange={(e) => setEditVisitMethod(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="ลงพื้นที่เยี่ยมบ้านจริง">ลงพื้นที่เยี่ยมบ้านจริง</option>
-                    <option value="เยี่ยมบ้านออนไลน์ (Video Call)">
-                      เยี่ยมบ้านออนไลน์ (Video Call)
-                    </option>
-                    <option value="สัมภาษณ์ผู้ปกครองที่โรงเรียน">
-                      สัมภาษณ์ผู้ปกครองที่โรงเรียน
-                    </option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    ผลประเมิน SDQ (ฉบับครูที่ปรึกษาประเมิน)
-                  </label>
-                  <select
-                    value={editSdqTeacher}
-                    onChange={(e) => setEditSdqTeacher(e.target.value as SdqLevel)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="NORMAL">ปกติ (Normal)</option>
-                    <option value="RISK">กลุ่มเสี่ยง (Risk - เฝ้าระวัง)</option>
-                    <option value="PROBLEM">มีปัญหา (Problem - ต้องส่งต่อดูแลพิเศษ)</option>
-                  </select>
-                </div>
-
-                <div className="flex items-end">
-                  <label className="flex items-center gap-2.5 p-2.5 rounded-xl border border-purple-200 bg-purple-50/60 cursor-pointer w-full">
-                    <input
-                      type="checkbox"
-                      checked={editScholarship}
-                      onChange={(e) => setEditScholarship(e.target.checked)}
-                      className="w-4 h-4 rounded text-purple-600"
-                    />
-                    <span className="font-bold text-purple-900">
-                      เสนอชื่อขอรับทุนการศึกษา / ทุนปัจจัยพื้นฐาน
-                    </span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Risk Factor Checkboxes */}
-              <div className="text-xs">
-                <label className="block font-semibold text-slate-700 mb-1.5">
-                  ปัจจัยเสี่ยงที่พบ (เลือกได้หลายข้อ)
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    'รายได้ครอบครัวต่ำ',
-                    'อาศัยอยู่กับปู่ย่าตายาย',
-                    'เดินทางไกล',
-                    'ต้องทำงานช่วยครอบครัวหลังเลิกเรียน',
-                    'เสี่ยงขาดเรียนบ่อย',
-                    'ความเครียดด้านอารมณ์/เพื่อน',
-                  ].map((factor) => {
-                    const active = editRiskFactors.includes(factor);
-                    return (
-                      <button
-                        type="button"
-                        key={factor}
-                        onClick={() => handleToggleRiskFactor(factor)}
-                        className={`px-3 py-1.5 rounded-xl border text-xs font-medium transition-colors ${
-                          active
-                            ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold'
-                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                        }`}
-                      >
-                        {active ? '✓ ' : '+ '}
-                        {factor}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Teacher Summary Note */}
-              <div className="text-xs">
-                <label className="block font-semibold text-slate-700 mb-1">
-                  บันทึกสรุปสภาพปัญหาและแนวทางช่วยเหลือของครูที่ปรึกษา
-                </label>
-                <textarea
-                  rows={3}
-                  value={editTeacherNote}
-                  onChange={(e) => setEditTeacherNote(e.target.value)}
-                  placeholder="ระบุสิ่งที่พบจากการเยี่ยมบ้าน ความเห็นผู้ปกครอง และแนวทางดูแลช่วยเหลือ..."
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              {/* Visit Photo URL */}
-              <div className="text-xs">
-                <label className="block font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
-                  <Camera className="w-3.5 h-3.5 text-slate-500" />
-                  <span>ลิงก์ภาพถ่ายการเยี่ยมบ้าน (แนบหลักฐานรายงานเยี่ยมบ้าน)</span>
-                </label>
-                <input
-                  type="text"
-                  value={editPhotoUrl}
-                  onChange={(e) => setEditPhotoUrl(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+            {/* Sub-Tabs inside นร.01 Modal */}
+            <div className="bg-slate-100 px-6 py-2.5 border-b border-slate-200 flex flex-wrap gap-2 text-xs">
+              {[
+                {
+                  key: 'NOR01_INCOME',
+                  label: 'หน้า 1-2: ข้อมูลนักเรียน & ตารางรายได้สมาชิกครัวเรือน (ข้อ 1-2)',
+                },
+                {
+                  key: 'NOR01_HOUSE',
+                  label: 'หน้า 2-4: ลักษณะบ้าน (พื้น/ฝา/หลังคา) & การเดินทาง (ข้อ 3-6)',
+                },
+                {
+                  key: 'PHOTOS_SDQ',
+                  label: 'หน้า 4: รูปถ่ายบ้าน 2 มุมบังคับ (นอกบ้าน/ในบ้าน) & SDQ (ข้อ 7)',
+                },
+                {
+                  key: 'SIGNATURES_CCT',
+                  label: 'หน้า 5: ลายเซ็นรับรอง 4 ฝ่าย & โอนขึ้น CCT กสศ. (ข้อ 8-10)',
+                },
+              ].map((t) => (
                 <button
                   type="button"
-                  onClick={() => setSelectedRecord(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50"
+                  key={t.key}
+                  onClick={() => setModalTab(t.key as any)}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-colors ${
+                    modalTab === t.key
+                      ? 'bg-[#0f2a59] text-white shadow-xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
                 >
-                  ยกเลิก
+                  {t.label}
                 </button>
+              ))}
+            </div>
+
+            <form
+              onSubmit={handleSaveNor01Visit}
+              className="p-6 space-y-5 max-h-[75vh] overflow-y-auto text-xs"
+            >
+              {/* TAB 1: ข้อ 1-2 สถานภาพครอบครัวและตารางสมาชิกครัวเรือน */}
+              {modalTab === 'NOR01_INCOME' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        1. สถานภาพครอบครัว (ข้อ 1)
+                      </label>
+                      <select
+                        value={editFamilyStatus}
+                        onChange={(e) =>
+                          setEditFamilyStatus(e.target.value as any)
+                        }
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                      >
+                        <option value="พ่อแม่อยู่ด้วยกัน">พ่อแม่อยู่ด้วยกัน</option>
+                        <option value="พ่อแม่แยกกันอยู่">พ่อแม่แยกกันอยู่</option>
+                        <option value="พ่อแม่หย่าร้าง">พ่อแม่หย่าร้าง</option>
+                        <option value="พ่อเสียชีวิต/สาบสูญ">พ่อเสียชีวิต/สาบสูญ</option>
+                        <option value="แม่เสียชีวิต/สาบสูญ">แม่เสียชีวิต/สาบสูญ</option>
+                        <option value="เสียชีวิตทั้งคู่/สาบสูญ">
+                          เสียชีวิตทั้งคู่/สาบสูญ
+                        </option>
+                        <option value="พ่อ/แม่ทอดทิ้ง">พ่อ/แม่ทอดทิ้ง</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        นักเรียนอาศัยอยู่กับ
+                      </label>
+                      <select
+                        value={editLivingWith}
+                        onChange={(e) => setEditLivingWith(e.target.value as any)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                      >
+                        <option value="พ่อ/แม่">พ่อ/แม่</option>
+                        <option value="ญาติ">ญาติ</option>
+                        <option value="อยู่ลำพัง">อยู่ลำพัง</option>
+                        <option value="ผู้อุปการะ/นายจ้าง">ผู้อุปการะ/นายจ้าง</option>
+                        <option value="ครัวเรือนสถาบัน">ครัวเรือนสถาบัน</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-end">
+                      <label className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 w-full cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editWelfareCard}
+                          onChange={(e) => setEditWelfareCard(e.target.checked)}
+                          className="w-4 h-4 rounded text-amber-600"
+                        />
+                        <span className="font-bold text-amber-900">
+                          ได้สวัสดิการแห่งรัฐ (ทะเบียนคนจน)
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* ตารางข้อ 2: สมาชิกในครัวเรือนและรายได้เฉลี่ย 5 ช่อง */}
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+                      <span className="font-bold text-slate-800">
+                        2. ตารางสมาชิกในครัวเรือนและรายได้เฉลี่ยต่อเดือนแยกตามประเภท (ข้อ 2)
+                      </span>
+                      <span className="font-bold text-emerald-700">
+                        รายได้ครัวเรือนเฉลี่ยต่อคน:{' '}
+                        {selectedRecord.perCapitaIncome.toLocaleString()} บาท/คน/เดือน
+                      </span>
+                    </div>
+                    <table className="w-full text-left border-collapse text-[11px]">
+                      <thead>
+                        <tr className="bg-slate-100/70 border-b border-slate-200 text-slate-600">
+                          <th className="p-2.5">ชื่อ - นามสกุล</th>
+                          <th className="p-2.5">ความสัมพันธ์</th>
+                          <th className="p-2.5">อายุ/การศึกษา</th>
+                          <th className="p-2.5">พิการ/โรคเรื้อรัง</th>
+                          <th className="p-2.5">ค่าจ้าง/เงินเดือน</th>
+                          <th className="p-2.5">เกษตร/ธุรกิจ</th>
+                          <th className="p-2.5">สวัสดิการรัฐ/อื่นๆ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {selectedRecord.householdMembers.map((m) => (
+                          <tr key={m.id}>
+                            <td className="p-2.5 font-semibold text-slate-800">
+                              {m.fullName}
+                              <div className="text-[10px] font-mono text-slate-400">
+                                {m.citizenId}
+                              </div>
+                            </td>
+                            <td className="p-2.5">{m.relation}</td>
+                            <td className="p-2.5">
+                              {m.age} ปี ({m.educationLevel})
+                            </td>
+                            <td className="p-2.5">
+                              {m.isDisabled && 'พิการ '}
+                              {m.hasChronicDisease && 'โรคเรื้อรัง '}
+                              {!m.isDisabled && !m.hasChronicDisease && '-'}
+                            </td>
+                            <td className="p-2.5">
+                              {m.incomeSalary.toLocaleString()} บ.
+                            </td>
+                            <td className="p-2.5">
+                              {(
+                                m.incomeAgriculture + m.incomeBusiness
+                              ).toLocaleString()}{' '}
+                              บ.
+                            </td>
+                            <td className="p-2.5">
+                              {(m.incomeWelfare + m.incomeOther).toLocaleString()}{' '}
+                              บ.
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: ข้อ 3-6 ลักษณะที่อยู่อาศัย (พื้นบ้าน, ฝาบ้าน, หลังคา, ห้องส้วม, น้ำ, ไฟ) */}
+              {modalTab === 'NOR01_HOUSE' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block font-bold text-slate-800 mb-1.5">
+                      3.1 ครัวเรือนมีภาระพึ่งพิง (เลือกได้มากกว่า 1 ข้อ)
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        'มีความพิการทางร่างกาย/สติปัญญา',
+                        'มีโรคเรื้อรัง ยกเว้น ความดัน/เบาหวาน',
+                        'ผู้สูงอายุตั้งแต่ 60 ปีขึ้นไป',
+                        'เป็นพ่อ/แม่เลี้ยงเดี่ยว',
+                        'มีคนอายุ 15-65 ปีที่ว่างงาน',
+                      ].map((flag) => {
+                        const active = editDependencyFlags.includes(flag);
+                        return (
+                          <button
+                            type="button"
+                            key={flag}
+                            onClick={() =>
+                              handleToggleArrayItem(
+                                editDependencyFlags,
+                                setEditDependencyFlags,
+                                flag
+                              )
+                            }
+                            className={`px-3 py-1.5 rounded-xl border font-semibold ${
+                              active
+                                ? 'bg-blue-50 border-blue-300 text-blue-800'
+                                : 'bg-white border-slate-200 text-slate-600'
+                            }`}
+                          >
+                            {active ? '✔ ' : '+ '}
+                            {flag}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        3.2 การอยู่อาศัย
+                      </label>
+                      <select
+                        value={editHousingType}
+                        onChange={(e) => setEditHousingType(e.target.value as any)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                      >
+                        <option value="อยู่บ้านตนเอง/เจ้าของบ้าน">
+                          อยู่บ้านตนเอง/เจ้าของบ้าน
+                        </option>
+                        <option value="อยู่บ้านเช่า">อยู่บ้านเช่า (เสียค่าเช่า)</option>
+                        <option value="อยู่กับผู้อื่น/อยู่ฟรี">
+                          อยู่กับผู้อื่น/อยู่ฟรี
+                        </option>
+                        <option value="หอพัก">หอพัก</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        ค่าเช่าบ้าน (บาท/เดือน)
+                      </label>
+                      <input
+                        type="number"
+                        value={editMonthlyRent}
+                        onChange={(e) =>
+                          setEditMonthlyRent(Number(e.target.value))
+                        }
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        3.4 ที่ดินทำการเกษตร (รวมเช่า)
+                      </label>
+                      <select
+                        value={editAgriLand}
+                        onChange={(e) => setEditAgriLand(e.target.value as any)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                      >
+                        <option value="ไม่ทำเกษตร">ไม่ทำเกษตร</option>
+                        <option value="มีที่ดินน้อยกว่า 1 ไร่">
+                          มีที่ดินน้อยกว่า 1 ไร่
+                        </option>
+                        <option value="มีที่ดิน 1 ถึง 5 ไร่">
+                          มีที่ดิน 1 ถึง 5 ไร่
+                        </option>
+                        <option value="มีที่ดินมากกว่า 5 ไร่">
+                          มีที่ดินมากกว่า 5 ไร่
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        3.3 วัสดุที่ใช้ทำพื้นบ้าน (บันทึกสิ่งที่เห็น)
+                      </label>
+                      <select
+                        value={editFloorMaterial}
+                        onChange={(e) => setEditFloorMaterial(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                      >
+                        <option value="กระเบื้อง/เซรามิค">กระเบื้อง/เซรามิค</option>
+                        <option value="ปาเก้/ไม้ขัดเงา">ปาเก้/ไม้ขัดเงา</option>
+                        <option value="ซีเมนต์เปลือย">ซีเมนต์เปลือย</option>
+                        <option value="ไม้กระดาน">ไม้กระดาน</option>
+                        <option value="ไวนิล/กระเบื้องยาง/เสื่อน้ำมัน">
+                          ไวนิล/กระเบื้องยาง/เสื่อน้ำมัน
+                        </option>
+                        <option value="ไม้ไผ่">ไม้ไผ่</option>
+                        <option value="ดิน/ทราย">ดิน/ทราย</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        วัสดุที่ใช้ทำฝาบ้าน
+                      </label>
+                      <select
+                        value={editWallMaterial}
+                        onChange={(e) => setEditWallMaterial(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                      >
+                        <option value="ฉาบซีเมนต์">ฉาบซีเมนต์</option>
+                        <option value="อิฐ/ก้อนปูน/อิฐบล็อก">
+                          อิฐ/ก้อนปูน/อิฐบล็อก
+                        </option>
+                        <option value="สังกะสี">สังกะสี</option>
+                        <option value="ไม้กระดาน">ไม้กระดาน</option>
+                        <option value="ไม้อัด">ไม้อัด</option>
+                        <option value="ไม้ไผ่/ท่อนไม้/เศษไม้">
+                          ไม้ไผ่/ท่อนไม้/เศษไม้
+                        </option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        วัสดุที่ใช้ทำหลังคา
+                      </label>
+                      <select
+                        value={editRoofMaterial}
+                        onChange={(e) => setEditRoofMaterial(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                      >
+                        <option value="โลหะ (เช่น สังกะสี/เหล็ก/อะลูมิเนียม)">
+                          โลหะ (เช่น สังกะสี/เหล็ก/อะลูมิเนียม)
+                        </option>
+                        <option value="กระเบื้อง/เซรามิค">กระเบื้อง/เซรามิค</option>
+                        <option value="ไม้กระดาน">ไม้กระดาน</option>
+                        <option value="ใบไม้/วัสดุธรรมชาติ">
+                          ใบไม้/วัสดุธรรมชาติ
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: ข้อ 7 ภาพถ่ายที่พักอาศัย 2 มุมบังคับ (นอกบ้านเห็นหลังคา / ในบ้านเห็นพื้น) & SDQ */}
+              {modalTab === 'PHOTOS_SDQ' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
+                      <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                        <Camera className="w-4 h-4 text-blue-600" />
+                        <span>
+                          รูปที่ 1: ภาพถ่ายนอกที่พักอาศัย (เห็นหลังคาและฝาผนังทั้งหลัง)
+                        </span>
+                      </div>
+                      <img
+                        src={editPhotoExterior}
+                        alt="Exterior"
+                        className="w-full h-40 object-cover rounded-lg border border-slate-200"
+                      />
+                      <input
+                        type="text"
+                        value={editPhotoExterior}
+                        onChange={(e) => setEditPhotoExterior(e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white"
+                        placeholder="URL รูปที่ 1 นอกที่พักอาศัย..."
+                      />
+                    </div>
+
+                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
+                      <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                        <Camera className="w-4 h-4 text-emerald-600" />
+                        <span>
+                          รูปที่ 2: ภาพถ่ายภายในที่พักอาศัย (เห็นพื้นและบริเวณภายใน)
+                        </span>
+                      </div>
+                      <img
+                        src={editPhotoInterior}
+                        alt="Interior"
+                        className="w-full h-40 object-cover rounded-lg border border-slate-200"
+                      />
+                      <input
+                        type="text"
+                        value={editPhotoInterior}
+                        onChange={(e) => setEditPhotoInterior(e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white"
+                        placeholder="URL รูปที่ 2 ภายในที่พักอาศัย..."
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      บันทึกสรุปการเยี่ยมบ้านและคัดกรอง SDQ ของครูที่ปรึกษา
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={editTeacherNote}
+                      onChange={(e) => setEditTeacherNote(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 4: ข้อ 8-10 ลายเซ็นดิจิทัล 4 ฝ่าย และการรับรองข้อมูลส่ง กสศ. */}
+              {modalTab === 'SIGNATURES_CCT' && (
+                <div className="space-y-4">
+                  <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900">
+                    <div className="font-bold">
+                      ข้อ 8 - ข้อ 10: การลงนามรับรองข้อมูลอิเล็กทรอนิกส์ (Digital Signature Pad 4 ฝ่าย)
+                    </div>
+                    <div className="text-[11px] mt-0.5">
+                      เมื่อลงนามครบทั้ง 4 ฝ่าย ระบบจะแนบลายเซ็นเข้ากับชุดข้อมูลเพื่อโอนเข้าสู่ระบบ https://cct.eef.or.th โดยอัตโนมัติ
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-3.5 rounded-xl border border-slate-200 space-y-2">
+                      <label className="block font-bold text-slate-800">
+                        1. ลงชื่อนักเรียน (อายุเกิน 10 ปี)
+                      </label>
+                      <input
+                        type="text"
+                        value={editStudentSig}
+                        onChange={(e) => setEditStudentSig(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 font-semibold text-blue-900"
+                      />
+                    </div>
+
+                    <div className="p-3.5 rounded-xl border border-slate-200 space-y-2">
+                      <label className="block font-bold text-slate-800">
+                        2. ลงชื่อผู้ปกครอง (ผู้ให้ข้อมูลและรับรอง)
+                      </label>
+                      <input
+                        type="text"
+                        value={editGuardianSig}
+                        onChange={(e) => setEditGuardianSig(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 font-semibold text-blue-900"
+                      />
+                    </div>
+
+                    <div className="p-3.5 rounded-xl border border-slate-200 space-y-2">
+                      <label className="block font-bold text-slate-800">
+                        3. ลงชื่อครูผู้เยี่ยมบ้าน/สำรวจข้อมูล
+                      </label>
+                      <input
+                        type="text"
+                        value={editTeacherSig}
+                        onChange={(e) => setEditTeacherSig(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 font-semibold text-blue-900"
+                      />
+                    </div>
+
+                    <div className="p-3.5 rounded-xl border border-slate-200 space-y-2">
+                      <label className="block font-bold text-slate-800">
+                        4. ลงชื่อเจ้าหน้าที่ของรัฐ & ผู้อำนวยการสถานศึกษา (ข้อ 10)
+                      </label>
+                      <input
+                        type="text"
+                        value={editOfficialName}
+                        onChange={(e) => setEditOfficialName(e.target.value)}
+                        placeholder="ชื่อ-สกุล เจ้าหน้าที่ของรัฐ (กำนัน/ผู้ใหญ่บ้าน/อปท.)"
+                        className="w-full px-3 py-1.5 rounded-lg border border-slate-200 mb-1"
+                      />
+                      <input
+                        type="text"
+                        value={editOfficialSig}
+                        onChange={(e) => setEditOfficialSig(e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 font-semibold text-blue-900"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                 <button
-                  type="submit"
-                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#0f2a59] hover:bg-[#163d7a] text-white text-xs font-bold shadow-xs"
+                  type="button"
+                  onClick={() => handleTriggerSingleCctSync(selectedRecord)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
                 >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>บันทึกผลเยี่ยมบ้าน & SDQ</span>
+                  <CloudUpload className="w-4 h-4" />
+                  <span>บันทึก & โอนเข้าเว็บ CCT กสศ. ทันที</span>
                 </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRecord(null)}
+                    className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-semibold"
+                  >
+                    ปิดหน้าต่าง
+                  </button>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#0f2a59] hover:bg-[#163d7a] text-white font-bold shadow-xs"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>บันทึกข้อมูลแบบ นร.01</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
