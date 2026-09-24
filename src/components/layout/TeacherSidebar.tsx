@@ -21,6 +21,7 @@ import {
   HeartHandshake,
   ShieldAlert,
   Vote,
+  X,
 } from 'lucide-react';
 
 export type TeacherViewKey =
@@ -49,41 +50,62 @@ interface TeacherSidebarProps {
   currentView: TeacherViewKey;
   onNavigate: (view: TeacherViewKey) => void;
   loginChannel?: 'E_LEAVE' | 'DIRECT_CLASSROOM';
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
   currentView,
   onNavigate,
   loginChannel = 'E_LEAVE',
+  isOpen = false,
+  onClose,
 }) => {
-  return (
-    <aside className="w-64 bg-white border-r border-slate-200/80 flex flex-col shrink-0 min-h-screen text-[13px] text-slate-600 font-sans select-none">
+  const handleSelect = (view: TeacherViewKey) => {
+    onNavigate(view);
+    onClose?.();
+  };
+
+  const sidebarContent = (
+    <>
       {/* Brand & User Profile Header */}
       <div className="p-4 border-b border-slate-100">
-        <div className="flex items-center gap-3">
-          {/* School Emblem (Garuda / Golden Crest) */}
-          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-amber-50 border border-amber-200 shadow-sm shrink-0 overflow-hidden">
-            <svg viewBox="0 0 40 40" className="w-8 h-8 text-amber-600">
-              <path
-                fill="currentColor"
-                d="M20 3L23 10L30 11L25 16L27 23L20 19L13 23L15 16L10 11L17 10Z"
-              />
-              <circle cx="20" cy="20" r="14" fill="none" stroke="currentColor" strokeWidth="1.5" />
-            </svg>
-          </div>
-          <div className="min-w-0">
-            <div className="font-semibold text-slate-800 text-sm">
-              ระบบจัดการชั้นเรียน
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* School Emblem (Garuda / Golden Crest) */}
+            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-amber-50 border border-amber-200 shadow-sm shrink-0 overflow-hidden">
+              <svg viewBox="0 0 40 40" className="w-8 h-8 text-amber-600">
+                <path
+                  fill="currentColor"
+                  d="M20 3L23 10L30 11L25 16L27 23L20 19L13 23L15 16L10 11L17 10Z"
+                />
+                <circle cx="20" cy="20" r="14" fill="none" stroke="currentColor" strokeWidth="1.5" />
+              </svg>
             </div>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <div className="w-4 h-4 rounded-full bg-slate-700 text-white text-[9px] flex items-center justify-center font-bold shrink-0">
-                ภ
+            <div className="min-w-0">
+              <div className="font-semibold text-slate-800 text-sm truncate">
+                ระบบจัดการชั้นเรียน
               </div>
-              <span className="text-xs text-slate-500 truncate max-w-[140px]">
-                นายภาสภูมิ เรืองปราชญ์
-              </span>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <div className="w-4 h-4 rounded-full bg-slate-700 text-white text-[9px] flex items-center justify-center font-bold shrink-0">
+                  ภ
+                </div>
+                <span className="text-xs text-slate-500 truncate max-w-[140px]">
+                  นายภาสภูมิ เรืองปราชญ์
+                </span>
+              </div>
             </div>
           </div>
+
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
+              aria-label="ปิดเมนู"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
         {/* Active Login Channel Status & Logout/Switch Login Button */}
@@ -103,7 +125,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             )}
           </div>
           <button
-            onClick={() => onNavigate('school-login')}
+            onClick={() => handleSelect('school-login')}
             className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold transition-colors"
             title="กลับไปยังหน้า Login (สลับช่องทาง E-Leave / ระบบจัดการชั้นเรียน / นักเรียน)"
           >
@@ -118,7 +140,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
         {/* หน้าหลัก & ลิงก์กลับระบบบริหารจัดการโรงเรียน */}
         <div className="space-y-1.5">
           <button
-            onClick={() => onNavigate('home')}
+            onClick={() => handleSelect('home')}
             className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ${
               currentView === 'home'
                 ? 'bg-blue-50 text-blue-600 font-medium'
@@ -156,7 +178,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
           </div>
           <div className="space-y-0.5">
             <button
-              onClick={() => onNavigate('class-overview')}
+              onClick={() => handleSelect('class-overview')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ${
                 currentView === 'class-overview'
                   ? 'bg-blue-50 text-blue-600 font-medium'
@@ -172,7 +194,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             </button>
 
             <button
-              onClick={() => onNavigate('exams')}
+              onClick={() => handleSelect('exams')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ${
                 currentView === 'exams'
                   ? 'bg-blue-50 text-blue-600 font-medium'
@@ -184,7 +206,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             </button>
 
             <button
-              onClick={() => onNavigate('assignments')}
+              onClick={() => handleSelect('assignments')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ${
                 currentView === 'assignments'
                   ? 'bg-blue-50 text-blue-600 font-medium'
@@ -196,7 +218,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             </button>
 
             <button
-              onClick={() => onNavigate('readiness')}
+              onClick={() => handleSelect('readiness')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ${
                 currentView === 'readiness'
                   ? 'bg-blue-50 text-blue-600 font-medium'
@@ -208,7 +230,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             </button>
 
             <button
-              onClick={() => onNavigate('sar')}
+              onClick={() => handleSelect('sar')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ${
                 currentView === 'sar'
                   ? 'bg-blue-50 text-blue-600 font-medium'
@@ -224,7 +246,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             </button>
 
             <button
-              onClick={() => onNavigate('home-visit')}
+              onClick={() => handleSelect('home-visit')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors ${
                 currentView === 'home-visit'
                   ? 'bg-blue-50 text-blue-600 font-semibold'
@@ -245,7 +267,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             </button>
 
             <button
-              onClick={() => onNavigate('student-affairs')}
+              onClick={() => handleSelect('student-affairs')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors ${
                 currentView === 'student-affairs'
                   ? 'bg-blue-50 text-blue-600 font-semibold'
@@ -265,7 +287,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             </button>
 
             <button
-              onClick={() => onNavigate('student-council')}
+              onClick={() => handleSelect('student-council')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors ${
                 currentView === 'student-council'
                   ? 'bg-blue-50 text-blue-600 font-semibold'
@@ -296,7 +318,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
           </div>
           <div className="space-y-0.5">
             <button
-              onClick={() => onNavigate('courses')}
+              onClick={() => handleSelect('courses')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ${
                 currentView === 'courses'
                   ? 'bg-blue-50 text-blue-600 font-medium'
@@ -308,7 +330,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             </button>
 
             <button
-              onClick={() => onNavigate('lessons')}
+              onClick={() => handleSelect('lessons')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ${
                 currentView === 'lessons'
                   ? 'bg-blue-50 text-blue-600 font-medium'
@@ -320,7 +342,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             </button>
 
             <button
-              onClick={() => onNavigate('roster')}
+              onClick={() => handleSelect('roster')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ${
                 currentView === 'roster' || currentView === 'student'
                   ? 'bg-blue-50 text-blue-600 font-medium'
@@ -336,7 +358,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             </button>
 
             <button
-              onClick={() => onNavigate('timetable')}
+              onClick={() => handleSelect('timetable')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ${
                 currentView === 'timetable'
                   ? 'bg-blue-50 text-blue-600 font-medium'
@@ -348,7 +370,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             </button>
 
             <button
-              onClick={() => onNavigate('academic-year')}
+              onClick={() => handleSelect('academic-year')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ${
                 currentView === 'academic-year'
                   ? 'bg-blue-50 text-blue-600 font-medium'
@@ -368,7 +390,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
           </div>
           <div className="space-y-0.5">
             <button
-              onClick={() => onNavigate('settings')}
+              onClick={() => handleSelect('settings')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ${
                 currentView === 'settings'
                   ? 'bg-blue-50 text-blue-600 font-medium'
@@ -380,7 +402,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             </button>
 
             <button
-              onClick={() => onNavigate('trash')}
+              onClick={() => handleSelect('trash')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ${
                 currentView === 'trash'
                   ? 'bg-blue-50 text-blue-600 font-medium'
@@ -393,7 +415,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
 
             {/* Portal Link to Student View */}
             <button
-              onClick={() => onNavigate('student-portal')}
+              onClick={() => handleSelect('student-portal')}
               className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left text-emerald-700 bg-emerald-50/70 hover:bg-emerald-100/70 transition-colors font-medium border border-emerald-200/50"
               title="สลับมุมมองไปยังพอร์ทัลนักเรียน ห้องเรียนผจญภัย"
             >
@@ -402,7 +424,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             </button>
 
             <button
-              onClick={() => onNavigate('accounts')}
+              onClick={() => handleSelect('accounts')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ${
                 currentView === 'accounts'
                   ? 'bg-blue-50 text-blue-600 font-medium'
@@ -415,6 +437,28 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
           </div>
         </div>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Desktop Permanent Sidebar */}
+      <aside className="hidden lg:flex w-64 bg-white border-r border-slate-200/80 flex-col shrink-0 min-h-screen text-[13px] text-slate-600 font-sans select-none">
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile Drawer Overlay */}
+      {isOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden flex">
+          <div
+            className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
+            onClick={onClose}
+          />
+          <aside className="relative z-10 w-72 max-w-[85vw] bg-white h-full shadow-2xl flex flex-col text-[13px] text-slate-600 font-sans select-none animate-in slide-in-from-left duration-200">
+            {sidebarContent}
+          </aside>
+        </div>
+      )}
+    </>
   );
 };

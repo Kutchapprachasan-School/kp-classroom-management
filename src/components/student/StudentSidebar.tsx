@@ -8,6 +8,7 @@ import {
   LogOut,
   MapPin,
   Vote,
+  X,
 } from 'lucide-react';
 
 export type StudentTabKey =
@@ -23,26 +24,47 @@ interface StudentSidebarProps {
   activeTab: StudentTabKey;
   onSelectTab: (tab: StudentTabKey) => void;
   onLogout: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 export const StudentSidebar: React.FC<StudentSidebarProps> = ({
   activeTab,
   onSelectTab,
   onLogout,
+  isOpen = false,
+  onClose,
 }) => {
-  return (
-    <aside className="w-60 bg-white border-r border-slate-200/80 flex flex-col shrink-0 min-h-screen text-[13px] text-slate-600 font-sans select-none">
+  const handleTabClick = (tab: StudentTabKey) => {
+    onSelectTab(tab);
+    onClose?.();
+  };
+
+  const sidebarContent = (
+    <>
       {/* Brand */}
-      <div className="p-4 border-b border-slate-100 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-blue-700 text-white font-bold flex items-center justify-center text-sm shadow-sm">
-          C
-        </div>
-        <div>
-          <div className="font-semibold text-slate-800 text-xs">
-            Classroom Manager
+      <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 rounded-full bg-blue-700 text-white font-bold flex items-center justify-center text-sm shadow-sm shrink-0">
+            C
           </div>
-          <div className="text-[11px] text-slate-400">ห้องเรียนผจญภัย</div>
+          <div className="min-w-0">
+            <div className="font-semibold text-slate-800 text-xs truncate">
+              Classroom Manager
+            </div>
+            <div className="text-[11px] text-slate-400 truncate">ห้องเรียนผจญภัย</div>
+          </div>
         </div>
+
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
+            aria-label="ปิดเมนู"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {/* Nav List */}
@@ -53,7 +75,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
           </div>
           <div className="space-y-1">
             <button
-              onClick={() => onSelectTab('home')}
+              onClick={() => handleTabClick('home')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ${
                 activeTab === 'home'
                   ? 'bg-blue-50 text-blue-700 font-medium'
@@ -65,7 +87,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
             </button>
 
             <button
-              onClick={() => onSelectTab('missions')}
+              onClick={() => handleTabClick('missions')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ${
                 activeTab === 'missions'
                   ? 'bg-blue-50 text-blue-700 font-medium'
@@ -77,7 +99,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
             </button>
 
             <button
-              onClick={() => onSelectTab('arena')}
+              onClick={() => handleTabClick('arena')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ${
                 activeTab === 'arena'
                   ? 'bg-blue-50 text-blue-700 font-medium'
@@ -89,7 +111,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
             </button>
 
             <button
-              onClick={() => onSelectTab('gradebook')}
+              onClick={() => handleTabClick('gradebook')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ${
                 activeTab === 'gradebook'
                   ? 'bg-blue-50 text-blue-700 font-medium'
@@ -101,7 +123,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
             </button>
 
             <button
-              onClick={() => onSelectTab('trophy')}
+              onClick={() => handleTabClick('trophy')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ${
                 activeTab === 'trophy'
                   ? 'bg-blue-50 text-blue-700 font-medium'
@@ -113,7 +135,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
             </button>
 
             <button
-              onClick={() => onSelectTab('home-visit')}
+              onClick={() => handleTabClick('home-visit')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors ${
                 activeTab === 'home-visit'
                   ? 'bg-blue-50 text-blue-700 font-semibold border border-blue-200'
@@ -130,7 +152,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
             </button>
 
             <button
-              onClick={() => onSelectTab('council-affairs')}
+              onClick={() => handleTabClick('council-affairs')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors ${
                 activeTab === 'council-affairs'
                   ? 'bg-blue-50 text-blue-700 font-semibold border border-blue-200'
@@ -158,13 +180,36 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
           <div className="text-[11px] text-slate-400">ม.3/8 · เลขที่ 1</div>
         </div>
         <button
-          onClick={onLogout}
+          onClick={() => {
+            onLogout();
+            onClose?.();
+          }}
           className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-600 hover:bg-white hover:text-slate-900 transition-colors"
         >
           <LogOut className="w-3.5 h-3.5" />
           <span>ออกจากระบบ</span>
         </button>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      <aside className="hidden lg:flex w-60 bg-white border-r border-slate-200/80 flex-col shrink-0 min-h-screen text-[13px] text-slate-600 font-sans select-none">
+        {sidebarContent}
+      </aside>
+
+      {isOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden flex">
+          <div
+            className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
+            onClick={onClose}
+          />
+          <aside className="relative z-10 w-64 max-w-[85vw] bg-white h-full shadow-2xl flex flex-col text-[13px] text-slate-600 font-sans select-none animate-in slide-in-from-left duration-200">
+            {sidebarContent}
+          </aside>
+        </div>
+      )}
+    </>
   );
 };

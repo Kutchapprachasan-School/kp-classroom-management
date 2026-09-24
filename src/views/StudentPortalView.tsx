@@ -24,6 +24,7 @@ interface StudentPortalViewProps {
 export const StudentPortalView: React.FC<StudentPortalViewProps> = ({ onExit }) => {
   const [activeTab, setActiveTab] = useState<StudentTabKey>('home');
   const [currentXp, setCurrentXp] = useState(650);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     gamificationService.claimDailyCheckin('stu-2').then((res) => {
@@ -49,13 +50,19 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({ onExit }) 
         activeTab={activeTab}
         onSelectTab={(tab) => setActiveTab(tab)}
         onLogout={onExit}
+        isOpen={isMobileSidebarOpen}
+        onClose={() => setIsMobileSidebarOpen(false)}
       />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        <StudentHeader onExit={onExit} totalXp={currentXp} />
+        <StudentHeader
+          onExit={onExit}
+          totalXp={currentXp}
+          onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
+        />
 
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+        <main className="flex-1 p-3.5 sm:p-6 md:p-8 overflow-y-auto overflow-x-hidden">
           {activeTab === 'home' && (
             <div className="max-w-7xl mx-auto space-y-6">
               {/* Greeting Header & Quick Callouts */}

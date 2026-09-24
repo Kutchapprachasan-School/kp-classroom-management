@@ -36,12 +36,16 @@ import {
   HeartHandshake,
   ShieldAlert,
   Vote,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<TeacherViewKey>('school-login');
   const [loginChannel, setLoginChannel] = useState<TeacherLoginChannel>('E_LEAVE');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isQuickBarOpen, setIsQuickBarOpen] = useState(false);
 
   const getHeaderTitle = () => {
     switch (currentView) {
@@ -97,19 +101,54 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans">
-      {/* Prototype Quick-Switcher Bar (Floating Preview Bar) */}
-      <div className="bg-slate-900 text-white px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2 shadow-md z-40 select-none">
-        <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1.5 font-semibold text-amber-400">
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans overflow-x-hidden">
+      {/* Prototype Quick-Switcher Bar (Collapsible on Mobile so it doesn't clutter the screen) */}
+      <div className="bg-slate-900 text-white px-3 sm:px-4 py-1.5 text-xs shadow-md z-40 select-none">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            onClick={() => setIsQuickBarOpen((prev) => !prev)}
+            className="flex items-center gap-1.5 font-semibold text-amber-400 hover:text-amber-300 transition-colors py-0.5"
+          >
             <Eye className="w-3.5 h-3.5" />
-            <span>สลับดูหน้าจอ:</span>
-          </span>
+            <span>สลับดูหน้าจอ (Prototype):</span>
+            <span className="lg:hidden inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">
+              {isQuickBarOpen ? 'ซ่อนเมนู' : 'แตะเพื่อเปิด'}
+              {isQuickBarOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </span>
+          </button>
+
+          <div className="flex items-center gap-1.5 lg:hidden">
+            <button
+              onClick={() => setCurrentView('school-login')}
+              className="px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-bold"
+            >
+              หน้า Login
+            </button>
+            <button
+              onClick={() => setCurrentView('home')}
+              className="px-2 py-0.5 rounded bg-blue-600 text-white text-[10px] font-bold"
+            >
+              หน้าครู
+            </button>
+            <button
+              onClick={() => setCurrentView('student-portal')}
+              className="px-2 py-0.5 rounded bg-amber-500 text-slate-950 text-[10px] font-bold"
+            >
+              หน้านักเรียน
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div
+          className={`${
+            isQuickBarOpen ? 'flex mt-2 pt-2 border-t border-slate-800' : 'hidden lg:flex mt-1'
+          } items-center gap-1.5 flex-wrap`}
+        >
           <button
-            onClick={() => setCurrentView('school-login')}
+            onClick={() => {
+              setCurrentView('school-login');
+              setIsQuickBarOpen(false);
+            }}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${
               currentView === 'school-login'
                 ? 'bg-amber-500 text-slate-950 shadow-xs'
@@ -121,7 +160,10 @@ export const App: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setCurrentView('home')}
+            onClick={() => {
+              setCurrentView('home');
+              setIsQuickBarOpen(false);
+            }}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
               currentView === 'home'
                 ? 'bg-blue-600 text-white shadow-xs'
@@ -133,7 +175,10 @@ export const App: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setCurrentView('class-overview')}
+            onClick={() => {
+              setCurrentView('class-overview');
+              setIsQuickBarOpen(false);
+            }}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
               currentView === 'class-overview'
                 ? 'bg-blue-600 text-white shadow-xs'
@@ -145,7 +190,10 @@ export const App: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setCurrentView('home-visit')}
+            onClick={() => {
+              setCurrentView('home-visit');
+              setIsQuickBarOpen(false);
+            }}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${
               currentView === 'home-visit'
                 ? 'bg-rose-600 text-white shadow-xs'
@@ -157,7 +205,10 @@ export const App: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setCurrentView('student-affairs')}
+            onClick={() => {
+              setCurrentView('student-affairs');
+              setIsQuickBarOpen(false);
+            }}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${
               currentView === 'student-affairs'
                 ? 'bg-amber-500 text-slate-950 shadow-xs'
@@ -169,7 +220,10 @@ export const App: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setCurrentView('student-council')}
+            onClick={() => {
+              setCurrentView('student-council');
+              setIsQuickBarOpen(false);
+            }}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${
               currentView === 'student-council'
                 ? 'bg-indigo-600 text-white shadow-xs'
@@ -181,7 +235,10 @@ export const App: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setCurrentView('readiness')}
+            onClick={() => {
+              setCurrentView('readiness');
+              setIsQuickBarOpen(false);
+            }}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
               currentView === 'readiness'
                 ? 'bg-blue-600 text-white shadow-xs'
@@ -193,7 +250,10 @@ export const App: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setCurrentView('student')}
+            onClick={() => {
+              setCurrentView('student');
+              setIsQuickBarOpen(false);
+            }}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
               currentView === 'student'
                 ? 'bg-blue-600 text-white shadow-xs'
@@ -205,7 +265,10 @@ export const App: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setCurrentView('sar')}
+            onClick={() => {
+              setCurrentView('sar');
+              setIsQuickBarOpen(false);
+            }}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
               currentView === 'sar'
                 ? 'bg-blue-600 text-white shadow-xs'
@@ -217,7 +280,10 @@ export const App: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setCurrentView('timetable')}
+            onClick={() => {
+              setCurrentView('timetable');
+              setIsQuickBarOpen(false);
+            }}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
               currentView === 'timetable'
                 ? 'bg-blue-600 text-white shadow-xs'
@@ -229,7 +295,10 @@ export const App: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setCurrentView('exams')}
+            onClick={() => {
+              setCurrentView('exams');
+              setIsQuickBarOpen(false);
+            }}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
               currentView === 'exams'
                 ? 'bg-blue-600 text-white shadow-xs'
@@ -241,7 +310,10 @@ export const App: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setCurrentView('student-portal')}
+            onClick={() => {
+              setCurrentView('student-portal');
+              setIsQuickBarOpen(false);
+            }}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
               currentView === 'student-portal'
                 ? 'bg-emerald-600 text-white shadow-xs'
@@ -270,11 +342,13 @@ export const App: React.FC = () => {
       ) : (
         /* Teacher Mode Layout */
         <div className="flex flex-1 min-h-0">
-          {/* Left Teacher Navigation Sidebar */}
+          {/* Left Teacher Navigation Sidebar (Desktop permanent + Mobile slide-over drawer) */}
           <TeacherSidebar
             currentView={currentView}
             loginChannel={loginChannel}
             onNavigate={(view) => setCurrentView(view)}
+            isOpen={isMobileSidebarOpen}
+            onClose={() => setIsMobileSidebarOpen(false)}
           />
 
           {/* Right Main Working Area */}
@@ -284,11 +358,12 @@ export const App: React.FC = () => {
               title={getHeaderTitle()}
               onBack={currentView !== 'home' ? handleBack : undefined}
               onOpenSearch={() => setIsSearchOpen(true)}
+              onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
               termLabel="ภาคเรียนที่ 1/2569"
             />
 
             {/* Dynamic View Body */}
-            <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+            <main className="flex-1 p-3.5 sm:p-6 md:p-8 overflow-y-auto overflow-x-hidden">
               {currentView === 'home' && (
                 <TeacherGlobalDashboardView
                   onNavigateToClass={() => setCurrentView('class-overview')}
