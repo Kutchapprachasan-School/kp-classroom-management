@@ -3,9 +3,27 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* 60-30-10 Color Rule Tokens */
+    --surface-60-canvas: #f8fafc;
+    --surface-60-card: #ffffff;
+    --structure-30-ink: #0f172a;
+    --structure-30-muted: #475569;
+    --accent-10-primary: #0d9488;
+  }
+
   body {
-    @apply bg-[#F8FAFC] text-slate-700 min-h-screen font-sans;
+    @apply bg-[#F8FAFC] text-slate-700 min-h-screen font-sans antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  ::selection {
+    background-color: #ccfbf1;
+    color: #0f172a;
+  }
+
+  table {
+    font-variant-numeric: tabular-nums;
   }
 }
 

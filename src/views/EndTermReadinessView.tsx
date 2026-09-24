@@ -4,7 +4,6 @@ import {
   FileText,
   PenTool,
   Compass,
-  ArrowRight,
   X,
   FileSpreadsheet,
 } from 'lucide-react';
@@ -108,190 +107,251 @@ export const EndTermReadinessView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in font-sans text-slate-800 select-none">
-      {/* 1. Header Status Title */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-1.5">
-        <div className="flex items-center gap-2">
-          <CheckCircle2 className="w-5 h-5 text-slate-600" />
-          <h1 className="text-base sm:text-lg font-bold text-slate-800">
-            ความพร้อมก่อนปิดภาคเรียน 1/2569{' '}
-            <span className="font-normal text-slate-500 text-sm">
-              (พร้อมส่ง {totalEmptyScores === 0 ? '1' : '0'} จาก 9 ชั้นเรียน)
-            </span>
+    <div className="space-y-6 max-w-7xl mx-auto pb-12 font-sans text-slate-800 select-none">
+      {/* 1. Clean Header Bar */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-lg sm:text-xl font-bold text-slate-900">
+            ตรวจสอบความพร้อมก่อนส่งเกรดปลายภาคเรียน 1/2569
           </h1>
+          <p className="text-xs text-slate-500 mt-1">
+            รายวิชา ศ20221 ดนตรีปฏิบัติตามความถนัด 1 — ชั้น ม.1/8 (นักเรียน 27 คน)
+          </p>
         </div>
-        <p className="text-xs text-slate-500">
-          ห้องที่ยังไม่ครบจะกางรายการที่ต้องทำออกมาให้ — กดปุ่มในแต่ละข้อเพื่อไปแก้ที่หน้าจอนั้นได้ทันที
-        </p>
+
+        <button
+          onClick={() => setIsOverviewModalOpen(true)}
+          className="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition-colors self-start sm:self-auto"
+        >
+          <FileSpreadsheet className="w-4 h-4 text-teal-600" />
+          <span>ดูตารางสรุปคะแนนทั้งห้อง</span>
+        </button>
       </div>
 
-      {/* 2. Classroom Accordion Card: ศ20221 ดนตรีปฏิบัติตามความถนัด 1 — ม.1/8 */}
-      <div className="space-y-4">
-        {/* Class Header & Status Pills */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs">
-          <h2 className="text-sm sm:text-base font-bold text-slate-800">
-            ศ20221 ดนตรีปฏิบัติตามความถนัด 1 — ม.1/8
-          </h2>
-          <span className={`px-2 py-0.5 font-bold rounded-md text-[11px] ${
-            totalEmptyScores === 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-          }`}>
-            {totalEmptyScores === 0 ? '5/5 ข้อ' : '2/5 ข้อ'}
-          </span>
-          <span className="text-slate-500">27 คน</span>
-
-          <div className="flex flex-wrap items-center gap-1.5 ml-auto">
-            <span className={`px-2 py-0.5 border rounded-md text-[11px] font-medium flex items-center gap-1 ${
-              totalEmptyScores > 0
-                ? 'bg-[#fef2f2] text-rose-700 border-rose-200'
-                : 'bg-[#e8f8f0] text-emerald-800 border-emerald-200'
-            }`}>
-              <span>{totalEmptyScores > 0 ? '⊗' : '✓'}</span> คะแนนยังว่าง {totalEmptyScores} ช่อง
+      {/* 2. Rule of Thirds (กฎสามส่วน): 3 Balanced Summary Zones */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-xs font-medium text-slate-500">
+              เกณฑ์ความพร้อมของรายวิชา
             </span>
-            <span className="px-2 py-0.5 bg-[#fef2f2] text-rose-700 border border-rose-200 rounded-md text-[11px] font-medium flex items-center gap-1">
-              <span>⊗</span> คุณลักษณะฯ/อ่านคิดฯ 0/27
-            </span>
-            <span className="px-2 py-0.5 bg-[#fef2f2] text-rose-700 border border-rose-200 rounded-md text-[11px] font-medium flex items-center gap-1">
-              <span>⊗</span> เวลาเรียนไม่พอ 3 คน
-            </span>
-            <span className="px-2 py-0.5 bg-[#e8f8f0] text-emerald-800 border border-emerald-200 rounded-md text-[11px] font-medium flex items-center gap-1">
-              <span>✓</span> คะแนนเต็ม 100
-            </span>
-            <span className="px-2 py-0.5 bg-[#e8f8f0] text-emerald-800 border border-emerald-200 rounded-md text-[11px] font-medium flex items-center gap-1">
-              <span>✓</span> ผูกหน่วยครบ
-            </span>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-slate-900 tabular-nums">
+                {totalEmptyScores === 0 ? '5/5' : '3/5'}
+              </span>
+              <span className="text-xs font-medium text-slate-500">
+                เงื่อนไขผ่านเกณฑ์
+              </span>
+            </div>
           </div>
+          <span
+            className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
+              totalEmptyScores === 0
+                ? 'bg-teal-50 text-teal-700 border-teal-200'
+                : 'bg-amber-50 text-amber-800 border-amber-200'
+            }`}
+          >
+            {totalEmptyScores === 0 ? 'พร้อมส่ง SGS' : 'รอกรอกข้อมูล'}
+          </span>
         </div>
 
-        {/* Subcard 1: คะแนนยังว่าง 17 ช่อง */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 border-l-[5px] border-l-amber-500 p-6 shadow-sm space-y-4">
-          <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-slate-600" />
-            <h3 className="font-bold text-slate-800 text-sm">
-              {totalEmptyScores > 0 ? `คะแนนยังว่าง ${totalEmptyScores} ช่อง` : 'คะแนนครบถ้วนแล้วทุกช่อง'}
-            </h3>
-          </div>
-
-          <div className="divide-y divide-slate-100">
-            {tasks.map((task) => (
-              <div
-                key={task.id}
-                className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-xs font-medium text-slate-500">
+              ช่องคะแนนงาน/สอบที่ยังว่าง
+            </span>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span
+                className={`text-2xl font-bold tabular-nums ${
+                  totalEmptyScores === 0 ? 'text-teal-700' : 'text-slate-900'
+                }`}
               >
-                <div className="flex items-center gap-2">
-                  {task.type === 'pencil' ? (
-                    <PenTool className="w-4 h-4 text-slate-400" />
-                  ) : (
-                    <div className="w-3.5 h-3.5 border border-slate-400 rounded-sm" />
-                  )}
-                  <span className="font-medium text-slate-700">{task.title}</span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {task.emptyCount > 0 ? (
-                    <span className="px-2.5 py-0.5 bg-[#fef7e6] text-[#8a6100] border border-[#f5e6be] rounded-md text-[11px] font-medium">
-                      ว่าง {task.emptyCount} ช่อง
-                    </span>
-                  ) : (
-                    <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-[11px] font-medium">
-                      ครบถ้วน
-                    </span>
-                  )}
-
-                  {task.emptyCount > 0 && (
-                    <button
-                      onClick={() => setGradingTask(task)}
-                      className="px-3 py-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors"
-                    >
-                      <span>กรอกคะแนน</span>
-                      <ArrowRight className="w-3 h-3 text-slate-400" />
-                    </button>
-                  )}
-
-                  {task.hasCloseBtn && task.emptyCount > 0 && (
-                    <button
-                      onClick={() => handleCloseTask(task.id, task.title)}
-                      className="px-3 py-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold transition-colors"
-                    >
-                      ปิดรับงาน
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+                {totalEmptyScores}
+              </span>
+              <span className="text-xs font-medium text-slate-500">
+                ช่องคะแนน (จาก {tasks.length} ชิ้นงาน)
+              </span>
+            </div>
           </div>
+          <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
+            คะแนนเต็ม 100
+          </span>
+        </div>
 
-          {/* Educational Note */}
-          <p className="text-[11px] text-slate-500 leading-relaxed pt-2 border-t border-slate-100">
-            ช่องว่างจะถูกคิดเป็น 0 ตอนสรุปคะแนน — ถ้าเด็กไม่ส่งจริง ให้กด{' '}
-            <span className="font-semibold text-slate-700">ปิดรับงาน</span>{' '}
-            เพื่อบันทึกเป็น “ไม่ส่ง” ทั้งห้องในครั้งเดียว จะได้แยกออกจาก
-            “ครูยังไม่ตรวจ” และทำให้เกรดคาดการณ์เชื่อถือได้
-          </p>
-
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-xs font-medium text-slate-500">
+              ประเมินคุณลักษณะฯ & อ่านคิดวิเคราะห์
+            </span>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-teal-700 tabular-nums">
+                {studentsList.filter((s) => s.score !== '').length}/{studentsList.length}
+              </span>
+              <span className="text-xs font-medium text-slate-500">
+                คนที่ประเมินแล้ว
+              </span>
+            </div>
+          </div>
           <button
-            onClick={() => setIsOverviewModalOpen(true)}
-            className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5"
+            onClick={handleAutoFillTraits}
+            className="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold transition-colors"
           >
-            <span>ดูภาพรวมคะแนนของห้องนี้</span>
-            <ArrowRight className="w-3 h-3 text-slate-400" />
+            ให้ระดับ 3 ทั้งห้อง
           </button>
         </div>
+      </div>
 
-        {/* Subcard 2: คุณลักษณะฯ / อ่านคิดวิเคราะห์ฯ ยังไม่ครบ 27 คน */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 border-l-[5px] border-l-amber-500 p-6 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* 3. Two Structured Data Tables (Left 7 Cols: ช่องคะแนนว่าง | Right 5 Cols: ประเมินคุณลักษณะฯ) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Table 1: ตารางรายการชิ้นงานที่ยังมีช่องคะแนนว่าง */}
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Compass className="w-4 h-4 text-slate-600" />
-              <h3 className="font-bold text-slate-800 text-sm">
-                คุณลักษณะฯ / อ่านคิดวิเคราะห์ฯ ยังไม่ครบ 27 คน
-              </h3>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs">
-              <button
-                onClick={handleAutoFillTraits}
-                className="px-3 py-1.5 border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-700 font-semibold"
-              >
-                + ให้ระดับ 3 (ดีเยี่ยม) ทั้งหมด
-              </button>
-              <button
-                onClick={handleSaveTraits}
-                className="px-3.5 py-1.5 bg-[#0f2a59] text-white rounded-xl font-bold shadow-xs hover:bg-[#164282]"
-              >
-                บันทึกการประเมิน
-              </button>
+              <FileText className="w-4 h-4 text-teal-600" />
+              <div>
+                <h2 className="font-bold text-slate-900 text-sm">
+                  ตารางตรวจสอบช่องคะแนนรายชิ้นงาน
+                </h2>
+                <p className="text-[11px] text-slate-500">
+                  หากนักเรียนไม่ส่งงานจริง สามารถกด “ปิดรับงาน” เพื่อบันทึกเป็น 0 ครั้งเดียวทั้งห้อง
+                </p>
+              </div>
             </div>
           </div>
 
-          <div className="space-y-2.5">
-            {studentsList.map((stu, idx) => (
-              <div
-                key={stu.no}
-                className="flex items-center justify-between gap-4 text-xs p-2 rounded-xl hover:bg-slate-50"
-              >
-                <span className="w-48 font-medium text-slate-700 truncate">
-                  {stu.no}. {stu.name}
-                </span>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-semibold">
+                  <th className="py-3 px-4">ชื่อชิ้นงาน / การสอบ</th>
+                  <th className="py-3 px-4">ประเภท</th>
+                  <th className="py-3 px-4 text-right">ช่องที่ยังว่าง</th>
+                  <th className="py-3 px-4 text-right">การดำเนินการ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {tasks.map((task) => (
+                  <tr key={task.id} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="py-3.5 px-4 font-bold text-slate-900">
+                      {task.title}
+                    </td>
+                    <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1.5">
+                        {task.type === 'pencil' ? (
+                          <PenTool className="w-3.5 h-3.5 text-slate-400" />
+                        ) : (
+                          <FileText className="w-3.5 h-3.5 text-slate-400" />
+                        )}
+                        <span>{task.type === 'pencil' ? 'สอบปฏิบัติ' : 'ชิ้นงาน/การบ้าน'}</span>
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-right whitespace-nowrap tabular-nums">
+                      {task.emptyCount > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 text-amber-700 font-bold">
+                          <span className="w-2 h-2 rounded-full bg-amber-500" />
+                          <span>ว่าง {task.emptyCount} ช่อง</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-teal-700 font-semibold">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> ครบถ้วน
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                      {task.emptyCount > 0 ? (
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            onClick={() => setGradingTask(task)}
+                            className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold transition-colors"
+                          >
+                            กรอกคะแนน
+                          </button>
+                          {task.hasCloseBtn && (
+                            <button
+                              onClick={() => handleCloseTask(task.id, task.title)}
+                              className="px-2.5 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-medium transition-colors"
+                            >
+                              ปิดรับงาน
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 text-[11px]">เรียบร้อย</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-                <div className="flex items-center gap-2 flex-1 max-w-sm">
-                  <input
-                    type="text"
-                    placeholder="กรอกผลการประเมิน หรือระดับ 0-3..."
-                    value={stu.score}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setStudentsList((prev) =>
-                        prev.map((s, i) => (i === idx ? { ...s, score: val } : s))
-                      );
-                    }}
-                    className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-blue-500 font-bold"
-                  />
-                  <span className="text-[11px] text-slate-400">
-                    {stu.score === '3' ? 'ดีเยี่ยม' : stu.score === '2' ? 'ดี' : stu.score === '1' ? 'ผ่าน' : '-'}
-                  </span>
-                </div>
-              </div>
-            ))}
+        {/* Table 2: ตารางประเมินคุณลักษณะอันพึงประสงค์ & อ่านคิดวิเคราะห์ */}
+        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Compass className="w-4 h-4 text-teal-600" />
+              <h2 className="font-bold text-slate-900 text-sm">
+                ตารางประเมินคุณลักษณะฯ (0–3)
+              </h2>
+            </div>
+
+            <button
+              onClick={handleSaveTraits}
+              className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition-colors"
+            >
+              บันทึกผล
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-semibold">
+                  <th className="py-3 px-4">เลขที่</th>
+                  <th className="py-3 px-4">ชื่อ - นามสกุล</th>
+                  <th className="py-3 px-4 text-center">ระดับ (0–3)</th>
+                  <th className="py-3 px-4 text-right">แปลผล</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {studentsList.map((stu, idx) => (
+                  <tr key={stu.no} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="py-3 px-4 font-mono text-slate-500 tabular-nums">
+                      {stu.no}
+                    </td>
+                    <td className="py-3 px-4 font-bold text-slate-900">
+                      {stu.name}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <input
+                        type="text"
+                        placeholder="0-3"
+                        value={stu.score}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setStudentsList((prev) =>
+                            prev.map((s, i) => (i === idx ? { ...s, score: val } : s))
+                          );
+                        }}
+                        className="w-14 px-2 py-1 text-center bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-teal-600 font-bold tabular-nums"
+                      />
+                    </td>
+                    <td className="py-3 px-4 text-right whitespace-nowrap">
+                      {stu.score === '3' ? (
+                        <span className="text-teal-700 font-semibold">ดีเยี่ยม</span>
+                      ) : stu.score === '2' ? (
+                        <span className="text-slate-700 font-medium">ดี</span>
+                      ) : stu.score === '1' ? (
+                        <span className="text-amber-700 font-medium">ผ่าน</span>
+                      ) : (
+                        <span className="text-slate-400">รอประเมิน</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

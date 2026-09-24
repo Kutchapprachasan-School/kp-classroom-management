@@ -102,228 +102,95 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans overflow-x-hidden">
-      {/* Prototype Quick-Switcher Bar (Collapsible on Mobile so it doesn't clutter the screen) */}
-      <div className="bg-slate-900 text-white px-3 sm:px-4 py-1.5 text-xs shadow-md z-40 select-none">
-        <div className="flex items-center justify-between gap-2">
-          <button
-            onClick={() => setIsQuickBarOpen((prev) => !prev)}
-            className="flex items-center gap-1.5 font-semibold text-amber-400 hover:text-amber-300 transition-colors py-0.5"
-          >
-            <Eye className="w-3.5 h-3.5" />
-            <span>สลับดูหน้าจอ (Prototype):</span>
-            <span className="lg:hidden inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">
-              {isQuickBarOpen ? 'ซ่อนเมนู' : 'แตะเพื่อเปิด'}
-              {isQuickBarOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            </span>
-          </button>
+      {/* Quiet Prototype Switcher Bar (Collapsed by default on all screens to preserve Visual Hierarchy & 60-30-10 rule) */}
+      <div className="bg-slate-900 text-slate-200 px-3.5 sm:px-6 py-1.5 text-xs border-b border-slate-800 z-40 select-none">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsQuickBarOpen((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 font-medium text-slate-300 hover:text-white transition-colors py-0.5"
+            >
+              <Eye className="w-3.5 h-3.5 text-teal-400" />
+              <span>ทางลัดสลับหน้าจอ</span>
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300 border border-slate-700">
+                {isQuickBarOpen ? 'ซ่อนรายการ' : '12 หน้าจอ'}
+                {isQuickBarOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </span>
+            </button>
+          </div>
 
-          <div className="flex items-center gap-1.5 lg:hidden">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => setCurrentView('school-login')}
-              className="px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-bold"
+              className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                currentView === 'school-login'
+                  ? 'bg-teal-600 text-white'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
             >
               หน้า Login
             </button>
             <button
               onClick={() => setCurrentView('home')}
-              className="px-2 py-0.5 rounded bg-blue-600 text-white text-[10px] font-bold"
+              className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                currentView !== 'school-login' && currentView !== 'student-portal'
+                  ? 'bg-teal-600 text-white'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
             >
-              หน้าครู
+              โหมดครูผู้สอน
             </button>
             <button
               onClick={() => setCurrentView('student-portal')}
-              className="px-2 py-0.5 rounded bg-amber-500 text-slate-950 text-[10px] font-bold"
+              className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                currentView === 'student-portal'
+                  ? 'bg-teal-600 text-white'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
             >
-              หน้านักเรียน
+              พอร์ทัลนักเรียน
             </button>
           </div>
         </div>
 
-        <div
-          className={`${
-            isQuickBarOpen ? 'flex mt-2 pt-2 border-t border-slate-800' : 'hidden lg:flex mt-1'
-          } items-center gap-1.5 flex-wrap`}
-        >
-          <button
-            onClick={() => {
-              setCurrentView('school-login');
-              setIsQuickBarOpen(false);
-            }}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${
-              currentView === 'school-login'
-                ? 'bg-amber-500 text-slate-950 shadow-xs'
-                : 'bg-slate-800 text-amber-300 hover:bg-slate-700 border border-amber-500/30'
-            }`}
-          >
-            <LogIn className="w-3 h-3" />
-            <span>🔐 หน้า Login (ครู 2 ช่องทาง / นักเรียน)</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setCurrentView('home');
-              setIsQuickBarOpen(false);
-            }}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
-              currentView === 'home'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <LayoutDashboard className="w-3 h-3" />
-            <span>1. หน้าหลัก (จัดการชั้นเรียน)</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setCurrentView('class-overview');
-              setIsQuickBarOpen(false);
-            }}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
-              currentView === 'class-overview'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <Users className="w-3 h-3" />
-            <span>2. ชั้นเรียน (ภาพรวม / เช็คชื่อ / งาน)</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setCurrentView('home-visit');
-              setIsQuickBarOpen(false);
-            }}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${
-              currentView === 'home-visit'
-                ? 'bg-rose-600 text-white shadow-xs'
-                : 'bg-slate-800 text-rose-300 hover:bg-slate-700 border border-rose-500/30'
-            }`}
-          >
-            <HeartHandshake className="w-3 h-3" />
-            <span>🏡 เยี่ยมบ้าน นร.01 / CCT กสศ.</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setCurrentView('student-affairs');
-              setIsQuickBarOpen(false);
-            }}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${
-              currentView === 'student-affairs'
-                ? 'bg-amber-500 text-slate-950 shadow-xs'
-                : 'bg-slate-800 text-amber-300 hover:bg-slate-700 border border-amber-500/30'
-            }`}
-          >
-            <ShieldAlert className="w-3 h-3" />
-            <span>🛡️ กิจการนักเรียน & เช็คชื่อเสาธง</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setCurrentView('student-council');
-              setIsQuickBarOpen(false);
-            }}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${
-              currentView === 'student-council'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'bg-slate-800 text-indigo-300 hover:bg-slate-700 border border-indigo-500/30'
-            }`}
-          >
-            <Vote className="w-3 h-3" />
-            <span>🗳️ สภานักเรียน & E-Voting</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setCurrentView('readiness');
-              setIsQuickBarOpen(false);
-            }}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
-              currentView === 'readiness'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <CheckCircle2 className="w-3 h-3" />
-            <span>3. ความพร้อมก่อนปิดเทอม</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setCurrentView('student');
-              setIsQuickBarOpen(false);
-            }}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
-              currentView === 'student'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <UserCheck className="w-3 h-3" />
-            <span>4. วิเคราะห์รายคน (Radar Chart)</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setCurrentView('sar');
-              setIsQuickBarOpen(false);
-            }}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
-              currentView === 'sar'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <FileSpreadsheet className="w-3 h-3" />
-            <span>5. เทียบผลข้ามห้อง (SAR/PA)</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setCurrentView('timetable');
-              setIsQuickBarOpen(false);
-            }}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
-              currentView === 'timetable'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <CalendarDays className="w-3 h-3" />
-            <span>ตารางสอน</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setCurrentView('exams');
-              setIsQuickBarOpen(false);
-            }}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
-              currentView === 'exams'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <PenTool className="w-3 h-3" />
-            <span>สอบ/งาน</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setCurrentView('student-portal');
-              setIsQuickBarOpen(false);
-            }}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
-              currentView === 'student-portal'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <GraduationCap className="w-3 h-3" />
-            <span>6. พอร์ทัลนักเรียน (โหวตสภา / ใบลา / เยี่ยมบ้าน)</span>
-          </button>
-        </div>
+        {isQuickBarOpen && (
+          <div className="max-w-7xl mx-auto flex items-center gap-1.5 flex-wrap mt-2 pt-2 border-t border-slate-800">
+            {[
+              { key: 'school-login', label: 'หน้า Login', icon: LogIn },
+              { key: 'home', label: '1. หน้าหลัก', icon: LayoutDashboard },
+              { key: 'class-overview', label: '2. ชั้นเรียนของฉัน', icon: Users },
+              { key: 'home-visit', label: '3. เยี่ยมบ้าน นร.01 (CCT)', icon: HeartHandshake },
+              { key: 'student-affairs', label: '4. กิจการนักเรียน & ใบลา', icon: ShieldAlert },
+              { key: 'student-council', label: '5. สภานักเรียน E-Voting', icon: Vote },
+              { key: 'readiness', label: '6. ความพร้อมก่อนปิดเทอม', icon: CheckCircle2 },
+              { key: 'student', label: '7. วิเคราะห์รายคน', icon: UserCheck },
+              { key: 'sar', label: '8. เทียบผลข้ามห้อง (SAR)', icon: FileSpreadsheet },
+              { key: 'timetable', label: '9. ตารางสอน', icon: CalendarDays },
+              { key: 'exams', label: '10. สอบ/งาน', icon: PenTool },
+              { key: 'student-portal', label: '11. พอร์ทัลนักเรียน', icon: GraduationCap },
+            ].map((item) => {
+              const IconComp = item.icon;
+              const isActive = currentView === item.key;
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => {
+                    setCurrentView(item.key as TeacherViewKey);
+                    setIsQuickBarOpen(false);
+                  }}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                    isActive
+                      ? 'bg-teal-600 text-white'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  <IconComp className="w-3 h-3" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Conditional Rendering: Direct Login Screen vs Student Portal vs Classroom Management */}

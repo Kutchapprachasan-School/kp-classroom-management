@@ -4,6 +4,9 @@ import {
   ChevronRight,
   CheckCircle2,
   Calendar,
+  Plus,
+  Clock,
+  ArrowUpRight,
 } from 'lucide-react';
 
 interface TeacherGlobalDashboardViewProps {
@@ -31,14 +34,99 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
   const [isAddingTodo, setIsAddingTodo] = useState(false);
   const [newTodoText, setNewTodoText] = useState('');
 
+  const todayScheduleRows = [
+    {
+      period: 'คาบ 2',
+      time: '09:20–10:10',
+      courseCode: 'ศ23101',
+      subject: 'ศิลปะพื้นฐาน 5',
+      classroom: 'ม.3/1',
+      room: 'ห้องปฏิบัติการศิลปะ 2',
+      status: 'CHECKED',
+      attendanceSummary: 'มา 22 · ลา 1',
+    },
+    {
+      period: 'คาบ 7',
+      time: '13:30–14:20',
+      courseCode: 'ก23901',
+      subject: 'กิจกรรมแนะแนว',
+      classroom: 'ม.3/1',
+      room: 'อาคาร 3 ห้อง 304',
+      status: 'PENDING',
+      attendanceSummary: 'รอเช็คชื่อ (23 คน)',
+    },
+    {
+      period: 'คาบ 8',
+      time: '14:20–15:10',
+      courseCode: 'ก20905',
+      subject: 'ชุมนุมดนตรีไทย-พื้นเมือง',
+      classroom: 'ม.1–ม.3',
+      room: 'หอประชุมดนตรีไทย',
+      status: 'PENDING',
+      attendanceSummary: 'รอเช็คชื่อ (30 คน)',
+    },
+  ];
+
+  const classroomTaskRows = [
+    {
+      id: 'task-1',
+      category: 'การเช็คชื่อรายคาบ',
+      detail: 'ยังมีคาบเรียนที่ยังไม่ได้บันทึกสถานะเข้าเรียน',
+      affectedClasses: 9,
+      totalVolume: '65 คาบ',
+      priority: 'HIGH',
+      actionLabel: 'ไปหน้าเช็คชื่อ',
+      onClick: onNavigateToAttendance,
+    },
+    {
+      id: 'task-2',
+      category: 'คะแนนเก็บระหว่างภาค',
+      detail: 'ช่องคะแนนงานและใบงานยังกรอกไม่ครบ',
+      affectedClasses: 8,
+      totalVolume: '375 ช่องคะแนน',
+      priority: 'HIGH',
+      actionLabel: 'กรอกคะแนน',
+      onClick: () => onNavigateToClass('cls-1'),
+    },
+    {
+      id: 'task-3',
+      category: 'คุณลักษณะอันพึงประสงค์ & อ่านคิดวิเคราะห์',
+      detail: 'รอประเมินผลระดับ 0–3 ประจำภาคเรียนที่ 1/2569',
+      affectedClasses: 9,
+      totalVolume: '276 คน',
+      priority: 'MEDIUM',
+      actionLabel: 'ประเมินรายห้อง',
+      onClick: onNavigateToReadiness,
+    },
+    {
+      id: 'task-4',
+      category: 'ความพร้อมก่อนส่งเกรดปิดภาคเรียน (SGS)',
+      detail: 'ตรวจสอบ 5 เงื่อนไขความสมบูรณ์ก่อนส่งทะเบียนวัดผล',
+      affectedClasses: 9,
+      totalVolume: '9 ห้องเรียน',
+      priority: 'MEDIUM',
+      actionLabel: 'ตรวจความพร้อม',
+      onClick: onNavigateToReadiness,
+    },
+    {
+      id: 'task-5',
+      category: 'การผูกหน่วยการเรียนรู้กับโครงสร้างรายวิชา',
+      detail: 'งานและข้อสอบทุกชิ้นผูกกับหน่วยการเรียนรู้ครบถ้วนแล้ว',
+      affectedClasses: 0,
+      totalVolume: 'ครบ 100%',
+      priority: 'DONE',
+      actionLabel: 'ดูหลักสูตร',
+      onClick: () => onNavigateToCourses?.(),
+    },
+  ];
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in font-sans text-slate-800 select-none">
-      {/* 1. Hero Profile & Term Progress Banner */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 border-l-[6px] border-l-rose-600 p-6 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6">
-          {/* Profile Left */}
+    <div className="space-y-6 max-w-7xl mx-auto pb-12 font-sans text-slate-800 select-none">
+      {/* 1. Top Identity & Semester Progress Header (60% White Surface, 30% Slate Ink, 10% Teal Accent) */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-slate-100 shadow-sm shrink-0 bg-slate-200">
+            <div className="w-14 h-14 rounded-full overflow-hidden border border-slate-200 shrink-0 bg-slate-100">
               <img
                 src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
                 alt="นายภาสภูมิ เรืองปราชญ์"
@@ -46,333 +134,308 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
               />
             </div>
             <div>
-              <span className="text-xs text-slate-400 font-normal">สวัสดีตอนเช้า</span>
-              <h1 className="text-xl font-bold text-slate-800 leading-snug">
+              <h1 className="text-lg sm:text-xl font-bold text-slate-900">
                 นายภาสภูมิ เรืองปราชญ์
               </h1>
               <p className="text-xs text-slate-500 mt-0.5">
-                โรงเรียนหางดงรัฐราษฎร์อุปถัมภ์
+                ครูประจำกลุ่มสาระการเรียนรู้ศิลปะ • วันอังคารที่ 22 กันยายน พ.ศ. 2569
               </p>
             </div>
           </div>
 
-          {/* Right Status Badge */}
-          <div className="self-start md:self-auto">
-            <div className="px-4 py-2.5 bg-[#e8f8f0] border border-[#c3eed7] rounded-xl flex items-center gap-2 text-emerald-800 text-xs font-semibold">
-              <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px]">
-                <Check className="w-3 h-3 stroke-[3]" />
+          {/* Semester Progress Compact Control */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 lg:w-[420px] pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+            <div className="flex-1">
+              <div className="flex items-center justify-between text-xs mb-1.5">
+                <span className="font-semibold text-slate-700">
+                  ภาคเรียนที่ 1/2569 (สัปดาห์ 19/20)
+                </span>
+                <span className="font-bold text-teal-700 tabular-nums">
+                  93% · เหลือ 10 วัน
+                </span>
               </div>
-              <span>ไม่มีงานรอตรวจ</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Term Date & Progress Bar */}
-        <div className="pt-4 border-t border-slate-100">
-          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 mb-2">
-            <div>
-              <h2 className="text-base font-bold text-slate-800">
-                วันอังคารที่ 22 กันยายน พ.ศ. 2569
-              </h2>
-              <div className="text-xs text-slate-500 mt-0.5">
-                ภาคเรียนที่ 1/2569 • สัปดาห์ที่ 19 จาก 20 •{' '}
-                <span className="text-slate-600 font-medium">เหลืออีก 10 วัน</span>
+              <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-teal-600 h-2 rounded-full transition-all duration-500"
+                  style={{ width: '93%' }}
+                />
               </div>
             </div>
 
             <button
               onClick={() => {
                 if (onNavigateToAcademicYear) onNavigateToAcademicYear();
-                else alert('ตั้งค่าวันเปิด-ปิดภาคเรียน');
               }}
-              className="text-xs text-slate-500 hover:text-slate-800 self-start sm:self-auto cursor-pointer"
+              className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 shrink-0 transition-colors self-start sm:self-center"
             >
-              ตั้งค่าวันเปิด-ปิด
+              ตั้งค่าภาคเรียน
             </button>
-          </div>
-
-          {/* Red Progress Bar */}
-          <div className="mt-3">
-            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-              <div
-                className="bg-rose-600 h-2 rounded-full transition-all duration-500"
-                style={{ width: '93%' }}
-              />
-            </div>
-            <div className="flex justify-between text-[11px] text-slate-400 mt-1.5 font-medium">
-              <span>15 พ.ค. 2569</span>
-              <span className="text-rose-700 font-bold">93%</span>
-              <span>2 ต.ค. 2569</span>
-            </div>
           </div>
         </div>
       </div>
 
-      {/* 2. Main Two-Column Grid: Today's Schedule & Pending Tasks (Left) vs Overview Cards (Right) */}
+      {/* 2. Rule of Thirds (กฎสามส่วน): 3 Balanced Summary Zones (1/3 : 1/3 : 1/3) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Zone 1/3: ภาระงานสอน */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
+          <div>
+            <div className="text-xs font-medium text-slate-500">
+              นักเรียนที่ดูแลรับผิดชอบ
+            </div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-slate-900 tabular-nums">
+                525
+              </span>
+              <span className="text-xs font-medium text-slate-500">
+                คน (12 ชั้นเรียน)
+              </span>
+            </div>
+          </div>
+          <div className="text-right text-xs text-slate-400 tabular-nums">
+            <div>ประถม/มัธยมต้น</div>
+            <div className="font-semibold text-slate-700 mt-0.5">ครบทุกห้อง</div>
+          </div>
+        </div>
+
+        {/* Zone 2/3: สถิติเวลาเรียนและคะแนนเฉลี่ย */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
+          <div>
+            <div className="text-xs font-medium text-slate-500">
+              อัตราการมาเรียนเฉลี่ยทั้งภาคเรียน
+            </div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-teal-700 tabular-nums">
+                95.0%
+              </span>
+              <span className="text-xs font-medium text-slate-500">
+                คะแนนเฉลี่ย 82%
+              </span>
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold">
+            <Check className="w-3.5 h-3.5" /> เกณฑ์ดีเยี่ยม
+          </span>
+        </div>
+
+        {/* Zone 3/3: นักเรียนกลุ่มเสี่ยง มส. */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
+          <div>
+            <div className="text-xs font-medium text-slate-500">
+              กลุ่มเสี่ยงเวลาเรียนไม่ถึงเกณฑ์ (มส.)
+            </div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-rose-600 tabular-nums">
+                7
+              </span>
+              <span className="text-xs font-medium text-slate-500">
+                คน ที่ต้องซ่อมเวลาเรียน
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={onNavigateToReadiness}
+            className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors"
+          >
+            ดูรายชื่อ
+          </button>
+        </div>
+      </div>
+
+      {/* 3. Rule of Thirds Workspace Grid: 2/3 Data Tables (8 cols) + 1/3 Action Checklist (4 cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column (8 cols) */}
+        {/* Left 2/3 Column (8 cols): Structured Data Tables */}
         <div className="lg:col-span-8 space-y-6">
-          {/* Card: วันนี้ — อ. 22 ก.ย. 2569 */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
+          {/* Table 1: ตารางสอนและเช็คชื่อประจำวัน */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-slate-500" />
-                <h3 className="font-bold text-slate-800 text-sm">
-                  วันนี้ — อ. 22 ก.ย. 2569
-                </h3>
+                <Calendar className="w-4 h-4 text-teal-600" />
+                <h2 className="font-bold text-slate-900 text-sm">
+                  ตารางสอนและการเช็คชื่อประจำวัน
+                </h2>
               </div>
 
-              {/* Tabs */}
-              <div className="flex items-center bg-slate-100 rounded-lg p-0.5 text-xs">
-                <button
-                  onClick={() => setActivePeriodTab('today')}
-                  className={`px-3 py-1 rounded-md font-medium transition-colors ${
-                    activePeriodTab === 'today'
-                      ? 'bg-[#0f2a59] text-white'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  วันนี้
-                </button>
-                <button
-                  onClick={() => setActivePeriodTab('week')}
-                  className={`px-3 py-1 rounded-md font-medium transition-colors ${
-                    activePeriodTab === 'week'
-                      ? 'bg-[#0f2a59] text-white'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  สัปดาห์
-                </button>
-                <button
-                  onClick={() => setActivePeriodTab('month')}
-                  className={`px-3 py-1 rounded-md font-medium transition-colors ${
-                    activePeriodTab === 'month'
-                      ? 'bg-[#0f2a59] text-white'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  เดือน
-                </button>
+              {/* Period Switcher */}
+              <div className="flex items-center bg-slate-100 rounded-xl p-1 text-xs self-start sm:self-auto">
+                {[
+                  { key: 'today', label: 'วันนี้' },
+                  { key: 'week', label: 'สัปดาห์นี้' },
+                  { key: 'month', label: 'เดือนนี้' },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActivePeriodTab(tab.key as 'today' | 'week' | 'month')}
+                    className={`px-3 py-1 rounded-lg font-medium transition-colors ${
+                      activePeriodTab === tab.key
+                        ? 'bg-slate-900 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Timetable Period Rows */}
-            <div className="space-y-3">
-              {/* Row 1 */}
-              <div className="border border-slate-200 rounded-xl p-3.5 border-l-4 border-l-amber-400 bg-white flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div>
-                    <div className="font-bold text-xs text-slate-800">คาบ 7</div>
-                    <div className="text-[11px] text-slate-400">13:30–14:20</div>
-                  </div>
-                  <span className="px-3 py-1 bg-[#fef7e6] text-[#8a6100] border border-[#f5e6be] rounded-md text-xs font-semibold">
-                    แนะแนว
-                  </span>
-                </div>
-
-                <button
-                  onClick={onNavigateToAttendance}
-                  className="px-4 py-1.5 bg-[#0f2a59] hover:bg-[#0b1f42] text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
-                >
-                  เช็คชื่อ
-                </button>
-              </div>
-
-              {/* Row 2 */}
-              <div className="border border-slate-200 rounded-xl p-3.5 border-l-4 border-l-amber-400 bg-white flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div>
-                    <div className="font-bold text-xs text-slate-800">คาบ 8</div>
-                    <div className="text-[11px] text-slate-400">14:20–15:10</div>
-                  </div>
-                  <span className="px-3 py-1 bg-[#fef7e6] text-[#8a6100] border border-[#f5e6be] rounded-md text-xs font-semibold">
-                    ชุมนุมดนตรีไทย-พื้นเมือง
-                  </span>
-                </div>
-
-                <button
-                  onClick={onNavigateToAttendance}
-                  className="px-4 py-1.5 bg-[#0f2a59] hover:bg-[#0b1f42] text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
-                >
-                  เช็คชื่อ
-                </button>
-              </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-semibold">
+                    <th className="py-3 px-4">คาบ / เวลา</th>
+                    <th className="py-3 px-4">รหัส / รายวิชา</th>
+                    <th className="py-3 px-4">ชั้นเรียน / ห้อง</th>
+                    <th className="py-3 px-4">สถานะเช็คชื่อ</th>
+                    <th className="py-3 px-4 text-right">การจัดการ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {todayScheduleRows.map((row) => (
+                    <tr key={row.period} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="font-bold text-slate-900">{row.period}</div>
+                        <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5 tabular-nums">
+                          <Clock className="w-3 h-3" />
+                          <span>{row.time}</span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="font-bold text-slate-900">{row.subject}</div>
+                        <div className="text-[11px] text-slate-400 font-mono">{row.courseCode}</div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold text-[11px]">
+                          {row.classroom}
+                        </span>
+                        <div className="text-[11px] text-slate-400 mt-0.5">{row.room}</div>
+                      </td>
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {row.status === 'CHECKED' ? (
+                          <span className="inline-flex items-center gap-1.5 text-teal-700 font-semibold">
+                            <span className="w-2 h-2 rounded-full bg-teal-500" />
+                            <span>{row.attendanceSummary}</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-amber-700 font-semibold">
+                            <span className="w-2 h-2 rounded-full bg-amber-500" />
+                            <span>{row.attendanceSummary}</span>
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                        <button
+                          onClick={onNavigateToAttendance}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                            row.status === 'CHECKED'
+                              ? 'border border-slate-200 text-slate-700 hover:bg-slate-50'
+                              : 'bg-teal-600 hover:bg-teal-700 text-white shadow-2xs'
+                          }`}
+                        >
+                          {row.status === 'CHECKED' ? 'แก้ไขเช็คชื่อ' : 'เช็คชื่อเข้าคาบ'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
 
-          {/* Card: งานที่ต้องทำ (นับเป็นจำนวนห้องที่ต้องเข้าไปทำ) */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 bg-slate-700 rounded-full" />
-                <h3 className="font-bold text-slate-800 text-sm">
-                  งานที่ต้องทำ <span className="font-normal text-xs text-slate-500">(นับเป็นจำนวนห้องที่ต้องเข้าไปทำ)</span>
-                </h3>
+          {/* Table 2: ตารางงานที่ต้องดำเนินการรายห้องเรียน (Converted from 5 scattered cards into a clean Data Table) */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h2 className="font-bold text-slate-900 text-sm">
+                  ตารางติดตามงานวัดผลและธุรกรรมชั้นเรียน
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  สรุปรายการที่ต้องดำเนินการก่อนส่งผลสัมฤทธิ์ทางการเรียนปลายภาค
+                </p>
               </div>
-
               <button
                 onClick={onNavigateToReadiness}
-                className="text-xs text-slate-600 hover:text-slate-900 font-semibold flex items-center gap-1"
+                className="text-xs text-teal-700 hover:text-teal-800 font-semibold inline-flex items-center gap-1"
               >
-                <span>ดูรายละเอียดรายห้อง</span>
+                <span>ดูภาพรวมทุกห้อง</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            {/* Grid of Actionable Task Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {/* Card 1 */}
-              <div
-                onClick={onNavigateToAttendance}
-                className="border border-slate-200 rounded-xl p-3.5 bg-white hover:bg-slate-50 transition-colors cursor-pointer space-y-1"
-              >
-                <div className="text-xl font-extrabold text-[#c25e00]">
-                  9 <span className="text-xs font-normal text-slate-500">ห้อง</span>
-                </div>
-                <div className="text-xs font-semibold text-slate-700">
-                  ยังมีคาบไม่เช็คชื่อ
-                </div>
-                <div className="text-[11px] text-slate-400">รวม 65 คาบ</div>
-              </div>
-
-              {/* Card 2 */}
-              <div
-                onClick={() => onNavigateToClass('cls-1')}
-                className="border border-slate-200 rounded-xl p-3.5 bg-white hover:bg-slate-50 transition-colors cursor-pointer space-y-1"
-              >
-                <div className="text-xl font-extrabold text-[#c25e00]">
-                  8 <span className="text-xs font-normal text-slate-500">ห้อง</span>
-                </div>
-                <div className="text-xs font-semibold text-slate-700">
-                  คะแนนยังกรอกไม่ครบ
-                </div>
-                <div className="text-[11px] text-slate-400">รวม 375 ช่อง</div>
-              </div>
-
-              {/* Card 3 */}
-              <div
-                onClick={onNavigateToReadiness}
-                className="border border-slate-200 rounded-xl p-3.5 bg-white hover:bg-slate-50 transition-colors cursor-pointer space-y-1"
-              >
-                <div className="text-xl font-extrabold text-[#c25e00]">
-                  9 <span className="text-xs font-normal text-slate-500">ห้อง</span>
-                </div>
-                <div className="text-xs font-semibold text-slate-700">
-                  คุณลักษณะฯ / อ่านคิดฯ
-                </div>
-                <div className="text-[11px] text-slate-400">รวม 276 คน</div>
-              </div>
-
-              {/* Card 4 (Complete) */}
-              <div
-                onClick={onNavigateToCourses}
-                className="border border-slate-200 rounded-xl p-3.5 bg-white flex flex-col justify-center items-start space-y-1 cursor-pointer hover:bg-slate-50 transition-colors"
-                title="คลิกเพื่อดูโครงสร้างหน่วยการเรียนรู้และหลักสูตร"
-              >
-                <Check className="w-5 h-5 text-emerald-600 stroke-[2.5]" />
-                <div className="text-xs font-semibold text-slate-700">
-                  มีงานยังไม่ผูกหน่วย
-                </div>
-              </div>
-            </div>
-
-            {/* Bottom Row */}
-            <div className="w-full sm:w-1/4">
-              <div
-                onClick={onNavigateToReadiness}
-                className="border border-slate-200 rounded-xl p-3.5 bg-white hover:bg-slate-50 transition-colors cursor-pointer space-y-1"
-              >
-                <div className="text-xl font-extrabold text-[#c25e00]">
-                  9 <span className="text-xs font-normal text-slate-500">ห้อง</span>
-                </div>
-                <div className="text-xs font-semibold text-slate-700">
-                  ยังไม่พร้อมปิดเทอม
-                </div>
-              </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-semibold">
+                    <th className="py-3 px-4">รายการตรวจสอบ</th>
+                    <th className="py-3 px-4 text-right">จำนวนห้องที่ค้าง</th>
+                    <th className="py-3 px-4 text-right">ปริมาณงาน</th>
+                    <th className="py-3 px-4">สถานะ</th>
+                    <th className="py-3 px-4 text-right">ดำเนินการ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {classroomTaskRows.map((item) => (
+                    <tr
+                      key={item.id}
+                      onClick={item.onClick}
+                      className="hover:bg-slate-50/60 transition-colors cursor-pointer"
+                    >
+                      <td className="py-3.5 px-4">
+                        <div className="font-bold text-slate-900">{item.category}</div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">{item.detail}</div>
+                      </td>
+                      <td className="py-3.5 px-4 text-right font-bold tabular-nums text-slate-900 whitespace-nowrap">
+                        {item.affectedClasses > 0 ? `${item.affectedClasses} ห้อง` : '-'}
+                      </td>
+                      <td className="py-3.5 px-4 text-right font-medium tabular-nums text-slate-600 whitespace-nowrap">
+                        {item.totalVolume}
+                      </td>
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {item.priority === 'DONE' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-[11px] font-semibold">
+                            <Check className="w-3 h-3" /> เรียบร้อย
+                          </span>
+                        ) : item.priority === 'HIGH' ? (
+                          <span className="inline-flex items-center gap-1.5 text-amber-700 font-semibold">
+                            <span className="w-2 h-2 rounded-full bg-amber-500" />
+                            <span>รอดำเนินการ</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-slate-600 font-medium">
+                            <span className="w-2 h-2 rounded-full bg-slate-400" />
+                            <span>ตามกำหนดการ</span>
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 text-teal-700 font-semibold hover:underline">
+                          <span>{item.actionLabel}</span>
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
 
-        {/* Right Column (4 cols): ภาพรวมตอนนี้ & สิ่งที่ต้องทำ */}
+        {/* Right 1/3 Column (4 cols): Focused Personal Checklist */}
         <div className="lg:col-span-4 space-y-6">
-          {/* Card: ภาพรวมตอนนี้ */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 text-slate-500 flex items-center justify-center font-bold">
-                  📊
-                </div>
-                <h3 className="font-bold text-slate-800 text-sm">
-                  ภาพรวมตอนนี้
-                </h3>
-              </div>
-
-              <button
-                onClick={onNavigateToReadiness}
-                className="text-xs text-slate-600 hover:text-slate-900 font-semibold flex items-center gap-1"
-              >
-                <span>ความพร้อม</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* 2x2 Grid + 1 Bottom Row */}
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                {/* Box 1: 525 นักเรียนที่ดูแล */}
-                <div className="border border-slate-200 rounded-xl p-3 bg-white space-y-1">
-                  <div className="text-2xl font-extrabold text-slate-800">525</div>
-                  <div className="text-xs font-bold text-slate-700">นักเรียนที่ดูแล</div>
-                  <div className="text-[11px] text-slate-400">12 ชั้นเรียน</div>
-                </div>
-
-                {/* Box 2: 82% ทำได้เฉลี่ย (Mint green) */}
-                <div className="border border-[#c6edd9] bg-[#eefaf3] rounded-xl p-3 space-y-1">
-                  <div className="text-2xl font-extrabold text-[#11844b]">82%</div>
-                  <div className="text-xs font-bold text-[#11844b]">ทำได้เฉลี่ย</div>
-                  <div className="text-[11px] text-slate-500">ของคะแนนที่กรอกแล้ว</div>
-                </div>
-
-                {/* Box 3: 95% เข้าเรียนเฉลี่ย (Mint green) */}
-                <div className="border border-[#c6edd9] bg-[#eefaf3] rounded-xl p-3 space-y-1">
-                  <div className="text-2xl font-extrabold text-[#11844b]">95%</div>
-                  <div className="text-xs font-bold text-[#11844b]">เข้าเรียนเฉลี่ย</div>
-                  <div className="text-[11px] text-slate-500">ทั้งภาคเรียน</div>
-                </div>
-
-                {/* Box 4: 7 เกินเกณฑ์ มส (Soft Red/Pink) */}
-                <div className="border border-[#fed0d0] bg-[#fef2f2] rounded-xl p-3 space-y-1">
-                  <div className="text-2xl font-extrabold text-rose-700">7</div>
-                  <div className="text-xs font-bold text-rose-700">เกินเกณฑ์ มส</div>
-                  <div className="text-[11px] text-slate-500">ต้องซ่อมเวลาเรียน</div>
-                </div>
-              </div>
-
-              {/* Bottom Box: 0 ช่องคะแนนว่าง */}
-              <div className="border border-slate-200 rounded-xl p-3 bg-white space-y-1">
-                <div className="text-2xl font-extrabold text-slate-800">0</div>
-                <div className="text-xs font-bold text-slate-700">ช่องคะแนนว่าง</div>
-                <div className="text-[11px] text-slate-400">รวมทุกชั้นเรียน</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Card: สิ่งที่ต้องทำ */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-slate-500" />
-                <h3 className="font-bold text-slate-800 text-sm">
-                  สิ่งที่ต้องทำ ({todos.filter((t) => !t.done).length})
-                </h3>
+                <CheckCircle2 className="w-4 h-4 text-teal-600" />
+                <h2 className="font-bold text-slate-900 text-sm">
+                  บันทึกช่วยจำของครู ({todos.filter((t) => !t.done).length})
+                </h2>
               </div>
 
               <button
                 onClick={() => setIsAddingTodo(true)}
-                className="px-2.5 py-1 border border-slate-200 hover:bg-slate-50 rounded-lg text-xs font-semibold text-slate-700 transition-colors"
+                className="inline-flex items-center gap-1 px-2.5 py-1 border border-slate-200 hover:bg-slate-50 rounded-lg text-xs font-semibold text-slate-700 transition-colors"
               >
-                + เพิ่ม
+                <Plus className="w-3.5 h-3.5" />
+                <span>เพิ่มรายการ</span>
               </button>
             </div>
 
@@ -380,10 +443,10 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
                 <input
                   type="text"
-                  placeholder="กรอกรายการที่ต้องทำ..."
+                  placeholder="ระบุสิ่งที่ต้องทำ..."
                   value={newTodoText}
                   onChange={(e) => setNewTodoText(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-teal-600"
                 />
                 <div className="flex justify-end gap-2">
                   <button
@@ -398,12 +461,15 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
                   <button
                     onClick={() => {
                       if (newTodoText.trim()) {
-                        setTodos([...todos, { id: `todo-${Date.now()}`, text: newTodoText.trim(), done: false }]);
+                        setTodos([
+                          ...todos,
+                          { id: `todo-${Date.now()}`, text: newTodoText.trim(), done: false },
+                        ]);
                         setNewTodoText('');
                         setIsAddingTodo(false);
                       }
                     }}
-                    className="px-3 py-1 bg-[#0f2a59] text-white rounded-lg text-xs font-semibold"
+                    className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold"
                   >
                     บันทึก
                   </button>
@@ -411,13 +477,13 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
               </div>
             )}
 
-            <div className="space-y-1.5">
+            <div className="divide-y divide-slate-100">
               {todos.map((todo) => (
                 <div
                   key={todo.id}
-                  className="flex items-center justify-between gap-2 p-2 hover:bg-slate-50 rounded-lg text-xs group"
+                  className="flex items-start justify-between gap-2 py-2.5 text-xs group"
                 >
-                  <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+                  <label className="flex items-start gap-2.5 cursor-pointer flex-1 min-w-0">
                     <input
                       type="checkbox"
                       checked={todo.done}
@@ -426,19 +492,22 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
                           todos.map((t) => (t.id === todo.id ? { ...t, done: !t.done } : t))
                         )
                       }
-                      className="rounded border-slate-300 text-blue-600 focus:ring-0"
+                      className="mt-0.5 rounded border-slate-300 text-teal-600 focus:ring-0"
                     />
                     <span
                       className={`${
-                        todo.done ? 'line-through text-slate-400' : 'text-slate-700 font-medium'
-                      } truncate`}
+                        todo.done
+                          ? 'line-through text-slate-400'
+                          : 'text-slate-700 font-medium leading-relaxed'
+                      }`}
                     >
                       {todo.text}
                     </span>
                   </label>
                   <button
                     onClick={() => setTodos(todos.filter((t) => t.id !== todo.id))}
-                    className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+                    className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity text-xs px-1"
+                    aria-label="ลบรายการ"
                   >
                     ✕
                   </button>

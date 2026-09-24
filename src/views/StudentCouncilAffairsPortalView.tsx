@@ -120,42 +120,42 @@ export const StudentCouncilAffairsPortalView: React.FC<
         </div>
       )}
 
-      {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-900 via-blue-900 to-[#0f2a59] rounded-2xl p-6 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* 1. Clean Header (60-30-10 Rule) */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <Vote className="w-6 h-6 text-amber-300" />
+          <h1 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2">
+            <Vote className="w-5 h-5 text-teal-600" />
             <span>
-              สภานักเรียน (E-Voting) & กิจการนักเรียน (ยื่นใบลา / คะแนนความประพฤติ)
+              สภานักเรียน (E-Voting) & บริการกิจการนักเรียน (ยื่นใบลา / ความประพฤติ)
             </span>
           </h1>
-          <p className="text-xs text-blue-100 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             ใช้สิทธิ์เลือกตั้งสภานักเรียนออนไลน์ ยื่นใบลาป่วย/ลากิจ และส่งข้อเสนอแนะพัฒนาโรงเรียน
           </p>
         </div>
-        <div className="bg-white/10 border border-white/15 rounded-xl px-4 py-2.5 text-xs shrink-0">
-          <div className="text-blue-200">คะแนนความประพฤติของฉัน</div>
-          <div className="text-lg font-black text-emerald-300 flex items-center gap-1">
+        <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-4 py-2.5 text-xs shrink-0">
+          <div className="text-slate-500">คะแนนความประพฤติของฉัน</div>
+          <div className="text-base font-bold text-teal-700 flex items-center gap-1 mt-0.5 tabular-nums">
             <ShieldCheck className="w-4 h-4" />
             <span>110 / 100 คะแนน (ดีเยี่ยม)</span>
           </div>
         </div>
       </div>
 
-      {/* 1. คูหาเลือกตั้งสภานักเรียนออนไลน์ (E-Voting) */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-4">
+      {/* 2. คูหาเลือกตั้งสภานักเรียนออนไลน์ (Rule of Thirds 3-Column Cards) */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
             <h2 className="text-sm font-bold text-slate-900">
-              1. คูหาเลือกตั้งสภานักเรียนออนไลน์ (E-Voting 1 สิทธิ์ 1 เสียง)
+              คูหาเลือกตั้งสภานักเรียนออนไลน์ (E-Voting 1 สิทธิ์ 1 เสียง)
             </h2>
             <p className="text-xs text-slate-500">
               เลือกพรรคที่ชื่นชอบเพื่อพัฒนาโรงเรียนของเรา (รับ +30 XP เมื่อใช้สิทธิ์)
             </p>
           </div>
           {votedPartyId && (
-            <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
-              ✓ คุณใช้สิทธิ์ลงคะแนนแล้ว
+            <span className="px-3 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold">
+              ✓ ใช้สิทธิ์ลงคะแนนแล้ว
             </span>
           )}
         </div>
@@ -166,18 +166,18 @@ export const StudentCouncilAffairsPortalView: React.FC<
             return (
               <div
                 key={party.id}
-                className={`rounded-2xl border p-4 flex flex-col justify-between space-y-3 ${
+                className={`rounded-2xl border p-4 flex flex-col justify-between space-y-3 transition-colors ${
                   isSelected
-                    ? 'border-emerald-500 bg-emerald-50/40'
-                    : 'border-slate-200 bg-white'
+                    ? 'border-teal-500 bg-teal-50/30'
+                    : 'border-slate-200/80 bg-white'
                 }`}
               >
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-1 rounded-lg bg-[#0f2a59] text-white font-bold">
+                    <span className="px-2.5 py-1 rounded-lg bg-slate-900 text-white font-bold">
                       เบอร์ {party.partyNumber}
                     </span>
-                    <span className="font-bold text-slate-500">
+                    <span className="font-bold text-slate-500 tabular-nums">
                       {party.voteCount.toLocaleString()} คะแนน
                     </span>
                   </div>
@@ -190,7 +190,7 @@ export const StudentCouncilAffairsPortalView: React.FC<
                   <div className="space-y-1 pt-1">
                     {party.policies.map((pol, i) => (
                       <div key={i} className="text-slate-600 flex gap-1.5">
-                        <Award className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                        <Award className="w-3.5 h-3.5 text-teal-600 shrink-0 mt-0.5" />
                         <span>{pol}</span>
                       </div>
                     ))}
@@ -200,19 +200,19 @@ export const StudentCouncilAffairsPortalView: React.FC<
                 <button
                   disabled={Boolean(votedPartyId)}
                   onClick={() => handleVote(party.id)}
-                  className={`w-full py-2 rounded-xl font-bold transition-colors ${
+                  className={`w-full py-2 rounded-xl font-semibold transition-colors ${
                     isSelected
-                      ? 'bg-emerald-600 text-white'
+                      ? 'bg-teal-600 text-white'
                       : votedPartyId
                       ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      : 'bg-slate-900 hover:bg-slate-800 text-white'
                   }`}
                 >
                   {isSelected
                     ? '✓ พรรคที่คุณลงคะแนน'
                     : votedPartyId
                     ? 'ใช้สิทธิ์แล้ว'
-                    : `กากบาทเลือกเบอร์ ${party.partyNumber}`}
+                    : `ลงคะแนนเบอร์ ${party.partyNumber}`}
                 </button>
               </div>
             );
@@ -220,103 +220,121 @@ export const StudentCouncilAffairsPortalView: React.FC<
         </div>
       </div>
 
-      {/* 2. ยื่นใบลาป่วย / ลากิจ & ตู้รับข้อเสนอแนะ */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 text-xs">
-        {/* ฟอร์มยื่นใบลานักเรียน */}
-        <form
-          onSubmit={handleSubmitLeave}
-          className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-4"
-        >
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-            <FileCheck2 className="w-4 h-4 text-blue-600" />
-            <span>2. ยื่นใบลาออนไลน์ (ลาป่วย / ลากิจ ส่งตรงถึงครูที่ปรึกษา)</span>
-          </h3>
+      {/* 3. ยื่นใบลาป่วย / ลากิจ & ตู้รับข้อเสนอแนะ */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs items-start">
+        {/* ฟอร์มยื่นใบลานักเรียน + ตารางประวัติใบลา */}
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <form onSubmit={handleSubmitLeave} className="p-5 sm:p-6 space-y-4">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <FileCheck2 className="w-4 h-4 text-teal-600" />
+              <span>ยื่นใบลาออนไลน์ (ลาป่วย / ลากิจ ส่งตรงถึงครูที่ปรึกษา)</span>
+            </h3>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">
-                ประเภทการลา
-              </label>
-              <select
-                value={leaveType}
-                onChange={(e) => setLeaveType(e.target.value as any)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200"
-              >
-                <option value="ลาป่วย">ลาป่วย</option>
-                <option value="ลากิจ">ลากิจ</option>
-              </select>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  ประเภทการลา
+                </label>
+                <select
+                  value={leaveType}
+                  onChange={(e) => setLeaveType(e.target.value as any)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white"
+                >
+                  <option value="ลาป่วย">ลาป่วย</option>
+                  <option value="ลากิจ">ลากิจ</option>
+                </select>
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  ตั้งแต่วันที่
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  ถึงวันที่
+                </label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                />
+              </div>
             </div>
+
             <div>
               <label className="block font-semibold text-slate-700 mb-1">
-                ตั้งแต่วันที่
+                สาเหตุการลา (ระบุอาการป่วยหรือธุระจำเป็น)
               </label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+              <textarea
+                rows={2}
+                required
+                value={leaveReason}
+                onChange={(e) => setLeaveReason(e.target.value)}
+                placeholder="เช่น มีไข้หวัดพักรักษาตัวที่บ้าน / เดินทางไปทำธุระกับผู้ปกครอง..."
                 className="w-full px-3 py-2 rounded-xl border border-slate-200"
               />
             </div>
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">
-                ถึงวันที่
-              </label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200"
-              />
-            </div>
-          </div>
 
-          <div>
-            <label className="block font-semibold text-slate-700 mb-1">
-              สาเหตุการลา (ระบุอาการป่วยหรือธุระจำเป็น)
-            </label>
-            <textarea
-              rows={2}
-              required
-              value={leaveReason}
-              onChange={(e) => setLeaveReason(e.target.value)}
-              placeholder="เช่น มีไข้หวัดพักรักษาตัวที่บ้าน / เดินทางไปทำธุระกับผู้ปกครอง..."
-              className="w-full px-3 py-2 rounded-xl border border-slate-200"
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full py-2.5 rounded-xl bg-[#0f2a59] hover:bg-[#163d7a] text-white font-bold"
-          >
-            ส่งใบลาให้ครูที่ปรึกษาอนุมัติ
-          </button>
+            <button
+              type="submit"
+              className="w-full py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold transition-colors"
+            >
+              ส่งใบลาให้ครูที่ปรึกษาอนุมัติ
+            </button>
+          </form>
 
           {myLeaves.length > 0 && (
-            <div className="pt-2 border-t border-slate-100 space-y-1.5">
-              <div className="font-bold text-slate-700">ประวัติใบลาของฉัน:</div>
-              {myLeaves.map((l) => (
-                <div
-                  key={l.id}
-                  className="p-2.5 rounded-lg bg-slate-50 flex items-center justify-between"
-                >
-                  <span>
-                    {l.leaveType} ({l.startDate}) — {l.reason}
-                  </span>
-                  <span className="font-bold text-blue-700">{l.status}</span>
-                </div>
-              ))}
+            <div className="border-t border-slate-100">
+              <div className="px-5 py-3 bg-slate-50/80 border-b border-slate-100 font-bold text-slate-700">
+                ตารางประวัติใบลาของฉัน
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50/40 border-b border-slate-100 text-slate-500 font-semibold">
+                      <th className="py-2.5 px-4">ประเภท</th>
+                      <th className="py-2.5 px-4">วันที่ลา</th>
+                      <th className="py-2.5 px-4">สาเหตุ</th>
+                      <th className="py-2.5 px-4 text-right">สถานะ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {myLeaves.map((l) => (
+                      <tr key={l.id}>
+                        <td className="py-2.5 px-4 font-semibold text-slate-800">
+                          {l.leaveType}
+                        </td>
+                        <td className="py-2.5 px-4 text-slate-500 tabular-nums">
+                          {l.startDate}
+                        </td>
+                        <td className="py-2.5 px-4 text-slate-600">{l.reason}</td>
+                        <td className="py-2.5 px-4 text-right font-semibold text-teal-700">
+                          {l.status === 'APPROVED' ? 'อนุมัติแล้ว' : 'รอพิจารณา'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
-        </form>
+        </div>
 
         {/* ฟอร์มส่งข้อเสนอแนะถึงสภานักเรียน */}
         <form
           onSubmit={handleSubmitSuggestion}
-          className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-4"
+          className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs space-y-4"
         >
           <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-purple-600" />
-            <span>3. ตู้รับฟังความคิดเห็น & ข้อเสนอแนะถึงสภานักเรียน (+20 XP)</span>
+            <MessageSquare className="w-4 h-4 text-teal-600" />
+            <span>ตู้รับฟังความคิดเห็น & ข้อเสนอแนะถึงสภานักเรียน (+20 XP)</span>
           </h3>
 
           <div>
@@ -326,7 +344,7 @@ export const StudentCouncilAffairsPortalView: React.FC<
             <select
               value={sugCategory}
               onChange={(e) => setSugCategory(e.target.value as any)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white"
             >
               <option value="อาคารสถานที่/สิ่งแวดล้อม">
                 อาคารสถานที่ / สิ่งแวดล้อม
@@ -356,7 +374,7 @@ export const StudentCouncilAffairsPortalView: React.FC<
               รายละเอียดเพิ่มเติม
             </label>
             <textarea
-              rows={2}
+              rows={3}
               required
               value={sugDetail}
               onChange={(e) => setSugDetail(e.target.value)}
@@ -367,7 +385,7 @@ export const StudentCouncilAffairsPortalView: React.FC<
 
           <button
             type="submit"
-            className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold"
+            className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold transition-colors"
           >
             <Send className="w-3.5 h-3.5" />
             <span>ส่งข้อเสนอแนะถึงสภานักเรียน</span>
