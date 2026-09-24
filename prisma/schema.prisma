@@ -1,0 +1,230 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ================= ENUMS =================
+enum Role { ADMIN, TEACHER, STUDENT }
+enum ScoreState { DRAFT, SUBMITTED, LOCKED }
+enum ScheduleType { NORMAL, EXAM, ACTIVITY, CANCELED }
+enum AttendanceStatus { PRESENT, ABSENT, LATE, LEAVE }
+enum TermType { SEMESTER_1, SEMESTER_2, SUMMER }
+enum RecordStatus { ACTIVE, ARCHIVED, DELETED }
+
+// ================= MULTI-TENANT & RBAC =================
+model School {
+  id          String             @id @default(cuid())
+  name        String
+  memberships SchoolMembership[]
+  terms       AcademicTerm[]
+  classrooms  Classroom[]
+}
+
+model User {
+  id               String             @id @default(cuid())
+  email            String             @unique
+  name             String
+  memberships      SchoolMembership[]
+  gamification     GamificationProfile?
+}
+
+model SchoolMembership {
+  id          String   @id @default(cuid())
+  userId      String
+  schoolId    String
+  role        Role
+  studentCode String?  
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  enrollments      Enrollment[]
+  teachingClasses  ClassroomTeacher[]
+
+  @@unique([userId, schoolId]) 
+  @@unique([schoolId, studentCode]) 
+}
+
+// ================= ACADEMIC STRUCTURE =================
+model AcademicTerm {
+  id          String      @id @default(cuid())
+  schoolId    String
+  school      School      @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  year        Int
+  term        TermType
+  classrooms  Classroom[]
+  
+  @@unique([id, schoolId]) 
+  @@unique([schoolId, year, term])
+}
+
+model Classroom {
+  id            String       @id @default(cuid())
+  schoolId      String
+  termId        String
+  name          String       // เช่น "ม.3/1"
+  subjectCode   String
+  subjectName   String
+  
+  status        RecordStatus @default(ACTIVE)
+  deletedAt     DateTime?    
+  deletedBy     String?
+
+  term          AcademicTerm @relation(fields: [termId, schoolId], references: [id, schoolId], onDelete: Restrict)
+  school        School       @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  
+  teachers      ClassroomTeacher[]
+  enrollments   Enrollment[]
+  assignments   Assignment[]
+  schedules     Schedule[]
+  sgsUnits      SgsUnit[]
+  
+  @@unique([id, schoolId]) 
+}
+
+model ClassroomTeacher {
+  id          String    @id @default(cuid())
+  classroomId String
+  schoolId    String    
+  userId      String
+  
+  classroom   Classroom        @relation(fields: [classroomId, schoolId], references: [id, schoolId], onDelete: Restrict)
+  membership  SchoolMembership @relation(fields: [userId, schoolId], references: [userId, schoolId], onDelete: Restrict)
+  
+  @@unique([classroomId, userId])
+}
+
+model Enrollment {
+  id            String       @id @default(cuid())
+  classroomId   String
+  schoolId      String       
+  userId        String       
+  studentNo     Int          
+
+  status        RecordStatus @default(ACTIVE)
+  deletedAt     DateTime?
+  deletedBy     String?
+  
+  classroom     Classroom        @relation(fields: [classroomId, schoolId], references: [id, schoolId], onDelete: Restrict)
+  membership    SchoolMembership @relation(fields: [userId, schoolId], references: [userId, schoolId], onDelete: Restrict)
+  
+  scores        Score[]
+  attendances   Attendance[]
+  xpLedgers     XpLedger[]
+  
+  @@unique([classroomId, userId])
+  @@unique([classroomId, studentNo]) 
+  @@unique([id, classroomId]) 
+}
+
+// ================= GRADING & SGS =================
+model SgsUnit {
+  id            String       @id @default(cuid())
+  classroomId   String
+  name          String
+  maxScore      Decimal      @db.Decimal(5, 2)
+  sgsColumnRef  String?      
+  
+  classroom     Classroom    @relation(fields: [classroomId], references: [id], onDelete: Restrict)
+  assignments   Assignment[]
+  
+  @@unique([classroomId, name])
+}
+
+model Assignment {
+  id              String       @id @default(cuid())
+  classroomId     String
+  sgsUnitId       String?      
+  title           String
+  maxScore        Decimal      @db.Decimal(5, 2)
+  
+  classroom       Classroom    @relation(fields: [classroomId], references: [id], onDelete: Restrict)
+  sgsUnit         SgsUnit?     @relation(fields: [sgsUnitId], references: [id], onDelete: SetNull)
+  scores          Score[]
+  externalMappings ExternalMapping[] 
+  
+  @@unique([id, classroomId]) 
+}
+
+model Score {
+  id            String       @id @default(cuid())
+  assignmentId  String
+  enrollmentId  String
+  classroomId   String       
+
+  value         Decimal?     @db.Decimal(5, 2) 
+  state         ScoreState   @default(DRAFT)
+  isExempt      Boolean      @default(false) 
+  
+  // Composite FK ป้องกัน Data Corruption ข้ามห้อง
+  assignment    Assignment   @relation(fields: [assignmentId, classroomId], references: [id, classroomId], onDelete: Restrict)
+  enrollment    Enrollment   @relation(fields: [enrollmentId, classroomId], references: [id, classroomId], onDelete: Restrict)
+  
+  @@unique([assignmentId, enrollmentId])
+}
+
+// ================= ATTENDANCE =================
+model Schedule {
+  id            String       @id @default(cuid())
+  classroomId   String
+  schoolDate    DateTime     @db.Date
+  periodNo      Int
+  type          ScheduleType @default(NORMAL)
+  isConducted   Boolean      @default(false) 
+  
+  classroom     Classroom    @relation(fields: [classroomId], references: [id], onDelete: Restrict)
+  attendances   Attendance[]
+  
+  @@unique([id, classroomId]) 
+  @@unique([classroomId, schoolDate, periodNo])
+}
+
+model Attendance {
+  id            String           @id @default(cuid())
+  scheduleId    String
+  enrollmentId  String
+  classroomId   String           
+  status        AttendanceStatus 
+  
+  schedule      Schedule         @relation(fields: [scheduleId, classroomId], references: [id, classroomId], onDelete: Restrict)
+  enrollment    Enrollment       @relation(fields: [enrollmentId, classroomId], references: [id, classroomId], onDelete: Restrict)
+  
+  @@unique([scheduleId, enrollmentId])
+}
+
+// ================= GAMIFICATION & EXTERNAL =================
+model GamificationProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalXp     Int      @default(0) // อัปเดตผ่าน DB Trigger เท่านั้น
+}
+
+model XpLedger {
+  id             String     @id @default(cuid())
+  enrollmentId   String
+  amount         Int
+  sourceType     String     
+  sourceId       String     
+  eventType      String     
+  eventVersion   Int        @default(1)
+  
+  enrollment     Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  
+  @@unique([enrollmentId, sourceType, sourceId, eventType, eventVersion])
+}
+
+model ExternalMapping {
+  id             String     @id @default(cuid())
+  assignmentId   String
+  provider       String     // e.g., "GOOGLE_CLASSROOM"
+  externalId     String     // e.g., courseWorkId
+  
+  assignment     Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  @@unique([provider, externalId])
+}
