@@ -19,6 +19,7 @@ import { UserAccountsView } from './views/UserAccountsView';
 import { StudentPortalView } from './views/StudentPortalView';
 import { SchoolPortalView, type TeacherLoginChannel } from './views/SchoolPortalView';
 import { HomeVisitSdqView } from './views/HomeVisitSdqView';
+import { StudentAffairsCouncilView } from './views/StudentAffairsCouncilView';
 import { QuickSearchModal } from './components/common/QuickSearchModal';
 import type { AtRiskStudent } from './types/viewModels';
 import {
@@ -33,6 +34,8 @@ import {
   PenTool,
   LogIn,
   HeartHandshake,
+  ShieldAlert,
+  Vote,
 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -55,7 +58,11 @@ export const App: React.FC = () => {
       case 'sar':
         return 'เทียบผลข้ามห้อง';
       case 'home-visit':
-        return 'เยี่ยมบ้านนักเรียน / ดูแลผู้เรียนรายบุคคล (SDQ)';
+        return 'เยี่ยมบ้านนักเรียน (แบบ นร./กสศ.01) & โอนข้อมูลเข้า CCT (cct.eef.or.th)';
+      case 'student-affairs':
+        return 'ระบบบริหารงานกิจการนักเรียน (เช็คชื่อเสาธง / วินัย / ใบลานักเรียน)';
+      case 'student-council':
+        return 'ระบบสภานักเรียน & เลือกตั้งออนไลน์ (E-Voting)';
       case 'courses':
         return 'รายวิชา / หลักสูตร';
       case 'lessons':
@@ -146,7 +153,31 @@ export const App: React.FC = () => {
             }`}
           >
             <HeartHandshake className="w-3 h-3" />
-            <span>🏡 เยี่ยมบ้าน / SDQ (ครู)</span>
+            <span>🏡 เยี่ยมบ้าน นร.01 / CCT กสศ.</span>
+          </button>
+
+          <button
+            onClick={() => setCurrentView('student-affairs')}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${
+              currentView === 'student-affairs'
+                ? 'bg-amber-500 text-slate-950 shadow-xs'
+                : 'bg-slate-800 text-amber-300 hover:bg-slate-700 border border-amber-500/30'
+            }`}
+          >
+            <ShieldAlert className="w-3 h-3" />
+            <span>🛡️ กิจการนักเรียน & เช็คชื่อเสาธง</span>
+          </button>
+
+          <button
+            onClick={() => setCurrentView('student-council')}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${
+              currentView === 'student-council'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-slate-800 text-indigo-300 hover:bg-slate-700 border border-indigo-500/30'
+            }`}
+          >
+            <Vote className="w-3 h-3" />
+            <span>🗳️ สภานักเรียน & E-Voting</span>
           </button>
 
           <button
@@ -218,7 +249,7 @@ export const App: React.FC = () => {
             }`}
           >
             <GraduationCap className="w-3 h-3" />
-            <span>6. ห้องเรียนผจญภัย (นักเรียน + ปักหมุดบ้าน)</span>
+            <span>6. พอร์ทัลนักเรียน (โหวตสภา / ใบลา / เยี่ยมบ้าน)</span>
           </button>
         </div>
       </div>
@@ -287,6 +318,22 @@ export const App: React.FC = () => {
               {currentView === 'sar' && <CrossClassSarView />}
 
               {currentView === 'home-visit' && <HomeVisitSdqView />}
+
+              {currentView === 'student-affairs' && (
+                <StudentAffairsCouncilView
+                  key="affairs"
+                  initialSection="AFFAIRS"
+                  onOpenHomeVisit={() => setCurrentView('home-visit')}
+                />
+              )}
+
+              {currentView === 'student-council' && (
+                <StudentAffairsCouncilView
+                  key="council"
+                  initialSection="COUNCIL"
+                  onOpenHomeVisit={() => setCurrentView('home-visit')}
+                />
+              )}
 
               {currentView === 'courses' && <CoursesCurriculumView />}
 

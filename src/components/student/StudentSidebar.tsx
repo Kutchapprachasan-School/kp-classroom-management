@@ -7,6 +7,7 @@ import {
   Award,
   LogOut,
   MapPin,
+  Vote,
 } from 'lucide-react';
 
 export type StudentTabKey =
@@ -15,7 +16,8 @@ export type StudentTabKey =
   | 'arena'
   | 'gradebook'
   | 'trophy'
-  | 'home-visit';
+  | 'home-visit'
+  | 'council-affairs';
 
 interface StudentSidebarProps {
   activeTab: StudentTabKey;
@@ -47,7 +49,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
         <div>
           <div className="px-3 pb-2 text-[11px] font-medium text-slate-400">
-            พื้นที่เรียนรู้
+            พื้นที่เรียนรู้ & กิจกรรมนักเรียน
           </div>
           <div className="space-y-1">
             <button
@@ -120,10 +122,27 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
             >
               <span className="flex items-center gap-3">
                 <MapPin className={`w-4 h-4 ${activeTab === 'home-visit' ? 'text-blue-600' : 'text-emerald-600'}`} />
-                <span>เยี่ยมบ้าน / SDQ</span>
+                <span>เยี่ยมบ้าน นร.01 / SDQ</span>
               </span>
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
                 GPS
+              </span>
+            </button>
+
+            <button
+              onClick={() => onSelectTab('council-affairs')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors ${
+                activeTab === 'council-affairs'
+                  ? 'bg-blue-50 text-blue-700 font-semibold border border-blue-200'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-3">
+                <Vote className={`w-4 h-4 ${activeTab === 'council-affairs' ? 'text-blue-600' : 'text-indigo-600'}`} />
+                <span>สภานักเรียน & ใบลา</span>
+              </span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold border border-indigo-200">
+                Vote
               </span>
             </button>
           </div>

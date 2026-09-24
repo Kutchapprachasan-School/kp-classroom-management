@@ -11,10 +11,11 @@ import { StudentArenaView } from './StudentArenaView';
 import { StudentGradebookView } from './StudentGradebookView';
 import { StudentTrophyView } from './StudentTrophyView';
 import { StudentHomeVisitFormView } from './StudentHomeVisitFormView';
+import { StudentCouncilAffairsPortalView } from './StudentCouncilAffairsPortalView';
 import { studentAdventureQuests } from '../data/mockData';
 import type { StudentQuestItem } from '../types/viewModels';
 import { gamificationService } from '../services/gamificationService';
-import { MapPin, ArrowRight } from 'lucide-react';
+import { MapPin, ArrowRight, Vote } from 'lucide-react';
 
 interface StudentPortalViewProps {
   onExit: () => void;
@@ -57,8 +58,8 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({ onExit }) 
         <main className="flex-1 p-6 md:p-8 overflow-y-auto">
           {activeTab === 'home' && (
             <div className="max-w-7xl mx-auto space-y-6">
-              {/* Greeting Header & Home Visit GPS Callout */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              {/* Greeting Header & Quick Callouts */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2">
                     <h1 className="text-xl sm:text-2xl font-bold text-slate-800">
@@ -73,14 +74,25 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({ onExit }) 
                   </p>
                 </div>
 
-                <button
-                  onClick={() => setActiveTab('home-visit')}
-                  className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition-colors shadow-xs"
-                >
-                  <MapPin className="w-4 h-4 text-emerald-600" />
-                  <span>กรอกข้อมูลเยี่ยมบ้าน / ปักหมุด GPS & SDQ (+50 XP)</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => setActiveTab('home-visit')}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition-colors shadow-xs"
+                  >
+                    <MapPin className="w-4 h-4 text-emerald-600" />
+                    <span>เยี่ยมบ้าน นร.01 / ปักหมุด GPS (+50 XP)</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('council-affairs')}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold transition-colors shadow-xs"
+                  >
+                    <Vote className="w-4 h-4 text-indigo-600" />
+                    <span>เลือกตั้งสภานักเรียน E-Voting & ยื่นใบลา</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
               {/* Two-Column Grid: Left (Adventure + Quests) vs Right (Pet + Badges) */}
@@ -137,6 +149,12 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({ onExit }) 
 
           {activeTab === 'home-visit' && (
             <StudentHomeVisitFormView
+              onAwardXp={(xp) => setCurrentXp((prev) => prev + xp)}
+            />
+          )}
+
+          {activeTab === 'council-affairs' && (
+            <StudentCouncilAffairsPortalView
               onAwardXp={(xp) => setCurrentXp((prev) => prev + xp)}
             />
           )}

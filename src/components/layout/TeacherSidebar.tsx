@@ -19,6 +19,8 @@ import {
   LogOut,
   School as SchoolIcon,
   HeartHandshake,
+  ShieldAlert,
+  Vote,
 } from 'lucide-react';
 
 export type TeacherViewKey =
@@ -30,6 +32,8 @@ export type TeacherViewKey =
   | 'readiness'
   | 'sar'
   | 'home-visit'
+  | 'student-affairs'
+  | 'student-council'
   | 'courses'
   | 'lessons'
   | 'roster'
@@ -233,10 +237,53 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
                     currentView === 'home-visit' ? 'text-blue-600' : 'text-rose-500'
                   }`}
                 />
-                <span>เยี่ยมบ้าน / ดูแลผู้เรียน (SDQ)</span>
+                <span>เยี่ยมบ้าน นร.01 / กสศ. (CCT)</span>
               </span>
               <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 font-bold border border-rose-200">
-                ใหม่
+                CCT
+              </span>
+            </button>
+
+            <button
+              onClick={() => onNavigate('student-affairs')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors ${
+                currentView === 'student-affairs'
+                  ? 'bg-blue-50 text-blue-600 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-3">
+                <ShieldAlert
+                  className={`w-4 h-4 ${
+                    currentView === 'student-affairs'
+                      ? 'text-blue-600'
+                      : 'text-amber-600'
+                  }`}
+                />
+                <span>กิจการนักเรียน & เช็คชื่อเสาธง</span>
+              </span>
+            </button>
+
+            <button
+              onClick={() => onNavigate('student-council')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors ${
+                currentView === 'student-council'
+                  ? 'bg-blue-50 text-blue-600 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-3">
+                <Vote
+                  className={`w-4 h-4 ${
+                    currentView === 'student-council'
+                      ? 'text-blue-600'
+                      : 'text-indigo-600'
+                  }`}
+                />
+                <span>สภานักเรียน & E-Voting</span>
+              </span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 font-bold border border-indigo-200">
+                Vote
               </span>
             </button>
           </div>
