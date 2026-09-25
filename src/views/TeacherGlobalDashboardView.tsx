@@ -26,10 +26,10 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
 }) => {
   const [activePeriodTab, setActivePeriodTab] = useState<'today' | 'week' | 'month'>('today');
   const [todos, setTodos] = useState([
-    { id: 'todo-1', text: 'ส่งคะแนนเก็บหน่วยที่ 1-2 เข้าสู่ระบบ SGS', done: true },
-    { id: 'todo-2', text: 'ติดตามงาน My Soundtrack ของนักเรียน ม.3/1 ที่ยังค้าง 2 คน', done: false },
-    { id: 'todo-3', text: 'ประเมินคุณลักษณะอันพึงประสงค์ 8 ประการ ห้อง ม.1/8', done: false },
-    { id: 'todo-4', text: 'ตรวจเช็ครายชื่อนักเรียนกลุ่มเสี่ยง มส. 7 คน', done: false },
+    { id: 'todo-1', text: 'ส่งคะแนนหน่วย 1–2 เข้า SGS', done: true },
+    { id: 'todo-2', text: 'ตามงานค้าง ม.3/1 (2 คน)', done: false },
+    { id: 'todo-3', text: 'ประเมินคุณลักษณะ ม.1/8', done: false },
+    { id: 'todo-4', text: 'ตรวจรายชื่อเสี่ยง มส. (7 คน)', done: false },
   ]);
   const [isAddingTodo, setIsAddingTodo] = useState(false);
   const [newTodoText, setNewTodoText] = useState('');
@@ -41,7 +41,7 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
       courseCode: 'ศ23101',
       subject: 'ศิลปะพื้นฐาน 5',
       classroom: 'ม.3/1',
-      room: 'ห้องปฏิบัติการศิลปะ 2',
+      room: 'ห้องศิลปะ 2',
       status: 'CHECKED',
       attendanceSummary: 'มา 22 · ลา 1',
     },
@@ -49,9 +49,9 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
       period: 'คาบ 7',
       time: '13:30–14:20',
       courseCode: 'ก23901',
-      subject: 'กิจกรรมแนะแนว',
+      subject: 'แนะแนว',
       classroom: 'ม.3/1',
-      room: 'อาคาร 3 ห้อง 304',
+      room: 'ห้อง 304',
       status: 'PENDING',
       attendanceSummary: 'รอเช็คชื่อ (23 คน)',
     },
@@ -59,9 +59,9 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
       period: 'คาบ 8',
       time: '14:20–15:10',
       courseCode: 'ก20905',
-      subject: 'ชุมนุมดนตรีไทย-พื้นเมือง',
+      subject: 'ชุมนุมดนตรีไทย',
       classroom: 'ม.1–ม.3',
-      room: 'หอประชุมดนตรีไทย',
+      room: 'หอประชุมดนตรี',
       status: 'PENDING',
       attendanceSummary: 'รอเช็คชื่อ (30 คน)',
     },
@@ -70,48 +70,43 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
   const classroomTaskRows = [
     {
       id: 'task-1',
-      category: 'การเช็คชื่อรายคาบ',
-      detail: 'ยังมีคาบเรียนที่ยังไม่ได้บันทึกสถานะเข้าเรียน',
+      category: 'เช็คชื่อรายคาบที่ค้าง',
       affectedClasses: 9,
       totalVolume: '65 คาบ',
       priority: 'HIGH',
-      actionLabel: 'ไปหน้าเช็คชื่อ',
+      actionLabel: 'เช็คชื่อ',
       onClick: onNavigateToAttendance,
     },
     {
       id: 'task-2',
-      category: 'คะแนนเก็บระหว่างภาค',
-      detail: 'ช่องคะแนนงานและใบงานยังกรอกไม่ครบ',
+      category: 'กรอกคะแนนเก็บระหว่างภาค',
       affectedClasses: 8,
-      totalVolume: '375 ช่องคะแนน',
+      totalVolume: '375 ช่อง',
       priority: 'HIGH',
       actionLabel: 'กรอกคะแนน',
       onClick: () => onNavigateToClass('cls-1'),
     },
     {
       id: 'task-3',
-      category: 'คุณลักษณะอันพึงประสงค์ & อ่านคิดวิเคราะห์',
-      detail: 'รอประเมินผลระดับ 0–3 ประจำภาคเรียนที่ 1/2569',
+      category: 'ประเมินคุณลักษณะ & อ่านคิดวิเคราะห์',
       affectedClasses: 9,
       totalVolume: '276 คน',
       priority: 'MEDIUM',
-      actionLabel: 'ประเมินรายห้อง',
+      actionLabel: 'ประเมิน',
       onClick: onNavigateToReadiness,
     },
     {
       id: 'task-4',
-      category: 'ความพร้อมก่อนส่งเกรดปิดภาคเรียน (SGS)',
-      detail: 'ตรวจสอบ 5 เงื่อนไขความสมบูรณ์ก่อนส่งทะเบียนวัดผล',
+      category: 'ตรวจความครบก่อนส่งเกรด (ปพ.5)',
       affectedClasses: 9,
-      totalVolume: '9 ห้องเรียน',
+      totalVolume: '9 ห้อง',
       priority: 'MEDIUM',
-      actionLabel: 'ตรวจความพร้อม',
+      actionLabel: 'ตรวจสอบ',
       onClick: onNavigateToReadiness,
     },
     {
       id: 'task-5',
-      category: 'การผูกหน่วยการเรียนรู้กับโครงสร้างรายวิชา',
-      detail: 'งานและข้อสอบทุกชิ้นผูกกับหน่วยการเรียนรู้ครบถ้วนแล้ว',
+      category: 'ผูกหน่วยการเรียนรู้',
       affectedClasses: 0,
       totalVolume: 'ครบ 100%',
       priority: 'DONE',
@@ -245,32 +240,29 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left 2/3 Column (8 cols): Structured Data Tables */}
         <div className="lg:col-span-8 space-y-6">
-          {/* Step-by-Step Guide Banner for Senior Teachers */}
-          <div className="bg-teal-50/90 border border-teal-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="space-y-1">
-              <div className="text-sm font-bold text-teal-950 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-teal-700 shrink-0" />
-                <span>งานสำคัญอันดับแรกวันนี้: เช็คชื่อเข้าคาบเรียน (เหลือ 2 คาบ)</span>
-              </div>
-              <p className="text-xs text-teal-800 leading-relaxed">
-                กดปุ่มสีเขียว <strong>“เช็คชื่อเข้าคาบ”</strong> ในตารางด้านล่างได้เลย — ระบบติ๊ก <strong>“มาเรียน”</strong> ให้นักเรียนครบทุกคนไว้ล่วงหน้าแล้ว คุณครูกดเปลี่ยนเฉพาะคนที่ สาย / ลา / ขาด เท่านั้น
-              </p>
+          {/* Concise 1-Line Action Banner */}
+          <div className="bg-teal-50/90 border border-teal-200 rounded-2xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 text-xs sm:text-sm text-teal-950">
+              <CheckCircle2 className="w-4 h-4 text-teal-700 shrink-0" />
+              <span>
+                <strong>รอเช็คชื่อวันนี้ 2 คาบ</strong> · ระบบติ๊ก “มาเรียน” ให้ครบแล้ว กดแก้เฉพาะ สาย/ลา/ขาด
+              </span>
             </div>
             <button
               onClick={onNavigateToAttendance}
-              className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shrink-0 shadow-xs transition-colors self-start sm:self-center"
+              className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shrink-0 shadow-xs transition-colors self-start sm:self-center"
             >
-              เช็คชื่อคาบถัดไปทันที
+              เช็คชื่อทันที
             </button>
           </div>
 
           {/* Table 1: ตารางสอนและเช็คชื่อประจำวัน */}
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="px-5 py-3.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-teal-600" />
                 <h2 className="font-bold text-slate-900 text-sm">
-                  ตารางสอนและการเช็คชื่อประจำวัน
+                  ตารางสอนวันนี้
                 </h2>
               </div>
 
@@ -301,33 +293,33 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-semibold">
                     <th className="py-3 px-4">คาบ / เวลา</th>
-                    <th className="py-3 px-4">รหัส / รายวิชา</th>
-                    <th className="py-3 px-4">ชั้นเรียน / ห้อง</th>
-                    <th className="py-3 px-4">สถานะเช็คชื่อ</th>
-                    <th className="py-3 px-4 text-right">การจัดการ</th>
+                    <th className="py-3 px-4">รายวิชา</th>
+                    <th className="py-3 px-4">ชั้นเรียน</th>
+                    <th className="py-3 px-4">สถานะ</th>
+                    <th className="py-3 px-4 text-right">จัดการ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {todayScheduleRows.map((row) => (
                     <tr key={row.period} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="py-3.5 px-4 whitespace-nowrap">
+                      <td className="py-3 px-4 whitespace-nowrap">
                         <div className="font-bold text-slate-900">{row.period}</div>
-                        <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5 tabular-nums">
+                        <div className="text-[11px] text-slate-400 flex items-center gap-1 tabular-nums">
                           <Clock className="w-3 h-3" />
                           <span>{row.time}</span>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4">
+                      <td className="py-3 px-4">
                         <div className="font-bold text-slate-900">{row.subject}</div>
                         <div className="text-[11px] text-slate-400 font-mono">{row.courseCode}</div>
                       </td>
-                      <td className="py-3.5 px-4">
+                      <td className="py-3 px-4 whitespace-nowrap">
                         <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold text-[11px]">
                           {row.classroom}
                         </span>
-                        <div className="text-[11px] text-slate-400 mt-0.5">{row.room}</div>
+                        <span className="text-[11px] text-slate-400 ml-1.5">{row.room}</span>
                       </td>
-                      <td className="py-3.5 px-4 whitespace-nowrap">
+                      <td className="py-3 px-4 whitespace-nowrap">
                         {row.status === 'CHECKED' ? (
                           <span className="inline-flex items-center gap-1.5 text-teal-700 font-semibold">
                             <span className="w-2 h-2 rounded-full bg-teal-500" />
@@ -340,7 +332,7 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
                           </span>
                         )}
                       </td>
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                      <td className="py-3 px-4 text-right whitespace-nowrap">
                         <button
                           onClick={onNavigateToAttendance}
                           className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
@@ -349,7 +341,7 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
                               : 'bg-teal-600 hover:bg-teal-700 text-white shadow-2xs'
                           }`}
                         >
-                          {row.status === 'CHECKED' ? 'แก้ไขเช็คชื่อ' : 'เช็คชื่อเข้าคาบ'}
+                          {row.status === 'CHECKED' ? 'แก้ไข' : 'เช็คชื่อ'}
                         </button>
                       </td>
                     </tr>
@@ -359,22 +351,17 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
             </div>
           </div>
 
-          {/* Table 2: ตารางงานที่ต้องดำเนินการรายห้องเรียน (Converted from 5 scattered cards into a clean Data Table) */}
+          {/* Table 2: ตารางงานวัดผลและ ปพ.5 */}
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h2 className="font-bold text-slate-900 text-sm">
-                  ตารางติดตามงานวัดผลและธุรกรรมชั้นเรียน
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  สรุปรายการที่ต้องดำเนินการก่อนส่งผลสัมฤทธิ์ทางการเรียนปลายภาค
-                </p>
-              </div>
+            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="font-bold text-slate-900 text-sm">
+                งานวัดผลและสมุดพก (ปพ.5)
+              </h2>
               <button
                 onClick={onNavigateToReadiness}
                 className="text-xs text-teal-700 hover:text-teal-800 font-semibold inline-flex items-center gap-1"
               >
-                <span>ดูภาพรวมทุกห้อง</span>
+                <span>ดูทั้งหมด</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -383,11 +370,11 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-semibold">
-                    <th className="py-3 px-4">รายการตรวจสอบ</th>
-                    <th className="py-3 px-4 text-right">จำนวนห้องที่ค้าง</th>
-                    <th className="py-3 px-4 text-right">ปริมาณงาน</th>
+                    <th className="py-3 px-4">รายการ</th>
+                    <th className="py-3 px-4 text-right">ห้องที่ค้าง</th>
+                    <th className="py-3 px-4 text-right">จำนวน</th>
                     <th className="py-3 px-4">สถานะ</th>
-                    <th className="py-3 px-4 text-right">ดำเนินการ</th>
+                    <th className="py-3 px-4 text-right">จัดการ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -397,9 +384,8 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
                       onClick={item.onClick}
                       className="hover:bg-slate-50/60 transition-colors cursor-pointer"
                     >
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold text-slate-900">{item.category}</div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">{item.detail}</div>
+                      <td className="py-3 px-4 font-bold text-slate-900">
+                        {item.category}
                       </td>
                       <td className="py-3.5 px-4 text-right font-bold tabular-nums text-slate-900 whitespace-nowrap">
                         {item.affectedClasses > 0 ? `${item.affectedClasses} ห้อง` : '-'}

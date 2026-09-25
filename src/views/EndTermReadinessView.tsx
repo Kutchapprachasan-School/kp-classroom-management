@@ -234,28 +234,26 @@ export const EndTermReadinessView: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Table 1: ตารางรายการชิ้นงานที่ยังมีช่องคะแนนว่าง */}
         <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-teal-600" />
-              <div>
-                <h2 className="font-bold text-slate-900 text-sm">
-                  ตารางตรวจสอบช่องคะแนนรายชิ้นงาน
-                </h2>
-                <p className="text-[11px] text-slate-500">
-                  หากนักเรียนไม่ส่งงานจริง สามารถกด “ปิดรับงาน” เพื่อบันทึกเป็น 0 ครั้งเดียวทั้งห้อง
-                </p>
-              </div>
+              <h2 className="font-bold text-slate-900 text-sm">
+                ช่องคะแนนรายชิ้นงาน
+              </h2>
             </div>
+            <span className="text-[11px] text-slate-400">
+              กด “ปิดรับงาน” เพื่อใส่ 0 คนไม่ส่ง
+            </span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-semibold">
-                  <th className="py-3 px-4">ชื่อชิ้นงาน / การสอบ</th>
+                  <th className="py-3 px-4">ชิ้นงาน / การสอบ</th>
                   <th className="py-3 px-4">ประเภท</th>
-                  <th className="py-3 px-4 text-right">ช่องที่ยังว่าง</th>
-                  <th className="py-3 px-4 text-right">การดำเนินการ</th>
+                  <th className="py-3 px-4 text-right">ช่องว่าง</th>
+                  <th className="py-3 px-4 text-right">จัดการ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
