@@ -245,6 +245,25 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left 2/3 Column (8 cols): Structured Data Tables */}
         <div className="lg:col-span-8 space-y-6">
+          {/* Step-by-Step Guide Banner for Senior Teachers */}
+          <div className="bg-teal-50/90 border border-teal-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <div className="text-sm font-bold text-teal-950 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-teal-700 shrink-0" />
+                <span>งานสำคัญอันดับแรกวันนี้: เช็คชื่อเข้าคาบเรียน (เหลือ 2 คาบ)</span>
+              </div>
+              <p className="text-xs text-teal-800 leading-relaxed">
+                กดปุ่มสีเขียว <strong>“เช็คชื่อเข้าคาบ”</strong> ในตารางด้านล่างได้เลย — ระบบติ๊ก <strong>“มาเรียน”</strong> ให้นักเรียนครบทุกคนไว้ล่วงหน้าแล้ว คุณครูกดเปลี่ยนเฉพาะคนที่ สาย / ลา / ขาด เท่านั้น
+              </p>
+            </div>
+            <button
+              onClick={onNavigateToAttendance}
+              className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shrink-0 shadow-xs transition-colors self-start sm:self-center"
+            >
+              เช็คชื่อคาบถัดไปทันที
+            </button>
+          </div>
+
           {/* Table 1: ตารางสอนและเช็คชื่อประจำวัน */}
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">

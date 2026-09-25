@@ -25,6 +25,34 @@
   table {
     font-variant-numeric: tabular-nums;
   }
+
+  /* Senior Teacher Comfort Font Scaling (ก- / ก ปกติ / ก+ ใหญ่พิเศษ) */
+  html[data-font-scale="normal"] {
+    font-size: 16.5px;
+  }
+
+  html[data-font-scale="large"] {
+    font-size: 18px;
+  }
+
+  html[data-font-scale="xlarge"] {
+    font-size: 19.5px;
+  }
+
+  html[data-font-scale="large"] .text-\[9px\],
+  html[data-font-scale="large"] .text-\[10px\],
+  html[data-font-scale="large"] .text-\[11px\] {
+    font-size: 0.8125rem !important;
+    line-height: 1.35 !important;
+  }
+
+  html[data-font-scale="xlarge"] .text-\[9px\],
+  html[data-font-scale="xlarge"] .text-\[10px\],
+  html[data-font-scale="xlarge"] .text-\[11px\],
+  html[data-font-scale="xlarge"] .text-xs {
+    font-size: 0.875rem !important;
+    line-height: 1.45 !important;
+  }
 }
 
 /* Custom scrollbars for clean dashboards */

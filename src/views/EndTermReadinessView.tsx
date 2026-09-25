@@ -60,9 +60,14 @@ export const EndTermReadinessView: React.FC = () => {
     { no: 7, name: 'ด.ช. ธนภัทร เขอหมือ', score: '' },
   ]);
 
-  // Modal states
+  // Modal & Confirmation Banner states
   const [gradingTask, setGradingTask] = useState<ReadinessTask | null>(null);
   const [isOverviewModalOpen, setIsOverviewModalOpen] = useState(false);
+  const [savedBannerMessage, setSavedBannerMessage] = useState<string | null>(null);
+
+  const showSuccessBanner = (msg: string) => {
+    setSavedBannerMessage(msg);
+  };
 
   const totalEmptyScores = tasks.reduce((sum, t) => sum + t.emptyCount, 0);
 
@@ -76,7 +81,9 @@ export const EndTermReadinessView: React.FC = () => {
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, emptyCount: 0 } : t))
     );
-    alert(`ปิดรับงาน "${taskTitle}": บันทึกนักเรียนที่ยังไม่ส่งเป็น 0 (ไม่ส่ง) เรียบร้อยแล้ว (อัปเดตลง Audit Log อัตโนมัติ)`);
+    showSuccessBanner(
+      `บันทึกเรียบร้อย: ปิดรับงาน "${taskTitle}" และใส่คะแนน 0 ให้คนที่ยังไม่ส่งแล้ว (ไม่ต้องกดซ้ำ)`
+    );
   };
 
   const handleSaveGrading = async (taskId: string) => {
@@ -94,25 +101,47 @@ export const EndTermReadinessView: React.FC = () => {
       prev.map((t) => (t.id === taskId ? { ...t, emptyCount: 0 } : t))
     );
     setGradingTask(null);
-    alert('บันทึกคะแนนเรียบร้อย! ช่องคะแนนว่างลดลงแล้ว');
+    showSuccessBanner(
+      'บันทึกคะแนนลงสมุดพก (ปพ.5) เรียบร้อยแล้ว! ช่องคะแนนว่างถูกอัปเดตครบถ้วน'
+    );
   };
 
   const handleAutoFillTraits = () => {
     setStudentsList((prev) => prev.map((s) => ({ ...s, score: '3' })));
-    alert('ใส่ผลการประเมินระดับ 3 (ดีเยี่ยม) ให้นักเรียนทั้งหมดเรียบร้อย');
+    showSuccessBanner(
+      'ใส่ระดับ 3 (ดีเยี่ยม) ให้นักเรียนครบทั้งห้องเรียบร้อยแล้ว — กดปุ่ม "บันทึกผลลง ปพ.5" ด้านล่างเพื่อยืนยัน'
+    );
   };
 
   const handleSaveTraits = () => {
-    alert('บันทึกผลการประเมินคุณลักษณะอันพึงประสงค์และอ่านคิดวิเคราะห์เข้าสู่ระบบ SGS สำเร็จ!');
+    showSuccessBanner(
+      'บันทึกผลคุณลักษณะอันพึงประสงค์และอ่านคิดวิเคราะห์เข้าสู่ระบบ ปพ.5 / SGS เรียบร้อยแล้ว ไม่ต้องกดซ้ำ'
+    );
   };
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 font-sans text-slate-800 select-none">
+      {/* Reassuring Green Confirmation Banner (No jarring browser alert) */}
+      {savedBannerMessage && (
+        <div className="bg-teal-50 border border-teal-300 rounded-2xl p-4 flex items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2.5 text-teal-950 text-xs sm:text-sm font-bold">
+            <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0" />
+            <span>{savedBannerMessage}</span>
+          </div>
+          <button
+            onClick={() => setSavedBannerMessage(null)}
+            className="px-2.5 py-1 rounded-lg bg-white border border-teal-200 text-teal-800 text-xs font-semibold hover:bg-teal-100 transition-colors shrink-0"
+          >
+            รับทราบ
+          </button>
+        </div>
+      )}
+
       {/* 1. Clean Header Bar */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-lg sm:text-xl font-bold text-slate-900">
-            ตรวจสอบความพร้อมก่อนส่งเกรดปลายภาคเรียน 1/2569
+            ตรวจสอบความครบถ้วนก่อนส่งเกรด (ปพ.5) ภาคเรียนที่ 1/2569
           </h1>
           <p className="text-xs text-slate-500 mt-1">
             รายวิชา ศ20221 ดนตรีปฏิบัติตามความถนัด 1 — ชั้น ม.1/8 (นักเรียน 27 คน)

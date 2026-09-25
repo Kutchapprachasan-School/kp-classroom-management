@@ -619,10 +619,10 @@ export const HomeVisitSdqView: React.FC = () => {
                       <div className="inline-flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => openRecordModal(rec, 'NOR01_INCOME')}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-semibold text-xs transition-colors"
                         >
-                          <Edit3 className="w-3.5 h-3.5 text-slate-500" />
-                          <span>นร.01</span>
+                          <Edit3 className="w-3.5 h-3.5 text-slate-600" />
+                          <span>กรอก นร.01</span>
                         </button>
 
                         <button
@@ -630,13 +630,13 @@ export const HomeVisitSdqView: React.FC = () => {
                           className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs shadow-2xs transition-colors"
                         >
                           <CloudUpload className="w-3.5 h-3.5" />
-                          <span>โอน CCT</span>
+                          <span>ส่งขึ้นเว็บ กสศ.</span>
                         </button>
 
                         <button
                           onClick={() => handleExportNor01JsonForCctBot(rec)}
-                          title="ดาวน์โหลดไฟล์ JSON Auto-Fill สำหรับ cct.eef.or.th"
-                          className="p-1.5 rounded-xl border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors"
+                          title="ดาวน์โหลดไฟล์ข้อมูล นร.01 สำหรับส่งระบบ กสศ."
+                          className="p-1.5 rounded-xl border border-slate-300 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors"
                         >
                           <Download className="w-3.5 h-3.5" />
                         </button>

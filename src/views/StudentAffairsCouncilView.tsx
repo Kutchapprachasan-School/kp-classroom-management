@@ -205,7 +205,7 @@ export const StudentAffairsCouncilView: React.FC<
             </div>
           </div>
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold">
-            Exception-Only
+            ติ๊ก “มา” ให้ครบแล้ว
           </span>
         </div>
 
@@ -293,6 +293,11 @@ export const StudentAffairsCouncilView: React.FC<
                   <span>ตารางอนุมัติใบลานักเรียน ({leaveRequests.length})</span>
                 </button>
               </div>
+
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-700 bg-teal-50 border border-teal-200 px-3 py-1 rounded-lg">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>กดเปลี่ยนสถานะแล้วระบบบันทึกให้อัตโนมัติทันที</span>
+              </span>
             </div>
 
             {/* Tab 1.1: เช็คชื่อแถวหน้าเสาธง (Data Table) */}
@@ -303,8 +308,8 @@ export const StudentAffairsCouncilView: React.FC<
                     <h2 className="text-sm font-bold text-slate-900">
                       ตารางเช็คชื่อเข้าแถวเคารพธงชาติรายวัน — ชั้น ม.3/1
                     </h2>
-                    <p className="text-xs text-slate-500">
-                      ค่าเริ่มต้นทุกคนคือ "มาเข้าแถว" บันทึกลงฐานข้อมูลเฉพาะคนที่ สาย / ลา / ขาด (คุ้มครองวันย้ายเข้า enrolled_at)
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      ระบบติ๊ก <strong>“มาเข้าแถว”</strong> ให้นักเรียนครบทุกคนไว้แล้ว — คุณครูกดปุ่มด้านขวาเฉพาะคนที่ <strong>สาย / ลาป่วย / ขาด</strong>
                     </p>
                   </div>
                 </div>
@@ -315,10 +320,10 @@ export const StudentAffairsCouncilView: React.FC<
                       <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-semibold">
                         <th className="py-3 px-4">รหัสนักเรียน</th>
                         <th className="py-3 px-4">ชื่อ - นามสกุล</th>
-                        <th className="py-3 px-4">วันเริ่มนับคาบเรียน (enrolled_at)</th>
+                        <th className="py-3 px-4">วันย้ายเข้าเรียน</th>
                         <th className="py-3 px-4">สถานะเข้าแถววันนี้</th>
                         <th className="py-3 px-4">หมายเหตุ</th>
-                        <th className="py-3 px-4 text-right">เปลี่ยนสถานะ</th>
+                        <th className="py-3 px-4 text-right">กดเลือกสถานะ (บันทึกอัตโนมัติ)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -359,27 +364,29 @@ export const StudentAffairsCouncilView: React.FC<
                           <td className="py-3.5 px-4 text-slate-500">
                             {stu.note || '-'}
                           </td>
-                          <td className="py-3.5 px-4 text-right whitespace-nowrap space-x-1">
-                            {[
-                              { key: 'PRESENT', label: 'มา' },
-                              { key: 'LATE', label: 'สาย' },
-                              { key: 'SICK_LEAVE', label: 'ลาป่วย' },
-                              { key: 'ABSENT', label: 'ขาด' },
-                            ].map((btn) => (
-                              <button
-                                key={btn.key}
-                                onClick={() =>
-                                  handleUpdateAssembly(stu.studentCode, btn.key as any)
-                                }
-                                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${
-                                  stu.status === btn.key
-                                    ? 'bg-teal-600 text-white border-teal-600'
-                                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                                }`}
-                              >
-                                {btn.label}
-                              </button>
-                            ))}
+                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1.5">
+                              {[
+                                { key: 'PRESENT', label: 'มา' },
+                                { key: 'LATE', label: 'สาย' },
+                                { key: 'SICK_LEAVE', label: 'ลาป่วย' },
+                                { key: 'ABSENT', label: 'ขาด' },
+                              ].map((btn) => (
+                                <button
+                                  key={btn.key}
+                                  onClick={() =>
+                                    handleUpdateAssembly(stu.studentCode, btn.key as any)
+                                  }
+                                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
+                                    stu.status === btn.key
+                                      ? 'bg-teal-600 text-white border-teal-600 shadow-2xs'
+                                      : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                                  }`}
+                                >
+                                  {btn.label}
+                                </button>
+                              ))}
+                            </div>
                           </td>
                         </tr>
                       ))}

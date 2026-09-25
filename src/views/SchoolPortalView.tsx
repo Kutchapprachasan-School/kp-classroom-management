@@ -6,7 +6,6 @@ import {
   EyeOff,
   GraduationCap,
   Building2,
-  School,
   QrCode,
   CheckCircle2,
 } from 'lucide-react';
@@ -27,8 +26,7 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
 }) => {
   const [lang, setLang] = useState<'th' | 'en'>('th');
   const [roleTab, setRoleTab] = useState<'TEACHER' | 'STUDENT'>('TEACHER');
-  const [teacherChannel, setTeacherChannel] =
-    useState<TeacherLoginChannel>('E_LEAVE');
+  const [teacherChannel] = useState<TeacherLoginChannel>('E_LEAVE');
 
   const [username, setUsername] = useState('passapoom.r');
   const [password, setPassword] = useState('••••••••••••');
@@ -40,12 +38,17 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
 
+  const [forgotResetSuccess, setForgotResetSuccess] = useState(false);
+
   const handleTeacherLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    const detectedChannel: TeacherLoginChannel = username.includes('@')
+      ? 'DIRECT_CLASSROOM'
+      : teacherChannel;
     setTimeout(() => {
       setLoading(false);
-      onEnterClassroomPortal('home', teacherChannel);
+      onEnterClassroomPortal('home', detectedChannel);
     }, 350);
   };
 
@@ -60,12 +63,7 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
 
   const handleForgotPasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    alert(
-      lang === 'th'
-        ? 'ระบบได้ส่งลิงก์สำหรับรีเซ็ตรหัสผ่านไปยังอีเมลของคุณแล้ว (ใช้ฐานข้อมูลเดียวกับระบบการลา E-Leave)'
-        : 'Password reset link has been sent to your email.'
-    );
-    setIsForgotPassword(false);
+    setForgotResetSuccess(true);
   };
 
   return (
@@ -101,7 +99,7 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1 text-center">
             {lang === 'th'
-              ? 'ชั้นเรียน • กิจการนักเรียน • สภานักเรียน • เยี่ยมบ้าน นร.01'
+              ? 'เช็คชื่อ • ให้คะแนน ปพ.5 • เยี่ยมบ้าน นร.01 • กิจการนักเรียน'
               : 'Classroom • Student Affairs • Student Council'}
           </p>
         </div>
@@ -113,6 +111,7 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
             onClick={() => {
               setRoleTab('TEACHER');
               setIsForgotPassword(false);
+              setForgotResetSuccess(false);
             }}
             className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
               roleTab === 'TEACHER'
@@ -127,6 +126,7 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
             onClick={() => {
               setRoleTab('STUDENT');
               setIsForgotPassword(false);
+              setForgotResetSuccess(false);
             }}
             className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
               roleTab === 'STUDENT'
@@ -150,6 +150,14 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
                   : 'Enter your username or email to reset password'}
               </p>
             </div>
+
+            {forgotResetSuccess && (
+              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-900 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>ส่งลิงก์ตั้งรหัสผ่านใหม่ไปยังอีเมลของคุณเรียบร้อยแล้ว</span>
+              </div>
+            )}
+
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <User className="h-[20px] w-[20px] text-slate-400" />
@@ -176,7 +184,10 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
             <div className="flex justify-center pt-2">
               <button
                 type="button"
-                onClick={() => setIsForgotPassword(false)}
+                onClick={() => {
+                  setIsForgotPassword(false);
+                  setForgotResetSuccess(false);
+                }}
                 className="text-[13px] font-medium text-slate-500 hover:text-slate-700 transition-colors"
               >
                 {lang === 'th' ? 'กลับไปหน้าเข้าสู่ระบบ' : 'Back to Login'}
@@ -184,67 +195,13 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
             </div>
           </form>
         ) : roleTab === 'TEACHER' ? (
-          /* ================= 1. ฟอร์มล็อกอินสำหรับครูผู้สอน (2 ช่องทาง) ================= */
+          /* ================= 1. ฟอร์มล็อกอินสำหรับครูผู้สอน (ช่องเดียว เข้าใจง่าย ไม่ต้องเลือกเอง) ================= */
           <form onSubmit={handleTeacherLogin} className="space-y-4">
-            {/* Teacher Channel Selector (เข้าผ่านระบบการลา E-Leave vs เข้าจากระบบจัดการชั้นเรียน) */}
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setTeacherChannel('E_LEAVE');
-                  setUsername('passapoom.r');
-                }}
-                className={`flex items-center gap-2 p-2.5 rounded-xl border text-left transition-all ${
-                  teacherChannel === 'E_LEAVE'
-                    ? 'border-emerald-500 bg-emerald-50/70 text-emerald-900 shadow-xs'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Building2
-                  className={`w-4 h-4 shrink-0 ${
-                    teacherChannel === 'E_LEAVE'
-                      ? 'text-emerald-600'
-                      : 'text-slate-400'
-                  }`}
-                />
-                <div className="min-w-0">
-                  <div className="text-[11px] font-bold truncate">
-                    1. เข้าผ่าน E-Leave
-                  </div>
-                  <div className="text-[10px] text-slate-500 truncate">
-                    รหัสเดียวกับระบบการลา
-                  </div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setTeacherChannel('DIRECT_CLASSROOM');
-                  setUsername('passapoom.r@school.ac.th');
-                }}
-                className={`flex items-center gap-2 p-2.5 rounded-xl border text-left transition-all ${
-                  teacherChannel === 'DIRECT_CLASSROOM'
-                    ? 'border-teal-500 bg-teal-50/70 text-teal-900 shadow-xs'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <School
-                  className={`w-4 h-4 shrink-0 ${
-                    teacherChannel === 'DIRECT_CLASSROOM'
-                      ? 'text-teal-600'
-                      : 'text-slate-400'
-                  }`}
-                />
-                <div className="min-w-0">
-                  <div className="text-[11px] font-bold truncate">
-                    2. ชั้นเรียนโดยตรง
-                  </div>
-                  <div className="text-[10px] text-slate-500 truncate">
-                    บัญชีระบบชั้นเรียน
-                  </div>
-                </div>
-              </button>
+            <div className="p-3 rounded-xl bg-emerald-50/90 border border-emerald-200 text-xs text-emerald-900 flex items-center gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="font-medium leading-relaxed">
+                ใช้ชื่อผู้ใช้และรหัสผ่านเดียวกับ <strong>ระบบการลา (E-Leave)</strong> ได้เลย ระบบเชื่อมต่อให้อัตโนมัติ
+              </span>
             </div>
 
             {/* Username Input */}
@@ -255,12 +212,8 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
               <input
                 type="text"
                 required
-                className="w-full h-[50px] pl-[44px] pr-4 rounded-xl border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
-                placeholder={
-                  teacherChannel === 'E_LEAVE'
-                    ? 'ชื่อผู้ใช้ หรือ อีเมล (ระบบการลา E-Leave)'
-                    : 'ชื่อผู้ใช้ หรือ อีเมล (ระบบจัดการชั้นเรียน)'
-                }
+                className="w-full h-[50px] pl-[44px] pr-4 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+                placeholder="ชื่อผู้ใช้ หรือ อีเมลครูผู้สอน (เช่น passapoom.r)"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
               />
@@ -283,6 +236,7 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                title={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
               >
                 {showPassword ? (
                   <EyeOff className="h-5 w-5" />
@@ -293,14 +247,13 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
             </div>
 
             <div className="flex items-center justify-between pt-1">
-              <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-medium">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>เชื่อมฐานข้อมูลเดียวกับระบบการลา</span>
+              <span className="text-xs text-slate-500">
+                ครูประจำวิชา / ครูที่ปรึกษา
               </span>
               <button
                 type="button"
                 onClick={() => setIsForgotPassword(true)}
-                className="text-[13px] font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
+                className="text-[13px] font-medium text-emerald-700 hover:text-emerald-800 transition-colors"
               >
                 {lang === 'th' ? 'ลืมรหัสผ่าน?' : 'Forgot password?'}
               </button>
@@ -313,9 +266,7 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
             >
               {loading
                 ? 'กำลังเข้าสู่ระบบ...'
-                : teacherChannel === 'E_LEAVE'
-                ? 'เข้าสู่ระบบจัดการชั้นเรียน (ผ่าน E-Leave)'
-                : 'เข้าสู่ระบบจัดการชั้นเรียนโดยตรง'}
+                : 'เข้าสู่ระบบจัดการชั้นเรียน'}
             </button>
           </form>
         ) : (
