@@ -92,6 +92,11 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
   const [isTransferInModalOpen, setIsTransferInModalOpen] = useState(false);
   const [transferInCode, setTransferInCode] = useState('45129');
   const [transferInName, setTransferInName] = useState('');
+  const [transferInGender, setTransferInGender] = useState<'MALE' | 'FEMALE'>('MALE');
+  const [transferInInsertPosition, setTransferInInsertPosition] = useState<
+    'AFTER_SAME_GENDER' | 'END_OF_CLASS' | 'CUSTOM_SEAT'
+  >('AFTER_SAME_GENDER');
+  const [transferInCustomSeat, setTransferInCustomSeat] = useState(6);
   const [transferInDate, setTransferInDate] = useState('2026-08-15');
   const [transferInU1Score, setTransferInU1Score] = useState(12);
 
@@ -701,11 +706,22 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
 
             <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto text-xs">
               <button
+                onClick={() => {
+                  const sorted =
+                    sgsRosterAndSubmissionService.sortRosterMaleFirstSgs();
+                  setSgsRoster(sorted);
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 rounded-xl font-bold transition-colors"
+              >
+                <span>🔄 จัดเรียง ชาย ➔ หญิง (ผู้ชายต่อท้ายผู้ชาย)</span>
+              </button>
+
+              <button
                 onClick={() => setIsTransferInModalOpen(true)}
                 className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-xl font-bold transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>+ เพิ่มนักเรียนย้ายเข้าใหม่ (ต่อท้ายเลขที่ SGS)</span>
+                <span>+ เพิ่มนักเรียนย้ายเข้าใหม่ (ต่อท้ายผู้ชาย / เลือกเลขที่ SGS)</span>
               </button>
 
               <button
@@ -741,8 +757,11 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
           {/* แถบป้องกันบรรทัดเลื่อนเมื่อมีนักเรียนย้ายเข้า-ย้ายออก */}
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
             <div className="text-slate-700">
-              🛡️ <strong>ระบบป้องกันรายชื่อไม่ตรงกับ SGS:</strong> นักเรียนที่{' '}
-              <span className="underline font-bold">ย้ายออกกลางเทอม</span> จะถูกคงแถวไว้ที่เลขที่เดิมตามฐานข้อมูล SGS เพื่อไม่ให้คนถัดไปเลื่อนบรรทัดขึ้นจนกรอกคะแนนผิดคน
+              🛡️ <strong>รองรับการเรียงรายชื่อแบบโรงเรียนไทย (ชายขึ้นก่อนหญิง):</strong> เมื่อนักเรียนชายย้ายเข้าใหม่ ระบบสามารถ{' '}
+              <span className="underline font-bold text-indigo-800">
+                แทรกต่อท้ายกลุ่มนักเรียนชาย (เช่น เลขที่ 5 ด.ช. ณัฐวุฒิ)
+              </span>{' '}
+              และเลื่อนเลขที่กลุ่มนักเรียนหญิงลงไปอัตโนมัติโดยที่คะแนนและประวัติส่งงานไม่สลับคน (หรือกด ▲/▼ เพื่อขยับเลขที่ได้ทันที)
             </div>
 
             <label className="inline-flex items-center gap-2 font-bold text-teal-800 cursor-pointer shrink-0">
@@ -760,7 +779,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold">
-                  <th className="py-3 px-3 text-center">เลขที่ SGS</th>
+                  <th className="py-3 px-3 text-center">เลขที่ SGS (ปรับลำดับ)</th>
                   <th className="py-3 px-3">รหัส</th>
                   <th className="py-3 px-3 min-w-48">ชื่อ-สกุล / สถานะย้ายเข้า-ออก</th>
                   <th className="py-3 px-3 text-center">เวลาเรียน</th>
@@ -797,18 +816,63 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                       }
                     >
                       <td className="py-3 px-3 text-center font-bold tabular-nums">
-                        {stu.sgsSeatNo}
+                        <div className="inline-flex items-center gap-1.5">
+                          <span className="w-6 text-center">{stu.sgsSeatNo}</span>
+                          <div className="flex flex-col gap-0.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSgsRoster(
+                                  sgsRosterAndSubmissionService.moveStudentSeat(
+                                    stu.studentCode,
+                                    'UP'
+                                  )
+                                )
+                              }
+                              title="เลื่อนเลขที่ขึ้น 1 ลำดับ"
+                              className="px-1 py-0.2 rounded bg-slate-100 hover:bg-slate-200 text-[9px] text-slate-600 leading-none"
+                            >
+                              ▲
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSgsRoster(
+                                  sgsRosterAndSubmissionService.moveStudentSeat(
+                                    stu.studentCode,
+                                    'DOWN'
+                                  )
+                                )
+                              }
+                              title="เลื่อนเลขที่ลง 1 ลำดับ"
+                              className="px-1 py-0.2 rounded bg-slate-100 hover:bg-slate-200 text-[9px] text-slate-600 leading-none"
+                            >
+                              ▼
+                            </button>
+                          </div>
+                        </div>
                       </td>
                       <td className="py-3 px-3 font-mono text-slate-500 tabular-nums">
                         {stu.studentCode}
                       </td>
                       <td className="py-3 px-3">
-                        <div
-                          className={`font-bold ${
-                            isOut ? 'line-through text-slate-400' : 'text-slate-900'
-                          }`}
-                        >
-                          {stu.studentName}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span
+                            className={`font-bold ${
+                              isOut ? 'line-through text-slate-400' : 'text-slate-900'
+                            }`}
+                          >
+                            {stu.studentName}
+                          </span>
+                          <span
+                            className={`px-1.5 py-0.2 rounded text-[10px] font-semibold ${
+                              stu.gender === 'MALE'
+                                ? 'bg-blue-50 text-blue-700'
+                                : 'bg-pink-50 text-pink-700'
+                            }`}
+                          >
+                            {stu.gender === 'MALE' ? 'ชาย' : 'หญิง'}
+                          </span>
                         </div>
                         {isOut && (
                           <span className="inline-block mt-0.5 px-2 py-0.5 rounded bg-slate-200 text-slate-700 text-[10px] font-semibold">
@@ -817,7 +881,8 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                         )}
                         {isIn && (
                           <span className="inline-block mt-0.5 px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-semibold">
-                            ย้ายเข้าใหม่ ({stu.transferDate}) — โอนหน่วย 1 แล้ว
+                            {stu.transferNote ||
+                              `ย้ายเข้าใหม่ (${stu.transferDate}) — ต่อท้ายผู้ชาย`}
                           </span>
                         )}
                       </td>
@@ -903,7 +968,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
             </table>
           </div>
 
-          {/* Modal เพิ่มนักเรียนย้ายเข้าใหม่กลางเทอม (ต่อท้ายเลขที่ SGS + โอนคะแนน) */}
+          {/* Modal เพิ่มนักเรียนย้ายเข้าใหม่กลางเทอม (รองรับการแทรกต่อท้ายผู้ชาย / ต่อท้ายสุด / ระบุเลขที่ SGS) */}
           {isTransferInModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
               <form
@@ -914,6 +979,9 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                     sgsRosterAndSubmissionService.addTransferredInStudent({
                       studentCode: transferInCode.trim(),
                       studentName: transferInName.trim(),
+                      gender: transferInGender,
+                      insertPosition: transferInInsertPosition,
+                      customSeatNo: Number(transferInCustomSeat) || undefined,
                       transferDate: transferInDate,
                       transferredU1Score: Number(transferInU1Score) || 0,
                     });
@@ -921,16 +989,32 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                   setTransferInName('');
                   setIsTransferInModalOpen(false);
                 }}
-                className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 space-y-4 shadow-xl text-xs"
+                className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-6 space-y-4 shadow-xl text-xs"
               >
                 <h3 className="text-base font-bold text-slate-900">
-                  + เพิ่มนักเรียนย้ายเข้าใหม่กลางเทอม (ต่อท้ายเลขที่ SGS อัตโนมัติ)
+                  + เพิ่มนักเรียนย้ายเข้าใหม่กลางเทอม (แทรกต่อท้ายผู้ชาย / เลือกเลขที่ตาม SGS)
                 </h3>
                 <p className="text-slate-500">
-                  ระบบจะต่อท้ายเป็น <strong>เลขที่ {sgsRoster.length + 1}</strong> ตามมาตรฐาน SGS เพื่อไม่ให้แทรกกลางจนรายชื่อคนอื่นเลื่อนบรรทัด
+                  เมื่อแทรกนักเรียนชายต่อท้ายกลุ่มผู้ชาย ระบบจะเลื่อนเลขที่กลุ่มนักเรียนหญิงลงไปอัตโนมัติ โดยที่ <strong>คะแนนและประวัติการส่งงานของนักเรียนหญิงทุกคนยังคงผูกตามรหัสประจำตัว ไม่สลับคน</strong>
                 </p>
 
                 <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      เพศของนักเรียน
+                    </label>
+                    <select
+                      value={transferInGender}
+                      onChange={(e) => {
+                        const g = e.target.value as 'MALE' | 'FEMALE';
+                        setTransferInGender(g);
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold"
+                    >
+                      <option value="MALE">ชาย (ด.ช. / นาย)</option>
+                      <option value="FEMALE">หญิง (ด.ญ. / น.ส.)</option>
+                    </select>
+                  </div>
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1">
                       รหัสนักเรียน
@@ -943,6 +1027,84 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                       className="w-full px-3 py-2 rounded-xl border border-slate-200"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    ชื่อ - นามสกุล นักเรียนที่ย้ายเข้าใหม่
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="เช่น ด.ช. ภูมิพัฒน์ เจริญรุ่งเรือง"
+                    value={transferInName}
+                    onChange={(e) => setTransferInName(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                  />
+                </div>
+
+                <div className="p-3 rounded-xl bg-indigo-50/60 border border-indigo-200 space-y-2">
+                  <label className="block font-bold text-indigo-950">
+                    ตำแหน่งเลขที่ในใบรายชื่อ SGS ของโรงเรียน:
+                  </label>
+
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="insertPos"
+                      checked={transferInInsertPosition === 'AFTER_SAME_GENDER'}
+                      onChange={() =>
+                        setTransferInInsertPosition('AFTER_SAME_GENDER')
+                      }
+                      className="mt-0.5 accent-indigo-600"
+                    />
+                    <span>
+                      <strong>
+                        ต่อท้ายกลุ่มเพศเดียวกัน (ผู้ชายต่อท้ายผู้ชาย / ผู้หญิงต่อท้ายผู้หญิง)
+                      </strong>{' '}
+                      — แทรกต่อท้ายนักเรียนชายคนสุดท้าย แล้วรันเลขที่นักเรียนหญิงต่อให้อัตโนมัติ
+                    </span>
+                  </label>
+
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="insertPos"
+                      checked={transferInInsertPosition === 'END_OF_CLASS'}
+                      onChange={() => setTransferInInsertPosition('END_OF_CLASS')}
+                      className="mt-0.5 accent-indigo-600"
+                    />
+                    <span>
+                      <strong>ต่อท้ายสุดของห้องเรียน</strong> (เป็นเลขที่{' '}
+                      {sgsRoster.length + 1} หลังนักเรียนหญิง)
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="insertPos"
+                      checked={transferInInsertPosition === 'CUSTOM_SEAT'}
+                      onChange={() => setTransferInInsertPosition('CUSTOM_SEAT')}
+                      className="accent-indigo-600"
+                    />
+                    <span>
+                      <strong>ระบุเลขที่ตาม SGS เอง:</strong> แทรกที่เลขที่
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={sgsRoster.length + 1}
+                      value={transferInCustomSeat}
+                      onChange={(e) =>
+                        setTransferInCustomSeat(Number(e.target.value))
+                      }
+                      className="w-16 px-2 py-1 rounded-lg border border-slate-300 bg-white text-center font-bold"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1">
                       วันที่ย้ายเข้าเรียน
@@ -954,34 +1116,21 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                       className="w-full px-3 py-2 rounded-xl border border-slate-200"
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    ชื่อ - นามสกุล นักเรียนที่ย้ายเข้าใหม่
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="เช่น ด.ญ. ชนากานต์ วงศ์สวัสดิ์"
-                    value={transferInName}
-                    onChange={(e) => setTransferInName(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    คะแนนเก็บที่โอนมาจากโรงเรียนเดิม (หน่วยที่ 1 เต็ม 15 คะแนน)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={15}
-                    value={transferInU1Score}
-                    onChange={(e) => setTransferInU1Score(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200"
-                  />
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      คะแนนโอนจาก รร.เดิม (หน่วย 1 เต็ม 15)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={15}
+                      value={transferInU1Score}
+                      onChange={(e) =>
+                        setTransferInU1Score(Number(e.target.value))
+                      }
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                    />
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-2">
@@ -996,7 +1145,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                     type="submit"
                     className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold"
                   >
-                    บันทึกต่อท้ายเลขที่ {sgsRoster.length + 1} ตาม SGS
+                    บันทึกและจัดลำดับเลขที่ตาม SGS
                   </button>
                 </div>
               </form>

@@ -204,15 +204,15 @@ export const AssignmentManagementView: React.FC = () => {
         <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs flex items-center justify-between">
           <div>
             <span className="text-xs font-medium text-slate-500">
-              การเรียงรายชื่อเทียบระบบ SGS
+              การเรียงรายชื่อเทียบระบบ SGS (ชาย ➔ หญิง)
             </span>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="text-base font-bold text-teal-700">
-                ล็อกลำดับเลขที่ 1–{roster.length} ตรงตาม SGS
+                ชายต่อท้ายชาย (เลขที่ 5) • ย้ายออกคงเลขที่ 3
               </span>
             </div>
             <p className="text-[11px] text-slate-500 mt-0.5">
-              คนย้ายออกคงบรรทัดเลขที่ 4 ไว้ ไม่ให้แถวเลื่อน
+              คะแนนผูกตามรหัสนักเรียน ไม่สลับคนแม้เลื่อนเลขที่หญิง
             </p>
           </div>
           <span className="px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold">
@@ -257,7 +257,7 @@ export const AssignmentManagementView: React.FC = () => {
               onChange={() => setHideTransferredOut((v) => !v)}
               className="w-4 h-4 accent-teal-600 rounded"
             />
-            <span>คงแถวนักเรียนย้ายออก (เลขที่ 4) ให้ตรงบรรทัด SGS</span>
+            <span>คงแถวนักเรียนย้ายออก (เลขที่ 3) ให้ตรงบรรทัด SGS</span>
           </label>
         </div>
 

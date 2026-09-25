@@ -6,11 +6,14 @@
 // ============================================================================
 
 export type StudentTransferState = 'ACTIVE' | 'TRANSFERRED_IN' | 'TRANSFERRED_OUT';
+export type StudentGender = 'MALE' | 'FEMALE';
+export type SgsInsertPosition = 'AFTER_SAME_GENDER' | 'END_OF_CLASS' | 'CUSTOM_SEAT';
 
 export interface SgsStudentRecord {
-  sgsSeatNo: number; // เลขที่ตามใบรายชื่อ SGS (ห้ามเลื่อนเมื่อมีคนย้ายออก)
+  sgsSeatNo: number; // เลขที่ตามใบรายชื่อ SGS
   studentCode: string;
   studentName: string;
+  gender: StudentGender; // ชายขึ้นก่อนหญิง (ผู้ชายเข้าใหม่ต่อท้ายผู้ชาย)
   classroom: string;
   transferState: StudentTransferState;
   transferDate?: string;
@@ -53,15 +56,18 @@ export interface StudentWorkSubmission {
   teacherFeedback?: string;
 }
 
-const STORAGE_KEY_SGS_ROSTER = 'kp_sgs_roster_v1';
+const STORAGE_KEY_SGS_ROSTER = 'kp_sgs_roster_v2';
 const STORAGE_KEY_TERM_ASSIGNMENTS = 'kp_term_assignments_v1';
 const STORAGE_KEY_WORK_SUBMISSIONS = 'kp_work_submissions_v1';
 
+// เรียงตามมาตรฐานทะเบียนโรงเรียนไทย: นักเรียนชาย (เลขที่ 1-5) -> นักเรียนหญิง (เลขที่ 6-8)
+// เมื่อ ด.ช. ณัฐวุฒิ ย้ายเข้าใหม่กลางเทอม จึงแทรกต่อท้ายกลุ่มผู้ชายที่ "เลขที่ 5" (ไม่ได้ไปอยู่เลขที่ 8 ท้ายสุด)
 const INITIAL_SGS_ROSTER: SgsStudentRecord[] = [
   {
     sgsSeatNo: 1,
     studentCode: '45101',
     studentName: 'ด.ช. กฤษณะ ศรีสมบูรณ์',
+    gender: 'MALE',
     classroom: 'ม.3/1',
     transferState: 'ACTIVE',
     attendancePercent: 96.5,
@@ -73,6 +79,7 @@ const INITIAL_SGS_ROSTER: SgsStudentRecord[] = [
     sgsSeatNo: 2,
     studentCode: '45102',
     studentName: 'ด.ช. ทัตธน คำฝั้น',
+    gender: 'MALE',
     classroom: 'ม.3/1',
     transferState: 'ACTIVE',
     attendancePercent: 95.0,
@@ -82,43 +89,23 @@ const INITIAL_SGS_ROSTER: SgsStudentRecord[] = [
   },
   {
     sgsSeatNo: 3,
-    studentCode: '45105',
-    studentName: 'ด.ญ. กมลชนก เลิศวิไล',
-    classroom: 'ม.3/1',
-    transferState: 'ACTIVE',
-    attendancePercent: 98.0,
-    morningStatusLabel: 'มาเข้าแถวปกติ',
-    midtermScore: 19,
-    finalScore: 28,
-  },
-  {
-    sgsSeatNo: 4,
     studentCode: '45107',
     studentName: 'ด.ช. ชัยมงคล วงศ์บุตร',
+    gender: 'MALE',
     classroom: 'ม.3/1',
     transferState: 'TRANSFERRED_OUT',
     transferDate: '2026-08-10',
-    transferNote: 'ย้ายออก (คงเลขที่ 4 ไว้ตาม SGS เพื่อไม่ให้เลขที่ 5-8 เลื่อนบรรทัด)',
+    transferNote: 'ย้ายออก (คงเลขที่ 3 ไว้ในกลุ่มนักเรียนชายตาม SGS เพื่อไม่ให้บรรทัดเลื่อน)',
     attendancePercent: 0,
     morningStatusLabel: 'ย้ายออกแล้ว',
     midtermScore: 0,
     finalScore: 0,
   },
   {
-    sgsSeatNo: 5,
-    studentCode: '45112',
-    studentName: 'ด.ญ. พิมพ์ชนก วงศ์สวัสดิ์',
-    classroom: 'ม.3/1',
-    transferState: 'ACTIVE',
-    attendancePercent: 91.0,
-    morningStatusLabel: 'อนุมัติลาป่วยแล้ว',
-    midtermScore: 16,
-    finalScore: 25,
-  },
-  {
-    sgsSeatNo: 6,
+    sgsSeatNo: 4,
     studentCode: '45115',
     studentName: 'ด.ช. อัศวิน วนเกษตรกุล',
+    gender: 'MALE',
     classroom: 'ม.3/1',
     transferState: 'ACTIVE',
     attendancePercent: 78.5,
@@ -127,29 +114,55 @@ const INITIAL_SGS_ROSTER: SgsStudentRecord[] = [
     finalScore: 18,
   },
   {
+    sgsSeatNo: 5,
+    studentCode: '45109',
+    studentName: 'ด.ช. ณัฐวุฒิ สายทอง',
+    gender: 'MALE',
+    classroom: 'ม.3/1',
+    transferState: 'TRANSFERRED_IN',
+    transferDate: '2026-07-01',
+    transferNote: 'ย้ายเข้าใหม่ (แทรกต่อท้ายกลุ่มนักเรียนชายที่เลขที่ 5 ตาม SGS + คะแนนหญิงไม่สลับคน)',
+    transferredBaseScore: { u1: 12 },
+    attendancePercent: 92.0,
+    morningStatusLabel: 'เข้าแถวสาย (รถโดยสารมาช้า)',
+    midtermScore: 15,
+    finalScore: 23,
+  },
+  {
+    sgsSeatNo: 6,
+    studentCode: '45105',
+    studentName: 'ด.ญ. กมลชนก เลิศวิไล',
+    gender: 'FEMALE',
+    classroom: 'ม.3/1',
+    transferState: 'ACTIVE',
+    attendancePercent: 98.0,
+    morningStatusLabel: 'มาเข้าแถวปกติ',
+    midtermScore: 19,
+    finalScore: 28,
+  },
+  {
     sgsSeatNo: 7,
+    studentCode: '45112',
+    studentName: 'ด.ญ. พิมพ์ชนก วงศ์สวัสดิ์',
+    gender: 'FEMALE',
+    classroom: 'ม.3/1',
+    transferState: 'ACTIVE',
+    attendancePercent: 91.0,
+    morningStatusLabel: 'อนุมัติลาป่วยแล้ว',
+    midtermScore: 16,
+    finalScore: 25,
+  },
+  {
+    sgsSeatNo: 8,
     studentCode: '45118',
     studentName: 'ด.ญ. อคิราห์ วิรากร',
+    gender: 'FEMALE',
     classroom: 'ม.3/1',
     transferState: 'ACTIVE',
     attendancePercent: 94.0,
     morningStatusLabel: 'มาเข้าแถวปกติ',
     midtermScore: 16,
     finalScore: 24,
-  },
-  {
-    sgsSeatNo: 8,
-    studentCode: '45109',
-    studentName: 'ด.ช. ณัฐวุฒิ สายทอง',
-    classroom: 'ม.3/1',
-    transferState: 'TRANSFERRED_IN',
-    transferDate: '2026-07-01',
-    transferNote: 'ย้ายเข้าใหม่กลางเทอม (ต่อท้ายเลขที่ 8 ตาม SGS + โอนคะแนนหน่วยที่ 1)',
-    transferredBaseScore: { u1: 12 },
-    attendancePercent: 92.0, // คำนวณเฉพาะตั้งแต่วันย้ายเข้า 1 ก.ค.
-    morningStatusLabel: 'เข้าแถวสาย (รถโดยสารมาช้า)',
-    midtermScore: 15,
-    finalScore: 23,
   },
 ];
 
@@ -282,29 +295,107 @@ export const sgsRosterAndSubmissionService = {
   addTransferredInStudent(payload: {
     studentCode: string;
     studentName: string;
+    gender: StudentGender;
+    insertPosition: SgsInsertPosition;
+    customSeatNo?: number;
     transferDate: string;
     transferredU1Score: number;
   }): SgsStudentRecord[] {
-    const roster = this.getSgsRoster();
-    const nextSeatNo =
-      roster.reduce((max, s) => Math.max(max, s.sgsSeatNo), 0) + 1;
+    const roster = [...this.getSgsRoster()].sort(
+      (a, b) => a.sgsSeatNo - b.sgsSeatNo
+    );
+
+    let insertIndex = roster.length; // Default: ท้ายสุดของห้อง
+
+    if (payload.insertPosition === 'AFTER_SAME_GENDER') {
+      if (payload.gender === 'MALE') {
+        // หาตำแหน่งสุดท้ายของนักเรียนชาย แล้วแทรกต่อท้ายผู้ชายทันที (เลื่อนเลขที่นักเรียนหญิงลงไป 1 ลำดับตาม SGS)
+        let lastMaleIdx = -1;
+        roster.forEach((s, idx) => {
+          if (s.gender === 'MALE') lastMaleIdx = idx;
+        });
+        insertIndex = lastMaleIdx !== -1 ? lastMaleIdx + 1 : 0;
+      } else {
+        insertIndex = roster.length;
+      }
+    } else if (
+      payload.insertPosition === 'CUSTOM_SEAT' &&
+      payload.customSeatNo
+    ) {
+      insertIndex = Math.max(
+        0,
+        Math.min(roster.length, payload.customSeatNo - 1)
+      );
+    }
+
+    const assignedSeatNo = insertIndex + 1;
+    const positionLabel =
+      payload.insertPosition === 'AFTER_SAME_GENDER' && payload.gender === 'MALE'
+        ? `แทรกต่อท้ายกลุ่มนักเรียนชาย (เลขที่ ${assignedSeatNo})`
+        : payload.insertPosition === 'CUSTOM_SEAT'
+        ? `แทรกที่เลขที่ ${assignedSeatNo} ตามใบรายชื่อ SGS`
+        : `ต่อท้ายสุดของห้อง (เลขที่ ${assignedSeatNo})`;
+
     const newStudent: SgsStudentRecord = {
-      sgsSeatNo: nextSeatNo,
+      sgsSeatNo: assignedSeatNo,
       studentCode: payload.studentCode,
       studentName: payload.studentName,
+      gender: payload.gender,
       classroom: 'ม.3/1',
       transferState: 'TRANSFERRED_IN',
       transferDate: payload.transferDate,
-      transferNote: `ย้ายเข้าใหม่ (${payload.transferDate}) — ต่อท้ายเลขที่ ${nextSeatNo} ตาม SGS + โอนคะแนนหน่วย 1 (${payload.transferredU1Score} คะแนน)`,
+      transferNote: `ย้ายเข้าใหม่ (${payload.transferDate}) — ${positionLabel} + โอนคะแนนหน่วย 1 (${payload.transferredU1Score} คะแนน)`,
       transferredBaseScore: { u1: payload.transferredU1Score },
       attendancePercent: 100,
       morningStatusLabel: 'มาเข้าแถวปกติ (นักเรียนย้ายเข้าใหม่)',
       midtermScore: 15,
       finalScore: 22,
     };
-    const updated = [...roster, newStudent];
-    this.saveSgsRoster(updated);
-    return updated;
+
+    const nextRoster = [
+      ...roster.slice(0, insertIndex),
+      newStudent,
+      ...roster.slice(insertIndex),
+    ].map((stu, idx) => ({
+      ...stu,
+      sgsSeatNo: idx + 1, // รันเลขที่ SGS ใหม่ให้เรียงต่อเนื่องโดยคะแนนยังผูกตามรหัสนักเรียน (studentCode) 100%
+    }));
+
+    this.saveSgsRoster(nextRoster);
+    return nextRoster;
+  },
+
+  // ปรับเลื่อนเลขที่นักเรียนขึ้น-ลง (▲/▼) ให้ตรงกับ SGS โดยที่คะแนนและงานที่ส่งผูกติดไปกับรหัสนักเรียนอัตโนมัติ
+  moveStudentSeat(studentCode: string, direction: 'UP' | 'DOWN'): SgsStudentRecord[] {
+    const roster = [...this.getSgsRoster()].sort(
+      (a, b) => a.sgsSeatNo - b.sgsSeatNo
+    );
+    const idx = roster.findIndex((s) => s.studentCode === studentCode);
+    if (idx === -1) return roster;
+    const targetIdx = direction === 'UP' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= roster.length) return roster;
+
+    const temp = roster[idx];
+    roster[idx] = roster[targetIdx];
+    roster[targetIdx] = temp;
+
+    const renumbered = roster.map((stu, i) => ({
+      ...stu,
+      sgsSeatNo: i + 1,
+    }));
+    return this.saveSgsRoster(renumbered);
+  },
+
+  // จัดเรียงลำดับตามมาตรฐานทะเบียน SGS อัตโนมัติ (กลุ่มนักเรียนชายขึ้นก่อน -> ตามด้วยกลุ่มนักเรียนหญิง)
+  sortRosterMaleFirstSgs(): SgsStudentRecord[] {
+    const roster = [...this.getSgsRoster()];
+    const males = roster.filter((s) => s.gender === 'MALE');
+    const females = roster.filter((s) => s.gender === 'FEMALE');
+    const renumbered = [...males, ...females].map((stu, i) => ({
+      ...stu,
+      sgsSeatNo: i + 1,
+    }));
+    return this.saveSgsRoster(renumbered);
   },
 
   toggleStudentTransferOut(studentCode: string): SgsStudentRecord[] {
