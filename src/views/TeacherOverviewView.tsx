@@ -6,7 +6,6 @@ import {
   CheckSquare,
   Sparkles,
   Download,
-  Copy,
   FileSpreadsheet,
   BookMarked,
   X,
@@ -26,7 +25,11 @@ import { assignmentService } from '../services/assignmentService';
 import { attendanceService } from '../services/attendanceService';
 import { scoreService } from '../services/scoreService';
 import { behaviorService } from '../services/behaviorService';
-import { trashService } from '../services/trashService';
+import { AssignmentManagementView } from './AssignmentManagementView';
+import {
+  sgsRosterAndSubmissionService,
+  type SgsStudentRecord,
+} from '../services/sgsRosterAndSubmissionService';
 
 
 interface TeacherOverviewViewProps {
@@ -63,7 +66,6 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
   onSwitchToAdventure,
 }) => {
   const [activeTab, setActiveTab] = useState<ClassSubTab>('overview');
-  const [asgType, setAsgType] = useState<'homework' | 'exam'>('homework');
   const [attendanceSearch, setAttendanceSearch] = useState('');
 
   // Modals state
@@ -72,7 +74,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
   const [isNewAssignmentOpen, setIsNewAssignmentOpen] = useState(false);
   const [isClassroomSyncOpen, setIsClassroomSyncOpen] = useState(false);
   const [isGradebookModalOpen, setIsGradebookModalOpen] = useState(false);
-  const [selectedAssignmentForGrading, setSelectedAssignmentForGrading] = useState<string | null>(null);
+  const [selectedAssignmentForGrading] = useState<string | null>(null);
   const [isWeightingModalOpen, setIsWeightingModalOpen] = useState(false);
   const [isAddReflectionOpen, setIsAddReflectionOpen] = useState(false);
 
@@ -81,6 +83,17 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
   const [newSgsUnit, setNewSgsUnit] = useState('หน่วยที่ 1');
   const [newMaxScore, setNewMaxScore] = useState(10);
   const [newDueDate, setNewDueDate] = useState('');
+
+  // SGS Roster Alignment State (แก้ปัญหารายชื่อไม่ตรง SGS เมื่อนักเรียนย้ายเข้า/ย้ายออก)
+  const [sgsRoster, setSgsRoster] = useState<SgsStudentRecord[]>(() =>
+    sgsRosterAndSubmissionService.getSgsRoster()
+  );
+  const [keepTransferredOutRow, setKeepTransferredOutRow] = useState(true);
+  const [isTransferInModalOpen, setIsTransferInModalOpen] = useState(false);
+  const [transferInCode, setTransferInCode] = useState('45129');
+  const [transferInName, setTransferInName] = useState('');
+  const [transferInDate, setTransferInDate] = useState('2026-08-15');
+  const [transferInU1Score, setTransferInU1Score] = useState(12);
 
   // Interactive Attendance Rows matching Image 4
   const [attendanceRows, setAttendanceRows] = useState([
@@ -666,260 +679,329 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
         </div>
       )}
 
-      {/* 4. TAB: งาน / คะแนนสอบ (Assignments) */}
+      {/* 4. TAB: งาน / คะแนนสอบ (Assignments — ตารางส่งงานทั้งเทอม & โหมดตรวจงานรายชิ้น) */}
       {activeTab === 'assignments' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-4">
-          {/* Sub Toggle: การบ้าน/ชิ้นงาน vs คะแนนสอบ */}
-          <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl w-fit text-xs">
-            <button
-              onClick={() => setAsgType('homework')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                asgType === 'homework'
-                  ? 'bg-white text-slate-800 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              การบ้าน / ชิ้นงาน ({assignmentRows.length})
-            </button>
-            <button
-              onClick={() => setAsgType('exam')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                asgType === 'exam'
-                  ? 'bg-white text-slate-800 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              คะแนนสอบ (2)
-            </button>
-          </div>
-
-          {/* Action Row */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-            <h3 className="font-bold text-slate-800 text-sm">
-              {asgType === 'homework'
-                ? `การบ้าน / ชิ้นงาน (${assignmentRows.length} รายการ)`
-                : 'การสอบกลางภาค / ปลายภาค (2 รายการ)'}
-            </h3>
-
-            <div className="flex items-center gap-2 self-start sm:self-auto text-xs">
-              <button
-                onClick={() => alert('เลือกชิ้นงานจากคลังมาใช้ซ้ำ')}
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-700 font-semibold transition-colors"
-              >
-                <Copy className="w-3.5 h-3.5 text-slate-400" />
-                <span>ใช้ซ้ำงานเดิม</span>
-              </button>
-              <button
-                onClick={() => setIsClassroomSyncOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-700 font-semibold transition-colors"
-              >
-                <Download className="w-3.5 h-3.5 text-slate-400" />
-                <span>↓ นำเข้าคะแนนจาก Classroom</span>
-              </button>
-              <button
-                onClick={() => setIsNewAssignmentOpen(true)}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0f2a59] hover:bg-[#0b1f42] text-white rounded-xl font-semibold shadow-xs transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ มอบหมายงานใหม่</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Assignments Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 text-slate-400 font-medium">
-                  <th className="py-2.5 px-3 w-8">
-                    <input
-                      type="checkbox"
-                      className="rounded border-slate-300 text-blue-600 focus:ring-0"
-                    />
-                  </th>
-                  <th className="py-2.5 px-3 min-w-48">ชื่องาน</th>
-                  <th className="py-2.5 px-3">หมวดคะแนน</th>
-                  <th className="py-2.5 px-3">หน่วย (SGS)</th>
-                  <th className="py-2.5 px-3 text-center">กำหนดส่ง</th>
-                  <th className="py-2.5 px-3 text-center">เต็ม</th>
-                  <th className="py-2.5 px-3 text-center">ส่งแล้ว</th>
-                  <th className="py-2.5 px-3 text-right min-w-48">จัดการ</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {assignmentRows.map((row) => (
-                  <tr key={row.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-3 px-3">
-                      <input
-                        type="checkbox"
-                        className="rounded border-slate-300 text-blue-600 focus:ring-0"
-                      />
-                    </td>
-                    <td className="py-3 px-3">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-slate-800">{row.title}</span>
-                          <span className="px-2 py-0.5 bg-[#e8f8f0] text-emerald-800 border border-emerald-200 rounded-md text-[10px] font-semibold flex items-center gap-1">
-                            🔗 {row.sharedTag}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-400 line-clamp-1">
-                          {row.subtext}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="py-3 px-3">
-                      <span className="px-2.5 py-0.5 bg-blue-50 text-blue-700 rounded-md text-[11px] font-medium border border-blue-100">
-                        {row.category}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3">
-                      <span className="px-2.5 py-0.5 bg-blue-50 text-blue-700 rounded-md text-[11px] font-medium border border-blue-100">
-                        {row.sgsUnit}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-center text-slate-400">
-                      {row.dueDate}
-                    </td>
-                    <td className="py-3 px-3 text-center font-bold text-slate-700">
-                      {row.maxScore}
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      <span
-                        className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${
-                          row.isFull
-                            ? 'bg-[#e8f8f0] text-emerald-800'
-                            : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        {row.submittedText}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-right">
-                      <div className="flex items-center justify-end gap-2 text-[11px]">
-                        <button
-                          onClick={() => {
-                            setSelectedAssignmentForGrading(row.title);
-                            setIsGradebookModalOpen(true);
-                          }}
-                          className="px-2.5 py-1 border border-emerald-300 bg-emerald-50/50 hover:bg-emerald-100 text-emerald-800 rounded-lg font-semibold"
-                        >
-                          บันทึกส่ง/คะแนน
-                        </button>
-                        <button
-                          onClick={async () => {
-                            await assignmentService.closeAssignment(row.id);
-                            await scoreService.autoZeroMissing(
-                              row.id,
-                              'room-3-1',
-                              sampleGradesRoster.map((s) => `stu-${s.no}`)
-                            );
-                            setAssignmentRows((prev) =>
-                              prev.map((r) => (r.id === row.id ? { ...r, isFull: true, submittedText: '23 / 23' } : r))
-                            );
-                            alert(`ปิดรับงาน ${row.title}: ตั้งสถานะนักเรียนที่ยังไม่ส่งเป็น 0 คะแนนเรียบร้อยแล้ว`);
-                          }}
-                          className="text-slate-600 hover:text-slate-900"
-                        >
-                          ปิดรับงาน
-                        </button>
-                        <button
-                          onClick={() => alert(`แก้ไขงาน ${row.title}`)}
-                          className="text-slate-400 hover:text-slate-700"
-                        >
-                          แก้
-                        </button>
-                        <button
-                          onClick={async () => {
-                            if (confirm(`คุณต้องการลบชิ้นงาน "${row.title}" หรือไม่? ข้อมูลจะถูกย้ายไปถังขยะและกู้คืนได้ภายใน 30 วัน`)) {
-                              await assignmentService.delete(row.id);
-                              await trashService.moveToTrash(row.id, 'งาน/การบ้าน', row.title);
-                              setAssignmentRows(assignmentRows.filter((r) => r.id !== row.id));
-                              alert(`ย้าย "${row.title}" ไปยังถังขยะเรียบร้อยแล้ว`);
-                            }
-                          }}
-                          className="text-slate-400 hover:text-rose-600"
-                        >
-                          ลบ
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="space-y-4">
+          <AssignmentManagementView />
         </div>
       )}
 
-      {/* 5. TAB: สรุปคะแนน (Grades Summary Table) */}
+      {/* 5. TAB: สรุปคะแนน ปพ.5 & ซิงค์รายชื่อตรงบรรทัด SGS (Grades Summary Table) */}
       {activeTab === 'grades' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-5">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
             <div>
-              <h3 className="font-bold text-slate-800 text-sm">
-                ตารางสรุปคะแนนรวม ศ23101 ศิลปะ ม.3/1 (23 นักเรียน)
+              <h3 className="font-bold text-slate-900 text-base">
+                ตารางสรุปคะแนนรวม ปพ.5 & เตรียมนำเข้า SGS — ศ23101 ศิลปะ ม.3/1
               </h3>
-              <p className="text-xs text-slate-400">
-                คะแนนเก็บ 70% + สอบปลายภาค 30% • รวม 100 คะแนนเต็ม
+              <p className="text-xs text-slate-500 mt-0.5">
+                ดึงคะแนนเก็บหน่วยที่ 1–3 จากตารางตรวจงานอัตโนมัติ • ล็อกลำดับเลขที่ให้ตรงกับใบรายชื่อ SGS 100% (ป้องกันบรรทัดเลื่อนจากนักเรียนย้ายเข้า/ย้ายออก)
               </p>
             </div>
 
-            <button
-              onClick={() => alert('ส่งออกไฟล์คะแนนในรูปแบบ OBEC SGS Excel สำเร็จ!')}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors self-start sm:self-auto"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>ส่งออก SGS Excel</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto text-xs">
+              <button
+                onClick={() => setIsTransferInModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-xl font-bold transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ เพิ่มนักเรียนย้ายเข้าใหม่ (ต่อท้ายเลขที่ SGS)</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  const rows = (keepTransferredOutRow
+                    ? sgsRoster
+                    : sgsRoster.filter((s) => s.transferState !== 'TRANSFERRED_OUT')
+                  ).map((stu) => {
+                    const g =
+                      sgsRosterAndSubmissionService.computeStudentSgsGrades(stu);
+                    return `${stu.sgsSeatNo},${stu.studentCode},"${stu.studentName}",${g.u1},${g.u2},${g.midterm},${g.u3},${g.final},${g.total},${g.gradeLabel}`;
+                  });
+                  const csvContent =
+                    'เลขที่_SGS,รหัสนักเรียน,ชื่อ_สกุล,หน่วย1(15),หน่วย2(20),กลางภาค(20),หน่วย3(15),ปลายภาค(30),รวม(100),ผลการเรียน\n' +
+                    rows.join('\n');
+                  const blob = new Blob(['\uFEFF' + csvContent], {
+                    type: 'text/csv;charset=utf-8;',
+                  });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'SGS_Grades_M3_1_Aligned.csv';
+                  a.click();
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold shadow-xs transition-colors"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>ส่งออกไฟล์ CSV/Excel ตรงบรรทัด SGS 100%</span>
+              </button>
+            </div>
+          </div>
+
+          {/* แถบป้องกันบรรทัดเลื่อนเมื่อมีนักเรียนย้ายเข้า-ย้ายออก */}
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="text-slate-700">
+              🛡️ <strong>ระบบป้องกันรายชื่อไม่ตรงกับ SGS:</strong> นักเรียนที่{' '}
+              <span className="underline font-bold">ย้ายออกกลางเทอม</span> จะถูกคงแถวไว้ที่เลขที่เดิมตามฐานข้อมูล SGS เพื่อไม่ให้คนถัดไปเลื่อนบรรทัดขึ้นจนกรอกคะแนนผิดคน
+            </div>
+
+            <label className="inline-flex items-center gap-2 font-bold text-teal-800 cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={keepTransferredOutRow}
+                onChange={() => setKeepTransferredOutRow((v) => !v)}
+                className="w-4 h-4 accent-teal-600 rounded"
+              />
+              <span>คงบรรทัดนักเรียนย้ายออกตาม SGS (แนะนำ)</span>
+            </label>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold">
-                  <th className="py-2.5 px-3">เลขที่</th>
-                  <th className="py-2.5 px-3">รหัสนักเรียน</th>
-                  <th className="py-2.5 px-3 min-w-40">ชื่อ-สกุล</th>
-                  <th className="py-2.5 px-3 text-center">หน่วย 1 (15)</th>
-                  <th className="py-2.5 px-3 text-center">หน่วย 2 (20)</th>
-                  <th className="py-2.5 px-3 text-center">กลางภาค (20)</th>
-                  <th className="py-2.5 px-3 text-center">หน่วย 3 (15)</th>
-                  <th className="py-2.5 px-3 text-center">ปลายภาค (30)</th>
-                  <th className="py-2.5 px-3 text-center font-bold text-blue-700">รวม (100)</th>
-                  <th className="py-2.5 px-3 text-center font-bold">เกรด</th>
+                  <th className="py-3 px-3 text-center">เลขที่ SGS</th>
+                  <th className="py-3 px-3">รหัส</th>
+                  <th className="py-3 px-3 min-w-48">ชื่อ-สกุล / สถานะย้ายเข้า-ออก</th>
+                  <th className="py-3 px-3 text-center">เวลาเรียน</th>
+                  <th className="py-3 px-3 text-center">ส่งงาน</th>
+                  <th className="py-3 px-3 text-center">หน่วย 1 (15)</th>
+                  <th className="py-3 px-3 text-center">หน่วย 2 (20)</th>
+                  <th className="py-3 px-3 text-center">กลางภาค (20)</th>
+                  <th className="py-3 px-3 text-center">หน่วย 3 (15)</th>
+                  <th className="py-3 px-3 text-center">ปลายภาค (30)</th>
+                  <th className="py-3 px-3 text-center font-bold text-teal-800">รวม (100)</th>
+                  <th className="py-3 px-3 text-center font-bold">เกรด</th>
+                  <th className="py-3 px-3 text-right">ปรับสถานะ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {sampleGradesRoster.map((stu) => (
-                  <tr key={stu.no} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-2.5 px-3 text-slate-500">{stu.no}</td>
-                    <td className="py-2.5 px-3 font-mono text-slate-400">{stu.code}</td>
-                    <td className="py-2.5 px-3 font-semibold text-slate-800">{stu.name}</td>
-                    <td className="py-2.5 px-3 text-center">{stu.u1}</td>
-                    <td className="py-2.5 px-3 text-center">{stu.u2}</td>
-                    <td className="py-2.5 px-3 text-center">{stu.midterm}</td>
-                    <td className="py-2.5 px-3 text-center">{stu.u3}</td>
-                    <td className="py-2.5 px-3 text-center">{stu.final}</td>
-                    <td className="py-2.5 px-3 text-center font-bold text-blue-600">
-                      {stu.total.toFixed(1)}
-                    </td>
-                    <td className="py-2.5 px-3 text-center">
-                      <span className={`px-2 py-0.5 rounded font-bold text-[11px] ${
-                        stu.grade === '4.0'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : stu.grade === '0'
-                          ? 'bg-rose-100 text-rose-800'
-                          : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {stu.grade}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {(keepTransferredOutRow
+                  ? sgsRoster
+                  : sgsRoster.filter((s) => s.transferState !== 'TRANSFERRED_OUT')
+                ).map((stu) => {
+                  const g =
+                    sgsRosterAndSubmissionService.computeStudentSgsGrades(stu);
+                  const isOut = stu.transferState === 'TRANSFERRED_OUT';
+                  const isIn = stu.transferState === 'TRANSFERRED_IN';
+
+                  return (
+                    <tr
+                      key={stu.studentCode}
+                      className={
+                        isOut
+                          ? 'bg-slate-100/80 text-slate-400'
+                          : isIn
+                          ? 'bg-indigo-50/30 hover:bg-indigo-50/50'
+                          : 'hover:bg-slate-50 transition-colors'
+                      }
+                    >
+                      <td className="py-3 px-3 text-center font-bold tabular-nums">
+                        {stu.sgsSeatNo}
+                      </td>
+                      <td className="py-3 px-3 font-mono text-slate-500 tabular-nums">
+                        {stu.studentCode}
+                      </td>
+                      <td className="py-3 px-3">
+                        <div
+                          className={`font-bold ${
+                            isOut ? 'line-through text-slate-400' : 'text-slate-900'
+                          }`}
+                        >
+                          {stu.studentName}
+                        </div>
+                        {isOut && (
+                          <span className="inline-block mt-0.5 px-2 py-0.5 rounded bg-slate-200 text-slate-700 text-[10px] font-semibold">
+                            ย้ายออก ({stu.transferDate}) — ล็อกเลขที่ {stu.sgsSeatNo} ตรง SGS
+                          </span>
+                        )}
+                        {isIn && (
+                          <span className="inline-block mt-0.5 px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-semibold">
+                            ย้ายเข้าใหม่ ({stu.transferDate}) — โอนหน่วย 1 แล้ว
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3 text-center tabular-nums">
+                        {isOut ? (
+                          '—'
+                        ) : (
+                          <span
+                            className={`font-semibold ${
+                              stu.attendancePercent < 80
+                                ? 'text-rose-600 font-bold'
+                                : 'text-slate-700'
+                            }`}
+                          >
+                            {stu.attendancePercent}%
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3 text-center whitespace-nowrap">
+                        {isOut ? (
+                          '—'
+                        ) : (
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                              g.missingCount === 0
+                                ? 'bg-teal-50 text-teal-700'
+                                : 'bg-rose-50 text-rose-700'
+                            }`}
+                          >
+                            {g.submittedCount}/{g.totalAssignedCount} งาน
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3 text-center font-semibold tabular-nums">
+                        {isOut ? '—' : g.u1}
+                      </td>
+                      <td className="py-3 px-3 text-center font-semibold tabular-nums">
+                        {isOut ? '—' : g.u2}
+                      </td>
+                      <td className="py-3 px-3 text-center tabular-nums">
+                        {isOut ? '—' : g.midterm}
+                      </td>
+                      <td className="py-3 px-3 text-center font-semibold tabular-nums">
+                        {isOut ? '—' : g.u3}
+                      </td>
+                      <td className="py-3 px-3 text-center tabular-nums">
+                        {isOut ? '—' : g.final}
+                      </td>
+                      <td className="py-3 px-3 text-center font-bold text-teal-700 tabular-nums">
+                        {isOut ? '—' : g.total}
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <span
+                          className={`px-2.5 py-0.5 rounded font-bold text-[11px] ${
+                            isOut
+                              ? 'bg-slate-200 text-slate-600'
+                              : g.gradeLabel === 'มส.' || g.gradeLabel === 'ร'
+                              ? 'bg-rose-100 text-rose-800'
+                              : 'bg-teal-100 text-teal-800'
+                          }`}
+                        >
+                          {g.gradeLabel}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-right whitespace-nowrap">
+                        <button
+                          onClick={() => {
+                            const updated =
+                              sgsRosterAndSubmissionService.toggleStudentTransferOut(
+                                stu.studentCode
+                              );
+                            setSgsRoster(updated);
+                          }}
+                          className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-100 text-[11px] font-semibold text-slate-600"
+                        >
+                          {isOut ? 'คืนสถานะปกติ' : 'แจ้งย้ายออก (คงเลขที่)'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
+
+          {/* Modal เพิ่มนักเรียนย้ายเข้าใหม่กลางเทอม (ต่อท้ายเลขที่ SGS + โอนคะแนน) */}
+          {isTransferInModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!transferInName.trim()) return;
+                  const updated =
+                    sgsRosterAndSubmissionService.addTransferredInStudent({
+                      studentCode: transferInCode.trim(),
+                      studentName: transferInName.trim(),
+                      transferDate: transferInDate,
+                      transferredU1Score: Number(transferInU1Score) || 0,
+                    });
+                  setSgsRoster(updated);
+                  setTransferInName('');
+                  setIsTransferInModalOpen(false);
+                }}
+                className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 space-y-4 shadow-xl text-xs"
+              >
+                <h3 className="text-base font-bold text-slate-900">
+                  + เพิ่มนักเรียนย้ายเข้าใหม่กลางเทอม (ต่อท้ายเลขที่ SGS อัตโนมัติ)
+                </h3>
+                <p className="text-slate-500">
+                  ระบบจะต่อท้ายเป็น <strong>เลขที่ {sgsRoster.length + 1}</strong> ตามมาตรฐาน SGS เพื่อไม่ให้แทรกกลางจนรายชื่อคนอื่นเลื่อนบรรทัด
+                </p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      รหัสนักเรียน
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={transferInCode}
+                      onChange={(e) => setTransferInCode(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      วันที่ย้ายเข้าเรียน
+                    </label>
+                    <input
+                      type="date"
+                      value={transferInDate}
+                      onChange={(e) => setTransferInDate(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    ชื่อ - นามสกุล นักเรียนที่ย้ายเข้าใหม่
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="เช่น ด.ญ. ชนากานต์ วงศ์สวัสดิ์"
+                    value={transferInName}
+                    onChange={(e) => setTransferInName(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    คะแนนเก็บที่โอนมาจากโรงเรียนเดิม (หน่วยที่ 1 เต็ม 15 คะแนน)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={15}
+                    value={transferInU1Score}
+                    onChange={(e) => setTransferInU1Score(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsTransferInModalOpen(false)}
+                    className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-semibold"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold"
+                  >
+                    บันทึกต่อท้ายเลขที่ {sgsRoster.length + 1} ตาม SGS
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
         </div>
       )}
 
