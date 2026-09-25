@@ -10,6 +10,8 @@ import {
   FileCheck2,
   HeartHandshake,
   Award,
+  Settings,
+  Lock,
 } from 'lucide-react';
 import {
   studentAffairsCouncilService,
@@ -18,6 +20,8 @@ import {
   type StudentLeaveRequest,
   type CouncilCandidateParty,
   type StudentSuggestion,
+  type AffairsTeacherRole,
+  type AffairsRolePermission,
 } from '../services/studentAffairsCouncilService';
 
 interface StudentAffairsCouncilViewProps {
@@ -36,6 +40,55 @@ export const StudentAffairsCouncilView: React.FC<
     'EVOTING' | 'SUGGESTIONS' | 'ACTIVITIES'
   >('EVOTING');
 
+  // Role & Classroom Scope (ครูที่ปรึกษาเห็นห้องตัวเอง ม.3/1, ครูกิจการ/ครูเวรเห็นทุกห้อง)
+  const [activeRole, setActiveRole] = useState<AffairsTeacherRole>(() =>
+    studentAffairsCouncilService.getActiveTeacherRole()
+  );
+  const [roleMatrix, setRoleMatrix] = useState<AffairsRolePermission[]>(() =>
+    studentAffairsCouncilService.getRolePermissions()
+  );
+  const [selectedRoom, setSelectedRoom] = useState<string>(() =>
+    studentAffairsCouncilService.getActiveTeacherRole() === 'HOMEROOM'
+      ? 'ม.3/1'
+      : 'ALL'
+  );
+  const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
+
+  const currentRolePerm =
+    roleMatrix.find((r) => r.role === activeRole) || roleMatrix[0];
+
+  const handleSwitchRole = (role: AffairsTeacherRole) => {
+    setActiveRole(role);
+    studentAffairsCouncilService.setActiveTeacherRole(role);
+    const perm = roleMatrix.find((r) => r.role === role);
+    if (perm && !perm.canViewAllRooms) {
+      setSelectedRoom('ม.3/1');
+    } else {
+      setSelectedRoom('ALL');
+    }
+  };
+
+  const handleTogglePermission = (
+    role: AffairsTeacherRole,
+    field: keyof Pick<
+      AffairsRolePermission,
+      | 'canViewAllRooms'
+      | 'canCheckFlagpoleAllRooms'
+      | 'canApproveLeaveAllRooms'
+      | 'canManageDiscipline'
+    >
+  ) => {
+    const updated = roleMatrix.map((item) =>
+      item.role === role ? { ...item, [field]: !item[field] } : item
+    );
+    setRoleMatrix(updated);
+    studentAffairsCouncilService.saveRolePermissions(updated);
+    const updatedPerm = updated.find((r) => r.role === activeRole);
+    if (updatedPerm && !updatedPerm.canViewAllRooms) {
+      setSelectedRoom('ม.3/1');
+    }
+  };
+
   const [assemblyList, setAssemblyList] = useState<AssemblyExceptionRecord[]>(
     () => studentAffairsCouncilService.getAssemblyRecords()
   );
@@ -48,9 +101,27 @@ export const StudentAffairsCouncilView: React.FC<
   const [parties] = useState<CouncilCandidateParty[]>(() =>
     studentAffairsCouncilService.getCandidateParties()
   );
+  const [abstainCount] = useState<number>(() =>
+    studentAffairsCouncilService.getAbstainCount()
+  );
   const [suggestions, setSuggestions] = useState<StudentSuggestion[]>(() =>
     studentAffairsCouncilService.getSuggestions()
   );
+
+  // Filtered records based on Role Scope & Classroom Filter
+  const effectiveRoomFilter = currentRolePerm.canViewAllRooms
+    ? selectedRoom
+    : 'ม.3/1';
+
+  const filteredAssembly =
+    effectiveRoomFilter === 'ALL'
+      ? assemblyList
+      : assemblyList.filter((s) => s.classroom === effectiveRoomFilter);
+
+  const filteredLeaves =
+    effectiveRoomFilter === 'ALL'
+      ? leaveRequests
+      : leaveRequests.filter((l) => l.classroom === effectiveRoomFilter);
 
   // Form state for adding discipline point
   const [newDiscStudent, setNewDiscStudent] = useState('ด.ช. ทัตธน คำฝั้น');
@@ -137,35 +208,160 @@ export const StudentAffairsCouncilView: React.FC<
       )}
 
       {/* 1. Dedicated Page Header (Separated: Student Affairs & Leave vs Student Council) */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        {mainSection === 'AFFAIRS' ? (
-          <>
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          {mainSection === 'AFFAIRS' ? (
+            <>
+              <div>
+                <h1 className="text-lg sm:text-xl font-bold text-slate-900">
+                  เช็คชื่อหน้าเสาธง & อนุมัติใบลานักเรียน
+                </h1>
+                <p className="text-xs text-slate-500 mt-1">
+                  เช็คชื่อเข้าแถวรายวัน · อนุมัติใบลาป่วย/ลากิจ · บันทึกคะแนนความประพฤติ (ซิงค์เข้าเช็คชื่อรายคาบอัตโนมัติ)
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
+                <button
+                  onClick={() => setIsAccessModalOpen((v) => !v)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold transition-colors"
+                >
+                  <Settings className="w-3.5 h-3.5 text-teal-600" />
+                  <span>ตั้งค่าการเข้าถึง (ครูทุกคน / ครูเวร / ครูกิจการ)</span>
+                </button>
+                {onOpenHomeVisit && (
+                  <button
+                    onClick={onOpenHomeVisit}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors"
+                  >
+                    <HeartHandshake className="w-3.5 h-3.5 text-teal-600" />
+                    <span>ไปหน้าเยี่ยมบ้าน นร.01</span>
+                  </button>
+                )}
+              </div>
+            </>
+          ) : (
             <div>
               <h1 className="text-lg sm:text-xl font-bold text-slate-900">
-                เช็คชื่อหน้าเสาธง & อนุมัติใบลานักเรียน
+                สภานักเรียน & เลือกตั้งออนไลน์ (E-Voting)
               </h1>
               <p className="text-xs text-slate-500 mt-1">
-                เช็คชื่อเข้าแถวรายวัน · อนุมัติใบลาป่วย/ลากิจ · บันทึกคะแนนความประพฤติ
+                ผลคะแนนเลือกตั้งสภานักเรียนเรียลไทม์ · นโยบายพรรคผู้สมัคร · ข้อเสนอแนะจากนักเรียน
               </p>
             </div>
-            {onOpenHomeVisit && (
+          )}
+        </div>
+
+        {/* Role Scope & Classroom Filter Bar (เฉพาะหน้าเสาธง & ใบลา) */}
+        {mainSection === 'AFFAIRS' && (
+          <div className="pt-3 border-t border-slate-100 flex flex-col xl:flex-row xl:items-center justify-between gap-3 text-xs">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="font-bold text-slate-600 mr-1">มุมมองสิทธิ์ผู้ใช้งาน:</span>
+              {roleMatrix.map((rm) => {
+                const isSelected = activeRole === rm.role;
+                return (
+                  <button
+                    key={rm.role}
+                    onClick={() => handleSwitchRole(rm.role)}
+                    className={`px-3 py-1.5 rounded-xl font-semibold transition-colors ${
+                      isSelected
+                        ? 'bg-teal-600 text-white shadow-2xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {rm.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-semibold text-slate-600">ขอบเขตห้องเรียนที่แสดง:</span>
+              {currentRolePerm.canViewAllRooms ? (
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                  {(['ALL', 'ม.3/1', 'ม.3/2', 'ม.3/3'] as const).map((roomKey) => (
+                    <button
+                      key={roomKey}
+                      onClick={() => setSelectedRoom(roomKey)}
+                      className={`px-2.5 py-1 rounded-lg font-semibold transition-colors ${
+                        selectedRoom === roomKey
+                          ? 'bg-slate-900 text-white'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      {roomKey === 'ALL' ? 'ทุกห้องเรียน (ทั้งโรงเรียน)' : `ชั้น ${roomKey}`}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-900 border border-amber-200 font-semibold">
+                  <Lock className="w-3.5 h-3.5 text-amber-600" />
+                  <span>เฉพาะห้องที่ปรึกษาของตนเอง (ม.3/1)</span>
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* แผงตั้งค่าสิทธิ์การเข้าถึง (Flexible Access Matrix เหมือนระบบการลา) */}
+        {mainSection === 'AFFAIRS' && isAccessModalOpen && (
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 text-xs">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm">
+                  ตั้งค่าสิทธิ์การเข้าถึงระบบหน้าเสาธง & ใบลานักเรียน (Role Access Matrix)
+                </h3>
+                <p className="text-slate-500">
+                  ปรับความยืดหยุ่นให้เหมาะกับบริบทโรงเรียน (เช่น เปิดให้ครูเวรหรือครูทุกคนช่วยดูทุกห้องเรียนได้)
+                </p>
+              </div>
               <button
-                onClick={onOpenHomeVisit}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors self-start lg:self-auto"
+                onClick={() => setIsAccessModalOpen(false)}
+                className="px-3 py-1 rounded-lg bg-white border border-slate-200 font-semibold text-slate-600 hover:bg-slate-100"
               >
-                <HeartHandshake className="w-3.5 h-3.5 text-teal-600" />
-                <span>ไปหน้าเยี่ยมบ้าน นร.01</span>
+                ✕ ปิดหน้าต่างตั้งค่า
               </button>
-            )}
-          </>
-        ) : (
-          <div>
-            <h1 className="text-lg sm:text-xl font-bold text-slate-900">
-              สภานักเรียน & เลือกตั้งออนไลน์ (E-Voting)
-            </h1>
-            <p className="text-xs text-slate-500 mt-1">
-              ผลคะแนนเลือกตั้งสภานักเรียนเรียลไทม์ · นโยบายพรรคผู้สมัคร · ข้อเสนอแนะจากนักเรียน
-            </p>
+            </div>
+
+            <div className="overflow-x-auto bg-white rounded-xl border border-slate-200">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                    <th className="py-2.5 px-3">กลุ่มบทบาทครู</th>
+                    <th className="py-2.5 px-3 text-center">ดูข้อมูลทุกห้องเรียน</th>
+                    <th className="py-2.5 px-3 text-center">เช็คชื่อเสาธงทุกห้อง</th>
+                    <th className="py-2.5 px-3 text-center">อนุมัติใบลาข้ามห้อง</th>
+                    <th className="py-2.5 px-3 text-center">บันทึกคะแนนความประพฤติ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {roleMatrix.map((row) => (
+                    <tr key={row.role} className="hover:bg-slate-50/70">
+                      <td className="py-2.5 px-3">
+                        <div className="font-bold text-slate-900">{row.label}</div>
+                        <div className="text-[11px] text-slate-500">{row.description}</div>
+                      </td>
+                      {(
+                        [
+                          'canViewAllRooms',
+                          'canCheckFlagpoleAllRooms',
+                          'canApproveLeaveAllRooms',
+                          'canManageDiscipline',
+                        ] as const
+                      ).map((field) => (
+                        <td key={field} className="py-2.5 px-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={row[field]}
+                            onChange={() => handleTogglePermission(row.role, field)}
+                            className="w-4 h-4 accent-teal-600 rounded cursor-pointer"
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
@@ -176,11 +372,11 @@ export const StudentAffairsCouncilView: React.FC<
           <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
             <div>
               <span className="text-xs font-medium text-slate-500">
-                เช็คชื่อหน้าเสาธงวันนี้ (ม.3/1)
+                เช็คชื่อหน้าเสาธง ({effectiveRoomFilter === 'ALL' ? 'ทุกห้องเรียน' : `ชั้น ${effectiveRoomFilter}`})
               </span>
               <div className="mt-1 flex items-baseline gap-2">
                 <span className="text-2xl font-bold text-slate-900 tabular-nums">
-                  {assemblyList.filter((s) => s.status === 'PRESENT').length}/{assemblyList.length}
+                  {filteredAssembly.filter((s) => s.status === 'PRESENT').length}/{filteredAssembly.length}
                 </span>
                 <span className="text-xs font-medium text-slate-500">
                   มาเข้าแถวปกติ
@@ -195,19 +391,19 @@ export const StudentAffairsCouncilView: React.FC<
           <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
             <div>
               <span className="text-xs font-medium text-slate-500">
-                ใบลานักเรียนรอพิจารณา
+                ใบลานักเรียนรอพิจารณา ({effectiveRoomFilter === 'ALL' ? 'ทุกห้อง' : effectiveRoomFilter})
               </span>
               <div className="mt-1 flex items-baseline gap-2">
                 <span className="text-2xl font-bold text-teal-700 tabular-nums">
-                  {leaveRequests.filter((r) => r.status === 'PENDING').length}
+                  {filteredLeaves.filter((r) => r.status === 'PENDING').length}
                 </span>
                 <span className="text-xs font-medium text-slate-500">
-                  ใบลา (จากทั้งหมด {leaveRequests.length} ใบ)
+                  ใบลา (จาก {filteredLeaves.length} ใบ)
                 </span>
               </div>
             </div>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
-              ซิงก์เวลาเรียนอัตโนมัติ
+              ซิงก์เข้าคาบเรียนอัตโนมัติ
             </span>
           </div>
 
@@ -235,14 +431,14 @@ export const StudentAffairsCouncilView: React.FC<
           <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
             <div>
               <span className="text-xs font-medium text-slate-500">
-                ผู้ใช้สิทธิ์เลือกตั้ง (E-Voting)
+                ผู้ใช้สิทธิ์เลือกตั้งรวม (รวมไม่ประสงค์ลงคะแนน)
               </span>
               <div className="mt-1 flex items-baseline gap-2">
                 <span className="text-2xl font-bold text-teal-700 tabular-nums">
-                  {totalVotes.toLocaleString()}
+                  {(totalVotes + abstainCount).toLocaleString()}
                 </span>
                 <span className="text-xs font-medium text-slate-500">
-                  คะแนนเสียง
+                  คน (ไม่ประสงค์ลงคะแนน {abstainCount} คน)
                 </span>
               </div>
             </div>
@@ -266,7 +462,7 @@ export const StudentAffairsCouncilView: React.FC<
               </div>
             </div>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
-              1 สิทธิ์ 1 เสียง
+              ปิดผลคะแนนฝั่งเด็กก่อนโหวต
             </span>
           </div>
 
@@ -349,7 +545,10 @@ export const StudentAffairsCouncilView: React.FC<
                 <div className="px-5 py-3.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
                     <h2 className="text-sm font-bold text-slate-900">
-                      ตารางเช็คชื่อเข้าแถวเคารพธงชาติรายวัน — ชั้น ม.3/1
+                      ตารางเช็คชื่อเข้าแถวเคารพธงชาติรายวัน —{' '}
+                      {effectiveRoomFilter === 'ALL'
+                        ? 'ทุกห้องเรียน (ม.3/1 - ม.3/3)'
+                        : `ชั้น ${effectiveRoomFilter}`}
                     </h2>
                     <p className="text-xs text-slate-600 mt-0.5">
                       ระบบติ๊ก <strong>“มาเข้าแถว”</strong> ให้นักเรียนครบทุกคนไว้แล้ว — คุณครูกดปุ่มด้านขวาเฉพาะคนที่ <strong>สาย / ลาป่วย / ขาด</strong>
@@ -362,7 +561,7 @@ export const StudentAffairsCouncilView: React.FC<
                     <thead>
                       <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-semibold">
                         <th className="py-3 px-4">รหัสนักเรียน</th>
-                        <th className="py-3 px-4">ชื่อ - นามสกุล</th>
+                        <th className="py-3 px-4">ชื่อ - นามสกุล / ห้อง</th>
                         <th className="py-3 px-4">วันย้ายเข้าเรียน</th>
                         <th className="py-3 px-4">สถานะเข้าแถววันนี้</th>
                         <th className="py-3 px-4">หมายเหตุ</th>
@@ -370,13 +569,14 @@ export const StudentAffairsCouncilView: React.FC<
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {assemblyList.map((stu) => (
+                      {filteredAssembly.map((stu) => (
                         <tr key={stu.studentCode} className="hover:bg-slate-50/60 transition-colors">
                           <td className="py-3.5 px-4 font-mono font-semibold text-slate-700 tabular-nums">
                             {stu.studentCode}
                           </td>
-                          <td className="py-3.5 px-4 font-bold text-slate-900">
-                            {stu.studentName}
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-slate-900">{stu.studentName}</div>
+                            <div className="text-[11px] text-slate-400">ชั้น {stu.classroom}</div>
                           </td>
                           <td className="py-3.5 px-4 text-slate-500 tabular-nums">
                             {stu.enrolledAt}
@@ -579,10 +779,13 @@ export const StudentAffairsCouncilView: React.FC<
               <div>
                 <div className="px-5 py-3.5 border-b border-slate-100">
                   <h3 className="text-sm font-bold text-slate-900">
-                    ตารางรายการขออนุมัติใบลานักเรียน (ลาป่วย / ลากิจ)
+                    ตารางรายการขออนุมัติใบลานักเรียน (ลาป่วย / ลากิจ) —{' '}
+                    {effectiveRoomFilter === 'ALL'
+                      ? 'ทุกห้องเรียน'
+                      : `ชั้น ${effectiveRoomFilter}`}
                   </h3>
                   <p className="text-xs text-slate-500">
-                    เมื่ออนุมัติแล้ว ระบบจะซิงก์เข้าตารางเช็คชื่อรายคาบและคำนวณตามกติกาเวลาเรียนโดยอัตโนมัติ
+                    เมื่ออนุมัติแล้ว ระบบจะซิงค์เข้าตารางเช็คชื่อหน้าเสาธงและตั้งค่า "ลา" ในคาบเรียนให้อัตโนมัติ
                   </p>
                 </div>
 
@@ -599,7 +802,7 @@ export const StudentAffairsCouncilView: React.FC<
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {leaveRequests.map((req) => (
+                      {filteredLeaves.map((req) => (
                         <tr key={req.id} className="hover:bg-slate-50/60 transition-colors">
                           <td className="py-3.5 px-4">
                             <div className="font-bold text-slate-900">{req.studentName}</div>

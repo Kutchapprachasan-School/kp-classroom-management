@@ -5,21 +5,45 @@ import {
   Check,
   CheckCircle2,
   Users,
+  AlertTriangle,
+  FileCheck2,
 } from 'lucide-react';
 import { timetableScheduleData } from '../data/mockData';
 import type { TimetableSlot } from '../types/viewModels';
+import { studentAffairsCouncilService } from '../services/studentAffairsCouncilService';
 
 export const TimetableView: React.FC = () => {
   const [selectedSlot, setSelectedSlot] = useState<TimetableSlot | null>(null);
-  const [attendanceRecords, setAttendanceRecords] = useState<Record<number, 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE'>>({
-    1: 'PRESENT',
-    2: 'PRESENT',
-    3: 'ABSENT',
-    4: 'PRESENT',
-    5: 'LATE',
-    6: 'LEAVE',
-    7: 'PRESENT',
-  });
+  const [overrideConfirmConflicts, setOverrideConfirmConflicts] = useState<
+    Array<{ no: number; name: string; leaveReason: string; chosenStatus: string }>
+  >([]);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const studentsList = [
+    { no: 1, code: '45101', name: 'ด.ช. กฤษณะ ศรีสมบูรณ์' },
+    { no: 2, code: '45102', name: 'ด.ช. ทัตธน คำฝั้น' },
+    { no: 3, code: '45105', name: 'ด.ญ. กมลชนก เลิศวิไล' },
+    { no: 4, code: '45109', name: 'ด.ช. ณัฐวุฒิ สายทอง' },
+    { no: 5, code: '45112', name: 'ด.ญ. พิมพ์ชนก วงศ์สวัสดิ์' },
+    { no: 6, code: '45115', name: 'ด.ช. อัศวิน วนเกษตรกุล' },
+    { no: 7, code: '45118', name: 'ด.ญ. อคิราห์ วิรากร' },
+  ];
+
+  const buildInitialAttendance = (): Record<number, 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE'> => {
+    const initial: Record<number, 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE'> = {};
+    for (const stu of studentsList) {
+      const morning = studentAffairsCouncilService.getMorningStatusForStudent(
+        stu.name,
+        stu.code
+      );
+      initial[stu.no] = morning.hasApprovedLeave ? 'LEAVE' : 'PRESENT';
+    }
+    return initial;
+  };
+
+  const [attendanceRecords, setAttendanceRecords] = useState<
+    Record<number, 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE'>
+  >(buildInitialAttendance);
 
   const days: Array<'จันทร์' | 'อังคาร' | 'พุธ' | 'พฤหัสบดี' | 'ศุกร์'> = [
     'จันทร์',
@@ -34,23 +58,24 @@ export const TimetableView: React.FC = () => {
     return timetableScheduleData.find((s) => s.day === day && s.period === period);
   };
 
-  const handleMarkAllPresent = () => {
-    const updated: Record<number, 'PRESENT'> = {};
-    for (let i = 1; i <= 7; i++) {
-      updated[i] = 'PRESENT';
-    }
-    setAttendanceRecords(updated);
+  const handleOpenSlot = (slot: TimetableSlot) => {
+    setAttendanceRecords(buildInitialAttendance());
+    setOverrideConfirmConflicts([]);
+    setSelectedSlot(slot);
   };
 
-  const studentsList = [
-    { no: 1, name: 'ด.ช. กฤษณะ ศรีสมบูรณ์' },
-    { no: 2, name: 'ด.ช. จิรายุ เดชปันคำ' },
-    { no: 3, name: 'ด.ช. ภูรินท์ บัณฑิต' },
-    { no: 4, name: 'ด.ช. อัศวิน วนเกษตรกุล' },
-    { no: 5, name: 'ด.ช. ชัยมงคล วงศ์บุตร' },
-    { no: 6, name: 'ด.ช. ทัตธน คำฝั้น' },
-    { no: 7, name: 'ด.ญ. อคิราห์ วิรากร' },
-  ];
+  const handleMarkAllPresent = () => {
+    const updated: Record<number, 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE'> = {};
+    for (const stu of studentsList) {
+      const morning = studentAffairsCouncilService.getMorningStatusForStudent(
+        stu.name,
+        stu.code
+      );
+      updated[stu.no] = morning.hasApprovedLeave ? 'LEAVE' : 'PRESENT';
+    }
+    setAttendanceRecords(updated);
+    setOverrideConfirmConflicts([]);
+  };
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in font-sans text-slate-800 select-none">
@@ -135,7 +160,7 @@ export const TimetableView: React.FC = () => {
                     return (
                       <td
                         key={period}
-                        onClick={() => setSelectedSlot(slot)}
+                        onClick={() => handleOpenSlot(slot)}
                         className="p-1.5 border-r border-slate-200 last:border-r-0 cursor-pointer group"
                       >
                         <div
@@ -169,7 +194,14 @@ export const TimetableView: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal: Roll-Call Interface */}
+      {toastMsg && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 text-xs font-semibold">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>{toastMsg}</span>
+        </div>
+      )}
+
+      {/* Modal: Roll-Call Interface with Morning Flagpole & Approved Leave Sync */}
       {selectedSlot && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
@@ -180,7 +212,7 @@ export const TimetableView: React.FC = () => {
                   <span>เช็คชื่อเข้าชั้นเรียน: {selectedSlot.subjectName} ({selectedSlot.room})</span>
                 </h3>
                 <p className="text-xs text-slate-400">
-                  วัน{selectedSlot.day} คาบที่ {selectedSlot.period} • {selectedSlot.time}
+                  วัน{selectedSlot.day} คาบที่ {selectedSlot.period} • {selectedSlot.time} • ซิงค์ข้อมูลเข้าแถวเสาธง & ใบลาอัตโนมัติ
                 </p>
               </div>
               <button
@@ -194,32 +226,75 @@ export const TimetableView: React.FC = () => {
             <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200">
               <span className="text-xs text-slate-600 font-medium flex items-center gap-1.5">
                 <Users className="w-4 h-4 text-slate-500" />
-                <span>จำนวนนักเรียน 7 คน</span>
+                <span>จำนวนนักเรียน {studentsList.length} คน (ดึงสถานะลาจากใบลาที่อนุมัติแล้วอัตโนมัติ)</span>
               </span>
 
               <button
                 onClick={handleMarkAllPresent}
                 className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
               >
-                ✓ มาครบทุกคน
+                ✓ มาครบทุกคน (คงสถานะผู้ที่ลา)
               </button>
             </div>
 
-            {/* Attendance Roster Radio list */}
+            {/* Attendance Roster Radio list with Morning Assembly Badge */}
             <div className="space-y-2">
               {studentsList.map((stu) => {
                 const currentStatus = attendanceRecords[stu.no] || 'PRESENT';
+                const morning = studentAffairsCouncilService.getMorningStatusForStudent(
+                  stu.name,
+                  stu.code
+                );
+                const isOverridingLeave =
+                  morning.hasApprovedLeave && currentStatus !== 'LEAVE';
 
                 return (
                   <div
                     key={stu.no}
-                    className="p-3 bg-white rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                    className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs transition-colors ${
+                      isOverridingLeave
+                        ? 'bg-amber-50/70 border-amber-300'
+                        : morning.hasApprovedLeave
+                        ? 'bg-blue-50/40 border-blue-200'
+                        : 'bg-white border-slate-200'
+                    }`}
                   >
-                    <span className="font-semibold text-slate-800 w-48">
-                      {stu.no}. {stu.name}
-                    </span>
+                    <div className="space-y-1">
+                      <div className="font-semibold text-slate-800 flex items-center gap-2">
+                        <span>
+                          {stu.no}. {stu.name}
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-normal">
+                          ({stu.code})
+                        </span>
+                      </div>
 
-                    <div className="flex items-center gap-1.5">
+                      {/* แสดงผลมาเข้าแถวหน้าเสาธง / ใบลาอนุมัติแล้ว เพื่อประกอบการเช็คเวลาเรียนของครู */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold ${
+                            morning.hasApprovedLeave
+                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                              : morning.assemblyStatus === 'LATE'
+                              ? 'bg-amber-100 text-amber-800'
+                              : morning.assemblyStatus === 'ABSENT'
+                              ? 'bg-rose-100 text-rose-800'
+                              : 'bg-emerald-50 text-emerald-700'
+                          }`}
+                        >
+                          <FileCheck2 className="w-3 h-3" />
+                          <span>เสาธง: {morning.assemblyLabel}</span>
+                        </span>
+
+                        {isOverridingLeave && (
+                          <span className="text-[11px] font-bold text-amber-800">
+                            ⚠️ เปลี่ยนจากสถานะ "ลา"
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
                       {(['PRESENT', 'ABSENT', 'LATE', 'LEAVE'] as const).map((status) => {
                         const isSelected = currentStatus === status;
                         const labelMap = {
@@ -230,18 +305,30 @@ export const TimetableView: React.FC = () => {
                         };
 
                         const colorMap = {
-                          PRESENT: isSelected ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-                          ABSENT: isSelected ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-                          LATE: isSelected ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-                          LEAVE: isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                          PRESENT: isSelected
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                          ABSENT: isSelected
+                            ? 'bg-rose-600 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                          LATE: isSelected
+                            ? 'bg-amber-600 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                          LEAVE: isSelected
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
                         };
 
                         return (
                           <button
                             key={status}
-                            onClick={() =>
-                              setAttendanceRecords({ ...attendanceRecords, [stu.no]: status })
-                            }
+                            onClick={() => {
+                              setAttendanceRecords({
+                                ...attendanceRecords,
+                                [stu.no]: status,
+                              });
+                              setOverrideConfirmConflicts([]);
+                            }}
                             className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${colorMap[status]}`}
                           >
                             {labelMap[status]}
@@ -254,9 +341,54 @@ export const TimetableView: React.FC = () => {
               })}
             </div>
 
-            <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800">
-              📌 การบันทึกเช็คชื่อจะตั้งค่า <code>isConducted = true</code> ซึ่งใช้เป็นฐานตัวหาร (Denominator) ที่แท้จริงในการคำนวณสถิติ มส. ตาม Blueprint
-            </div>
+            {/* แจ้งเตือนเมื่อกดบันทึกแต่มีการเปลี่ยนสถานะของนักเรียนที่ลาแล้ว */}
+            {overrideConfirmConflicts.length > 0 && (
+              <div className="p-4 bg-amber-50 rounded-xl border-2 border-amber-300 space-y-2.5 text-xs">
+                <div className="font-bold text-amber-900 flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>
+                    แจ้งเตือนก่อนบันทึก: พบนักเรียนที่แจ้งลา/อนุมัติใบลาแล้วถูกเปลี่ยนสถานะ ({overrideConfirmConflicts.length} คน)
+                  </span>
+                </div>
+                <ul className="space-y-1 text-amber-800 pl-5 list-disc">
+                  {overrideConfirmConflicts.map((c) => (
+                    <li key={c.no}>
+                      <span className="font-bold">{c.name}</span> — แจ้ง{' '}
+                      <span className="underline">{c.leaveReason}</span> แต่ถูกเปลี่ยนเป็นสถานะ{' '}
+                      <span className="font-bold text-rose-700">"{c.chosenStatus}"</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                  <button
+                    onClick={() => {
+                      const reverted = { ...attendanceRecords };
+                      for (const c of overrideConfirmConflicts) {
+                        reverted[c.no] = 'LEAVE';
+                      }
+                      setAttendanceRecords(reverted);
+                      setOverrideConfirmConflicts([]);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-amber-900 font-semibold hover:bg-amber-100"
+                  >
+                    คืนค่าเป็น "ลา" ตามใบลา
+                  </button>
+                  <button
+                    onClick={() => {
+                      setOverrideConfirmConflicts([]);
+                      setSelectedSlot(null);
+                      setToastMsg(
+                        'ยืนยันการเปลี่ยนสถานะและบันทึกการเช็คชื่อเข้าชั้นเรียนเรียบร้อยแล้ว'
+                      );
+                      setTimeout(() => setToastMsg(null), 3500);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-amber-700 hover:bg-amber-800 text-white font-semibold"
+                  >
+                    ยืนยันการบันทึกตามที่เปลี่ยน
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
               <button
@@ -267,8 +399,44 @@ export const TimetableView: React.FC = () => {
               </button>
               <button
                 onClick={() => {
-                  alert('บันทึกการเช็คชื่อเข้าชั้นเรียนและปรับปรุงฐานเวลาเรียนเรียบร้อย!');
+                  const statusLabelMap = {
+                    PRESENT: 'มาเรียน',
+                    ABSENT: 'ขาดเรียน',
+                    LATE: 'มาสาย',
+                    LEAVE: 'ลา',
+                  };
+                  const conflicts: Array<{
+                    no: number;
+                    name: string;
+                    leaveReason: string;
+                    chosenStatus: string;
+                  }> = [];
+
+                  for (const stu of studentsList) {
+                    const morning =
+                      studentAffairsCouncilService.getMorningStatusForStudent(
+                        stu.name,
+                        stu.code
+                      );
+                    const chosen = attendanceRecords[stu.no] || 'PRESENT';
+                    if (morning.hasApprovedLeave && chosen !== 'LEAVE') {
+                      conflicts.push({
+                        no: stu.no,
+                        name: stu.name,
+                        leaveReason: morning.leaveReason || 'อนุมัติใบลาแล้ว',
+                        chosenStatus: statusLabelMap[chosen],
+                      });
+                    }
+                  }
+
+                  if (conflicts.length > 0) {
+                    setOverrideConfirmConflicts(conflicts);
+                    return;
+                  }
+
                   setSelectedSlot(null);
+                  setToastMsg('บันทึกการเช็คชื่อเข้าชั้นเรียนและซิงค์เวลาเรียนเรียบร้อยแล้ว');
+                  setTimeout(() => setToastMsg(null), 3500);
                 }}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs"
               >

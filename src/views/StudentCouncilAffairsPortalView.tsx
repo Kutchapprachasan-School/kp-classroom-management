@@ -299,7 +299,9 @@ export const StudentCouncilAffairsPortalView: React.FC<
                           เบอร์ {party.partyNumber}
                         </span>
                         <span className="font-bold text-slate-500 tabular-nums">
-                          {party.voteCount.toLocaleString()} คะแนน
+                          {votedPartyId
+                            ? `${party.voteCount.toLocaleString()} คะแนน`
+                            : '🔒 ปิดผลคะแนนก่อนโหวต'}
                         </span>
                       </div>
                       <div className="font-bold text-slate-900 text-sm">
@@ -338,6 +340,29 @@ export const StudentCouncilAffairsPortalView: React.FC<
                   </div>
                 );
               })}
+            </div>
+
+            {/* ตัวเลือก ไม่ประสงค์ลงคะแนน (Abstain / Vote No) ตามระเบียบการเลือกตั้ง */}
+            <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="text-slate-500">
+                ตามระเบียบการเลือกตั้งสภานักเรียน นักเรียนสามารถเลือกใช้สิทธิ์{' '}
+                <span className="font-semibold text-slate-700">"ไม่ประสงค์ลงคะแนน"</span> ได้ (รับ +30 XP เช่นกัน)
+              </div>
+              <button
+                disabled={Boolean(votedPartyId)}
+                onClick={() => handleVote('ABSTAIN')}
+                className={`px-4 py-2 rounded-xl font-semibold border transition-colors shrink-0 ${
+                  votedPartyId === 'ABSTAIN'
+                    ? 'bg-teal-600 text-white border-teal-600'
+                    : votedPartyId
+                    ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300'
+                }`}
+              >
+                {votedPartyId === 'ABSTAIN'
+                  ? '✓ ใช้สิทธิ์ไม่ประสงค์ลงคะแนนแล้ว'
+                  : 'ไม่ประสงค์ลงคะแนน (Vote No)'}
+              </button>
             </div>
           </div>
 

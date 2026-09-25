@@ -75,15 +75,76 @@ export interface StudentSuggestion {
   createdAt: string;
 }
 
-const STORAGE_KEY_ASSEMBLY = 'cms_affairs_assembly_v1';
+export type AffairsTeacherRole = 'HOMEROOM' | 'DUTY' | 'AFFAIRS' | 'ALL_TEACHERS';
+
+export interface AffairsRolePermission {
+  role: AffairsTeacherRole;
+  label: string;
+  description: string;
+  canViewAllRooms: boolean;
+  canCheckFlagpoleAllRooms: boolean;
+  canApproveLeaveAllRooms: boolean;
+  canManageDiscipline: boolean;
+}
+
+const STORAGE_KEY_ASSEMBLY = 'cms_affairs_assembly_v2';
 const STORAGE_KEY_DISCIPLINE = 'cms_affairs_discipline_v1';
-const STORAGE_KEY_LEAVES = 'cms_affairs_student_leaves_v1';
+const STORAGE_KEY_LEAVES = 'cms_affairs_student_leaves_v2';
 const STORAGE_KEY_PARTIES = 'cms_council_parties_v1';
 const STORAGE_KEY_VOTED_STUDENTS = 'cms_council_voted_students_v1';
+const STORAGE_KEY_ABSTAIN_COUNT = 'cms_council_abstain_count_v1';
 const STORAGE_KEY_ACTIVITIES = 'cms_council_activities_v1';
 const STORAGE_KEY_SUGGESTIONS = 'cms_council_suggestions_v1';
+const STORAGE_KEY_ROLE_MATRIX = 'cms_affairs_role_matrix_v1';
+const STORAGE_KEY_ACTIVE_ROLE = 'cms_affairs_active_role_v1';
+
+export const DEFAULT_ROLE_PERMISSIONS: AffairsRolePermission[] = [
+  {
+    role: 'HOMEROOM',
+    label: 'ครูที่ปรึกษา (ม.3/1)',
+    description: 'เห็นเฉพาะห้องที่ปรึกษาของตนเอง เช็คชื่อเสาธงและอนุมัติใบลาในห้องตนเอง',
+    canViewAllRooms: false,
+    canCheckFlagpoleAllRooms: false,
+    canApproveLeaveAllRooms: false,
+    canManageDiscipline: true,
+  },
+  {
+    role: 'DUTY',
+    label: 'ครูเวรประจำวัน',
+    description: 'เห็นทุกห้องเรียนเพื่อเช็คชื่อหน้าเสาธงและตรวจสอบใบลาประจำวัน',
+    canViewAllRooms: true,
+    canCheckFlagpoleAllRooms: true,
+    canApproveLeaveAllRooms: false,
+    canManageDiscipline: true,
+  },
+  {
+    role: 'AFFAIRS',
+    label: 'ครูกิจการนักเรียน (ฝ่ายปกครอง)',
+    description: 'เห็นทุกห้องเรียน อนุมัติใบลาทุกห้อง บันทึกความประพฤติ และตั้งค่าสิทธิ์ระบบ',
+    canViewAllRooms: true,
+    canCheckFlagpoleAllRooms: true,
+    canApproveLeaveAllRooms: true,
+    canManageDiscipline: true,
+  },
+  {
+    role: 'ALL_TEACHERS',
+    label: 'ครูทุกคน (ครูประจำวิชา)',
+    description: 'ดูผลมาเข้าแถวและสถานะใบลาเพื่อใช้ประกอบการเช็คเวลาเรียนรายคาบ',
+    canViewAllRooms: true,
+    canCheckFlagpoleAllRooms: false,
+    canApproveLeaveAllRooms: false,
+    canManageDiscipline: false,
+  },
+];
 
 const INITIAL_ASSEMBLY: AssemblyExceptionRecord[] = [
+  {
+    studentCode: '45101',
+    studentName: 'ด.ช. กฤษณะ ศรีสมบูรณ์',
+    classroom: 'ม.3/1',
+    enrolledAt: '2026-05-16',
+    status: 'PRESENT',
+  },
   {
     studentCode: '45102',
     studentName: 'ด.ช. ทัตธน คำฝั้น',
@@ -112,7 +173,30 @@ const INITIAL_ASSEMBLY: AssemblyExceptionRecord[] = [
     classroom: 'ม.3/1',
     enrolledAt: '2026-05-16',
     status: 'SICK_LEAVE',
-    note: 'ผู้ปกครองแจ้งลาป่วยผ่านพอร์ทัลนักเรียน',
+    note: 'ผู้ปกครองแจ้งลาป่วยผ่านพอร์ทัลนักเรียน (อนุมัติแล้ว)',
+  },
+  {
+    studentCode: '45201',
+    studentName: 'ด.ช. ภานุพงศ์ เจริญสุข',
+    classroom: 'ม.3/2',
+    enrolledAt: '2026-05-16',
+    status: 'PRESENT',
+  },
+  {
+    studentCode: '45204',
+    studentName: 'ด.ญ. ชนากานต์ รัตนโชติ',
+    classroom: 'ม.3/2',
+    enrolledAt: '2026-05-16',
+    status: 'PERSONAL_LEAVE',
+    note: 'ลากิจไปทำพาสปอร์ตกับผู้ปกครอง',
+  },
+  {
+    studentCode: '45302',
+    studentName: 'ด.ช. ธนดล ยิ่งเจริญ',
+    classroom: 'ม.3/3',
+    enrolledAt: '2026-05-16',
+    status: 'ABSENT',
+    note: 'ยังไม่แจ้งสาเหตุ',
   },
 ];
 
@@ -162,13 +246,13 @@ const INITIAL_LEAVES: StudentLeaveRequest[] = [
     studentName: 'ด.ญ. พิมพ์ชนก วงศ์สวัสดิ์',
     classroom: 'ม.3/1',
     leaveType: 'ลาป่วย',
-    startDate: '2026-09-24',
-    endDate: '2026-09-24',
+    startDate: '2026-09-25',
+    endDate: '2026-09-25',
     daysCount: 1,
     reason: 'มีไข้หวัดและปวดศีรษะ มีใบรับรองแพทย์คลินิก',
     guardianPhone: '082-119-5621',
     status: 'APPROVED',
-    createdAt: '24 ก.ย. 2569 07:15 น.',
+    createdAt: '25 ก.ย. 2569 07:15 น.',
   },
   {
     id: 'sl-2',
@@ -182,7 +266,21 @@ const INITIAL_LEAVES: StudentLeaveRequest[] = [
     reason: 'เดินทางไปทำบัตรประชาชนใหม่และติดต่อเอกสารทุน กสศ. กับมารดา',
     guardianPhone: '081-452-9918',
     status: 'PENDING',
-    createdAt: '24 ก.ย. 2569 12:30 น.',
+    createdAt: '25 ก.ย. 2569 08:10 น.',
+  },
+  {
+    id: 'sl-3',
+    studentCode: '45204',
+    studentName: 'ด.ญ. ชนากานต์ รัตนโชติ',
+    classroom: 'ม.3/2',
+    leaveType: 'ลากิจ',
+    startDate: '2026-09-25',
+    endDate: '2026-09-25',
+    daysCount: 1,
+    reason: 'เดินทางไปทำหนังสือเดินทางราชการกับผู้ปกครอง',
+    guardianPhone: '089-774-1120',
+    status: 'PENDING',
+    createdAt: '25 ก.ย. 2569 07:40 น.',
   },
 ];
 
@@ -356,20 +454,59 @@ export const studentAffairsCouncilService = {
     id: string,
     status: StudentLeaveRequest['status']
   ): StudentLeaveRequest[] {
-    const updated = this.getStudentLeaves().map((item) =>
+    const leaves = this.getStudentLeaves();
+    const target = leaves.find((l) => l.id === id);
+    const updated = leaves.map((item) =>
       item.id === id ? { ...item, status } : item
     );
     localStorage.setItem(STORAGE_KEY_LEAVES, JSON.stringify(updated));
+
+    // Invariant 1: เมื่ออนุมัติใบลา ให้ซิงค์สถานะเข้าแถวเสาธงเป็น ลาป่วย/ลากิจ อัตโนมัติ
+    if (target && status === 'APPROVED') {
+      const assemblyStatus: AssemblyExceptionRecord['status'] =
+        target.leaveType === 'ลาป่วย' ? 'SICK_LEAVE' : 'PERSONAL_LEAVE';
+      const currentAssembly = this.getAssemblyRecords();
+      const exists = currentAssembly.some((a) => a.studentCode === target.studentCode);
+      if (exists) {
+        this.updateAssemblyStatus(
+          target.studentCode,
+          assemblyStatus,
+          `อนุมัติ${target.leaveType}: ${target.reason}`
+        );
+      } else {
+        const nextAssembly: AssemblyExceptionRecord[] = [
+          ...currentAssembly,
+          {
+            studentCode: target.studentCode,
+            studentName: target.studentName,
+            classroom: target.classroom,
+            enrolledAt: '2026-05-16',
+            status: assemblyStatus,
+            note: `อนุมัติ${target.leaveType}: ${target.reason}`,
+          },
+        ];
+        localStorage.setItem(STORAGE_KEY_ASSEMBLY, JSON.stringify(nextAssembly));
+      }
+    }
     return updated;
   },
 
-  // 4. เลือกตั้งสภานักเรียน E-Voting
+  // 4. เลือกตั้งสภานักเรียน E-Voting (รองรับ ไม่ประสงค์ลงคะแนน ABSTAIN)
   getCandidateParties(): CouncilCandidateParty[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_PARTIES);
       return raw ? JSON.parse(raw) : INITIAL_PARTIES;
     } catch {
       return INITIAL_PARTIES;
+    }
+  },
+
+  getAbstainCount(): number {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_ABSTAIN_COUNT);
+      return raw ? Number(raw) : 19;
+    } catch {
+      return 19;
     }
   },
 
@@ -386,23 +523,35 @@ export const studentAffairsCouncilService = {
   castStudentVote(
     studentCode: string,
     partyId: string
-  ): { parties: CouncilCandidateParty[]; alreadyVoted: boolean } {
+  ): { parties: CouncilCandidateParty[]; abstainCount: number; alreadyVoted: boolean } {
     const existingVote = this.hasStudentVoted(studentCode);
     if (existingVote) {
-      return { parties: this.getCandidateParties(), alreadyVoted: true };
+      return {
+        parties: this.getCandidateParties(),
+        abstainCount: this.getAbstainCount(),
+        alreadyVoted: true,
+      };
     }
 
-    const parties = this.getCandidateParties().map((p) =>
-      p.id === partyId ? { ...p, voteCount: p.voteCount + 1 } : p
-    );
-    localStorage.setItem(STORAGE_KEY_PARTIES, JSON.stringify(parties));
+    let parties = this.getCandidateParties();
+    let abstainCount = this.getAbstainCount();
+
+    if (partyId === 'ABSTAIN') {
+      abstainCount += 1;
+      localStorage.setItem(STORAGE_KEY_ABSTAIN_COUNT, String(abstainCount));
+    } else {
+      parties = parties.map((p) =>
+        p.id === partyId ? { ...p, voteCount: p.voteCount + 1 } : p
+      );
+      localStorage.setItem(STORAGE_KEY_PARTIES, JSON.stringify(parties));
+    }
 
     const rawMap = localStorage.getItem(STORAGE_KEY_VOTED_STUDENTS);
     const map: Record<string, string> = rawMap ? JSON.parse(rawMap) : {};
     map[studentCode] = partyId;
     localStorage.setItem(STORAGE_KEY_VOTED_STUDENTS, JSON.stringify(map));
 
-    return { parties, alreadyVoted: false };
+    return { parties, abstainCount, alreadyVoted: false };
   },
 
   // 5. กิจกรรมสภานักเรียน & ตู้รับความคิดเห็น
@@ -449,5 +598,115 @@ export const studentAffairsCouncilService = {
     );
     localStorage.setItem(STORAGE_KEY_SUGGESTIONS, JSON.stringify(updated));
     return updated;
+  },
+
+  // 6. การตั้งค่าสิทธิ์การเข้าถึง (Flexible 4-Role Access Matrix)
+  getRolePermissions(): AffairsRolePermission[] {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_ROLE_MATRIX);
+      return raw ? JSON.parse(raw) : DEFAULT_ROLE_PERMISSIONS;
+    } catch {
+      return DEFAULT_ROLE_PERMISSIONS;
+    }
+  },
+
+  saveRolePermissions(matrix: AffairsRolePermission[]): AffairsRolePermission[] {
+    localStorage.setItem(STORAGE_KEY_ROLE_MATRIX, JSON.stringify(matrix));
+    return matrix;
+  },
+
+  getActiveTeacherRole(): AffairsTeacherRole {
+    const saved = localStorage.getItem(STORAGE_KEY_ACTIVE_ROLE);
+    if (
+      saved === 'HOMEROOM' ||
+      saved === 'DUTY' ||
+      saved === 'AFFAIRS' ||
+      saved === 'ALL_TEACHERS'
+    ) {
+      return saved;
+    }
+    return 'HOMEROOM';
+  },
+
+  setActiveTeacherRole(role: AffairsTeacherRole): void {
+    localStorage.setItem(STORAGE_KEY_ACTIVE_ROLE, role);
+  },
+
+  // 7. ดึงสถานะมาเข้าแถวหน้าเสาธง + ใบลาที่อนุมัติแล้ว เพื่อส่งต่อให้ครูประจำวิชาเช็คชื่อรายคาบ
+  getMorningStatusForStudent(studentName: string, studentCode?: string): {
+    assemblyStatus: AssemblyExceptionRecord['status'];
+    assemblyLabel: string;
+    hasApprovedLeave: boolean;
+    leaveReason?: string;
+    recommendedClassStatus: 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE';
+  } {
+    const assemblyList = this.getAssemblyRecords();
+    const leaves = this.getStudentLeaves();
+
+    const approvedLeave = leaves.find(
+      (l) =>
+        l.status === 'APPROVED' &&
+        ((studentCode && l.studentCode === studentCode) ||
+          l.studentName.includes(studentName) ||
+          studentName.includes(l.studentName))
+    );
+
+    const assemblyRecord = assemblyList.find(
+      (a) =>
+        (studentCode && a.studentCode === studentCode) ||
+        a.studentName.includes(studentName) ||
+        studentName.includes(a.studentName)
+    );
+
+    if (approvedLeave) {
+      return {
+        assemblyStatus:
+          approvedLeave.leaveType === 'ลาป่วย' ? 'SICK_LEAVE' : 'PERSONAL_LEAVE',
+        assemblyLabel: `อนุมัติ${approvedLeave.leaveType}แล้ว (${approvedLeave.reason})`,
+        hasApprovedLeave: true,
+        leaveReason: `${approvedLeave.leaveType}: ${approvedLeave.reason}`,
+        recommendedClassStatus: 'LEAVE',
+      };
+    }
+
+    if (assemblyRecord) {
+      if (
+        assemblyRecord.status === 'SICK_LEAVE' ||
+        assemblyRecord.status === 'PERSONAL_LEAVE'
+      ) {
+        const label =
+          assemblyRecord.status === 'SICK_LEAVE' ? 'ลาป่วยหน้าเสาธง' : 'ลากิจหน้าเสาธง';
+        return {
+          assemblyStatus: assemblyRecord.status,
+          assemblyLabel: `${label}${assemblyRecord.note ? ` (${assemblyRecord.note})` : ''}`,
+          hasApprovedLeave: true,
+          leaveReason: assemblyRecord.note || label,
+          recommendedClassStatus: 'LEAVE',
+        };
+      }
+      if (assemblyRecord.status === 'LATE') {
+        return {
+          assemblyStatus: 'LATE',
+          assemblyLabel: `เข้าแถวสาย${assemblyRecord.note ? ` (${assemblyRecord.note})` : ''}`,
+          hasApprovedLeave: false,
+          recommendedClassStatus: 'PRESENT',
+        };
+      }
+      if (assemblyRecord.status === 'ABSENT') {
+        return {
+          assemblyStatus: 'ABSENT',
+          assemblyLabel: 'ขาดเข้าแถวหน้าเสาธง',
+          hasApprovedLeave: false,
+          recommendedClassStatus: 'ABSENT',
+        };
+      }
+    }
+
+    return {
+      assemblyStatus: 'PRESENT',
+      assemblyLabel: 'มาเข้าแถวปกติ',
+      hasApprovedLeave: false,
+      recommendedClassStatus: 'PRESENT',
+    };
   },
 };
