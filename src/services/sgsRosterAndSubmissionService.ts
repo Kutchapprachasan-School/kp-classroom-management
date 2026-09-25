@@ -10,7 +10,7 @@ export type StudentGender = 'MALE' | 'FEMALE';
 export type SgsInsertPosition = 'AFTER_SAME_GENDER' | 'END_OF_CLASS' | 'CUSTOM_SEAT';
 
 export interface SgsStudentRecord {
-  sgsSeatNo: number; // เลขที่ตามใบรายชื่อ SGS
+  sgsSeatNo: number; // เลขที่ตามใบรายชื่อ SGS (ศูนย์กลางจากห้องทะเบียน/ครูที่ปรึกษา)
   studentCode: string;
   studentName: string;
   gender: StudentGender; // ชายขึ้นก่อนหญิง (ผู้ชายเข้าใหม่ต่อท้ายผู้ชาย)
@@ -22,6 +22,9 @@ export interface SgsStudentRecord {
     u1?: number;
     u2?: number;
   };
+  // Q1-C: ครูพิมพ์คะแนนเก็บสุทธิทับเองท้ายเทอมได้อิสระ (เต็ม 50) กรณีบางวิชาไม่มีคะแนนเทียบโอนจาก รร.เดิม
+  manualAccumulatedOverride?: number | null;
+  manualOverrideNote?: string;
   attendancePercent: number;
   morningStatusLabel: string;
   midtermScore: number; // เต็ม 20
@@ -37,6 +40,14 @@ export interface TermAssignmentItem {
   maxScore: number;
   assignedDate: string;
   dueDate: string;
+  // Q3-A: งานบังคับ / ตัวชี้วัดต้องรู้ (ถ้าไม่ส่งติด "ร" ทันที และเมื่อตรวจให้คะแนนแล้วปลด "ร" อัตโนมัติ)
+  isRequiredForPass?: boolean;
+}
+
+export interface CentralRosterSyncMeta {
+  lastUpdatedBy: string;
+  lastUpdatedAt: string;
+  syncNote: string;
 }
 
 export type SubmissionCellStatus =
@@ -56,9 +67,10 @@ export interface StudentWorkSubmission {
   teacherFeedback?: string;
 }
 
-const STORAGE_KEY_SGS_ROSTER = 'kp_sgs_roster_v2';
-const STORAGE_KEY_TERM_ASSIGNMENTS = 'kp_term_assignments_v1';
-const STORAGE_KEY_WORK_SUBMISSIONS = 'kp_work_submissions_v1';
+const STORAGE_KEY_SGS_ROSTER = 'kp_sgs_roster_v3';
+const STORAGE_KEY_TERM_ASSIGNMENTS = 'kp_term_assignments_v2';
+const STORAGE_KEY_WORK_SUBMISSIONS = 'kp_work_submissions_v2';
+const STORAGE_KEY_ROSTER_SYNC_META = 'kp_sgs_roster_sync_meta_v1';
 
 // เรียงตามมาตรฐานทะเบียนโรงเรียนไทย: นักเรียนชาย (เลขที่ 1-5) -> นักเรียนหญิง (เลขที่ 6-8)
 // เมื่อ ด.ช. ณัฐวุฒิ ย้ายเข้าใหม่กลางเทอม จึงแทรกต่อท้ายกลุ่มผู้ชายที่ "เลขที่ 5" (ไม่ได้ไปอยู่เลขที่ 8 ท้ายสุด)
@@ -121,8 +133,10 @@ const INITIAL_SGS_ROSTER: SgsStudentRecord[] = [
     classroom: 'ม.3/1',
     transferState: 'TRANSFERRED_IN',
     transferDate: '2026-07-01',
-    transferNote: 'ย้ายเข้าใหม่ (แทรกต่อท้ายกลุ่มนักเรียนชายที่เลขที่ 5 ตาม SGS + คะแนนหญิงไม่สลับคน)',
-    transferredBaseScore: { u1: 12 },
+    transferNote: 'ย้ายเข้าใหม่ (แทรกต่อท้ายกลุ่มนักเรียนชายที่เลขที่ 5 ตาม SGS • บางวิชาไม่มีเทียบโอน ครูกรอกคะแนนเก็บสุทธิเองได้)',
+    transferredBaseScore: undefined,
+    manualAccumulatedOverride: 36,
+    manualOverrideNote: 'ไม่มีคะแนนเทียบโอนวิชาศิลปะจาก รร.เดิม — ครูประเมินคะแนนเก็บสุทธิท้ายเทอม 36/50',
     attendancePercent: 92.0,
     morningStatusLabel: 'เข้าแถวสาย (รถโดยสารมาช้า)',
     midtermScore: 15,
@@ -176,6 +190,7 @@ const INITIAL_TERM_ASSIGNMENTS: TermAssignmentItem[] = [
     maxScore: 10,
     assignedDate: '18 พ.ค. 69',
     dueDate: '25 พ.ค. 69',
+    isRequiredForPass: false,
   },
   {
     id: 'asg-2',
@@ -186,6 +201,7 @@ const INITIAL_TERM_ASSIGNMENTS: TermAssignmentItem[] = [
     maxScore: 5,
     assignedDate: '1 มิ.ย. 69',
     dueDate: '8 มิ.ย. 69',
+    isRequiredForPass: false,
   },
   {
     id: 'asg-3',
@@ -196,6 +212,7 @@ const INITIAL_TERM_ASSIGNMENTS: TermAssignmentItem[] = [
     maxScore: 10,
     assignedDate: '10 ก.ค. 69',
     dueDate: '20 ก.ค. 69',
+    isRequiredForPass: true, // ⭐ งานบังคับ / ตัวชี้วัดต้องรู้ (ไม่ส่งติด ร)
   },
   {
     id: 'asg-4',
@@ -206,6 +223,7 @@ const INITIAL_TERM_ASSIGNMENTS: TermAssignmentItem[] = [
     maxScore: 10,
     assignedDate: '5 ส.ค. 69',
     dueDate: '15 ส.ค. 69',
+    isRequiredForPass: false,
   },
   {
     id: 'asg-5',
@@ -216,6 +234,7 @@ const INITIAL_TERM_ASSIGNMENTS: TermAssignmentItem[] = [
     maxScore: 15,
     assignedDate: '10 ก.ย. 69',
     dueDate: '25 ก.ย. 69',
+    isRequiredForPass: true, // ⭐ งานบังคับ / ตัวชี้วัดต้องรู้ (ไม่ส่งติด ร)
   },
 ];
 
@@ -234,47 +253,47 @@ const INITIAL_SUBMISSIONS: StudentWorkSubmission[] = [
   { assignmentId: 'asg-4', studentCode: '45102', status: 'GRADED', score: 10, submittedAt: '14 ส.ค. 10:40', workTitle: 'โปสเตอร์รักษ์ป่าไม้.png' },
   { assignmentId: 'asg-5', studentCode: '45102', status: 'SUBMITTED_PENDING', score: null, submittedAt: '25 ก.ย. 08:15', workTitle: 'จิตรกรรมไทยร่วมสมัย_ทัตธน.jpg' },
 
-  // เลขที่ 3 กมลชนก (ส่งครบ ตรวจครบ)
+  // เลขที่ 6 กมลชนก (ส่งครบ ตรวจครบ)
   { assignmentId: 'asg-1', studentCode: '45105', status: 'GRADED', score: 10, submittedAt: '22 พ.ค. 11:00', workTitle: 'วงจรสี_กมลชนก.jpg' },
   { assignmentId: 'asg-2', studentCode: '45105', status: 'GRADED', score: 5, submittedAt: '5 มิ.ย. 15:10', workTitle: 'แสงเงาดินสอ_กมลชนก.jpg' },
   { assignmentId: 'asg-3', studentCode: '45105', status: 'GRADED', score: 10, submittedAt: '17 ก.ค. 12:30', workTitle: 'ภาพพิมพ์ใบเฟิร์น.jpg' },
   { assignmentId: 'asg-4', studentCode: '45105', status: 'GRADED', score: 10, submittedAt: '13 ส.ค. 14:20', workTitle: 'SaveEarth_Poster.png' },
   { assignmentId: 'asg-5', studentCode: '45105', status: 'GRADED', score: 15, submittedAt: '22 ก.ย. 16:40', workTitle: 'ศิลปะไทยประยุกต์_กมลชนก.pdf' },
 
-  // เลขที่ 4 ชัยมงคล (ย้ายออกกลางเทอม - ล็อกแถวตาม SGS)
+  // เลขที่ 3 ชัยมงคล (ย้ายออกกลางเทอม - ล็อกแถวตาม SGS)
   { assignmentId: 'asg-1', studentCode: '45107', status: 'EXEMPT_TRANSFERRED', score: null },
   { assignmentId: 'asg-2', studentCode: '45107', status: 'EXEMPT_TRANSFERRED', score: null },
   { assignmentId: 'asg-3', studentCode: '45107', status: 'EXEMPT_TRANSFERRED', score: null },
   { assignmentId: 'asg-4', studentCode: '45107', status: 'EXEMPT_TRANSFERRED', score: null },
   { assignmentId: 'asg-5', studentCode: '45107', status: 'EXEMPT_TRANSFERRED', score: null },
 
-  // เลขที่ 5 พิมพ์ชนก (ส่งแล้ว 4 รอตรวจ 2)
+  // เลขที่ 7 พิมพ์ชนก (ส่งแล้ว 5 รอตรวจ 2)
   { assignmentId: 'asg-1', studentCode: '45112', status: 'GRADED', score: 9, submittedAt: '25 พ.ค. 08:50', workTitle: 'วงจรสี_พิมพ์ชนก.jpg' },
   { assignmentId: 'asg-2', studentCode: '45112', status: 'GRADED', score: 4, submittedAt: '8 มิ.ย. 10:10', workTitle: 'แรงเงาหุ่นนิ่ง.jpg' },
   { assignmentId: 'asg-3', studentCode: '45112', status: 'GRADED', score: 8, submittedAt: '20 ก.ค. 13:00', workTitle: 'ภาพพิมพ์ดอกไม้.jpg' },
   { assignmentId: 'asg-4', studentCode: '45112', status: 'SUBMITTED_PENDING', score: null, submittedAt: '15 ส.ค. 17:00', workTitle: 'โปสเตอร์คัดแยกขยะ.jpg' },
   { assignmentId: 'asg-5', studentCode: '45112', status: 'SUBMITTED_PENDING', score: null, submittedAt: '24 ก.ย. 19:20', workTitle: 'ศิลปะร่วมสมัย_พิมพ์ชนก.pdf' },
 
-  // เลขที่ 6 อัศวิน (ค้างส่ง 3 งาน เสี่ยงติด ร)
+  // เลขที่ 4 อัศวิน (ค้างส่ง 3 งาน มีงานบังคับ asg-3 และ asg-5)
   { assignmentId: 'asg-1', studentCode: '45115', status: 'GRADED', score: 7, submittedAt: '28 พ.ค. (ส่งช้า)', workTitle: 'วงจรสี_อัศวิน.jpg' },
   { assignmentId: 'asg-2', studentCode: '45115', status: 'GRADED', score: 4, submittedAt: '10 มิ.ย. (ส่งช้า)', workTitle: 'แรงเงา_อัศวิน.jpg' },
   { assignmentId: 'asg-3', studentCode: '45115', status: 'MISSING', score: null },
   { assignmentId: 'asg-4', studentCode: '45115', status: 'MISSING', score: null },
   { assignmentId: 'asg-5', studentCode: '45115', status: 'MISSING', score: null },
 
-  // เลขที่ 7 อคิราห์ (ส่งแล้ว รอตรวจ 1 ค้าง 1)
+  // เลขที่ 8 อคิราห์ (คะแนนรวมเกิน 50 แต่ค้างส่งชิ้นงานที่ 5 ซึ่งเป็น ⭐ งานบังคับ -> ระบบขึ้นติด "ร" อัตโนมัติ)
   { assignmentId: 'asg-1', studentCode: '45118', status: 'GRADED', score: 9, submittedAt: '24 พ.ค. 14:10', workTitle: 'วงจรสี_อคิราห์.jpg' },
   { assignmentId: 'asg-2', studentCode: '45118', status: 'GRADED', score: 5, submittedAt: '7 มิ.ย. 11:30', workTitle: 'แรงเงา_อคิราห์.jpg' },
   { assignmentId: 'asg-3', studentCode: '45118', status: 'GRADED', score: 8, submittedAt: '19 ก.ค. 15:45', workTitle: 'ภาพพิมพ์วัสดุธรรมชาติ.jpg' },
   { assignmentId: 'asg-4', studentCode: '45118', status: 'SUBMITTED_PENDING', score: null, submittedAt: '15 ส.ค. 12:15', workTitle: 'โปสเตอร์ลดพลาสติก.png' },
   { assignmentId: 'asg-5', studentCode: '45118', status: 'MISSING', score: null },
 
-  // เลขที่ 8 ณัฐวุฒิ (นักเรียนย้ายเข้าใหม่ 1 ก.ค. - งานที่ 1-2 เทียบโอนคะแนนหน่วย 1 จาก รร.เดิม, เริ่มส่งงานที่ 3-5)
-  { assignmentId: 'asg-1', studentCode: '45109', status: 'EXEMPT_TRANSFERRED', score: 8, workTitle: 'เทียบโอนคะแนนจาก รร.เดิม' },
-  { assignmentId: 'asg-2', studentCode: '45109', status: 'EXEMPT_TRANSFERRED', score: 4, workTitle: 'เทียบโอนคะแนนจาก รร.เดิม' },
+  // เลขที่ 5 ณัฐวุฒิ (นักเรียนชายย้ายเข้าใหม่ 1 ก.ค. แทรกต่อท้ายผู้ชาย - บางวิชาไม่มีเทียบโอน ครูพิมพ์คะแนนสุทธิทับเอง 36/50)
+  { assignmentId: 'asg-1', studentCode: '45109', status: 'MISSING', score: null },
+  { assignmentId: 'asg-2', studentCode: '45109', status: 'MISSING', score: null },
   { assignmentId: 'asg-3', studentCode: '45109', status: 'GRADED', score: 8, submittedAt: '20 ก.ค. 16:00', workTitle: 'ภาพพิมพ์_ณัฐวุฒิ.jpg' },
   { assignmentId: 'asg-4', studentCode: '45109', status: 'GRADED', score: 9, submittedAt: '15 ส.ค. 09:40', workTitle: 'โปสเตอร์สิ่งแวดล้อม_ณัฐวุฒิ.jpg' },
-  { assignmentId: 'asg-5', studentCode: '45109', status: 'SUBMITTED_PENDING', score: null, submittedAt: '25 ก.ย. 07:50', workTitle: 'ศิลปะร่วมสมัย_ณัฐวุฒิ.pdf' },
+  { assignmentId: 'asg-5', studentCode: '45109', status: 'GRADED', score: 13, submittedAt: '25 ก.ย. 07:50', workTitle: 'ศิลปะร่วมสมัย_ณัฐวุฒิ.pdf' },
 ];
 
 export const sgsRosterAndSubmissionService = {
@@ -287,9 +306,73 @@ export const sgsRosterAndSubmissionService = {
     }
   },
 
-  saveSgsRoster(roster: SgsStudentRecord[]): SgsStudentRecord[] {
+  saveSgsRoster(roster: SgsStudentRecord[], actorLabel = 'งานทะเบียน / ครูที่ปรึกษา'): SgsStudentRecord[] {
     localStorage.setItem(STORAGE_KEY_SGS_ROSTER, JSON.stringify(roster));
+    this.markCentralRosterSynced(
+      actorLabel,
+      `ซิงค์ลำดับเลขที่ SGS ห้อง ม.3/1 (${roster.length} รายชื่อ • ชาย ➔ หญิง)`
+    );
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('kp-sgs-roster-updated'));
+    }
     return roster;
+  },
+
+  getCentralRosterSyncInfo(): CentralRosterSyncMeta {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_ROSTER_SYNC_META);
+      return raw
+        ? JSON.parse(raw)
+        : {
+            lastUpdatedBy: 'งานทะเบียนวัดผล & ครูที่ปรึกษา ม.3/1',
+            lastUpdatedAt: 'วันนี้ 08:30 น.',
+            syncNote: 'ซิงค์ลำดับเลขที่ SGS กลางกับทุกกลุ่มสาระวิชาเรียบร้อย (ชาย 1-5 ➔ หญิง 6-8)',
+          };
+    } catch {
+      return {
+        lastUpdatedBy: 'งานทะเบียนวัดผล & ครูที่ปรึกษา ม.3/1',
+        lastUpdatedAt: 'วันนี้ 08:30 น.',
+        syncNote: 'ซิงค์ลำดับเลขที่ SGS กลางกับทุกกลุ่มสาระวิชาเรียบร้อย',
+      };
+    }
+  },
+
+  markCentralRosterSynced(lastUpdatedBy: string, syncNote: string): CentralRosterSyncMeta {
+    const now = new Date();
+    const timeStr = `วันนี้ ${String(now.getHours()).padStart(2, '0')}:${String(
+      now.getMinutes()
+    ).padStart(2, '0')} น.`;
+    const meta: CentralRosterSyncMeta = {
+      lastUpdatedBy,
+      lastUpdatedAt: timeStr,
+      syncNote,
+    };
+    localStorage.setItem(STORAGE_KEY_ROSTER_SYNC_META, JSON.stringify(meta));
+    return meta;
+  },
+
+  // Q1-C: ครูประจำวิชาพิมพ์คะแนนเก็บสุทธิทับเองท้ายเทอมได้อิสระ (เต็ม 50) สำหรับกรณีบางวิชาไม่มีเทียบโอน
+  updateStudentManualAccumulatedScore(
+    studentCode: string,
+    manualScore: number | null,
+    note?: string
+  ): SgsStudentRecord[] {
+    const clamped =
+      manualScore === null || Number.isNaN(manualScore)
+        ? null
+        : Math.max(0, Math.min(50, Math.round(manualScore)));
+    const roster = this.getSgsRoster().map((stu) => {
+      if (stu.studentCode !== studentCode) return stu;
+      return {
+        ...stu,
+        manualAccumulatedOverride: clamped,
+        manualOverrideNote:
+          clamped !== null
+            ? note || `ครูผู้สอนกำหนดคะแนนเก็บสุทธิท้ายเทอม (${clamped}/50)`
+            : undefined,
+      };
+    });
+    return this.saveSgsRoster(roster, 'ครูประจำวิชา (ปรับคะแนนเก็บสุทธิ)');
   },
 
   addTransferredInStudent(payload: {
@@ -300,6 +383,7 @@ export const sgsRosterAndSubmissionService = {
     customSeatNo?: number;
     transferDate: string;
     transferredU1Score: number;
+    manualNetAccumulatedScore?: number | null;
   }): SgsStudentRecord[] {
     const roster = [...this.getSgsRoster()].sort(
       (a, b) => a.sgsSeatNo - b.sgsSeatNo
@@ -336,6 +420,10 @@ export const sgsRosterAndSubmissionService = {
         ? `แทรกที่เลขที่ ${assignedSeatNo} ตามใบรายชื่อ SGS`
         : `ต่อท้ายสุดของห้อง (เลขที่ ${assignedSeatNo})`;
 
+    const hasManualOverride =
+      payload.manualNetAccumulatedScore !== undefined &&
+      payload.manualNetAccumulatedScore !== null;
+
     const newStudent: SgsStudentRecord = {
       sgsSeatNo: assignedSeatNo,
       studentCode: payload.studentCode,
@@ -344,8 +432,17 @@ export const sgsRosterAndSubmissionService = {
       classroom: 'ม.3/1',
       transferState: 'TRANSFERRED_IN',
       transferDate: payload.transferDate,
-      transferNote: `ย้ายเข้าใหม่ (${payload.transferDate}) — ${positionLabel} + โอนคะแนนหน่วย 1 (${payload.transferredU1Score} คะแนน)`,
-      transferredBaseScore: { u1: payload.transferredU1Score },
+      transferNote: `ย้ายเข้าใหม่ (${payload.transferDate}) — ${positionLabel}`,
+      transferredBaseScore:
+        payload.transferredU1Score > 0
+          ? { u1: payload.transferredU1Score }
+          : undefined,
+      manualAccumulatedOverride: hasManualOverride
+        ? payload.manualNetAccumulatedScore
+        : null,
+      manualOverrideNote: hasManualOverride
+        ? `ไม่มีคะแนนเทียบโอน — ครูระบุคะแนนเก็บสุทธิ ${payload.manualNetAccumulatedScore}/50`
+        : undefined,
       attendancePercent: 100,
       morningStatusLabel: 'มาเข้าแถวปกติ (นักเรียนย้ายเข้าใหม่)',
       midtermScore: 15,
@@ -361,7 +458,7 @@ export const sgsRosterAndSubmissionService = {
       sgsSeatNo: idx + 1, // รันเลขที่ SGS ใหม่ให้เรียงต่อเนื่องโดยคะแนนยังผูกตามรหัสนักเรียน (studentCode) 100%
     }));
 
-    this.saveSgsRoster(nextRoster);
+    this.saveSgsRoster(nextRoster, 'งานทะเบียน / ครูที่ปรึกษา');
     return nextRoster;
   },
 
@@ -383,7 +480,7 @@ export const sgsRosterAndSubmissionService = {
       ...stu,
       sgsSeatNo: i + 1,
     }));
-    return this.saveSgsRoster(renumbered);
+    return this.saveSgsRoster(renumbered, 'งานทะเบียน / ครูที่ปรึกษา');
   },
 
   // จัดเรียงลำดับตามมาตรฐานทะเบียน SGS อัตโนมัติ (กลุ่มนักเรียนชายขึ้นก่อน -> ตามด้วยกลุ่มนักเรียนหญิง)
@@ -395,7 +492,7 @@ export const sgsRosterAndSubmissionService = {
       ...stu,
       sgsSeatNo: i + 1,
     }));
-    return this.saveSgsRoster(renumbered);
+    return this.saveSgsRoster(renumbered, 'งานทะเบียน / ครูที่ปรึกษา');
   },
 
   toggleStudentTransferOut(studentCode: string): SgsStudentRecord[] {
@@ -414,7 +511,7 @@ export const sgsRosterAndSubmissionService = {
             : undefined,
       };
     });
-    return this.saveSgsRoster(roster);
+    return this.saveSgsRoster(roster, 'งานทะเบียน / ครูที่ปรึกษา');
   },
 
   getTermAssignments(): TermAssignmentItem[] {
@@ -426,11 +523,23 @@ export const sgsRosterAndSubmissionService = {
     }
   },
 
+  // Q3-A: สลับตั้งค่า ⭐ งานบังคับ (ไม่ส่งติด ร) รายชิ้นงาน
+  toggleAssignmentRequiredForPass(assignmentId: string): TermAssignmentItem[] {
+    const list = this.getTermAssignments().map((item) =>
+      item.id === assignmentId
+        ? { ...item, isRequiredForPass: !item.isRequiredForPass }
+        : item
+    );
+    localStorage.setItem(STORAGE_KEY_TERM_ASSIGNMENTS, JSON.stringify(list));
+    return list;
+  },
+
   addTermAssignment(payload: {
     title: string;
     sgsUnit: 'u1' | 'u2' | 'u3';
     maxScore: number;
     dueDate: string;
+    isRequiredForPass?: boolean;
   }): TermAssignmentItem[] {
     const list = this.getTermAssignments();
     const unitLabelMap = {
@@ -447,6 +556,7 @@ export const sgsRosterAndSubmissionService = {
       maxScore: payload.maxScore,
       assignedDate: 'วันนี้',
       dueDate: payload.dueDate || '30 ก.ย. 69',
+      isRequiredForPass: payload.isRequiredForPass ?? true,
     };
     const updated = [...list, newItem];
     localStorage.setItem(STORAGE_KEY_TERM_ASSIGNMENTS, JSON.stringify(updated));
@@ -467,7 +577,7 @@ export const sgsRosterAndSubmissionService = {
     return list;
   },
 
-  // อัปเดตคะแนนรายชิ้น (Inline Matrix หรือ SpeedGrader)
+  // อัปเดตคะแนนรายชิ้น (Inline Matrix หรือ SpeedGrader) -> ถ้าเป็นงานบังคับ เมื่อตรวจปุ๊บจะปลด "ร" อัตโนมัติทันที
   gradeSubmission(
     assignmentId: string,
     studentCode: string,
@@ -492,7 +602,7 @@ export const sgsRosterAndSubmissionService = {
             score,
             status: score === null ? 'MISSING' : status,
             submittedAt: 'ครูตรวจบันทึกคะแนน',
-            workTitle: 'ส่งงานหน้าชั้นเรียน',
+            workTitle: 'ส่งงานหน้าชั้นเรียน / ส่งซ่อมแก้ ร',
           };
 
     const updated =
@@ -521,11 +631,14 @@ export const sgsRosterAndSubmissionService = {
     return this.saveSubmissions(subs);
   },
 
-  // คำนวณคะแนนเก็บหน่วยที่ 1, 2, 3 ของนักเรียนแต่ละคนจากตารางส่งงานอัตโนมัติ
+  // คำนวณคะแนนเก็บหน่วยที่ 1, 2, 3 + รองรับการพิมพ์คะแนนเก็บสุทธิทับเอง (Q1-C) + ตรวจสอบงานบังคับติด "ร" อัตโนมัติ (Q3-A)
   computeStudentSgsGrades(student: SgsStudentRecord): {
     u1: number;
     u2: number;
     u3: number;
+    calculatedAccumulated: number;
+    effectiveAccumulated: number;
+    isManualOverride: boolean;
     midterm: number;
     final: number;
     total: number;
@@ -534,6 +647,8 @@ export const sgsRosterAndSubmissionService = {
     totalAssignedCount: number;
     missingCount: number;
     pendingReviewCount: number;
+    missingMandatoryTitles: string[];
+    rReasonLabel?: string;
   } {
     const assignments = this.getTermAssignments();
     const subs = this.getSubmissions().filter(
@@ -545,6 +660,9 @@ export const sgsRosterAndSubmissionService = {
         u1: 0,
         u2: 0,
         u3: 0,
+        calculatedAccumulated: 0,
+        effectiveAccumulated: 0,
+        isManualOverride: false,
         midterm: 0,
         final: 0,
         total: 0,
@@ -553,6 +671,7 @@ export const sgsRosterAndSubmissionService = {
         totalAssignedCount: assignments.length,
         missingCount: 0,
         pendingReviewCount: 0,
+        missingMandatoryTitles: [],
       };
     }
 
@@ -562,6 +681,7 @@ export const sgsRosterAndSubmissionService = {
     let submittedCount = 0;
     let missingCount = 0;
     let pendingReviewCount = 0;
+    const missingMandatoryTitles: string[] = [];
 
     for (const asg of assignments) {
       const sub = subs.find((s) => s.assignmentId === asg.id);
@@ -586,6 +706,9 @@ export const sgsRosterAndSubmissionService = {
         if (asg.sgsUnit === 'u3') u3 += earned;
       } else {
         missingCount += 1;
+        if (asg.isRequiredForPass) {
+          missingMandatoryTitles.push(`งานที่ ${asg.orderNo}`);
+        }
       }
     }
 
@@ -598,13 +721,26 @@ export const sgsRosterAndSubmissionService = {
       u1 = student.transferredBaseScore.u1;
     }
 
-    const total = u1 + u2 + u3 + student.midtermScore + student.finalScore;
+    const calculatedAccumulated = u1 + u2 + u3;
+    const isManualOverride =
+      student.manualAccumulatedOverride !== undefined &&
+      student.manualAccumulatedOverride !== null;
+    const effectiveAccumulated = isManualOverride
+      ? (student.manualAccumulatedOverride as number)
+      : calculatedAccumulated;
+
+    const total =
+      effectiveAccumulated + student.midtermScore + student.finalScore;
 
     let gradeLabel = '0';
+    let rReasonLabel: string | undefined;
+
     if (student.attendancePercent < 80) {
       gradeLabel = 'มส.';
-    } else if (missingCount >= 2) {
+    } else if (missingMandatoryTitles.length > 0) {
+      // Q3-A: ค้างส่งชิ้นงานบังคับ (ตัวชี้วัดต้องรู้) -> ติด "ร" อัตโนมัติแม้คะแนนรวมเกิน 50
       gradeLabel = 'ร';
+      rReasonLabel = `ค้างงานบังคับ (${missingMandatoryTitles.join(', ')})`;
     } else if (total >= 80) {
       gradeLabel = '4.0';
     } else if (total >= 75) {
@@ -625,6 +761,9 @@ export const sgsRosterAndSubmissionService = {
       u1,
       u2,
       u3,
+      calculatedAccumulated,
+      effectiveAccumulated,
+      isManualOverride,
       midterm: student.midtermScore,
       final: student.finalScore,
       total,
@@ -633,6 +772,8 @@ export const sgsRosterAndSubmissionService = {
       totalAssignedCount: assignments.length,
       missingCount,
       pendingReviewCount,
+      missingMandatoryTitles,
+      rReasonLabel,
     };
   },
 };

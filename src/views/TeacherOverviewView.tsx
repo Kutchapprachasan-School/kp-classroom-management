@@ -754,14 +754,31 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
             </div>
           </div>
 
-          {/* แถบป้องกันบรรทัดเลื่อนเมื่อมีนักเรียนย้ายเข้า-ย้ายออก */}
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="text-slate-700">
-              🛡️ <strong>รองรับการเรียงรายชื่อแบบโรงเรียนไทย (ชายขึ้นก่อนหญิง):</strong> เมื่อนักเรียนชายย้ายเข้าใหม่ ระบบสามารถ{' '}
-              <span className="underline font-bold text-indigo-800">
-                แทรกต่อท้ายกลุ่มนักเรียนชาย (เช่น เลขที่ 5 ด.ช. ณัฐวุฒิ)
-              </span>{' '}
-              และเลื่อนเลขที่กลุ่มนักเรียนหญิงลงไปอัตโนมัติโดยที่คะแนนและประวัติส่งงานไม่สลับคน (หรือกด ▲/▼ เพื่อขยับเลขที่ได้ทันที)
+          {/* แถบซิงค์รายชื่อศูนย์กลางจากห้องทะเบียน/ครูที่ปรึกษา (Q2-A) + แก้คะแนนสุทธิอิสระ (Q1-C) + งานบังคับติด ร (Q3-A) */}
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-3 text-xs">
+            <div className="space-y-1 text-slate-700">
+              <div>
+                🛡️ <strong>ซิงค์ลำดับเลขที่ SGS ศูนย์กลาง (Q2-A):</strong>{' '}
+                <span className="font-bold text-teal-800">
+                  {sgsRosterAndSubmissionService.getCentralRosterSyncInfo().syncNote}
+                </span>{' '}
+                <span className="text-slate-500">
+                  (อัปเดตโดย{' '}
+                  {sgsRosterAndSubmissionService.getCentralRosterSyncInfo().lastUpdatedBy}{' '}
+                  • {sgsRosterAndSubmissionService.getCentralRosterSyncInfo().lastUpdatedAt})
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-600">
+                ✏️ <strong>บางวิชาไม่มีคะแนนเทียบโอน (Q1-C):</strong> ครูสามารถพิมพ์ตัวเลขทับในช่อง{' '}
+                <span className="font-bold text-indigo-800 bg-indigo-50 px-1.5 py-0.5 rounded">
+                  เก็บสุทธิ (50)
+                </span>{' '}
+                ได้โดยตรง • ⭐ หากค้างส่งงานบังคับ ระบบจะขึ้นสถานะ{' '}
+                <span className="font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded">
+                  ติด &quot;ร&quot;
+                </span>{' '}
+                อัตโนมัติ (Q3-A)
+              </div>
             </div>
 
             <label className="inline-flex items-center gap-2 font-bold text-teal-800 cursor-pointer shrink-0">
@@ -779,19 +796,25 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold">
-                  <th className="py-3 px-3 text-center">เลขที่ SGS (ปรับลำดับ)</th>
-                  <th className="py-3 px-3">รหัส</th>
+                  <th className="py-3 px-2.5 text-center">เลขที่ SGS</th>
+                  <th className="py-3 px-2.5">รหัส</th>
                   <th className="py-3 px-3 min-w-48">ชื่อ-สกุล / สถานะย้ายเข้า-ออก</th>
-                  <th className="py-3 px-3 text-center">เวลาเรียน</th>
-                  <th className="py-3 px-3 text-center">ส่งงาน</th>
-                  <th className="py-3 px-3 text-center">หน่วย 1 (15)</th>
-                  <th className="py-3 px-3 text-center">หน่วย 2 (20)</th>
-                  <th className="py-3 px-3 text-center">กลางภาค (20)</th>
-                  <th className="py-3 px-3 text-center">หน่วย 3 (15)</th>
-                  <th className="py-3 px-3 text-center">ปลายภาค (30)</th>
-                  <th className="py-3 px-3 text-center font-bold text-teal-800">รวม (100)</th>
-                  <th className="py-3 px-3 text-center font-bold">เกรด</th>
-                  <th className="py-3 px-3 text-right">ปรับสถานะ</th>
+                  <th className="py-3 px-2.5 text-center">เวลาเรียน</th>
+                  <th className="py-3 px-2.5 text-center">ส่งงาน</th>
+                  <th className="py-3 px-2 text-center">น.1 (15)</th>
+                  <th className="py-3 px-2 text-center">น.2 (20)</th>
+                  <th className="py-3 px-2 text-center">น.3 (15)</th>
+                  <th className="py-3 px-2.5 text-center bg-indigo-50/70 text-indigo-900 font-bold border-x border-indigo-100">
+                    เก็บสุทธิ (50)
+                    <div className="text-[10px] font-normal text-indigo-700">
+                      (ครูพิมพ์ทับได้)
+                    </div>
+                  </th>
+                  <th className="py-3 px-2 text-center">กลางภาค (20)</th>
+                  <th className="py-3 px-2 text-center">ปลายภาค (30)</th>
+                  <th className="py-3 px-2.5 text-center font-bold text-teal-800">รวม (100)</th>
+                  <th className="py-3 px-2.5 text-center font-bold">เกรด / ติด ร</th>
+                  <th className="py-3 px-2.5 text-right">ปรับสถานะ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -815,9 +838,9 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                           : 'hover:bg-slate-50 transition-colors'
                       }
                     >
-                      <td className="py-3 px-3 text-center font-bold tabular-nums">
-                        <div className="inline-flex items-center gap-1.5">
-                          <span className="w-6 text-center">{stu.sgsSeatNo}</span>
+                      <td className="py-3 px-2.5 text-center font-bold tabular-nums">
+                        <div className="inline-flex items-center gap-1">
+                          <span className="w-5 text-center">{stu.sgsSeatNo}</span>
                           <div className="flex flex-col gap-0.5">
                             <button
                               type="button"
@@ -852,7 +875,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                           </div>
                         </div>
                       </td>
-                      <td className="py-3 px-3 font-mono text-slate-500 tabular-nums">
+                      <td className="py-3 px-2.5 font-mono text-slate-500 tabular-nums">
                         {stu.studentCode}
                       </td>
                       <td className="py-3 px-3">
@@ -885,8 +908,13 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                               `ย้ายเข้าใหม่ (${stu.transferDate}) — ต่อท้ายผู้ชาย`}
                           </span>
                         )}
+                        {g.isManualOverride && stu.manualOverrideNote && (
+                          <div className="mt-0.5 text-[10px] font-bold text-indigo-700">
+                            ✏️ {stu.manualOverrideNote}
+                          </div>
+                        )}
                       </td>
-                      <td className="py-3 px-3 text-center tabular-nums">
+                      <td className="py-3 px-2.5 text-center tabular-nums">
                         {isOut ? (
                           '—'
                         ) : (
@@ -901,7 +929,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                           </span>
                         )}
                       </td>
-                      <td className="py-3 px-3 text-center whitespace-nowrap">
+                      <td className="py-3 px-2.5 text-center whitespace-nowrap">
                         {isOut ? (
                           '—'
                         ) : (
@@ -916,38 +944,98 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                           </span>
                         )}
                       </td>
-                      <td className="py-3 px-3 text-center font-semibold tabular-nums">
+                      <td className="py-3 px-2 text-center font-semibold tabular-nums">
                         {isOut ? '—' : g.u1}
                       </td>
-                      <td className="py-3 px-3 text-center font-semibold tabular-nums">
+                      <td className="py-3 px-2 text-center font-semibold tabular-nums">
                         {isOut ? '—' : g.u2}
                       </td>
-                      <td className="py-3 px-3 text-center tabular-nums">
-                        {isOut ? '—' : g.midterm}
-                      </td>
-                      <td className="py-3 px-3 text-center font-semibold tabular-nums">
+                      <td className="py-3 px-2 text-center font-semibold tabular-nums">
                         {isOut ? '—' : g.u3}
                       </td>
-                      <td className="py-3 px-3 text-center tabular-nums">
+                      {/* Q1-C: ช่องพิมพ์คะแนนเก็บสุทธิทับเองท้ายเทอม (เต็ม 50) สำหรับบางวิชาที่ไม่มีเทียบโอน */}
+                      <td className="py-2.5 px-2.5 text-center bg-indigo-50/40 border-x border-indigo-100/80">
+                        {isOut ? (
+                          '—'
+                        ) : (
+                          <div className="flex flex-col items-center gap-0.5">
+                            <input
+                              type="number"
+                              min={0}
+                              max={50}
+                              value={g.effectiveAccumulated}
+                              onChange={(e) => {
+                                const val =
+                                  e.target.value === ''
+                                    ? null
+                                    : Number(e.target.value);
+                                setSgsRoster(
+                                  sgsRosterAndSubmissionService.updateStudentManualAccumulatedScore(
+                                    stu.studentCode,
+                                    val
+                                  )
+                                );
+                              }}
+                              className={`w-14 text-center font-bold rounded-lg py-1 border tabular-nums ${
+                                g.isManualOverride
+                                  ? 'bg-indigo-100 text-indigo-900 border-indigo-400'
+                                  : 'bg-white text-slate-800 border-slate-200'
+                              }`}
+                              title="พิมพ์คะแนนเก็บสุทธิท้ายเทอม (เต็ม 50) ทับได้ทันที"
+                            />
+                            {g.isManualOverride ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setSgsRoster(
+                                    sgsRosterAndSubmissionService.updateStudentManualAccumulatedScore(
+                                      stu.studentCode,
+                                      null
+                                    )
+                                  )
+                                }
+                                className="text-[9px] text-indigo-700 hover:underline font-semibold"
+                              >
+                                รีเซ็ต ({g.calculatedAccumulated})
+                              </button>
+                            ) : (
+                              <span className="text-[9px] text-slate-400">
+                                รวมจากงาน
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-2 text-center tabular-nums">
+                        {isOut ? '—' : g.midterm}
+                      </td>
+                      <td className="py-3 px-2 text-center tabular-nums">
                         {isOut ? '—' : g.final}
                       </td>
-                      <td className="py-3 px-3 text-center font-bold text-teal-700 tabular-nums">
+                      <td className="py-3 px-2.5 text-center font-bold text-teal-700 tabular-nums">
                         {isOut ? '—' : g.total}
                       </td>
-                      <td className="py-3 px-3 text-center">
-                        <span
-                          className={`px-2.5 py-0.5 rounded font-bold text-[11px] ${
-                            isOut
-                              ? 'bg-slate-200 text-slate-600'
-                              : g.gradeLabel === 'มส.' || g.gradeLabel === 'ร'
-                              ? 'bg-rose-100 text-rose-800'
-                              : 'bg-teal-100 text-teal-800'
-                          }`}
-                        >
-                          {g.gradeLabel}
-                        </span>
+                      <td className="py-3 px-2.5 text-center">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span
+                            className={`px-2.5 py-0.5 rounded font-bold text-[11px] ${
+                              isOut
+                                ? 'bg-slate-200 text-slate-600'
+                                : g.gradeLabel === 'มส.' || g.gradeLabel === 'ร'
+                                ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                : 'bg-teal-100 text-teal-800'
+                            }`}
+                          >
+                            {g.gradeLabel}
+                          </span>
+                          {g.rReasonLabel && !isOut && (
+                            <span className="text-[9px] font-bold text-rose-700 max-w-28 leading-tight">
+                              {g.rReasonLabel}
+                            </span>
+                          )}
+                        </div>
                       </td>
-                      <td className="py-3 px-3 text-right whitespace-nowrap">
+                      <td className="py-3 px-2.5 text-right whitespace-nowrap">
                         <button
                           onClick={() => {
                             const updated =

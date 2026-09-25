@@ -14,6 +14,10 @@ import {
 import { classroomService } from '../services/classroomService';
 import { studentService, type StudentRecord } from '../services/studentService';
 import { trashService } from '../services/trashService';
+import {
+  sgsRosterAndSubmissionService,
+  type SgsStudentRecord,
+} from '../services/sgsRosterAndSubmissionService';
 import type { ClassroomRosterItem, AtRiskStudent } from '../types/viewModels';
 
 interface ClassroomsRosterViewProps {
@@ -28,6 +32,9 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
   const [classrooms, setClassrooms] = useState<ClassroomRosterItem[]>([]);
   const [selectedClass, setSelectedClass] = useState<ClassroomRosterItem | null>(null);
   const [students, setStudents] = useState<StudentRecord[]>([]);
+  const [centralSgsRoster, setCentralSgsRoster] = useState<SgsStudentRecord[]>(() =>
+    sgsRosterAndSubmissionService.getSgsRoster()
+  );
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -233,7 +240,149 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
         })}
       </div>
 
-      {/* Student Roster Table Card */}
+      {/* Q2-A: ศูนย์กลางลำดับเลขที่ SGS จากห้องทะเบียน/ครูที่ปรึกษา (Single Source of Truth ➔ ซิงค์ทุกวิชาอัตโนมัติ) */}
+      <div className="bg-white rounded-2xl border border-teal-200/80 p-5 shadow-xs space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800 text-[11px] font-bold">
+                Single Source of Truth (Q2-A)
+              </span>
+              <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                ศูนย์กลางจัดลำดับเลขที่ใบรายชื่อ SGS ประจำห้อง (ซิงค์อัตโนมัติทุกกลุ่มสาระวิชา)
+              </h2>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              เมื่อครูที่ปรึกษาหรือฝ่ายทะเบียนปรับลำดับเลขที่ (ชาย ➔ หญิง / นักเรียนชายเข้าใหม่ต่อท้ายกลุ่มชาย / ล็อกเลขที่คนย้ายออก) ลำดับเลขที่ในตารางตรวจงานและตารางคะแนน ปพ.5 ของครูประจำวิชาทุกคนจะอัปเดตตรงกันทันทีโดยคะแนนไม่สลับคน
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                const sorted = sgsRosterAndSubmissionService.sortRosterMaleFirstSgs();
+                setCentralSgsRoster(sorted);
+              }}
+              className="px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-xs transition-colors"
+            >
+              🔄 จัดเรียงมาตรฐาน SGS (ชาย ➔ หญิง) & ซิงค์ทุกวิชา
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                <th className="py-2.5 px-3 text-center w-24">เลขที่ SGS</th>
+                <th className="py-2.5 px-3">รหัสประจำตัว</th>
+                <th className="py-2.5 px-3">ชื่อ - นามสกุล</th>
+                <th className="py-2.5 px-3 text-center">เพศ</th>
+                <th className="py-2.5 px-3">สถานะทะเบียน SGS (ซิงค์ทุกวิชา)</th>
+                <th className="py-2.5 px-3 text-right">จัดการโดยทะเบียน/ที่ปรึกษา</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {centralSgsRoster.map((stu) => (
+                <tr
+                  key={stu.studentCode}
+                  className={
+                    stu.transferState === 'TRANSFERRED_OUT'
+                      ? 'bg-slate-100/70 text-slate-400'
+                      : stu.transferState === 'TRANSFERRED_IN'
+                      ? 'bg-indigo-50/30'
+                      : 'hover:bg-slate-50'
+                  }
+                >
+                  <td className="py-2.5 px-3 text-center font-bold tabular-nums">
+                    <div className="inline-flex items-center gap-1.5">
+                      <span className="w-5 text-center">{stu.sgsSeatNo}</span>
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCentralSgsRoster(
+                              sgsRosterAndSubmissionService.moveStudentSeat(
+                                stu.studentCode,
+                                'UP'
+                              )
+                            )
+                          }
+                          className="px-1 py-0.2 rounded bg-slate-100 hover:bg-slate-200 text-[9px] text-slate-600"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCentralSgsRoster(
+                              sgsRosterAndSubmissionService.moveStudentSeat(
+                                stu.studentCode,
+                                'DOWN'
+                              )
+                            )
+                          }
+                          className="px-1 py-0.2 rounded bg-slate-100 hover:bg-slate-200 text-[9px] text-slate-600"
+                        >
+                          ▼
+                        </button>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-2.5 px-3 font-mono">{stu.studentCode}</td>
+                  <td className="py-2.5 px-3 font-bold text-slate-900">
+                    {stu.studentName}
+                  </td>
+                  <td className="py-2.5 px-3 text-center">
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        stu.gender === 'MALE'
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'bg-pink-50 text-pink-700'
+                      }`}
+                    >
+                      {stu.gender === 'MALE' ? 'ชาย' : 'หญิง'}
+                    </span>
+                  </td>
+                  <td className="py-2.5 px-3">
+                    {stu.transferState === 'TRANSFERRED_OUT' ? (
+                      <span className="px-2 py-0.5 rounded bg-slate-200 text-slate-700 text-[11px] font-semibold">
+                        ย้ายออก — ล็อกแถวเลขที่ {stu.sgsSeatNo} ไม่ให้คนถัดไปเลื่อนบรรทัด
+                      </span>
+                    ) : stu.transferState === 'TRANSFERRED_IN' ? (
+                      <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[11px] font-semibold">
+                        ย้ายเข้าใหม่ — แทรกต่อท้ายกลุ่มชาย (เลขที่ {stu.sgsSeatNo})
+                      </span>
+                    ) : (
+                      <span className="text-emerald-700 font-semibold text-[11px]">
+                        ✓ ปกติ (ซิงค์ครบ 8 กลุ่มสาระวิชา)
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-2.5 px-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCentralSgsRoster(
+                          sgsRosterAndSubmissionService.toggleStudentTransferOut(
+                            stu.studentCode
+                          )
+                        )
+                      }
+                      className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-100 text-[11px] font-semibold text-slate-700"
+                    >
+                      {stu.transferState === 'TRANSFERRED_OUT'
+                        ? 'คืนสถานะปกติ'
+                        : 'แจ้งย้ายออก (ล็อกแถว SGS)'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
       {selectedClass && (
         <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">

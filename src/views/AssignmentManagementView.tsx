@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BookOpen,
   Plus,
@@ -10,6 +10,7 @@ import {
   FileText,
   ArrowRightLeft,
   UserPlus,
+  Star,
 } from 'lucide-react';
 import {
   sgsRosterAndSubmissionService,
@@ -24,7 +25,7 @@ export const AssignmentManagementView: React.FC = () => {
   // 2) 'SPEED_GRADER': ตรวจงานนักเรียนรายชิ้น (ดูไฟล์งานที่ส่ง + กดปุ่มให้คะแนนด่วน 1 คลิก)
   const [viewMode, setViewMode] = useState<'MATRIX' | 'SPEED_GRADER'>('MATRIX');
 
-  const [roster] = useState<SgsStudentRecord[]>(() =>
+  const [roster, setRoster] = useState<SgsStudentRecord[]>(() =>
     sgsRosterAndSubmissionService.getSgsRoster()
   );
   const [assignments, setAssignments] = useState<TermAssignmentItem[]>(() =>
@@ -33,6 +34,15 @@ export const AssignmentManagementView: React.FC = () => {
   const [submissions, setSubmissions] = useState<StudentWorkSubmission[]>(() =>
     sgsRosterAndSubmissionService.getSubmissions()
   );
+
+  // Q2-A: ซิงค์อัตโนมัติเมื่อฝ่ายทะเบียน/ครูที่ปรึกษาอัปเดตลำดับเลขที่ SGS ในหน้ารายชื่อห้องเรียน
+  useEffect(() => {
+    const syncRoster = () => {
+      setRoster(sgsRosterAndSubmissionService.getSgsRoster());
+    };
+    window.addEventListener('kp-sgs-roster-updated', syncRoster);
+    return () => window.removeEventListener('kp-sgs-roster-updated', syncRoster);
+  }, []);
 
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>(
     () => sgsRosterAndSubmissionService.getTermAssignments()[4]?.id || 'asg-5'
@@ -43,6 +53,7 @@ export const AssignmentManagementView: React.FC = () => {
   const [newUnit, setNewUnit] = useState<'u1' | 'u2' | 'u3'>('u3');
   const [newMaxScore, setNewMaxScore] = useState(10);
   const [newDueDate, setNewDueDate] = useState('30 ก.ย. 69');
+  const [newIsRequiredForPass, setNewIsRequiredForPass] = useState(true);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -65,6 +76,18 @@ export const AssignmentManagementView: React.FC = () => {
   const getSubmissionCell = (studentCode: string, assignmentId: string) => {
     return submissions.find(
       (s) => s.studentCode === studentCode && s.assignmentId === assignmentId
+    );
+  };
+
+  const handleToggleMandatory = (assignmentId: string) => {
+    const updated =
+      sgsRosterAndSubmissionService.toggleAssignmentRequiredForPass(assignmentId);
+    setAssignments(updated);
+    const target = updated.find((a) => a.id === assignmentId);
+    showToast(
+      target?.isRequiredForPass
+        ? `ตั้งค่า "${target.title}" เป็น ⭐ งานบังคับ (ไม่ส่งติด ร อัตโนมัติ)`
+        : `เปลี่ยน "${target?.title}" เป็นงานเก็บคะแนนทั่วไป (ไม่ติด ร)`
     );
   };
 
@@ -105,6 +128,7 @@ export const AssignmentManagementView: React.FC = () => {
       sgsUnit: newUnit,
       maxScore: Number(newMaxScore) || 10,
       dueDate: newDueDate,
+      isRequiredForPass: newIsRequiredForPass,
     });
     setAssignments(updated);
     setSelectedAssignmentId(updated[updated.length - 1].id);
@@ -297,10 +321,12 @@ export const AssignmentManagementView: React.FC = () => {
                     {assignments.map((asg) => (
                       <th
                         key={asg.id}
-                        className="py-3 px-3 text-center min-w-32 border-l border-slate-200/70"
+                        className="py-3 px-3 text-center min-w-36 border-l border-slate-200/70"
                       >
-                        <div className="font-bold text-slate-900">
-                          งานที่ {asg.orderNo} ({asg.maxScore} คะแนน)
+                        <div className="font-bold text-slate-900 flex items-center justify-center gap-1">
+                          <span>
+                            งานที่ {asg.orderNo} ({asg.maxScore} คะแนน)
+                          </span>
                         </div>
                         <div className="text-[11px] text-slate-500 truncate max-w-36 mx-auto">
                           {asg.title.replace(/^.*:\s*/, '')}
@@ -308,10 +334,31 @@ export const AssignmentManagementView: React.FC = () => {
                         <div className="text-[10px] text-teal-700 font-semibold mt-0.5">
                           [{asg.sgsUnit.toUpperCase()}] กำหนดส่ง {asg.dueDate}
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleMandatory(asg.id)}
+                          className={`mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${
+                            asg.isRequiredForPass
+                              ? 'bg-rose-100 text-rose-800 border border-rose-200 hover:bg-rose-200'
+                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                          }`}
+                          title="คลิกเพื่อสลับตั้งค่าเป็นงานบังคับ (ถ้าไม่ส่งติด ร อัตโนมัติ)"
+                        >
+                          <Star
+                            className={`w-3 h-3 ${
+                              asg.isRequiredForPass ? 'fill-rose-600 text-rose-600' : ''
+                            }`}
+                          />
+                          <span>
+                            {asg.isRequiredForPass
+                              ? 'งานบังคับ (ไม่ส่งติด ร)'
+                              : 'งานทั่วไป'}
+                          </span>
+                        </button>
                       </th>
                     ))}
                     <th className="py-3 px-3 text-center border-l border-slate-200 bg-teal-50/50 text-teal-900 font-bold">
-                      รวมเก็บ ({totalMaxScore})
+                      รวมเก็บ ({totalMaxScore}) / สถานะ ร
                     </th>
                   </tr>
                 </thead>
@@ -482,9 +529,29 @@ export const AssignmentManagementView: React.FC = () => {
                         })}
 
                         <td className="py-3 px-3 text-center border-l border-slate-200 bg-teal-50/30 font-bold text-teal-800 tabular-nums">
-                          {isTransferredOut
-                            ? '—'
-                            : `${computed.u1 + computed.u2 + computed.u3} / ${totalMaxScore}`}
+                          {isTransferredOut ? (
+                            '—'
+                          ) : (
+                            <div className="space-y-1">
+                              <div>
+                                {computed.effectiveAccumulated} / {totalMaxScore}
+                              </div>
+                              {computed.isManualOverride && (
+                                <span className="inline-block px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-bold">
+                                  ✏️ ครูพิมพ์สุทธิ ({computed.effectiveAccumulated})
+                                </span>
+                              )}
+                              {computed.missingMandatoryTitles.length > 0 ? (
+                                <span className="inline-block px-1.5 py-0.5 rounded bg-rose-600 text-white text-[10px] font-bold">
+                                  ติด ร ({computed.missingMandatoryTitles.join(', ')})
+                                </span>
+                              ) : (
+                                <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                                  ผ่านงานบังคับครบ
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );
@@ -526,6 +593,11 @@ export const AssignmentManagementView: React.FC = () => {
                       <span>
                         งานที่ {asg.orderNo}: {asg.title.replace(/^.*:\s*/, '')}
                       </span>
+                      {asg.isRequiredForPass && (
+                        <span className="px-1.5 py-0.2 rounded bg-rose-500 text-white font-bold text-[10px]">
+                          ⭐ บังคับ
+                        </span>
+                      )}
                       {pendingInAsg > 0 && (
                         <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 font-bold text-[10px]">
                           รอตรวจ {pendingInAsg}
@@ -594,7 +666,9 @@ export const AssignmentManagementView: React.FC = () => {
                         )}
                         {(!sub || sub.status === 'MISSING') && !isTransferredOut && (
                           <span className="px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold">
-                            ⚠️ ยังไม่ส่งงานชิ้นนี้
+                            {activeAssignment.isRequiredForPass
+                              ? '⚠️ ค้างงานบังคับ (ติด ร จนกว่าจะตรวจให้คะแนน)'
+                              : '⚠️ ยังไม่ส่งงานชิ้นนี้'}
                           </span>
                         )}
                       </div>
@@ -756,6 +830,23 @@ export const AssignmentManagementView: React.FC = () => {
                 className="w-full px-3 py-2 rounded-xl border border-slate-200"
               />
             </div>
+
+            <label className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-50/70 border border-rose-200 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newIsRequiredForPass}
+                onChange={(e) => setNewIsRequiredForPass(e.target.checked)}
+                className="mt-0.5 accent-rose-600 w-4 h-4"
+              />
+              <div>
+                <div className="font-bold text-rose-900">
+                  ⭐ ตั้งเป็นงานบังคับ / ตัวชี้วัดต้องรู้ (ไม่ส่งติด &quot;ร&quot; อัตโนมัติ)
+                </div>
+                <div className="text-[11px] text-rose-700 mt-0.5">
+                  หากนักเรียนไม่ส่งงานชิ้นนี้ ระบบจะขึ้นสถานะติด &quot;ร&quot; ในตาราง SGS และปลดให้อัตโนมัติเมื่อครูตรวจให้คะแนน
+                </div>
+              </div>
+            </label>
 
             <div className="flex justify-end gap-2 pt-2">
               <button
