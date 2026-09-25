@@ -28,9 +28,7 @@ interface StudentAffairsCouncilViewProps {
 export const StudentAffairsCouncilView: React.FC<
   StudentAffairsCouncilViewProps
 > = ({ initialSection = 'AFFAIRS', onOpenHomeVisit }) => {
-  const [mainSection, setMainSection] = useState<'AFFAIRS' | 'COUNCIL'>(
-    initialSection
-  );
+  const mainSection = initialSection;
   const [affairsTab, setAffairsTab] = useState<
     'ASSEMBLY' | 'DISCIPLINE' | 'STUDENT_LEAVE'
   >('ASSEMBLY');
@@ -138,115 +136,160 @@ export const StudentAffairsCouncilView: React.FC<
         </div>
       )}
 
-      {/* 1. Clean Module Header & Mode Switcher (60% White, 30% Slate, 10% Teal) */}
+      {/* 1. Dedicated Page Header (Separated: Student Affairs & Leave vs Student Council) */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-lg sm:text-xl font-bold text-slate-900">
-            ระบบบริหารงานกิจการนักเรียน & สภานักเรียนออนไลน์ (E-Voting)
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            เช็คชื่อแถวหน้าเสาธง (Exception-Only) • บันทึกวินัยและคะแนนความประพฤติ • อนุมัติใบลานักเรียน • เลือกตั้งสภานักเรียน
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl">
-            <button
-              onClick={() => setMainSection('AFFAIRS')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors ${
-                mainSection === 'AFFAIRS'
-                  ? 'bg-slate-900 text-white shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <ShieldAlert className="w-3.5 h-3.5 text-teal-400" />
-              <span>ฝ่ายกิจการนักเรียน & ใบลา</span>
-            </button>
-
-            <button
-              onClick={() => setMainSection('COUNCIL')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors ${
-                mainSection === 'COUNCIL'
-                  ? 'bg-slate-900 text-white shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Vote className="w-3.5 h-3.5 text-teal-400" />
-              <span>สภานักเรียน & E-Voting</span>
-            </button>
+        {mainSection === 'AFFAIRS' ? (
+          <>
+            <div>
+              <h1 className="text-lg sm:text-xl font-bold text-slate-900">
+                เช็คชื่อหน้าเสาธง & อนุมัติใบลานักเรียน
+              </h1>
+              <p className="text-xs text-slate-500 mt-1">
+                เช็คชื่อเข้าแถวรายวัน · อนุมัติใบลาป่วย/ลากิจ · บันทึกคะแนนความประพฤติ
+              </p>
+            </div>
+            {onOpenHomeVisit && (
+              <button
+                onClick={onOpenHomeVisit}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors self-start lg:self-auto"
+              >
+                <HeartHandshake className="w-3.5 h-3.5 text-teal-600" />
+                <span>ไปหน้าเยี่ยมบ้าน นร.01</span>
+              </button>
+            )}
+          </>
+        ) : (
+          <div>
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900">
+              สภานักเรียน & เลือกตั้งออนไลน์ (E-Voting)
+            </h1>
+            <p className="text-xs text-slate-500 mt-1">
+              ผลคะแนนเลือกตั้งสภานักเรียนเรียลไทม์ · นโยบายพรรคผู้สมัคร · ข้อเสนอแนะจากนักเรียน
+            </p>
           </div>
-
-          {onOpenHomeVisit && (
-            <button
-              onClick={onOpenHomeVisit}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors"
-            >
-              <HeartHandshake className="w-3.5 h-3.5 text-teal-600" />
-              <span>เยี่ยมบ้าน นร.01</span>
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
-      {/* 2. Rule of Thirds (กฎสามส่วน): 3 Balanced Summary Zones */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-xs font-medium text-slate-500">
-              เช็คชื่อหน้าเสาธงวันนี้ (ม.3/1)
-            </span>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 tabular-nums">
-                {assemblyList.filter((s) => s.status === 'PRESENT').length}/{assemblyList.length}
-              </span>
+      {/* 2. Rule of Thirds (กฎสามส่วน): Dedicated 3-Card Summary per Page */}
+      {mainSection === 'AFFAIRS' ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
+            <div>
               <span className="text-xs font-medium text-slate-500">
-                มาเข้าแถวปกติ
+                เช็คชื่อหน้าเสาธงวันนี้ (ม.3/1)
               </span>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-slate-900 tabular-nums">
+                  {assemblyList.filter((s) => s.status === 'PRESENT').length}/{assemblyList.length}
+                </span>
+                <span className="text-xs font-medium text-slate-500">
+                  มาเข้าแถวปกติ
+                </span>
+              </div>
             </div>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold">
+              ติ๊ก “มา” ให้ครบแล้ว
+            </span>
           </div>
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold">
-            ติ๊ก “มา” ให้ครบแล้ว
-          </span>
-        </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-xs font-medium text-slate-500">
-              ใบลานักเรียน (ลาป่วย / ลากิจ)
-            </span>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 tabular-nums">
-                {leaveRequests.filter((r) => r.status === 'PENDING').length}
-              </span>
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
+            <div>
               <span className="text-xs font-medium text-slate-500">
-                รอพิจารณา (จากทั้งหมด {leaveRequests.length} ใบ)
+                ใบลานักเรียนรอพิจารณา
               </span>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-teal-700 tabular-nums">
+                  {leaveRequests.filter((r) => r.status === 'PENDING').length}
+                </span>
+                <span className="text-xs font-medium text-slate-500">
+                  ใบลา (จากทั้งหมด {leaveRequests.length} ใบ)
+                </span>
+              </div>
             </div>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
+              ซิงก์เวลาเรียนอัตโนมัติ
+            </span>
           </div>
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
-            ซิงก์เวลาเรียนอัตโนมัติ
-          </span>
-        </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-xs font-medium text-slate-500">
-              ผู้ใช้สิทธิ์เลือกตั้งสภานักเรียน E-Voting
-            </span>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-teal-700 tabular-nums">
-                {totalVotes.toLocaleString()}
-              </span>
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
+            <div>
               <span className="text-xs font-medium text-slate-500">
-                คะแนนเสียง (Real-time)
+                บันทึกวินัย & ความประพฤติ
               </span>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-slate-900 tabular-nums">
+                  {disciplineLogs.length}
+                </span>
+                <span className="text-xs font-medium text-slate-500">
+                  รายการที่บันทึก
+                </span>
+              </div>
             </div>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold">
+              เชื่อมสมุดพก ปพ.5
+            </span>
           </div>
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold">
-            {parties.length} พรรคผู้สมัคร
-          </span>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
+            <div>
+              <span className="text-xs font-medium text-slate-500">
+                ผู้ใช้สิทธิ์เลือกตั้ง (E-Voting)
+              </span>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-teal-700 tabular-nums">
+                  {totalVotes.toLocaleString()}
+                </span>
+                <span className="text-xs font-medium text-slate-500">
+                  คะแนนเสียง
+                </span>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold">
+              นับผลเรียลไทม์
+            </span>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
+            <div>
+              <span className="text-xs font-medium text-slate-500">
+                พรรคผู้สมัครสภานักเรียน
+              </span>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-slate-900 tabular-nums">
+                  {parties.length}
+                </span>
+                <span className="text-xs font-medium text-slate-500">
+                  พรรค (ปีการศึกษา 2569)
+                </span>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
+              1 สิทธิ์ 1 เสียง
+            </span>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
+            <div>
+              <span className="text-xs font-medium text-slate-500">
+                ข้อเสนอแนะถึงสภานักเรียน
+              </span>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-slate-900 tabular-nums">
+                  {suggestions.length}
+                </span>
+                <span className="text-xs font-medium text-slate-500">
+                  เรื่องที่เสนอเข้ามา
+                </span>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold">
+              รับฟังเสียงนักเรียน
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* =====================================================================
           SECTION 1: ระบบบริหารงานกิจการนักเรียน (Student Affairs)

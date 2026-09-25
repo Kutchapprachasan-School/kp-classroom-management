@@ -15,7 +15,7 @@ import { StudentCouncilAffairsPortalView } from './StudentCouncilAffairsPortalVi
 import { studentAdventureQuests } from '../data/mockData';
 import type { StudentQuestItem } from '../types/viewModels';
 import { gamificationService } from '../services/gamificationService';
-import { MapPin, ArrowRight, Vote } from 'lucide-react';
+import { MapPin, ArrowRight, Vote, FileCheck2 } from 'lucide-react';
 
 interface StudentPortalViewProps {
   onExit: () => void;
@@ -87,16 +87,25 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({ onExit }) 
                     className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition-colors shadow-xs"
                   >
                     <MapPin className="w-4 h-4 text-emerald-600" />
-                    <span>เยี่ยมบ้าน นร.01 / ปักหมุด GPS (+50 XP)</span>
+                    <span>เยี่ยมบ้าน นร.01 (+50 XP)</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
 
                   <button
-                    onClick={() => setActiveTab('council-affairs')}
+                    onClick={() => setActiveTab('student-leave')}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-bold transition-colors shadow-xs"
+                  >
+                    <FileCheck2 className="w-4 h-4 text-teal-600" />
+                    <span>ยื่นใบลาออนไลน์</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('student-council')}
                     className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold transition-colors shadow-xs"
                   >
                     <Vote className="w-4 h-4 text-indigo-600" />
-                    <span>เลือกตั้งสภานักเรียน E-Voting & ยื่นใบลา</span>
+                    <span>เลือกตั้งสภานักเรียน</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -160,8 +169,16 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({ onExit }) 
             />
           )}
 
-          {activeTab === 'council-affairs' && (
+          {activeTab === 'student-leave' && (
             <StudentCouncilAffairsPortalView
+              section="LEAVE"
+              onAwardXp={(xp) => setCurrentXp((prev) => prev + xp)}
+            />
+          )}
+
+          {(activeTab === 'student-council' || activeTab === 'council-affairs') && (
+            <StudentCouncilAffairsPortalView
+              section="COUNCIL"
               onAwardXp={(xp) => setCurrentXp((prev) => prev + xp)}
             />
           )}
