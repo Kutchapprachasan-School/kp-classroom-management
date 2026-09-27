@@ -237,108 +237,120 @@ export const TimetableView: React.FC = () => {
               </button>
             </div>
 
-            {/* Attendance Roster Radio list with Morning Assembly Badge */}
-            <div className="space-y-2">
-              {studentsList.map((stu) => {
-                const currentStatus = attendanceRecords[stu.no] || 'PRESENT';
-                const morning = studentAffairsCouncilService.getMorningStatusForStudent(
-                  stu.name,
-                  stu.code
-                );
-                const isOverridingLeave =
-                  morning.hasApprovedLeave && currentStatus !== 'LEAVE';
+            {/* ตารางเช็คชื่อรายคาบแบบแถวกระชับบรรทัดเดียว (เห็นรายชื่อทั้งห้องในหน้าเดียว) */}
+            <div className="overflow-x-auto border border-slate-200 rounded-xl">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                    <th className="w-12 text-center">เลขที่</th>
+                    <th>ชื่อ - นามสกุล (รหัส)</th>
+                    <th>ผลเช็คชื่อหน้าเสาธง & ใบลา</th>
+                    <th className="text-right">เช็คเวลาเรียนคาบนี้</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {studentsList.map((stu) => {
+                    const currentStatus = attendanceRecords[stu.no] || 'PRESENT';
+                    const morning = studentAffairsCouncilService.getMorningStatusForStudent(
+                      stu.name,
+                      stu.code
+                    );
+                    const isOverridingLeave =
+                      morning.hasApprovedLeave && currentStatus !== 'LEAVE';
 
-                return (
-                  <div
-                    key={stu.no}
-                    className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs transition-colors ${
-                      isOverridingLeave
-                        ? 'bg-amber-50/70 border-amber-300'
-                        : morning.hasApprovedLeave
-                        ? 'bg-blue-50/40 border-blue-200'
-                        : 'bg-white border-slate-200'
-                    }`}
-                  >
-                    <div className="space-y-1">
-                      <div className="font-semibold text-slate-800 flex items-center gap-2">
-                        <span>
-                          {stu.no}. {stu.name}
-                        </span>
-                        <span className="text-[11px] text-slate-400 font-normal">
-                          ({stu.code})
-                        </span>
-                      </div>
-
-                      {/* แสดงผลมาเข้าแถวหน้าเสาธง / ใบลาอนุมัติแล้ว เพื่อประกอบการเช็คเวลาเรียนของครู */}
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold ${
-                            morning.hasApprovedLeave
-                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                              : morning.assemblyStatus === 'LATE'
-                              ? 'bg-amber-100 text-amber-800'
-                              : morning.assemblyStatus === 'ABSENT'
-                              ? 'bg-rose-100 text-rose-800'
-                              : 'bg-emerald-50 text-emerald-700'
-                          }`}
-                        >
-                          <FileCheck2 className="w-3 h-3" />
-                          <span>เสาธง: {morning.assemblyLabel}</span>
-                        </span>
-
-                        {isOverridingLeave && (
-                          <span className="text-[11px] font-bold text-amber-800">
-                            ⚠️ เปลี่ยนจากสถานะ "ลา"
+                    return (
+                      <tr
+                        key={stu.no}
+                        className={
+                          isOverridingLeave
+                            ? 'bg-amber-50/70'
+                            : morning.hasApprovedLeave
+                            ? 'bg-blue-50/40'
+                            : 'hover:bg-slate-50'
+                        }
+                      >
+                        <td className="text-center font-bold tabular-nums">
+                          {stu.no}
+                        </td>
+                        <td className="whitespace-nowrap">
+                          <span className="font-bold text-slate-900">{stu.name}</span>{' '}
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            ({stu.code})
                           </span>
-                        )}
-                      </div>
-                    </div>
+                        </td>
+                        <td className="whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1.5">
+                            <span
+                              className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-semibold ${
+                                morning.hasApprovedLeave
+                                  ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                  : morning.assemblyStatus === 'LATE'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : morning.assemblyStatus === 'ABSENT'
+                                  ? 'bg-rose-100 text-rose-800'
+                                  : 'bg-emerald-50 text-emerald-700'
+                              }`}
+                            >
+                              <FileCheck2 className="w-3 h-3" />
+                              <span>เสาธง: {morning.assemblyLabel}</span>
+                            </span>
+                            {isOverridingLeave && (
+                              <span className="text-[10px] font-bold text-amber-800">
+                                ⚠️ เปลี่ยนจาก &quot;ลา&quot;
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="text-right whitespace-nowrap">
+                          <div className="inline-flex items-center justify-end gap-1">
+                            {(['PRESENT', 'ABSENT', 'LATE', 'LEAVE'] as const).map(
+                              (status) => {
+                                const isSelected = currentStatus === status;
+                                const labelMap = {
+                                  PRESENT: 'มา',
+                                  ABSENT: 'ขาด',
+                                  LATE: 'สาย',
+                                  LEAVE: 'ลา',
+                                };
+                                const colorMap = {
+                                  PRESENT: isSelected
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                                  ABSENT: isSelected
+                                    ? 'bg-rose-600 text-white'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                                  LATE: isSelected
+                                    ? 'bg-amber-600 text-white'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                                  LEAVE: isSelected
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                                };
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {(['PRESENT', 'ABSENT', 'LATE', 'LEAVE'] as const).map((status) => {
-                        const isSelected = currentStatus === status;
-                        const labelMap = {
-                          PRESENT: 'มา',
-                          ABSENT: 'ขาด',
-                          LATE: 'สาย',
-                          LEAVE: 'ลา',
-                        };
-
-                        const colorMap = {
-                          PRESENT: isSelected
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-                          ABSENT: isSelected
-                            ? 'bg-rose-600 text-white'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-                          LATE: isSelected
-                            ? 'bg-amber-600 text-white'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-                          LEAVE: isSelected
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-                        };
-
-                        return (
-                          <button
-                            key={status}
-                            onClick={() => {
-                              setAttendanceRecords({
-                                ...attendanceRecords,
-                                [stu.no]: status,
-                              });
-                              setOverrideConfirmConflicts([]);
-                            }}
-                            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${colorMap[status]}`}
-                          >
-                            {labelMap[status]}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
+                                return (
+                                  <button
+                                    key={status}
+                                    onClick={() => {
+                                      setAttendanceRecords({
+                                        ...attendanceRecords,
+                                        [stu.no]: status,
+                                      });
+                                      setOverrideConfirmConflicts([]);
+                                    }}
+                                    className={`px-2.5 py-0.5 rounded-md text-xs font-semibold transition-colors ${colorMap[status]}`}
+                                  >
+                                    {labelMap[status]}
+                                  </button>
+                                );
+                              }
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
 
             {/* แจ้งเตือนเมื่อกดบันทึกแต่มีการเปลี่ยนสถานะของนักเรียนที่ลาแล้ว */}

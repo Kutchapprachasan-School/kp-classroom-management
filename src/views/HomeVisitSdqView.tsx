@@ -508,76 +508,80 @@ export const HomeVisitSdqView: React.FC = () => {
                     key={rec.id}
                     className="hover:bg-slate-50/60 transition-colors"
                   >
-                    {/* Col 1: Student Info (Distilled) */}
-                    <td className="py-3 px-4 align-middle">
-                      <div className="font-bold text-slate-900">
-                        {rec.studentName}
-                      </div>
-                      <div className="text-[11px] text-slate-500 mt-0.5 tabular-nums flex items-center gap-1.5">
-                        <span>รหัส {rec.studentCode} · {rec.classroom}</span>
+                    {/* Col 1: Student Info (Single-line compact) */}
+                    <td className="align-middle whitespace-nowrap">
+                      <div className="inline-flex items-center gap-1.5">
+                        <span className="font-bold text-slate-900">
+                          {rec.studentName}
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-mono tabular-nums">
+                          ({rec.studentCode} · {rec.classroom})
+                        </span>
                         {rec.hasStateWelfareCard && (
-                          <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-semibold">
+                          <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 text-[10px] font-semibold">
                             บัตรสวัสดิการฯ
                           </span>
                         )}
                       </div>
                     </td>
 
-                    {/* Col 2: Income (Distilled) */}
-                    <td className="py-3 px-4 align-middle text-right whitespace-nowrap">
-                      <div className="font-bold text-slate-900 tabular-nums">
-                        {rec.perCapitaIncome.toLocaleString()} บ./เดือน
+                    {/* Col 2: Income (Single-line compact) */}
+                    <td className="align-middle text-right whitespace-nowrap">
+                      <div className="inline-flex items-center justify-end gap-1.5">
+                        <span className="font-bold text-slate-900 tabular-nums">
+                          {rec.perCapitaIncome.toLocaleString()} บ.
+                        </span>
+                        {isPoorEligible ? (
+                          <span className="px-1.5 py-0.2 rounded bg-teal-50 text-teal-700 text-[10px] font-semibold">
+                            ผ่านเกณฑ์
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-[10px]">
+                            เกินเกณฑ์
+                          </span>
+                        )}
                       </div>
-                      {isPoorEligible ? (
-                        <span className="text-teal-700 text-[11px] font-semibold">
-                          ผ่านเกณฑ์ กสศ.
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 text-[11px]">
-                          เกินเกณฑ์
-                        </span>
-                      )}
                     </td>
 
-                    {/* Col 3: House condition & 2 Photos (Distilled) */}
-                    <td className="py-3 px-4 align-middle">
-                      <div className="flex items-center gap-2.5">
+                    {/* Col 3: House condition & 2 Photos (Single-line compact) */}
+                    <td className="align-middle whitespace-nowrap">
+                      <div className="inline-flex items-center gap-2">
                         <div className="flex items-center gap-1 shrink-0">
                           <img
                             src={rec.photoExteriorUrl}
                             alt="นอกบ้าน"
-                            className="w-10 h-8 object-cover rounded border border-slate-200"
+                            className="w-7 h-5 object-cover rounded border border-slate-200"
                             title="รูปที่ 1: นอกบ้าน"
                           />
                           <img
                             src={rec.photoInteriorUrl}
                             alt="ในบ้าน"
-                            className="w-10 h-8 object-cover rounded border border-slate-200"
+                            className="w-7 h-5 object-cover rounded border border-slate-200"
                             title="รูปที่ 2: ในบ้าน"
                           />
                         </div>
-                        <span className="font-medium text-slate-700">
+                        <span className="font-medium text-slate-700 text-[11px]">
                           {rec.housingType}
                         </span>
                       </div>
                     </td>
 
-                    {/* Col 4: Signatures (Distilled) */}
-                    <td className="py-3 px-4 align-middle whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1.5 font-semibold text-teal-700">
-                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    {/* Col 4: Signatures */}
+                    <td className="align-middle whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1 font-semibold text-teal-700 text-[11px]">
+                        <CheckCircle2 className="w-3 h-3 shrink-0" />
                         <span>ครบ 4 ฝ่าย</span>
                       </span>
                     </td>
 
-                    {/* Col 5: CCT Sync Status (Distilled) */}
-                    <td className="py-3 px-4 align-middle whitespace-nowrap">
+                    {/* Col 5: CCT Sync Status */}
+                    <td className="align-middle whitespace-nowrap">
                       {rec.cctSyncStatus === 'SYNCED' ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-[11px] font-semibold">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-[10px] font-semibold">
                           <CheckCircle2 className="w-3 h-3" /> ส่งแล้ว
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 text-amber-700 font-semibold text-[11px]">
+                        <span className="inline-flex items-center gap-1 text-amber-700 font-semibold text-[10px]">
                           <span className="w-2 h-2 rounded-full bg-amber-500" />
                           <span>รอส่ง กสศ.</span>
                         </span>
@@ -585,30 +589,30 @@ export const HomeVisitSdqView: React.FC = () => {
                     </td>
 
                     {/* Col 6: Actions */}
-                    <td className="py-3.5 px-4 align-middle text-right whitespace-nowrap">
-                      <div className="inline-flex items-center justify-end gap-1.5">
+                    <td className="align-middle text-right whitespace-nowrap">
+                      <div className="inline-flex items-center justify-end gap-1">
                         <button
                           onClick={() => openRecordModal(rec, 'NOR01_INCOME')}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-semibold text-xs transition-colors"
+                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-semibold text-xs transition-colors"
                         >
-                          <Edit3 className="w-3.5 h-3.5 text-slate-600" />
+                          <Edit3 className="w-3 h-3 text-slate-600" />
                           <span>กรอก นร.01</span>
                         </button>
 
                         <button
                           onClick={() => handleTriggerSingleCctSync(rec)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs shadow-2xs transition-colors"
+                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs shadow-2xs transition-colors"
                         >
-                          <CloudUpload className="w-3.5 h-3.5" />
-                          <span>ส่งขึ้นเว็บ กสศ.</span>
+                          <CloudUpload className="w-3 h-3" />
+                          <span>ส่ง กสศ.</span>
                         </button>
 
                         <button
                           onClick={() => handleExportNor01JsonForCctBot(rec)}
                           title="ดาวน์โหลดไฟล์ข้อมูล นร.01 สำหรับส่งระบบ กสศ."
-                          className="p-1.5 rounded-xl border border-slate-300 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors"
+                          className="p-1 rounded-lg border border-slate-300 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors"
                         >
-                          <Download className="w-3.5 h-3.5" />
+                          <Download className="w-3 h-3" />
                         </button>
                       </div>
                     </td>

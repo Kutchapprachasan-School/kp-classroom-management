@@ -295,39 +295,37 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                       : 'hover:bg-slate-50'
                   }
                 >
-                  <td className="py-2.5 px-3 text-center font-bold tabular-nums">
-                    <div className="inline-flex items-center gap-1.5">
+                  <td className="text-center font-bold tabular-nums whitespace-nowrap">
+                    <div className="inline-flex items-center gap-1">
                       <span className="w-5 text-center">{stu.sgsSeatNo}</span>
-                      <div className="flex flex-col gap-0.5">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setCentralSgsRoster(
-                              sgsRosterAndSubmissionService.moveStudentSeat(
-                                stu.studentCode,
-                                'UP'
-                              )
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCentralSgsRoster(
+                            sgsRosterAndSubmissionService.moveStudentSeat(
+                              stu.studentCode,
+                              'UP'
                             )
-                          }
-                          className="px-1 py-0.2 rounded bg-slate-100 hover:bg-slate-200 text-[9px] text-slate-600"
-                        >
-                          ▲
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setCentralSgsRoster(
-                              sgsRosterAndSubmissionService.moveStudentSeat(
-                                stu.studentCode,
-                                'DOWN'
-                              )
+                          )
+                        }
+                        className="px-1 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[9px] text-slate-600 leading-none"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCentralSgsRoster(
+                            sgsRosterAndSubmissionService.moveStudentSeat(
+                              stu.studentCode,
+                              'DOWN'
                             )
-                          }
-                          className="px-1 py-0.2 rounded bg-slate-100 hover:bg-slate-200 text-[9px] text-slate-600"
-                        >
-                          ▼
-                        </button>
-                      </div>
+                          )
+                        }
+                        className="px-1 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[9px] text-slate-600 leading-none"
+                      >
+                        ▼
+                      </button>
                     </div>
                   </td>
                   <td className="py-2.5 px-3 font-mono">{stu.studentCode}</td>

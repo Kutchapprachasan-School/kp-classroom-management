@@ -571,44 +571,46 @@ export const StudentAffairsCouncilView: React.FC<
                     <tbody className="divide-y divide-slate-100">
                       {filteredAssembly.map((stu) => (
                         <tr key={stu.studentCode} className="hover:bg-slate-50/60 transition-colors">
-                          <td className="py-3.5 px-4 font-mono font-semibold text-slate-700 tabular-nums">
+                          <td className="font-mono font-semibold text-slate-700 tabular-nums whitespace-nowrap">
                             {stu.studentCode}
                           </td>
-                          <td className="py-3.5 px-4">
-                            <div className="font-bold text-slate-900">{stu.studentName}</div>
-                            <div className="text-[11px] text-slate-400">ชั้น {stu.classroom}</div>
+                          <td className="whitespace-nowrap">
+                            <span className="font-bold text-slate-900">{stu.studentName}</span>{' '}
+                            <span className="text-[11px] text-slate-500 font-semibold">
+                              ({stu.classroom})
+                            </span>
                           </td>
-                          <td className="py-3.5 px-4 text-slate-500 tabular-nums">
+                          <td className="text-slate-500 tabular-nums whitespace-nowrap">
                             {stu.enrolledAt}
                           </td>
-                          <td className="py-3.5 px-4 whitespace-nowrap">
+                          <td className="whitespace-nowrap">
                             {stu.status === 'PRESENT' ? (
-                              <span className="inline-flex items-center gap-1.5 text-teal-700 font-semibold">
+                              <span className="inline-flex items-center gap-1 text-teal-700 font-semibold">
                                 <span className="w-2 h-2 rounded-full bg-teal-500" />
-                                <span>มาเข้าแถวปกติ</span>
+                                <span>มาปกติ</span>
                               </span>
                             ) : stu.status === 'LATE' ? (
-                              <span className="inline-flex items-center gap-1.5 text-amber-700 font-semibold">
+                              <span className="inline-flex items-center gap-1 text-amber-700 font-semibold">
                                 <span className="w-2 h-2 rounded-full bg-amber-500" />
                                 <span>มาสาย</span>
                               </span>
                             ) : stu.status === 'SICK_LEAVE' || stu.status === 'PERSONAL_LEAVE' ? (
-                              <span className="inline-flex items-center gap-1.5 text-slate-700 font-semibold">
+                              <span className="inline-flex items-center gap-1 text-slate-700 font-semibold">
                                 <span className="w-2 h-2 rounded-full bg-slate-500" />
                                 <span>{stu.status === 'SICK_LEAVE' ? 'ลาป่วย' : 'ลากิจ'}</span>
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1.5 text-rose-600 font-semibold">
+                              <span className="inline-flex items-center gap-1 text-rose-600 font-semibold">
                                 <span className="w-2 h-2 rounded-full bg-rose-500" />
-                                <span>ขาดเข้าแถว</span>
+                                <span>ขาด</span>
                               </span>
                             )}
                           </td>
-                          <td className="py-3.5 px-4 text-slate-500">
+                          <td className="text-slate-500 truncate max-w-44">
                             {stu.note || '-'}
                           </td>
-                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                            <div className="inline-flex items-center gap-1.5">
+                          <td className="text-right whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1">
                               {[
                                 { key: 'PRESENT', label: 'มา' },
                                 { key: 'LATE', label: 'สาย' },
@@ -620,7 +622,7 @@ export const StudentAffairsCouncilView: React.FC<
                                   onClick={() =>
                                     handleUpdateAssembly(stu.studentCode, btn.key as any)
                                   }
-                                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
+                                  className={`px-2.5 py-0.5 rounded-lg text-xs font-bold border transition-colors ${
                                     stu.status === btn.key
                                       ? 'bg-teal-600 text-white border-teal-600 shadow-2xs'
                                       : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
@@ -733,30 +735,30 @@ export const StudentAffairsCouncilView: React.FC<
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
                         <tr className="bg-slate-50/50 border-b border-slate-200/80 text-slate-500 font-semibold">
-                          <th className="py-3 px-4">วันที่</th>
-                          <th className="py-3 px-4">นักเรียน</th>
-                          <th className="py-3 px-4">รายการพฤติกรรม</th>
-                          <th className="py-3 px-4">ผู้บันทึก</th>
-                          <th className="py-3 px-4 text-right">คะแนน</th>
+                          <th>วันที่</th>
+                          <th>นักเรียน (ห้อง)</th>
+                          <th>รายการพฤติกรรม</th>
+                          <th>ผู้บันทึก</th>
+                          <th className="text-right">คะแนน</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {disciplineLogs.map((log) => (
                           <tr key={log.id} className="hover:bg-slate-50/60 transition-colors">
-                            <td className="py-3 px-4 text-slate-500 whitespace-nowrap tabular-nums">
+                            <td className="text-slate-500 whitespace-nowrap tabular-nums">
                               {log.date}
                             </td>
-                            <td className="py-3 px-4">
-                              <div className="font-bold text-slate-900">{log.studentName}</div>
-                              <div className="text-[11px] text-slate-400">ชั้น {log.classroom}</div>
+                            <td className="whitespace-nowrap">
+                              <span className="font-bold text-slate-900">{log.studentName}</span>{' '}
+                              <span className="text-[11px] text-slate-400">({log.classroom})</span>
                             </td>
-                            <td className="py-3 px-4 text-slate-700">
+                            <td className="text-slate-700">
                               {log.reason}
                             </td>
-                            <td className="py-3 px-4 text-slate-500 whitespace-nowrap">
+                            <td className="text-slate-500 whitespace-nowrap">
                               {log.reporter}
                             </td>
-                            <td className="py-3 px-4 text-right whitespace-nowrap font-bold tabular-nums">
+                            <td className="text-right whitespace-nowrap font-bold tabular-nums">
                               <span
                                 className={
                                   log.type === 'BONUS' ? 'text-teal-700' : 'text-rose-600'
@@ -774,10 +776,10 @@ export const StudentAffairsCouncilView: React.FC<
               </div>
             )}
 
-            {/* Tab 1.3: ตารางอนุมัติใบลานักเรียน (Converted from stacked cards to Data Table) */}
+            {/* Tab 1.3: ตารางอนุมัติใบลานักเรียน (Single-line compact rows) */}
             {affairsTab === 'STUDENT_LEAVE' && (
               <div>
-                <div className="px-5 py-3.5 border-b border-slate-100">
+                <div className="px-5 py-3 border-b border-slate-100">
                   <h3 className="text-sm font-bold text-slate-900">
                     ตารางรายการขออนุมัติใบลานักเรียน (ลาป่วย / ลากิจ) —{' '}
                     {effectiveRoomFilter === 'ALL'
@@ -785,7 +787,7 @@ export const StudentAffairsCouncilView: React.FC<
                       : `ชั้น ${effectiveRoomFilter}`}
                   </h3>
                   <p className="text-xs text-slate-500">
-                    เมื่ออนุมัติแล้ว ระบบจะซิงค์เข้าตารางเช็คชื่อหน้าเสาธงและตั้งค่า "ลา" ในคาบเรียนให้อัตโนมัติ
+                    เมื่ออนุมัติแล้ว ระบบจะซิงค์เข้าตารางเช็คชื่อหน้าเสาธงและตั้งค่า &quot;ลา&quot; ในคาบเรียนให้อัตโนมัติ
                   </p>
                 </div>
 
@@ -793,38 +795,38 @@ export const StudentAffairsCouncilView: React.FC<
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-semibold">
-                        <th className="py-3 px-4">รหัส / นักเรียน</th>
-                        <th className="py-3 px-4">ประเภทการลา</th>
-                        <th className="py-3 px-4">ช่วงวันที่ลา</th>
-                        <th className="py-3 px-4">เหตุผล & เบอร์ผู้ปกครอง</th>
-                        <th className="py-3 px-4">สถานะ</th>
-                        <th className="py-3 px-4 text-right">การพิจารณา</th>
+                        <th>นักเรียน (รหัส · ห้อง)</th>
+                        <th>ประเภทการลา</th>
+                        <th>ช่วงวันที่ลา</th>
+                        <th>เหตุผล & เบอร์ผู้ปกครอง</th>
+                        <th>สถานะ</th>
+                        <th className="text-right">การพิจารณา</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {filteredLeaves.map((req) => (
                         <tr key={req.id} className="hover:bg-slate-50/60 transition-colors">
-                          <td className="py-3.5 px-4">
-                            <div className="font-bold text-slate-900">{req.studentName}</div>
-                            <div className="text-[11px] text-slate-400 font-mono tabular-nums">
-                              รหัส {req.studentCode} · ชั้น {req.classroom}
-                            </div>
+                          <td className="whitespace-nowrap">
+                            <span className="font-bold text-slate-900">{req.studentName}</span>{' '}
+                            <span className="text-[11px] text-slate-400 font-mono tabular-nums">
+                              ({req.studentCode} · {req.classroom})
+                            </span>
                           </td>
-                          <td className="py-3.5 px-4 whitespace-nowrap">
-                            <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 font-semibold">
+                          <td className="whitespace-nowrap">
+                            <span className="px-2 py-0.2 rounded bg-slate-100 text-slate-800 font-semibold">
                               {req.leaveType} ({req.daysCount} วัน)
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap tabular-nums">
-                            {req.startDate} ถึง {req.endDate}
+                          <td className="text-slate-600 whitespace-nowrap tabular-nums">
+                            {req.startDate} - {req.endDate}
                           </td>
-                          <td className="py-3.5 px-4">
-                            <div className="text-slate-800 font-medium">{req.reason}</div>
-                            <div className="text-[11px] text-slate-400 tabular-nums">
-                              โทร. {req.guardianPhone}
-                            </div>
+                          <td className="whitespace-nowrap">
+                            <span className="text-slate-800 font-medium">{req.reason}</span>{' '}
+                            <span className="text-[11px] text-slate-400 tabular-nums">
+                              (โทร. {req.guardianPhone})
+                            </span>
                           </td>
-                          <td className="py-3.5 px-4 whitespace-nowrap">
+                          <td className="whitespace-nowrap">
                             {req.status === 'APPROVED' ? (
                               <span className="inline-flex items-center gap-1 text-teal-700 font-semibold">
                                 <CheckCircle2 className="w-3.5 h-3.5" /> อนุมัติแล้ว
@@ -838,14 +840,14 @@ export const StudentAffairsCouncilView: React.FC<
                               </span>
                             )}
                           </td>
-                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                          <td className="text-right whitespace-nowrap">
                             {req.status === 'APPROVED' ? (
                               <span className="text-slate-400 text-[11px]">ดำเนินการแล้ว</span>
                             ) : (
-                              <div className="inline-flex items-center gap-1.5">
+                              <div className="inline-flex items-center gap-1">
                                 <button
                                   onClick={() => handleApproveLeave(req.id, 'APPROVED')}
-                                  className="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold transition-colors"
+                                  className="px-2.5 py-0.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold transition-colors"
                                 >
                                   อนุมัติ
                                 </button>

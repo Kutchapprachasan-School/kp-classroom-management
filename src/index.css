@@ -24,6 +24,27 @@
 
   table {
     font-variant-numeric: tabular-nums;
+    border-collapse: collapse;
+  }
+
+  /* Global Ultra-Compact Table Layout (แสดงรายชื่อนักเรียนได้มากที่สุดใน 1 หน้าจอทุกตาราง) */
+  table thead th {
+    padding-top: 0.35rem !important;
+    padding-bottom: 0.35rem !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    line-height: 1.2 !important;
+    vertical-align: middle !important;
+    white-space: nowrap;
+  }
+
+  table tbody td {
+    padding-top: 0.25rem !important;
+    padding-bottom: 0.25rem !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    line-height: 1.25 !important;
+    vertical-align: middle !important;
   }
 
   /* Senior Teacher Comfort Font Scaling (ก- เล็ก / ก ปกติ / ก+ ใหญ่ / ก++ ใหญ่พิเศษ / ตั้งค่าเอง) */
