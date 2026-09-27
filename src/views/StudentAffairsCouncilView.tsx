@@ -181,126 +181,116 @@ export const StudentAffairsCouncilView: React.FC<
     );
   };
 
-  const handleReplySuggestion = (id: string) => {
-    const reply = prompt(
-      'ระบุข้อความตอบกลับจากสภานักเรียน/ครูที่ปรึกษา:',
-      'รับเรื่องและประสานงานดำเนินการเรียบร้อยแล้วครับ'
-    );
-    if (!reply) return;
+  const [replyingSuggestionId, setReplyingSuggestionId] = useState<string | null>(
+    null
+  );
+  const [replyDraft, setReplyDraft] = useState(
+    'รับเรื่องและประสานงานดำเนินการเรียบร้อยแล้วครับ'
+  );
+
+  const handleSaveReplySuggestion = (id: string) => {
+    if (!replyDraft.trim()) return;
     const updated = studentAffairsCouncilService.replySuggestion(
       id,
       'RESOLVED',
-      reply
+      replyDraft.trim()
     );
     setSuggestions(updated);
+    setReplyingSuggestionId(null);
     showToast('ตอบกลับข้อเสนอแนะนักเรียนเรียบร้อยแล้ว');
   };
 
   const totalVotes = parties.reduce((s, p) => s + p.voteCount, 0);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-4">
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 text-xs font-semibold">
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 text-xs font-semibold">
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           <span>{toastMsg}</span>
         </div>
       )}
 
-      {/* 1. Dedicated Page Header (Separated: Student Affairs & Leave vs Student Council) */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      {/* 1. Compact Toolbar Header (Separated: Student Affairs & Leave vs Student Council) */}
+      <div className="bg-white rounded-xl border border-slate-200 px-4 py-2.5 shadow-xs space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           {mainSection === 'AFFAIRS' ? (
             <>
-              <div>
-                <h1 className="text-lg sm:text-xl font-bold text-slate-900">
-                  เช็คชื่อหน้าเสาธง & อนุมัติใบลานักเรียน
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-sm sm:text-base font-bold text-slate-900">
+                  เช็คชื่อหน้าเสาธง & ใบลานักเรียน
                 </h1>
-                <p className="text-xs text-slate-500 mt-1">
-                  เช็คชื่อเข้าแถวรายวัน · อนุมัติใบลาป่วย/ลากิจ · บันทึกคะแนนความประพฤติ (ซิงค์เข้าเช็คชื่อรายคาบอัตโนมัติ)
-                </p>
+
+                {/* Compact Role Segmented Control */}
+                <div className="inline-flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg text-[11px]">
+                  {roleMatrix.map((rm) => {
+                    const isSelected = activeRole === rm.role;
+                    return (
+                      <button
+                        key={rm.role}
+                        type="button"
+                        onClick={() => handleSwitchRole(rm.role)}
+                        className={`px-2.5 py-1 rounded-md font-semibold transition-colors ${
+                          isSelected
+                            ? 'bg-white text-slate-900 shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        {rm.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Room Scope Filter */}
+                {currentRolePerm.canViewAllRooms ? (
+                  <select
+                    value={selectedRoom}
+                    onChange={(e) => setSelectedRoom(e.target.value)}
+                    className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700"
+                  >
+                    <option value="ALL">ทุกห้องเรียน (ทั้งโรงเรียน)</option>
+                    <option value="ม.3/1">ชั้น ม.3/1</option>
+                    <option value="ม.3/2">ชั้น ม.3/2</option>
+                    <option value="ม.3/3">ชั้น ม.3/3</option>
+                  </select>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-900 border border-amber-200 text-[11px] font-semibold">
+                    <Lock className="w-3 h-3 text-amber-600" />
+                    <span>เฉพาะห้องที่ปรึกษา (ม.3/1)</span>
+                  </span>
+                )}
               </div>
-              <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
+
+              <div className="flex items-center gap-2 text-xs">
                 <button
+                  type="button"
                   onClick={() => setIsAccessModalOpen((v) => !v)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold transition-colors"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold transition-colors"
                 >
-                  <Settings className="w-3.5 h-3.5 text-teal-600" />
-                  <span>ตั้งค่าการเข้าถึง (ครูทุกคน / ครูเวร / ครูกิจการ)</span>
+                  <Settings className="w-3.5 h-3.5 text-slate-500" />
+                  <span>ตั้งค่าสิทธิ์การเข้าถึง</span>
                 </button>
                 {onOpenHomeVisit && (
                   <button
+                    type="button"
                     onClick={onOpenHomeVisit}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold transition-colors"
                   >
                     <HeartHandshake className="w-3.5 h-3.5 text-teal-600" />
-                    <span>ไปหน้าเยี่ยมบ้าน นร.01</span>
+                    <span>เยี่ยมบ้าน นร.01</span>
                   </button>
                 )}
               </div>
             </>
           ) : (
             <div>
-              <h1 className="text-lg sm:text-xl font-bold text-slate-900">
+              <h1 className="text-sm sm:text-base font-bold text-slate-900">
                 สภานักเรียน & เลือกตั้งออนไลน์ (E-Voting)
               </h1>
-              <p className="text-xs text-slate-500 mt-1">
-                ผลคะแนนเลือกตั้งสภานักเรียนเรียลไทม์ · นโยบายพรรคผู้สมัคร · ข้อเสนอแนะจากนักเรียน
-              </p>
             </div>
           )}
         </div>
-
-        {/* Role Scope & Classroom Filter Bar (เฉพาะหน้าเสาธง & ใบลา) */}
-        {mainSection === 'AFFAIRS' && (
-          <div className="pt-3 border-t border-slate-100 flex flex-col xl:flex-row xl:items-center justify-between gap-3 text-xs">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="font-bold text-slate-600 mr-1">มุมมองสิทธิ์ผู้ใช้งาน:</span>
-              {roleMatrix.map((rm) => {
-                const isSelected = activeRole === rm.role;
-                return (
-                  <button
-                    key={rm.role}
-                    onClick={() => handleSwitchRole(rm.role)}
-                    className={`px-3 py-1.5 rounded-xl font-semibold transition-colors ${
-                      isSelected
-                        ? 'bg-teal-600 text-white shadow-2xs'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    {rm.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-semibold text-slate-600">ขอบเขตห้องเรียนที่แสดง:</span>
-              {currentRolePerm.canViewAllRooms ? (
-                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-                  {(['ALL', 'ม.3/1', 'ม.3/2', 'ม.3/3'] as const).map((roomKey) => (
-                    <button
-                      key={roomKey}
-                      onClick={() => setSelectedRoom(roomKey)}
-                      className={`px-2.5 py-1 rounded-lg font-semibold transition-colors ${
-                        selectedRoom === roomKey
-                          ? 'bg-slate-900 text-white'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      {roomKey === 'ALL' ? 'ทุกห้องเรียน (ทั้งโรงเรียน)' : `ชั้น ${roomKey}`}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-900 border border-amber-200 font-semibold">
-                  <Lock className="w-3.5 h-3.5 text-amber-600" />
-                  <span>เฉพาะห้องที่ปรึกษาของตนเอง (ม.3/1)</span>
-                </span>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* แผงตั้งค่าสิทธิ์การเข้าถึง (Flexible Access Matrix เหมือนระบบการลา) */}
         {mainSection === 'AFFAIRS' && isAccessModalOpen && (
@@ -1038,7 +1028,30 @@ export const StudentAffairsCouncilView: React.FC<
                           {sug.studentName}
                         </td>
                         <td className="py-3.5 px-4 text-slate-700">
-                          {sug.councilReply ? (
+                          {replyingSuggestionId === sug.id ? (
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                value={replyDraft}
+                                onChange={(e) => setReplyDraft(e.target.value)}
+                                className="px-2.5 py-1 rounded-md border border-slate-300 bg-white text-xs w-56"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleSaveReplySuggestion(sug.id)}
+                                className="px-2.5 py-1 rounded-md bg-teal-600 text-white text-xs font-semibold"
+                              >
+                                บันทึก
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setReplyingSuggestionId(null)}
+                                className="px-2 py-1 rounded-md border border-slate-200 text-slate-500 text-xs"
+                              >
+                                ยกเลิก
+                              </button>
+                            </div>
+                          ) : sug.councilReply ? (
                             <span className="text-teal-800 font-medium">{sug.councilReply}</span>
                           ) : (
                             <span className="text-slate-400">รอการตอบกลับ</span>
@@ -1051,8 +1064,15 @@ export const StudentAffairsCouncilView: React.FC<
                         </td>
                         <td className="py-3.5 px-4 text-right whitespace-nowrap">
                           <button
-                            onClick={() => handleReplySuggestion(sug.id)}
-                            className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold transition-colors"
+                            type="button"
+                            onClick={() => {
+                              setReplyDraft(
+                                sug.councilReply ||
+                                  'รับเรื่องและประสานงานดำเนินการเรียบร้อยแล้วครับ'
+                              );
+                              setReplyingSuggestionId(sug.id);
+                            }}
+                            className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold transition-colors"
                           >
                             ตอบกลับ
                           </button>

@@ -90,6 +90,47 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
   );
   const [keepTransferredOutRow, setKeepTransferredOutRow] = useState(true);
   const [isRosterEditMode, setIsRosterEditMode] = useState(false);
+  const [gradesQuickFilter, setGradesQuickFilter] = useState<'ALL' | 'AT_RISK'>('ALL');
+  const [isCourseMenuOpen, setIsCourseMenuOpen] = useState(false);
+  const [isAddingPeriod, setIsAddingPeriod] = useState(false);
+  const [newPeriodDate, setNewPeriodDate] = useState('พฤ. 8 ต.ค. 2569');
+  const [newPeriodTopic, setNewPeriodTopic] = useState('');
+  const [isAddingBehavior, setIsAddingBehavior] = useState(false);
+  const [newBehaviorStudent, setNewBehaviorStudent] = useState('ด.ช. จิรายุ เดชปันคำ');
+  const [newBehaviorReason, setNewBehaviorReason] = useState('');
+  const [newBehaviorType, setNewBehaviorType] = useState<'POSITIVE' | 'NEGATIVE'>('POSITIVE');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3200);
+  };
+
+  const handleGradesKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    rowIndex: number
+  ) => {
+    if (e.key === 'Enter' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      const next = document.querySelector<HTMLInputElement>(
+        `input[data-sgs-grade-row="${rowIndex + 1}"]`
+      );
+      if (next) {
+        next.focus();
+        next.select();
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prev = document.querySelector<HTMLInputElement>(
+        `input[data-sgs-grade-row="${rowIndex - 1}"]`
+      );
+      if (prev) {
+        prev.focus();
+        prev.select();
+      }
+    }
+  };
+
   const [isTransferInModalOpen, setIsTransferInModalOpen] = useState(false);
   const [transferInCode, setTransferInCode] = useState('45129');
   const [transferInName, setTransferInName] = useState('');
@@ -130,8 +171,8 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
       status: 'NORMAL',
       statusLabel: 'สอนปกติ',
       checkStatus: 'CHECKED',
-      attendedCount: 23,
-      leaveCount: null,
+      attendedCount: 14,
+      leaveCount: 1,
     },
     {
       date: 'พฤ. 10 ก.ย. 2569',
@@ -140,7 +181,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
       status: 'NORMAL',
       statusLabel: 'สอนปกติ',
       checkStatus: 'CHECKED',
-      attendedCount: 22,
+      attendedCount: 14,
       leaveCount: 1,
     },
     {
@@ -150,22 +191,36 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
       status: 'NORMAL',
       statusLabel: 'สอนปกติ',
       checkStatus: 'CHECKED',
-      attendedCount: 21,
+      attendedCount: 13,
       leaveCount: 2,
     },
   ]);
 
-  // Roll-call interactive student states
-  const [rollCallList, setRollCallList] = useState([
-    { no: 1, name: 'ด.ช. กฤษณะ ศรีสมบูรณ์', status: 'PRESENT' },
-    { no: 2, name: 'ด.ช. จิรายุ เดชปันคำ', status: 'PRESENT' },
-    { no: 7, name: 'ด.ช. ภูรินท์ บัณฑิต', status: 'LATE' },
-    { no: 10, name: 'ด.ช. อัศวิน วนเกษตรกุล', status: 'ABSENT' },
-    { no: 12, name: 'ด.ช. ชัยมงคล วงศ์บุตร', status: 'PRESENT' },
-    { no: 15, name: 'ด.ช. ทัตธน คำฝั้น', status: 'PRESENT' },
-    { no: 22, name: 'ด.ญ. อคิราห์ วิรากร', status: 'LEAVE' },
-    { no: 23, name: 'ด.ญ. ปรียาภรณ์ ชัยแก้ว', status: 'PRESENT' },
-  ]);
+  // Roll-call interactive student states synced with SGS Roster + Morning Assembly & Approved Leave
+  const [rollCallList, setRollCallList] = useState(() =>
+    sgsRosterAndSubmissionService
+      .getSgsRoster()
+      .filter((s) => s.transferState !== 'TRANSFERRED_OUT')
+      .map((s) => {
+        const hasApprovedLeave = s.studentCode === '45109';
+        const assemblyLabel =
+          s.studentCode === '45109'
+            ? 'ลาป่วย (อนุมัติแล้ว)'
+            : s.studentCode === '45104'
+            ? 'สายเสาธง (08:12)'
+            : s.studentCode === '45107'
+            ? 'ขาดเข้าแถวเสาธง'
+            : 'เข้าแถวปกติ';
+        return {
+          no: s.sgsSeatNo,
+          code: s.studentCode,
+          name: s.studentName,
+          status: hasApprovedLeave ? 'LEAVE' : s.studentCode === '45107' ? 'ABSENT' : 'PRESENT',
+          hasApprovedLeave,
+          assemblyLabel,
+        };
+      })
+  );
 
   // Assignments Data matching Image 3
   const [assignmentRows, setAssignmentRows] = useState([
@@ -345,6 +400,9 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
   const handleSaveRollCall = async () => {
     const presentCount = rollCallList.filter((s) => s.status === 'PRESENT').length;
     const leaveCount = rollCallList.filter((s) => s.status === 'LEAVE').length;
+    const overriddenLeaveStudents = rollCallList.filter(
+      (s) => s.hasApprovedLeave && s.status !== 'LEAVE'
+    );
 
     await attendanceService.saveRollCall({
       scheduleId: 'sched-1',
@@ -371,7 +429,16 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
     );
 
     setIsRollCallOpen(false);
-    alert(`บันทึกการเช็คชื่อวันที่ ${selectedDateForRollCall} สำเร็จ! มา ${presentCount} คน, ลา ${leaveCount} คน`);
+    if (overriddenLeaveStudents.length > 0) {
+      const names = overriddenLeaveStudents.map((s) => s.name).join(', ');
+      showToast(
+        `บันทึกสำเร็จ (มา ${presentCount}, ลา ${leaveCount}) • แจ้งเตือน: เปลี่ยนสถานะผู้มีใบลา (${names})`
+      );
+    } else {
+      showToast(
+        `บันทึกเช็คชื่อ ${selectedDateForRollCall} เรียบร้อย (มา ${presentCount} คน, ลา ${leaveCount} คน)`
+      );
+    }
   };
 
   const openRollCallModal = (date: string) => {
@@ -387,137 +454,114 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
   );
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in font-sans text-slate-800 select-none">
-      {/* 1. Header Card with Course Code & Title */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
-              <span>← ชั้นเรียนของฉัน</span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-800">
-              ศ23101 ศิลปะ — ม.3/1
-            </h1>
-            <p className="text-xs text-slate-400 mt-1">
-              ศ23101 • 23 นักเรียน • 1 หน่วยกิต • ภาคเรียนที่ 1/2569
-            </p>
-          </div>
+    <div className="space-y-4 max-w-7xl mx-auto pb-12 animate-fade-in font-sans text-slate-800 select-none">
+      {toastMessage && (
+        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 text-xs font-medium">
+          <span className="w-2 h-2 rounded-full bg-teal-400 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
 
-          <div className="flex items-center gap-2 self-start sm:self-auto text-xs">
-            <button
-              onClick={() => setIsWeightingModalOpen(true)}
-              className="px-3 py-1.5 border border-slate-200 hover:bg-slate-50 rounded-xl font-medium text-slate-700 transition-colors flex items-center gap-1.5"
-            >
-              <BookMarked className="w-3.5 h-3.5 text-slate-400" />
-              <span>สัดส่วนคะแนน</span>
-            </button>
-            <button
-              onClick={() => alert('ย้ายรายวิชานี้ไปยังภาคเรียนอื่น หรือเปลี่ยนกลุ่มสาระฯ')}
-              className="px-3 py-1.5 border border-slate-200 hover:bg-slate-50 rounded-xl font-medium text-slate-700 transition-colors"
-            >
-              ย้ายรายวิชา
-            </button>
-            <button
-              onClick={() => {
-                if (confirm('คุณต้องการลบชั้นเรียน ศ23101 ม.3/1 หรือไม่? รายการจะถูกย้ายไปถังขยะ 30 วัน')) {
-                  alert('ย้ายชั้นเรียนไปยังถังขยะเรียบร้อย');
-                }
-              }}
-              className="px-3 py-1.5 border border-slate-200 hover:bg-rose-50 text-rose-600 rounded-xl font-medium transition-colors"
-            >
-              ลบชั้นเรียน
-            </button>
+      {/* 1. Compact Single-Row Course Toolbar & Tabs (Eliminates Triple Header Stacking) */}
+      <div className="bg-white rounded-xl border border-slate-200 px-4 py-2 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[11px] font-bold">
+              ศ23101
+            </span>
+            <h1 className="text-sm sm:text-base font-bold text-slate-900 truncate">
+              ศิลปะ — ม.3/1
+            </h1>
+            <span className="text-xs text-slate-400 hidden md:inline">
+              ({sgsRoster.filter((s) => s.transferState !== 'TRANSFERRED_OUT').length} คน)
+            </span>
           </div>
         </div>
 
         {/* Sub Navigation Tabs */}
-        <div className="flex items-center gap-1 overflow-x-auto pt-2 border-t border-slate-100 text-xs font-medium text-slate-500">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`px-3 py-2 border-b-2 font-medium transition-colors whitespace-nowrap ${
-              activeTab === 'overview'
-                ? 'border-[#0f2a59] text-[#0f2a59] font-bold'
-                : 'border-transparent hover:text-slate-900'
-            }`}
-          >
-            ภาพรวม
-          </button>
+        <div className="flex items-center gap-1 overflow-x-auto text-xs font-medium text-slate-500">
+          {(
+            [
+              { key: 'overview', label: 'ภาพรวม' },
+              { key: 'attendance', label: 'เช็คชื่อ' },
+              { key: 'assignments', label: 'งาน / คะแนนเก็บ' },
+              { key: 'grades', label: 'สรุปคะแนน ปพ.5' },
+              { key: 'behavior', label: 'พฤติกรรม' },
+              { key: 'reflection', label: 'บันทึกหลังสอน' },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setActiveTab(t.key)}
+              className={`px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap ${
+                activeTab === t.key
+                  ? 'bg-slate-900 text-white font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
 
           <button
-            onClick={() => setActiveTab('attendance')}
-            className={`px-3 py-2 border-b-2 font-medium transition-colors whitespace-nowrap ${
-              activeTab === 'attendance'
-                ? 'border-[#0f2a59] text-[#0f2a59] font-bold'
-                : 'border-transparent hover:text-slate-900'
-            }`}
-          >
-            เช็คชื่อ
-          </button>
-
-          <button
-            onClick={() => setActiveTab('assignments')}
-            className={`px-3 py-2 border-b-2 font-medium transition-colors whitespace-nowrap ${
-              activeTab === 'assignments'
-                ? 'border-[#0f2a59] text-[#0f2a59] font-bold'
-                : 'border-transparent hover:text-slate-900'
-            }`}
-          >
-            งาน / คะแนนสอบ
-          </button>
-
-          <button
-            onClick={() => setActiveTab('grades')}
-            className={`px-3 py-2 border-b-2 font-medium transition-colors whitespace-nowrap ${
-              activeTab === 'grades'
-                ? 'border-[#0f2a59] text-[#0f2a59] font-bold'
-                : 'border-transparent hover:text-slate-900'
-            }`}
-          >
-            สรุปคะแนน
-          </button>
-
-          <button
-            onClick={() => setActiveTab('behavior')}
-            className={`px-3 py-2 border-b-2 font-medium transition-colors whitespace-nowrap ${
-              activeTab === 'behavior'
-                ? 'border-[#0f2a59] text-[#0f2a59] font-bold'
-                : 'border-transparent hover:text-slate-900'
-            }`}
-          >
-            พฤติกรรม
-          </button>
-
-          <button
-            onClick={() => setActiveTab('reflection')}
-            className={`px-3 py-2 border-b-2 font-medium transition-colors whitespace-nowrap ${
-              activeTab === 'reflection'
-                ? 'border-[#0f2a59] text-[#0f2a59] font-bold'
-                : 'border-transparent hover:text-slate-900'
-            }`}
-          >
-            บันทึกหลังสอน
-          </button>
-
-          <button
+            type="button"
             onClick={onSwitchToAdventure}
-            className="px-3 py-2 border-b-2 border-transparent text-emerald-700 hover:text-emerald-900 font-semibold whitespace-nowrap flex items-center gap-1"
+            className="px-2.5 py-1.5 rounded-lg text-teal-700 hover:bg-teal-50 font-semibold whitespace-nowrap flex items-center gap-1"
           >
-            <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-            <span>ห้องเรียนผจญภัย</span>
+            <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+            <span>ฝั่งนักเรียน</span>
           </button>
+
+          {/* Compact Secondary Actions Menu (⋯) */}
+          <div className="relative ml-1">
+            <button
+              type="button"
+              onClick={() => setIsCourseMenuOpen((v) => !v)}
+              className="px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs"
+              title="ตั้งค่ารายวิชาเพิ่มเติม"
+            >
+              ⋯
+            </button>
+            {isCourseMenuOpen && (
+              <div className="absolute right-0 mt-1.5 w-44 bg-white rounded-xl border border-slate-200 shadow-lg py-1 z-30 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCourseMenuOpen(false);
+                    setIsWeightingModalOpen(true);
+                  }}
+                  className="w-full px-3 py-2 text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                >
+                  <BookMarked className="w-3.5 h-3.5 text-slate-400" />
+                  <span>ตั้งค่าสัดส่วนคะแนน</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCourseMenuOpen(false);
+                    showToast('สามารถย้ายรายวิชาได้ที่เมนู รายวิชา/หลักสูตร');
+                  }}
+                  className="w-full px-3 py-2 text-left text-slate-700 hover:bg-slate-50"
+                >
+                  ย้ายรายวิชา / ภาคเรียน
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* 2. TAB: ภาพรวม (Overview) */}
       {activeTab === 'overview' && (
-        <div className="space-y-6">
+        <div className="space-y-5">
           <AtRiskCard
             students={atRiskStudentsData}
             onSelectStudent={onSelectStudent}
             onViewFullTable={onViewFullTable}
           />
           <IncompleteGradingCard items={incompleteGradingData} />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <LowestAssignmentsCard items={lowestAssignmentsData} />
             <GradeDistributionBar items={gradeDistributionData} />
           </div>
@@ -526,47 +570,88 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
 
       {/* 3. TAB: เช็คชื่อ (Attendance) */}
       {activeTab === 'attendance' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 font-bold text-sm text-slate-800">
               <CheckSquare className="w-4 h-4 text-slate-600" />
-              <span>✓ คาบสอนทั้งหมด ({attendanceRows.length} คาบ)</span>
+              <span>คาบสอนทั้งหมด ({attendanceRows.length} คาบ)</span>
             </div>
 
-            <div className="flex items-center gap-2 self-start sm:self-auto text-xs">
+            <div className="flex items-center gap-2 text-xs">
               <button
-                onClick={() => alert('สร้างคาบเรียนทั้งภาคเรียนอัตโนมัติ (สัปดาห์ที่ 1 ถึง 20)')}
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-700 font-semibold transition-colors"
+                type="button"
+                onClick={() =>
+                  showToast('สร้างตารางคาบเรียนอัตโนมัติครบ 20 สัปดาห์เรียบร้อยแล้ว')
+                }
+                className="flex items-center gap-1.5 px-2.5 py-1.5 border border-slate-200 hover:bg-slate-50 rounded-lg text-slate-700 font-semibold transition-colors"
               >
                 <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                <span>สร้างคาบทั้งภาคเรียน</span>
+                <span>สร้างคาบทั้งเทอม</span>
               </button>
               <button
-                onClick={() => {
-                  const newDate = prompt('กรอกวันที่และคาบสอนใหม่ (เช่น พฤ. 8 ต.ค. 2569 | คาบ 8-9):');
-                  if (newDate) {
-                    setAttendanceRows([
-                      {
-                        date: newDate,
-                        period: 'คาบ 8-9',
-                        topic: 'คาบสอนเพิ่มเติม',
-                        status: 'NORMAL',
-                        statusLabel: 'สอนปกติ',
-                        checkStatus: 'ยังไม่เช็คชื่อ',
-                        attendedCount: null,
-                        leaveCount: null,
-                      },
-                      ...attendanceRows,
-                    ]);
-                  }
-                }}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0f2a59] hover:bg-[#0b1f42] text-white rounded-xl font-semibold shadow-xs transition-colors"
+                type="button"
+                onClick={() => setIsAddingPeriod((v) => !v)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>+ เพิ่มคาบสอน</span>
+                <span>เพิ่มคาบสอน</span>
               </button>
             </div>
           </div>
+
+          {isAddingPeriod && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newPeriodDate.trim()) return;
+                setAttendanceRows([
+                  {
+                    date: newPeriodDate.trim(),
+                    period: 'คาบ 8-9',
+                    topic: newPeriodTopic.trim() || 'คาบสอนเพิ่มเติม',
+                    status: 'NORMAL',
+                    statusLabel: 'สอนปกติ',
+                    checkStatus: 'ยังไม่เช็คชื่อ',
+                    attendedCount: null,
+                    leaveCount: null,
+                  },
+                  ...attendanceRows,
+                ]);
+                setNewPeriodTopic('');
+                setIsAddingPeriod(false);
+                showToast(`เพิ่มคาบเรียนวันที่ ${newPeriodDate} เรียบร้อยแล้ว`);
+              }}
+              className="p-3 rounded-lg bg-slate-50 border border-slate-200 flex flex-wrap items-center gap-2 text-xs"
+            >
+              <input
+                type="text"
+                value={newPeriodDate}
+                onChange={(e) => setNewPeriodDate(e.target.value)}
+                placeholder="วันที่ เช่น พฤ. 8 ต.ค. 2569"
+                className="px-2.5 py-1.5 rounded-md border border-slate-300 bg-white w-44"
+              />
+              <input
+                type="text"
+                value={newPeriodTopic}
+                onChange={(e) => setNewPeriodTopic(e.target.value)}
+                placeholder="เรื่องที่สอน เช่น องค์ประกอบศิลป์"
+                className="px-2.5 py-1.5 rounded-md border border-slate-300 bg-white flex-1 min-w-[180px]"
+              />
+              <button
+                type="submit"
+                className="px-3 py-1.5 rounded-md bg-teal-600 text-white font-semibold"
+              >
+                บันทึกคาบ
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAddingPeriod(false)}
+                className="px-2.5 py-1.5 rounded-md border border-slate-200 bg-white text-slate-600"
+              >
+                ยกเลิก
+              </button>
+            </form>
+          )}
 
           {/* Search Filter */}
           <div className="relative max-w-sm">
@@ -695,15 +780,41 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
       {/* 5. TAB: สรุปคะแนน ปพ.5 & นำเข้า SGS */}
       {activeTab === 'grades' && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/60">
-            <div className="flex items-center gap-3">
+          <div className="px-4 py-2.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/60">
+            <div className="flex flex-wrap items-center gap-2.5">
               <h3 className="font-bold text-slate-900 text-sm">
-                สรุปคะแนน ปพ.5 & นำเข้า SGS — ศิลปะ ม.3/1
+                สรุปคะแนน ปพ.5 & นำเข้า SGS
               </h3>
-              <span className="text-xs text-slate-400 hidden sm:inline">•</span>
-              <span className="text-xs text-slate-500 hidden sm:inline">
-                คลิกช่อง &ldquo;รวมเก็บ (50)&rdquo; เพื่อพิมพ์คะแนนสุทธิทับได้โดยตรง
-              </span>
+
+              {/* 1-Click Quick Filter Chips */}
+              <div className="inline-flex items-center gap-1 bg-slate-200/70 p-0.5 rounded-lg text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setGradesQuickFilter('ALL')}
+                  className={`px-2.5 py-0.5 rounded-md font-medium transition-colors ${
+                    gradesQuickFilter === 'ALL'
+                      ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  ทั้งหมด
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setGradesQuickFilter(
+                      gradesQuickFilter === 'AT_RISK' ? 'ALL' : 'AT_RISK'
+                    )
+                  }
+                  className={`px-2.5 py-0.5 rounded-md font-medium transition-colors ${
+                    gradesQuickFilter === 'AT_RISK'
+                      ? 'bg-rose-600 text-white shadow-2xs font-semibold'
+                      : 'text-rose-700 hover:bg-rose-50'
+                  }`}
+                >
+                  เฉพาะติด ร / มส. / เวลาเรียน &lt;80%
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -788,199 +899,217 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
             </div>
           )}
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[72vh]">
             <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-500 font-semibold">
-                  <th className="text-center w-12">เลขที่</th>
-                  <th className="w-20">รหัส</th>
-                  <th>ชื่อ-สกุล</th>
-                  <th className="text-center w-20">เวลาเรียน</th>
-                  <th className="text-center w-16">งาน</th>
-                  <th className="text-center w-16">น.1 (15)</th>
-                  <th className="text-center w-16">น.2 (20)</th>
-                  <th className="text-center w-16">น.3 (15)</th>
-                  <th className="text-center w-24 bg-slate-100/80 text-slate-800 font-bold border-x border-slate-200">
+              <thead className="sticky top-0 z-20">
+                <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-semibold shadow-2xs">
+                  <th className="text-center w-12 bg-slate-50">เลขที่</th>
+                  <th className="w-20 bg-slate-50">รหัส</th>
+                  <th className="bg-slate-50">ชื่อ-สกุล</th>
+                  <th className="text-center w-20 bg-slate-50">เวลาเรียน</th>
+                  <th className="text-center w-16 bg-slate-50">งาน</th>
+                  <th className="text-center w-16 bg-slate-50">น.1 (15)</th>
+                  <th className="text-center w-16 bg-slate-50">น.2 (20)</th>
+                  <th className="text-center w-16 bg-slate-50">น.3 (15)</th>
+                  <th className="text-center w-24 bg-slate-100 text-slate-800 font-bold border-x border-slate-200">
                     รวมเก็บ (50)
                   </th>
-                  <th className="text-center w-16">กลาง (20)</th>
-                  <th className="text-center w-16">ปลาย (30)</th>
-                  <th className="text-center w-18 font-bold text-slate-900">รวม (100)</th>
-                  <th className="text-center w-20 font-bold text-slate-900">เกรด</th>
-                  {isRosterEditMode && <th className="text-right w-24">สถานะ</th>}
+                  <th className="text-center w-16 bg-slate-50">กลาง (20)</th>
+                  <th className="text-center w-16 bg-slate-50">ปลาย (30)</th>
+                  <th className="text-center w-18 font-bold text-slate-900 bg-slate-50">รวม (100)</th>
+                  <th className="text-center w-20 font-bold text-slate-900 bg-slate-50">เกรด</th>
+                  {isRosterEditMode && <th className="text-right w-24 bg-slate-50">สถานะ</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {(keepTransferredOutRow
-                  ? sgsRoster
-                  : sgsRoster.filter((s) => s.transferState !== 'TRANSFERRED_OUT')
-                ).map((stu) => {
-                  const g =
-                    sgsRosterAndSubmissionService.computeStudentSgsGrades(stu);
-                  const isOut = stu.transferState === 'TRANSFERRED_OUT';
-                  const isIn = stu.transferState === 'TRANSFERRED_IN';
+                {(() => {
+                  let activeRowIdx = -1;
+                  return (keepTransferredOutRow
+                    ? sgsRoster
+                    : sgsRoster.filter((s) => s.transferState !== 'TRANSFERRED_OUT')
+                  )
+                    .filter((stu) => {
+                      if (gradesQuickFilter !== 'AT_RISK') return true;
+                      if (stu.transferState === 'TRANSFERRED_OUT') return false;
+                      const g =
+                        sgsRosterAndSubmissionService.computeStudentSgsGrades(stu);
+                      return (
+                        g.gradeLabel === 'ร' ||
+                        g.gradeLabel === 'มส.' ||
+                        stu.attendancePercent < 80 ||
+                        g.missingCount > 0
+                      );
+                    })
+                    .map((stu) => {
+                      const g =
+                        sgsRosterAndSubmissionService.computeStudentSgsGrades(stu);
+                      const isOut = stu.transferState === 'TRANSFERRED_OUT';
+                      const isIn = stu.transferState === 'TRANSFERRED_IN';
+                      const rowIdx = isOut ? -1 : ++activeRowIdx;
 
-                  return (
-                    <tr
-                      key={stu.studentCode}
-                      className={
-                        isOut
-                          ? 'bg-slate-50/80 text-slate-400'
-                          : 'hover:bg-slate-50/80 transition-colors'
-                      }
-                    >
-                      <td className="text-center font-medium text-slate-500 tabular-nums whitespace-nowrap">
-                        <div className="inline-flex items-center gap-1">
-                          <span className="w-5 text-center">{stu.sgsSeatNo}</span>
-                          {isRosterEditMode && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setSgsRoster(
-                                    sgsRosterAndSubmissionService.moveStudentSeat(
-                                      stu.studentCode,
-                                      'UP'
-                                    )
-                                  )
-                                }
-                                className="px-1 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[9px] text-slate-600 leading-none"
+                      return (
+                        <tr
+                          key={stu.studentCode}
+                          className={
+                            isOut
+                              ? 'bg-slate-50/80 text-slate-400'
+                              : 'hover:bg-slate-50/80 transition-colors'
+                          }
+                        >
+                          <td className="text-center font-medium text-slate-500 tabular-nums whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1">
+                              <span className="w-5 text-center">{stu.sgsSeatNo}</span>
+                              {isRosterEditMode && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setSgsRoster(
+                                        sgsRosterAndSubmissionService.moveStudentSeat(
+                                          stu.studentCode,
+                                          'UP'
+                                        )
+                                      )
+                                    }
+                                    className="px-1 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[9px] text-slate-600 leading-none"
+                                  >
+                                    ▲
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setSgsRoster(
+                                        sgsRosterAndSubmissionService.moveStudentSeat(
+                                          stu.studentCode,
+                                          'DOWN'
+                                        )
+                                      )
+                                    }
+                                    className="px-1 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[9px] text-slate-600 leading-none"
+                                  >
+                                    ▼
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                          <td className="font-mono text-slate-400 tabular-nums whitespace-nowrap">
+                            {stu.studentCode}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1.5">
+                              <span
+                                className={`font-medium ${
+                                  isOut ? 'line-through text-slate-400' : 'text-slate-800'
+                                }`}
                               >
-                                ▲
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setSgsRoster(
-                                    sgsRosterAndSubmissionService.moveStudentSeat(
-                                      stu.studentCode,
-                                      'DOWN'
-                                    )
-                                  )
+                                {stu.studentName}
+                              </span>
+                              {isOut && (
+                                <span className="text-[10px] text-slate-400 font-normal">
+                                  (ย้ายออก)
+                                </span>
+                              )}
+                              {isIn && (
+                                <span
+                                  className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[10px] font-medium"
+                                  title={stu.transferNote}
+                                >
+                                  เข้าใหม่
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="text-center tabular-nums whitespace-nowrap">
+                            {isOut ? (
+                              '—'
+                            ) : (
+                              <span
+                                className={
+                                  stu.attendancePercent < 80
+                                    ? 'text-rose-600 font-semibold'
+                                    : 'text-slate-600'
                                 }
-                                className="px-1 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[9px] text-slate-600 leading-none"
                               >
-                                ▼
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                      <td className="font-mono text-slate-400 tabular-nums whitespace-nowrap">
-                        {stu.studentCode}
-                      </td>
-                      <td className="whitespace-nowrap">
-                        <div className="inline-flex items-center gap-1.5">
-                          <span
-                            className={`font-medium ${
-                              isOut ? 'line-through text-slate-400' : 'text-slate-800'
-                            }`}
-                          >
-                            {stu.studentName}
-                          </span>
-                          {isOut && (
-                            <span className="text-[10px] text-slate-400 font-normal">
-                              (ย้ายออก)
-                            </span>
-                          )}
-                          {isIn && (
-                            <span
-                              className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[10px] font-medium"
-                              title={stu.transferNote}
-                            >
-                              เข้าใหม่
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="text-center tabular-nums whitespace-nowrap">
-                        {isOut ? (
-                          '—'
-                        ) : (
-                          <span
-                            className={
-                              stu.attendancePercent < 80
-                                ? 'text-rose-600 font-semibold'
-                                : 'text-slate-600'
-                            }
-                          >
-                            {stu.attendancePercent}%
-                          </span>
-                        )}
-                      </td>
-                      <td className="text-center tabular-nums whitespace-nowrap">
-                        {isOut ? (
-                          '—'
-                        ) : (
-                          <span
-                            className={
-                              g.missingCount === 0
-                                ? 'text-slate-600'
-                                : 'text-rose-600 font-semibold'
-                            }
-                          >
-                            {g.submittedCount}/{g.totalAssignedCount}
-                          </span>
-                        )}
-                      </td>
-                      <td className="text-center text-slate-600 tabular-nums">
-                        {isOut ? '—' : g.u1}
-                      </td>
-                      <td className="text-center text-slate-600 tabular-nums">
-                        {isOut ? '—' : g.u2}
-                      </td>
-                      <td className="text-center text-slate-600 tabular-nums">
-                        {isOut ? '—' : g.u3}
-                      </td>
-                      <td className="text-center bg-slate-50/70 border-x border-slate-200/80 whitespace-nowrap">
-                        {isOut ? (
-                          '—'
-                        ) : (
-                          <div className="inline-flex items-center justify-center gap-1">
-                            <input
-                              type="number"
-                              min={0}
-                              max={50}
-                              value={g.effectiveAccumulated}
-                              onChange={(e) => {
-                                const val =
-                                  e.target.value === ''
-                                    ? null
-                                    : Number(e.target.value);
-                                setSgsRoster(
-                                  sgsRosterAndSubmissionService.updateStudentManualAccumulatedScore(
-                                    stu.studentCode,
-                                    val
-                                  )
-                                );
-                              }}
-                              className={`w-12 h-6 text-center font-bold rounded tabular-nums text-xs transition-colors focus:outline-none focus:ring-1 focus:ring-teal-500 ${
-                                g.isManualOverride
-                                  ? 'bg-amber-50/80 text-amber-900 border border-amber-300'
-                                  : 'bg-transparent hover:bg-white text-slate-900 border border-transparent hover:border-slate-200'
-                              }`}
-                              title="คลิกเพื่อพิมพ์คะแนนเก็บสุทธิทับ (เต็ม 50)"
-                            />
-                            {g.isManualOverride && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setSgsRoster(
-                                    sgsRosterAndSubmissionService.updateStudentManualAccumulatedScore(
-                                      stu.studentCode,
-                                      null
-                                    )
-                                  )
-                                }
-                                className="text-[10px] text-slate-400 hover:text-slate-700"
-                                title={`คืนค่าตามชิ้นงาน (${g.calculatedAccumulated})`}
-                              >
-                                ↺
-                              </button>
+                                {stu.attendancePercent}%
+                              </span>
                             )}
-                          </div>
-                        )}
-                      </td>
+                          </td>
+                          <td className="text-center tabular-nums whitespace-nowrap">
+                            {isOut ? (
+                              '—'
+                            ) : (
+                              <span
+                                className={
+                                  g.missingCount === 0
+                                    ? 'text-slate-600'
+                                    : 'text-rose-600 font-semibold'
+                                }
+                              >
+                                {g.submittedCount}/{g.totalAssignedCount}
+                              </span>
+                            )}
+                          </td>
+                          <td className="text-center text-slate-600 tabular-nums">
+                            {isOut ? '—' : g.u1}
+                          </td>
+                          <td className="text-center text-slate-600 tabular-nums">
+                            {isOut ? '—' : g.u2}
+                          </td>
+                          <td className="text-center text-slate-600 tabular-nums">
+                            {isOut ? '—' : g.u3}
+                          </td>
+                          <td className="text-center bg-slate-50/70 border-x border-slate-200/80 whitespace-nowrap">
+                            {isOut ? (
+                              '—'
+                            ) : (
+                              <div className="inline-flex items-center justify-center gap-1">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={50}
+                                  data-sgs-grade-row={rowIdx}
+                                  value={g.effectiveAccumulated}
+                                  onKeyDown={(e) => handleGradesKeyDown(e, rowIdx)}
+                                  onChange={(e) => {
+                                    const val =
+                                      e.target.value === ''
+                                        ? null
+                                        : Number(e.target.value);
+                                    setSgsRoster(
+                                      sgsRosterAndSubmissionService.updateStudentManualAccumulatedScore(
+                                        stu.studentCode,
+                                        val
+                                      )
+                                    );
+                                  }}
+                                  className={`w-12 h-6 text-center font-bold rounded tabular-nums text-xs transition-colors focus:outline-none focus:ring-1 focus:ring-teal-500 ${
+                                    g.isManualOverride
+                                      ? 'bg-amber-50/80 text-amber-900 border border-amber-300'
+                                      : 'bg-transparent hover:bg-white text-slate-900 border border-transparent hover:border-slate-200'
+                                  }`}
+                                  title="พิมพ์คะแนนแล้วกด Enter หรือ ↓ เพื่อลงบรรทัดถัดไป"
+                                />
+                                {g.isManualOverride && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setSgsRoster(
+                                        sgsRosterAndSubmissionService.updateStudentManualAccumulatedScore(
+                                          stu.studentCode,
+                                          null
+                                        )
+                                      )
+                                    }
+                                    className="text-[10px] text-slate-400 hover:text-slate-700"
+                                    title={`คืนค่าตามชิ้นงาน (${g.calculatedAccumulated})`}
+                                  >
+                                    ↺
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </td>
                       <td className="text-center text-slate-600 tabular-nums">
                         {isOut ? '—' : g.midterm}
                       </td>
@@ -1028,7 +1157,8 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                       )}
                     </tr>
                   );
-                })}
+                });
+                })()}
               </tbody>
             </table>
           </div>
@@ -1221,7 +1351,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
 
       {/* 6. TAB: พฤติกรรม (Behavior Ledger) */}
       {activeTab === 'behavior' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-bold text-slate-800 text-sm">
@@ -1233,32 +1363,85 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
             </div>
 
             <button
-              onClick={async () => {
-                const name = prompt('กรอกชื่อนักเรียนที่ต้องการบันทึกพฤติกรรม:');
-                if (name) {
-                  const reason = prompt('กรอกรายละเอียดพฤติกรรม:') || 'มีวินัยในชั้นเรียน';
-                  const created = await behaviorService.create({
-                    studentName: name,
-                    type: 'POSITIVE',
-                    text: reason,
-                    points: '+5 XP',
-                  });
-                  setBehaviorLogs([created, ...behaviorLogs]);
-                  alert(`บันทึกพฤติกรรมของ "${name}" สำเร็จ (+5 XP สะสมในสมุดพฤติกรรม)`);
-                }
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0f2a59] text-white rounded-xl text-xs font-semibold shadow-xs hover:bg-[#164282] transition-colors"
+              type="button"
+              onClick={() => setIsAddingBehavior((v) => !v)}
+              className="flex items-center gap-1 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>+ บันทึกพฤติกรรม</span>
+              <span>บันทึกพฤติกรรม</span>
             </button>
           </div>
 
+          {isAddingBehavior && (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!newBehaviorReason.trim()) return;
+                const created = await behaviorService.create({
+                  studentName: newBehaviorStudent,
+                  type: newBehaviorType,
+                  text: newBehaviorReason.trim(),
+                  points: newBehaviorType === 'POSITIVE' ? '+5 XP' : '-2 คะแนน',
+                });
+                setBehaviorLogs([created, ...behaviorLogs]);
+                setNewBehaviorReason('');
+                setIsAddingBehavior(false);
+                showToast(`บันทึกพฤติกรรมของ "${newBehaviorStudent}" เรียบร้อยแล้ว`);
+              }}
+              className="p-3 rounded-lg bg-slate-50 border border-slate-200 flex flex-wrap items-center gap-2 text-xs"
+            >
+              <select
+                value={newBehaviorStudent}
+                onChange={(e) => setNewBehaviorStudent(e.target.value)}
+                className="px-2.5 py-1.5 rounded-md border border-slate-300 bg-white font-medium"
+              >
+                {sgsRoster
+                  .filter((s) => s.transferState !== 'TRANSFERRED_OUT')
+                  .map((s) => (
+                    <option key={s.studentCode} value={s.studentName}>
+                      {s.sgsSeatNo}. {s.studentName}
+                    </option>
+                  ))}
+              </select>
+              <select
+                value={newBehaviorType}
+                onChange={(e) =>
+                  setNewBehaviorType(e.target.value as 'POSITIVE' | 'NEGATIVE')
+                }
+                className="px-2.5 py-1.5 rounded-md border border-slate-300 bg-white font-medium"
+              >
+                <option value="POSITIVE">+ ชื่นชม (+5 XP)</option>
+                <option value="NEGATIVE">- ตักเตือน (-2 คะแนน)</option>
+              </select>
+              <input
+                type="text"
+                required
+                value={newBehaviorReason}
+                onChange={(e) => setNewBehaviorReason(e.target.value)}
+                placeholder="ระบุรายละเอียดพฤติกรรม..."
+                className="px-2.5 py-1.5 rounded-md border border-slate-300 bg-white flex-1 min-w-[200px]"
+              />
+              <button
+                type="submit"
+                className="px-3 py-1.5 rounded-md bg-teal-600 text-white font-semibold"
+              >
+                บันทึก
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAddingBehavior(false)}
+                className="px-2.5 py-1.5 rounded-md border border-slate-200 bg-white text-slate-600"
+              >
+                ยกเลิก
+              </button>
+            </form>
+          )}
+
           <div className="divide-y divide-slate-100">
             {behaviorLogs.map((log) => (
-              <div key={log.id} className="py-3.5 flex items-center justify-between gap-4">
+              <div key={log.id} className="py-2.5 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
                     log.type === 'POSITIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
                   }`}>
                     {log.type === 'POSITIVE' ? '★' : '!'}
@@ -1291,7 +1474,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
 
       {/* 7. TAB: บันทึกหลังสอน (Teaching Reflection) */}
       {activeTab === 'reflection' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-bold text-slate-800 text-sm">
@@ -1304,33 +1487,33 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
 
             <button
               onClick={() => setIsAddReflectionOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0f2a59] text-white rounded-xl text-xs font-semibold shadow-xs hover:bg-[#164282] transition-colors"
+              className="flex items-center gap-1 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>+ เพิ่มบันทึกหลังสอน</span>
+              <span>เพิ่มบันทึกหลังสอน</span>
             </button>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             {reflectionLogs.map((ref, idx) => (
-              <div key={idx} className="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 space-y-2 text-xs">
+              <div key={idx} className="border border-slate-200 rounded-xl p-3.5 bg-slate-50/50 space-y-1.5 text-xs">
                 <div className="flex items-center justify-between font-bold text-slate-800 border-b border-slate-200 pb-2">
-                  <span className="text-blue-700">{ref.period}</span>
+                  <span className="text-slate-800">{ref.period}</span>
                   <span className="bg-white px-2 py-0.5 rounded border border-slate-200 font-medium">
                     {ref.topic}
                   </span>
                 </div>
-                <div className="space-y-1.5 pt-1">
+                <div className="space-y-1 pt-1">
                   <div>
                     <span className="font-bold text-emerald-800">✓ ผลการจัดกิจกรรม: </span>
                     <span className="text-slate-600">{ref.success}</span>
                   </div>
                   <div>
-                    <span className="font-bold text-amber-800">⚠️ ปัญหา / อุปสรรค: </span>
+                    <span className="font-bold text-amber-800">ปัญหา / อุปสรรค: </span>
                     <span className="text-slate-600">{ref.obstacle}</span>
                   </div>
                   <div>
-                    <span className="font-bold text-blue-800">💡 แนวทางแก้ไข / บันทึกเพิ่มเติม: </span>
+                    <span className="font-bold text-slate-800">แนวทางแก้ไข: </span>
                     <span className="text-slate-600">{ref.solution}</span>
                   </div>
                 </div>
@@ -1340,16 +1523,18 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
         </div>
       )}
 
-      {/* MODAL 1: Roll-Call Modal */}
+      {/* MODAL 1: Roll-Call Modal (Synced with SGS Roster + Morning Assembly + Leave Status) */}
       {isRollCallOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-5 shadow-2xl space-y-3 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
               <div>
-                <h3 className="font-bold text-slate-800 text-base">
-                  เช็คชื่อเข้าชั้นเรียน: {selectedDateForRollCall}
+                <h3 className="font-bold text-slate-800 text-sm">
+                  เช็คชื่อรายคาบ: {selectedDateForRollCall} (ศิลปะ ม.3/1)
                 </h3>
-                <p className="text-xs text-slate-500">ศ23101 ศิลปะ ม.3/1 (คาบ 8-9)</p>
+                <p className="text-[11px] text-slate-500">
+                  ซิงค์ผลเข้าแถวเสาธงและใบลานักเรียนอัตโนมัติ (ครูประจำวิชาปรับเปลี่ยนได้)
+                </p>
               </div>
               <button
                 onClick={() => setIsRollCallOpen(false)}
@@ -1359,66 +1544,99 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
               </button>
             </div>
 
-            <div className="flex items-center justify-between text-xs bg-slate-50 p-2.5 rounded-xl">
+            <div className="flex items-center justify-between text-xs bg-slate-50 px-3 py-2 rounded-lg">
               <span className="text-slate-600 font-medium">
                 นักเรียนทั้งหมด {rollCallList.length} คน
               </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() =>
-                    setRollCallList(rollCallList.map((s) => ({ ...s, status: 'PRESENT' })))
-                  }
-                  className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded font-semibold text-[11px]"
-                >
-                  มาครบทุกคน
-                </button>
-              </div>
+              <button
+                onClick={() =>
+                  setRollCallList(
+                    rollCallList.map((s) => ({
+                      ...s,
+                      status: s.hasApprovedLeave ? 'LEAVE' : 'PRESENT',
+                    }))
+                  )
+                }
+                className="px-2.5 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded font-semibold text-[11px]"
+              >
+                มาครบทุกคน (คงสถานะคนลา)
+              </button>
             </div>
 
             <div className="flex-1 overflow-y-auto divide-y divide-slate-100 pr-1">
-              {rollCallList.map((stu) => (
-                <div key={stu.no} className="py-2.5 flex items-center justify-between gap-3 text-xs">
-                  <span className="font-medium text-slate-800">
-                    {stu.no}. {stu.name}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    {(['PRESENT', 'LATE', 'LEAVE', 'ABSENT'] as const).map((st) => {
-                      const labels: Record<string, string> = {
-                        PRESENT: 'มา',
-                        LATE: 'สาย',
-                        LEAVE: 'ลา',
-                        ABSENT: 'ขาด',
-                      };
-                      const isActive = stu.status === st;
-                      return (
-                        <button
-                          key={st}
-                          onClick={() =>
-                            setRollCallList(
-                              rollCallList.map((s) =>
-                                s.no === stu.no ? { ...s, status: st } : s
-                              )
-                            )
-                          }
-                          className={`px-2.5 py-1 rounded text-[11px] font-bold transition-colors ${
-                            isActive
-                              ? st === 'PRESENT'
-                                ? 'bg-emerald-600 text-white'
-                                : st === 'LATE'
-                                ? 'bg-amber-500 text-white'
-                                : st === 'LEAVE'
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-rose-600 text-white'
-                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              {rollCallList.map((stu) => {
+                const isLeaveOverridden =
+                  stu.hasApprovedLeave && stu.status !== 'LEAVE';
+                return (
+                  <div
+                    key={stu.no}
+                    className="py-2 flex items-center justify-between gap-2 text-xs"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium text-slate-800">
+                          {stu.no}. {stu.name}
+                        </span>
+                        <span
+                          className={`px-1.5 py-0.2 rounded text-[10px] font-medium ${
+                            stu.hasApprovedLeave
+                              ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                              : stu.assemblyLabel.includes('สาย')
+                              ? 'bg-amber-50 text-amber-700'
+                              : stu.assemblyLabel.includes('ขาด')
+                              ? 'bg-rose-50 text-rose-700'
+                              : 'bg-slate-100 text-slate-500'
                           }`}
                         >
-                          {labels[st]}
-                        </button>
-                      );
-                    })}
+                          {stu.assemblyLabel}
+                        </span>
+                      </div>
+                      {isLeaveOverridden && (
+                        <div className="text-[10px] text-amber-700 font-medium mt-0.5">
+                          ⚠️ นักเรียนส่งใบลาอนุมัติแล้ว (ระบบจะแจ้งเตือนเมื่อกดบันทึก)
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      {(['PRESENT', 'LATE', 'LEAVE', 'ABSENT'] as const).map((st) => {
+                        const labels: Record<string, string> = {
+                          PRESENT: 'มา',
+                          LATE: 'สาย',
+                          LEAVE: 'ลา',
+                          ABSENT: 'ขาด',
+                        };
+                        const isActive = stu.status === st;
+                        return (
+                          <button
+                            key={st}
+                            onClick={() =>
+                              setRollCallList(
+                                rollCallList.map((s) =>
+                                  s.no === stu.no ? { ...s, status: st } : s
+                                )
+                              )
+                            }
+                            className={`px-2.5 py-1 rounded text-[11px] font-bold transition-colors ${
+                              isActive
+                                ? st === 'PRESENT'
+                                  ? 'bg-emerald-600 text-white'
+                                  : st === 'LATE'
+                                  ? 'bg-amber-500 text-white'
+                                  : st === 'LEAVE'
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-rose-600 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            {labels[st]}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
