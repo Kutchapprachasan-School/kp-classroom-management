@@ -15,6 +15,7 @@ interface TeacherGlobalDashboardViewProps {
   onNavigateToReadiness: () => void;
   onNavigateToAcademicYear?: () => void;
   onNavigateToCourses?: () => void;
+  onNavigateToMorningAssembly?: () => void;
 }
 
 export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProps> = ({
@@ -23,18 +24,32 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
   onNavigateToReadiness,
   onNavigateToAcademicYear,
   onNavigateToCourses,
+  onNavigateToMorningAssembly,
 }) => {
   const [activePeriodTab, setActivePeriodTab] = useState<'today' | 'week' | 'month'>('today');
+  const [isMorningAssemblyChecked, setIsMorningAssemblyChecked] = useState(false);
   const [todos, setTodos] = useState([
+    { id: 'todo-0', text: '07:45 น. เช็คชื่อแถวตอนเช้า ม.3/1 (ก่อนเข้าเรียน)', done: false },
     { id: 'todo-1', text: 'ส่งคะแนนหน่วย 1–2 เข้า SGS', done: true },
     { id: 'todo-2', text: 'ตามงานค้าง ม.3/1 (2 คน)', done: false },
     { id: 'todo-3', text: 'ประเมินคุณลักษณะ ม.1/8', done: false },
-    { id: 'todo-4', text: 'ตรวจรายชื่อเสี่ยง มส. (7 คน)', done: false },
   ]);
   const [isAddingTodo, setIsAddingTodo] = useState(false);
   const [newTodoText, setNewTodoText] = useState('');
 
   const todayScheduleRows = [
+    {
+      period: 'แถวเช้า',
+      time: '07:45–08:20',
+      courseCode: 'หน้าเสาธง',
+      subject: 'เช็คชื่อเข้าแถวตอนเช้า (ครูที่ปรึกษา)',
+      classroom: 'ม.3/1',
+      room: 'ลานหน้าเสาธง',
+      status: isMorningAssemblyChecked ? 'CHECKED' : 'MORNING_FIRST',
+      attendanceSummary: isMorningAssemblyChecked
+        ? 'เช็คแถวเช้าแล้ว (มา 6 · ลา 1 · ขาด 1)'
+        : 'ด่านแรกสุดก่อนเริ่มเรียน (ซิงก์ใบลา 1 คน)',
+    },
     {
       period: 'คาบ 2',
       time: '09:20–10:10',
@@ -43,7 +58,7 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
       classroom: 'ม.3/1',
       room: 'ห้องศิลปะ 2',
       status: 'CHECKED',
-      attendanceSummary: 'มา 22 · ลา 1',
+      attendanceSummary: 'มา 22 · ลา 1 (รับข้อมูลจากแถวเช้า)',
     },
     {
       period: 'คาบ 7',
@@ -240,29 +255,53 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left 2/3 Column (8 cols): Structured Data Tables */}
         <div className="lg:col-span-8 space-y-6">
-          {/* Concise 1-Line Action Banner */}
-          <div className="bg-teal-50/90 border border-teal-200 rounded-2xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 text-xs sm:text-sm text-teal-950">
-              <CheckCircle2 className="w-4 h-4 text-teal-700 shrink-0" />
+          {/* Step 1 Banner: เช็คชื่อแถวตอนเช้า (07:45 น.) ก่อนเริ่มการเรียน */}
+          <div className="bg-amber-50/90 border border-amber-200 rounded-2xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 text-xs sm:text-sm text-amber-950">
+              <CheckCircle2 className="w-4 h-4 text-amber-700 shrink-0" />
               <span>
-                <strong>รอเช็คชื่อวันนี้ 2 คาบ</strong> · ระบบติ๊ก “มาเรียน” ให้ครบแล้ว กดแก้เฉพาะ สาย/ลา/ขาด
+                <strong>ลำดับที่ 1 (07:45 น.) เช็คชื่อแถวตอนเช้า ม.3/1 ก่อนเข้าเรียน</strong> ·{' '}
+                {isMorningAssemblyChecked
+                  ? 'บันทึกเช็คชื่อหน้าเสาธงเรียบร้อยแล้ว (ซิงก์สถานะเข้าคาบเรียนอัตโนมัติ)'
+                  : 'ระบบดึงใบลาออนไลน์ให้อัตโนมัติ 1 คน กดยืนยันมาเข้าแถวหรือปรับแก้ได้ทันที'}
               </span>
             </div>
-            <button
-              onClick={onNavigateToAttendance}
-              className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shrink-0 shadow-xs transition-colors self-start sm:self-center"
-            >
-              เช็คชื่อทันที
-            </button>
+            <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+              {!isMorningAssemblyChecked && (
+                <button
+                  onClick={() => {
+                    setIsMorningAssemblyChecked(true);
+                    setTodos((prev) =>
+                      prev.map((t) => (t.id === 'todo-0' ? { ...t, done: true } : t))
+                    );
+                  }}
+                  className="px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition-colors"
+                >
+                  ✓ ยืนยันมาแถวครบ (ยกเว้นลา)
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  if (onNavigateToMorningAssembly) {
+                    onNavigateToMorningAssembly();
+                  } else {
+                    onNavigateToAttendance();
+                  }
+                }}
+                className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-xs transition-colors"
+              >
+                เปิดใบเช็คชื่อแถวเช้า
+              </button>
+            </div>
           </div>
 
-          {/* Table 1: ตารางสอนและเช็คชื่อประจำวัน */}
+          {/* Table 1: ลำดับงานเช็คชื่อแถวตอนเช้า & ตารางสอนประจำวัน */}
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
             <div className="px-5 py-3.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-teal-600" />
                 <h2 className="font-bold text-slate-900 text-sm">
-                  ตารางสอนวันนี้
+                  ลำดับงานวันนี้: 1. เช็คชื่อแถวเช้า (07:45) → 2. เข้าสอนรายคาบ
                 </h2>
               </div>
 
@@ -292,8 +331,8 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-semibold">
-                    <th className="py-3 px-4">คาบ / เวลา</th>
-                    <th className="py-3 px-4">รายวิชา</th>
+                    <th className="py-3 px-4">ลำดับ / เวลา</th>
+                    <th className="py-3 px-4">กิจกรรม / รายวิชา</th>
                     <th className="py-3 px-4">ชั้นเรียน</th>
                     <th className="py-3 px-4">สถานะ</th>
                     <th className="py-3 px-4 text-right">จัดการ</th>
@@ -301,9 +340,23 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {todayScheduleRows.map((row) => (
-                    <tr key={row.period} className="hover:bg-slate-50/60 transition-colors">
+                    <tr
+                      key={row.period}
+                      className={`transition-colors ${
+                        row.period === 'แถวเช้า'
+                          ? 'bg-amber-50/40 hover:bg-amber-50/70'
+                          : 'hover:bg-slate-50/60'
+                      }`}
+                    >
                       <td className="py-3 px-4 whitespace-nowrap">
-                        <div className="font-bold text-slate-900">{row.period}</div>
+                        <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                          <span>{row.period}</span>
+                          {row.period === 'แถวเช้า' && (
+                            <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">
+                              ก่อนเรียน
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[11px] text-slate-400 flex items-center gap-1 tabular-nums">
                           <Clock className="w-3 h-3" />
                           <span>{row.time}</span>
@@ -333,16 +386,31 @@ export const TeacherGlobalDashboardView: React.FC<TeacherGlobalDashboardViewProp
                         )}
                       </td>
                       <td className="py-3 px-4 text-right whitespace-nowrap">
-                        <button
-                          onClick={onNavigateToAttendance}
-                          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-                            row.status === 'CHECKED'
-                              ? 'border border-slate-200 text-slate-700 hover:bg-slate-50'
-                              : 'bg-teal-600 hover:bg-teal-700 text-white shadow-2xs'
-                          }`}
-                        >
-                          {row.status === 'CHECKED' ? 'แก้ไข' : 'เช็คชื่อ'}
-                        </button>
+                        {row.period === 'แถวเช้า' ? (
+                          <button
+                            onClick={() => {
+                              if (onNavigateToMorningAssembly) {
+                                onNavigateToMorningAssembly();
+                              } else {
+                                onNavigateToAttendance();
+                              }
+                            }}
+                            className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white shadow-2xs transition-colors"
+                          >
+                            {row.status === 'CHECKED' ? 'แก้ไขแถวเช้า' : 'เช็คชื่อแถวเช้า'}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={onNavigateToAttendance}
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                              row.status === 'CHECKED'
+                                ? 'border border-slate-200 text-slate-700 hover:bg-slate-50'
+                                : 'bg-teal-600 hover:bg-teal-700 text-white shadow-2xs'
+                            }`}
+                          >
+                            {row.status === 'CHECKED' ? 'แก้ไข' : 'เช็คชื่อคาบเรียน'}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}

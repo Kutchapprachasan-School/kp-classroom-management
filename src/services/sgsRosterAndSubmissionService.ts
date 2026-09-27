@@ -29,6 +29,8 @@ export interface SgsStudentRecord {
   morningStatusLabel: string;
   midtermScore: number; // เต็ม 20
   finalScore: number; // เต็ม 30
+  analyticalThinkingLevel?: 0 | 1 | 2 | 3; // อ่าน คิดวิเคราะห์ และเขียน (ระดับ 0-3)
+  desiredCharacteristicsLevel?: 0 | 1 | 2 | 3; // คุณลักษณะอันพึงประสงค์ (ระดับ 0-3)
 }
 
 export interface TermAssignmentItem {
@@ -65,6 +67,13 @@ export interface StudentWorkSubmission {
   workTitle?: string;
   workAttachmentLabel?: string;
   teacherFeedback?: string;
+  // Cloudflare R2 Storage & Lifecycle fields
+  r2ObjectKey?: string;
+  originalSizeKb?: number;
+  compressedSizeKb?: number;
+  externalLinkUrl?: string;
+  academicYearTerm?: string;
+  isR2FilePurged?: boolean;
 }
 
 const STORAGE_KEY_SGS_ROSTER = 'kp_sgs_roster_v3';
@@ -643,6 +652,10 @@ export const sgsRosterAndSubmissionService = {
     final: number;
     total: number;
     gradeLabel: string;
+    numericGrade: number;
+    autoLevelFromGrade: 0 | 1 | 2 | 3;
+    analyticalThinkingLevel: 0 | 1 | 2 | 3;
+    desiredCharacteristicsLevel: 0 | 1 | 2 | 3;
     submittedCount: number;
     totalAssignedCount: number;
     missingCount: number;
@@ -667,6 +680,10 @@ export const sgsRosterAndSubmissionService = {
         final: 0,
         total: 0,
         gradeLabel: 'ย้ายออก',
+        numericGrade: 0,
+        autoLevelFromGrade: 0,
+        analyticalThinkingLevel: 0,
+        desiredCharacteristicsLevel: 0,
         submittedCount: 0,
         totalAssignedCount: assignments.length,
         missingCount: 0,
@@ -757,6 +774,40 @@ export const sgsRosterAndSubmissionService = {
       gradeLabel = '1.0';
     }
 
+    const numericGrade =
+      gradeLabel === '4.0'
+        ? 4.0
+        : gradeLabel === '3.5'
+        ? 3.5
+        : gradeLabel === '3.0'
+        ? 3.0
+        : gradeLabel === '2.5'
+        ? 2.5
+        : gradeLabel === '2.0'
+        ? 2.0
+        : gradeLabel === '1.5'
+        ? 1.5
+        : gradeLabel === '1.0'
+        ? 1.0
+        : 0;
+
+    const autoLevelFromGrade: 0 | 1 | 2 | 3 =
+      numericGrade >= 3.0
+        ? 3
+        : numericGrade >= 2.0
+        ? 2
+        : numericGrade >= 1.0
+        ? 1
+        : 0;
+
+    const analyticalThinkingLevel: 0 | 1 | 2 | 3 =
+      student.analyticalThinkingLevel ?? autoLevelFromGrade;
+    const desiredCharacteristicsLevel: 0 | 1 | 2 | 3 =
+      student.desiredCharacteristicsLevel ??
+      (student.attendancePercent >= 80 && autoLevelFromGrade === 0
+        ? 1
+        : autoLevelFromGrade);
+
     return {
       u1,
       u2,
@@ -768,12 +819,211 @@ export const sgsRosterAndSubmissionService = {
       final: student.finalScore,
       total,
       gradeLabel,
+      numericGrade,
+      autoLevelFromGrade,
+      analyticalThinkingLevel,
+      desiredCharacteristicsLevel,
       submittedCount,
       totalAssignedCount: assignments.length,
       missingCount,
       pendingReviewCount,
       missingMandatoryTitles,
       rReasonLabel,
+    };
+  },
+
+  // คำนวณระดับ "อ่าน คิดวิเคราะห์ เขียน (0-3)" และ "คุณลักษณะอันพึงประสงค์ (0-3)" อัตโนมัติจากเกรดวิชาทั้งห้อง
+  calculateAttributesFromGrades(options?: {
+    minGradeFor3?: number;
+    minGradeFor2?: number;
+    minGradeFor1?: number;
+    fallbackForR?: 0 | 1;
+  }): SgsStudentRecord[] {
+    const min3 = options?.minGradeFor3 ?? 3.0;
+    const min2 = options?.minGradeFor2 ?? 2.0;
+    const min1 = options?.minGradeFor1 ?? 1.0;
+    const fallback = options?.fallbackForR ?? 0;
+
+    const roster = this.getSgsRoster().map((stu) => {
+      if (stu.transferState === 'TRANSFERRED_OUT') return stu;
+      const g = this.computeStudentSgsGrades(stu);
+      const level: 0 | 1 | 2 | 3 =
+        g.numericGrade >= min3
+          ? 3
+          : g.numericGrade >= min2
+          ? 2
+          : g.numericGrade >= min1
+          ? 1
+          : fallback;
+      const charLevel: 0 | 1 | 2 | 3 =
+        stu.attendancePercent >= 90 && level < 3
+          ? (Math.min(3, level + 1) as 0 | 1 | 2 | 3)
+          : level;
+      return {
+        ...stu,
+        analyticalThinkingLevel: level,
+        desiredCharacteristicsLevel: charLevel,
+      };
+    });
+    return this.saveSgsRoster(
+      roster,
+      'คำนวณอ่านคิดวิเคราะห์ & คุณลักษณะฯ จากเกรดวิชาอัตโนมัติ'
+    );
+  },
+
+  updateStudentAttributeLevel(
+    studentCode: string,
+    field: 'analyticalThinkingLevel' | 'desiredCharacteristicsLevel',
+    level: 0 | 1 | 2 | 3
+  ): SgsStudentRecord[] {
+    const roster = this.getSgsRoster().map((stu) =>
+      stu.studentCode === studentCode ? { ...stu, [field]: level } : stu
+    );
+    return this.saveSgsRoster(roster, 'แก้ไขระดับประเมินรายบุคคล');
+  },
+
+  // อัปโหลดไฟล์งานนักเรียนขึ้น Cloudflare R2 (บีบอัดรูป WebP อัตโนมัติ + รองรับแนบลิงก์เสริม Google Drive/Canva)
+  submitStudentWorkToR2(payload: {
+    assignmentId: string;
+    studentCode: string;
+    workTitle: string;
+    fileName?: string;
+    originalSizeKb?: number;
+    compressedSizeKb?: number;
+    externalLinkUrl?: string;
+    academicYearTerm?: string;
+  }): StudentWorkSubmission[] {
+    const subs = this.getSubmissions();
+    const idx = subs.findIndex(
+      (s) =>
+        s.assignmentId === payload.assignmentId &&
+        s.studentCode === payload.studentCode
+    );
+    const term = payload.academicYearTerm || '1/2569';
+    const cleanFileName = payload.fileName
+      ? payload.fileName.replace(/\.(jpg|jpeg|png|heic)$/i, '.webp')
+      : undefined;
+    const r2Key = cleanFileName
+      ? `r2://kp-classroom-submissions/${term.replace('/', '-')}/m3-1/${payload.assignmentId}/${payload.studentCode}_${cleanFileName}`
+      : undefined;
+    const origKb = payload.originalSizeKb ?? (cleanFileName ? 4250 : 0);
+    const compKb = payload.compressedSizeKb ?? (cleanFileName ? 148 : 0);
+
+    const attachmentLabel = cleanFileName
+      ? `☁️ R2: ${cleanFileName} (บีบอัดเหลือ ${compKb} KB จาก ${(origKb / 1024).toFixed(1)} MB)`
+      : payload.externalLinkUrl
+      ? `🔗 ลิงก์แนบ: ${payload.externalLinkUrl}`
+      : 'ส่งงานออนไลน์';
+
+    const existingScore = idx !== -1 ? subs[idx].score : null;
+    const nextItem: StudentWorkSubmission = {
+      ...(idx !== -1 ? subs[idx] : {}),
+      assignmentId: payload.assignmentId,
+      studentCode: payload.studentCode,
+      status:
+        existingScore !== null && existingScore !== undefined
+          ? 'GRADED'
+          : 'SUBMITTED_PENDING',
+      score: existingScore,
+      submittedAt: 'เพิ่งส่งเมื่อสักครู่ (Cloudflare R2)',
+      workTitle: payload.workTitle || 'ส่งชิ้นงานผ่านระบบออนไลน์',
+      workAttachmentLabel: attachmentLabel,
+      r2ObjectKey: r2Key,
+      originalSizeKb: origKb,
+      compressedSizeKb: compKb,
+      externalLinkUrl: payload.externalLinkUrl,
+      academicYearTerm: term,
+      isR2FilePurged: false,
+    };
+
+    const updated =
+      idx !== -1
+        ? subs.map((item, i) => (i === idx ? nextItem : item))
+        : [...subs, nextItem];
+
+    return this.saveSubmissions(updated);
+  },
+
+  // คำนวณสถิติพื้นที่ Cloudflare R2 (จำนวนไฟล์, พื้นที่จริงหลังบีบอัด WebP, พื้นที่ที่ประหยัดได้ และไฟล์ที่พร้อมลบท้ายปี)
+  getR2StorageStats(): {
+    activeFileCount: number;
+    purgedFileCount: number;
+    totalOriginalMb: number;
+    totalCompressedMb: number;
+    savedPercent: number;
+    freeTierLimitMb: number;
+    usagePercent: number;
+  } {
+    const subs = this.getSubmissions();
+    let activeFileCount = 0;
+    let purgedFileCount = 0;
+    let totalOriginalKb = 0;
+    let totalCompressedKb = 0;
+
+    for (const s of subs) {
+      const hasAttachment = Boolean(s.r2ObjectKey || s.workAttachmentLabel);
+      if (!hasAttachment) continue;
+      if (s.isR2FilePurged) {
+        purgedFileCount += 1;
+      } else {
+        activeFileCount += 1;
+        totalOriginalKb += s.originalSizeKb ?? 3800;
+        totalCompressedKb += s.compressedSizeKb ?? 155;
+      }
+    }
+
+    const totalOriginalMb = Number((totalOriginalKb / 1024).toFixed(2));
+    const totalCompressedMb = Number((totalCompressedKb / 1024).toFixed(2));
+    const savedPercent =
+      totalOriginalKb > 0
+        ? Math.round((1 - totalCompressedKb / totalOriginalKb) * 100)
+        : 96;
+    const freeTierLimitMb = 10240; // 10 GB Free Tier on Cloudflare R2
+    const usagePercent = Number(
+      Math.min(100, (totalCompressedMb / freeTierLimitMb) * 100).toFixed(3)
+    );
+
+    return {
+      activeFileCount,
+      purgedFileCount,
+      totalOriginalMb,
+      totalCompressedMb,
+      savedPercent,
+      freeTierLimitMb,
+      usagePercent,
+    };
+  },
+
+  // ล้างไฟล์แนบใน Cloudflare R2 หลังอนุมัติเกรดแต่ละปีการศึกษา (คืนพื้นที่ R2 100% แต่เก็บคะแนนและเกรดไว้ถาวร)
+  purgeR2FilesAfterGrading(onlyGraded: boolean = true): {
+    purgedCount: number;
+    freedMb: number;
+    submissions: StudentWorkSubmission[];
+  } {
+    let purgedCount = 0;
+    let freedKb = 0;
+    const updated = this.getSubmissions().map((sub) => {
+      const hasFile =
+        !sub.isR2FilePurged && Boolean(sub.r2ObjectKey || sub.workAttachmentLabel);
+      const canPurge = onlyGraded ? sub.status === 'GRADED' : true;
+      if (hasFile && canPurge) {
+        purgedCount += 1;
+        freedKb += sub.compressedSizeKb ?? 155;
+        return {
+          ...sub,
+          isR2FilePurged: true,
+          r2ObjectKey: undefined,
+          workAttachmentLabel: `🧹 ล้างไฟล์ R2 หลังตัดเกรดแล้ว (คงคะแนน ${sub.score ?? '-'} คะแนนถาวร)`,
+        };
+      }
+      return sub;
+    });
+
+    this.saveSubmissions(updated);
+    return {
+      purgedCount,
+      freedMb: Number((freedKb / 1024).toFixed(2)),
+      submissions: updated,
     };
   },
 };

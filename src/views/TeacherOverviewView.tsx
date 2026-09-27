@@ -39,10 +39,11 @@ interface TeacherOverviewViewProps {
 }
 
 export type ClassSubTab =
-  | 'overview'
   | 'attendance'
   | 'assignments'
   | 'grades'
+  | 'attributes'
+  | 'overview'
   | 'behavior'
   | 'reflection'
   | 'adventure';
@@ -65,7 +66,30 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
   onViewFullTable,
   onSwitchToAdventure,
 }) => {
-  const [activeTab, setActiveTab] = useState<ClassSubTab>('overview');
+  // เริ่มต้นที่แท็บ "เช็คชื่อแถวตอนเช้า & เข้าเรียน" เป็นอันดับแรกสุดก่อนเริ่มสอน
+  const [activeTab, setActiveTab] = useState<ClassSubTab>('attendance');
+  const [selectedClassroom, setSelectedClassroom] = useState<'ม.3/1' | 'ม.3/2' | 'ม.1/8'>('ม.3/1');
+  const [attendanceSubMode, setAttendanceSubMode] = useState<'MORNING_AND_TODAY' | 'TERM_HISTORY'>('MORNING_AND_TODAY');
+  const [morningCheckState, setMorningCheckState] = useState<Record<string, 'PRESENT' | 'LATE' | 'LEAVE' | 'ABSENT'>>({
+    '45101': 'PRESENT',
+    '45102': 'LEAVE',
+    '45103': 'LATE',
+    '45104': 'ABSENT',
+    '45128': 'PRESENT',
+    '45105': 'PRESENT',
+    '45106': 'PRESENT',
+    '45107': 'PRESENT',
+  });
+  const [periodCheckState, setPeriodCheckState] = useState<Record<string, 'PRESENT' | 'LATE' | 'LEAVE' | 'ABSENT'>>({
+    '45101': 'PRESENT',
+    '45102': 'LEAVE',
+    '45103': 'PRESENT',
+    '45104': 'ABSENT',
+    '45128': 'PRESENT',
+    '45105': 'PRESENT',
+    '45106': 'PRESENT',
+    '45107': 'PRESENT',
+  });
   const [attendanceSearch, setAttendanceSearch] = useState('');
 
   // Modals state
@@ -462,30 +486,52 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
         </div>
       )}
 
-      {/* 1. Compact Single-Row Course Toolbar & Tabs (Eliminates Triple Header Stacking) */}
-      <div className="bg-white rounded-xl border border-slate-200 px-4 py-2 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+      {/* 1. Compact Single-Row Course Toolbar, Classroom Switcher & Ordered Workflow Tabs */}
+      <div className="bg-white rounded-xl border border-slate-200 px-4 py-2.5 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 flex-wrap min-w-0">
           <div className="flex items-center gap-2 min-w-0">
             <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[11px] font-bold">
               ศ23101
             </span>
             <h1 className="text-sm sm:text-base font-bold text-slate-900 truncate">
-              ศิลปะ — ม.3/1
+              ศิลปะ — {selectedClassroom}
             </h1>
             <span className="text-xs text-slate-400 hidden md:inline">
               ({sgsRoster.filter((s) => s.transferState !== 'TRANSFERRED_OUT').length} คน)
             </span>
           </div>
+
+          {/* 1-Click Classroom Switcher (สลับห้องสอนทันทีไม่ต้องย้อนกลับหน้าแรก) */}
+          <div className="inline-flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200/80 text-[11px]">
+            {(['ม.3/1', 'ม.3/2', 'ม.1/8'] as const).map((room) => (
+              <button
+                key={room}
+                type="button"
+                onClick={() => {
+                  setSelectedClassroom(room);
+                  showToast(`สลับไปยังห้อง ${room} เรียบร้อยแล้ว`);
+                }}
+                className={`px-2 py-0.5 rounded-md font-semibold transition-colors ${
+                  selectedClassroom === room
+                    ? 'bg-white text-teal-800 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {room}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Sub Navigation Tabs */}
+        {/* Sub Navigation Tabs — เรียงตามลำดับงานจริงของครู: เช็คชื่อแถวเช้า/คาบเรียน -> สั่งงาน/ส่งงาน R2 -> ปพ.5 -> คุณลักษณะฯ */}
         <div className="flex items-center gap-1 overflow-x-auto text-xs font-medium text-slate-500">
           {(
             [
+              { key: 'attendance', label: '1. เช็คชื่อแถวเช้า & คาบเรียน' },
+              { key: 'assignments', label: '2. สั่งงาน / ส่งงาน (R2)' },
+              { key: 'grades', label: '3. สรุปคะแนน ปพ.5' },
+              { key: 'attributes', label: '4. คุณลักษณะฯ & คิดวิเคราะห์' },
               { key: 'overview', label: 'ภาพรวม' },
-              { key: 'attendance', label: 'เช็คชื่อ' },
-              { key: 'assignments', label: 'งาน / คะแนนเก็บ' },
-              { key: 'grades', label: 'สรุปคะแนน ปพ.5' },
               { key: 'behavior', label: 'พฤติกรรม' },
               { key: 'reflection', label: 'บันทึกหลังสอน' },
             ] as const
@@ -568,14 +614,343 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
         </div>
       )}
 
-      {/* 3. TAB: เช็คชื่อ (Attendance) */}
-      {activeTab === 'attendance' && (
+      {/* 2.5 TAB: คุณลักษณะอันพึงประสงค์ & อ่านคิดวิเคราะห์ (คำนวณจากเกรด 1-คลิก) */}
+      {activeTab === 'attributes' && (
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 font-bold text-sm text-slate-800">
-              <CheckSquare className="w-4 h-4 text-slate-600" />
-              <span>คาบสอนทั้งหมด ({attendanceRows.length} คาบ)</span>
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-100">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">
+                ประเมินอ่าน คิดวิเคราะห์ เขียน (0–3) & คุณลักษณะอันพึงประสงค์ (0–3) — {selectedClassroom}
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                คำนวณระดับ 0–3 อัตโนมัติจากเกรดวิชา (เกรด 3.0–4.0 = 3 ดีเยี่ยม · 2.0–2.5 = 2 ดี · 1.0–1.5 = 1 ผ่าน) และคลิกปรับรายบุคคลได้ทันที
+              </p>
             </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => {
+                  const updated = sgsRosterAndSubmissionService.calculateAttributesFromGrades({
+                    minGradeFor3: 3.0,
+                    minGradeFor2: 2.0,
+                    minGradeFor1: 1.0,
+                    fallbackForR: 1,
+                  });
+                  setSgsRoster(updated);
+                  showToast('⚡ คำนวณระดับอ่านคิดวิเคราะห์ & คุณลักษณะฯ (0–3) จากเกรดวิชาครบทุกคนแล้ว');
+                }}
+                className="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-2xs transition-colors"
+              >
+                ⚡ คำนวณระดับ 0–3 จากเกรดวิชา (1-คลิก)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const updated = sgsRoster.map((stu) =>
+                    stu.transferState === 'TRANSFERRED_OUT'
+                      ? stu
+                      : { ...stu, analyticalThinkingLevel: 3 as const, desiredCharacteristicsLevel: 3 as const }
+                  );
+                  setSgsRoster(sgsRosterAndSubmissionService.saveSgsRoster(updated, 'ครูผู้สอน'));
+                  showToast('ตั้งค่าระดับ 3 (ดีเยี่ยม) ครบทุกคนในห้องเรียบร้อยแล้ว');
+                }}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors"
+              >
+                ตั้งค่า 3 (ดีเยี่ยม) ทั้งห้อง
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                  <th className="py-2.5 px-3 w-14">เลขที่</th>
+                  <th className="py-2.5 px-3 w-20">รหัส</th>
+                  <th className="py-2.5 px-3">ชื่อ-นามสกุล</th>
+                  <th className="py-2.5 px-3 text-center">เวลาเรียน</th>
+                  <th className="py-2.5 px-3 text-center">คะแนนรวม / เกรดวิชา</th>
+                  <th className="py-2.5 px-3 text-center">อ่าน คิดวิเคราะห์ เขียน (0–3)</th>
+                  <th className="py-2.5 px-3 text-center">คุณลักษณะอันพึงประสงค์ (0–3)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {sgsRoster
+                  .filter((s) => s.transferState !== 'TRANSFERRED_OUT')
+                  .map((stu) => {
+                    const g = sgsRosterAndSubmissionService.computeStudentSgsGrades(stu);
+                    return (
+                      <tr key={stu.studentCode} className="hover:bg-slate-50/70">
+                        <td className="py-2 px-3 font-bold text-slate-800 tabular-nums">{stu.sgsSeatNo}</td>
+                        <td className="py-2 px-3 font-mono text-slate-500">{stu.studentCode}</td>
+                        <td className="py-2 px-3 font-semibold text-slate-900">{stu.studentName}</td>
+                        <td className="py-2 px-3 text-center tabular-nums text-slate-700">
+                          {stu.attendancePercent}%
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          <span className="font-bold text-slate-900 tabular-nums">{g.total}</span>
+                          <span className="mx-1 text-slate-300">·</span>
+                          <span
+                            className={`px-1.5 py-0.5 rounded font-bold text-[11px] ${
+                              g.gradeLabel === 'ร' || g.gradeLabel === 'มส.'
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                : 'bg-teal-50 text-teal-800 border border-teal-200'
+                            }`}
+                          >
+                            เกรด {g.gradeLabel}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          <div className="inline-flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg">
+                            {([3, 2, 1, 0] as const).map((lvl) => (
+                              <button
+                                key={lvl}
+                                type="button"
+                                onClick={() => {
+                                  const next = sgsRosterAndSubmissionService.updateStudentAttributeLevel(
+                                    stu.studentCode,
+                                    'analyticalThinkingLevel',
+                                    lvl
+                                  );
+                                  setSgsRoster(next);
+                                }}
+                                className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${
+                                  g.analyticalThinkingLevel === lvl
+                                    ? 'bg-teal-600 text-white shadow-2xs'
+                                    : 'text-slate-600 hover:bg-white'
+                                }`}
+                              >
+                                {lvl}
+                              </button>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          <div className="inline-flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg">
+                            {([3, 2, 1, 0] as const).map((lvl) => (
+                              <button
+                                key={lvl}
+                                type="button"
+                                onClick={() => {
+                                  const next = sgsRosterAndSubmissionService.updateStudentAttributeLevel(
+                                    stu.studentCode,
+                                    'desiredCharacteristicsLevel',
+                                    lvl
+                                  );
+                                  setSgsRoster(next);
+                                }}
+                                className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${
+                                  g.desiredCharacteristicsLevel === lvl
+                                    ? 'bg-slate-900 text-white shadow-2xs'
+                                    : 'text-slate-600 hover:bg-white'
+                                }`}
+                              >
+                                {lvl}
+                              </button>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* 3. TAB: เช็คชื่อแถวตอนเช้า (07:45) & เช็คชื่อคาบเรียน (Attendance — งานแรกสุดของครู) */}
+      {activeTab === 'attendance' && (
+        <div className="space-y-3">
+          {/* Sub-mode Toggle: 1. เช็คชื่อแถวเช้า (07:45) & คาบเรียนวันนี้ (Inline) ⇄ 2. ตารางประวัติคาบสอนทั้งเทอม */}
+          <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-xs space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-bold text-xs">
+                  ขั้นตอนที่ 1 ก่อนเริ่มเรียน
+                </span>
+                <h2 className="font-bold text-sm text-slate-900">
+                  เช็คชื่อแถวตอนเช้า (07:45 น.) → ซิงก์เข้าเช็คชื่อคาบเรียน ({selectedClassroom})
+                </h2>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setAttendanceSubMode('MORNING_AND_TODAY')}
+                  className={`px-3 py-1.5 rounded-lg font-semibold transition-colors ${
+                    attendanceSubMode === 'MORNING_AND_TODAY'
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  🌅 เช็คชื่อแถวเช้า & คาบเรียนวันนี้
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAttendanceSubMode('TERM_HISTORY')}
+                  className={`px-3 py-1.5 rounded-lg font-semibold transition-colors ${
+                    attendanceSubMode === 'TERM_HISTORY'
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  📅 ประวัติคาบสอนทั้งเทอม ({attendanceRows.length} คาบ)
+                </button>
+              </div>
+            </div>
+
+            {attendanceSubMode === 'MORNING_AND_TODAY' && (
+              <div className="space-y-3">
+                {/* Quick Bulk Action Bar for Morning Assembly -> Period Roll-Call */}
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-amber-50/70 border border-amber-200/80 rounded-xl px-3.5 py-2.5 text-xs">
+                  <div className="text-amber-950">
+                    <strong>1. เช็คชื่อแถวตอนเช้า (07:45 น.)</strong> เสร็จแล้ว ระบบส่งต่อสถานะเข้า{' '}
+                    <strong>2. เช็คชื่อคาบเรียน</strong> อัตโนมัติ (คนที่ลาป่วยระบบล็อก &ldquo;ลา&rdquo; ให้ทั้งสองช่อง)
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextMorning: Record<string, 'PRESENT' | 'LATE' | 'LEAVE' | 'ABSENT'> = {};
+                        const nextPeriod: Record<string, 'PRESENT' | 'LATE' | 'LEAVE' | 'ABSENT'> = {};
+                        sgsRoster.forEach((stu) => {
+                          const isLeave = stu.studentCode === '45102';
+                          nextMorning[stu.studentCode] = isLeave ? 'LEAVE' : 'PRESENT';
+                          nextPeriod[stu.studentCode] = isLeave ? 'LEAVE' : 'PRESENT';
+                        });
+                        setMorningCheckState(nextMorning);
+                        setPeriodCheckState(nextPeriod);
+                        showToast('✓ บันทึกเช็คชื่อแถวตอนเช้า & ซิงก์เข้าคาบเรียนครบทุกคนแล้ว');
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-2xs transition-colors"
+                    >
+                      ✓ มาแถวเช้าครบ & ซิงก์เข้าคาบเรียน (1-คลิก)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPeriodCheckState({ ...morningCheckState });
+                        showToast('คัดลอกสถานะจากแถวตอนเช้าเข้าสู่คาบเรียนเรียบร้อยแล้ว');
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-white border border-amber-300 hover:bg-amber-100/50 text-amber-900 font-semibold transition-colors"
+                    >
+                      ⇄ ดึงสถานะแถวเช้าเข้าคาบเรียน
+                    </button>
+                  </div>
+                </div>
+
+                {/* Ultra-Compact Single-Screen Table: Morning Roll-Call (07:45) + Period Roll-Call Side-by-Side */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                        <th className="py-2 px-3 w-12">เลขที่</th>
+                        <th className="py-2 px-3 w-18">รหัส</th>
+                        <th className="py-2 px-3">ชื่อ-นามสกุล</th>
+                        <th className="py-2 px-3 text-center bg-amber-50/60 border-x border-amber-100">
+                          🌅 ขั้นที่ 1: เช็คชื่อแถวตอนเช้า (07:45 น.)
+                        </th>
+                        <th className="py-2 px-3 text-center bg-teal-50/40">
+                          📚 ขั้นที่ 2: เช็คชื่อเข้าคาบเรียน (ศ23101)
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {sgsRoster
+                        .filter((s) => s.transferState !== 'TRANSFERRED_OUT')
+                        .map((stu) => {
+                          const mStat = morningCheckState[stu.studentCode] || 'PRESENT';
+                          const pStat = periodCheckState[stu.studentCode] || 'PRESENT';
+                          const statusOptions = [
+                            { key: 'PRESENT', label: 'มา', activeCls: 'bg-teal-600 text-white' },
+                            { key: 'LATE', label: 'สาย', activeCls: 'bg-amber-500 text-white' },
+                            { key: 'LEAVE', label: 'ลา', activeCls: 'bg-sky-600 text-white' },
+                            { key: 'ABSENT', label: 'ขาด', activeCls: 'bg-rose-600 text-white' },
+                          ] as const;
+
+                          return (
+                            <tr key={stu.studentCode} className="hover:bg-slate-50/70">
+                              <td className="py-2 px-3 font-bold text-slate-800 tabular-nums">
+                                {stu.sgsSeatNo}
+                              </td>
+                              <td className="py-2 px-3 font-mono text-slate-500">{stu.studentCode}</td>
+                              <td className="py-2 px-3">
+                                <div className="font-semibold text-slate-900 flex items-center gap-1.5">
+                                  <span>{stu.studentName}</span>
+                                  {stu.studentCode === '45102' && (
+                                    <span className="px-1.5 py-0.2 rounded bg-sky-50 text-sky-700 border border-sky-200 text-[10px] font-semibold">
+                                      ใบลาป่วยอนุมัติ
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-2 px-3 text-center bg-amber-50/25 border-x border-amber-100/80">
+                                <div className="inline-flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200">
+                                  {statusOptions.map((opt) => (
+                                    <button
+                                      key={opt.key}
+                                      type="button"
+                                      onClick={() => {
+                                        setMorningCheckState((prev) => ({
+                                          ...prev,
+                                          [stu.studentCode]: opt.key,
+                                        }));
+                                        setPeriodCheckState((prev) => ({
+                                          ...prev,
+                                          [stu.studentCode]: opt.key,
+                                        }));
+                                      }}
+                                      className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${
+                                        mStat === opt.key
+                                          ? opt.activeCls
+                                          : 'text-slate-600 hover:bg-slate-100'
+                                      }`}
+                                    >
+                                      {opt.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </td>
+                              <td className="py-2 px-3 text-center bg-teal-50/15">
+                                <div className="inline-flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200">
+                                  {statusOptions.map((opt) => (
+                                    <button
+                                      key={opt.key}
+                                      type="button"
+                                      onClick={() =>
+                                        setPeriodCheckState((prev) => ({
+                                          ...prev,
+                                          [stu.studentCode]: opt.key,
+                                        }))
+                                      }
+                                      className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${
+                                        pStat === opt.key
+                                          ? opt.activeCls
+                                          : 'text-slate-600 hover:bg-slate-100'
+                                      }`}
+                                    >
+                                      {opt.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {attendanceSubMode === 'TERM_HISTORY' && (
+            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2 font-bold text-sm text-slate-800">
+                  <CheckSquare className="w-4 h-4 text-slate-600" />
+                  <span>คาบสอนทั้งหมด ({attendanceRows.length} คาบ)</span>
+                </div>
 
             <div className="flex items-center gap-2 text-xs">
               <button
@@ -767,6 +1142,8 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
               </tbody>
             </table>
           </div>
+          </div>
+          )}
         </div>
       )}
 

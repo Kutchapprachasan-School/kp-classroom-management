@@ -40,7 +40,7 @@ export const AssignmentManagementView: React.FC = () => {
     useState<string>('asg-3');
   const [activeStudentIndex, setActiveStudentIndex] = useState<number>(0);
 
-  // Modal create assignment
+  // Modal create assignment & R2 Storage / Student Upload drawers
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newUnit, setNewUnit] = useState<'u1' | 'u2' | 'u3'>('u2');
@@ -48,10 +48,23 @@ export const AssignmentManagementView: React.FC = () => {
   const [newDueDate, setNewDueDate] = useState('28 ก.ย. 69');
   const [newIsMandatory, setNewIsMandatory] = useState(false);
 
+  const [isR2PanelOpen, setIsR2PanelOpen] = useState(false);
+  const [isStudentSubmitOpen, setIsStudentSubmitOpen] = useState(false);
+  const [uploadStudentCode, setUploadStudentCode] = useState('45102');
+  const [uploadAssignmentId, setUploadAssignmentId] = useState('asg-3');
+  const [uploadWorkTitle] = useState('ส่งงานภาพวาดทัศนียภาพ 2 จุด');
+  const [uploadFileName, setUploadFileName] = useState('perspective_2point_45102.jpg');
+  const [uploadExternalLink, setUploadExternalLink] = useState('');
+
+  const r2Stats = useMemo(
+    () => sgsRosterAndSubmissionService.getR2StorageStats(),
+    [submissions]
+  );
+
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const showToast = (msg: string) => {
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 2500);
+    setTimeout(() => setToastMsg(null), 2800);
   };
 
   const filteredAssignments = useMemo(() => {
@@ -348,7 +361,7 @@ export const AssignmentManagementView: React.FC = () => {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {pendingTotalCount > 0 && (
               <button
                 type="button"
@@ -369,6 +382,36 @@ export const AssignmentManagementView: React.FC = () => {
 
             <button
               type="button"
+              onClick={() => {
+                setIsStudentSubmitOpen((v) => !v);
+                setIsR2PanelOpen(false);
+              }}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
+                isStudentSubmitOpen
+                  ? 'bg-teal-600 text-white border-teal-600'
+                  : 'bg-teal-50/80 hover:bg-teal-100/80 text-teal-900 border-teal-200'
+              }`}
+            >
+              <span>📤 นักเรียนส่งไฟล์งาน (R2)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsR2PanelOpen((v) => !v);
+                setIsStudentSubmitOpen(false);
+              }}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
+                isR2PanelOpen
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+              }`}
+            >
+              <span>☁️ พื้นที่ R2 ({r2Stats.totalCompressedMb} MB) · ล้างไฟล์ท้ายปี</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setIsNewModalOpen(true)}
               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors"
             >
@@ -377,6 +420,198 @@ export const AssignmentManagementView: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Drawer 1: นักเรียนส่งไฟล์งานขึ้น Cloudflare R2 (บีบอัด WebP อัตโนมัติ + รองรับแนบลิงก์ Google Drive/Canva) */}
+        {isStudentSubmitOpen && (
+          <div className="px-4 py-3.5 bg-teal-50/50 border-b border-teal-200 space-y-2.5 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span className="font-bold text-teal-950">
+                  📤 ระบบนักเรียนส่งงานออนไลน์ → อัปโหลดตรงเข้า Cloudflare R2 (บีบอัดรูป WebP อัตโนมัติ ประหยัดพื้นที่ 96%)
+                </span>
+                <p className="text-[11px] text-teal-800 mt-0.5">
+                  ไม่ต้องให้นักเรียนล็อกอิน Google Drive ของครู (ไม่ติดปัญหาสิทธิ์ Permission) · แปลงภาพถ่ายสมุด/ชิ้นงาน 4.2 MB เหลือ ~148 KB (.webp) ก่อนขึ้น R2
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsStudentSubmitOpen(false)}
+                className="text-slate-500 hover:text-slate-800 font-semibold"
+              >
+                ปิด ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const updated = sgsRosterAndSubmissionService.submitStudentWorkToR2({
+                  assignmentId: uploadAssignmentId,
+                  studentCode: uploadStudentCode,
+                  workTitle: uploadWorkTitle,
+                  fileName: uploadFileName || 'student_work.jpg',
+                  originalSizeKb: 4250,
+                  compressedSizeKb: 148,
+                  externalLinkUrl: uploadExternalLink.trim() || undefined,
+                  academicYearTerm: '1/2569',
+                });
+                setSubmissions([...updated]);
+                const stu = roster.find((r) => r.studentCode === uploadStudentCode);
+                showToast(
+                  `☁️ อัปโหลดไฟล์งานของ ${stu?.studentName || uploadStudentCode} ขึ้น Cloudflare R2 (บีบอัดเหลือ 148 KB) เรียบร้อยแล้ว!`
+                );
+              }}
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 items-end pt-1"
+            >
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  1. เลือกนักเรียนที่ส่งงาน
+                </label>
+                <select
+                  value={uploadStudentCode}
+                  onChange={(e) => setUploadStudentCode(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs"
+                >
+                  {roster
+                    .filter((s) => s.transferState !== 'TRANSFERRED_OUT')
+                    .map((s) => (
+                      <option key={s.studentCode} value={s.studentCode}>
+                        เลขที่ {s.sgsSeatNo} · {s.studentName}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  2. ชิ้นงานที่ส่ง
+                </label>
+                <select
+                  value={uploadAssignmentId}
+                  onChange={(e) => setUploadAssignmentId(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs"
+                >
+                  {assignments.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      งานที่ {a.orderNo}: {a.title} ({a.maxScore} คะแนน)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  3. ไฟล์ภาพ/PDF ที่อัปโหลดเข้า R2
+                </label>
+                <input
+                  type="text"
+                  value={uploadFileName}
+                  onChange={(e) => setUploadFileName(e.target.value)}
+                  placeholder="ชื่อไฟล์ เช่น work_45102.jpg"
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  4. หรือแนบลิงก์เสริม (Drive/Canva ถ้ามี)
+                </label>
+                <input
+                  type="text"
+                  value={uploadExternalLink}
+                  onChange={(e) => setUploadExternalLink(e.target.value)}
+                  placeholder="https://drive.google.com/... (ตัวเลือก)"
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-bold shadow-2xs transition-colors"
+              >
+                ☁️ อัปโหลดเข้า R2 & ส่งงาน
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Drawer 2: จัดการพื้นที่ Cloudflare R2 & ล้างไฟล์หลังให้เกรดแต่ละปีการศึกษา */}
+        {isR2PanelOpen && (
+          <div className="px-4 py-3.5 bg-slate-50 border-b border-slate-200 space-y-3 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span className="font-bold text-slate-900">
+                  ☁️ จัดการพื้นที่เก็บไฟล์งานนักเรียน Cloudflare R2 (`r2://kp-classroom-submissions/1-2569/`)
+                </span>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  เปรียบเทียบสถาปัตยกรรม: ใช้ <strong>Cloudflare R2 + บีบอัด WebP ฝั่งเบราว์เซอร์ + ล้างไฟล์หลังตัดเกรดปีการศึกษา</strong> แก้ปัญหาเต็มเร็วและไม่ติดสิทธิ์เหมือนโฟลเดอร์ Google Drive
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const res = sgsRosterAndSubmissionService.purgeR2FilesAfterGrading(true);
+                    setSubmissions([...res.submissions]);
+                    showToast(
+                      `🧹 ล้างไฟล์แนบใน R2 ที่ตรวจให้เกรดแล้ว ${res.purgedCount} ไฟล์ (คืนพื้นที่ ${res.freedMb} MB · คงคะแนนและเกรด 100%)`
+                    );
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-2xs transition-colors"
+                >
+                  🧹 ล้างไฟล์ใน R2 หลังตัดเกรดปีการศึกษา (คงคะแนนไว้ 100%)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsR2PanelOpen(false)}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 font-semibold"
+                >
+                  ปิด
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5">
+              <div className="p-2.5 rounded-lg bg-white border border-slate-200">
+                <div className="text-[11px] text-slate-500">ไฟล์งานที่เก็บใน R2 ปัจจุบัน</div>
+                <div className="text-sm font-bold text-slate-900 mt-0.5 tabular-nums">
+                  {r2Stats.activeFileCount} ไฟล์ · ใช้จริง {r2Stats.totalCompressedMb} MB
+                </div>
+                <div className="text-[11px] text-teal-700 font-medium">
+                  (จากไฟล์ต้นฉบับ {r2Stats.totalOriginalMb} MB · ประหยัด {r2Stats.savedPercent}%)
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-white border border-slate-200">
+                <div className="text-[11px] text-slate-500">โควตาฟรี Cloudflare R2 (10 GB)</div>
+                <div className="text-sm font-bold text-teal-700 mt-0.5 tabular-nums">
+                  ใช้ไป {r2Stats.usagePercent}% ของ 10,240 MB
+                </div>
+                <div className="text-[11px] text-slate-500">
+                  รองรับรูปงานบีบอัด WebP ได้กว่า 65,000 ชิ้น/ปี
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-white border border-slate-200">
+                <div className="text-[11px] text-slate-500">ทำไม R2 ดีกว่าตั้งโฟลเดอร์ Google Drive?</div>
+                <div className="text-[11px] text-slate-700 mt-0.5 leading-relaxed">
+                  • <strong>ไม่ติดสิทธิ์ OAuth:</strong> นักเรียนส่งไฟล์ได้ทันทีโดยไม่ต้องล็อกอิน Gmail<br />
+                  • <strong>ปลอดภัย:</strong> เพื่อนแอบดูหรือลบไฟล์งานในโฟลเดอร์รวมไม่ได้
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-white border border-slate-200">
+                <div className="text-[11px] text-slate-500">ไฟล์ที่ล้างออกหลังจบปีการศึกษา</div>
+                <div className="text-sm font-bold text-slate-900 mt-0.5 tabular-nums">
+                  ล้างแล้ว {r2Stats.purgedFileCount} ไฟล์
+                </div>
+                <div className="text-[11px] text-slate-500">
+                  ลบเฉพาะไฟล์รูป/PDF ใน R2 แต่คะแนนใน ปพ.5 อยู่ครบถาวร
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* MODE 1: Clean Spreadsheet Matrix Grid */}
         {viewMode === 'MATRIX_TABLE' && (

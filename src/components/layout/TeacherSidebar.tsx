@@ -19,7 +19,6 @@ import {
   LogOut,
   HeartHandshake,
   ShieldAlert,
-  Vote,
   X,
   ChevronDown,
   ChevronUp,
@@ -58,10 +57,10 @@ interface TeacherSidebarProps {
 
 const PRIMARY_VIEWS: TeacherViewKey[] = [
   'home',
-  'class-overview',
-  'home-visit',
   'student-affairs',
-  'student-council',
+  'class-overview',
+  'assignments',
+  'home-visit',
   'readiness',
 ];
 
@@ -128,10 +127,10 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
 
       {/* Navigation Groups */}
       <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-3">
-        {/* หมวดหลัก (แยกหน้าใบลา กับ หน้าสภานักเรียน ออกจากกันชัดเจน) */}
+        {/* หมวดหลักเรียงตามลำดับงานจริงของครู: 1. เช็คชื่อแถวเช้า (07:45) -> 2. เข้าสอนรายวิชา -> 3. สั่งงาน/ส่งงาน R2 */}
         <div>
           <div className="px-2.5 pb-1.5 text-[11px] font-bold text-slate-400">
-            เมนูหลักประจำวัน
+            ลำดับงานประจำวันของครู
           </div>
           <div className="space-y-1">
             <button
@@ -151,6 +150,27 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             </button>
 
             <button
+              onClick={() => handleSelect('student-affairs')}
+              className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-left text-xs transition-colors ${
+                currentView === 'student-affairs'
+                  ? 'bg-amber-50 text-amber-900 font-bold border border-amber-300'
+                  : 'text-slate-800 hover:bg-amber-50/60 font-semibold bg-amber-50/30 border border-amber-200/60'
+              }`}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <ShieldAlert
+                  className={`w-4 h-4 shrink-0 ${
+                    currentView === 'student-affairs' ? 'text-amber-700' : 'text-amber-600'
+                  }`}
+                />
+                <span className="truncate">2. เช็คชื่อแถวเช้า & ใบลา</span>
+              </div>
+              <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 text-[10px] font-bold shrink-0">
+                07:45
+              </span>
+            </button>
+
+            <button
               onClick={() => handleSelect('class-overview')}
               className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs transition-colors ${
                 currentView === 'class-overview'
@@ -163,7 +183,28 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
                   currentView === 'class-overview' ? 'text-teal-700' : 'text-slate-400'
                 }`}
               />
-              <span className="truncate">2. เช็คชื่อ & คะแนน (ปพ.5)</span>
+              <span className="truncate">3. เข้าสอน & ปพ.5 (คาบเรียน)</span>
+            </button>
+
+            <button
+              onClick={() => handleSelect('assignments')}
+              className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-left text-xs transition-colors ${
+                currentView === 'assignments'
+                  ? 'bg-teal-50 text-teal-900 font-bold border border-teal-300'
+                  : 'text-slate-700 hover:bg-slate-100 font-medium'
+              }`}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <PenTool
+                  className={`w-4 h-4 shrink-0 ${
+                    currentView === 'assignments' ? 'text-teal-700' : 'text-slate-400'
+                  }`}
+                />
+                <span className="truncate">4. สั่งงาน & ส่งงาน (R2)</span>
+              </div>
+              <span className="px-1.5 py-0.2 rounded bg-teal-100 text-teal-800 text-[10px] font-bold shrink-0">
+                R2
+              </span>
             </button>
 
             <button
@@ -179,39 +220,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
                   currentView === 'home-visit' ? 'text-teal-700' : 'text-slate-400'
                 }`}
               />
-              <span className="truncate">3. เยี่ยมบ้าน & ทุน กสศ.</span>
-            </button>
-
-            <button
-              onClick={() => handleSelect('student-affairs')}
-              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs transition-colors ${
-                currentView === 'student-affairs'
-                  ? 'bg-teal-50 text-teal-900 font-bold border border-teal-300'
-                  : 'text-slate-700 hover:bg-slate-100 font-medium'
-              }`}
-            >
-              <ShieldAlert
-                className={`w-4 h-4 shrink-0 ${
-                  currentView === 'student-affairs' ? 'text-teal-700' : 'text-slate-400'
-                }`}
-              />
-              <span className="truncate">4. เช็คชื่อเสาธง & ใบลา</span>
-            </button>
-
-            <button
-              onClick={() => handleSelect('student-council')}
-              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs transition-colors ${
-                currentView === 'student-council'
-                  ? 'bg-teal-50 text-teal-900 font-bold border border-teal-300'
-                  : 'text-slate-700 hover:bg-slate-100 font-medium'
-              }`}
-            >
-              <Vote
-                className={`w-4 h-4 shrink-0 ${
-                  currentView === 'student-council' ? 'text-teal-700' : 'text-slate-400'
-                }`}
-              />
-              <span className="truncate">5. สภานักเรียน (เลือกตั้ง)</span>
+              <span className="truncate">5. เยี่ยมบ้าน & ทุน กสศ.</span>
             </button>
 
             <button
@@ -227,7 +236,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
                   currentView === 'readiness' ? 'text-teal-700' : 'text-slate-400'
                 }`}
               />
-              <span className="truncate">6. ตรวจก่อนส่งเกรด (ปพ.5)</span>
+              <span className="truncate">6. ส่งเกรด & ล้างไฟล์ R2</span>
             </button>
           </div>
         </div>

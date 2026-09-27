@@ -238,6 +238,7 @@ export const App: React.FC = () => {
                   onNavigateToReadiness={() => setCurrentView('readiness')}
                   onNavigateToAcademicYear={() => setCurrentView('academic-year')}
                   onNavigateToCourses={() => setCurrentView('courses')}
+                  onNavigateToMorningAssembly={() => setCurrentView('student-affairs')}
                 />
               )}
 
