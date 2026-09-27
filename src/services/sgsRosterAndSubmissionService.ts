@@ -1026,4 +1026,303 @@ export const sgsRosterAndSubmissionService = {
       submissions: updated,
     };
   },
+
+  // ดึงข้อมูลการใช้พื้นที่ R2 แยกตามครูผู้สอนและแต่ละรายวิชา + สถานะ Backup เข้า Google Drive โรงเรียน (100 TB Workspace)
+  getCourseStorageSummaries(): R2CourseStorageSummary[] {
+    try {
+      const raw = localStorage.getItem('kp_r2_course_storage_v1');
+      const list: R2CourseStorageSummary[] = raw
+        ? JSON.parse(raw)
+        : INITIAL_R2_COURSE_STORAGE;
+
+      // ซิงก์ข้อมูลจริงของวิชา ศ23101 ม.3/1 เข้ากับรายการแรกเสมอ
+      const liveStats = this.getR2StorageStats();
+      const subs = this.getSubmissions();
+      const canvaCount = subs.filter((s) => Boolean(s.externalLinkUrl)).length;
+
+      return list.map((item) => {
+        if (item.courseId === 'course-art-301') {
+          return {
+            ...item,
+            r2FileCount: liveStats.activeFileCount,
+            canvaLinkCount: Math.max(item.canvaLinkCount, canvaCount),
+            originalMb: liveStats.totalOriginalMb,
+            r2UsedMb: liveStats.totalCompressedMb,
+            isPurgedFromR2: liveStats.activeFileCount === 0 && liveStats.purgedFileCount > 0,
+          };
+        }
+        return item;
+      });
+    } catch {
+      return INITIAL_R2_COURSE_STORAGE;
+    }
+  },
+
+  saveCourseStorageSummaries(list: R2CourseStorageSummary[]): R2CourseStorageSummary[] {
+    localStorage.setItem('kp_r2_course_storage_v1', JSON.stringify(list));
+    return this.getCourseStorageSummaries();
+  },
+
+  // โอนถ่าย/สำรองไฟล์จาก Cloudflare R2 ไปยัง Google Drive ของโรงเรียน (100 TB Google Workspace) แยกโฟลเดอร์ตาม ปีการศึกษา / เทอม / วิชา (ครูผู้สอน)
+  backupCoursesToSchoolWorkspaceDrive(params: {
+    mode: 'SINGLE_COURSE' | 'TEACHER_ALL' | 'TERM_ALL' | 'YEAR_ALL';
+    courseId?: string;
+    teacherId?: string;
+    academicTerm?: string;
+    academicYear?: string;
+  }): {
+    backedUpCourseCount: number;
+    transferredMb: number;
+    courses: R2CourseStorageSummary[];
+  } {
+    let backedUpCourseCount = 0;
+    let transferredMb = 0;
+    const current = this.getCourseStorageSummaries();
+
+    const updated = current.map((c) => {
+      const match =
+        (params.mode === 'SINGLE_COURSE' && c.courseId === params.courseId) ||
+        (params.mode === 'TEACHER_ALL' && c.teacherId === params.teacherId) ||
+        (params.mode === 'TERM_ALL' && c.academicTerm === params.academicTerm) ||
+        (params.mode === 'YEAR_ALL' && c.academicYear === params.academicYear);
+
+      if (match && c.r2FileCount > 0) {
+        backedUpCourseCount += 1;
+        transferredMb += c.r2UsedMb;
+        return {
+          ...c,
+          isBackedUpToSchoolDrive: true,
+          lastBackupAt: 'โอนเข้า Google Drive รร. (100TB) แล้ววันนี้',
+        };
+      }
+      return c;
+    });
+
+    const saved = this.saveCourseStorageSummaries(updated);
+    return {
+      backedUpCourseCount,
+      transferredMb: Number(transferredMb.toFixed(2)),
+      courses: saved,
+    };
+  },
+
+  // ล้างไฟล์ใน R2 ตามสิทธิ์:
+  // - TEACHER (ครูผู้สอน): ล้างได้เฉพาะรายวิชาของตัวเองเท่านั้น
+  // - ADMIN (แอดมินระบบ): ล้างได้ของครูทุกคน ทั้งรายวิชา, ทั้งเทอม หรือทั้งปีการศึกษา (พร้อมตัวเลือก Auto-Backup ลง Google Drive 100TB ก่อนลบ)
+  purgeCoursesR2ByRole(params: {
+    role: 'TEACHER' | 'ADMIN';
+    currentTeacherId: string;
+    mode: 'SINGLE_COURSE' | 'TEACHER_OWN_ALL' | 'TERM_ALL' | 'YEAR_ALL';
+    courseId?: string;
+    academicTerm?: string;
+    academicYear?: string;
+    autoBackupToSchoolDriveFirst?: boolean;
+  }): {
+    purgedCourseCount: number;
+    purgedFileCount: number;
+    freedMb: number;
+    courses: R2CourseStorageSummary[];
+  } {
+    let purgedCourseCount = 0;
+    let purgedFileCount = 0;
+    let freedMb = 0;
+    const current = this.getCourseStorageSummaries();
+
+    const updated = current.map((c) => {
+      // ตรวจสอบสิทธิ์: ถ้าเป็นครูผู้สอน (TEACHER) ห้ามลบวิชาของครูคนอื่นเด็ดขาด
+      if (params.role === 'TEACHER' && c.teacherId !== params.currentTeacherId) {
+        return c;
+      }
+
+      const match =
+        (params.mode === 'SINGLE_COURSE' && c.courseId === params.courseId) ||
+        (params.mode === 'TEACHER_OWN_ALL' && c.teacherId === params.currentTeacherId) ||
+        (params.role === 'ADMIN' &&
+          params.mode === 'TERM_ALL' &&
+          c.academicTerm === params.academicTerm) ||
+        (params.role === 'ADMIN' &&
+          params.mode === 'YEAR_ALL' &&
+          c.academicYear === params.academicYear);
+
+      if (match && !c.isPurgedFromR2 && c.r2FileCount > 0) {
+        purgedCourseCount += 1;
+        purgedFileCount += c.r2FileCount;
+        freedMb += c.r2UsedMb;
+
+        // ถ้าตรงกับวิชา ศ23101 ม.3/1 ให้ล้างไฟล์ในตารางส่งงานจริงด้วย
+        if (c.courseId === 'course-art-301') {
+          this.purgeR2FilesAfterGrading(false);
+        }
+
+        return {
+          ...c,
+          r2FileCount: 0,
+          r2UsedMb: 0,
+          isPurgedFromR2: true,
+          isBackedUpToSchoolDrive: params.autoBackupToSchoolDriveFirst
+            ? true
+            : c.isBackedUpToSchoolDrive,
+          lastBackupAt: params.autoBackupToSchoolDriveFirst
+            ? 'Backup อัตโนมัติเข้า Google Drive รร. (100TB) ก่อนล้าง R2'
+            : c.lastBackupAt,
+        };
+      }
+      return c;
+    });
+
+    const saved = this.saveCourseStorageSummaries(updated);
+    return {
+      purgedCourseCount,
+      purgedFileCount,
+      freedMb: Number(freedMb.toFixed(2)),
+      courses: saved,
+    };
+  },
 };
+
+export interface R2CourseStorageSummary {
+  courseId: string;
+  courseCode: string;
+  courseName: string;
+  classroom: string;
+  teacherId: string;
+  teacherName: string;
+  department: string;
+  academicTerm: string;
+  academicYear: string;
+  r2FileCount: number;
+  canvaLinkCount: number;
+  originalMb: number;
+  r2UsedMb: number;
+  isGradedComplete: boolean;
+  isBackedUpToSchoolDrive: boolean;
+  schoolDriveFolderPath: string;
+  lastBackupAt?: string;
+  isPurgedFromR2: boolean;
+}
+
+const INITIAL_R2_COURSE_STORAGE: R2CourseStorageSummary[] = [
+  {
+    courseId: 'course-art-301',
+    courseCode: 'ศ23101',
+    courseName: 'ศิลปะพื้นฐาน 5',
+    classroom: 'ม.3/1',
+    teacherId: 't-pasporm',
+    teacherName: 'ครูภาสภูมิ เรืองปราชญ์',
+    department: 'ศิลปะ',
+    academicTerm: '1/2569',
+    academicYear: '2569',
+    r2FileCount: 24,
+    canvaLinkCount: 8,
+    originalMb: 92.4,
+    r2UsedMb: 3.65,
+    isGradedComplete: true,
+    isBackedUpToSchoolDrive: false,
+    schoolDriveFolderPath:
+      'Google Drive รร. (100TB) / ปีการศึกษา 2569 / เทอม 1 / ศ23101-ศิลปะพื้นฐาน 5 (ครูภาสภูมิ) / ม.3-1',
+    isPurgedFromR2: false,
+  },
+  {
+    courseId: 'course-art-302',
+    courseCode: 'ศ23101',
+    courseName: 'ศิลปะพื้นฐาน 5',
+    classroom: 'ม.3/2',
+    teacherId: 't-pasporm',
+    teacherName: 'ครูภาสภูมิ เรืองปราชญ์',
+    department: 'ศิลปะ',
+    academicTerm: '1/2569',
+    academicYear: '2569',
+    r2FileCount: 145,
+    canvaLinkCount: 32,
+    originalMb: 580.0,
+    r2UsedMb: 21.8,
+    isGradedComplete: true,
+    isBackedUpToSchoolDrive: true,
+    lastBackupAt: '20 ก.ย. 2569 (14:30 น.)',
+    schoolDriveFolderPath:
+      'Google Drive รร. (100TB) / ปีการศึกษา 2569 / เทอม 1 / ศ23101-ศิลปะพื้นฐาน 5 (ครูภาสภูมิ) / ม.3-2',
+    isPurgedFromR2: false,
+  },
+  {
+    courseId: 'course-guidance-301',
+    courseCode: 'ก23901',
+    courseName: 'กิจกรรมแนะแนว',
+    classroom: 'ม.3/1',
+    teacherId: 't-pasporm',
+    teacherName: 'ครูภาสภูมิ เรืองปราชญ์',
+    department: 'กิจกรรมพัฒนาผู้เรียน',
+    academicTerm: '1/2569',
+    academicYear: '2569',
+    r2FileCount: 86,
+    canvaLinkCount: 44,
+    originalMb: 310.5,
+    r2UsedMb: 12.4,
+    isGradedComplete: true,
+    isBackedUpToSchoolDrive: false,
+    schoolDriveFolderPath:
+      'Google Drive รร. (100TB) / ปีการศึกษา 2569 / เทอม 1 / ก23901-แนะแนว (ครูภาสภูมิ) / ม.3-1',
+    isPurgedFromR2: false,
+  },
+  {
+    courseId: 'course-math-301',
+    courseCode: 'ค23101',
+    courseName: 'คณิตศาสตร์พื้นฐาน 5',
+    classroom: 'ม.3/1–ม.3/4',
+    teacherId: 't-somying',
+    teacherName: 'ครูสมหญิง ใจดี',
+    department: 'คณิตศาสตร์',
+    academicTerm: '1/2569',
+    academicYear: '2569',
+    r2FileCount: 420,
+    canvaLinkCount: 15,
+    originalMb: 1680.0,
+    r2UsedMb: 64.5,
+    isGradedComplete: true,
+    isBackedUpToSchoolDrive: true,
+    lastBackupAt: '25 ก.ย. 2569 (16:10 น.)',
+    schoolDriveFolderPath:
+      'Google Drive รร. (100TB) / ปีการศึกษา 2569 / เทอม 1 / ค23101-คณิตศาสตร์ 5 (ครูสมหญิง) / ม.3',
+    isPurgedFromR2: false,
+  },
+  {
+    courseId: 'course-sci-301',
+    courseCode: 'ว23101',
+    courseName: 'วิทยาศาสตร์พื้นฐาน 5',
+    classroom: 'ม.3/1–ม.3/4',
+    teacherId: 't-wichai',
+    teacherName: 'ครูวิชัย วิทยา',
+    department: 'วิทยาศาสตร์และเทคโนโลยี',
+    academicTerm: '1/2569',
+    academicYear: '2569',
+    r2FileCount: 380,
+    canvaLinkCount: 95,
+    originalMb: 1520.0,
+    r2UsedMb: 58.2,
+    isGradedComplete: true,
+    isBackedUpToSchoolDrive: false,
+    schoolDriveFolderPath:
+      'Google Drive รร. (100TB) / ปีการศึกษา 2569 / เทอม 1 / ว23101-วิทยาศาสตร์ 5 (ครูวิชัย) / ม.3',
+    isPurgedFromR2: false,
+  },
+  {
+    courseId: 'course-thai-2568',
+    courseCode: 'ท22102',
+    courseName: 'ภาษาไทยพื้นฐาน 4 (ปีการศึกษาเก่า)',
+    classroom: 'ม.2/1–ม.2/4',
+    teacherId: 't-pimjai',
+    teacherName: 'ครูพิมพ์ใจ รักไทย',
+    department: 'ภาษาไทย',
+    academicTerm: '2/2568',
+    academicYear: '2568',
+    r2FileCount: 510,
+    canvaLinkCount: 60,
+    originalMb: 1980.0,
+    r2UsedMb: 76.8,
+    isGradedComplete: true,
+    isBackedUpToSchoolDrive: true,
+    lastBackupAt: '31 มี.ค. 2569 (ปิดปีการศึกษา 2568)',
+    schoolDriveFolderPath:
+      'Google Drive รร. (100TB) / ปีการศึกษา 2568 / เทอม 2 / ท22102-ภาษาไทย 4 (ครูพิมพ์ใจ) / ม.2',
+    isPurgedFromR2: false,
+  },
+];

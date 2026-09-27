@@ -236,7 +236,28 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
                   currentView === 'readiness' ? 'text-teal-700' : 'text-slate-400'
                 }`}
               />
-              <span className="truncate">6. ส่งเกรด & ล้างไฟล์ R2</span>
+              <span className="truncate">6. ตรวจก่อนส่งเกรด (ปพ.5)</span>
+            </button>
+
+            <button
+              onClick={() => handleSelect('settings')}
+              className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-left text-xs transition-colors ${
+                currentView === 'settings'
+                  ? 'bg-teal-50 text-teal-900 font-bold border border-teal-300'
+                  : 'text-slate-700 hover:bg-slate-100 font-medium'
+              }`}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Settings
+                  className={`w-4 h-4 shrink-0 ${
+                    currentView === 'settings' ? 'text-teal-700' : 'text-slate-400'
+                  }`}
+                />
+                <span className="truncate">7. แดชบอร์ดแอดมิน & พื้นที่ R2</span>
+              </div>
+              <span className="px-1.5 py-0.2 rounded bg-blue-100 text-blue-800 text-[10px] font-bold shrink-0">
+                100TB
+              </span>
             </button>
           </div>
         </div>
