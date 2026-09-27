@@ -1,15 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
-  BookOpen,
   Plus,
   CheckCircle2,
-  Table,
-  FileCheck,
   Zap,
   FileText,
-  ArrowRightLeft,
-  UserPlus,
-  Star,
 } from 'lucide-react';
 import {
   sgsRosterAndSubmissionService,
@@ -19,9 +13,6 @@ import {
 } from '../services/sgsRosterAndSubmissionService';
 
 export const AssignmentManagementView: React.FC = () => {
-  // 2 มุมมองหลักตามที่ครูต้องการ:
-  // 1) 'MATRIX': ดูการส่งงานนักเรียนแบบตารางรวมทั้งเทอม (จำได้ว่าสั่งกี่งาน ใครทำไปกี่งาน กรอกคะแนนในตารางได้ทันที)
-  // 2) 'SPEED_GRADER': ตรวจงานนักเรียนรายชิ้น (ดูไฟล์งานที่ส่ง + กดปุ่มให้คะแนนด่วน 1 คลิก)
   const [viewMode, setViewMode] = useState<'MATRIX' | 'SPEED_GRADER'>('MATRIX');
 
   const [roster, setRoster] = useState<SgsStudentRecord[]>(() =>
@@ -34,7 +25,6 @@ export const AssignmentManagementView: React.FC = () => {
     sgsRosterAndSubmissionService.getSubmissions()
   );
 
-  // Q2-A: ซิงค์อัตโนมัติเมื่อฝ่ายทะเบียน/ครูที่ปรึกษาอัปเดตลำดับเลขที่ SGS ในหน้ารายชื่อห้องเรียน
   useEffect(() => {
     const syncRoster = () => {
       setRoster(sgsRosterAndSubmissionService.getSgsRoster());
@@ -57,7 +47,7 @@ export const AssignmentManagementView: React.FC = () => {
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3500);
+    setTimeout(() => setToastMsg(null), 2800);
   };
 
   const activeAssignment =
@@ -85,8 +75,8 @@ export const AssignmentManagementView: React.FC = () => {
     const target = updated.find((a) => a.id === assignmentId);
     showToast(
       target?.isRequiredForPass
-        ? `ตั้งค่า "${target.title}" เป็น ⭐ งานบังคับ (ไม่ส่งติด ร อัตโนมัติ)`
-        : `เปลี่ยน "${target?.title}" เป็นงานเก็บคะแนนทั่วไป (ไม่ติด ร)`
+        ? `ตั้ง "${target.title}" เป็นงานบังคับ (ไม่ส่งติด ร)`
+        : `เปลี่ยน "${target?.title}" เป็นงานทั่วไป`
     );
   };
 
@@ -110,13 +100,10 @@ export const AssignmentManagementView: React.FC = () => {
   };
 
   const handleBulkGradeAll = (assignmentId?: string) => {
-    const updated = sgsRosterAndSubmissionService.bulkGradeAllSubmitted(assignmentId);
+    const updated =
+      sgsRosterAndSubmissionService.bulkGradeAllSubmitted(assignmentId);
     setSubmissions(updated);
-    showToast(
-      assignmentId
-        ? 'ให้คะแนนเต็มสำหรับนักเรียนที่ส่งงานชิ้นนี้แล้วทั้งหมดเรียบร้อย!'
-        : 'ตรวจให้คะแนนเต็มทุกงานที่นักเรียนส่งเข้ามาแล้วทั้งหมดในคลิกเดียว!'
-    );
+    showToast('ให้คะแนนเต็มงานที่ส่งแล้วเรียบร้อย');
   };
 
   const handleCreateAssignment = (e: React.FormEvent) => {
@@ -133,464 +120,300 @@ export const AssignmentManagementView: React.FC = () => {
     setSelectedAssignmentId(updated[updated.length - 1].id);
     setNewTitle('');
     setIsNewModalOpen(false);
-    showToast('เพิ่มงานใหม่เข้าตารางส่งงานและผูกช่องคะแนน SGS เรียบร้อยแล้ว');
+    showToast('เพิ่มงานใหม่เรียบร้อยแล้ว');
   };
 
   return (
-    <div className="space-y-5 max-w-7xl mx-auto pb-12 animate-fade-in font-sans text-slate-800">
+    <div className="space-y-3 max-w-7xl mx-auto pb-8 font-sans text-slate-800">
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 text-xs font-semibold">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 text-xs font-medium">
+          <CheckCircle2 className="w-4 h-4 text-teal-400" />
           <span>{toastMsg}</span>
         </div>
       )}
 
-      {/* 1. Header & Pain-Point Solution Summary */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
+      {/* Single Clean Card: Toolbar + Table (No Cluttered Banners or Extra Cards) */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+        {/* Top Control Bar */}
+        <div className="px-4 py-3 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-teal-50 text-teal-700 rounded-xl">
-              <BookOpen className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-lg sm:text-xl font-bold text-slate-900">
-                ตารางติดตามการส่งงาน & ระบบตรวจงานนักเรียน (เชื่อมคะแนน ปพ.5 / SGS)
-              </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
-                ดูภาพรวมว่าสั่งไปกี่งาน ใครค้างส่งงานไหน และตรวจให้คะแนนแบบตารางหรือรายชิ้นในคลิกเดียว
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
-          {pendingReviewTotal > 0 && (
-            <button
-              onClick={() => handleBulkGradeAll()}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
-            >
-              <Zap className="w-4 h-4" />
-              <span>ตรวจให้คะแนนเต็มงานที่ส่งแล้วทั้งหมด ({pendingReviewTotal} ชิ้น)</span>
-            </button>
-          )}
-
-          <button
-            onClick={() => setIsNewModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span>สั่งงานใหม่ (+ผูกช่อง SGS)</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Rule of Thirds (3 Summary Cards: จำได้ทันทีว่าสั่งกี่งาน รอตรวจกี่ชิ้น ใครค้างส่ง) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-xs font-medium text-slate-500">
-              งานที่ครูสั่งแล้วทั้งหมดในเทอมนี้
-            </span>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 tabular-nums">
-                {assignments.length} งาน
-              </span>
-              <span className="text-xs font-semibold text-teal-700">
-                (คะแนนเก็บรวม {totalMaxScore} คะแนน)
-              </span>
+            <div className="inline-flex bg-slate-100 p-1 rounded-xl text-xs">
+              <button
+                onClick={() => setViewMode('MATRIX')}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition-colors ${
+                  viewMode === 'MATRIX'
+                    ? 'bg-white text-slate-900 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                ตารางส่งงาน ({assignments.length} งาน)
+              </button>
+              <button
+                onClick={() => setViewMode('SPEED_GRADER')}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition-colors flex items-center gap-1.5 ${
+                  viewMode === 'SPEED_GRADER'
+                    ? 'bg-white text-slate-900 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>ตรวจรายชิ้น</span>
+                {pendingReviewTotal > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">
+                    {pendingReviewTotal}
+                  </span>
+                )}
+              </button>
             </div>
           </div>
-          <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
-            ผูกหน่วยที่ 1–3
-          </span>
-        </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-xs font-medium text-slate-500">
-              ผลงานนักเรียนที่ส่งแล้วรอครูตรวจ
-            </span>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-amber-600 tabular-nums">
-                {pendingReviewTotal} ชิ้น
-              </span>
-              <span className="text-xs text-slate-500">
-                กดตรวจรวมในคลิกเดียวได้
-              </span>
-            </div>
-          </div>
-          <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold">
-            ไม่ต้องเปิดทีละคน
-          </span>
-        </div>
+          <div className="flex flex-wrap items-center gap-2.5 text-xs">
+            <label className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-700 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={!hideTransferredOut}
+                onChange={() => setHideTransferredOut((v) => !v)}
+                className="w-3.5 h-3.5 accent-teal-600 rounded"
+              />
+              <span>แสดงคนย้ายออก</span>
+            </label>
 
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-xs font-medium text-slate-500">
-              การเรียงรายชื่อเทียบระบบ SGS (ชาย ➔ หญิง)
-            </span>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-base font-bold text-teal-700">
-                ชายต่อท้ายชาย (เลขที่ 5) • ย้ายออกคงเลขที่ 3
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              คะแนนผูกตามรหัสนักเรียน ไม่สลับคนแม้เลื่อนเลขที่หญิง
-            </p>
-          </div>
-          <span className="px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold">
-            ตรงบรรทัด 100%
-          </span>
-        </div>
-      </div>
-
-      {/* 3. Mode Switcher Bar: แบบตารางเช็คงานทั้งห้อง vs แบบตรวจงานรายชิ้น */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
-            <button
-              onClick={() => setViewMode('MATRIX')}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-colors ${
-                viewMode === 'MATRIX'
-                  ? 'bg-slate-900 text-white shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Table className="w-4 h-4" />
-              <span>1. ดูแบบตารางส่งงานทั้งเทอม (เช็คใครส่งกี่งาน / กรอกคะแนนในตาราง)</span>
-            </button>
+            {pendingReviewTotal > 0 && (
+              <button
+                onClick={() => handleBulkGradeAll()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-semibold transition-colors"
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-600" />
+                <span>ตรวจให้เต็มที่ส่งแล้ว ({pendingReviewTotal})</span>
+              </button>
+            )}
 
             <button
-              onClick={() => setViewMode('SPEED_GRADER')}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-colors ${
-                viewMode === 'SPEED_GRADER'
-                  ? 'bg-slate-900 text-white shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+              onClick={() => setIsNewModalOpen(true)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-semibold transition-colors"
             >
-              <FileCheck className="w-4 h-4" />
-              <span>2. โหมดตรวจงานนักเรียนรายชิ้น (ดูไฟล์งานที่ส่ง & กดให้คะแนนด่วน)</span>
+              <Plus className="w-3.5 h-3.5" />
+              <span>สั่งงานใหม่</span>
             </button>
           </div>
-
-          <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={!hideTransferredOut}
-              onChange={() => setHideTransferredOut((v) => !v)}
-              className="w-4 h-4 accent-teal-600 rounded"
-            />
-            <span>คงแถวนักเรียนย้ายออก (เลขที่ 3) ให้ตรงบรรทัด SGS</span>
-          </label>
         </div>
 
         {/* =====================================================================
-            VIEW MODE 1: ตารางภาพรวมการส่งงานทั้งห้อง (Submission Matrix Grid)
+            VIEW MODE 1: ตารางส่งงานทั้งเทอม (Clean Spreadsheet Matrix)
            ===================================================================== */}
         {viewMode === 'MATRIX' && (
-          <div>
-            <div className="px-5 py-3 bg-slate-50/70 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <div className="text-slate-600">
-                💡 <strong>วิธีใช้แบบเร็ว:</strong> พิมพ์ตัวเลขคะแนนลงในช่องตารางได้ทันที หรือคลิกปุ่ม{' '}
-                <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-bold">
-                  รอตรวจ (กดให้เต็ม)
-                </span>{' '}
-                เพื่อให้คะแนนเต็มทันทีโดยไม่ต้องเปิดดูทีละคน
-              </div>
-              <div className="flex items-center gap-3 text-[11px] font-semibold">
-                <span className="inline-flex items-center gap-1 text-teal-700">
-                  <span className="w-2 h-2 rounded-full bg-teal-500" /> ตรวจแล้ว
-                </span>
-                <span className="inline-flex items-center gap-1 text-amber-700">
-                  <span className="w-2 h-2 rounded-full bg-amber-500" /> ส่งแล้วรอตรวจ
-                </span>
-                <span className="inline-flex items-center gap-1 text-rose-600">
-                  <span className="w-2 h-2 rounded-full bg-rose-500" /> ยังไม่ส่ง (ค้าง)
-                </span>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
-                    <th className="w-12 text-center">เลขที่</th>
-                    <th className="min-w-48">ชื่อ-สกุล (รหัส) • สถานะ</th>
-                    <th className="text-center">ส่งงาน</th>
-                    {assignments.map((asg) => (
-                      <th
-                        key={asg.id}
-                        className="text-center min-w-28 border-l border-slate-200/70"
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold">
+                  <th className="w-12 text-center">เลขที่</th>
+                  <th className="w-16">รหัส</th>
+                  <th className="min-w-44">ชื่อ - นามสกุล</th>
+                  {assignments.map((asg) => (
+                    <th
+                      key={asg.id}
+                      className="text-center min-w-24 border-l border-slate-100"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleToggleMandatory(asg.id)}
+                        className="w-full text-center group"
+                        title={`คลิกเพื่อสลับงานบังคับ (ปัจจุบัน: ${
+                          asg.isRequiredForPass ? 'งานบังคับ ไม่ส่งติด ร' : 'งานทั่วไป'
+                        })`}
                       >
-                        <div className="flex items-center justify-center gap-1 font-bold text-slate-900">
+                        <div className="font-bold text-slate-800 group-hover:text-teal-700 flex items-center justify-center gap-1">
                           <span>
                             งาน {asg.orderNo} ({asg.maxScore})
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleMandatory(asg.id)}
-                            className={`inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold transition-colors ${
-                              asg.isRequiredForPass
-                                ? 'bg-rose-100 text-rose-800 border border-rose-200 hover:bg-rose-200'
-                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                            }`}
-                            title={`${asg.title} (${asg.dueDate}) — คลิกเพื่อสลับงานบังคับติด ร`}
-                          >
-                            <Star
-                              className={`w-2.5 h-2.5 ${
-                                asg.isRequiredForPass ? 'fill-rose-600 text-rose-600' : ''
-                              }`}
-                            />
-                            <span>{asg.isRequiredForPass ? 'บังคับ' : 'ทั่วไป'}</span>
-                          </button>
-                        </div>
-                        <div className="text-[10px] text-slate-500 truncate max-w-32 mx-auto">
-                          [{asg.sgsUnit.toUpperCase()}] {asg.title.replace(/^.*:\s*/, '')}
-                        </div>
-                      </th>
-                    ))}
-                    <th className="text-center border-l border-slate-200 bg-teal-50/50 text-teal-900 font-bold">
-                      รวม ({totalMaxScore}) • สถานะ ร
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y divide-slate-100">
-                  {visibleRoster.map((stu) => {
-                    const computed =
-                      sgsRosterAndSubmissionService.computeStudentSgsGrades(stu);
-                    const isTransferredOut =
-                      stu.transferState === 'TRANSFERRED_OUT';
-                    const isTransferredIn =
-                      stu.transferState === 'TRANSFERRED_IN';
-
-                    return (
-                      <tr
-                        key={stu.studentCode}
-                        className={
-                          isTransferredOut
-                            ? 'bg-slate-100/80 text-slate-400'
-                            : isTransferredIn
-                            ? 'bg-indigo-50/30 hover:bg-indigo-50/60'
-                            : 'hover:bg-slate-50/70'
-                        }
-                      >
-                        <td className="text-center font-bold tabular-nums">
-                          {stu.sgsSeatNo}
-                        </td>
-
-                        <td className="whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
+                          {asg.isRequiredForPass && (
                             <span
-                              className={`font-bold ${
-                                isTransferredOut
-                                  ? 'line-through text-slate-400'
-                                  : 'text-slate-900'
-                              }`}
+                              className="text-rose-600 font-bold"
+                              title="งานบังคับ (ไม่ส่งติด ร)"
                             >
-                              {stu.studentName}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              ({stu.studentCode})
-                            </span>
-                            {isTransferredOut && (
-                              <span
-                                className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-slate-200 text-slate-700 text-[10px] font-semibold"
-                                title={`ย้ายออก (${stu.transferDate}) — ล็อกแถวเลขที่ ${stu.sgsSeatNo} ตาม SGS`}
-                              >
-                                <ArrowRightLeft className="w-2.5 h-2.5" />
-                                <span>ย้ายออก (ล็อก #{stu.sgsSeatNo})</span>
-                              </span>
-                            )}
-                            {isTransferredIn && (
-                              <span
-                                className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-800 text-[10px] font-semibold"
-                                title={`ย้ายเข้าใหม่ (${stu.transferDate}) — ต่อท้ายกลุ่มชาย`}
-                              >
-                                <UserPlus className="w-2.5 h-2.5" />
-                                <span>เข้าใหม่ (ต่อท้ายชาย)</span>
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        <td className="text-center whitespace-nowrap">
-                          {isTransferredOut ? (
-                            <span className="text-[10px] font-semibold text-slate-400">
-                              ย้ายออก
-                            </span>
-                          ) : computed.missingCount === 0 ? (
-                            <span className="px-1.5 py-0.2 rounded-full bg-teal-50 text-teal-700 border border-teal-200 font-bold text-[10px]">
-                              ครบ {computed.submittedCount}/{computed.totalAssignedCount}
-                            </span>
-                          ) : (
-                            <span className="px-1.5 py-0.2 rounded-full bg-rose-50 text-rose-700 border border-rose-200 font-bold text-[10px]">
-                              {computed.submittedCount}/{computed.totalAssignedCount} (ค้าง{' '}
-                              {computed.missingCount})
+                              *
                             </span>
                           )}
-                        </td>
+                        </div>
+                        <div className="text-[10px] font-normal text-slate-400 truncate max-w-28 mx-auto">
+                          {asg.title.replace(/^.*:\s*/, '')}
+                        </div>
+                      </button>
+                    </th>
+                  ))}
+                  <th className="w-24 text-center border-l border-slate-200 bg-slate-50 text-slate-800 font-bold">
+                    รวม ({totalMaxScore})
+                  </th>
+                  <th className="w-20 text-center">สถานะ</th>
+                </tr>
+              </thead>
 
-                        {assignments.map((asg) => {
-                          const cell = getSubmissionCell(stu.studentCode, asg.id);
+              <tbody className="divide-y divide-slate-100">
+                {visibleRoster.map((stu) => {
+                  const computed =
+                    sgsRosterAndSubmissionService.computeStudentSgsGrades(stu);
+                  const isTransferredOut =
+                    stu.transferState === 'TRANSFERRED_OUT';
+                  const isTransferredIn =
+                    stu.transferState === 'TRANSFERRED_IN';
 
-                          if (isTransferredOut) {
-                            return (
-                              <td
-                                key={asg.id}
-                                className="text-center border-l border-slate-200/60 text-slate-400 text-[11px]"
-                              >
-                                —
-                              </td>
-                            );
-                          }
+                  return (
+                    <tr
+                      key={stu.studentCode}
+                      className={
+                        isTransferredOut
+                          ? 'bg-slate-50 text-slate-400'
+                          : 'hover:bg-slate-50/70'
+                      }
+                    >
+                      <td className="text-center font-semibold text-slate-600 tabular-nums">
+                        {stu.sgsSeatNo}
+                      </td>
 
+                      <td className="font-mono text-slate-400 tabular-nums">
+                        {stu.studentCode}
+                      </td>
+
+                      <td className="whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1.5">
+                          <span
+                            className={`font-medium ${
+                              isTransferredOut
+                                ? 'line-through text-slate-400'
+                                : 'text-slate-900'
+                            }`}
+                          >
+                            {stu.studentName}
+                          </span>
+                          {isTransferredOut && (
+                            <span className="px-1.5 py-0.2 rounded bg-slate-200/80 text-slate-600 text-[10px]">
+                              ย้ายออก
+                            </span>
+                          )}
+                          {isTransferredIn && (
+                            <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[10px]">
+                              ย้ายเข้า
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {assignments.map((asg) => {
+                        const cell = getSubmissionCell(stu.studentCode, asg.id);
+
+                        if (isTransferredOut) {
                           return (
                             <td
                               key={asg.id}
-                              className="text-center border-l border-slate-200/60 whitespace-nowrap"
+                              className="text-center border-l border-slate-100 text-slate-300"
                             >
-                              {cell?.status === 'SUBMITTED_PENDING' ? (
-                                <button
-                                  onClick={() =>
-                                    handleGradeChange(
-                                      asg.id,
-                                      stu.studentCode,
-                                      asg.maxScore
-                                    )
-                                  }
-                                  className="px-2 py-0.5 rounded-md bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-[11px] transition-colors"
-                                  title={`ส่งแล้วเมื่อ ${cell.submittedAt} — คลิกเพื่อให้คะแนนเต็ม (${asg.maxScore}) ทันที`}
-                                >
-                                  รอตรวจ•ให้เต็ม({asg.maxScore})
-                                </button>
-                              ) : cell?.status === 'EXEMPT_TRANSFERRED' ? (
-                                <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold text-[10px]">
-                                  โอน {cell.score ?? 0}/{asg.maxScore}
-                                </span>
-                              ) : cell?.status === 'GRADED' ? (
-                                <div className="inline-flex items-center justify-center gap-0.5">
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    max={asg.maxScore}
-                                    value={cell.score ?? ''}
-                                    onChange={(e) =>
-                                      handleGradeChange(
-                                        asg.id,
-                                        stu.studentCode,
-                                        e.target.value === ''
-                                          ? null
-                                          : Number(e.target.value)
-                                      )
-                                    }
-                                    className="w-11 h-6 text-center font-bold text-teal-800 bg-teal-50/70 border border-teal-200 rounded-md tabular-nums text-xs"
-                                  />
-                                  <span className="text-slate-400 text-[10px]">
-                                    /{asg.maxScore}
-                                  </span>
-                                </div>
-                              ) : (
-                                <div className="inline-flex items-center justify-center gap-1">
-                                  <span className="text-[10px] font-bold text-rose-600">
-                                    ค้าง
-                                  </span>
-                                  <button
-                                    onClick={() =>
-                                      handleGradeChange(
-                                        asg.id,
-                                        stu.studentCode,
-                                        asg.maxScore
-                                      )
-                                    }
-                                    className="px-1.5 py-0.2 rounded bg-slate-100 hover:bg-teal-50 text-[10px] text-slate-600 hover:text-teal-700 font-semibold border border-slate-200"
-                                  >
-                                    +ให้คะแนน
-                                  </button>
-                                </div>
-                              )}
+                              —
                             </td>
                           );
-                        })}
+                        }
 
-                        <td className="text-center border-l border-slate-200 bg-teal-50/30 font-bold text-teal-800 tabular-nums whitespace-nowrap">
-                          {isTransferredOut ? (
-                            '—'
-                          ) : (
-                            <div className="inline-flex items-center justify-center gap-1.5">
-                              <span>
-                                {computed.effectiveAccumulated}/{totalMaxScore}
-                              </span>
-                              {computed.isManualOverride && (
-                                <span
-                                  className="px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-800 text-[10px] font-bold"
-                                  title="ครูพิมพ์คะแนนเก็บสุทธิทับเอง"
-                                >
-                                  ✏️สุทธิ
-                                </span>
-                              )}
-                              {computed.missingMandatoryTitles.length > 0 ? (
-                                <span className="px-1.5 py-0.2 rounded bg-rose-600 text-white text-[10px] font-bold">
-                                  ติด ร ({computed.missingMandatoryTitles.join(',')})
-                                </span>
-                              ) : (
-                                <span className="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                                  ✓ครบ
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        return (
+                          <td
+                            key={asg.id}
+                            className="text-center border-l border-slate-100 whitespace-nowrap"
+                          >
+                            {cell?.status === 'SUBMITTED_PENDING' ? (
+                              <button
+                                onClick={() =>
+                                  handleGradeChange(
+                                    asg.id,
+                                    stu.studentCode,
+                                    asg.maxScore
+                                  )
+                                }
+                                className="px-2 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 font-semibold text-[11px] transition-colors"
+                                title={`ส่งแล้ว (${cell.submittedAt}) — คลิกเพื่อให้ ${asg.maxScore} คะแนน`}
+                              >
+                                รอตรวจ ({asg.maxScore})
+                              </button>
+                            ) : cell?.status === 'GRADED' ? (
+                              <input
+                                type="number"
+                                min={0}
+                                max={asg.maxScore}
+                                value={cell.score ?? ''}
+                                onChange={(e) =>
+                                  handleGradeChange(
+                                    asg.id,
+                                    stu.studentCode,
+                                    e.target.value === ''
+                                      ? null
+                                      : Number(e.target.value)
+                                  )
+                                }
+                                className="w-12 h-6 text-center font-semibold text-slate-800 bg-transparent hover:bg-slate-100 focus:bg-white border border-transparent hover:border-slate-200 focus:border-teal-500 rounded tabular-nums text-xs focus:outline-none"
+                              />
+                            ) : (
+                              <button
+                                onClick={() =>
+                                  handleGradeChange(
+                                    asg.id,
+                                    stu.studentCode,
+                                    asg.maxScore
+                                  )
+                                }
+                                className="w-12 h-6 rounded text-slate-300 hover:text-teal-700 hover:bg-slate-100 text-[11px] transition-colors"
+                                title="ยังไม่ส่ง — คลิกเพื่อให้คะแนน"
+                              >
+                                —
+                              </button>
+                            )}
+                          </td>
+                        );
+                      })}
+
+                      <td className="text-center border-l border-slate-200 bg-slate-50/50 font-bold text-slate-900 tabular-nums">
+                        {isTransferredOut ? '—' : computed.effectiveAccumulated}
+                      </td>
+
+                      <td className="text-center whitespace-nowrap">
+                        {isTransferredOut ? (
+                          <span className="text-slate-400 text-[11px]">—</span>
+                        ) : computed.missingMandatoryTitles.length > 0 ? (
+                          <span
+                            className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 font-semibold text-[11px]"
+                            title={`ค้างงานบังคับ: ${computed.missingMandatoryTitles.join(', ')}`}
+                          >
+                            ติด ร
+                          </span>
+                        ) : (
+                          <span className="text-teal-700 font-medium text-[11px]">
+                            ครบ
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
 
         {/* =====================================================================
-            VIEW MODE 2: โหมดตรวจงานนักเรียนรายชิ้นแบบแถวกระชับ (Compact Table SpeedGrader)
+            VIEW MODE 2: ตรวจรายชิ้น (Clean SpeedGrader Table)
            ===================================================================== */}
         {viewMode === 'SPEED_GRADER' && (
           <div className="p-4 space-y-3">
-            {/* แถบเลือกงานที่ต้องการตรวจ */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-xs font-bold text-slate-600">
-                  เลือกงานตรวจ:
-                </span>
                 {assignments.map((asg) => {
                   const isSelected = asg.id === activeAssignment.id;
-                  const pendingInAsg = submissions.filter(
-                    (s) =>
-                      s.assignmentId === asg.id &&
-                      s.status === 'SUBMITTED_PENDING'
-                  ).length;
                   return (
                     <button
                       key={asg.id}
                       onClick={() => setSelectedAssignmentId(asg.id)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 ${
+                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                         isSelected
-                          ? 'bg-teal-600 text-white shadow-2xs'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                       }`}
                     >
-                      <span>
-                        งาน {asg.orderNo}: {asg.title.replace(/^.*:\s*/, '')}
-                      </span>
-                      {asg.isRequiredForPass && (
-                        <span className="px-1 py-0.2 rounded bg-rose-500 text-white font-bold text-[10px]">
-                          ⭐บังคับ
-                        </span>
-                      )}
-                      {pendingInAsg > 0 && (
-                        <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 font-bold text-[10px]">
-                          รอ {pendingInAsg}
-                        </span>
-                      )}
+                      งาน {asg.orderNo}: {asg.title.replace(/^.*:\s*/, '')}
                     </button>
                   );
                 })}
@@ -598,25 +421,20 @@ export const AssignmentManagementView: React.FC = () => {
 
               <button
                 onClick={() => handleBulkGradeAll(activeAssignment.id)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold shadow-xs shrink-0"
+                className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold"
               >
-                <Zap className="w-3.5 h-3.5" />
-                <span>
-                  ให้เต็ม ({activeAssignment.maxScore}) ทุกคนที่ส่งแล้ว
-                </span>
+                ให้เต็ม ({activeAssignment.maxScore}) ทุกคนที่ส่งแล้ว
               </button>
             </div>
 
-            {/* ตารางตรวจผลงานรายคนแบบบรรทัดเดียวกระชับ (เห็นครบทั้งห้องในหน้าเดียว) */}
-            <div className="overflow-x-auto border border-slate-200 rounded-xl">
+            <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                  <tr className="border-b border-slate-200 text-slate-500 font-semibold">
                     <th className="w-12 text-center">เลขที่</th>
-                    <th>ชื่อ - นามสกุล (รหัส)</th>
-                    <th>สถานะการส่ง</th>
-                    <th>ไฟล์ผลงาน & เวลาส่ง</th>
-                    <th className="text-right">กดให้คะแนนด่วน (1 คลิก) / กรอกคะแนน</th>
+                    <th>ชื่อ - นามสกุล</th>
+                    <th>ไฟล์งานที่ส่ง</th>
+                    <th className="text-right">ให้คะแนน (เต็ม {activeAssignment.maxScore})</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -633,61 +451,26 @@ export const AssignmentManagementView: React.FC = () => {
                         key={stu.studentCode}
                         className={
                           isTransferredOut
-                            ? 'bg-slate-100 text-slate-400'
-                            : sub?.status === 'SUBMITTED_PENDING'
-                            ? 'bg-amber-50/40 hover:bg-amber-50/70'
-                            : (!sub || sub.status === 'MISSING')
-                            ? 'bg-rose-50/20 hover:bg-rose-50/40'
+                            ? 'bg-slate-50 text-slate-400'
                             : 'hover:bg-slate-50'
                         }
                       >
-                        <td className="text-center font-bold tabular-nums">
+                        <td className="text-center font-semibold text-slate-600 tabular-nums">
                           {stu.sgsSeatNo}
                         </td>
-                        <td className="whitespace-nowrap">
-                          <span className="font-bold text-slate-900">
-                            {stu.studentName}
-                          </span>{' '}
-                          <span className="text-slate-400 font-mono text-[10px]">
-                            ({stu.studentCode})
-                          </span>
+                        <td className="font-medium text-slate-900 whitespace-nowrap">
+                          {stu.studentName}
                         </td>
-                        <td className="whitespace-nowrap">
+                        <td className="text-slate-500 whitespace-nowrap">
                           {isTransferredOut ? (
-                            <span className="text-slate-400">ย้ายออก</span>
-                          ) : sub?.status === 'GRADED' ? (
-                            <span className="px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 font-bold text-[10px]">
-                              ✓ ตรวจแล้ว ({sub.score}/{activeAssignment.maxScore})
-                            </span>
-                          ) : sub?.status === 'SUBMITTED_PENDING' ? (
-                            <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px]">
-                              ⏳ รอครูตรวจ
+                            'ย้ายออก'
+                          ) : sub?.workTitle ? (
+                            <span className="inline-flex items-center gap-1 text-slate-700">
+                              <FileText className="w-3.5 h-3.5 text-teal-600" />
+                              <span>{sub.workTitle}</span>
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold text-[10px]">
-                              {activeAssignment.isRequiredForPass
-                                ? '⚠️ ค้างงานบังคับ (ติด ร)'
-                                : '⚠️ ยังไม่ส่ง'}
-                            </span>
-                          )}
-                        </td>
-                        <td className="whitespace-nowrap text-slate-600">
-                          {isTransferredOut ? (
-                            '—'
-                          ) : (
-                            <div className="inline-flex items-center gap-2">
-                              <span className="inline-flex items-center gap-1 font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
-                                <FileText className="w-3 h-3 text-teal-600" />
-                                <span className="truncate max-w-44">
-                                  {sub?.workTitle || 'รอส่งหน้าชั้นเรียน'}
-                                </span>
-                              </span>
-                              {sub?.submittedAt && (
-                                <span className="text-[10px] text-slate-400">
-                                  ({sub.submittedAt})
-                                </span>
-                              )}
-                            </div>
+                            <span className="text-slate-400">ยังไม่ส่ง</span>
                           )}
                         </td>
                         <td className="text-right whitespace-nowrap">
@@ -695,20 +478,15 @@ export const AssignmentManagementView: React.FC = () => {
                             <div className="inline-flex items-center justify-end gap-1">
                               {[
                                 {
-                                  label: `เต็ม(${activeAssignment.maxScore})`,
+                                  label: `เต็ม (${activeAssignment.maxScore})`,
                                   val: activeAssignment.maxScore,
                                 },
                                 {
-                                  label: `ดีมาก(${Math.max(
-                                    1,
-                                    activeAssignment.maxScore - 1
-                                  )})`,
+                                  label: `${Math.max(1, activeAssignment.maxScore - 1)}`,
                                   val: Math.max(1, activeAssignment.maxScore - 1),
                                 },
                                 {
-                                  label: `ผ่าน(${Math.ceil(
-                                    activeAssignment.maxScore * 0.7
-                                  )})`,
+                                  label: `${Math.ceil(activeAssignment.maxScore * 0.7)}`,
                                   val: Math.ceil(activeAssignment.maxScore * 0.7),
                                 },
                               ].map((preset) => (
@@ -721,10 +499,10 @@ export const AssignmentManagementView: React.FC = () => {
                                       preset.val
                                     )
                                   }
-                                  className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition-colors ${
+                                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
                                     sub?.score === preset.val
-                                      ? 'bg-teal-600 text-white shadow-2xs'
-                                      : 'bg-slate-100 hover:bg-teal-50 text-slate-700 hover:text-teal-800 border border-slate-200'
+                                      ? 'bg-teal-600 text-white'
+                                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                                   }`}
                                 >
                                   {preset.label}
@@ -735,7 +513,7 @@ export const AssignmentManagementView: React.FC = () => {
                                 type="number"
                                 min={0}
                                 max={activeAssignment.maxScore}
-                                placeholder="คะแนน"
+                                placeholder="—"
                                 value={sub?.score ?? ''}
                                 onChange={(e) =>
                                   handleGradeChange(
@@ -746,7 +524,7 @@ export const AssignmentManagementView: React.FC = () => {
                                       : Number(e.target.value)
                                   )
                                 }
-                                className="w-12 h-6 px-1 text-center font-bold border border-slate-300 rounded-md tabular-nums text-xs"
+                                className="w-12 h-6 px-1 text-center font-semibold border border-slate-200 rounded tabular-nums text-xs"
                               />
                             </div>
                           )}
@@ -761,27 +539,25 @@ export const AssignmentManagementView: React.FC = () => {
         )}
       </div>
 
-      {/* Modal สั่งงานใหม่ + ผูกช่องคะแนน SGS */}
+      {/* Modal สั่งงานใหม่ */}
       {isNewModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
           <form
             onSubmit={handleCreateAssignment}
             className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 space-y-4 shadow-xl text-xs"
           >
-            <h3 className="text-base font-bold text-slate-900">
-              + สั่งงานใหม่ (ผูกเข้าตารางเช็คงาน & ช่องคะแนน SGS)
-            </h3>
+            <h3 className="text-base font-bold text-slate-900">สั่งงานใหม่</h3>
 
             <div>
               <label className="block font-semibold text-slate-700 mb-1">
-                หัวข้องาน / การบ้าน
+                ชื่อชิ้นงาน / การบ้าน
               </label>
               <input
                 type="text"
                 required
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="เช่น วาดภาพทัศนียภาพ 1 จุดรวมสายตา"
+                placeholder="เช่น วาดภาพทัศนียภาพ"
                 className="w-full px-3 py-2 rounded-xl border border-slate-200"
               />
             </div>
@@ -789,16 +565,16 @@ export const AssignmentManagementView: React.FC = () => {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  ผูกเข้าช่องคะแนน SGS
+                  หน่วยคะแนน SGS
                 </label>
                 <select
                   value={newUnit}
                   onChange={(e) => setNewUnit(e.target.value as any)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white"
                 >
-                  <option value="u1">หน่วยที่ 1 (ก่อนกลางภาค)</option>
-                  <option value="u2">หน่วยที่ 2 (ก่อนกลางภาค)</option>
-                  <option value="u3">หน่วยที่ 3 (หลังกลางภาค)</option>
+                  <option value="u1">หน่วยที่ 1</option>
+                  <option value="u2">หน่วยที่ 2</option>
+                  <option value="u3">หน่วยที่ 3</option>
                 </select>
               </div>
               <div>
@@ -828,21 +604,16 @@ export const AssignmentManagementView: React.FC = () => {
               />
             </div>
 
-            <label className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-50/70 border border-rose-200 cursor-pointer">
+            <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={newIsRequiredForPass}
                 onChange={(e) => setNewIsRequiredForPass(e.target.checked)}
-                className="mt-0.5 accent-rose-600 w-4 h-4"
+                className="accent-teal-600 w-4 h-4"
               />
-              <div>
-                <div className="font-bold text-rose-900">
-                  ⭐ ตั้งเป็นงานบังคับ / ตัวชี้วัดต้องรู้ (ไม่ส่งติด &quot;ร&quot; อัตโนมัติ)
-                </div>
-                <div className="text-[11px] text-rose-700 mt-0.5">
-                  หากนักเรียนไม่ส่งงานชิ้นนี้ ระบบจะขึ้นสถานะติด &quot;ร&quot; ในตาราง SGS และปลดให้อัตโนมัติเมื่อครูตรวจให้คะแนน
-                </div>
-              </div>
+              <span className="font-medium text-slate-700">
+                ตั้งเป็นงานบังคับ (หากไม่ส่งจะขึ้นสถานะติด &quot;ร&quot;)
+              </span>
             </label>
 
             <div className="flex justify-end gap-2 pt-2">
@@ -855,9 +626,9 @@ export const AssignmentManagementView: React.FC = () => {
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 rounded-xl bg-teal-600 text-white font-bold"
+                className="px-4 py-2 rounded-xl bg-teal-600 text-white font-semibold"
               >
-                บันทึกและเพิ่มคอลัมน์ในตารางส่งงาน
+                บันทึก
               </button>
             </div>
           </form>

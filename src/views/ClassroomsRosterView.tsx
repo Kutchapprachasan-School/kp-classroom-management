@@ -240,47 +240,36 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
         })}
       </div>
 
-      {/* Q2-A: ศูนย์กลางลำดับเลขที่ SGS จากห้องทะเบียน/ครูที่ปรึกษา (Single Source of Truth ➔ ซิงค์ทุกวิชาอัตโนมัติ) */}
-      <div className="bg-white rounded-2xl border border-teal-200/80 p-5 shadow-xs space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800 text-[11px] font-bold">
-                Single Source of Truth (Q2-A)
-              </span>
-              <h2 className="text-sm sm:text-base font-bold text-slate-900">
-                ศูนย์กลางจัดลำดับเลขที่ใบรายชื่อ SGS ประจำห้อง (ซิงค์อัตโนมัติทุกกลุ่มสาระวิชา)
-              </h2>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              เมื่อครูที่ปรึกษาหรือฝ่ายทะเบียนปรับลำดับเลขที่ (ชาย ➔ หญิง / นักเรียนชายเข้าใหม่ต่อท้ายกลุ่มชาย / ล็อกเลขที่คนย้ายออก) ลำดับเลขที่ในตารางตรวจงานและตารางคะแนน ปพ.5 ของครูประจำวิชาทุกคนจะอัปเดตตรงกันทันทีโดยคะแนนไม่สลับคน
-            </p>
+      {/* จัดลำดับเลขที่ใบรายชื่อ SGS ประจำห้อง */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/60">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-bold text-slate-900">
+              ลำดับเลขที่ใบรายชื่อ SGS ประจำห้อง (ซิงค์ทุกวิชา)
+            </h2>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                const sorted = sgsRosterAndSubmissionService.sortRosterMaleFirstSgs();
-                setCentralSgsRoster(sorted);
-              }}
-              className="px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-xs transition-colors"
-            >
-              🔄 จัดเรียงมาตรฐาน SGS (ชาย ➔ หญิง) & ซิงค์ทุกวิชา
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const sorted = sgsRosterAndSubmissionService.sortRosterMaleFirstSgs();
+              setCentralSgsRoster(sorted);
+            }}
+            className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors"
+          >
+            เรียงลำดับ ชาย ➔ หญิง อัตโนมัติ
+          </button>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
-                <th className="py-2.5 px-3 text-center w-24">เลขที่ SGS</th>
-                <th className="py-2.5 px-3">รหัสประจำตัว</th>
-                <th className="py-2.5 px-3">ชื่อ - นามสกุล</th>
-                <th className="py-2.5 px-3 text-center">เพศ</th>
-                <th className="py-2.5 px-3">สถานะทะเบียน SGS (ซิงค์ทุกวิชา)</th>
-                <th className="py-2.5 px-3 text-right">จัดการโดยทะเบียน/ที่ปรึกษา</th>
+              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-semibold">
+                <th className="text-center w-20">เลขที่</th>
+                <th className="w-24">รหัส</th>
+                <th>ชื่อ - นามสกุล</th>
+                <th className="w-40">สถานะ</th>
+                <th className="text-right w-28">จัดการ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -289,13 +278,11 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                   key={stu.studentCode}
                   className={
                     stu.transferState === 'TRANSFERRED_OUT'
-                      ? 'bg-slate-100/70 text-slate-400'
-                      : stu.transferState === 'TRANSFERRED_IN'
-                      ? 'bg-indigo-50/30'
-                      : 'hover:bg-slate-50'
+                      ? 'bg-slate-50/80 text-slate-400'
+                      : 'hover:bg-slate-50/80'
                   }
                 >
-                  <td className="text-center font-bold tabular-nums whitespace-nowrap">
+                  <td className="text-center font-medium text-slate-500 tabular-nums whitespace-nowrap">
                     <div className="inline-flex items-center gap-1">
                       <span className="w-5 text-center">{stu.sgsSeatNo}</span>
                       <button
@@ -328,37 +315,30 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                       </button>
                     </div>
                   </td>
-                  <td className="py-2.5 px-3 font-mono">{stu.studentCode}</td>
-                  <td className="py-2.5 px-3 font-bold text-slate-900">
+                  <td className="font-mono text-slate-400">{stu.studentCode}</td>
+                  <td
+                    className={`font-medium ${
+                      stu.transferState === 'TRANSFERRED_OUT'
+                        ? 'line-through text-slate-400'
+                        : 'text-slate-800'
+                    }`}
+                  >
                     {stu.studentName}
                   </td>
-                  <td className="py-2.5 px-3 text-center">
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        stu.gender === 'MALE'
-                          ? 'bg-blue-50 text-blue-700'
-                          : 'bg-pink-50 text-pink-700'
-                      }`}
-                    >
-                      {stu.gender === 'MALE' ? 'ชาย' : 'หญิง'}
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-3">
+                  <td>
                     {stu.transferState === 'TRANSFERRED_OUT' ? (
-                      <span className="px-2 py-0.5 rounded bg-slate-200 text-slate-700 text-[11px] font-semibold">
-                        ย้ายออก — ล็อกแถวเลขที่ {stu.sgsSeatNo} ไม่ให้คนถัดไปเลื่อนบรรทัด
+                      <span className="text-slate-400 text-[11px]">
+                        ย้ายออก (คงเลขที่ #{stu.sgsSeatNo})
                       </span>
                     ) : stu.transferState === 'TRANSFERRED_IN' ? (
-                      <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[11px] font-semibold">
-                        ย้ายเข้าใหม่ — แทรกต่อท้ายกลุ่มชาย (เลขที่ {stu.sgsSeatNo})
+                      <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-medium">
+                        ย้ายเข้าใหม่
                       </span>
                     ) : (
-                      <span className="text-emerald-700 font-semibold text-[11px]">
-                        ✓ ปกติ (ซิงค์ครบ 8 กลุ่มสาระวิชา)
-                      </span>
+                      <span className="text-slate-500 text-[11px]">ปกติ</span>
                     )}
                   </td>
-                  <td className="py-2.5 px-3 text-right">
+                  <td className="text-right">
                     <button
                       type="button"
                       onClick={() =>
@@ -368,11 +348,11 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                           )
                         )
                       }
-                      className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-100 text-[11px] font-semibold text-slate-700"
+                      className="px-2 py-0.5 rounded border border-slate-200 hover:bg-slate-100 text-[10px] font-medium text-slate-600"
                     >
                       {stu.transferState === 'TRANSFERRED_OUT'
-                        ? 'คืนสถานะปกติ'
-                        : 'แจ้งย้ายออก (ล็อกแถว SGS)'}
+                        ? 'คืนสถานะ'
+                        : 'แจ้งย้ายออก'}
                     </button>
                   </td>
                 </tr>

@@ -89,6 +89,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
     sgsRosterAndSubmissionService.getSgsRoster()
   );
   const [keepTransferredOutRow, setKeepTransferredOutRow] = useState(true);
+  const [isRosterEditMode, setIsRosterEditMode] = useState(false);
   const [isTransferInModalOpen, setIsTransferInModalOpen] = useState(false);
   const [transferInCode, setTransferInCode] = useState('45129');
   const [transferInName, setTransferInName] = useState('');
@@ -691,37 +692,41 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
         </div>
       )}
 
-      {/* 5. TAB: สรุปคะแนน ปพ.5 & ซิงค์รายชื่อตรงบรรทัด SGS (Grades Summary Table) */}
+      {/* 5. TAB: สรุปคะแนน ปพ.5 & นำเข้า SGS */}
       {activeTab === 'grades' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-5">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-            <div>
-              <h3 className="font-bold text-slate-900 text-base">
-                ตารางสรุปคะแนนรวม ปพ.5 & เตรียมนำเข้า SGS — ศ23101 ศิลปะ ม.3/1
+        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/60">
+            <div className="flex items-center gap-3">
+              <h3 className="font-bold text-slate-900 text-sm">
+                สรุปคะแนน ปพ.5 & นำเข้า SGS — ศิลปะ ม.3/1
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                ดึงคะแนนเก็บหน่วยที่ 1–3 จากตารางตรวจงานอัตโนมัติ • ล็อกลำดับเลขที่ให้ตรงกับใบรายชื่อ SGS 100% (ป้องกันบรรทัดเลื่อนจากนักเรียนย้ายเข้า/ย้ายออก)
-              </p>
+              <span className="text-xs text-slate-400 hidden sm:inline">•</span>
+              <span className="text-xs text-slate-500 hidden sm:inline">
+                คลิกช่อง &ldquo;รวมเก็บ (50)&rdquo; เพื่อพิมพ์คะแนนสุทธิทับได้โดยตรง
+              </span>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto text-xs">
-              <button
-                onClick={() => {
-                  const sorted =
-                    sgsRosterAndSubmissionService.sortRosterMaleFirstSgs();
-                  setSgsRoster(sorted);
-                }}
-                className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 rounded-xl font-bold transition-colors"
-              >
-                <span>🔄 จัดเรียง ชาย ➔ หญิง (ผู้ชายต่อท้ายผู้ชาย)</span>
-              </button>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <label className="inline-flex items-center gap-1.5 text-slate-600 cursor-pointer select-none px-2 py-1 rounded hover:bg-slate-100">
+                <input
+                  type="checkbox"
+                  checked={keepTransferredOutRow}
+                  onChange={() => setKeepTransferredOutRow((v) => !v)}
+                  className="w-3.5 h-3.5 accent-slate-800 rounded"
+                />
+                <span>แสดงคนย้ายออก</span>
+              </label>
 
               <button
-                onClick={() => setIsTransferInModalOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-xl font-bold transition-colors"
+                type="button"
+                onClick={() => setIsRosterEditMode((v) => !v)}
+                className={`px-2.5 py-1.5 rounded-lg border font-semibold transition-colors ${
+                  isRosterEditMode
+                    ? 'bg-slate-800 text-white border-slate-800'
+                    : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                }`}
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ เพิ่มนักเรียนย้ายเข้าใหม่ (ต่อท้ายผู้ชาย / เลือกเลขที่ SGS)</span>
+                {isRosterEditMode ? 'เสร็จสิ้นการปรับรายชื่อ' : 'ปรับลำดับ / ย้ายเข้า-ออก'}
               </button>
 
               <button
@@ -746,72 +751,63 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                   a.download = 'SGS_Grades_M3_1_Aligned.csv';
                   a.click();
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold shadow-xs transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold transition-colors"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
-                <span>ส่งออกไฟล์ CSV/Excel ตรงบรรทัด SGS 100%</span>
+                <span>ส่งออก CSV (SGS)</span>
               </button>
             </div>
           </div>
 
-          {/* แถบซิงค์รายชื่อศูนย์กลางจากห้องทะเบียน/ครูที่ปรึกษา (Q2-A) + แก้คะแนนสุทธิอิสระ (Q1-C) + งานบังคับติด ร (Q3-A) */}
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-3 text-xs">
-            <div className="space-y-1 text-slate-700">
-              <div>
-                🛡️ <strong>ซิงค์ลำดับเลขที่ SGS ศูนย์กลาง (Q2-A):</strong>{' '}
-                <span className="font-bold text-teal-800">
-                  {sgsRosterAndSubmissionService.getCentralRosterSyncInfo().syncNote}
-                </span>{' '}
-                <span className="text-slate-500">
-                  (อัปเดตโดย{' '}
-                  {sgsRosterAndSubmissionService.getCentralRosterSyncInfo().lastUpdatedBy}{' '}
-                  • {sgsRosterAndSubmissionService.getCentralRosterSyncInfo().lastUpdatedAt})
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-600">
-                ✏️ <strong>บางวิชาไม่มีคะแนนเทียบโอน (Q1-C):</strong> ครูสามารถพิมพ์ตัวเลขทับในช่อง{' '}
-                <span className="font-bold text-indigo-800 bg-indigo-50 px-1.5 py-0.5 rounded">
-                  เก็บสุทธิ (50)
-                </span>{' '}
-                ได้โดยตรง • ⭐ หากค้างส่งงานบังคับ ระบบจะขึ้นสถานะ{' '}
-                <span className="font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded">
-                  ติด &quot;ร&quot;
-                </span>{' '}
-                อัตโนมัติ (Q3-A)
+          {isRosterEditMode && (
+            <div className="px-4 py-2 bg-slate-100/80 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span className="text-slate-600">
+                โหมดปรับรายชื่อ: กด ▲/▼ หน้าเลขที่เพื่อสลับลำดับ หรือเพิ่มนักเรียนย้ายเข้าใหม่
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sorted =
+                      sgsRosterAndSubmissionService.sortRosterMaleFirstSgs();
+                    setSgsRoster(sorted);
+                  }}
+                  className="px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-md font-semibold"
+                >
+                  เรียง ชาย ➔ หญิง อัตโนมัติ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsTransferInModalOpen(true)}
+                  className="flex items-center gap-1 px-2.5 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-md font-semibold"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>เพิ่มนักเรียนย้ายเข้า</span>
+                </button>
               </div>
             </div>
-
-            <label className="inline-flex items-center gap-2 font-bold text-teal-800 cursor-pointer shrink-0">
-              <input
-                type="checkbox"
-                checked={keepTransferredOutRow}
-                onChange={() => setKeepTransferredOutRow((v) => !v)}
-                className="w-4 h-4 accent-teal-600 rounded"
-              />
-              <span>คงบรรทัดนักเรียนย้ายออกตาม SGS (แนะนำ)</span>
-            </label>
-          </div>
+          )}
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold">
-                  <th className="text-center">เลขที่ SGS</th>
-                  <th>รหัส</th>
-                  <th>ชื่อ-สกุล • สถานะ</th>
-                  <th className="text-center">เวลาเรียน</th>
-                  <th className="text-center">ส่งงาน</th>
-                  <th className="text-center">น.1(15)</th>
-                  <th className="text-center">น.2(20)</th>
-                  <th className="text-center">น.3(15)</th>
-                  <th className="text-center bg-indigo-50/70 text-indigo-900 font-bold border-x border-indigo-100">
-                    เก็บสุทธิ (50) • พิมพ์ทับได้
+                <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-500 font-semibold">
+                  <th className="text-center w-12">เลขที่</th>
+                  <th className="w-20">รหัส</th>
+                  <th>ชื่อ-สกุล</th>
+                  <th className="text-center w-20">เวลาเรียน</th>
+                  <th className="text-center w-16">งาน</th>
+                  <th className="text-center w-16">น.1 (15)</th>
+                  <th className="text-center w-16">น.2 (20)</th>
+                  <th className="text-center w-16">น.3 (15)</th>
+                  <th className="text-center w-24 bg-slate-100/80 text-slate-800 font-bold border-x border-slate-200">
+                    รวมเก็บ (50)
                   </th>
-                  <th className="text-center">กลาง(20)</th>
-                  <th className="text-center">ปลาย(30)</th>
-                  <th className="text-center font-bold text-teal-800">รวม(100)</th>
-                  <th className="text-center font-bold">เกรด / ติด ร</th>
-                  <th className="text-right">ปรับสถานะ</th>
+                  <th className="text-center w-16">กลาง (20)</th>
+                  <th className="text-center w-16">ปลาย (30)</th>
+                  <th className="text-center w-18 font-bold text-slate-900">รวม (100)</th>
+                  <th className="text-center w-20 font-bold text-slate-900">เกรด</th>
+                  {isRosterEditMode && <th className="text-right w-24">สถานะ</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -829,90 +825,70 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                       key={stu.studentCode}
                       className={
                         isOut
-                          ? 'bg-slate-100/80 text-slate-400'
-                          : isIn
-                          ? 'bg-indigo-50/30 hover:bg-indigo-50/50'
-                          : 'hover:bg-slate-50 transition-colors'
+                          ? 'bg-slate-50/80 text-slate-400'
+                          : 'hover:bg-slate-50/80 transition-colors'
                       }
                     >
-                      <td className="text-center font-bold tabular-nums whitespace-nowrap">
+                      <td className="text-center font-medium text-slate-500 tabular-nums whitespace-nowrap">
                         <div className="inline-flex items-center gap-1">
                           <span className="w-5 text-center">{stu.sgsSeatNo}</span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setSgsRoster(
-                                sgsRosterAndSubmissionService.moveStudentSeat(
-                                  stu.studentCode,
-                                  'UP'
-                                )
-                              )
-                            }
-                            title="เลื่อนเลขที่ขึ้น 1 ลำดับ"
-                            className="px-1 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[9px] text-slate-600 leading-none"
-                          >
-                            ▲
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setSgsRoster(
-                                sgsRosterAndSubmissionService.moveStudentSeat(
-                                  stu.studentCode,
-                                  'DOWN'
-                                )
-                              )
-                            }
-                            title="เลื่อนเลขที่ลง 1 ลำดับ"
-                            className="px-1 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[9px] text-slate-600 leading-none"
-                          >
-                            ▼
-                          </button>
+                          {isRosterEditMode && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setSgsRoster(
+                                    sgsRosterAndSubmissionService.moveStudentSeat(
+                                      stu.studentCode,
+                                      'UP'
+                                    )
+                                  )
+                                }
+                                className="px-1 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[9px] text-slate-600 leading-none"
+                              >
+                                ▲
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setSgsRoster(
+                                    sgsRosterAndSubmissionService.moveStudentSeat(
+                                      stu.studentCode,
+                                      'DOWN'
+                                    )
+                                  )
+                                }
+                                className="px-1 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[9px] text-slate-600 leading-none"
+                              >
+                                ▼
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
-                      <td className="font-mono text-slate-500 tabular-nums whitespace-nowrap">
+                      <td className="font-mono text-slate-400 tabular-nums whitespace-nowrap">
                         {stu.studentCode}
                       </td>
                       <td className="whitespace-nowrap">
                         <div className="inline-flex items-center gap-1.5">
                           <span
-                            className={`font-bold ${
-                              isOut ? 'line-through text-slate-400' : 'text-slate-900'
+                            className={`font-medium ${
+                              isOut ? 'line-through text-slate-400' : 'text-slate-800'
                             }`}
                           >
                             {stu.studentName}
                           </span>
-                          <span
-                            className={`px-1.5 py-0.2 rounded text-[10px] font-semibold ${
-                              stu.gender === 'MALE'
-                                ? 'bg-blue-50 text-blue-700'
-                                : 'bg-pink-50 text-pink-700'
-                            }`}
-                          >
-                            {stu.gender === 'MALE' ? 'ช' : 'ญ'}
-                          </span>
                           {isOut && (
-                            <span
-                              className="px-1.5 py-0.2 rounded bg-slate-200 text-slate-700 text-[10px] font-semibold"
-                              title={`ย้ายออก (${stu.transferDate}) — ล็อกเลขที่ ${stu.sgsSeatNo} ตรง SGS`}
-                            >
-                              ย้ายออก (ล็อก #{stu.sgsSeatNo})
+                            <span className="text-[10px] text-slate-400 font-normal">
+                              (ย้ายออก)
                             </span>
                           )}
                           {isIn && (
                             <span
-                              className="px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-800 text-[10px] font-semibold"
+                              className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[10px] font-medium"
                               title={stu.transferNote}
                             >
-                              เข้าใหม่ (ต่อท้ายชาย)
-                            </span>
-                          )}
-                          {g.isManualOverride && (
-                            <span
-                              className="px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold"
-                              title={stu.manualOverrideNote}
-                            >
-                              ✏️สุทธิ
+                              เข้าใหม่
                             </span>
                           )}
                         </div>
@@ -922,42 +898,41 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                           '—'
                         ) : (
                           <span
-                            className={`font-semibold ${
+                            className={
                               stu.attendancePercent < 80
-                                ? 'text-rose-600 font-bold'
-                                : 'text-slate-700'
-                            }`}
+                                ? 'text-rose-600 font-semibold'
+                                : 'text-slate-600'
+                            }
                           >
                             {stu.attendancePercent}%
                           </span>
                         )}
                       </td>
-                      <td className="text-center whitespace-nowrap">
+                      <td className="text-center tabular-nums whitespace-nowrap">
                         {isOut ? (
                           '—'
                         ) : (
                           <span
-                            className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                            className={
                               g.missingCount === 0
-                                ? 'bg-teal-50 text-teal-700'
-                                : 'bg-rose-50 text-rose-700'
-                            }`}
+                                ? 'text-slate-600'
+                                : 'text-rose-600 font-semibold'
+                            }
                           >
                             {g.submittedCount}/{g.totalAssignedCount}
                           </span>
                         )}
                       </td>
-                      <td className="text-center font-semibold tabular-nums">
+                      <td className="text-center text-slate-600 tabular-nums">
                         {isOut ? '—' : g.u1}
                       </td>
-                      <td className="text-center font-semibold tabular-nums">
+                      <td className="text-center text-slate-600 tabular-nums">
                         {isOut ? '—' : g.u2}
                       </td>
-                      <td className="text-center font-semibold tabular-nums">
+                      <td className="text-center text-slate-600 tabular-nums">
                         {isOut ? '—' : g.u3}
                       </td>
-                      {/* Q1-C: ช่องพิมพ์คะแนนเก็บสุทธิทับเองท้ายเทอม (เต็ม 50) แบบบรรทัดเดียวกระชับ */}
-                      <td className="text-center bg-indigo-50/40 border-x border-indigo-100/80 whitespace-nowrap">
+                      <td className="text-center bg-slate-50/70 border-x border-slate-200/80 whitespace-nowrap">
                         {isOut ? (
                           '—'
                         ) : (
@@ -979,12 +954,12 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                                   )
                                 );
                               }}
-                              className={`w-11 h-6 text-center font-bold rounded-md border tabular-nums text-xs ${
+                              className={`w-12 h-6 text-center font-bold rounded tabular-nums text-xs transition-colors focus:outline-none focus:ring-1 focus:ring-teal-500 ${
                                 g.isManualOverride
-                                  ? 'bg-indigo-100 text-indigo-900 border-indigo-400'
-                                  : 'bg-white text-slate-800 border-slate-200'
+                                  ? 'bg-amber-50/80 text-amber-900 border border-amber-300'
+                                  : 'bg-transparent hover:bg-white text-slate-900 border border-transparent hover:border-slate-200'
                               }`}
-                              title="พิมพ์คะแนนเก็บสุทธิท้ายเทอม (เต็ม 50) ทับได้ทันที"
+                              title="คลิกเพื่อพิมพ์คะแนนเก็บสุทธิทับ (เต็ม 50)"
                             />
                             {g.isManualOverride && (
                               <button
@@ -997,58 +972,60 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                                     )
                                   )
                                 }
-                                className="text-[10px] text-indigo-700 hover:underline font-semibold"
-                                title={`รีเซ็ตกลับเป็นคะแนนรวมจากชิ้นงาน (${g.calculatedAccumulated})`}
+                                className="text-[10px] text-slate-400 hover:text-slate-700"
+                                title={`คืนค่าตามชิ้นงาน (${g.calculatedAccumulated})`}
                               >
-                                ↺({g.calculatedAccumulated})
+                                ↺
                               </button>
                             )}
                           </div>
                         )}
                       </td>
-                      <td className="text-center tabular-nums">
+                      <td className="text-center text-slate-600 tabular-nums">
                         {isOut ? '—' : g.midterm}
                       </td>
-                      <td className="text-center tabular-nums">
+                      <td className="text-center text-slate-600 tabular-nums">
                         {isOut ? '—' : g.final}
                       </td>
-                      <td className="text-center font-bold text-teal-700 tabular-nums">
+                      <td className="text-center font-bold text-slate-900 tabular-nums">
                         {isOut ? '—' : g.total}
                       </td>
                       <td className="text-center whitespace-nowrap">
-                        <div className="inline-flex items-center justify-center gap-1">
+                        {isOut ? (
+                          <span className="text-slate-400">—</span>
+                        ) : g.gradeLabel === 'ร' || g.gradeLabel === 'มส.' ? (
                           <span
-                            className={`px-2 py-0.2 rounded font-bold text-[11px] ${
-                              isOut
-                                ? 'bg-slate-200 text-slate-600'
-                                : g.gradeLabel === 'มส.' || g.gradeLabel === 'ร'
-                                ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                                : 'bg-teal-100 text-teal-800'
-                            }`}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 font-bold text-[11px]"
+                            title={
+                              g.missingMandatoryTitles.length > 0
+                                ? `ค้างงานสำคัญ: ${g.missingMandatoryTitles.join(', ')}`
+                                : undefined
+                            }
                           >
                             {g.gradeLabel}
                           </span>
-                          {g.rReasonLabel && !isOut && (
-                            <span className="text-[10px] font-bold text-rose-700">
-                              ({g.missingMandatoryTitles.join(',')})
-                            </span>
-                          )}
-                        </div>
+                        ) : (
+                          <span className="font-bold text-slate-800 tabular-nums">
+                            {g.gradeLabel}
+                          </span>
+                        )}
                       </td>
-                      <td className="text-right whitespace-nowrap">
-                        <button
-                          onClick={() => {
-                            const updated =
-                              sgsRosterAndSubmissionService.toggleStudentTransferOut(
-                                stu.studentCode
-                              );
-                            setSgsRoster(updated);
-                          }}
-                          className="px-2 py-0.5 rounded border border-slate-200 hover:bg-slate-100 text-[10px] font-semibold text-slate-600"
-                        >
-                          {isOut ? 'คืนสถานะปกติ' : 'แจ้งย้ายออก (คงเลขที่)'}
-                        </button>
-                      </td>
+                      {isRosterEditMode && (
+                        <td className="text-right whitespace-nowrap">
+                          <button
+                            onClick={() => {
+                              const updated =
+                                sgsRosterAndSubmissionService.toggleStudentTransferOut(
+                                  stu.studentCode
+                                );
+                              setSgsRoster(updated);
+                            }}
+                            className="px-2 py-0.5 rounded border border-slate-200 hover:bg-slate-100 text-[10px] font-medium text-slate-600"
+                          >
+                            {isOut ? 'คืนสถานะ' : 'แจ้งย้ายออก'}
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
