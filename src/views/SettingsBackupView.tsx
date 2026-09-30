@@ -14,18 +14,72 @@ import {
   sgsRosterAndSubmissionService,
   type R2CourseStorageSummary,
 } from '../services/sgsRosterAndSubmissionService';
+import {
+  getSchoolSettings,
+  saveSchoolSettings,
+  resetSchoolSettingsToDefault,
+  type SchoolUserRole,
+  type SchoolBrandingSettings,
+} from '../config/schoolRoles';
 
-export const SettingsBackupView: React.FC = () => {
+interface SettingsBackupViewProps {
+  activeRole?: SchoolUserRole;
+}
+
+export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
+  activeRole = 'ACADEMIC_ADMIN',
+}) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [snapshots, setSnapshots] = useState<SgsSnapshotRecord[]>([]);
-  const [roleMode, setRoleMode] = useState<'ADMIN' | 'TEACHER'>('ADMIN');
-  const [selectedTeacherFilter, setSelectedTeacherFilter] = useState<string>('ALL');
+  const [schoolSettings, setSchoolSettings] = useState<SchoolBrandingSettings>(() =>
+    getSchoolSettings()
+  );
+  const [roleMode, setRoleMode] = useState<'ADMIN' | 'TEACHER'>(
+    activeRole === 'ACADEMIC_ADMIN' ? 'ADMIN' : 'TEACHER'
+  );
+  const [selectedTeacherFilter, setSelectedTeacherFilter] = useState<string>(
+    activeRole === 'ACADEMIC_ADMIN' ? 'ALL' : 't-pasporm'
+  );
   const [selectedTermFilter, setSelectedTermFilter] = useState<string>('ALL');
   const [courseStorages, setCourseStorages] = useState<R2CourseStorageSummary[]>(() =>
     sgsRosterAndSubmissionService.getCourseStorageSummaries()
   );
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const handleSaveBranding = (e: React.FormEvent) => {
+    e.preventDefault();
+    const updated = saveSchoolSettings(schoolSettings);
+    setSchoolSettings(updated);
+    showToast('บันทึกข้อมูลโรงเรียน โลโก้ และการเชื่อมระบบ SMS เรียบร้อยแล้ว');
+  };
+
+  const handleUploadLogoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        const updated = saveSchoolSettings({
+          ...schoolSettings,
+          logoUrl: reader.result,
+        });
+        setSchoolSettings(updated);
+        showToast('อัปเดตโลโก้โรงเรียนสำหรับหน้า Login เรียบร้อยแล้ว');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  useEffect(() => {
+    if (activeRole === 'ACADEMIC_ADMIN') {
+      setRoleMode('ADMIN');
+      setSelectedTeacherFilter('ALL');
+    } else {
+      setRoleMode('TEACHER');
+      setSelectedTeacherFilter('t-pasporm');
+    }
+  }, [activeRole]);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -137,10 +191,10 @@ export const SettingsBackupView: React.FC = () => {
           </div>
           <div>
             <h1 className="text-base sm:text-lg font-bold text-slate-900">
-              แดชบอร์ดแอดมิน & จัดการพื้นที่จัดเก็บไฟล์ R2 / โอนย้ายเข้า Google Drive โรงเรียน (100 TB Workspace)
+              ตั้งค่าระบบ & พื้นที่จัดเก็บไฟล์ R2 / Google Drive โรงเรียนกุดจับประชาสรรค์ (100 TB Workspace)
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              ติดตามการใช้พื้นที่ R2 ของครูแต่ละคน-แต่ละวิชา · สำรองไฟล์เข้า Google Workspace โรงเรียน (100 TB) แยกตามปี/เทอม/วิชา ก่อนกดล้างไฟล์ R2
+              โรงเรียนกุดจับประชาสรรค์ (สพม.อุดรธานี) · แยกสิทธิ์ครูผู้สอนล้างเฉพาะวิชาตัวเอง vs ฝ่ายวิชาการ/แอดมินจัดการทั้งโรงเรียน
             </p>
           </div>
         </div>
@@ -176,6 +230,106 @@ export const SettingsBackupView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Section 0: ตั้งค่าชื่อโรงเรียน โลโก้หน้า Login & เชื่อมข้อมูลผู้ใช้ระบบ SMS */}
+      <form
+        onSubmit={handleSaveBranding}
+        className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-3">
+            <img
+              src={schoolSettings.logoUrl}
+              alt={schoolSettings.nameTh}
+              className="w-12 h-12 rounded-xl border border-slate-200 p-1 object-contain bg-white shadow-2xs"
+            />
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">
+                ข้อมูลโรงเรียน โลโก้หน้า Login และการเชื่อมบัญชีผู้ใช้ School Management System (SMS)
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                หน้า Login จะดึงชื่อโรงเรียน โลโก้ และฐานข้อมูลผู้ใช้งานเดียวกับระบบ SMS โดยอัตโนมัติ
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const def = resetSchoolSettingsToDefault();
+                setSchoolSettings(def);
+                showToast('คืนค่าเริ่มต้น โรงเรียนกุดจับประชาสรรค์ เรียบร้อยแล้ว');
+              }}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-600 cursor-pointer"
+            >
+              คืนค่าเริ่มต้น
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs cursor-pointer"
+            >
+              บันทึกการตั้งค่าโรงเรียน & SMS
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">
+              ชื่อโรงเรียน (ภาษาไทย)
+            </label>
+            <input
+              type="text"
+              value={schoolSettings.nameTh}
+              onChange={(e) =>
+                setSchoolSettings({ ...schoolSettings, nameTh: e.target.value })
+              }
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 font-semibold"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">
+              ชื่อระบบใต้โลโก้ (Subtitle)
+            </label>
+            <input
+              type="text"
+              value={schoolSettings.smsSystemName}
+              onChange={(e) =>
+                setSchoolSettings({ ...schoolSettings, smsSystemName: e.target.value })
+              }
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 font-semibold"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">
+              URL ระบบ SMS หลัก (Shared User Auth)
+            </label>
+            <input
+              type="text"
+              value={schoolSettings.smsApiUrl}
+              onChange={(e) =>
+                setSchoolSettings({ ...schoolSettings, smsApiUrl: e.target.value })
+              }
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-700 font-mono text-[11px]"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">
+              อัปโหลดโลโก้โรงเรียนใหม่ (PNG/JPG/SVG)
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleUploadLogoFile}
+              className="w-full text-[11px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+            />
+          </div>
+        </div>
+      </form>
 
       {/* Section 1: ภาพรวมการใช้พื้นที่ R2 แยกตามครูผู้สอนแต่ละคน (Per-Teacher Storage Cards) */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">

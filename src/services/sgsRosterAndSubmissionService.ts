@@ -583,7 +583,24 @@ export const sgsRosterAndSubmissionService = {
 
   saveSubmissions(list: StudentWorkSubmission[]): StudentWorkSubmission[] {
     localStorage.setItem(STORAGE_KEY_WORK_SUBMISSIONS, JSON.stringify(list));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('kp-copilot-updated'));
+    }
     return list;
+  },
+
+  resetDemoSubmissionsAndRoster(): void {
+    localStorage.setItem(
+      STORAGE_KEY_WORK_SUBMISSIONS,
+      JSON.stringify(INITIAL_SUBMISSIONS)
+    );
+    localStorage.setItem(
+      STORAGE_KEY_SGS_ROSTER,
+      JSON.stringify(INITIAL_SGS_ROSTER)
+    );
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('kp-copilot-updated'));
+    }
   },
 
   // อัปเดตคะแนนรายชิ้น (Inline Matrix หรือ SpeedGrader) -> ถ้าเป็นงานบังคับ เมื่อตรวจปุ๊บจะปลด "ร" อัตโนมัติทันที

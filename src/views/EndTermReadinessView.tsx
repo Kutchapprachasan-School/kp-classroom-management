@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CheckCircle2,
   FileText,
@@ -6,9 +6,11 @@ import {
   Compass,
   X,
   FileSpreadsheet,
+  Zap,
 } from 'lucide-react';
 import { assignmentService } from '../services/assignmentService';
 import { scoreService } from '../services/scoreService';
+import { teacherCopilotService } from '../services/teacherCopilotService';
 
 interface ReadinessTask {
   id: string;
@@ -18,47 +20,88 @@ interface ReadinessTask {
   hasCloseBtn: boolean;
 }
 
-export const EndTermReadinessView: React.FC = () => {
-  const [tasks, setTasks] = useState<ReadinessTask[]>([
-    {
-      id: 't-1',
-      title: 'โน้ตล่องแม่ปิง',
-      type: 'box',
-      emptyCount: 6,
-      hasCloseBtn: true,
-    },
-    {
-      id: 't-2',
-      title: 'สอบอ่านโน้ตล่องแม่ปิง 1 บรรทัด',
-      type: 'pencil',
-      emptyCount: 6,
-      hasCloseBtn: false,
-    },
-    {
-      id: 't-3',
-      title: 'ร้องโน้ตพื้นฐาน',
-      type: 'pencil',
-      emptyCount: 3,
-      hasCloseBtn: false,
-    },
-    {
-      id: 't-4',
-      title: 'โน้ตเพลงของตนเอง',
-      type: 'box',
-      emptyCount: 2,
-      hasCloseBtn: true,
-    },
-  ]);
+const INITIAL_READINESS_TASKS: ReadinessTask[] = [
+  {
+    id: 't-1',
+    title: 'โน้ตล่องแม่ปิง',
+    type: 'box',
+    emptyCount: 6,
+    hasCloseBtn: true,
+  },
+  {
+    id: 't-2',
+    title: 'สอบอ่านโน้ตล่องแม่ปิง 1 บรรทัด',
+    type: 'pencil',
+    emptyCount: 6,
+    hasCloseBtn: false,
+  },
+  {
+    id: 't-3',
+    title: 'ร้องโน้ตพื้นฐาน',
+    type: 'pencil',
+    emptyCount: 3,
+    hasCloseBtn: false,
+  },
+  {
+    id: 't-4',
+    title: 'โน้ตเพลงของตนเอง',
+    type: 'box',
+    emptyCount: 2,
+    hasCloseBtn: true,
+  },
+];
 
-  const [studentsList, setStudentsList] = useState([
-    { no: 1, name: 'สุภคม -', score: '' },
-    { no: 2, name: 'ด.ช. ทัตธน คำฝั้น', score: '3' },
-    { no: 3, name: 'ด.ช. ทานต์ธีรา -', score: '' },
-    { no: 4, name: 'ด.ช. จตุภัทร โนแก้ว', score: '3' },
-    { no: 5, name: 'ด.ช. จิรโชติ มะนาว', score: '2' },
-    { no: 6, name: 'ด.ช. เด่นภูมิ แจ้งประเสริฐ', score: '3' },
-    { no: 7, name: 'ด.ช. ธนภัทร เขอหมือ', score: '' },
-  ]);
+const INITIAL_READINESS_STUDENTS = [
+  { no: 1, name: 'สุภคม -', score: '' },
+  { no: 2, name: 'ด.ช. ทัตธน คำฝั้น', score: '3' },
+  { no: 3, name: 'ด.ช. ทานต์ธีรา -', score: '' },
+  { no: 4, name: 'ด.ช. จตุภัทร โนแก้ว', score: '3' },
+  { no: 5, name: 'ด.ช. จิรโชติ มะนาว', score: '2' },
+  { no: 6, name: 'ด.ช. เด่นภูมิ แจ้งประเสริฐ', score: '3' },
+  { no: 7, name: 'ด.ช. ธนภัทร เขอหมือ', score: '' },
+];
+
+export const EndTermReadinessView: React.FC = () => {
+  const isSgsResolvedInCopilot = () =>
+    teacherCopilotService
+      .getState()
+      .resolvedItemIds.includes('urgent-sgs-readiness');
+
+  const [tasks, setTasks] = useState<ReadinessTask[]>(() =>
+    isSgsResolvedInCopilot()
+      ? INITIAL_READINESS_TASKS.map((t) => ({ ...t, emptyCount: 0 }))
+      : INITIAL_READINESS_TASKS
+  );
+
+  const [studentsList, setStudentsList] = useState(() =>
+    isSgsResolvedInCopilot()
+      ? INITIAL_READINESS_STUDENTS.map((s) => ({
+          ...s,
+          score: s.score === '' ? '3' : s.score,
+        }))
+      : INITIAL_READINESS_STUDENTS
+  );
+
+  useEffect(() => {
+    const handler = () => {
+      const resolved = isSgsResolvedInCopilot();
+      setTasks(
+        resolved
+          ? INITIAL_READINESS_TASKS.map((t) => ({ ...t, emptyCount: 0 }))
+          : INITIAL_READINESS_TASKS
+      );
+      setStudentsList(
+        resolved
+          ? INITIAL_READINESS_STUDENTS.map((s) => ({
+              ...s,
+              score: s.score === '' ? '3' : s.score,
+            }))
+          : INITIAL_READINESS_STUDENTS
+      );
+    };
+    window.addEventListener('kp-copilot-updated', handler);
+    return () => window.removeEventListener('kp-copilot-updated', handler);
+  }, []);
 
   // Modal & Confirmation Banner states
   const [gradingTask, setGradingTask] = useState<ReadinessTask | null>(null);
@@ -70,6 +113,19 @@ export const EndTermReadinessView: React.FC = () => {
   };
 
   const totalEmptyScores = tasks.reduce((sum, t) => sum + t.emptyCount, 0);
+  const unratedTraitsCount = studentsList.filter((s) => s.score === '').length;
+  const isAllReadyForSgs = totalEmptyScores === 0 && unratedTraitsCount === 0;
+
+  const handleOneClickFixAllBlockers = () => {
+    setTasks((prev) => prev.map((t) => ({ ...t, emptyCount: 0 })));
+    setStudentsList((prev) =>
+      prev.map((s) => ({ ...s, score: s.score === '' ? '3' : s.score }))
+    );
+    teacherCopilotService.resolveUrgentItem('urgent-sgs-readiness');
+    showSuccessBanner(
+      '⚡ เคลียร์งานค้างครบทั้ง 3 ด่านเรียบร้อย! ปิดช่องคะแนนว่างทั้งหมด + ประเมินคุณลักษณะฯ ครบทุกคน — สถานะ 5/5 พร้อมส่งออกไฟล์ SGS ทันที'
+    );
+  };
 
   const handleCloseTask = async (taskId: string, taskTitle: string) => {
     await assignmentService.closeAssignment(taskId);
@@ -114,18 +170,19 @@ export const EndTermReadinessView: React.FC = () => {
   };
 
   const handleSaveTraits = () => {
+    teacherCopilotService.resolveUrgentItem('urgent-sgs-readiness');
     showSuccessBanner(
       'บันทึกผลคุณลักษณะอันพึงประสงค์และอ่านคิดวิเคราะห์เข้าสู่ระบบ ปพ.5 / SGS เรียบร้อยแล้ว ไม่ต้องกดซ้ำ'
     );
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12 font-sans text-slate-800 select-none">
-      {/* Reassuring Green Confirmation Banner (No jarring browser alert) */}
+    <div className="space-y-3 max-w-7xl mx-auto pb-12 font-sans text-slate-800 select-none">
+      {/* Confirmation Toast/Banner */}
       {savedBannerMessage && (
-        <div className="bg-teal-50 border border-teal-300 rounded-2xl p-4 flex items-center justify-between gap-3 shadow-xs">
-          <div className="flex items-center gap-2.5 text-teal-950 text-xs sm:text-sm font-bold">
-            <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0" />
+        <div className="bg-teal-50 border border-teal-300 rounded-xl p-3 flex items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2 text-teal-950 text-xs sm:text-sm font-bold">
+            <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0" />
             <span>{savedBannerMessage}</span>
           </div>
           <button
@@ -137,24 +194,38 @@ export const EndTermReadinessView: React.FC = () => {
         </div>
       )}
 
-      {/* 1. Clean Header Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-lg sm:text-xl font-bold text-slate-900">
-            ตรวจสอบความครบถ้วนก่อนส่งเกรด (ปพ.5) ภาคเรียนที่ 1/2569
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            รายวิชา ศ20221 ดนตรีปฏิบัติตามความถนัด 1 — ชั้น ม.1/8 (นักเรียน 27 คน)
-          </p>
+      {/* Pre-SGS Action Bar (Actionable, Zero-Clutter) */}
+      <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-3.5 shadow-xs flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="px-2.5 py-0.5 rounded-full bg-slate-900 text-white text-[11px] font-bold">
+            ด่านส่งเกรด SGS
+          </span>
+          <span className="text-xs font-bold text-slate-800">
+            {isAllReadyForSgs
+              ? '✓ ผ่านเกณฑ์ครบ — พร้อมส่งออกไฟล์ SGS 100%'
+              : `ค้าง ${totalEmptyScores} ช่องคะแนนว่าง · รอประเมินคุณลักษณะฯ ${unratedTraitsCount} คน`}
+          </span>
         </div>
 
-        <button
-          onClick={() => setIsOverviewModalOpen(true)}
-          className="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition-colors self-start sm:self-auto"
-        >
-          <FileSpreadsheet className="w-4 h-4 text-teal-600" />
-          <span>ดูตารางสรุปคะแนนทั้งห้อง</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {!isAllReadyForSgs && (
+            <button
+              type="button"
+              onClick={handleOneClickFixAllBlockers}
+              className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-2xs transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>⚡ เคลียร์งานค้างให้พร้อมส่ง SGS (1 คลิก)</span>
+            </button>
+          )}
+          <button
+            onClick={() => setIsOverviewModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-teal-600" />
+            <span>ดูตารางสรุปคะแนน</span>
+          </button>
+        </div>
       </div>
 
       {/* 2. Rule of Thirds (กฎสามส่วน): 3 Balanced Summary Zones */}

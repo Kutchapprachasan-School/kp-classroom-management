@@ -488,7 +488,35 @@ export const studentAffairsCouncilService = {
         localStorage.setItem(STORAGE_KEY_ASSEMBLY, JSON.stringify(nextAssembly));
       }
     }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('kp-copilot-updated'));
+    }
     return updated;
+  },
+
+  approveAllPendingLeaves(classroomFilter?: string): StudentLeaveRequest[] {
+    const leaves = this.getStudentLeaves();
+    const pendingToApprove = leaves.filter(
+      (l) =>
+        l.status === 'PENDING' &&
+        (!classroomFilter || classroomFilter === 'ALL' || l.classroom === classroomFilter)
+    );
+    let current = leaves;
+    pendingToApprove.forEach((p) => {
+      current = this.updateStudentLeaveStatus(p.id, 'APPROVED');
+    });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('kp-copilot-updated'));
+    }
+    return current;
+  },
+
+  resetDemoAffairsState(): void {
+    localStorage.setItem(STORAGE_KEY_LEAVES, JSON.stringify(INITIAL_LEAVES));
+    localStorage.setItem(STORAGE_KEY_ASSEMBLY, JSON.stringify(INITIAL_ASSEMBLY));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('kp-copilot-updated'));
+    }
   },
 
   // 4. เลือกตั้งสภานักเรียน E-Voting (รองรับ ไม่ประสงค์ลงคะแนน ABSTAIN)

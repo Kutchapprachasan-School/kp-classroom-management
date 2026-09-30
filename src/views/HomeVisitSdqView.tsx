@@ -339,30 +339,25 @@ export const HomeVisitSdqView: React.FC = () => {
   ).length;
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-3.5">
       {/* Toast Notification */}
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl border border-slate-700 flex items-center gap-2.5 text-xs font-medium">
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl border border-slate-700 flex items-center gap-2 text-xs font-medium">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMsg}</span>
         </div>
       )}
 
-      {/* 1. Clean Header Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
-          <h1 className="text-lg sm:text-xl font-bold text-slate-900">
-            เยี่ยมบ้านนักเรียน (นร.01) & คัดกรองทุน กสศ.
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            แบบสำรวจ นร.01 · รูปถ่ายบ้าน 2 มุม · ลายเซ็นรับรอง 4 ฝ่าย พร้อมส่งระบบ กสศ.
-          </p>
-        </div>
+      {/* 1. Actionable Header Bar (Zero Clutter) */}
+      <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-3.5 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h1 className="text-base sm:text-lg font-bold text-slate-900">
+          เยี่ยมบ้านนักเรียน (นร.01) & ทุน กสศ.
+        </h1>
 
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
             onClick={() => setIsLeavePolicyOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
           >
             <Settings2 className="w-3.5 h-3.5 text-slate-500" />
             <span>กติกาเวลาเรียน</span>
@@ -371,7 +366,7 @@ export const HomeVisitSdqView: React.FC = () => {
           <button
             onClick={handleBatchSyncToCct}
             disabled={isBatchSyncing}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-2xs transition-colors"
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
           >
             <CloudUpload className="w-4 h-4" />
             <span>

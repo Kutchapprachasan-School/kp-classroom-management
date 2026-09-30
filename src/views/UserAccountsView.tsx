@@ -1,90 +1,167 @@
 import React, { useState } from 'react';
-import { KeyRound, Plus, Search, Shield, User, Printer, X, QrCode, Mail } from 'lucide-react';
+import {
+  KeyRound,
+  Plus,
+  Search,
+  ShieldCheck,
+  User,
+  Printer,
+  X,
+  QrCode,
+  Mail,
+  CheckCircle2,
+  Lock,
+} from 'lucide-react';
 import { authService } from '../services/authService';
+import {
+  getSchoolSettings,
+  getSmsUsers,
+  saveSmsUsers,
+  SCHOOL_ROLE_PROFILES,
+  type SchoolUserRole,
+} from '../config/schoolRoles';
 
 interface UserAccountRow {
   id: string;
   name: string;
   email: string;
-  role: 'ADMIN' | 'TEACHER' | 'STUDENT';
+  schoolRole: SchoolUserRole;
   schoolCode: string;
   authType: string;
-  classesCount: number;
+  departmentOrClass: string;
 }
 
-export const UserAccountsView: React.FC = () => {
-  const [roleFilter, setRoleFilter] = useState<'ALL' | 'TEACHER' | 'STUDENT'>('ALL');
+interface UserAccountsViewProps {
+  activeRole?: SchoolUserRole;
+  onChangeRole?: (role: SchoolUserRole) => void;
+}
+
+export const UserAccountsView: React.FC<UserAccountsViewProps> = ({
+  activeRole = 'ACADEMIC_ADMIN',
+  onChangeRole,
+}) => {
+  const schoolSettings = getSchoolSettings();
+  const [roleFilter, setRoleFilter] = useState<'ALL' | SchoolUserRole>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [isSlipModalOpen, setIsSlipModalOpen] = useState(false);
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
 
   // Add user form state
-  const [newRole, setNewRole] = useState<'TEACHER' | 'STUDENT'>('TEACHER');
+  const [newRole, setNewRole] = useState<SchoolUserRole>('TEACHER_GENERAL');
   const [newName, setNewName] = useState('');
   const [newEmailOrCode, setNewEmailOrCode] = useState('');
   const [newPasswordOrPin, setNewPasswordOrPin] = useState('');
 
-  const [users, setUsers] = useState<UserAccountRow[]>([
-    { id: 'u-1', name: 'นายภาสภูมิ เรืองปราชญ์', email: 'pasphum@school.ac.th', role: 'TEACHER', schoolCode: 'T-0104', authType: 'Email/Password + Google SSO', classesCount: 5 },
-    { id: 'u-2', name: 'นางสาววิภาดา สมบูรณ์', email: 'wiphada@school.ac.th', role: 'TEACHER', schoolCode: 'T-0105', authType: 'Email/Password + Google SSO', classesCount: 4 },
-    { id: 'u-3', name: 'นายเอกชัย มิ่งขวัญ (หัวหน้ากลุ่มสาระ)', email: 'ekkachai@school.ac.th', role: 'ADMIN', schoolCode: 'A-0002', authType: 'Email/Password + Google SSO', classesCount: 2 },
-    { id: 'u-4', name: 'ด.ช. กฤษณะ ศรีสมบูรณ์', email: 'รหัส 45101 (PIN วันเกิด)', role: 'STUDENT', schoolCode: '45101', authType: 'รหัสนักเรียน 5 หลัก + PIN', classesCount: 1 },
-    { id: 'u-5', name: 'ด.ช. จิรายุ เดชปันคำ', email: 'รหัส 45102 (PIN วันเกิด)', role: 'STUDENT', schoolCode: '45102', authType: 'รหัสนักเรียน 5 หลัก + PIN', classesCount: 1 },
-    { id: 'u-6', name: 'ด.ช. ทัตธน คำฝั้น', email: 'รหัส 45115 (PIN วันเกิด)', role: 'STUDENT', schoolCode: '45115', authType: 'รหัสนักเรียน 5 หลัก + PIN', classesCount: 1 },
-  ]);
+  const [users, setUsers] = useState<UserAccountRow[]>(() =>
+    getSmsUsers().map((u) => ({
+      id: u.id,
+      name: u.fullName,
+      email: u.username,
+      schoolRole: u.role,
+      schoolCode: u.smsId,
+      authType: 'SMS Unified SSO (ใช้บัญชีเดียวกับระบบ SMS)',
+      departmentOrClass: u.departmentOrClass,
+    }))
+  );
 
   const filteredUsers = users.filter((u) => {
-    const matchesRole = roleFilter === 'ALL' || u.role === roleFilter;
+    const matchesRole = roleFilter === 'ALL' || u.schoolRole === roleFilter;
     const matchesSearch =
       u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.schoolCode.includes(searchTerm);
+      u.schoolCode.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesRole && matchesSearch;
   });
+
+  const handleChangeUserRole = (userId: string, nextRole: SchoolUserRole) => {
+    setUsers((prev) => {
+      const updated = prev.map((u) =>
+        u.id === userId ? { ...u, schoolRole: nextRole } : u
+      );
+      const currentSms = getSmsUsers().map((su) =>
+        su.id === userId ? { ...su, role: nextRole } : su
+      );
+      saveSmsUsers(currentSms);
+      return updated;
+    });
+  };
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newEmailOrCode) return;
 
-    if (newRole === 'TEACHER') {
-      await authService.loginTeacher(newEmailOrCode, newPasswordOrPin || 'password123');
+    const isStudent =
+      newRole === 'STUDENT_GENERAL' || newRole === 'STUDENT_COUNCIL';
+
+    if (!isStudent) {
+      await authService.loginTeacher(
+        newEmailOrCode,
+        newPasswordOrPin || 'password123'
+      );
     } else {
       await authService.loginStudent(newEmailOrCode, newPasswordOrPin || '2510');
     }
 
+    const generatedId = `u-${Date.now()}`;
+    const generatedCode = !isStudent
+      ? `KPS-${Math.floor(Math.random() * 900 + 100)}`
+      : newEmailOrCode;
+
     const newItem: UserAccountRow = {
-      id: `u-${Date.now()}`,
+      id: generatedId,
       name: newName,
-      email: newRole === 'TEACHER' ? newEmailOrCode : `รหัส ${newEmailOrCode} (PIN: ${newPasswordOrPin || '2510'})`,
-      role: newRole,
-      schoolCode: newRole === 'TEACHER' ? `T-${Math.floor(Math.random() * 900 + 100)}` : newEmailOrCode,
-      authType: newRole === 'TEACHER' ? 'Email/Password + Google SSO' : 'รหัสนักเรียน 5 หลัก + PIN',
-      classesCount: 1,
+      email: newEmailOrCode,
+      schoolRole: newRole,
+      schoolCode: generatedCode,
+      authType: 'SMS Unified SSO (ใช้บัญชีเดียวกับระบบ SMS)',
+      departmentOrClass: SCHOOL_ROLE_PROFILES[newRole].department,
     };
+
+    const currentSms = getSmsUsers();
+    saveSmsUsers([
+      {
+        id: generatedId,
+        smsId: generatedCode,
+        username: newEmailOrCode,
+        loginAliases: [newEmailOrCode, generatedCode, newName],
+        passwordOrPin: newPasswordOrPin || (isStudent ? '2510' : '123456'),
+        fullName: newName,
+        role: newRole,
+        departmentOrClass: SCHOOL_ROLE_PROFILES[newRole].department,
+        positionTitle: SCHOOL_ROLE_PROFILES[newRole].title,
+        smsGroup: isStudent ? 'STUDENT' : 'PERSONNEL',
+        smsSynced: true,
+      },
+      ...currentSms,
+    ]);
 
     setUsers([newItem, ...users]);
     setIsAddUserOpen(false);
     setNewName('');
     setNewEmailOrCode('');
     setNewPasswordOrPin('');
-    alert(`สร้างบัญชีผู้ใช้งาน "${newName}" (${newRole}) ตามมาตรฐาน Hybrid Auth (ADR-003) สำเร็จ!`);
   };
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in font-sans text-slate-800 select-none">
-      {/* Header */}
+      {/* Header: โรงเรียนกุดจับประชาสรรค์ */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 bg-indigo-50 text-indigo-700 rounded-xl border border-indigo-200">
               <KeyRound className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-800">
-                บัญชีและรหัสผ่าน (Hybrid Auth & RBAC - ADR-003)
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500">
-                ครูใช้ Email/Password หรือ Google SSO • นักเรียนใช้รหัสนักเรียน 5 หลัก + PIN วันเกิด / QR Code
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
+                  จัดการบัญชีและสิทธิ์การเข้าถึง 5 บทบาท (RBAC)
+                </h1>
+                <span className="px-2.5 py-0.5 rounded-full bg-teal-50 border border-teal-200 text-teal-800 text-xs font-bold">
+                  {schoolSettings.nameTh} ({schoolSettings.shortCode})
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                แยกสิทธิ์ชัดเจนระหว่าง 1) ครูผู้ใช้งานทั่วไป • 2) ฝ่ายกิจการนักเรียน • 3) ฝ่ายวิชาการ/แอดมิน • 4) นักเรียนทั่วไป • 5) สภานักเรียน
               </p>
             </div>
           </div>
@@ -93,125 +170,229 @@ export const UserAccountsView: React.FC = () => {
         <div className="flex items-center gap-2 self-start sm:self-auto text-xs">
           <button
             onClick={() => setIsSlipModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-colors"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>พิมพ์สลิปรหัสนักเรียน & QR</span>
+            <span>พิมพ์สลิป QR นักเรียน</span>
           </button>
           <button
             onClick={() => setIsAddUserOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold shadow-xs transition-colors"
           >
             <Plus className="w-4 h-4" />
-            <span>+ สร้างบัญชีใหม่</span>
+            <span>+ เพิ่มบัญชีผู้ใช้ใหม่</span>
           </button>
         </div>
       </div>
 
+      {/* ============================================================================
+          5-ROLE PERMISSION MATRIX (ตารางสรุปขอบเขตสิทธิ์ทั้ง 5 บทบาทของ รร.กุดจับประชาสรรค์)
+      ============================================================================ */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-2xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+          <div>
+            <h2 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-teal-600" />
+              <span>โครงสร้างการแบ่งสิทธิ์ 5 บทบาท — {schoolSettings.nameTh}</span>
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              คลิกปุ่ม "สลับทดสอบสิทธิ์นี้" เพื่อดูเมนู Sidebar และหน้าจอที่แต่ละบทบาทมองเห็นจริง
+            </p>
+          </div>
+          <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-200">
+            กำลังดูในฐานะ: {SCHOOL_ROLE_PROFILES[activeRole].shortLabel}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+          {(
+            [
+              'TEACHER_GENERAL',
+              'STUDENT_AFFAIRS',
+              'ACADEMIC_ADMIN',
+              'STUDENT_GENERAL',
+              'STUDENT_COUNCIL',
+            ] as SchoolUserRole[]
+          ).map((roleKey) => {
+            const prof = SCHOOL_ROLE_PROFILES[roleKey];
+            const isCurrent = activeRole === roleKey;
+            return (
+              <div
+                key={roleKey}
+                className={`p-3.5 rounded-2xl border flex flex-col justify-between transition-all ${
+                  isCurrent
+                    ? 'bg-teal-50/60 border-teal-400 shadow-xs'
+                    : 'bg-slate-50/60 border-slate-200/90'
+                }`}
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${prof.badgeColor}`}
+                    >
+                      {prof.shortLabel}
+                    </span>
+                    {isCurrent && (
+                      <span className="text-[10px] font-bold text-teal-700">
+                        ● ใช้งานอยู่
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="text-xs font-bold text-slate-900">
+                      {prof.userName}
+                    </div>
+                    <div className="text-[10px] text-slate-500">
+                      {prof.userPosition}
+                    </div>
+                  </div>
+
+                  <ul className="space-y-1 pt-1 border-t border-slate-200/70">
+                    {prof.keyPermissions.map((perm, idx) => (
+                      <li
+                        key={idx}
+                        className="text-[11px] text-slate-700 flex items-start gap-1.5 leading-snug"
+                      >
+                        <CheckCircle2 className="w-3 h-3 text-teal-600 shrink-0 mt-0.5" />
+                        <span>{perm}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="mt-3 pt-2 border-t border-slate-200/70 space-y-2">
+                  <div className="text-[10px] text-amber-800 bg-amber-50/80 border border-amber-200/70 rounded-lg p-1.5 flex items-start gap-1">
+                    <Lock className="w-3 h-3 text-amber-600 shrink-0 mt-0.5" />
+                    <span>{prof.restrictedNote}</span>
+                  </div>
+
+                  {onChangeRole && (
+                    <button
+                      type="button"
+                      onClick={() => onChangeRole(roleKey)}
+                      className={`w-full py-1.5 rounded-xl text-[11px] font-bold transition-colors ${
+                        isCurrent
+                          ? 'bg-teal-700 text-white'
+                          : 'bg-white hover:bg-slate-100 text-slate-800 border border-slate-300'
+                      }`}
+                    >
+                      {isCurrent ? '✓ กำลังเปิดดูสิทธิ์นี้' : 'สลับทดสอบสิทธิ์นี้'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Filter Tabs & Search */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-100 shadow-card">
-        <div className="flex items-center gap-1 text-xs w-full sm:w-auto">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
+        <div className="flex flex-wrap items-center gap-1 text-xs w-full sm:w-auto">
           <button
             onClick={() => setRoleFilter('ALL')}
-            className={`px-3 py-1.5 rounded-xl font-medium transition-colors ${
-              roleFilter === 'ALL' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-500 hover:bg-slate-50'
+            className={`px-3 py-1.5 rounded-xl font-semibold transition-colors ${
+              roleFilter === 'ALL'
+                ? 'bg-slate-900 text-white'
+                : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
             ทั้งหมด ({users.length})
           </button>
-          <button
-            onClick={() => setRoleFilter('TEACHER')}
-            className={`px-3 py-1.5 rounded-xl font-medium transition-colors ${
-              roleFilter === 'TEACHER' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-500 hover:bg-slate-50'
-            }`}
-          >
-            ครูผู้สอน (Email/Password + SSO)
-          </button>
-          <button
-            onClick={() => setRoleFilter('STUDENT')}
-            className={`px-3 py-1.5 rounded-xl font-medium transition-colors ${
-              roleFilter === 'STUDENT' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-500 hover:bg-slate-50'
-            }`}
-          >
-            นักเรียน (รหัส 5 หลัก + PIN)
-          </button>
+          {(
+            [
+              'TEACHER_GENERAL',
+              'STUDENT_AFFAIRS',
+              'ACADEMIC_ADMIN',
+              'STUDENT_GENERAL',
+              'STUDENT_COUNCIL',
+            ] as SchoolUserRole[]
+          ).map((rk) => (
+            <button
+              key={rk}
+              onClick={() => setRoleFilter(rk)}
+              className={`px-2.5 py-1.5 rounded-xl font-semibold transition-colors ${
+                roleFilter === rk
+                  ? 'bg-teal-600 text-white'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {SCHOOL_ROLE_PROFILES[rk].shortLabel}
+            </button>
+          ))}
         </div>
 
         <div className="relative w-full sm:w-64">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="ค้นหาชื่อ อีเมล หรือรหัส..."
+            placeholder="ค้นหาชื่อ อีเมล @kutchap.ac.th หรือรหัส..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500"
           />
         </div>
       </div>
 
       {/* Users Table */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm">
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-100 text-slate-400 font-medium">
-                <th className="py-2.5 px-3">รหัสประจำตัว</th>
+              <tr className="border-b border-slate-100 text-slate-400 font-semibold">
+                <th className="py-2.5 px-3">รหัส</th>
                 <th className="py-2.5 px-3">ชื่อ-สกุล</th>
-                <th className="py-2.5 px-3">ข้อมูลเข้าสู่ระบบ</th>
-                <th className="py-2.5 px-3">รูปแบบการยืนยันตัวตน</th>
-                <th className="py-2.5 px-3 text-center">บทบาท (Role)</th>
-                <th className="py-2.5 px-3 text-right">การจัดการ</th>
+                <th className="py-2.5 px-3">สังกัด / ชั้นเรียน</th>
+                <th className="py-2.5 px-3">บัญชีเข้าสู่ระบบ</th>
+                <th className="py-2.5 px-3 text-center">บทบาทและสิทธิ์ (ปรับเปลี่ยนได้)</th>
+                <th className="py-2.5 px-3 text-right">จัดการรหัสผ่าน</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredUsers.map((u) => (
-                <tr key={u.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3 px-3 font-mono font-semibold text-slate-600">{u.schoolCode}</td>
-                  <td className="py-3 px-3 font-bold text-slate-800 flex items-center gap-2">
-                    <User className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{u.name}</span>
-                  </td>
-                  <td className="py-3 px-3 text-slate-500">{u.email}</td>
-                  <td className="py-3 px-3">
-                    <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[11px] font-medium">
-                      {u.authType}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-center">
-                    {u.role === 'ADMIN' && (
-                      <span className="px-2.5 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-md font-bold text-[11px] inline-flex items-center gap-1">
-                        <Shield className="w-3 h-3" /> ADMIN
-                      </span>
-                    )}
-                    {u.role === 'TEACHER' && (
-                      <span className="px-2.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-md font-bold text-[11px]">
-                        TEACHER
-                      </span>
-                    )}
-                    {u.role === 'STUDENT' && (
-                      <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md font-medium text-[11px]">
-                        STUDENT
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-3 px-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
+              {filteredUsers.map((u) => {
+                const prof = SCHOOL_ROLE_PROFILES[u.schoolRole];
+                return (
+                  <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="py-3 px-3 font-mono font-bold text-slate-600">
+                      {u.schoolCode}
+                    </td>
+                    <td className="py-3 px-3 font-bold text-slate-800 flex items-center gap-2">
+                      <User className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{u.name}</span>
+                    </td>
+                    <td className="py-3 px-3 text-slate-600">{u.departmentOrClass}</td>
+                    <td className="py-3 px-3 text-slate-500">{u.email}</td>
+                    <td className="py-3 px-3 text-center">
+                      <select
+                        value={u.schoolRole}
+                        onChange={(e) =>
+                          handleChangeUserRole(u.id, e.target.value as SchoolUserRole)
+                        }
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 focus:outline-none focus:border-teal-500"
+                      >
+                        <option value="TEACHER_GENERAL">ครูผู้สอนทั่วไป ({prof.shortLabel})</option>
+                        <option value="STUDENT_AFFAIRS">ฝ่ายกิจการนักเรียน</option>
+                        <option value="ACADEMIC_ADMIN">ฝ่ายวิชาการ / แอดมิน</option>
+                        <option value="STUDENT_GENERAL">นักเรียนทั่วไป</option>
+                        <option value="STUDENT_COUNCIL">คณะกรรมการสภานักเรียน</option>
+                      </select>
+                    </td>
+                    <td className="py-3 px-3 text-right">
                       <button
                         onClick={() =>
                           alert(
-                            u.role === 'STUDENT'
-                              ? `รีเซ็ตรหัส PIN ของ ${u.name} กลับเป็นค่าเริ่มต้น (${u.schoolCode.slice(1)}) เรียบร้อย`
-                              : `ส่งลิงก์ตั้งรหัสผ่านใหม่ไปยังอีเมล ${u.email} เรียบร้อย`
+                            `รีเซ็ตรหัสผ่าน/PIN ของ ${u.name} (${schoolSettings.nameTh}) เรียบร้อยแล้ว`
                           )
                         }
                         className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors"
                       >
-                        {u.role === 'STUDENT' ? 'รีเซ็ต PIN' : 'ตั้งรหัสผ่านใหม่'}
+                        รีเซ็ตรหัส
                       </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -223,161 +404,157 @@ export const UserAccountsView: React.FC = () => {
           <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <QrCode className="w-5 h-5 text-blue-600" />
+                <QrCode className="w-5 h-5 text-teal-600" />
                 <h3 className="font-bold text-slate-800 text-base">
-                  สลิปรหัสผ่านและ QR Code สำหรับแจกนักเรียน (ม.3/1)
+                  สลิป QR Code นักเรียน — {schoolSettings.nameTh}
                 </h3>
               </div>
-              <button onClick={() => setIsSlipModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <button
+                onClick={() => setIsSlipModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
               {users
-                .filter((u) => u.role === 'STUDENT')
+                .filter(
+                  (u) =>
+                    u.schoolRole === 'STUDENT_GENERAL' ||
+                    u.schoolRole === 'STUDENT_COUNCIL'
+                )
                 .map((stu) => (
                   <div
                     key={stu.id}
                     className="p-3 border border-dashed border-slate-300 rounded-xl flex items-center justify-between bg-slate-50/60"
                   >
                     <div className="space-y-0.5 text-xs">
-                      <div className="font-bold text-slate-800">{stu.name}</div>
-                      <div className="text-slate-500">
-                        รหัสประจำตัว: <span className="font-mono font-bold text-blue-700">{stu.schoolCode}</span> • รหัส PIN เริ่มต้น:{' '}
-                        <span className="font-mono font-bold text-emerald-700">{stu.schoolCode.slice(1)}</span>
+                      <div className="font-bold text-slate-800">
+                        {stu.name}{' '}
+                        <span className="text-[10px] text-teal-700">
+                          ({SCHOOL_ROLE_PROFILES[stu.schoolRole].shortLabel})
+                        </span>
                       </div>
-                      <div className="text-[10px] text-slate-400">สแกน QR เพื่อเข้าสู่ห้องเรียนผจญภัยบนมือถือได้ทันที</div>
+                      <div className="text-slate-500">
+                        รหัสประจำตัว:{' '}
+                        <span className="font-mono font-bold text-teal-700">
+                          {stu.schoolCode}
+                        </span>{' '}
+                        • PIN เริ่มต้น:{' '}
+                        <span className="font-mono font-bold text-emerald-700">
+                          2510
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {schoolSettings.nameTh} • สพม.อุดรธานี
+                      </div>
                     </div>
-                    <div className="p-2 bg-white border border-slate-200 rounded-lg text-center">
-                      <QrCode className="w-8 h-8 text-slate-700 mx-auto" />
-                      <span className="text-[9px] font-mono text-slate-400">{stu.schoolCode}</span>
+                    <div className="w-12 h-12 bg-white border border-slate-200 rounded-lg flex items-center justify-center">
+                      <QrCode className="w-8 h-8 text-slate-700" />
                     </div>
                   </div>
                 ))}
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 text-xs">
-              <button
-                onClick={() => setIsSlipModalOpen(false)}
-                className="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 font-semibold"
-              >
-                ปิด
-              </button>
-              <button
-                onClick={() => {
-                  window.print();
-                }}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center gap-1.5"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>สั่งพิมพ์สลิปทั้งหมด</span>
-              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal: Create New Account (Hybrid Auth) */}
+      {/* Modal: Add User */}
       {isAddUserOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <form onSubmit={handleCreateUser} className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-bold text-slate-800 text-base">สร้างบัญชีผู้ใช้งานใหม่ (Hybrid Auth)</h3>
-              <button type="button" onClick={() => setIsAddUserOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <div className="flex items-center gap-2">
+                <Mail className="w-5 h-5 text-indigo-600" />
+                <h3 className="font-bold text-slate-800 text-base">
+                  เพิ่มบัญชีผู้ใช้งานใหม่ ({schoolSettings.nameTh})
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsAddUserOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <form onSubmit={handleCreateUser} className="space-y-3 text-xs">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">ประเภทผู้ใช้งาน</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setNewRole('TEACHER')}
-                    className={`py-2 rounded-xl font-bold border ${
-                      newRole === 'TEACHER'
-                        ? 'bg-blue-50 border-blue-400 text-blue-700'
-                        : 'border-slate-200 text-slate-500'
-                    }`}
-                  >
-                    ครูผู้สอน (Email/Pass + SSO)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNewRole('STUDENT')}
-                    className={`py-2 rounded-xl font-bold border ${
-                      newRole === 'STUDENT'
-                        ? 'bg-emerald-50 border-emerald-400 text-emerald-700'
-                        : 'border-slate-200 text-slate-500'
-                    }`}
-                  >
-                    นักเรียน (รหัส 5 หลัก + PIN)
-                  </button>
-                </div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  เลือกบทบาทและสิทธิ์การเข้าถึง (5 บทบาท)
+                </label>
+                <select
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value as SchoolUserRole)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800"
+                >
+                  <option value="TEACHER_GENERAL">1. ครูผู้ใช้งานทั่วไป (ครูประจำวิชา/ที่ปรึกษา)</option>
+                  <option value="STUDENT_AFFAIRS">2. กลุ่มบริหารงานกิจการนักเรียน</option>
+                  <option value="ACADEMIC_ADMIN">3. กลุ่มบริหารงานวิชาการ / แอดมิน</option>
+                  <option value="STUDENT_GENERAL">4. นักเรียนทั่วไป</option>
+                  <option value="STUDENT_COUNCIL">5. คณะกรรมการสภานักเรียน</option>
+                </select>
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">ชื่อ - นามสกุล</label>
+                <label className="block font-bold text-slate-700 mb-1">
+                  ชื่อ-นามสกุล
+                </label>
                 <input
                   type="text"
                   required
-                  placeholder={newRole === 'TEACHER' ? 'เช่น ครูสมชาย ใจดี' : 'เช่น ด.ช. ปัญญา มีสุข'}
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"
+                  placeholder="เช่น ครูสมชาย ใจดี หรือ ด.ญ. มานี มีตา"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  {newRole === 'TEACHER' ? 'อีเมลผู้ใช้งาน (Username / Email)' : 'รหัสประจำตัวนักเรียน (5 หลัก)'}
-                </label>
-                <div className="relative">
-                  <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    required
-                    placeholder={newRole === 'TEACHER' ? 'teacher@school.ac.th' : 'เช่น 45128'}
-                    value={newEmailOrCode}
-                    onChange={(e) => setNewEmailOrCode(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  {newRole === 'TEACHER' ? 'รหัสผ่าน (Password)' : 'รหัส PIN 4 หลัก (เช่น วันเดือนเกิด)'}
+                <label className="block font-bold text-slate-700 mb-1">
+                  อีเมล (@kutchap.ac.th) หรือ รหัสนักเรียน 5 หลัก
                 </label>
                 <input
-                  type="password"
+                  type="text"
                   required
-                  placeholder={newRole === 'TEACHER' ? 'รหัสผ่านอย่างน้อย 8 ตัวอักษร' : 'เช่น 2510'}
-                  value={newPasswordOrPin}
-                  onChange={(e) => setNewPasswordOrPin(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"
+                  value={newEmailOrCode}
+                  onChange={(e) => setNewEmailOrCode(e.target.value)}
+                  placeholder="เช่น somchai.j@kutchap.ac.th หรือ 45120"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl"
                 />
               </div>
-            </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 text-xs">
-              <button
-                type="button"
-                onClick={() => setIsAddUserOpen(false)}
-                className="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 font-semibold"
-              >
-                ยกเลิก
-              </button>
-              <button
-                type="submit"
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-xs"
-              >
-                บันทึกบัญชีผู้ใช้งาน
-              </button>
-            </div>
-          </form>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  รหัสผ่านเริ่มต้น / PIN 4 หลัก
+                </label>
+                <input
+                  type="text"
+                  value={newPasswordOrPin}
+                  onChange={(e) => setNewPasswordOrPin(e.target.value)}
+                  placeholder="เว้นว่างเพื่อใช้ค่าเริ่มต้นอัตโนมัติ"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddUserOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-semibold"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold"
+                >
+                  บันทึกบัญชีและกำหนดสิทธิ์
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

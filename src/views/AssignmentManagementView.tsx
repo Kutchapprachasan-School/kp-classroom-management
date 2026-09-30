@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   CheckCircle2,
   Plus,
@@ -13,10 +13,19 @@ import {
   type TermAssignmentItem,
   type StudentWorkSubmission,
 } from '../services/sgsRosterAndSubmissionService';
+import { PaperRegisterLedger } from '../components/teacher/PaperRegisterLedger';
 
-type QuickFilterMode = 'ALL' | 'MISSING_OR_R' | 'PENDING_REVIEW';
+export type QuickFilterMode = 'ALL' | 'MISSING_OR_R' | 'PENDING_REVIEW';
 
-export const AssignmentManagementView: React.FC = () => {
+interface AssignmentManagementViewProps {
+  initialQuickFilter?: QuickFilterMode;
+  initialHighlightBanner?: string | null;
+}
+
+export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> = ({
+  initialQuickFilter = 'ALL',
+  initialHighlightBanner: _initialHighlightBanner = null,
+}) => {
   const [roster, setRoster] = useState<SgsStudentRecord[]>(() =>
     sgsRosterAndSubmissionService.getSgsRoster()
   );
@@ -31,7 +40,21 @@ export const AssignmentManagementView: React.FC = () => {
     'MATRIX_TABLE'
   );
   const [selectedUnitFilter, setSelectedUnitFilter] = useState<string>('ALL');
-  const [quickFilter, setQuickFilter] = useState<QuickFilterMode>('ALL');
+  const [quickFilter, setQuickFilter] = useState<QuickFilterMode>(initialQuickFilter);
+
+  useEffect(() => {
+    setQuickFilter(initialQuickFilter);
+  }, [initialQuickFilter]);
+
+  useEffect(() => {
+    const handler = () => {
+      setRoster([...sgsRosterAndSubmissionService.getSgsRoster()]);
+      setAssignments([...sgsRosterAndSubmissionService.getTermAssignments()]);
+      setSubmissions([...sgsRosterAndSubmissionService.getSubmissions()]);
+    };
+    window.addEventListener('kp-copilot-updated', handler);
+    return () => window.removeEventListener('kp-copilot-updated', handler);
+  }, []);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showTransferredOut, setShowTransferredOut] = useState<boolean>(true);
 
@@ -250,6 +273,9 @@ export const AssignmentManagementView: React.FC = () => {
         </div>
       )}
 
+      {/* ตารางสมุดตรวจการบ้าน & เช็คงานส่งแบบกระดาษ (เห็นทั้งห้อง + ทุกชิ้นงานในหน้าเดียว ไม่มีคำอธิบายรกตา) */}
+      <PaperRegisterLedger initialMode="HOMEWORK_CHECK" />
+
       {/* Clean Single-Card Container */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         {/* Compact Top Toolbar */}
@@ -433,11 +459,8 @@ export const AssignmentManagementView: React.FC = () => {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <span className="font-bold text-teal-950">
-                  📤 ระบบนักเรียนส่งงานออนไลน์ (บังคับกฎ: รูป/PDF อัปโหลดเข้า R2 · ส่วนงาน Canva และวิดีโอขนาดใหญ่ส่งเป็นลิงก์เท่านั้น)
+                  📤 ส่งงานออนไลน์ (รูป/PDF เข้า R2 · ลิงก์ Canva/วิดีโอ 0 KB)
                 </span>
-                <p className="text-[11px] text-teal-800 mt-0.5">
-                  แยกช่องทางชัดเจนไม่ซ้ำซ้อน: ภาพถ่ายสมุด/PDF บีบอัดเป็น `.webp` (~148 KB) เข้า R2 · ส่วนงานออกแบบใน Canva หรือคลิปวิดีโอขนาดใหญ่ ให้นักเรียนส่งเป็นลิงก์เท่านั้น (ใช้พื้นที่ R2 = 0 KB)
-                </p>
               </div>
               <div className="flex items-center gap-2">
                 <div className="inline-flex bg-white p-0.5 rounded-lg border border-teal-300 text-[11px]">
@@ -648,12 +671,8 @@ export const AssignmentManagementView: React.FC = () => {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <span className="font-bold text-slate-900">
-                  ☁️ จัดการพื้นที่ Cloudflare R2 & สำรองไฟล์เข้า Google Drive โรงเรียน (100 TB Workspace)
+                  ☁️ จัดการพื้นที่ Cloudflare R2 & สำรอง Google Drive (100 TB)
                 </span>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  • <strong>สิทธิ์ครูผู้สอน:</strong> โอนย้ายเข้า Google Drive รร. (100TB) และกดล้างไฟล์ R2 <strong>เฉพาะรายวิชาของตัวเอง</strong> ได้<br />
-                  • <strong>สิทธิ์แอดมิน:</strong> ดูพื้นที่ครูทุกคน และกดล้างได้ทั้ง <strong>รายวิชา / ทั้งภาคเรียน / ทั้งปีการศึกษา</strong>
-                </p>
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">

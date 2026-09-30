@@ -38,55 +38,114 @@ import {
   Vote,
   ChevronDown,
   ChevronUp,
+  ShieldCheck,
 } from 'lucide-react';
+import type { CrossViewNavigationPayload } from './services/teacherCopilotService';
+import type { ClassSubTab } from './views/TeacherOverviewView';
+import type { QuickFilterMode } from './views/AssignmentManagementView';
+import {
+  KUTCHAP_SCHOOL_INFO,
+  SCHOOL_ROLE_PROFILES,
+  type SchoolUserRole,
+} from './config/schoolRoles';
 
 export const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<TeacherViewKey>('school-login');
+  const [activeRole, setActiveRole] = useState<SchoolUserRole>('TEACHER_GENERAL');
   const [loginChannel, setLoginChannel] = useState<TeacherLoginChannel>('E_LEAVE');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isQuickBarOpen, setIsQuickBarOpen] = useState(false);
 
+  // Context-Aware Deep-Link Navigation States
+  const [deepLinkClassTab, setDeepLinkClassTab] = useState<ClassSubTab>('attendance');
+  const [deepLinkAffairsTab, setDeepLinkAffairsTab] = useState<
+    'ASSEMBLY' | 'DISCIPLINE' | 'STUDENT_LEAVE'
+  >('ASSEMBLY');
+  const [deepLinkGradesFilter, setDeepLinkGradesFilter] = useState<'ALL' | 'AT_RISK'>('ALL');
+  const [deepLinkAssignmentFilter, setDeepLinkAssignmentFilter] =
+    useState<QuickFilterMode>('ALL');
+  const [deepLinkBanner, setDeepLinkBanner] = useState<string | null>(null);
+
+  const handleChangeRole = (nextRole: SchoolUserRole) => {
+    setActiveRole(nextRole);
+    if (nextRole === 'STUDENT_GENERAL' || nextRole === 'STUDENT_COUNCIL') {
+      setCurrentView('student-portal');
+      return;
+    }
+
+    const defaultTarget = SCHOOL_ROLE_PROFILES[nextRole].defaultView as TeacherViewKey;
+    if (currentView === 'student-portal' || currentView === 'school-login') {
+      setCurrentView(defaultTarget);
+      return;
+    }
+
+    // หากสลับออกจากฝ่ายวิชาการขณะที่เปิดหน้าตั้งค่าระบบเฉพาะแอดมิน ให้พากลับหน้าหลักของบทบาทนั้น
+    if (
+      nextRole !== 'ACADEMIC_ADMIN' &&
+      ['academic-year', 'accounts', 'trash'].includes(currentView)
+    ) {
+      setCurrentView(defaultTarget);
+    }
+  };
+
+  const handleDeepNavigate = (payload: CrossViewNavigationPayload) => {
+    if (payload.classSubTab) {
+      setDeepLinkClassTab(payload.classSubTab);
+    }
+    if (payload.affairsSubTab) {
+      setDeepLinkAffairsTab(payload.affairsSubTab);
+    }
+    if (payload.gradesQuickFilter) {
+      setDeepLinkGradesFilter(payload.gradesQuickFilter);
+    }
+    if (payload.assignmentQuickFilter) {
+      setDeepLinkAssignmentFilter(payload.assignmentQuickFilter);
+    }
+    setDeepLinkBanner(payload.highlightBanner || null);
+    setCurrentView(payload.view as TeacherViewKey);
+  };
+
   const getHeaderTitle = () => {
     switch (currentView) {
       case 'home':
-        return 'หน้าหลัก';
+        return 'หน้าแรก';
       case 'class-overview':
-        return 'ศ23101 ศิลปะ — ม.3/1';
+        return 'ศ23101 ศิลปะ';
       case 'exams':
-        return 'จัดการการสอบ';
+        return 'ข้อสอบ';
       case 'assignments':
-        return 'จัดการงาน/การบ้าน';
+        return 'สั่งงาน / R2';
       case 'readiness':
-        return 'ความพร้อมก่อนปิดเทอม';
+        return 'ส่งเกรด SGS';
       case 'sar':
-        return 'เทียบผลข้ามห้อง';
+        return 'รายงาน SAR';
       case 'home-visit':
-        return 'เยี่ยมบ้านนักเรียน (แบบ นร./กสศ.01) & โอนข้อมูลเข้า CCT (cct.eef.or.th)';
+        return 'เยี่ยมบ้าน นร.01';
       case 'student-affairs':
-        return 'ระบบบริหารงานกิจการนักเรียน (เช็คชื่อเสาธง / วินัย / ใบลานักเรียน)';
+        return 'เช็คชื่อแถวเช้า';
       case 'student-council':
-        return 'ระบบสภานักเรียน & เลือกตั้งออนไลน์ (E-Voting)';
+        return 'สภานักเรียน';
       case 'courses':
-        return 'รายวิชา / หลักสูตร';
+        return 'รายวิชา';
       case 'lessons':
         return 'แผนการสอน';
       case 'roster':
-        return 'ห้องเรียน / รายชื่อนักเรียน';
+        return 'รายชื่อนักเรียน';
       case 'student':
-        return 'ด.ช. ทัตธน คำฝั้น (วิเคราะห์รายคน)';
+        return 'ข้อมูลนักเรียน';
       case 'timetable':
-        return 'ตารางสอน / คาบเรียน';
+        return 'ตารางสอน';
       case 'academic-year':
-        return 'ปีการศึกษาและภาคเรียน';
+        return 'ตั้งค่าปีการศึกษา';
       case 'settings':
-        return 'ตั้งค่า / สำรองข้อมูล';
+        return 'ตั้งค่า & พื้นที่ R2';
       case 'trash':
-        return 'ถังขยะ (รายการที่ถูกลบ)';
+        return 'ถังขยะ';
       case 'accounts':
-        return 'บัญชีผู้ใช้และสิทธิ์การเข้าถึง';
+        return 'จัดการสิทธิ์ 5 บทบาท';
       default:
-        return 'ระบบจัดการชั้นเรียน';
+        return KUTCHAP_SCHOOL_INFO.nameTh;
     }
   };
 
@@ -102,53 +161,101 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans overflow-x-hidden">
-      {/* Quiet Prototype Switcher Bar (Collapsed by default on all screens to preserve Visual Hierarchy & 60-30-10 rule) */}
+      {/* Top Bar: โรงเรียนกุดจับประชาสรรค์ + 1-Click 5-Role Switcher */}
       <div className="bg-slate-900 text-slate-200 px-3.5 sm:px-6 py-1.5 text-xs border-b border-slate-800 z-40 select-none">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
-          <div className="flex items-center gap-3">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <span className="inline-flex items-center gap-1.5 font-bold text-teal-400">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>{KUTCHAP_SCHOOL_INFO.nameTh} (สพม.อุดรธานี)</span>
+            </span>
+
             <button
               onClick={() => setIsQuickBarOpen((prev) => !prev)}
-              className="inline-flex items-center gap-1.5 font-medium text-slate-300 hover:text-white transition-colors py-0.5"
+              className="inline-flex items-center gap-1 font-medium text-slate-300 hover:text-white transition-colors py-0.5"
             >
-              <Eye className="w-3.5 h-3.5 text-teal-400" />
-              <span>ทางลัดสลับหน้าจอ</span>
+              <Eye className="w-3.5 h-3.5 text-slate-400" />
               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300 border border-slate-700">
-                {isQuickBarOpen ? 'ซ่อนรายการ' : '12 หน้าจอ'}
-                {isQuickBarOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                {isQuickBarOpen ? 'ซ่อนทางลัด' : 'ทางลัด 12 หน้าจอ'}
+                {isQuickBarOpen ? (
+                  <ChevronUp className="w-3 h-3" />
+                ) : (
+                  <ChevronDown className="w-3 h-3" />
+                )}
               </span>
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          {/* 5-Role Quick Switcher Bar */}
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-[10px] text-slate-400 mr-1 hidden md:inline">
+              สลับสิทธิ์ 5 บทบาท:
+            </span>
             <button
               onClick={() => setCurrentView('school-login')}
-              className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-colors ${
+              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
                 currentView === 'school-login'
-                  ? 'bg-teal-600 text-white'
+                  ? 'bg-slate-700 text-white border border-slate-500'
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
             >
               หน้า Login
             </button>
             <button
-              onClick={() => setCurrentView('home')}
-              className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                currentView !== 'school-login' && currentView !== 'student-portal'
+              onClick={() => handleChangeRole('TEACHER_GENERAL')}
+              className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${
+                currentView !== 'school-login' &&
+                currentView !== 'student-portal' &&
+                activeRole === 'TEACHER_GENERAL'
                   ? 'bg-teal-600 text-white'
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
             >
-              โหมดครูผู้สอน
+              1. ครูทั่วไป
             </button>
             <button
-              onClick={() => setCurrentView('student-portal')}
-              className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                currentView === 'student-portal'
-                  ? 'bg-teal-600 text-white'
+              onClick={() => handleChangeRole('STUDENT_AFFAIRS')}
+              className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${
+                currentView !== 'school-login' &&
+                currentView !== 'student-portal' &&
+                activeRole === 'STUDENT_AFFAIRS'
+                  ? 'bg-amber-600 text-white'
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
             >
-              พอร์ทัลนักเรียน
+              2. ฝ่ายกิจการ
+            </button>
+            <button
+              onClick={() => handleChangeRole('ACADEMIC_ADMIN')}
+              className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${
+                currentView !== 'school-login' &&
+                currentView !== 'student-portal' &&
+                activeRole === 'ACADEMIC_ADMIN'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              3. ฝ่ายวิชาการ/แอดมิน
+            </button>
+            <button
+              onClick={() => handleChangeRole('STUDENT_GENERAL')}
+              className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${
+                currentView === 'student-portal' && activeRole === 'STUDENT_GENERAL'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              4. นักเรียน
+            </button>
+            <button
+              onClick={() => handleChangeRole('STUDENT_COUNCIL')}
+              className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${
+                currentView === 'student-portal' && activeRole === 'STUDENT_COUNCIL'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              5. สภานักเรียน
             </button>
           </div>
         </div>
@@ -196,22 +303,37 @@ export const App: React.FC = () => {
       {/* Conditional Rendering: Direct Login Screen vs Student Portal vs Classroom Management */}
       {currentView === 'school-login' ? (
         <SchoolPortalView
-          onEnterClassroomPortal={(target, channel) => {
+          onEnterClassroomPortal={(target, channel, role) => {
             if (channel) {
               setLoginChannel(channel);
             }
+            if (role) {
+              setActiveRole(role);
+            }
             setCurrentView((target as TeacherViewKey) || 'home');
           }}
-          onEnterStudentPortal={() => setCurrentView('student-portal')}
+          onEnterStudentPortal={(stuRole) => {
+            setActiveRole(stuRole || 'STUDENT_GENERAL');
+            setCurrentView('student-portal');
+          }}
         />
       ) : currentView === 'student-portal' ? (
-        <StudentPortalView onExit={() => setCurrentView('school-login')} />
+        <StudentPortalView
+          studentRole={
+            activeRole === 'STUDENT_COUNCIL' ? 'STUDENT_COUNCIL' : 'STUDENT_GENERAL'
+          }
+          onChangeStudentRole={(stuRole) => setActiveRole(stuRole)}
+          onSwitchToTeacherRole={(tRole) => handleChangeRole(tRole)}
+          onExit={() => setCurrentView('school-login')}
+        />
       ) : (
         /* Teacher Mode Layout */
         <div className="flex flex-1 min-h-0">
-          {/* Left Teacher Navigation Sidebar (Desktop permanent + Mobile slide-over drawer) */}
+          {/* Left Teacher Navigation Sidebar (Separated Operational vs System Settings + 5 Roles) */}
           <TeacherSidebar
             currentView={currentView}
+            activeRole={activeRole}
+            onChangeRole={handleChangeRole}
             loginChannel={loginChannel}
             onNavigate={(view) => setCurrentView(view)}
             isOpen={isMobileSidebarOpen}
@@ -227,6 +349,7 @@ export const App: React.FC = () => {
               onOpenSearch={() => setIsSearchOpen(true)}
               onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
               termLabel="ภาคเรียนที่ 1/2569"
+              onDeepNavigate={handleDeepNavigate}
             />
 
             {/* Dynamic View Body */}
@@ -234,11 +357,15 @@ export const App: React.FC = () => {
               {currentView === 'home' && (
                 <TeacherGlobalDashboardView
                   onNavigateToClass={() => setCurrentView('class-overview')}
-                  onNavigateToAttendance={() => setCurrentView('class-overview')}
+                  onNavigateToAttendance={() => {
+                    setDeepLinkClassTab('attendance');
+                    setCurrentView('class-overview');
+                  }}
                   onNavigateToReadiness={() => setCurrentView('readiness')}
                   onNavigateToAcademicYear={() => setCurrentView('academic-year')}
                   onNavigateToCourses={() => setCurrentView('courses')}
                   onNavigateToMorningAssembly={() => setCurrentView('student-affairs')}
+                  onDeepNavigate={handleDeepNavigate}
                 />
               )}
 
@@ -246,15 +373,24 @@ export const App: React.FC = () => {
                 <TeacherOverviewView
                   onSelectStudent={handleSelectStudent}
                   onViewFullTable={() =>
-                    alert('เปิดตารางคะแนนเต็มของวิชา ศ23101 ศิลปะ ม.3/1')
+                    alert('เปิดตารางคะแนนเต็มของวิชา ศ23101 ศิลปะ ม.3/1 รร.กุดจับประชาสรรค์')
                   }
                   onSwitchToAdventure={() => setCurrentView('student-portal')}
+                  initialTab={deepLinkClassTab}
+                  initialGradesFilter={deepLinkGradesFilter}
+                  initialAssignmentFilter={deepLinkAssignmentFilter}
+                  initialHighlightBanner={deepLinkBanner}
                 />
               )}
 
               {currentView === 'exams' && <ExamManagementView />}
 
-              {currentView === 'assignments' && <AssignmentManagementView />}
+              {currentView === 'assignments' && (
+                <AssignmentManagementView
+                  initialQuickFilter={deepLinkAssignmentFilter}
+                  initialHighlightBanner={deepLinkBanner}
+                />
+              )}
 
               {currentView === 'readiness' && <EndTermReadinessView />}
 
@@ -266,7 +402,10 @@ export const App: React.FC = () => {
                 <StudentAffairsCouncilView
                   key="affairs"
                   initialSection="AFFAIRS"
+                  initialAffairsTab={deepLinkAffairsTab}
+                  initialHighlightBanner={deepLinkBanner}
                   onOpenHomeVisit={() => setCurrentView('home-visit')}
+                  onDeepNavigate={handleDeepNavigate}
                 />
               )}
 
@@ -275,6 +414,7 @@ export const App: React.FC = () => {
                   key="council"
                   initialSection="COUNCIL"
                   onOpenHomeVisit={() => setCurrentView('home-visit')}
+                  onDeepNavigate={handleDeepNavigate}
                 />
               )}
 
@@ -297,12 +437,92 @@ export const App: React.FC = () => {
 
               {currentView === 'academic-year' && <AcademicTermsView />}
 
-              {currentView === 'settings' && <SettingsBackupView />}
+              {currentView === 'settings' && (
+                <SettingsBackupView activeRole={activeRole} />
+              )}
 
               {currentView === 'trash' && <TrashManagementView />}
 
-              {currentView === 'accounts' && <UserAccountsView />}
+              {currentView === 'accounts' && (
+                <UserAccountsView
+                  activeRole={activeRole}
+                  onChangeRole={handleChangeRole}
+                />
+              )}
             </main>
+
+            {/* Mobile Bottom Navigation Bar (กดสลับด้วยนิ้วโป้งมือเดียวในแนวตั้ง: หน้าแรก | เช็คแถวเช้า | เช็คชื่อสอน | คะแนน | เมนู) */}
+            <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 px-2 py-1.5 grid grid-cols-5 gap-1 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] select-none">
+              <button
+                type="button"
+                onClick={() => setCurrentView('home')}
+                className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-colors ${
+                  currentView === 'home'
+                    ? 'text-[#1967D2] bg-blue-50/80'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                <LayoutDashboard className="w-4 h-4 mb-0.5" />
+                <span>หน้าแรก</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setDeepLinkAffairsTab('ASSEMBLY');
+                  setCurrentView('student-affairs');
+                }}
+                className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-colors ${
+                  currentView === 'student-affairs'
+                    ? 'text-amber-700 bg-amber-50'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <UserCheck className="w-4 h-4 mb-0.5 text-amber-600" />
+                <span>เช็คแถวเช้า</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setDeepLinkClassTab('attendance');
+                  setCurrentView('class-overview');
+                }}
+                className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-colors ${
+                  currentView === 'class-overview' && deepLinkClassTab === 'attendance'
+                    ? 'text-[#1967D2] bg-blue-50/80'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Users className="w-4 h-4 mb-0.5" />
+                <span>เช็คชื่อสอน</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setDeepLinkClassTab('grades');
+                  setCurrentView('class-overview');
+                }}
+                className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-colors ${
+                  currentView === 'class-overview' && deepLinkClassTab === 'grades'
+                    ? 'text-teal-700 bg-teal-50'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <FileSpreadsheet className="w-4 h-4 mb-0.5" />
+                <span>คะแนน ปพ.5</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                className="flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold text-slate-600 hover:text-slate-900"
+              >
+                <PenTool className="w-4 h-4 mb-0.5" />
+                <span>เมนูทั้งหมด</span>
+              </button>
+            </nav>
           </div>
         </div>
       )}

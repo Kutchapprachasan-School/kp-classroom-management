@@ -3,7 +3,6 @@ import {
   Home,
   Users,
   PenTool,
-  BookOpen,
   CheckCircle2,
   FileSpreadsheet,
   BookMarked,
@@ -23,7 +22,15 @@ import {
   ChevronDown,
   ChevronUp,
   FolderOpen,
+  Vote,
+  Lock,
+  ShieldCheck,
 } from 'lucide-react';
+import {
+  getSchoolSettings,
+  SCHOOL_ROLE_PROFILES,
+  type SchoolUserRole,
+} from '../../config/schoolRoles';
 
 export type TeacherViewKey =
   | 'school-login'
@@ -50,49 +57,224 @@ export type TeacherViewKey =
 interface TeacherSidebarProps {
   currentView: TeacherViewKey;
   onNavigate: (view: TeacherViewKey) => void;
+  activeRole?: SchoolUserRole;
+  onChangeRole?: (role: SchoolUserRole) => void;
   loginChannel?: 'E_LEAVE' | 'DIRECT_CLASSROOM';
   isOpen?: boolean;
   onClose?: () => void;
 }
 
-const PRIMARY_VIEWS: TeacherViewKey[] = [
-  'home',
-  'student-affairs',
-  'class-overview',
-  'assignments',
-  'home-visit',
-  'readiness',
-];
+interface NavMenuItem {
+  key: TeacherViewKey;
+  label: string;
+  icon: React.FC<{ className?: string }>;
+  badge?: string;
+  badgeStyle?: string;
+  highlightStyle?: boolean;
+}
 
 export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
   currentView,
   onNavigate,
+  activeRole = 'TEACHER_GENERAL',
+  onChangeRole,
   isOpen = false,
   onClose,
 }) => {
-  const isSecondaryViewActive = !PRIMARY_VIEWS.includes(currentView);
-  const [showMoreMenus, setShowMoreMenus] = useState<boolean>(isSecondaryViewActive);
+  const [showMoreOperational, setShowMoreOperational] = useState<boolean>(false);
+  const [showSettingsDrawer, setShowSettingsDrawer] = useState<boolean>(
+    ['settings', 'academic-year', 'accounts', 'trash'].includes(currentView)
+  );
+
+  const activeProfile =
+    SCHOOL_ROLE_PROFILES[activeRole] || SCHOOL_ROLE_PROFILES.TEACHER_GENERAL;
 
   const handleSelect = (view: TeacherViewKey) => {
     onNavigate(view);
     onClose?.();
   };
 
+  // ============================================================================
+  // 1. เมนูหน้าการใช้งานปฏิบัติงานรายวัน (Operational Workflows — แยกตาม 3 บทบาทฝั่งครู/บุคลากร)
+  // ============================================================================
+  const getPrimaryOperationalMenus = (): NavMenuItem[] => {
+    if (activeRole === 'STUDENT_AFFAIRS') {
+      return [
+        {
+          key: 'student-affairs',
+          label: '1. เช็คชื่อแถวเช้า (07:45) & ใบลา',
+          icon: ShieldAlert,
+          badge: '07:45',
+          badgeStyle: 'bg-amber-100 text-amber-800',
+          highlightStyle: true,
+        },
+        {
+          key: 'home-visit',
+          label: '2. เยี่ยมบ้าน นร.01 & SDQ ทั้ง รร.',
+          icon: HeartHandshake,
+          badge: 'กสศ.',
+          badgeStyle: 'bg-emerald-100 text-emerald-800',
+        },
+        {
+          key: 'student-council',
+          label: '3. กำกับสภานักเรียน & เลือกตั้ง',
+          icon: Vote,
+          badge: 'สภาฯ',
+          badgeStyle: 'bg-purple-100 text-purple-800',
+        },
+        {
+          key: 'roster',
+          label: '4. ทะเบียนนักเรียน & ผู้ปกครอง',
+          icon: School,
+        },
+        {
+          key: 'home',
+          label: '5. ภาพรวมสถิติการมาเรียนวันนี้',
+          icon: Home,
+        },
+      ];
+    }
+
+    if (activeRole === 'ACADEMIC_ADMIN') {
+      return [
+        {
+          key: 'readiness',
+          label: '1. ตรวจความพร้อม & อนุมัติเกรด SGS',
+          icon: CheckCircle2,
+          badge: 'SGS',
+          badgeStyle: 'bg-indigo-100 text-indigo-800',
+          highlightStyle: true,
+        },
+        {
+          key: 'sar',
+          label: '2. รายงานผลสัมฤทธิ์ข้ามห้อง (SAR)',
+          icon: FileSpreadsheet,
+          badge: 'SAR',
+          badgeStyle: 'bg-blue-100 text-blue-800',
+        },
+        {
+          key: 'courses',
+          label: '3. รายวิชา & โครงสร้างหลักสูตร',
+          icon: BookMarked,
+        },
+        {
+          key: 'timetable',
+          label: '4. ตารางสอนรวมทั้งโรงเรียน',
+          icon: CalendarDays,
+        },
+        {
+          key: 'roster',
+          label: '5. ทะเบียนนักเรียนกลาง (ย้าย/เลขที่)',
+          icon: School,
+        },
+        {
+          key: 'exams',
+          label: '6. จัดการสอบกลางภาค / ปลายภาค',
+          icon: PenTool,
+        },
+        {
+          key: 'home',
+          label: '7. ภาพรวมวิชาการวันนี้',
+          icon: Home,
+        },
+      ];
+    }
+
+    // Default: TEACHER_GENERAL (ครูผู้ใช้งานทั่วไป / ครูประจำวิชา & ครูที่ปรึกษา)
+    return [
+      {
+        key: 'home',
+        label: '1. หน้าแรกวันนี้ (งานด่วนของครู)',
+        icon: Home,
+      },
+      {
+        key: 'student-affairs',
+        label: '2. เช็คชื่อแถวเช้า ม.3/1 (07:45)',
+        icon: ShieldAlert,
+        badge: '07:45',
+        badgeStyle: 'bg-amber-100 text-amber-800',
+        highlightStyle: true,
+      },
+      {
+        key: 'class-overview',
+        label: '3. เข้าสอน & ปพ.5 (วิชาที่สอน)',
+        icon: Users,
+      },
+      {
+        key: 'assignments',
+        label: '4. สั่งงาน & ตรวจงาน (R2 / Canva)',
+        icon: PenTool,
+        badge: 'R2',
+        badgeStyle: 'bg-teal-100 text-teal-800',
+      },
+      {
+        key: 'home-visit',
+        label: '5. เยี่ยมบ้าน ม.3/1 (นร.01)',
+        icon: HeartHandshake,
+      },
+      {
+        key: 'readiness',
+        label: '6. ตรวจก่อนส่งเกรด (วิชาที่สอน)',
+        icon: CheckCircle2,
+      },
+    ];
+  };
+
+  // เมนูเสริมสำหรับการปฏิบัติงาน (ไม่มีเมนูตั้งค่าระบบปะปน)
+  const getSecondaryOperationalMenus = (): NavMenuItem[] => {
+    if (activeRole === 'TEACHER_GENERAL') {
+      return [
+        { key: 'exams', label: 'ข้อสอบกลางภาค / ปลายภาค', icon: PenTool },
+        { key: 'lessons', label: 'แผนการสอนของฉัน', icon: FileText },
+        { key: 'timetable', label: 'ตารางสอนของฉัน', icon: CalendarDays },
+        { key: 'roster', label: 'รายชื่อนักเรียนห้องที่ปรึกษา', icon: School },
+      ];
+    }
+    if (activeRole === 'STUDENT_AFFAIRS') {
+      return [
+        { key: 'class-overview', label: 'ดูเวลาเรียนรายคาบ (ม.1–ม.6)', icon: Users },
+        { key: 'timetable', label: 'ตารางเรียนรวมแต่ละห้อง', icon: CalendarDays },
+      ];
+    }
+    // ACADEMIC_ADMIN
+    return [
+      { key: 'class-overview', label: 'ตรวจสอบสมุด ปพ.5 รายวิชา', icon: Users },
+      { key: 'assignments', label: 'ติดตามการสั่งงาน/ส่งงานรวม', icon: PenTool },
+      { key: 'lessons', label: 'คลังแผนการสอนทั้งโรงเรียน', icon: FileText },
+      { key: 'student-affairs', label: 'สถิติเวลาเรียน & ใบลาหน้าเสาธง', icon: ShieldAlert },
+    ];
+  };
+
+  const primaryMenus = getPrimaryOperationalMenus();
+  const secondaryMenus = getSecondaryOperationalMenus();
+  const isSettingsViewActive = [
+    'settings',
+    'academic-year',
+    'accounts',
+    'trash',
+  ].includes(currentView);
+
+  const schoolSettings = getSchoolSettings();
+
   const sidebarContent = (
     <>
-      {/* Brand & User Profile Header (Compact) */}
-      <div className="p-3 border-b border-slate-200/80 bg-slate-50/50">
-        <div className="flex items-center justify-between gap-2">
+      {/* ============================================================================
+          ZONE A: ข้อมูลโรงเรียนกุดจับประชาสรรค์ + โปรไฟล์ตามบทบาท + ตัวสลับ 5 สิทธิ์
+      ============================================================================ */}
+      <div className="p-3 border-b border-slate-200/80 bg-slate-50/70 shrink-0">
+        <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-teal-600 text-white shadow-xs shrink-0 font-bold text-xs">
-              ปพ.5
-            </div>
+            <img
+              src={schoolSettings.logoUrl}
+              alt={schoolSettings.nameTh}
+              className="w-9 h-9 rounded-xl bg-white border border-slate-200 p-0.5 object-contain shadow-2xs shrink-0"
+            />
             <div className="min-w-0">
               <div className="font-bold text-slate-900 text-xs truncate">
-                ระบบจัดการชั้นเรียน
+                {schoolSettings.nameTh}
               </div>
-              <div className="text-[11px] text-slate-500 truncate">
-                ครูภาสภูมิ เรืองปราชญ์
+              <div className="text-[10px] text-teal-700 font-semibold truncate">
+                {schoolSettings.shortCode}
               </div>
             </div>
           </div>
@@ -108,322 +290,189 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
           )}
         </div>
 
-        {/* Compact Logout Button */}
-        <div className="mt-2.5 pt-2 border-t border-slate-200/70 flex items-center justify-between gap-1.5">
-          <span className="inline-flex items-center gap-1 text-[11px] text-teal-800 font-medium truncate">
-            <span className="w-1.5 h-1.5 rounded-full bg-teal-600 shrink-0" />
-            เชื่อมระบบการลา
-          </span>
-          <button
-            onClick={() => handleSelect('school-login')}
-            className="inline-flex items-center gap-1 px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-md text-[11px] font-semibold transition-colors shrink-0"
-            title="ออกจากระบบ หรือ สลับบัญชี"
-          >
-            <LogOut className="w-3 h-3 text-slate-500" />
-            <span>สลับบัญชี</span>
-          </button>
+        {/* Active User & Role Badge */}
+        <div className="mt-2.5 p-2 rounded-xl bg-white border border-slate-200/90 shadow-2xs">
+          <div className="flex items-center justify-between gap-1.5 mb-0.5">
+            <span className="text-xs font-bold text-slate-900 truncate">
+              {activeProfile.userName}
+            </span>
+            <span
+              className={`px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0 ${activeProfile.badgeColor}`}
+            >
+              {activeProfile.shortLabel}
+            </span>
+          </div>
+          <div className="text-[10px] text-slate-500 truncate">
+            {activeProfile.userPosition}
+          </div>
         </div>
+
+        {/* 1-Click Role Switcher (สลับ 5 บทบาทชัดเจน) */}
+        {onChangeRole && (
+          <div className="mt-2">
+            <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 mb-1 px-0.5">
+              <span>สลับบทบาทเพื่อดูสิทธิ์เข้าถึง:</span>
+              <ShieldCheck className="w-3 h-3 text-teal-600" />
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              <button
+                type="button"
+                onClick={() => onChangeRole('TEACHER_GENERAL')}
+                className={`px-1.5 py-1 rounded-lg text-[10px] font-bold transition-colors truncate ${
+                  activeRole === 'TEACHER_GENERAL'
+                    ? 'bg-teal-600 text-white shadow-2xs'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                }`}
+                title="สิทธิ์ครูผู้ใช้งานทั่วไป (ครูประจำวิชา / ที่ปรึกษา)"
+              >
+                ครูทั่วไป
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeRole('STUDENT_AFFAIRS')}
+                className={`px-1.5 py-1 rounded-lg text-[10px] font-bold transition-colors truncate ${
+                  activeRole === 'STUDENT_AFFAIRS'
+                    ? 'bg-amber-600 text-white shadow-2xs'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                }`}
+                title="สิทธิ์กลุ่มบริหารงานกิจการนักเรียน"
+              >
+                ฝ่ายกิจการ
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeRole('ACADEMIC_ADMIN')}
+                className={`px-1.5 py-1 rounded-lg text-[10px] font-bold transition-colors truncate ${
+                  activeRole === 'ACADEMIC_ADMIN'
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                }`}
+                title="สิทธิ์กลุ่มบริหารงานวิชาการ & แอดมิน"
+              >
+                ฝ่ายวิชาการ
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-1 mt-1">
+              <button
+                type="button"
+                onClick={() => onChangeRole('STUDENT_GENERAL')}
+                className="px-1.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors truncate"
+                title="สลับไปหน้าพอร์ทัลนักเรียนทั่วไป"
+              >
+                🎓 นักเรียนทั่วไป
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeRole('STUDENT_COUNCIL')}
+                className="px-1.5 py-1 rounded-lg text-[10px] font-bold bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 transition-colors truncate"
+                title="สลับไปหน้าพอร์ทัลคณะกรรมการสภานักเรียน"
+              >
+                🗳️ สภานักเรียน
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Navigation Groups */}
+      {/* ============================================================================
+          ZONE B: หน้าการใช้งานปฏิบัติงานรายวัน (Operational Pages — ไม่มีเมนูตั้งค่าปน)
+      ============================================================================ */}
       <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-3">
-        {/* หมวดหลักเรียงตามลำดับงานจริงของครู: 1. เช็คชื่อแถวเช้า (07:45) -> 2. เข้าสอนรายวิชา -> 3. สั่งงาน/ส่งงาน R2 */}
         <div>
-          <div className="px-2.5 pb-1.5 text-[11px] font-bold text-slate-400">
-            ลำดับงานประจำวันของครู
+          <div className="px-2.5 pb-1.5 flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-500">
+              {activeRole === 'STUDENT_AFFAIRS'
+                ? 'หน้าใช้งาน: ฝ่ายกิจการนักเรียน'
+                : activeRole === 'ACADEMIC_ADMIN'
+                ? 'หน้าใช้งาน: ฝ่ายวิชาการ & ทะเบียน'
+                : 'หน้าใช้งาน: งานสอนประจำวัน'}
+            </span>
           </div>
+
           <div className="space-y-1">
-            <button
-              onClick={() => handleSelect('home')}
-              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs transition-colors ${
-                currentView === 'home'
-                  ? 'bg-teal-50 text-teal-900 font-bold border border-teal-300'
-                  : 'text-slate-700 hover:bg-slate-100 font-medium'
-              }`}
-            >
-              <Home
-                className={`w-4 h-4 shrink-0 ${
-                  currentView === 'home' ? 'text-teal-700' : 'text-slate-400'
-                }`}
-              />
-              <span className="truncate">1. หน้าแรกวันนี้</span>
-            </button>
-
-            <button
-              onClick={() => handleSelect('student-affairs')}
-              className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-left text-xs transition-colors ${
-                currentView === 'student-affairs'
-                  ? 'bg-amber-50 text-amber-900 font-bold border border-amber-300'
-                  : 'text-slate-800 hover:bg-amber-50/60 font-semibold bg-amber-50/30 border border-amber-200/60'
-              }`}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <ShieldAlert
-                  className={`w-4 h-4 shrink-0 ${
-                    currentView === 'student-affairs' ? 'text-amber-700' : 'text-amber-600'
+            {primaryMenus.map((item) => {
+              const IconComp = item.icon;
+              const isActive = currentView === item.key;
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => handleSelect(item.key)}
+                  className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-left text-xs transition-colors ${
+                    isActive
+                      ? item.highlightStyle
+                        ? 'bg-amber-50 text-amber-900 font-bold border border-amber-300'
+                        : 'bg-teal-50 text-teal-900 font-bold border border-teal-300'
+                      : item.highlightStyle
+                      ? 'text-slate-800 hover:bg-amber-50/60 font-semibold bg-amber-50/30 border border-amber-200/60'
+                      : 'text-slate-700 hover:bg-slate-100 font-medium'
                   }`}
-                />
-                <span className="truncate">2. เช็คชื่อแถวเช้า & ใบลา</span>
-              </div>
-              <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 text-[10px] font-bold shrink-0">
-                07:45
-              </span>
-            </button>
-
-            <button
-              onClick={() => handleSelect('class-overview')}
-              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs transition-colors ${
-                currentView === 'class-overview'
-                  ? 'bg-teal-50 text-teal-900 font-bold border border-teal-300'
-                  : 'text-slate-700 hover:bg-slate-100 font-medium'
-              }`}
-            >
-              <Users
-                className={`w-4 h-4 shrink-0 ${
-                  currentView === 'class-overview' ? 'text-teal-700' : 'text-slate-400'
-                }`}
-              />
-              <span className="truncate">3. เข้าสอน & ปพ.5 (คาบเรียน)</span>
-            </button>
-
-            <button
-              onClick={() => handleSelect('assignments')}
-              className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-left text-xs transition-colors ${
-                currentView === 'assignments'
-                  ? 'bg-teal-50 text-teal-900 font-bold border border-teal-300'
-                  : 'text-slate-700 hover:bg-slate-100 font-medium'
-              }`}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <PenTool
-                  className={`w-4 h-4 shrink-0 ${
-                    currentView === 'assignments' ? 'text-teal-700' : 'text-slate-400'
-                  }`}
-                />
-                <span className="truncate">4. สั่งงาน & ส่งงาน (R2)</span>
-              </div>
-              <span className="px-1.5 py-0.2 rounded bg-teal-100 text-teal-800 text-[10px] font-bold shrink-0">
-                R2
-              </span>
-            </button>
-
-            <button
-              onClick={() => handleSelect('home-visit')}
-              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs transition-colors ${
-                currentView === 'home-visit'
-                  ? 'bg-teal-50 text-teal-900 font-bold border border-teal-300'
-                  : 'text-slate-700 hover:bg-slate-100 font-medium'
-              }`}
-            >
-              <HeartHandshake
-                className={`w-4 h-4 shrink-0 ${
-                  currentView === 'home-visit' ? 'text-teal-700' : 'text-slate-400'
-                }`}
-              />
-              <span className="truncate">5. เยี่ยมบ้าน & ทุน กสศ.</span>
-            </button>
-
-            <button
-              onClick={() => handleSelect('readiness')}
-              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs transition-colors ${
-                currentView === 'readiness'
-                  ? 'bg-teal-50 text-teal-900 font-bold border border-teal-300'
-                  : 'text-slate-700 hover:bg-slate-100 font-medium'
-              }`}
-            >
-              <CheckCircle2
-                className={`w-4 h-4 shrink-0 ${
-                  currentView === 'readiness' ? 'text-teal-700' : 'text-slate-400'
-                }`}
-              />
-              <span className="truncate">6. ตรวจก่อนส่งเกรด (ปพ.5)</span>
-            </button>
-
-            <button
-              onClick={() => handleSelect('settings')}
-              className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-left text-xs transition-colors ${
-                currentView === 'settings'
-                  ? 'bg-teal-50 text-teal-900 font-bold border border-teal-300'
-                  : 'text-slate-700 hover:bg-slate-100 font-medium'
-              }`}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <Settings
-                  className={`w-4 h-4 shrink-0 ${
-                    currentView === 'settings' ? 'text-teal-700' : 'text-slate-400'
-                  }`}
-                />
-                <span className="truncate">7. แดชบอร์ดแอดมิน & พื้นที่ R2</span>
-              </div>
-              <span className="px-1.5 py-0.2 rounded bg-blue-100 text-blue-800 text-[10px] font-bold shrink-0">
-                100TB
-              </span>
-            </button>
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <IconComp
+                      className={`w-4 h-4 shrink-0 ${
+                        isActive
+                          ? item.highlightStyle
+                            ? 'text-amber-700'
+                            : 'text-teal-700'
+                          : item.highlightStyle
+                          ? 'text-amber-600'
+                          : 'text-slate-400'
+                      }`}
+                    />
+                    <span className="truncate">{item.label}</span>
+                  </div>
+                  {item.badge && (
+                    <span
+                      className={`px-1.5 py-0.2 rounded text-[10px] font-bold shrink-0 ${
+                        item.badgeStyle || 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* ปุ่มลัดสลับไปหน้าเว็บนักเรียน */}
-        <div>
+        {/* หมวดเครื่องมือปฏิบัติงานเสริมตามบทบาท (พับเก็บได้ และไม่มีการตั้งค่าปะปน) */}
+        <div className="pt-2 border-t border-slate-200/70">
           <button
-            onClick={() => handleSelect('student-portal')}
-            className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-left text-xs text-teal-800 bg-teal-50/70 hover:bg-teal-100/80 transition-colors font-semibold border border-teal-200"
-            title="เปิดหน้าจอฝั่งนักเรียน"
-          >
-            <ExternalLink className="w-3.5 h-3.5 text-teal-700 shrink-0" />
-            <span className="truncate">ดูหน้าจอฝั่งนักเรียน</span>
-          </button>
-        </div>
-
-        {/* หมวดที่ 2: เมนูเพิ่มเติม & ตั้งค่าระบบ (พับเก็บได้ ไม่รกสายตา) */}
-        <div className="pt-2 border-t border-slate-200/80">
-          <button
-            onClick={() => setShowMoreMenus((prev) => !prev)}
+            onClick={() => setShowMoreOperational((prev) => !prev)}
             className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
           >
             <span className="flex items-center gap-2 truncate">
               <FolderOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              <span className="truncate">เมนูเพิ่มเติม & ตั้งค่า</span>
+              <span className="truncate">เครื่องมือปฏิบัติงานเพิ่มเติม</span>
             </span>
-            {showMoreMenus || isSecondaryViewActive ? (
+            {showMoreOperational ? (
               <ChevronUp className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             ) : (
               <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             )}
           </button>
 
-          {(showMoreMenus || isSecondaryViewActive) && (
+          {showMoreOperational && (
             <div className="mt-1 space-y-0.5 pl-1 text-xs">
-              <button
-                onClick={() => handleSelect('exams')}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors ${
-                  currentView === 'exams'
-                    ? 'bg-teal-50 text-teal-900 font-bold border border-teal-200'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <PenTool className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="truncate">การสอบกลาง/ปลายภาค</span>
-              </button>
-
-              <button
-                onClick={() => handleSelect('assignments')}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors ${
-                  currentView === 'assignments'
-                    ? 'bg-teal-50 text-teal-900 font-bold border border-teal-200'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="truncate">สั่งงาน / การบ้าน</span>
-              </button>
-
-              <button
-                onClick={() => handleSelect('sar')}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors ${
-                  currentView === 'sar'
-                    ? 'bg-teal-50 text-teal-900 font-bold border border-teal-200'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="truncate">เทียบผลข้ามห้อง (SAR)</span>
-              </button>
-
-              <button
-                onClick={() => handleSelect('roster')}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors ${
-                  currentView === 'roster' || currentView === 'student'
-                    ? 'bg-teal-50 text-teal-900 font-bold border border-teal-200'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <School className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="truncate">ทะเบียนรายชื่อนักเรียน</span>
-              </button>
-
-              <button
-                onClick={() => handleSelect('timetable')}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors ${
-                  currentView === 'timetable'
-                    ? 'bg-teal-50 text-teal-900 font-bold border border-teal-200'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <CalendarDays className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="truncate">ตารางสอน / คาบเรียน</span>
-              </button>
-
-              <button
-                onClick={() => handleSelect('courses')}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors ${
-                  currentView === 'courses'
-                    ? 'bg-teal-50 text-teal-900 font-bold border border-teal-200'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <BookMarked className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="truncate">รายวิชา / หลักสูตร</span>
-              </button>
-
-              <button
-                onClick={() => handleSelect('lessons')}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors ${
-                  currentView === 'lessons'
-                    ? 'bg-teal-50 text-teal-900 font-bold border border-teal-200'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="truncate">แผนการสอน</span>
-              </button>
-
-              <button
-                onClick={() => handleSelect('academic-year')}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors ${
-                  currentView === 'academic-year'
-                    ? 'bg-teal-50 text-teal-900 font-bold border border-teal-200'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="truncate">ตั้งค่าปีการศึกษา</span>
-              </button>
-
-              <button
-                onClick={() => handleSelect('settings')}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors ${
-                  currentView === 'settings'
-                    ? 'bg-teal-50 text-teal-900 font-bold border border-teal-200'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <Settings className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="truncate">ตั้งค่า / สำรองข้อมูล</span>
-              </button>
-
-              <button
-                onClick={() => handleSelect('accounts')}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors ${
-                  currentView === 'accounts'
-                    ? 'bg-teal-50 text-teal-900 font-bold border border-teal-200'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <KeyRound className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="truncate">บัญชีและรหัสผ่าน</span>
-              </button>
-
-              <button
-                onClick={() => handleSelect('trash')}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors ${
-                  currentView === 'trash'
-                    ? 'bg-teal-50 text-teal-900 font-bold border border-teal-200'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <Trash2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="truncate">ถังขยะ</span>
-              </button>
+              {secondaryMenus.map((item) => {
+                const IconComp = item.icon;
+                const isActive = currentView === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => handleSelect(item.key)}
+                    className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors ${
+                      isActive
+                        ? 'bg-teal-50 text-teal-900 font-bold border border-teal-200'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <IconComp className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })}
 
               <a
                 href="http://localhost:3001/dashboard"
@@ -433,7 +482,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
               >
                 <span className="flex items-center gap-2.5 min-w-0">
                   <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span className="truncate">เว็บระบบการลา (E-Leave)</span>
+                  <span className="truncate">ระบบการลาครู (E-Leave)</span>
                 </span>
                 <ExternalLink className="w-3 h-3 text-slate-400 shrink-0" />
               </a>
@@ -441,13 +490,153 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
           )}
         </div>
       </div>
+
+      {/* ============================================================================
+          ZONE C: โซนการตั้งค่าระบบ (System Settings Zone — แยกขาดจากหน้าใช้งานอยู่ด้านล่างสุด)
+      ============================================================================ */}
+      <div className="border-t-2 border-slate-200 bg-slate-100/80 p-2.5 shrink-0 space-y-1.5">
+        <button
+          type="button"
+          onClick={() => setShowSettingsDrawer((prev) => !prev)}
+          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-colors ${
+            isSettingsViewActive
+              ? 'bg-slate-900 text-white shadow-xs'
+              : 'bg-white text-slate-800 border border-slate-200/90 hover:bg-slate-50'
+          }`}
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            <Settings
+              className={`w-3.5 h-3.5 shrink-0 ${
+                isSettingsViewActive ? 'text-teal-400' : 'text-slate-600'
+              }`}
+            />
+            <span className="truncate">
+              {activeRole === 'ACADEMIC_ADMIN'
+                ? '⚙️ การตั้งค่าระบบ & แอดมิน'
+                : '⚙️ การตั้งค่า (แยกจากหน้าใช้งาน)'}
+            </span>
+          </span>
+          {showSettingsDrawer || isSettingsViewActive ? (
+            <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-70" />
+          ) : (
+            <ChevronUp className="w-3.5 h-3.5 shrink-0 opacity-70" />
+          )}
+        </button>
+
+        {(showSettingsDrawer || isSettingsViewActive) && (
+          <div className="bg-white rounded-xl border border-slate-200/90 p-1.5 space-y-0.5 text-xs shadow-2xs">
+            {/* 1. ตั้งค่าพื้นที่จัดเก็บไฟล์ R2 / สำรองข้อมูล (ครูเห็นเฉพาะวิชาตัวเอง / วิชาการเห็นทั้ง รร.) */}
+            <button
+              onClick={() => handleSelect('settings')}
+              className={`w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
+                currentView === 'settings'
+                  ? 'bg-teal-50 text-teal-900 font-bold border border-teal-200'
+                  : 'text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <span className="flex items-center gap-2 min-w-0">
+                <Settings className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                <span className="truncate">
+                  {activeRole === 'TEACHER_GENERAL'
+                    ? 'ตั้งค่าวิชา & พื้นที่ R2 ของฉัน'
+                    : 'พื้นที่ R2 & Google Drive 100TB'}
+                </span>
+              </span>
+              <span className="px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 text-[9px] font-bold shrink-0">
+                R2
+              </span>
+            </button>
+
+            {/* 2. เมนูตั้งค่าระดับโรงเรียน (เฉพาะฝ่ายวิชาการ / แอดมิน เท่านั้น) */}
+            {activeRole === 'ACADEMIC_ADMIN' ? (
+              <>
+                <button
+                  onClick={() => handleSelect('academic-year')}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
+                    currentView === 'academic-year'
+                      ? 'bg-teal-50 text-teal-900 font-bold border border-teal-200'
+                      : 'text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <span className="truncate">ตั้งค่าปีการศึกษา / ภาคเรียน</span>
+                </button>
+
+                <button
+                  onClick={() => handleSelect('accounts')}
+                  className={`w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
+                    currentView === 'accounts'
+                      ? 'bg-teal-50 text-teal-900 font-bold border border-teal-200'
+                      : 'text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="flex items-center gap-2 min-w-0">
+                    <KeyRound className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                    <span className="truncate">จัดการบัญชี & สิทธิ์ 5 บทบาท</span>
+                  </span>
+                  <span className="px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 text-[9px] font-bold shrink-0">
+                    RBAC
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => handleSelect('trash')}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
+                    currentView === 'trash'
+                      ? 'bg-teal-50 text-teal-900 font-bold border border-teal-200'
+                      : 'text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <span className="truncate">ถังขยะและกู้คืนข้อมูลระบบ</span>
+                </button>
+              </>
+            ) : (
+              <div className="px-2 py-1.5 rounded-lg bg-slate-50 border border-slate-200/70 flex items-center justify-between gap-1.5 text-[10px] text-slate-500">
+                <span className="flex items-center gap-1.5 truncate">
+                  <Lock className="w-3 h-3 text-slate-400 shrink-0" />
+                  <span className="truncate">ตั้งค่าระบบ/สิทธิ์ผู้ใช้ (เฉพาะวิชาการ)</span>
+                </span>
+                {onChangeRole && (
+                  <button
+                    type="button"
+                    onClick={() => onChangeRole('ACADEMIC_ADMIN')}
+                    className="text-indigo-700 font-bold hover:underline shrink-0"
+                  >
+                    สลับดู
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ปุ่มสลับบัญชี / ออกจากระบบ */}
+        <div className="flex items-center justify-between gap-1.5 pt-1">
+          <button
+            onClick={() => handleSelect('student-portal')}
+            className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 rounded-lg text-[11px] font-bold transition-colors truncate"
+          >
+            <ExternalLink className="w-3 h-3 shrink-0" />
+            <span className="truncate">พอร์ทัลนักเรียน</span>
+          </button>
+          <button
+            onClick={() => handleSelect('school-login')}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-[11px] font-semibold transition-colors shrink-0"
+            title="กลับหน้าเข้าสู่ระบบ รร.กุดจับประชาสรรค์"
+          >
+            <LogOut className="w-3 h-3 text-slate-500" />
+            <span>ออก</span>
+          </button>
+        </div>
+      </div>
     </>
   );
 
   return (
     <>
-      {/* Desktop Permanent Sidebar (Compact w-56 = 224px to give maximum space to data tables) */}
-      <aside className="hidden lg:flex w-56 bg-white border-r border-slate-200/80 flex-col shrink-0 min-h-screen text-xs text-slate-700 font-sans select-none">
+      {/* Desktop Permanent Sidebar */}
+      <aside className="hidden lg:flex w-60 bg-white border-r border-slate-200/80 flex-col shrink-0 min-h-screen text-xs text-slate-700 font-sans select-none">
         {sidebarContent}
       </aside>
 
@@ -458,7 +647,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
             onClick={onClose}
           />
-          <aside className="relative z-10 w-64 max-w-[82vw] bg-white h-full shadow-2xl flex flex-col text-xs text-slate-700 font-sans select-none animate-in slide-in-from-left duration-200">
+          <aside className="relative z-10 w-68 max-w-[85vw] bg-white h-full shadow-2xl flex flex-col text-xs text-slate-700 font-sans select-none animate-in slide-in-from-left duration-200">
             {sidebarContent}
           </aside>
         </div>

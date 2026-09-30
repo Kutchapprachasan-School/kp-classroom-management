@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldAlert,
   Vote,
@@ -8,90 +8,49 @@ import {
   MessageSquare,
   Calendar,
   FileCheck2,
-  HeartHandshake,
   Award,
-  Settings,
-  Lock,
 } from 'lucide-react';
 import {
   studentAffairsCouncilService,
-  type AssemblyExceptionRecord,
   type DisciplineRecord,
   type StudentLeaveRequest,
   type CouncilCandidateParty,
   type StudentSuggestion,
-  type AffairsTeacherRole,
-  type AffairsRolePermission,
 } from '../services/studentAffairsCouncilService';
+import {
+  teacherCopilotService,
+  type CrossViewNavigationPayload,
+} from '../services/teacherCopilotService';
+import { MobileVerticalAttendanceSheet } from '../components/teacher/MobileVerticalAttendanceSheet';
+import { PaperRegisterLedger } from '../components/teacher/PaperRegisterLedger';
 
 interface StudentAffairsCouncilViewProps {
   initialSection?: 'AFFAIRS' | 'COUNCIL';
+  initialAffairsTab?: 'ASSEMBLY' | 'DISCIPLINE' | 'STUDENT_LEAVE';
+  initialHighlightBanner?: string | null;
   onOpenHomeVisit?: () => void;
+  onDeepNavigate?: (payload: CrossViewNavigationPayload) => void;
 }
 
 export const StudentAffairsCouncilView: React.FC<
   StudentAffairsCouncilViewProps
-> = ({ initialSection = 'AFFAIRS', onOpenHomeVisit }) => {
+> = ({
+  initialSection = 'AFFAIRS',
+  initialAffairsTab = 'ASSEMBLY',
+  onOpenHomeVisit: _onOpenHomeVisit,
+}) => {
   const mainSection = initialSection;
   const [affairsTab, setAffairsTab] = useState<
     'ASSEMBLY' | 'DISCIPLINE' | 'STUDENT_LEAVE'
-  >('ASSEMBLY');
+  >(initialAffairsTab);
   const [councilTab, setCouncilTab] = useState<
     'EVOTING' | 'SUGGESTIONS' | 'ACTIVITIES'
   >('EVOTING');
+  const [assemblyViewMode, setAssemblyViewMode] = useState<
+    'PAPER_LEDGER' | 'MOBILE_VERTICAL'
+  >('PAPER_LEDGER');
 
-  // Role & Classroom Scope (ครูที่ปรึกษาเห็นห้องตัวเอง ม.3/1, ครูกิจการ/ครูเวรเห็นทุกห้อง)
-  const [activeRole, setActiveRole] = useState<AffairsTeacherRole>(() =>
-    studentAffairsCouncilService.getActiveTeacherRole()
-  );
-  const [roleMatrix, setRoleMatrix] = useState<AffairsRolePermission[]>(() =>
-    studentAffairsCouncilService.getRolePermissions()
-  );
-  const [selectedRoom, setSelectedRoom] = useState<string>(() =>
-    studentAffairsCouncilService.getActiveTeacherRole() === 'HOMEROOM'
-      ? 'ม.3/1'
-      : 'ALL'
-  );
-  const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
-
-  const currentRolePerm =
-    roleMatrix.find((r) => r.role === activeRole) || roleMatrix[0];
-
-  const handleSwitchRole = (role: AffairsTeacherRole) => {
-    setActiveRole(role);
-    studentAffairsCouncilService.setActiveTeacherRole(role);
-    const perm = roleMatrix.find((r) => r.role === role);
-    if (perm && !perm.canViewAllRooms) {
-      setSelectedRoom('ม.3/1');
-    } else {
-      setSelectedRoom('ALL');
-    }
-  };
-
-  const handleTogglePermission = (
-    role: AffairsTeacherRole,
-    field: keyof Pick<
-      AffairsRolePermission,
-      | 'canViewAllRooms'
-      | 'canCheckFlagpoleAllRooms'
-      | 'canApproveLeaveAllRooms'
-      | 'canManageDiscipline'
-    >
-  ) => {
-    const updated = roleMatrix.map((item) =>
-      item.role === role ? { ...item, [field]: !item[field] } : item
-    );
-    setRoleMatrix(updated);
-    studentAffairsCouncilService.saveRolePermissions(updated);
-    const updatedPerm = updated.find((r) => r.role === activeRole);
-    if (updatedPerm && !updatedPerm.canViewAllRooms) {
-      setSelectedRoom('ม.3/1');
-    }
-  };
-
-  const [assemblyList, setAssemblyList] = useState<AssemblyExceptionRecord[]>(
-    () => studentAffairsCouncilService.getAssemblyRecords()
-  );
+  const [selectedLeaveRoom, setSelectedLeaveRoom] = useState<string>('ALL');
   const [disciplineLogs, setDisciplineLogs] = useState<DisciplineRecord[]>(() =>
     studentAffairsCouncilService.getDisciplineLogs()
   );
@@ -108,20 +67,10 @@ export const StudentAffairsCouncilView: React.FC<
     studentAffairsCouncilService.getSuggestions()
   );
 
-  // Filtered records based on Role Scope & Classroom Filter
-  const effectiveRoomFilter = currentRolePerm.canViewAllRooms
-    ? selectedRoom
-    : 'ม.3/1';
-
-  const filteredAssembly =
-    effectiveRoomFilter === 'ALL'
-      ? assemblyList
-      : assemblyList.filter((s) => s.classroom === effectiveRoomFilter);
-
   const filteredLeaves =
-    effectiveRoomFilter === 'ALL'
+    selectedLeaveRoom === 'ALL'
       ? leaveRequests
-      : leaveRequests.filter((l) => l.classroom === effectiveRoomFilter);
+      : leaveRequests.filter((l) => l.classroom === selectedLeaveRoom);
 
   // Form state for adding discipline point
   const [newDiscStudent, setNewDiscStudent] = useState('ด.ช. ทัตธน คำฝั้น');
@@ -133,18 +82,6 @@ export const StudentAffairsCouncilView: React.FC<
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3500);
-  };
-
-  const handleUpdateAssembly = (
-    code: string,
-    status: AssemblyExceptionRecord['status']
-  ) => {
-    const updated = studentAffairsCouncilService.updateAssemblyStatus(
-      code,
-      status
-    );
-    setAssemblyList(updated);
-    showToast(`อัปเดตสถานะเข้าแถวหน้าเสาธงรหัส ${code} เป็น ${status} แล้ว`);
   };
 
   const handleAddDiscipline = (e: React.FormEvent) => {
@@ -200,6 +137,22 @@ export const StudentAffairsCouncilView: React.FC<
     showToast('ตอบกลับข้อเสนอแนะนักเรียนเรียบร้อยแล้ว');
   };
 
+  useEffect(() => {
+    setAffairsTab(initialAffairsTab);
+  }, [initialAffairsTab]);
+
+  useEffect(() => {
+    const handler = () => {
+      setLeaveRequests([...studentAffairsCouncilService.getStudentLeaves()]);
+    };
+    window.addEventListener('kp-copilot-updated', handler);
+    return () => window.removeEventListener('kp-copilot-updated', handler);
+  }, []);
+
+  const pendingLeavesCount = leaveRequests.filter(
+    (l) => l.status === 'PENDING'
+  ).length;
+
   const totalVotes = parties.reduce((s, p) => s + p.voteCount, 0);
 
   return (
@@ -211,423 +164,174 @@ export const StudentAffairsCouncilView: React.FC<
         </div>
       )}
 
-      {/* 1. Compact Toolbar Header (Separated: Student Affairs & Leave vs Student Council) */}
-      <div className="bg-white rounded-xl border border-slate-200 px-4 py-2.5 shadow-xs space-y-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {mainSection === 'AFFAIRS' ? (
-            <>
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-sm sm:text-base font-bold text-slate-900">
-                  เช็คชื่อหน้าเสาธง & ใบลานักเรียน
-                </h1>
+      {mainSection === 'COUNCIL' && (
+        <>
+          <div className="bg-white rounded-xl border border-slate-200 px-4 py-2.5 shadow-xs">
+            <h1 className="text-sm sm:text-base font-bold text-slate-900">
+              สภานักเรียน & เลือกตั้งออนไลน์ (E-Voting)
+            </h1>
+          </div>
 
-                {/* Compact Role Segmented Control */}
-                <div className="inline-flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg text-[11px]">
-                  {roleMatrix.map((rm) => {
-                    const isSelected = activeRole === rm.role;
-                    return (
-                      <button
-                        key={rm.role}
-                        type="button"
-                        onClick={() => handleSwitchRole(rm.role)}
-                        className={`px-2.5 py-1 rounded-md font-semibold transition-colors ${
-                          isSelected
-                            ? 'bg-white text-slate-900 shadow-2xs'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        {rm.label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Room Scope Filter */}
-                {currentRolePerm.canViewAllRooms ? (
-                  <select
-                    value={selectedRoom}
-                    onChange={(e) => setSelectedRoom(e.target.value)}
-                    className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700"
-                  >
-                    <option value="ALL">ทุกห้องเรียน (ทั้งโรงเรียน)</option>
-                    <option value="ม.3/1">ชั้น ม.3/1</option>
-                    <option value="ม.3/2">ชั้น ม.3/2</option>
-                    <option value="ม.3/3">ชั้น ม.3/3</option>
-                  </select>
-                ) : (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-900 border border-amber-200 text-[11px] font-semibold">
-                    <Lock className="w-3 h-3 text-amber-600" />
-                    <span>เฉพาะห้องที่ปรึกษา (ม.3/1)</span>
-                  </span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setIsAccessModalOpen((v) => !v)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold transition-colors"
-                >
-                  <Settings className="w-3.5 h-3.5 text-slate-500" />
-                  <span>ตั้งค่าสิทธิ์การเข้าถึง</span>
-                </button>
-                {onOpenHomeVisit && (
-                  <button
-                    type="button"
-                    onClick={onOpenHomeVisit}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold transition-colors"
-                  >
-                    <HeartHandshake className="w-3.5 h-3.5 text-teal-600" />
-                    <span>เยี่ยมบ้าน นร.01</span>
-                  </button>
-                )}
-              </div>
-            </>
-          ) : (
-            <div>
-              <h1 className="text-sm sm:text-base font-bold text-slate-900">
-                สภานักเรียน & เลือกตั้งออนไลน์ (E-Voting)
-              </h1>
-            </div>
-          )}
-        </div>
-
-        {/* แผงตั้งค่าสิทธิ์การเข้าถึง (Flexible Access Matrix เหมือนระบบการลา) */}
-        {mainSection === 'AFFAIRS' && isAccessModalOpen && (
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 text-xs">
-            <div className="flex items-center justify-between">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-slate-900 text-sm">
-                  ตั้งค่าสิทธิ์การเข้าถึงระบบหน้าเสาธง & ใบลานักเรียน (Role Access Matrix)
-                </h3>
-                <p className="text-slate-500">
-                  ปรับความยืดหยุ่นให้เหมาะกับบริบทโรงเรียน (เช่น เปิดให้ครูเวรหรือครูทุกคนช่วยดูทุกห้องเรียนได้)
-                </p>
+                <span className="text-xs font-medium text-slate-500">
+                  ผู้ใช้สิทธิ์เลือกตั้งรวม (รวมไม่ประสงค์ลงคะแนน)
+                </span>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="text-2xl font-bold text-teal-700 tabular-nums">
+                    {(totalVotes + abstainCount).toLocaleString()}
+                  </span>
+                  <span className="text-xs font-medium text-slate-500">
+                    คน (ไม่ประสงค์ลงคะแนน {abstainCount} คน)
+                  </span>
+                </div>
               </div>
-              <button
-                onClick={() => setIsAccessModalOpen(false)}
-                className="px-3 py-1 rounded-lg bg-white border border-slate-200 font-semibold text-slate-600 hover:bg-slate-100"
-              >
-                ✕ ปิดหน้าต่างตั้งค่า
-              </button>
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold">
+                นับผลเรียลไทม์
+              </span>
             </div>
 
-            <div className="overflow-x-auto bg-white rounded-xl border border-slate-200">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
-                    <th className="py-2.5 px-3">กลุ่มบทบาทครู</th>
-                    <th className="py-2.5 px-3 text-center">ดูข้อมูลทุกห้องเรียน</th>
-                    <th className="py-2.5 px-3 text-center">เช็คชื่อเสาธงทุกห้อง</th>
-                    <th className="py-2.5 px-3 text-center">อนุมัติใบลาข้ามห้อง</th>
-                    <th className="py-2.5 px-3 text-center">บันทึกคะแนนความประพฤติ</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {roleMatrix.map((row) => (
-                    <tr key={row.role} className="hover:bg-slate-50/70">
-                      <td className="py-2.5 px-3">
-                        <div className="font-bold text-slate-900">{row.label}</div>
-                        <div className="text-[11px] text-slate-500">{row.description}</div>
-                      </td>
-                      {(
-                        [
-                          'canViewAllRooms',
-                          'canCheckFlagpoleAllRooms',
-                          'canApproveLeaveAllRooms',
-                          'canManageDiscipline',
-                        ] as const
-                      ).map((field) => (
-                        <td key={field} className="py-2.5 px-3 text-center">
-                          <input
-                            type="checkbox"
-                            checked={row[field]}
-                            onChange={() => handleTogglePermission(row.role, field)}
-                            className="w-4 h-4 accent-teal-600 rounded cursor-pointer"
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-xs font-medium text-slate-500">
+                  พรรคผู้สมัครสภานักเรียน
+                </span>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="text-2xl font-bold text-slate-900 tabular-nums">
+                    {parties.length}
+                  </span>
+                  <span className="text-xs font-medium text-slate-500">
+                    พรรค (ปีการศึกษา 2569)
+                  </span>
+                </div>
+              </div>
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
+                ปิดผลคะแนนฝั่งเด็กก่อนโหวต
+              </span>
             </div>
-          </div>
-        )}
-      </div>
 
-      {/* 2. Rule of Thirds (กฎสามส่วน): Dedicated 3-Card Summary per Page */}
-      {mainSection === 'AFFAIRS' ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
-            <div>
-              <span className="text-xs font-medium text-slate-500">
-                เช็คชื่อหน้าเสาธง ({effectiveRoomFilter === 'ALL' ? 'ทุกห้องเรียน' : `ชั้น ${effectiveRoomFilter}`})
-              </span>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-slate-900 tabular-nums">
-                  {filteredAssembly.filter((s) => s.status === 'PRESENT').length}/{filteredAssembly.length}
-                </span>
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
+              <div>
                 <span className="text-xs font-medium text-slate-500">
-                  มาเข้าแถวปกติ
+                  ข้อเสนอแนะถึงสภานักเรียน
                 </span>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="text-2xl font-bold text-slate-900 tabular-nums">
+                    {suggestions.length}
+                  </span>
+                  <span className="text-xs font-medium text-slate-500">
+                    เรื่องที่เสนอเข้ามา
+                  </span>
+                </div>
               </div>
-            </div>
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold">
-              ติ๊ก “มา” ให้ครบแล้ว
-            </span>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
-            <div>
-              <span className="text-xs font-medium text-slate-500">
-                ใบลานักเรียนรอพิจารณา ({effectiveRoomFilter === 'ALL' ? 'ทุกห้อง' : effectiveRoomFilter})
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold">
+                รับฟังเสียงนักเรียน
               </span>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-teal-700 tabular-nums">
-                  {filteredLeaves.filter((r) => r.status === 'PENDING').length}
-                </span>
-                <span className="text-xs font-medium text-slate-500">
-                  ใบลา (จาก {filteredLeaves.length} ใบ)
-                </span>
-              </div>
             </div>
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
-              ซิงก์เข้าคาบเรียนอัตโนมัติ
-            </span>
           </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
-            <div>
-              <span className="text-xs font-medium text-slate-500">
-                บันทึกวินัย & ความประพฤติ
-              </span>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-slate-900 tabular-nums">
-                  {disciplineLogs.length}
-                </span>
-                <span className="text-xs font-medium text-slate-500">
-                  รายการที่บันทึก
-                </span>
-              </div>
-            </div>
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold">
-              เชื่อมสมุดพก ปพ.5
-            </span>
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
-            <div>
-              <span className="text-xs font-medium text-slate-500">
-                ผู้ใช้สิทธิ์เลือกตั้งรวม (รวมไม่ประสงค์ลงคะแนน)
-              </span>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-teal-700 tabular-nums">
-                  {(totalVotes + abstainCount).toLocaleString()}
-                </span>
-                <span className="text-xs font-medium text-slate-500">
-                  คน (ไม่ประสงค์ลงคะแนน {abstainCount} คน)
-                </span>
-              </div>
-            </div>
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold">
-              นับผลเรียลไทม์
-            </span>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
-            <div>
-              <span className="text-xs font-medium text-slate-500">
-                พรรคผู้สมัครสภานักเรียน
-              </span>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-slate-900 tabular-nums">
-                  {parties.length}
-                </span>
-                <span className="text-xs font-medium text-slate-500">
-                  พรรค (ปีการศึกษา 2569)
-                </span>
-              </div>
-            </div>
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
-              ปิดผลคะแนนฝั่งเด็กก่อนโหวต
-            </span>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
-            <div>
-              <span className="text-xs font-medium text-slate-500">
-                ข้อเสนอแนะถึงสภานักเรียน
-              </span>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-slate-900 tabular-nums">
-                  {suggestions.length}
-                </span>
-                <span className="text-xs font-medium text-slate-500">
-                  เรื่องที่เสนอเข้ามา
-                </span>
-              </div>
-            </div>
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold">
-              รับฟังเสียงนักเรียน
-            </span>
-          </div>
-        </div>
+        </>
       )}
 
       {/* =====================================================================
-          SECTION 1: ระบบบริหารงานกิจการนักเรียน (Student Affairs)
+          SECTION 1: ระบบบริหารงานกิจการนักเรียน (ออกแบบเน้นมือถือแนวตั้ง ตัดข้อความรกออกทั้งหมด)
          ===================================================================== */}
       {mainSection === 'AFFAIRS' && (
-        <div className="space-y-5">
-          {/* Unified Sub-navigation (60-30-10 Rule: No clashing rainbow buttons) */}
+        <div className="space-y-3">
+          {/* แถบไอคอนสลับงาน 3 ปุ่มสั้นๆ เข้าใจทันที (เช็คแถวเช้า | ใบลา | ความประพฤติ) */}
+          <div className="max-w-xl mx-auto grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-2xl border border-slate-200">
+            <button
+              onClick={() => setAffairsTab('ASSEMBLY')}
+              className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs sm:text-sm font-bold transition-colors ${
+                affairsTab === 'ASSEMBLY'
+                  ? 'bg-[#1967D2] text-white shadow-xs'
+                  : 'text-slate-700 hover:bg-white'
+              }`}
+            >
+              <UserCheck className="w-4 h-4 shrink-0" />
+              <span className="truncate">เช็คแถวเช้า</span>
+            </button>
+
+            <button
+              onClick={() => setAffairsTab('STUDENT_LEAVE')}
+              className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs sm:text-sm font-bold transition-colors ${
+                affairsTab === 'STUDENT_LEAVE'
+                  ? 'bg-[#1967D2] text-white shadow-xs'
+                  : 'text-slate-700 hover:bg-white'
+              }`}
+            >
+              <FileCheck2 className="w-4 h-4 shrink-0" />
+              <span className="truncate">ใบลา ({pendingLeavesCount})</span>
+            </button>
+
+            <button
+              onClick={() => setAffairsTab('DISCIPLINE')}
+              className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs sm:text-sm font-bold transition-colors ${
+                affairsTab === 'DISCIPLINE'
+                  ? 'bg-[#1967D2] text-white shadow-xs'
+                  : 'text-slate-700 hover:bg-white'
+              }`}
+            >
+              <ShieldAlert className="w-4 h-4 shrink-0" />
+              <span className="truncate">ความประพฤติ</span>
+            </button>
+          </div>
+
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl">
-                <button
-                  onClick={() => setAffairsTab('ASSEMBLY')}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                    affairsTab === 'ASSEMBLY'
-                      ? 'bg-slate-900 text-white shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <UserCheck className="w-3.5 h-3.5" />
-                  <span>เช็คชื่อแถวหน้าเสาธง</span>
-                </button>
-
-                <button
-                  onClick={() => setAffairsTab('DISCIPLINE')}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                    affairsTab === 'DISCIPLINE'
-                      ? 'bg-slate-900 text-white shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <ShieldAlert className="w-3.5 h-3.5" />
-                  <span>ตารางวินัย & คะแนนพฤติกรรม ({disciplineLogs.length})</span>
-                </button>
-
-                <button
-                  onClick={() => setAffairsTab('STUDENT_LEAVE')}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                    affairsTab === 'STUDENT_LEAVE'
-                      ? 'bg-slate-900 text-white shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <FileCheck2 className="w-3.5 h-3.5" />
-                  <span>ตารางอนุมัติใบลานักเรียน ({leaveRequests.length})</span>
-                </button>
-              </div>
-
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-700 bg-teal-50 border border-teal-200 px-3 py-1 rounded-lg">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>กดเปลี่ยนสถานะแล้วระบบบันทึกให้อัตโนมัติทันที</span>
-              </span>
-            </div>
-
-            {/* Tab 1.1: เช็คชื่อแถวหน้าเสาธง (Data Table) */}
+            {/* Tab 1.1: เช็คชื่อแถวหน้าเสาธง (สมุด ปพ.5 แบบกระดาษ พร้อมสลับโหมดการ์ดมือถือ) */}
             {affairsTab === 'ASSEMBLY' && (
-              <div>
-                <div className="px-5 py-3.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <h2 className="text-sm font-bold text-slate-900">
-                      ตารางเช็คชื่อเข้าแถวเคารพธงชาติรายวัน —{' '}
-                      {effectiveRoomFilter === 'ALL'
-                        ? 'ทุกห้องเรียน (ม.3/1 - ม.3/3)'
-                        : `ชั้น ${effectiveRoomFilter}`}
-                    </h2>
-                    <p className="text-xs text-slate-600 mt-0.5">
-                      ระบบติ๊ก <strong>“มาเข้าแถว”</strong> ให้นักเรียนครบทุกคนไว้แล้ว — คุณครูกดปุ่มด้านขวาเฉพาะคนที่ <strong>สาย / ลาป่วย / ขาด</strong>
-                    </p>
+              <div className="p-2 sm:p-4 bg-slate-50/50 space-y-2.5">
+                <div className="flex items-center justify-between gap-2 px-1">
+                  <span className="text-xs font-bold text-slate-700">
+                    เช็คแถวเช้า: {assemblyViewMode === 'PAPER_LEDGER' ? 'สมุด ปพ.5 แบบกระดาษ' : 'การ์ดแนวตั้งสำหรับมือถือ'}
+                  </span>
+                  <div className="inline-flex rounded-lg bg-white border border-slate-300 p-0.5 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setAssemblyViewMode('PAPER_LEDGER')}
+                      className={`px-2.5 py-1 rounded-md font-bold transition-colors cursor-pointer ${
+                        assemblyViewMode === 'PAPER_LEDGER'
+                          ? 'bg-[#1967D2] text-white shadow-2xs'
+                          : 'text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      สมุด ปพ.5 (แนวนอน)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAssemblyViewMode('MOBILE_VERTICAL')}
+                      className={`px-2.5 py-1 rounded-md font-bold transition-colors cursor-pointer ${
+                        assemblyViewMode === 'MOBILE_VERTICAL'
+                          ? 'bg-[#1967D2] text-white shadow-2xs'
+                          : 'text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      การ์ดมือถือ (แนวตั้ง)
+                    </button>
                   </div>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-semibold">
-                        <th className="py-3 px-4">รหัสนักเรียน</th>
-                        <th className="py-3 px-4">ชื่อ - นามสกุล / ห้อง</th>
-                        <th className="py-3 px-4">วันย้ายเข้าเรียน</th>
-                        <th className="py-3 px-4">สถานะเข้าแถววันนี้</th>
-                        <th className="py-3 px-4">หมายเหตุ</th>
-                        <th className="py-3 px-4 text-right">กดเลือกสถานะ (บันทึกอัตโนมัติ)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filteredAssembly.map((stu) => (
-                        <tr key={stu.studentCode} className="hover:bg-slate-50/60 transition-colors">
-                          <td className="font-mono font-semibold text-slate-700 tabular-nums whitespace-nowrap">
-                            {stu.studentCode}
-                          </td>
-                          <td className="whitespace-nowrap">
-                            <span className="font-bold text-slate-900">{stu.studentName}</span>{' '}
-                            <span className="text-[11px] text-slate-500 font-semibold">
-                              ({stu.classroom})
-                            </span>
-                          </td>
-                          <td className="text-slate-500 tabular-nums whitespace-nowrap">
-                            {stu.enrolledAt}
-                          </td>
-                          <td className="whitespace-nowrap">
-                            {stu.status === 'PRESENT' ? (
-                              <span className="inline-flex items-center gap-1 text-teal-700 font-semibold">
-                                <span className="w-2 h-2 rounded-full bg-teal-500" />
-                                <span>มาปกติ</span>
-                              </span>
-                            ) : stu.status === 'LATE' ? (
-                              <span className="inline-flex items-center gap-1 text-amber-700 font-semibold">
-                                <span className="w-2 h-2 rounded-full bg-amber-500" />
-                                <span>มาสาย</span>
-                              </span>
-                            ) : stu.status === 'SICK_LEAVE' || stu.status === 'PERSONAL_LEAVE' ? (
-                              <span className="inline-flex items-center gap-1 text-slate-700 font-semibold">
-                                <span className="w-2 h-2 rounded-full bg-slate-500" />
-                                <span>{stu.status === 'SICK_LEAVE' ? 'ลาป่วย' : 'ลากิจ'}</span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-rose-600 font-semibold">
-                                <span className="w-2 h-2 rounded-full bg-rose-500" />
-                                <span>ขาด</span>
-                              </span>
-                            )}
-                          </td>
-                          <td className="text-slate-500 truncate max-w-44">
-                            {stu.note || '-'}
-                          </td>
-                          <td className="text-right whitespace-nowrap">
-                            <div className="inline-flex items-center gap-1">
-                              {[
-                                { key: 'PRESENT', label: 'มา' },
-                                { key: 'LATE', label: 'สาย' },
-                                { key: 'SICK_LEAVE', label: 'ลาป่วย' },
-                                { key: 'ABSENT', label: 'ขาด' },
-                              ].map((btn) => (
-                                <button
-                                  key={btn.key}
-                                  onClick={() =>
-                                    handleUpdateAssembly(stu.studentCode, btn.key as any)
-                                  }
-                                  className={`px-2.5 py-0.5 rounded-lg text-xs font-bold border transition-colors ${
-                                    stu.status === btn.key
-                                      ? 'bg-teal-600 text-white border-teal-600 shadow-2xs'
-                                      : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
-                                  }`}
-                                >
-                                  {btn.label}
-                                </button>
-                              ))}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                {assemblyViewMode === 'PAPER_LEDGER' ? (
+                  <PaperRegisterLedger
+                    initialMode="MORNING_ASSEMBLY"
+                    defaultRoom="ม.2/1"
+                    subjectLabel="กิจกรรมหน้าเสาธง 07:45 น."
+                  />
+                ) : (
+                  <MobileVerticalAttendanceSheet
+                    defaultRoom="ม.2/1"
+                    availableRooms={['ม.2/1', 'ม.3/1', 'ม.1/8']}
+                    activityLine="การเช็คชื่อตอนเช้า กิจกรรมหน้าเสาธง"
+                    dateLine="ประจำวันจันทร์ ที่ 28 กันยายน 2569"
+                    defaultStatus="ABSENT"
+                    onSaveSuccess={(summary) => {
+                      teacherCopilotService.completeMorningAssemblyOneClick();
+                      showToast(
+                        `บันทึกเช็คชื่อแถวเช้า ${summary.room} สำเร็จ (มา ${summary.present} • ขาด ${summary.absent} • สาย ${summary.late} • ลา ${summary.sick})`
+                      );
+                    }}
+                  />
+                )}
               </div>
             )}
 
@@ -769,16 +473,26 @@ export const StudentAffairsCouncilView: React.FC<
             {/* Tab 1.3: ตารางอนุมัติใบลานักเรียน (Single-line compact rows) */}
             {affairsTab === 'STUDENT_LEAVE' && (
               <div>
-                <div className="px-5 py-3 border-b border-slate-100">
-                  <h3 className="text-sm font-bold text-slate-900">
-                    ตารางรายการขออนุมัติใบลานักเรียน (ลาป่วย / ลากิจ) —{' '}
-                    {effectiveRoomFilter === 'ALL'
+                <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-900">
+                    รายการขออนุมัติใบลานักเรียน (ลาป่วย / ลากิจ) —{' '}
+                    {selectedLeaveRoom === 'ALL'
                       ? 'ทุกห้องเรียน'
-                      : `ชั้น ${effectiveRoomFilter}`}
+                      : `ชั้น ${selectedLeaveRoom}`}
                   </h3>
-                  <p className="text-xs text-slate-500">
-                    เมื่ออนุมัติแล้ว ระบบจะซิงค์เข้าตารางเช็คชื่อหน้าเสาธงและตั้งค่า &quot;ลา&quot; ในคาบเรียนให้อัตโนมัติ
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-slate-500 font-medium">ห้อง:</span>
+                    <select
+                      value={selectedLeaveRoom}
+                      onChange={(e) => setSelectedLeaveRoom(e.target.value)}
+                      className="text-xs font-semibold px-2 py-1 rounded-lg border border-slate-200 bg-white text-slate-700"
+                    >
+                      <option value="ALL">ทุกห้องเรียน</option>
+                      <option value="ม.1/8">ม.1/8</option>
+                      <option value="ม.2/1">ม.2/1</option>
+                      <option value="ม.3/1">ม.3/1</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -911,12 +625,9 @@ export const StudentAffairsCouncilView: React.FC<
             <div>
               <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    ตารางสรุปผลคะแนนเลือกตั้งสภานักเรียนออนไลน์ (Real-time)
+                  <h3 className="text-xs sm:text-sm font-bold text-slate-900">
+                    สรุปผลคะแนนเลือกตั้งสภานักเรียนออนไลน์ (Real-time)
                   </h3>
-                  <p className="text-xs text-slate-500">
-                    เปรียบเทียบคะแนนเสียง สัดส่วนร้อยละ และนโยบายหลักของผู้สมัครทั้ง {parties.length} พรรค
-                  </p>
                 </div>
               </div>
 
