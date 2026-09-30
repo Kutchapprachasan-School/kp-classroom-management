@@ -44,18 +44,32 @@ import type { CrossViewNavigationPayload } from './services/teacherCopilotServic
 import type { ClassSubTab } from './views/TeacherOverviewView';
 import type { QuickFilterMode } from './views/AssignmentManagementView';
 import {
-  KUTCHAP_SCHOOL_INFO,
+  getSchoolSettings,
+  applySchoolBrandingAndTypography,
   SCHOOL_ROLE_PROFILES,
   type SchoolUserRole,
 } from './config/schoolRoles';
 
 export const App: React.FC = () => {
+  const [schoolSettings, setSchoolSettings] = useState(() => getSchoolSettings());
   const [currentView, setCurrentView] = useState<TeacherViewKey>('school-login');
   const [activeRole, setActiveRole] = useState<SchoolUserRole>('TEACHER_GENERAL');
   const [loginChannel, setLoginChannel] = useState<TeacherLoginChannel>('E_LEAVE');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isQuickBarOpen, setIsQuickBarOpen] = useState(false);
+
+  React.useEffect(() => {
+    applySchoolBrandingAndTypography(schoolSettings);
+    const handleSettingsChange = () => {
+      const next = getSchoolSettings();
+      setSchoolSettings(next);
+      applySchoolBrandingAndTypography(next);
+    };
+    window.addEventListener('kps-school-settings-updated', handleSettingsChange);
+    return () =>
+      window.removeEventListener('kps-school-settings-updated', handleSettingsChange);
+  }, []);
 
   // Context-Aware Deep-Link Navigation States
   const [deepLinkClassTab, setDeepLinkClassTab] = useState<ClassSubTab>('attendance');
@@ -145,7 +159,7 @@ export const App: React.FC = () => {
       case 'accounts':
         return 'จัดการสิทธิ์ 5 บทบาท';
       default:
-        return KUTCHAP_SCHOOL_INFO.nameTh;
+        return `${schoolSettings.classroomSystemTitle} • ${schoolSettings.nameTh}`;
     }
   };
 
@@ -167,7 +181,9 @@ export const App: React.FC = () => {
           <div className="flex items-center gap-2.5">
             <span className="inline-flex items-center gap-1.5 font-bold text-teal-400">
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>{KUTCHAP_SCHOOL_INFO.nameTh} (สพม.อุดรธานี)</span>
+              <span>
+                {schoolSettings.classroomSystemTitle} • {schoolSettings.nameTh}
+              </span>
             </span>
 
             <button

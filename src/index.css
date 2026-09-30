@@ -1,20 +1,76 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Kanit:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* 60-30-10 Color Rule Tokens */
     --surface-60-canvas: #f8fafc;
     --surface-60-card: #ffffff;
     --structure-30-ink: #0f172a;
     --structure-30-muted: #475569;
     --accent-10-primary: #0d9488;
+    --kps-font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, sans-serif;
+    --kps-base-font-size: 15px;
+  }
+
+  html {
+    font-family: var(--kps-font-family) !important;
+    font-size: clamp(11px, var(--kps-base-font-size, 15px), 20px);
+  }
+
+  body,
+  .font-sans,
+  button,
+  input,
+  select,
+  textarea {
+    font-family: var(--kps-font-family) !important;
   }
 
   body {
-    @apply bg-[#F8FAFC] text-slate-700 min-h-screen font-sans antialiased;
+    @apply bg-[#F8FAFC] text-slate-700 min-h-screen antialiased;
+    font-size: clamp(11px, var(--kps-base-font-size, 15px), 20px);
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* ============================================================================
+     STRICT TYPOGRAPHY GUARDRAIL: ขนาดตัวอักษรต่ำสุด 11px และไม่เกิน 20px ทั้งระบบ
+  ============================================================================ */
+  .text-\[8px\],
+  .text-\[9px\],
+  .text-\[10px\],
+  .text-\[11px\] {
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+  }
+
+  .text-xs {
+    font-size: clamp(11px, 0.8rem, 14px) !important;
+  }
+
+  .text-sm {
+    font-size: clamp(12px, 0.9rem, 16px) !important;
+  }
+
+  .text-base {
+    font-size: clamp(13px, 1rem, 18px) !important;
+  }
+
+  .text-lg {
+    font-size: clamp(14px, 1.1rem, 19px) !important;
+  }
+
+  .text-xl,
+  .text-2xl,
+  .text-3xl,
+  .text-4xl,
+  .text-\[22px\],
+  h1,
+  h2 {
+    font-size: clamp(16px, 1.25rem, 20px) !important;
+    line-height: 1.35 !important;
   }
 
   ::selection {
@@ -27,13 +83,13 @@
     border-collapse: collapse;
   }
 
-  /* Global Ultra-Compact Table Layout (แสดงรายชื่อนักเรียนได้มากที่สุดใน 1 หน้าจอทุกตาราง) */
+  /* Global Compact Paper Table Layout */
   table thead th {
     padding-top: 0.35rem !important;
     padding-bottom: 0.35rem !important;
     padding-left: 0.5rem !important;
     padding-right: 0.5rem !important;
-    line-height: 1.2 !important;
+    line-height: 1.25 !important;
     vertical-align: middle !important;
     white-space: nowrap;
   }
@@ -43,43 +99,8 @@
     padding-bottom: 0.25rem !important;
     padding-left: 0.5rem !important;
     padding-right: 0.5rem !important;
-    line-height: 1.25 !important;
+    line-height: 1.3 !important;
     vertical-align: middle !important;
-  }
-
-  /* Senior Teacher Comfort Font Scaling (ก- เล็ก / ก ปกติ / ก+ ใหญ่ / ก++ ใหญ่พิเศษ / ตั้งค่าเอง) */
-  html[data-font-scale="small"] {
-    font-size: 14.5px;
-  }
-
-  html[data-font-scale="normal"] {
-    font-size: 16px;
-  }
-
-  html[data-font-scale="large"] {
-    font-size: 18px;
-  }
-
-  html[data-font-scale="xlarge"] {
-    font-size: 20px;
-  }
-
-  html[data-font-scale="large"] .text-\[9px\],
-  html[data-font-scale="large"] .text-\[10px\],
-  html[data-font-scale="large"] .text-\[11px\] {
-    font-size: 0.8125rem !important;
-    line-height: 1.35 !important;
-  }
-
-  html[data-font-scale="xlarge"] .text-\[9px\],
-  html[data-font-scale="xlarge"] .text-\[10px\],
-  html[data-font-scale="xlarge"] .text-\[11px\],
-  html[data-font-scale="xlarge"] .text-xs,
-  html[data-font-scale="custom"] .text-\[9px\],
-  html[data-font-scale="custom"] .text-\[10px\],
-  html[data-font-scale="custom"] .text-\[11px\] {
-    font-size: 0.8125rem !important;
-    line-height: 1.4 !important;
   }
 }
 

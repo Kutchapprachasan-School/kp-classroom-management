@@ -202,6 +202,19 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
   const [selectedRoom, setSelectedRoom] = useState<string>(defaultRoom);
   const [attendanceViewType, setAttendanceViewType] = useState<'MULTI_PERIOD' | 'TODAY_SINGLE'>('MULTI_PERIOD');
   const [assignments, setAssignments] = useState<AssignmentColumnDef[]>(DEFAULT_ASSIGNMENTS);
+  const [morningSyncMode, setMorningSyncMode] = useState<'AUTO_PREFILL' | 'MANUAL_FRESH'>(() => {
+    try {
+      const raw = window.localStorage.getItem('kps_school_branding_settings_v1');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.morningToClassSyncMode === 'MANUAL_FRESH') return 'MANUAL_FRESH';
+      }
+    } catch {
+      // ignore
+    }
+    return 'AUTO_PREFILL';
+  });
+
   const [rows, setRows] = useState<StudentPaperRow[]>(() => buildInitialRows());
   const [savedToast, setSavedToast] = useState<string | null>(null);
   const [previewAttachment, setPreviewAttachment] = useState<{
@@ -215,6 +228,44 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
   const [newHwTitle, setNewHwTitle] = useState('');
   const [newHwMax, setNewHwMax] = useState(15);
 
+  const applyMorningSyncModeToRows = (nextSyncMode: 'AUTO_PREFILL' | 'MANUAL_FRESH') => {
+    setMorningSyncMode(nextSyncMode);
+    try {
+      const raw = window.localStorage.getItem('kps_school_branding_settings_v1');
+      const parsed = raw ? JSON.parse(raw) : {};
+      parsed.morningToClassSyncMode = nextSyncMode;
+      window.localStorage.setItem('kps_school_branding_settings_v1', JSON.stringify(parsed));
+      window.dispatchEvent(new Event('kps-school-settings-updated'));
+    } catch {
+      // ignore
+    }
+    setRows((prev) =>
+      prev.map((r) => {
+        const updatedPeriods = [...r.classPeriods];
+        updatedPeriods[4] = nextSyncMode === 'AUTO_PREFILL' ? r.morningStatus : 'PRESENT';
+        return { ...r, classPeriods: updatedPeriods };
+      })
+    );
+  };
+
+  useEffect(() => {
+    const syncFromSettings = () => {
+      try {
+        const raw = window.localStorage.getItem('kps_school_branding_settings_v1');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const nextMode =
+            parsed.morningToClassSyncMode === 'MANUAL_FRESH' ? 'MANUAL_FRESH' : 'AUTO_PREFILL';
+          setMorningSyncMode(nextMode);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener('kps-school-settings-updated', syncFromSettings);
+    return () => window.removeEventListener('kps-school-settings-updated', syncFromSettings);
+  }, []);
+
   useEffect(() => {
     setMode(initialMode);
   }, [initialMode]);
@@ -222,6 +273,15 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
   const switchMode = (nextMode: PaperLedgerMode) => {
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
+    }
+    if (nextMode === 'CLASS_ATTENDANCE') {
+      setRows((prev) =>
+        prev.map((r) => {
+          const updatedPeriods = [...r.classPeriods];
+          updatedPeriods[4] = morningSyncMode === 'AUTO_PREFILL' ? r.morningStatus : 'PRESENT';
+          return { ...r, classPeriods: updatedPeriods };
+        })
+      );
     }
     setMode(nextMode);
     onModeChange?.(nextMode);
@@ -566,30 +626,63 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
 
         <div className="flex items-center gap-1.5">
           {mode === 'CLASS_ATTENDANCE' && (
-            <div className="inline-flex rounded-lg bg-white border border-slate-300 p-0.5 text-[11px]">
-              <button
-                type="button"
-                onClick={() => switchAttendanceViewType('MULTI_PERIOD')}
-                className={`px-2 py-0.5 rounded font-bold cursor-pointer transition-colors ${
-                  attendanceViewType === 'MULTI_PERIOD'
-                    ? 'bg-teal-700 text-white'
-                    : 'text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                รวมหลายคาบ
-              </button>
-              <button
-                type="button"
-                onClick={() => switchAttendanceViewType('TODAY_SINGLE')}
-                className={`px-2 py-0.5 rounded font-bold cursor-pointer transition-colors ${
-                  attendanceViewType === 'TODAY_SINGLE'
-                    ? 'bg-teal-700 text-white'
-                    : 'text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                เฉพาะวันนี้
-              </button>
-            </div>
+            <>
+              <div className="inline-flex rounded-lg bg-white border border-slate-300 p-0.5 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    applyMorningSyncModeToRows('AUTO_PREFILL');
+                    triggerToast('ดึงสถานะเช็คชื่อแถวเช้ามาใส่คาบเรียนให้อัตโนมัติ (แก้ทับได้)');
+                  }}
+                  className={`px-2 py-0.5 rounded font-bold cursor-pointer transition-colors ${
+                    morningSyncMode === 'AUTO_PREFILL'
+                      ? 'bg-[#1967D2] text-white'
+                      : 'text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  ดึงแถวเช้า
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    applyMorningSyncModeToRows('MANUAL_FRESH');
+                    triggerToast('ตั้งค่าเป็นกรอกเช็คชื่อใหม่ในคาบเรียน');
+                  }}
+                  className={`px-2 py-0.5 rounded font-bold cursor-pointer transition-colors ${
+                    morningSyncMode === 'MANUAL_FRESH'
+                      ? 'bg-[#1967D2] text-white'
+                      : 'text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  กรอกใหม่
+                </button>
+              </div>
+
+              <div className="inline-flex rounded-lg bg-white border border-slate-300 p-0.5 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => switchAttendanceViewType('MULTI_PERIOD')}
+                  className={`px-2 py-0.5 rounded font-bold cursor-pointer transition-colors ${
+                    attendanceViewType === 'MULTI_PERIOD'
+                      ? 'bg-teal-700 text-white'
+                      : 'text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  รวมหลายคาบ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchAttendanceViewType('TODAY_SINGLE')}
+                  className={`px-2 py-0.5 rounded font-bold cursor-pointer transition-colors ${
+                    attendanceViewType === 'TODAY_SINGLE'
+                      ? 'bg-teal-700 text-white'
+                      : 'text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  เฉพาะวันนี้
+                </button>
+              </div>
+            </>
           )}
 
           {(mode === 'HOMEWORK_CHECK' || mode === 'SCORE_GRADEBOOK') && (

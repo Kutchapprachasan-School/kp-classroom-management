@@ -231,7 +231,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         </div>
       </div>
 
-      {/* Section 0: ตั้งค่าชื่อโรงเรียน โลโก้หน้า Login & เชื่อมข้อมูลผู้ใช้ระบบ SMS */}
+      {/* Section 0: ตั้งค่าระบบจัดการชั้นเรียน (ชื่อระบบ, โลโก้, ฟอนต์, ขนาดอักษร 11px–20px และการดึงเช็คชื่อแถวเช้าเข้าคาบเรียน) */}
       <form
         onSubmit={handleSaveBranding}
         className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4"
@@ -245,10 +245,10 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
             />
             <div>
               <h2 className="text-sm font-bold text-slate-900">
-                ข้อมูลโรงเรียน โลโก้หน้า Login และการเชื่อมบัญชีผู้ใช้ School Management System (SMS)
+                ตั้งค่าระบบจัดการชั้นเรียน • ชื่อระบบ โลโก้ ฟอนต์ (11px–20px) & รูปแบบการเช็คชื่อ
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                หน้า Login จะดึงชื่อโรงเรียน โลโก้ และฐานข้อมูลผู้ใช้งานเดียวกับระบบ SMS โดยอัตโนมัติ
+                ปรับแต่งชื่อระบบ โลโก้ ฟอนต์ ขนาดตัวอักษร (ต่ำสุด 11px ไม่เกิน 20px) และรูปแบบการดึงสถานะเช็คชื่อแถวเช้าเข้าคาบเรียน
               </p>
             </div>
           </div>
@@ -269,57 +269,71 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
               type="submit"
               className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs cursor-pointer"
             >
-              บันทึกการตั้งค่าโรงเรียน & SMS
+              บันทึกการตั้งค่าระบบ
             </button>
           </div>
         </div>
 
+        {/* แถวที่ 1: ชื่อระบบจัดการชั้นเรียน, ชื่อโรงเรียน, ชื่อระบบใต้โลโก้, อัปโหลดโลโก้ */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
           <div>
             <label className="block font-bold text-slate-700 mb-1">
-              ชื่อโรงเรียน (ภาษาไทย)
+              ชื่อระบบจัดการชั้นเรียน
+            </label>
+            <input
+              type="text"
+              value={schoolSettings.classroomSystemTitle}
+              onChange={(e) => {
+                const updated = saveSchoolSettings({
+                  ...schoolSettings,
+                  classroomSystemTitle: e.target.value,
+                });
+                setSchoolSettings(updated);
+              }}
+              placeholder="เช่น ระบบจัดการชั้นเรียน"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 font-semibold"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">
+              ชื่อโรงเรียน (แสดงหน้า Login & หัวตาราง)
             </label>
             <input
               type="text"
               value={schoolSettings.nameTh}
-              onChange={(e) =>
-                setSchoolSettings({ ...schoolSettings, nameTh: e.target.value })
-              }
+              onChange={(e) => {
+                const updated = saveSchoolSettings({
+                  ...schoolSettings,
+                  nameTh: e.target.value,
+                });
+                setSchoolSettings(updated);
+              }}
               className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 font-semibold"
             />
           </div>
 
           <div>
             <label className="block font-bold text-slate-700 mb-1">
-              ชื่อระบบใต้โลโก้ (Subtitle)
+              ชื่อระบบใต้โลโก้หน้า Login (SMS)
             </label>
             <input
               type="text"
               value={schoolSettings.smsSystemName}
-              onChange={(e) =>
-                setSchoolSettings({ ...schoolSettings, smsSystemName: e.target.value })
-              }
+              onChange={(e) => {
+                const updated = saveSchoolSettings({
+                  ...schoolSettings,
+                  smsSystemName: e.target.value,
+                });
+                setSchoolSettings(updated);
+              }}
               className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 font-semibold"
             />
           </div>
 
           <div>
             <label className="block font-bold text-slate-700 mb-1">
-              URL ระบบ SMS หลัก (Shared User Auth)
-            </label>
-            <input
-              type="text"
-              value={schoolSettings.smsApiUrl}
-              onChange={(e) =>
-                setSchoolSettings({ ...schoolSettings, smsApiUrl: e.target.value })
-              }
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-700 font-mono text-[11px]"
-            />
-          </div>
-
-          <div>
-            <label className="block font-bold text-slate-700 mb-1">
-              อัปโหลดโลโก้โรงเรียนใหม่ (PNG/JPG/SVG)
+              โลโก้โรงเรียน / ระบบ (PNG/JPG/SVG)
             </label>
             <input
               type="file"
@@ -327,6 +341,142 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
               onChange={handleUploadLogoFile}
               className="w-full text-[11px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
             />
+          </div>
+        </div>
+
+        {/* แถวที่ 2: ฟอนต์ระบบ, ขนาดตัวอักษร (11px – 20px), และตัวเลือกการเช็คชื่อคาบเรียนต่อจากแถวเช้า (Q2) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-2 border-t border-slate-100 text-xs">
+          {/* 1. เลือกฟอนต์ของระบบ */}
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+            <label className="block font-bold text-slate-800">
+              1. ฟอนต์หลักของระบบจัดการชั้นเรียน (Font Family)
+            </label>
+            <select
+              value={schoolSettings.fontFamily}
+              onChange={(e) => {
+                const nextFont = e.target.value as SchoolBrandingSettings['fontFamily'];
+                const updated = saveSchoolSettings({
+                  ...schoolSettings,
+                  fontFamily: nextFont,
+                });
+                setSchoolSettings(updated);
+                showToast(`เปลี่ยนฟอนต์ระบบเป็น "${nextFont}" เรียบร้อยแล้ว`);
+              }}
+              className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-slate-900 font-bold cursor-pointer"
+            >
+              <option value="Sarabun">Sarabun (สารบรรณ — อ่านง่าย มาตรฐานราชการไทย)</option>
+              <option value="Prompt">Prompt (พร้อมท์ — ทันสมัย คมชัดบนมือถือ)</option>
+              <option value="Kanit">Kanit (คณิต — หัวข้อชัดเจน สบายตา)</option>
+              <option value="Noto Sans Thai">Noto Sans Thai (โนโตะ — มาตรฐาน Google)</option>
+              <option value="IBM Plex Sans Thai">IBM Plex Sans Thai (โมเดิร์น อ่านตารางตัวเลขง่าย)</option>
+            </select>
+          </div>
+
+          {/* 2. ขนาดตัวอักษร 11px – 20px */}
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="font-bold text-slate-800">
+                2. ขนาดตัวอักษรระบบ (ต่ำสุด 11px – ไม่เกิน 20px)
+              </label>
+              <span className="px-2 py-0.5 rounded-lg bg-teal-600 text-white font-extrabold text-xs">
+                {schoolSettings.baseFontSizePx}px
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold text-slate-500">11px</span>
+              <input
+                type="range"
+                min={11}
+                max={20}
+                step={1}
+                value={schoolSettings.baseFontSizePx}
+                onChange={(e) => {
+                  const nextPx = Math.min(20, Math.max(11, Number(e.target.value) || 15));
+                  const updated = saveSchoolSettings({
+                    ...schoolSettings,
+                    baseFontSizePx: nextPx,
+                  });
+                  setSchoolSettings(updated);
+                }}
+                className="w-full accent-teal-600 cursor-pointer"
+              />
+              <span className="text-[11px] font-bold text-slate-500">20px</span>
+            </div>
+
+            <div className="flex flex-wrap gap-1 pt-0.5">
+              {[11, 13, 15, 17, 20].map((px) => (
+                <button
+                  key={px}
+                  type="button"
+                  onClick={() => {
+                    const updated = saveSchoolSettings({
+                      ...schoolSettings,
+                      baseFontSizePx: px,
+                    });
+                    setSchoolSettings(updated);
+                    showToast(`ปรับขนาดตัวอักษรเป็น ${px}px (อยู่ในเกณฑ์ 11px–20px)`);
+                  }}
+                  className={`px-2 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                    schoolSettings.baseFontSizePx === px
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  {px}px {px === 15 ? '(แนะนำ)' : ''}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 3. รูปแบบการดึงเช็คชื่อแถวเช้าเข้าคาบเรียน (Q2 Option) */}
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+            <label className="block font-bold text-slate-800">
+              3. การเช็คชื่อเข้าเรียนรายคาบ (เชื่อมกับแถวเช้า 07:45 น.)
+            </label>
+            <div className="grid grid-cols-1 gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  const updated = saveSchoolSettings({
+                    ...schoolSettings,
+                    morningToClassSyncMode: 'AUTO_PREFILL',
+                  });
+                  setSchoolSettings(updated);
+                  showToast('ตั้งค่า: ดึงสถานะจากแถวเช้ามากรอกให้อัตโนมัติ (ครูแก้ไขทับได้)');
+                }}
+                className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
+                  schoolSettings.morningToClassSyncMode === 'AUTO_PREFILL'
+                    ? 'bg-teal-600 text-white border-teal-700 shadow-2xs'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <div className="font-bold">
+                  ✓ ให้กรอกต่อจากแถวเช้าเลย (Auto Pre-fill + แก้ทับได้)
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const updated = saveSchoolSettings({
+                    ...schoolSettings,
+                    morningToClassSyncMode: 'MANUAL_FRESH',
+                  });
+                  setSchoolSettings(updated);
+                  showToast('ตั้งค่า: ให้ครูประจำวิชากรอกเช็คชื่อใหม่ทุกคาบเรียน');
+                }}
+                className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
+                  schoolSettings.morningToClassSyncMode === 'MANUAL_FRESH'
+                    ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <div className="font-bold">
+                  ✎ ให้กรอกใหม่ทุกคาบเรียน (ไม่ดึงผลแถวเช้ามาเติมล่วงหน้า)
+                </div>
+              </button>
+            </div>
           </div>
         </div>
       </form>

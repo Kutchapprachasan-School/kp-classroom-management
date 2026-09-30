@@ -21,7 +21,17 @@ export interface SchoolRoleProfile {
   restrictedNote: string;
 }
 
+export type SchoolFontFamily =
+  | 'Sarabun'
+  | 'Prompt'
+  | 'Kanit'
+  | 'Noto Sans Thai'
+  | 'IBM Plex Sans Thai';
+
+export type MorningToClassSyncMode = 'AUTO_PREFILL' | 'MANUAL_FRESH';
+
 export interface SchoolBrandingSettings {
+  classroomSystemTitle: string;
   nameTh: string;
   nameEn: string;
   shortCode: string;
@@ -33,6 +43,9 @@ export interface SchoolBrandingSettings {
   smsSystemName: string;
   smsApiUrl: string;
   smsLastSyncedAt: string;
+  fontFamily: SchoolFontFamily;
+  baseFontSizePx: number;
+  morningToClassSyncMode: MorningToClassSyncMode;
 }
 
 export interface SmsUserAccount {
@@ -89,6 +102,7 @@ export const DEFAULT_KUTCHAP_LOGO_SVG = `data:image/svg+xml;utf8,${encodeURIComp
 `)}`;
 
 export const KUTCHAP_SCHOOL_INFO: SchoolBrandingSettings = {
+  classroomSystemTitle: 'ระบบจัดการชั้นเรียน',
   nameTh: 'โรงเรียนกุดจับประชาสรรค์',
   nameEn: 'Kutchapprachasan School',
   shortCode: 'ก.ป.ส. • สพม.อุดรธานี',
@@ -99,11 +113,44 @@ export const KUTCHAP_SCHOOL_INFO: SchoolBrandingSettings = {
   logoUrl: DEFAULT_KUTCHAP_LOGO_SVG,
   smsSystemName: 'School Management System',
   smsApiUrl: 'https://sms.kutchap.ac.th/api/v1/auth-sync',
-  smsLastSyncedAt: '28 ก.ย. 2569 • 06:23 น.',
+  smsLastSyncedAt: '30 ก.ย. 2569 • 11:05 น.',
+  fontFamily: 'Sarabun',
+  baseFontSizePx: 15,
+  morningToClassSyncMode: 'AUTO_PREFILL',
 };
 
 const SCHOOL_SETTINGS_STORAGE_KEY = 'kps_school_branding_settings_v1';
 const SMS_USERS_STORAGE_KEY = 'kps_sms_unified_users_v1';
+
+export function clampFontSize11To20(val: number | undefined): number {
+  const numeric = typeof val === 'number' && !Number.isNaN(val) ? val : 15;
+  return Math.min(20, Math.max(11, Math.round(numeric)));
+}
+
+export function applySchoolBrandingAndTypography(settings?: SchoolBrandingSettings): void {
+  if (typeof document === 'undefined') return;
+  const current = settings || getSchoolSettings();
+  const clampedPx = clampFontSize11To20(current.baseFontSizePx);
+  const font = current.fontFamily || 'Sarabun';
+
+  // Ensure Google Fonts stylesheet for Thai fonts is loaded
+  const fontLinkId = 'kps-google-fonts-thai';
+  if (!document.getElementById(fontLinkId)) {
+    const link = document.createElement('link');
+    link.id = fontLinkId;
+    link.rel = 'stylesheet';
+    link.href =
+      'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Kanit:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700;800&display=swap';
+    document.head.appendChild(link);
+  }
+
+  document.documentElement.style.setProperty(
+    '--kps-font-family',
+    `'${font}', -apple-system, BlinkMacSystemFont, sans-serif`
+  );
+  document.documentElement.style.setProperty('--kps-base-font-size', `${clampedPx}px`);
+  document.title = `${current.classroomSystemTitle} — ${current.nameTh}`;
+}
 
 export function getSchoolSettings(): SchoolBrandingSettings {
   if (typeof window === 'undefined') return KUTCHAP_SCHOOL_INFO;
@@ -115,6 +162,9 @@ export function getSchoolSettings(): SchoolBrandingSettings {
       ...KUTCHAP_SCHOOL_INFO,
       ...parsed,
       logoUrl: parsed.logoUrl?.trim() ? parsed.logoUrl : DEFAULT_KUTCHAP_LOGO_SVG,
+      baseFontSizePx: clampFontSize11To20(parsed.baseFontSizePx),
+      fontFamily: parsed.fontFamily || 'Sarabun',
+      morningToClassSyncMode: parsed.morningToClassSyncMode || 'AUTO_PREFILL',
     };
   } catch {
     return KUTCHAP_SCHOOL_INFO;
@@ -129,8 +179,10 @@ export function saveSchoolSettings(next: Partial<SchoolBrandingSettings>): Schoo
   if (!merged.logoUrl?.trim()) {
     merged.logoUrl = DEFAULT_KUTCHAP_LOGO_SVG;
   }
+  merged.baseFontSizePx = clampFontSize11To20(merged.baseFontSizePx);
   if (typeof window !== 'undefined') {
     window.localStorage.setItem(SCHOOL_SETTINGS_STORAGE_KEY, JSON.stringify(merged));
+    applySchoolBrandingAndTypography(merged);
     window.dispatchEvent(new Event('kps-school-settings-updated'));
   }
   return merged;
@@ -139,6 +191,7 @@ export function saveSchoolSettings(next: Partial<SchoolBrandingSettings>): Schoo
 export function resetSchoolSettingsToDefault(): SchoolBrandingSettings {
   if (typeof window !== 'undefined') {
     window.localStorage.removeItem(SCHOOL_SETTINGS_STORAGE_KEY);
+    applySchoolBrandingAndTypography(KUTCHAP_SCHOOL_INFO);
     window.dispatchEvent(new Event('kps-school-settings-updated'));
   }
   return KUTCHAP_SCHOOL_INFO;
