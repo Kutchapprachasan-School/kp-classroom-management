@@ -96,38 +96,6 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
           )}
         </div>
 
-        {/* Role Toggle: นักเรียนทั่วไป vs สภานักเรียน */}
-        {onChangeStudentRole && (
-          <div className="mt-2.5">
-            <div className="text-[10px] font-bold text-slate-500 mb-1">
-              สลับบทบาทฝั่งนักเรียน:
-            </div>
-            <div className="grid grid-cols-2 gap-1">
-              <button
-                type="button"
-                onClick={() => onChangeStudentRole('STUDENT_GENERAL')}
-                className={`px-2 py-1.5 rounded-lg text-[10px] font-bold transition-colors truncate ${
-                  studentRole === 'STUDENT_GENERAL'
-                    ? 'bg-emerald-600 text-white shadow-2xs'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                🎓 นักเรียนทั่วไป
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangeStudentRole('STUDENT_COUNCIL')}
-                className={`px-2 py-1.5 rounded-lg text-[10px] font-bold transition-colors truncate ${
-                  studentRole === 'STUDENT_COUNCIL'
-                    ? 'bg-purple-600 text-white shadow-2xs'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                🗳️ สภานักเรียน
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Nav List */}

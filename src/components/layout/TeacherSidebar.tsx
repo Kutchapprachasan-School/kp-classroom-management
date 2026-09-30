@@ -24,7 +24,6 @@ import {
   FolderOpen,
   Vote,
   Lock,
-  ShieldCheck,
 } from 'lucide-react';
 import {
   getSchoolSettings,
@@ -306,72 +305,6 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             {activeProfile.userPosition}
           </div>
         </div>
-
-        {/* 1-Click Role Switcher (สลับ 5 บทบาทชัดเจน) */}
-        {onChangeRole && (
-          <div className="mt-2">
-            <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 mb-1 px-0.5">
-              <span>สลับบทบาทเพื่อดูสิทธิ์เข้าถึง:</span>
-              <ShieldCheck className="w-3 h-3 text-teal-600" />
-            </div>
-            <div className="grid grid-cols-3 gap-1">
-              <button
-                type="button"
-                onClick={() => onChangeRole('TEACHER_GENERAL')}
-                className={`px-1.5 py-1 rounded-lg text-[10px] font-bold transition-colors truncate ${
-                  activeRole === 'TEACHER_GENERAL'
-                    ? 'bg-teal-600 text-white shadow-2xs'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                }`}
-                title="สิทธิ์ครูผู้ใช้งานทั่วไป (ครูประจำวิชา / ที่ปรึกษา)"
-              >
-                ครูทั่วไป
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangeRole('STUDENT_AFFAIRS')}
-                className={`px-1.5 py-1 rounded-lg text-[10px] font-bold transition-colors truncate ${
-                  activeRole === 'STUDENT_AFFAIRS'
-                    ? 'bg-amber-600 text-white shadow-2xs'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                }`}
-                title="สิทธิ์กลุ่มบริหารงานกิจการนักเรียน"
-              >
-                ฝ่ายกิจการ
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangeRole('ACADEMIC_ADMIN')}
-                className={`px-1.5 py-1 rounded-lg text-[10px] font-bold transition-colors truncate ${
-                  activeRole === 'ACADEMIC_ADMIN'
-                    ? 'bg-indigo-600 text-white shadow-2xs'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                }`}
-                title="สิทธิ์กลุ่มบริหารงานวิชาการ & แอดมิน"
-              >
-                ฝ่ายวิชาการ
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-1 mt-1">
-              <button
-                type="button"
-                onClick={() => onChangeRole('STUDENT_GENERAL')}
-                className="px-1.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors truncate"
-                title="สลับไปหน้าพอร์ทัลนักเรียนทั่วไป"
-              >
-                🎓 นักเรียนทั่วไป
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangeRole('STUDENT_COUNCIL')}
-                className="px-1.5 py-1 rounded-lg text-[10px] font-bold bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 transition-colors truncate"
-                title="สลับไปหน้าพอร์ทัลคณะกรรมการสภานักเรียน"
-              >
-                🗳️ สภานักเรียน
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ============================================================================
