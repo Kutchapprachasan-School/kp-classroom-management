@@ -101,7 +101,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       return [
         {
           key: 'student-affairs',
-          label: '1. เช็คชื่อแถวเช้า (07:45) & ใบลา',
+          label: 'เช็คชื่อแถวเช้า & ใบลา',
           icon: ShieldAlert,
           badge: '07:45',
           badgeStyle: 'bg-amber-100 text-amber-800',
@@ -109,26 +109,26 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
         },
         {
           key: 'home-visit',
-          label: '2. เยี่ยมบ้าน นร.01 & SDQ ทั้ง รร.',
+          label: 'เยี่ยมบ้าน นร.01 & SDQ',
           icon: HeartHandshake,
           badge: 'กสศ.',
           badgeStyle: 'bg-emerald-100 text-emerald-800',
         },
         {
           key: 'student-council',
-          label: '3. กำกับสภานักเรียน & เลือกตั้ง',
+          label: 'สภานักเรียน & เลือกตั้ง',
           icon: Vote,
           badge: 'สภาฯ',
           badgeStyle: 'bg-purple-100 text-purple-800',
         },
         {
           key: 'roster',
-          label: '4. ทะเบียนนักเรียน & ผู้ปกครอง',
+          label: 'ทะเบียนนักเรียน & ผู้ปกครอง',
           icon: School,
         },
         {
           key: 'home',
-          label: '5. ภาพรวมสถิติการมาเรียนวันนี้',
+          label: 'สถิติการมาเรียนวันนี้',
           icon: Home,
         },
       ];
@@ -138,7 +138,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       return [
         {
           key: 'readiness',
-          label: '1. ตรวจความพร้อม & อนุมัติเกรด SGS',
+          label: 'ตรวจอนุมัติเกรด SGS',
           icon: CheckCircle2,
           badge: 'SGS',
           badgeStyle: 'bg-indigo-100 text-indigo-800',
@@ -146,34 +146,34 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
         },
         {
           key: 'sar',
-          label: '2. รายงานผลสัมฤทธิ์ข้ามห้อง (SAR)',
+          label: 'รายงานผลสัมฤทธิ์ (SAR)',
           icon: FileSpreadsheet,
           badge: 'SAR',
           badgeStyle: 'bg-blue-100 text-blue-800',
         },
         {
           key: 'courses',
-          label: '3. รายวิชา & โครงสร้างหลักสูตร',
+          label: 'รายวิชา & หลักสูตร',
           icon: BookMarked,
         },
         {
           key: 'timetable',
-          label: '4. ตารางสอนรวมทั้งโรงเรียน',
+          label: 'ตารางสอนรวมโรงเรียน',
           icon: CalendarDays,
         },
         {
           key: 'roster',
-          label: '5. ทะเบียนนักเรียนกลาง (ย้าย/เลขที่)',
+          label: 'ทะเบียนนักเรียนกลาง',
           icon: School,
         },
         {
           key: 'exams',
-          label: '6. จัดการสอบกลางภาค / ปลายภาค',
+          label: 'จัดการสอบกลาง/ปลายภาค',
           icon: PenTool,
         },
         {
           key: 'home',
-          label: '7. ภาพรวมวิชาการวันนี้',
+          label: 'ภาพรวมงานวิชาการ',
           icon: Home,
         },
       ];
@@ -183,12 +183,12 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     return [
       {
         key: 'home',
-        label: '1. หน้าแรกวันนี้ (งานด่วนของครู)',
+        label: 'หน้าแรก (ศูนย์งานของครู)',
         icon: Home,
       },
       {
         key: 'student-affairs',
-        label: '2. เช็คชื่อแถวเช้า ม.3/1 (07:45)',
+        label: 'เช็คชื่อแถวเช้า (ที่ปรึกษา)',
         icon: ShieldAlert,
         badge: '07:45',
         badgeStyle: 'bg-amber-100 text-amber-800',
@@ -196,24 +196,24 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       },
       {
         key: 'class-overview',
-        label: '3. เข้าสอน & ปพ.5 (วิชาที่สอน)',
+        label: 'เข้าสอน & ปพ.5',
         icon: Users,
       },
       {
         key: 'assignments',
-        label: '4. สั่งงาน & ตรวจงาน (R2 / Canva)',
+        label: 'สั่งงาน & ตรวจการบ้าน',
         icon: PenTool,
         badge: 'R2',
         badgeStyle: 'bg-teal-100 text-teal-800',
       },
       {
         key: 'home-visit',
-        label: '5. เยี่ยมบ้าน ม.3/1 (นร.01)',
+        label: 'เยี่ยมบ้าน (นร.01)',
         icon: HeartHandshake,
       },
       {
         key: 'readiness',
-        label: '6. ตรวจก่อนส่งเกรด (วิชาที่สอน)',
+        label: 'ตรวจส่งเกรด SGS',
         icon: CheckCircle2,
       },
     ];
