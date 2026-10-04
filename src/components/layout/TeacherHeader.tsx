@@ -12,6 +12,7 @@ import {
   Zap,
   CheckCircle2,
   ArrowUpRight,
+  Calendar,
 } from 'lucide-react';
 import {
   teacherCopilotService,
@@ -160,10 +161,13 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
             <span className="hidden sm:inline">ย้อนกลับ</span>
           </button>
         )}
-        <div className="flex items-center gap-2 min-w-0">
-          <h1 className="font-bold text-slate-900 text-sm sm:text-base truncate">
+        <div className="flex flex-col min-w-0">
+          <h1 className="font-extrabold text-slate-900 text-base sm:text-lg leading-tight truncate">
             {title}
           </h1>
+          <span className="text-[11px] text-slate-500 font-medium truncate hidden sm:inline">
+            ครูปัญจพล เกษรัตน์ | กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ
+          </span>
         </div>
       </div>
 
@@ -430,11 +434,30 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
         </div>
 
         {/* Term Selector Dropdown */}
-        <div className="hidden sm:flex items-center gap-1.5 pl-2 border-l border-slate-200 text-xs">
-          <button className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-800 font-semibold transition-colors">
+        <div className="hidden sm:flex items-center gap-1.5 text-xs">
+          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 font-semibold transition-colors shadow-2xs">
+            <Calendar className="w-3.5 h-3.5 text-[#0C6D5B]" />
             <span className="truncate">{termLabel}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           </button>
+        </div>
+
+        {/* User Profile Avatar Dropdown matching Mockup */}
+        <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
+          <div className="w-8 h-8 rounded-full bg-teal-100 overflow-hidden shrink-0 border border-slate-200 shadow-2xs">
+            <img
+              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150"
+              alt="ครูปัญจพล เกษรัตน์"
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="hidden md:flex flex-col text-left leading-none">
+            <span className="text-xs font-bold text-slate-900">
+              ปัญจพล เกษรัตน์
+            </span>
+            <span className="text-[10px] text-slate-500 mt-0.5">ครู</span>
+          </div>
+          <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden md:block" />
         </div>
       </div>
     </header>

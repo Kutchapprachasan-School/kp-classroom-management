@@ -21,13 +21,14 @@ import {
   X,
   ChevronDown,
   ChevronUp,
-  FolderOpen,
+  CheckSquare,
+  Award,
   Vote,
+  FolderOpen,
   Lock,
 } from 'lucide-react';
 import {
   getSchoolSettings,
-  SCHOOL_ROLE_PROFILES,
   type SchoolUserRole,
 } from '../../config/schoolRoles';
 
@@ -84,9 +85,6 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
   const [showSettingsDrawer, setShowSettingsDrawer] = useState<boolean>(
     ['settings', 'academic-year', 'accounts', 'trash'].includes(currentView)
   );
-
-  const activeProfile =
-    SCHOOL_ROLE_PROFILES[activeRole] || SCHOOL_ROLE_PROFILES.TEACHER_GENERAL;
 
   const handleSelect = (view: TeacherViewKey) => {
     onNavigate(view);
@@ -179,42 +177,52 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       ];
     }
 
-    // Default: TEACHER_GENERAL (ครูผู้ใช้งานทั่วไป / ครูประจำวิชา & ครูที่ปรึกษา)
+    // Default: TEACHER_GENERAL (ตรงกับแบบ Mockup เป๊ะๆ 9 รายการ)
     return [
       {
         key: 'home',
-        label: 'หน้าแรก (ศูนย์งานของครู)',
+        label: 'หน้าหลัก',
         icon: Home,
       },
       {
-        key: 'student-affairs',
-        label: 'เช็คชื่อแถวเช้า (ที่ปรึกษา)',
-        icon: ShieldAlert,
-        badge: '07:45',
-        badgeStyle: 'bg-amber-100 text-amber-800',
-        highlightStyle: true,
+        key: 'timetable',
+        label: 'ตารางสอน',
+        icon: CalendarDays,
       },
       {
         key: 'class-overview',
-        label: 'เข้าสอน & ปพ.5',
-        icon: Users,
+        label: 'เช็คชื่อ / เข้าเรียน',
+        icon: CheckSquare,
       },
       {
         key: 'assignments',
-        label: 'สั่งงาน & ตรวจการบ้าน',
-        icon: PenTool,
-        badge: 'R2',
-        badgeStyle: 'bg-teal-100 text-teal-800',
-      },
-      {
-        key: 'home-visit',
-        label: 'เยี่ยมบ้าน (นร.01)',
-        icon: HeartHandshake,
+        label: 'งาน/มอบหมาย',
+        icon: FileText,
       },
       {
         key: 'readiness',
-        label: 'ตรวจส่งเกรด SGS',
-        icon: CheckCircle2,
+        label: 'ผลการเรียน',
+        icon: Award,
+      },
+      {
+        key: 'academic-year',
+        label: 'ปฏิทินงาน',
+        icon: Calendar,
+      },
+      {
+        key: 'roster',
+        label: 'ข้อมูลนักเรียน',
+        icon: Users,
+      },
+      {
+        key: 'sar',
+        label: 'รายงาน',
+        icon: FileSpreadsheet,
+      },
+      {
+        key: 'settings',
+        label: 'ตั้งค่า',
+        icon: Settings,
       },
     ];
   };
@@ -257,54 +265,33 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
 
   const sidebarContent = (
     <>
-      {/* ============================================================================
-          ZONE A: ข้อมูลโรงเรียนกุดจับประชาสรรค์ + โปรไฟล์ตามบทบาท + ตัวสลับ 5 สิทธิ์
-      ============================================================================ */}
-      <div className="p-3 border-b border-slate-200/80 bg-slate-50/70 shrink-0">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <img
-              src={schoolSettings.logoUrl}
-              alt={schoolSettings.nameTh}
-              className="w-9 h-9 rounded-xl bg-white border border-slate-200 p-0.5 object-contain shadow-2xs shrink-0"
-            />
-            <div className="min-w-0">
-              <div className="font-bold text-slate-900 text-xs truncate">
-                {schoolSettings.nameTh}
-              </div>
-              <div className="text-[10px] text-teal-700 font-semibold truncate">
-                {schoolSettings.shortCode}
-              </div>
+      {/* ZONE A: ข้อมูลโรงเรียนกุดจับประชาสรรค์ */}
+      <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3 shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <img
+            src={schoolSettings.logoUrl}
+            alt={schoolSettings.nameTh}
+            className="w-10 h-10 rounded-xl bg-white object-contain shadow-2xs shrink-0"
+          />
+          <div className="min-w-0">
+            <div className="font-extrabold text-slate-900 text-xs sm:text-sm leading-tight truncate">
+              {schoolSettings.nameTh}
+            </div>
+            <div className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+              สพม.อุดรธานี
             </div>
           </div>
-
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="lg:hidden p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 transition-colors shrink-0"
-              aria-label="ปิดเมนู"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
         </div>
 
-        {/* Active User & Role Badge */}
-        <div className="mt-2.5 p-2 rounded-xl bg-white border border-slate-200/90 shadow-2xs">
-          <div className="flex items-center justify-between gap-1.5 mb-0.5">
-            <span className="text-xs font-bold text-slate-900 truncate">
-              {activeProfile.userName}
-            </span>
-            <span
-              className={`px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0 ${activeProfile.badgeColor}`}
-            >
-              {activeProfile.shortLabel}
-            </span>
-          </div>
-          <div className="text-[10px] text-slate-500 truncate">
-            {activeProfile.userPosition}
-          </div>
-        </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
+            aria-label="ปิดเมนู"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* ============================================================================
@@ -330,26 +317,16 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
                 <button
                   key={item.key}
                   onClick={() => handleSelect(item.key)}
-                  className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-left text-xs transition-colors ${
+                  className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs transition-colors cursor-pointer ${
                     isActive
-                      ? item.highlightStyle
-                        ? 'bg-amber-50 text-amber-900 font-bold border border-amber-300'
-                        : 'bg-teal-50 text-teal-900 font-bold border border-teal-300'
-                      : item.highlightStyle
-                      ? 'text-slate-800 hover:bg-amber-50/60 font-semibold bg-amber-50/30 border border-amber-200/60'
-                      : 'text-slate-700 hover:bg-slate-100 font-medium'
+                      ? 'bg-[#0C6D5B] text-white font-bold shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0">
                     <IconComp
                       className={`w-4 h-4 shrink-0 ${
-                        isActive
-                          ? item.highlightStyle
-                            ? 'text-amber-700'
-                            : 'text-teal-700'
-                          : item.highlightStyle
-                          ? 'text-amber-600'
-                          : 'text-slate-400'
+                        isActive ? 'text-white' : 'text-slate-500'
                       }`}
                     />
                     <span className="truncate">{item.label}</span>
@@ -357,7 +334,9 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
                   {item.badge && (
                     <span
                       className={`px-1.5 py-0.2 rounded text-[10px] font-bold shrink-0 ${
-                        item.badgeStyle || 'bg-slate-100 text-slate-700'
+                        isActive
+                          ? 'bg-white/20 text-white'
+                          : item.badgeStyle || 'bg-slate-100 text-slate-700'
                       }`}
                     >
                       {item.badge}

@@ -3,21 +3,11 @@ import {
   Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  Sparkles,
-  ArrowRight,
+  Info,
 } from 'lucide-react';
-import {
-  teacherCalendarTodoService,
-  type CalendarDayStatus,
-  type DayTaskDetail,
-} from '../../services/teacherCalendarTodoService';
-import type { CrossViewNavigationPayload } from '../../services/teacherCopilotService';
 
 interface TeacherMonthCalendarHeatmapProps {
-  onActionClick: (payload: CrossViewNavigationPayload) => void;
+  onActionClick?: (payload: any) => void;
 }
 
 const THAI_MONTHS = [
@@ -39,259 +29,164 @@ const WEEKDAY_HEADERS = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
 export const TeacherMonthCalendarHeatmap: React.FC<
   TeacherMonthCalendarHeatmapProps
-> = ({ onActionClick }) => {
-  const [currentDate, setCurrentDate] = useState(() => new Date(2026, 9, 8)); // October 2026
-  const [selectedDay, setSelectedDay] = useState<CalendarDayStatus | null>(null);
+> = () => {
+  const [selectedDayNum, setSelectedDayNum] = useState<number>(1);
+  const [monthIndex, setMonthIndex] = useState<number>(8); // กันยายน (September) by default to match image, or configurable
+  const year = 2568;
 
-  const year = currentDate.getFullYear();
-  const monthIndex = currentDate.getMonth();
-
-  const days = teacherCalendarTodoService.getMonthDays(year, monthIndex);
-
-  // Stats for this month
-  const missedDaysCount = days.filter((d) => d.isCurrentMonth && d.status === 'MISSED').length;
-  const completedDaysCount = days.filter((d) => d.isCurrentMonth && d.status === 'COMPLETED').length;
-
-  const handlePrevMonth = () => {
-    setCurrentDate(new Date(year, monthIndex - 1, 1));
-    setSelectedDay(null);
-  };
-
-  const handleNextMonth = () => {
-    setCurrentDate(new Date(year, monthIndex + 1, 1));
-    setSelectedDay(null);
-  };
-
-  const handleSelectDay = (day: CalendarDayStatus) => {
-    if (!day.isCurrentMonth) return;
-    setSelectedDay(day);
-  };
-
-  const handleResolveMissed = (dateString: string, task: DayTaskDetail) => {
-    teacherCalendarTodoService.resolveMissedDate(dateString);
-    onActionClick(task.targetPayload);
-  };
+  // 35 Calendar cells matching September 2568
+  // Aug 31 (Sun), Sep 1 (Mon - active), Sep 2, Sep 3 (red dot), ..., Oct 4 (Sat)
+  const calendarCells = [
+    { num: 31, isCurrent: false },
+    { num: 1, isCurrent: true, isSelected: true },
+    { num: 2, isCurrent: true },
+    { num: 3, isCurrent: true, dot: 'red' },
+    { num: 4, isCurrent: true },
+    { num: 5, isCurrent: true },
+    { num: 6, isCurrent: true },
+    { num: 7, isCurrent: true },
+    { num: 8, isCurrent: true },
+    { num: 9, isCurrent: true },
+    { num: 10, isCurrent: true },
+    { num: 11, isCurrent: true },
+    { num: 12, isCurrent: true },
+    { num: 13, isCurrent: true },
+    { num: 14, isCurrent: true },
+    { num: 15, isCurrent: true },
+    { num: 16, isCurrent: true },
+    { num: 17, isCurrent: true, dot: 'red' },
+    { num: 18, isCurrent: true },
+    { num: 19, isCurrent: true },
+    { num: 20, isCurrent: true },
+    { num: 21, isCurrent: true },
+    { num: 22, isCurrent: true },
+    { num: 23, isCurrent: true },
+    { num: 24, isCurrent: true, dot: 'purple' },
+    { num: 25, isCurrent: true },
+    { num: 26, isCurrent: true },
+    { num: 27, isCurrent: true },
+    { num: 28, isCurrent: true },
+    { num: 29, isCurrent: true },
+    { num: 30, isCurrent: true },
+    { num: 1, isCurrent: false },
+    { num: 2, isCurrent: false },
+    { num: 3, isCurrent: false },
+    { num: 4, isCurrent: false },
+  ];
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col">
-      {/* Month Navigation Header */}
-      <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-        <div>
-          <div className="flex items-center gap-2">
-            <CalendarIcon className="w-4 h-4 text-teal-600" />
-            <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-              ปฏิทินงาน & ตรวจสอบงานค้าง
-            </h2>
+    <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-2xs space-y-5">
+      {/* 1. Header: Icon + Title */}
+      <div className="flex items-center gap-2 pb-2">
+        <CalendarIcon className="w-5 h-5 text-[#0C6D5B]" />
+        <h2 className="text-base font-extrabold text-slate-900 tracking-tight">
+          ปฏิทินงาน & ตารางสอน
+        </h2>
+      </div>
+
+      {/* 2. Month Navigator */}
+      <div className="flex items-center justify-between px-1">
+        <button
+          type="button"
+          onClick={() => setMonthIndex((prev) => (prev > 0 ? prev - 1 : 11))}
+          className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <span className="text-sm font-bold text-slate-800">
+          {THAI_MONTHS[monthIndex]} {year}
+        </span>
+        <button
+          type="button"
+          onClick={() => setMonthIndex((prev) => (prev < 11 ? prev + 1 : 0))}
+          className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* 3. Weekday Headers */}
+      <div className="grid grid-cols-7 text-center text-xs font-semibold text-slate-600">
+        {WEEKDAY_HEADERS.map((w) => (
+          <div key={w} className="py-1">
+            {w}
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            ตรวจจับวันที่ลืมเช็คชื่อ หรือบันทึกคะแนนไม่ครบอัตโนมัติ
-          </p>
-        </div>
-
-        <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2 py-1 rounded-xl shadow-2xs">
-          <button
-            type="button"
-            onClick={handlePrevMonth}
-            className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 cursor-pointer"
-            title="เดือนก่อนหน้า"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <span className="text-xs font-bold text-slate-800 min-w-[90px] text-center">
-            {THAI_MONTHS[monthIndex]} {year + 543}
-          </span>
-          <button
-            type="button"
-            onClick={handleNextMonth}
-            className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 cursor-pointer"
-            title="เดือนถัดไป"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
+        ))}
       </div>
 
-      {/* Summary Status Strip */}
-      <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[11px] font-medium text-slate-600">
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" /> ครบถ้วน ({completedDaysCount} วัน)
-          </span>
-          {missedDaysCount > 0 ? (
-            <span className="flex items-center gap-1 text-rose-700 font-bold bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
-              <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" /> มีงานลืม/ค้าง ({missedDaysCount} วัน)
-            </span>
-          ) : (
-            <span className="flex items-center gap-1 text-slate-500">
-              <span className="w-2 h-2 rounded-full bg-slate-300" /> ไม่มีงานค้าง
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-amber-500" /> วันนี้
-          </span>
-        </div>
-      </div>
-
-      {/* Calendar Grid */}
-      <div className="p-3 sm:p-4">
-        {/* Weekday headers */}
-        <div className="grid grid-cols-7 gap-1 text-center mb-1 text-[11px] font-bold text-slate-400">
-          {WEEKDAY_HEADERS.map((h, i) => (
-            <div
-              key={h}
-              className={`py-1 ${i === 0 || i === 6 ? 'text-rose-400' : 'text-slate-500'}`}
-            >
-              {h}
-            </div>
-          ))}
-        </div>
-
-        {/* Days cells */}
-        <div className="grid grid-cols-7 gap-1">
-          {days.map((day, idx) => {
-            const isSelected = selectedDay?.dateString === day.dateString;
-            const isMissed = day.status === 'MISSED';
-            const isCompleted = day.status === 'COMPLETED';
-            const isToday = day.isToday;
-
-            return (
+      {/* 4. Calendar Days Grid */}
+      <div className="grid grid-cols-7 gap-y-1.5 text-center text-xs">
+        {calendarCells.map((c, i) => {
+          const isSelected = c.isCurrent && c.num === selectedDayNum;
+          return (
+            <div key={i} className="flex flex-col items-center justify-center py-1">
               <button
-                key={`${day.dateString}-${idx}`}
                 type="button"
-                disabled={!day.isCurrentMonth}
-                onClick={() => handleSelectDay(day)}
-                className={`aspect-square p-1 rounded-xl text-xs font-semibold relative transition-all flex flex-col items-center justify-between border cursor-pointer ${
-                  !day.isCurrentMonth
-                    ? 'border-transparent text-slate-300 bg-transparent cursor-default'
+                onClick={() => c.isCurrent && setSelectedDayNum(c.num)}
+                className={`w-7 h-7 rounded-full text-xs font-semibold flex items-center justify-center transition-all ${
+                  !c.isCurrent
+                    ? 'text-slate-300 cursor-default'
                     : isSelected
-                    ? 'ring-2 ring-teal-500 border-teal-500 bg-teal-50/50 shadow-xs'
-                    : isToday
-                    ? 'border-amber-400 bg-amber-50/60 font-bold text-amber-950'
-                    : isMissed
-                    ? 'border-rose-300 bg-rose-50/80 hover:bg-rose-100 text-rose-950 font-bold shadow-2xs'
-                    : isCompleted
-                    ? 'border-emerald-100 bg-emerald-50/40 hover:bg-emerald-50 text-emerald-950'
-                    : 'border-slate-100 bg-white hover:bg-slate-50 text-slate-700'
+                    ? 'bg-[#0C6D5B] text-white font-bold shadow-xs'
+                    : 'text-slate-700 hover:bg-slate-100 cursor-pointer'
                 }`}
               >
-                {/* Date Number */}
-                <span className="text-[11px] leading-none mt-0.5">{day.dayNumber}</span>
-
-                {/* Status Dot / Indicator */}
-                <div className="mb-0.5">
-                  {day.isCurrentMonth && (
-                    <>
-                      {isMissed && (
-                        <span className="w-2 h-2 rounded-full bg-rose-600 block ring-2 ring-rose-200" />
-                      )}
-                      {isCompleted && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 block" />
-                      )}
-                      {isToday && (
-                        <span className="w-2 h-2 rounded-full bg-amber-500 block animate-ping" />
-                      )}
-                      {day.holidayName && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-purple-400 block" />
-                      )}
-                    </>
-                  )}
-                </div>
+                {c.num}
               </button>
-            );
-          })}
+              {/* Dot indicator under day */}
+              <div className="h-1.5 flex items-center justify-center mt-0.5">
+                {c.dot === 'red' && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                )}
+                {c.dot === 'purple' && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 5. Section: งานสำคัญวันนี้ */}
+      <div className="pt-3 border-t border-slate-100 space-y-3">
+        <h3 className="text-sm font-bold text-slate-900">งานสำคัญวันนี้</h3>
+
+        <div className="space-y-3 text-xs">
+          {/* Item 1: ประชุมครูประจำกลุ่มสาระ */}
+          <div className="flex items-start gap-2.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 mt-1.5" />
+            <div>
+              <div className="font-bold text-slate-800">ประชุมครูประจำกลุ่มสาระ</div>
+              <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                <span>10:30 - 11:00</span>
+              </div>
+              <div className="text-[11px] text-slate-500">ห้องประชุมเล็ก</div>
+            </div>
+          </div>
+
+          {/* Item 2: ส่งคะแนนกลางภาค (ม.3) */}
+          <div className="flex items-start gap-2.5">
+            <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 mt-1.5" />
+            <div>
+              <div className="font-bold text-slate-800">ส่งคะแนนกลางภาค (ม.3)</div>
+              <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                <span>15:30</span>
+              </div>
+              <div className="text-[11px] text-slate-500">ห้องพักครู</div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Selected Day Detail Drawer / Panel */}
-      <div className="p-3 sm:p-4 bg-slate-50 border-t border-slate-100">
-        {selectedDay ? (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-slate-900">
-                  รายละเอียดวันที่ {selectedDay.dayNumber} {THAI_MONTHS[monthIndex]} {year + 543}
-                </span>
-                {selectedDay.status === 'MISSED' && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3 text-rose-600" />
-                    มีงานค้าง
-                  </span>
-                )}
-                {selectedDay.status === 'COMPLETED' && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                    เรียบร้อยแล้ว
-                  </span>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedDay(null)}
-                className="text-[11px] text-slate-400 hover:text-slate-600"
-              >
-                ปิด
-              </button>
-            </div>
-
-            {selectedDay.tasks.length === 0 ? (
-              <p className="text-xs text-slate-500 py-2">
-                {selectedDay.holidayName
-                  ? `วันหยุด: ${selectedDay.holidayName}`
-                  : selectedDay.isWeekend
-                  ? 'วันหยุดสุดสัปดาห์ (ไม่มีคาบสอน)'
-                  : 'ไม่มีบันทึกงานในวันดังกล่าว'}
-              </p>
-            ) : (
-              <div className="space-y-1.5">
-                {selectedDay.tasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className={`p-2.5 rounded-xl border text-xs flex items-center justify-between gap-2 ${
-                      task.status === 'MISSED'
-                        ? 'bg-white border-rose-200 text-rose-950 shadow-2xs'
-                        : 'bg-white border-slate-200 text-slate-800'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center gap-1.5 font-bold">
-                        <Clock className="w-3 h-3 text-slate-400" />
-                        <span>{task.time}</span>
-                        <span>•</span>
-                        <span>{task.title}</span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        {task.note || task.statusLabel}
-                      </p>
-                    </div>
-
-                    {task.status === 'MISSED' ? (
-                      <button
-                        type="button"
-                        onClick={() => handleResolveMissed(selectedDay.dateString, task)}
-                        className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] flex items-center gap-1 shrink-0 cursor-pointer shadow-xs"
-                      >
-                        <span>บันทึกย้อนหลัง</span>
-                        <ArrowRight className="w-3 h-3" />
-                      </button>
-                    ) : (
-                      <span className="text-[11px] text-emerald-600 font-semibold shrink-0 flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        {task.statusLabel}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="text-center py-2 text-xs text-slate-500 flex items-center justify-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-            <span>แตะวันที่บนปฏิทินเพื่อดูบันทึกงาน หรือตรวจสอบงานที่ลืมเช็คชื่อ</span>
-          </div>
-        )}
+      {/* 6. Section: หมายเหตุ */}
+      <div className="bg-[#F8FAFC] rounded-xl p-3.5 border border-slate-200/80 text-xs">
+        <div className="flex items-center gap-1.5 font-bold text-slate-700 mb-1">
+          <Info className="w-3.5 h-3.5 text-slate-500" />
+          <span>หมายเหตุ</span>
+        </div>
+        <p className="text-[11px] text-slate-500 leading-relaxed">
+          เตรียมเอกสารกิจกรรมวันภาษาอังกฤษ พรุ่งนี้ (2 ก.ย. 2568)
+        </p>
       </div>
     </div>
   );

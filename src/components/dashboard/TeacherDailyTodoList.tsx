@@ -1,8 +1,11 @@
 import React from 'react';
 import {
-  CheckCircle2,
+  Check,
   Clock,
-  ChevronRight,
+  Play,
+  FileText,
+  User,
+  Users,
 } from 'lucide-react';
 import type { DailyTodoItem } from '../../services/teacherCalendarTodoService';
 import type { CrossViewNavigationPayload } from '../../services/teacherCopilotService';
@@ -23,123 +26,149 @@ export const TeacherDailyTodoList: React.FC<TeacherDailyTodoListProps> = ({
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col">
-      {/* Header */}
-      <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-teal-500 animate-pulse" />
-            <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+    <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-2xs">
+      {/* Header matching Mockup */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-slate-100">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-[#0C6D5B] text-white flex items-center justify-center shrink-0 shadow-xs">
+            <Check className="w-5 h-5 stroke-[3]" />
+          </div>
+          <div>
+            <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
               สิ่งที่ต้องทำวันนี้ (To-Do List)
             </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              จัดลำดับตามเวลาเรียน และงานที่ต้องดำเนินการ
+            </p>
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            เรียงลำดับตามคาบเวลาสอนจริง จัดการงานด่วนจบในคลิกเดียว
-          </p>
         </div>
-        <div className="text-right">
-          <span className="text-xs font-bold text-slate-700 bg-white px-2.5 py-1 rounded-full border border-slate-200 shadow-2xs">
+
+        {/* Progress Display */}
+        <div className="flex flex-col items-start sm:items-end gap-1.5">
+          <span className="text-xs font-semibold text-slate-700">
             เสร็จแล้ว {completedCount}/{totalCount} งาน ({progressPercent}%)
           </span>
+          <div className="w-36 bg-slate-100 h-2 rounded-full overflow-hidden">
+            <div
+              className="bg-[#0C6D5B] h-full rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Progress Bar */}
-      <div className="w-full bg-slate-100 h-1.5 overflow-hidden">
-        <div
-          className="bg-teal-600 h-full transition-all duration-500 ease-out"
-          style={{ width: `${progressPercent}%` }}
-        />
-      </div>
-
-      {/* To-Do Items List */}
-      <div className="divide-y divide-slate-100 p-2 sm:p-3 space-y-1">
+      {/* Todo items */}
+      <div className="divide-y divide-slate-100">
         {todos.map((item) => {
           const isDone = item.status === 'COMPLETED';
-          const isAction = item.status === 'ACTION_REQUIRED';
+          const isGrading = item.periodLabel === 'ตรวจงาน';
 
           return (
             <div
               key={item.id}
-              className={`p-3 sm:p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                isDone
-                  ? 'bg-slate-50/60 border-slate-200/60 opacity-80'
-                  : isAction
-                  ? 'bg-amber-50/40 border-amber-200/80 shadow-2xs'
-                  : 'bg-white border-slate-200/80 hover:border-slate-300'
-              }`}
+              className="py-4 sm:py-4.5 flex flex-col md:flex-row md:items-center justify-between gap-4 group"
             >
-              {/* Left Details */}
-              <div className="flex items-start gap-3 min-w-0">
+              {/* Left & Center section */}
+              <div className="flex items-start gap-3.5 min-w-0">
+                {/* Circle checkbox */}
                 <button
                   type="button"
                   onClick={() => onToggleTodo(item.id)}
                   title={isDone ? 'ทำเครื่องหมายว่ายังไม่เสร็จ' : 'ทำเครื่องหมายว่าเสร็จแล้ว'}
-                  className={`mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center shrink-0 border transition-colors cursor-pointer ${
+                  className={`mt-1 w-5 h-5 rounded-full flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
                     isDone
-                      ? 'bg-teal-600 border-teal-600 text-white'
-                      : 'border-slate-300 bg-white hover:border-teal-500 text-transparent'
+                      ? 'bg-[#0C6D5B] text-white'
+                      : 'border-2 border-slate-300 hover:border-[#0C6D5B] bg-white'
                   }`}
                 >
-                  <CheckCircle2 className="w-4 h-4 fill-current" />
+                  {isDone && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                 </button>
 
-                <div className="min-w-0">
+                {/* Time Box */}
+                <div className="w-24 sm:w-28 shrink-0">
+                  <div className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
+                    {item.time}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5 font-medium">
+                    {item.periodLabel}
+                  </div>
+                </div>
+
+                {/* Task Details */}
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-slate-500" />
-                      {item.time} ({item.periodLabel})
-                    </span>
-
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 border border-teal-200/60">
-                      {item.classroom}
-                    </span>
-
-                    <span
-                      className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${
-                        isDone
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : isAction
-                          ? 'bg-amber-100 text-amber-900 font-bold'
-                          : 'bg-slate-100 text-slate-600'
+                    <h3
+                      className={`text-xs sm:text-sm font-bold text-slate-900 ${
+                        isDone ? 'line-through text-slate-500' : ''
                       }`}
                     >
-                      {item.statusBadge}
+                      {item.title}
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-md bg-[#E6F4F1] text-[#0C6D5B] text-[11px] font-bold">
+                      {item.classroom}
                     </span>
                   </div>
 
-                  <h3
-                    className={`text-xs sm:text-sm font-bold mt-1 text-slate-900 truncate ${
-                      isDone ? 'line-through text-slate-500' : ''
-                    }`}
-                  >
-                    {item.title}
-                  </h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    {item.summaryText || (isGrading
+                      ? 'ตรวจใบงานที่ 2 : ออกแบบโปสเตอร์ (R2 / Canva)'
+                      : 'สอนตามแผนการจัดการเรียนรู้ (PBL)')}
+                  </p>
 
-                  {item.summaryText && (
-                    <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed truncate">
-                      {item.summaryText}
-                    </p>
-                  )}
+                  {/* Metadata Row matching Mockup */}
+                  <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-1.5 flex-wrap">
+                    <span className="flex items-center gap-1">
+                      <User className="w-3 h-3 text-slate-500" />
+                      <span>ห้อง {item.classroom}</span>
+                    </span>
+                    <span>|</span>
+                    <span className="flex items-center gap-1">
+                      <Users className="w-3 h-3 text-slate-500" />
+                      <span>38 คน</span>
+                    </span>
+                    <span>|</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-slate-500" />
+                      <span>
+                        {isDone
+                          ? 'เช็คชื่อภายใน 08:20'
+                          : isGrading
+                          ? 'ส่งภายใน 15:30'
+                          : `เริ่มสอน ${item.time.split('-')[0].trim()}`}
+                      </span>
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Right Action Button */}
-              <div className="flex items-center justify-end gap-2 shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => onActionClick(item.targetPayload)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
-                    isDone
-                      ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      : isAction
-                      ? 'bg-teal-600 hover:bg-teal-700 text-white shadow-teal-600/10'
-                      : 'bg-slate-800 hover:bg-slate-900 text-white'
-                  }`}
-                >
-                  <span>{item.actionLabel}</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
+              {/* Right Action Section */}
+              <div className="flex items-center md:flex-col md:items-end justify-between md:justify-center gap-2 shrink-0 pt-2 md:pt-0">
+                {isDone ? (
+                  <span className="px-3.5 py-1.5 rounded-full bg-[#E8F8F0] text-[#0C8050] text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                    <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>เสร็จแล้ว</span>
+                  </span>
+                ) : (
+                  <>
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#FEF6E9] text-[#B87000] text-[11px] font-semibold flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-[#B87000]" />
+                      <span>รอดำเนินการ</span>
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => onActionClick(item.targetPayload)}
+                      className="px-4 py-2 rounded-xl bg-[#0C6D5B] hover:bg-[#095748] text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs cursor-pointer transition-colors"
+                    >
+                      {isGrading ? (
+                        <FileText className="w-3.5 h-3.5" />
+                      ) : (
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                      )}
+                      <span>{isGrading ? 'ตรวจงาน' : 'เริ่มสอน'}</span>
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           );
