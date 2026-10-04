@@ -5,11 +5,9 @@ import {
   Bell,
   ChevronDown,
   Menu,
-  Type,
   Check,
   Minus,
   Plus,
-  Zap,
   CheckCircle2,
   ArrowUpRight,
   Calendar,
@@ -124,11 +122,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const currentOption =
-    FONT_SCALE_OPTIONS.find((o) => o.key === fontScale) || FONT_SCALE_OPTIONS[2];
-
   const unresolvedItems = urgentItems.filter((i) => !i.isResolved);
-  const topNextAction = unresolvedItems[0] || null;
 
   const handleQuickResolve = (itemId: string) => {
     const res = teacherCopilotService.resolveUrgentItem(itemId);
@@ -180,62 +174,57 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
         </div>
       </div>
 
-      {/* Center: School Motto matching Mockup Image 2 */}
-      <div className="hidden xl:flex flex-col items-center justify-center text-center px-2">
-        <span className="text-xs font-bold text-slate-700 tracking-wide">
-          {schoolSettings.motto || 'ครูมืออาชีพ สร้างโอกาส พัฒนานักเรียนสู่อนาคต'}
-        </span>
-        <span className="text-[10px] text-slate-400">
-          {schoolSettings.nameTh} • {schoolSettings.districtProvince}
-        </span>
-      </div>
-
-      {/* Right Actions */}
-      <div className="flex items-center gap-1.5 sm:gap-2.5 text-slate-600 shrink-0">
-        {/* Topbar Next-Action Quick Pill (มองเห็นงานสำคัญอันดับ 1 ได้จากทุกหน้าจอ) */}
-        {topNextAction ? (
+      {/* Right Actions matching Image 1 */}
+      <div className="flex items-center gap-2 sm:gap-3 text-slate-600 shrink-0">
+        {/* 1. Term Selector Dropdown matching Image 1 */}
+        <div className="hidden sm:flex items-center text-xs">
           <button
             type="button"
-            onClick={() => {
-              if (onDeepNavigate) {
-                onDeepNavigate(topNextAction.targetPayload);
-              } else {
-                setIsBellOpen(true);
-              }
-            }}
-            className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100/80 border border-amber-200 text-amber-950 text-xs font-bold transition-colors"
-            title="กดเพื่อไปทำงานที่สำคัญที่สุดตอนนี้"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 font-semibold transition-colors shadow-2xs cursor-pointer"
           >
-            <Zap className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-            <span className="max-w-[240px] truncate">
-              ต่อไป: {topNextAction.title}
-            </span>
-            <span className="px-1.5 py-0.2 rounded bg-amber-600 text-white text-[10px]">
-              ทำเลย
-            </span>
+            <Calendar className="w-3.5 h-3.5 text-[#0C6D5B]" />
+            <span className="truncate">{termLabel}</span>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           </button>
-        ) : (
-          <span className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 border border-teal-200 text-teal-800 text-xs font-bold">
-            <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />
-            <span>งานด่วนวันนี้ครบ 100%</span>
-          </span>
-        )}
+        </div>
 
-        {/* Compact Font Size Dropdown (5 Options + Custom Slider saved to localStorage) */}
+        {/* 2. Quick Search Box matching Image 1 */}
+        <div
+          onClick={onOpenSearch}
+          className="relative hidden md:flex items-center cursor-pointer group"
+        >
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none group-hover:text-slate-600 transition-colors" />
+          <input
+            type="text"
+            readOnly
+            placeholder="ค้นหา..."
+            onClick={onOpenSearch}
+            className="w-36 lg:w-44 pl-8 pr-3 py-1.5 rounded-xl border border-slate-200/90 bg-slate-50/60 hover:bg-slate-50 text-xs text-slate-800 placeholder-slate-400 cursor-pointer focus:outline-hidden transition-colors"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={onOpenSearch}
+          className="md:hidden flex items-center justify-center w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 cursor-pointer"
+          title="ค้นหา"
+        >
+          <Search className="w-3.5 h-3.5 text-[#0C6D5B]" />
+        </button>
+
+        {/* 3. Compact Font Size Button - Just "T" placed beside Notification Bell */}
         <div className="relative" ref={dropdownRef}>
           <button
             type="button"
             onClick={() => setIsFontDropdownOpen((prev) => !prev)}
-            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-teal-50/80 hover:bg-teal-100/80 border border-teal-200 text-teal-900 text-xs font-bold transition-colors"
+            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${
+              isFontDropdownOpen
+                ? 'bg-[#0C6D5B] text-white shadow-xs'
+                : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 hover:text-slate-900'
+            }`}
             title="ปรับขนาดตัวอักษร"
+            aria-label="ปรับขนาดตัวอักษร"
           >
-            <Type className="w-3.5 h-3.5 text-teal-700 shrink-0" />
-            <span>
-              {fontScale === 'custom'
-                ? `ขนาด ${customFontPx}px`
-                : currentOption.shortLabel}
-            </span>
-            <ChevronDown className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+            <span className="font-extrabold text-sm leading-none font-serif">T</span>
           </button>
 
           {isFontDropdownOpen && (
@@ -256,7 +245,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
                         setIsFontDropdownOpen(false);
                       }
                     }}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors ${
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer ${
                       active
                         ? 'bg-teal-50 text-teal-900 font-bold border border-teal-200'
                         : 'text-slate-700 hover:bg-slate-50 font-medium'
@@ -289,7 +278,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
                       setFontScale('custom');
                       setCustomFontPx((p) => Math.max(13, Number((p - 0.5).toFixed(1))));
                     }}
-                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700"
+                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 cursor-pointer"
                     title="ลดขนาด"
                   >
                     <Minus className="w-3.5 h-3.5" />
@@ -312,7 +301,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
                       setFontScale('custom');
                       setCustomFontPx((p) => Math.min(22, Number((p + 0.5).toFixed(1))));
                     }}
-                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700"
+                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 cursor-pointer"
                     title="เพิ่มขนาด"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -323,17 +312,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
           )}
         </div>
 
-        {/* Quick Search Button */}
-        <button
-          onClick={onOpenSearch}
-          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 transition-colors"
-          title="ค้นหาชื่อนักเรียน หรือ รายวิชา"
-        >
-          <Search className="w-3.5 h-3.5 text-teal-600" />
-          <span className="hidden md:inline">ค้นหา</span>
-        </button>
-
-        {/* Interactive Notification & 1-Click Urgent Action Bell */}
+        {/* 4. Interactive Notification Bell */}
         <div className="relative" ref={bellRef}>
           <button
             type="button"
@@ -341,20 +320,21 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
               refreshCopilot();
               setIsBellOpen((prev) => !prev);
             }}
-            className={`p-2 rounded-xl transition-colors ${
+            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors cursor-pointer relative ${
               isBellOpen
-                ? 'bg-slate-900 text-white'
-                : 'hover:text-slate-800 hover:bg-slate-100'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/80 hover:text-slate-900'
             }`}
-            title="ศูนย์งานด่วนของครู (กดจัดการใน 1 คลิก)"
+            title="ศูนย์งานด่วนของครู"
+            aria-label="การแจ้งเตือน"
           >
-            <Bell className="w-4 h-4" />
+            <Bell className="w-4 h-4 text-[#0C6D5B]" />
+            {unresolvedItems.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold shadow-xs">
+                {unresolvedItems.length}
+              </span>
+            )}
           </button>
-          {unresolvedItems.length > 0 && (
-            <span className="absolute top-1 right-1 w-4 h-4 bg-rose-600 text-white rounded-full text-[10px] flex items-center justify-center font-bold shadow-xs">
-              {unresolvedItems.length}
-            </span>
-          )}
 
           {isBellOpen && (
             <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl border border-slate-200 shadow-2xl p-3 z-50 space-y-2.5">
@@ -428,7 +408,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
                         <button
                           type="button"
                           onClick={() => handleQuickResolve(item.id)}
-                          className="px-2.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-[11px] font-bold transition-colors"
+                          className="px-2.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-[11px] font-bold transition-colors cursor-pointer"
                         >
                           {item.quickActionLabel}
                         </button>
@@ -438,7 +418,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
                             setIsBellOpen(false);
                             onDeepNavigate?.(item.targetPayload);
                           }}
-                          className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold inline-flex items-center gap-1"
+                          className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer"
                         >
                           <span>{item.navigateLabel}</span>
                           <ArrowUpRight className="w-3 h-3" />
@@ -452,18 +432,9 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
           )}
         </div>
 
-        {/* Term Selector Dropdown */}
-        <div className="hidden sm:flex items-center gap-1.5 text-xs">
-          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 font-semibold transition-colors shadow-2xs">
-            <Calendar className="w-3.5 h-3.5 text-[#0C6D5B]" />
-            <span className="truncate">{termLabel}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          </button>
-        </div>
-
-        {/* User Profile Avatar Dropdown matching Mockup */}
+        {/* 5. User Profile Avatar Dropdown matching Image 1 */}
         <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-          <div className="w-8 h-8 rounded-full bg-teal-100 overflow-hidden shrink-0 border border-slate-200 shadow-2xs">
+          <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-slate-200 shadow-2xs">
             <img
               src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150"
               alt="ครูปัญจพล เกษรัตน์"
@@ -474,7 +445,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
             <span className="text-xs font-bold text-slate-900">
               ปัญจพล เกษรัตน์
             </span>
-            <span className="text-[10px] text-slate-500 mt-0.5">ครู • ม.5</span>
+            <span className="text-[10px] text-slate-500 mt-0.5">ครู</span>
           </div>
           <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden md:block" />
         </div>
