@@ -339,7 +339,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
               type="file"
               accept="image/*"
               onChange={handleUploadLogoFile}
-              className="w-full text-[11px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+              className="w-full text-[11px] text-slate-800 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-slate-800 hover:file:bg-slate-200"
             />
           </div>
         </div>

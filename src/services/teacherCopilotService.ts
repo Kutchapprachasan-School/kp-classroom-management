@@ -21,7 +21,11 @@ export type DeepLinkTargetView =
   | 'assignments'
   | 'readiness'
   | 'student-affairs'
-  | 'home-visit';
+  | 'home-visit'
+  | 'exams'
+  | 'sar'
+  | 'timetable'
+  | 'settings';
 
 export interface CrossViewNavigationPayload {
   view: DeepLinkTargetView;
