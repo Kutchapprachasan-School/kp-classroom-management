@@ -26,11 +26,14 @@ import {
   Eye,
   GraduationCap,
   LayoutDashboard,
+  Home,
   UserCheck,
   FileSpreadsheet,
   CheckCircle2,
   Users,
   CalendarDays,
+  ClipboardList,
+  MoreHorizontal,
   PenTool,
   LogIn,
   HeartHandshake,
@@ -40,6 +43,14 @@ import {
   ChevronUp,
   ShieldCheck,
 } from 'lucide-react';
+import { TeacherCalendarMobileView } from './components/dashboard/TeacherCalendarMobileView';
+import { TeacherAllTasksMobileView } from './components/dashboard/TeacherAllTasksMobileView';
+import { TeacherMoreAccountMobileView } from './components/dashboard/TeacherMoreAccountMobileView';
+import { TeacherTaskDetailModal } from './components/dashboard/TeacherTaskDetailModal';
+import {
+  teacherCalendarTodoService,
+  type DailyTodoItem,
+} from './services/teacherCalendarTodoService';
 import type { CrossViewNavigationPayload } from './services/teacherCopilotService';
 import type { ClassSubTab } from './views/TeacherOverviewView';
 import type { QuickFilterMode } from './views/AssignmentManagementView';
@@ -59,6 +70,7 @@ export const App: React.FC = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isQuickBarOpen, setIsQuickBarOpen] = useState(false);
   const [isDevToolbarVisible, setIsDevToolbarVisible] = useState(false);
+  const [selectedTaskForModal, setSelectedTaskForModal] = useState<DailyTodoItem | null>(null);
 
   React.useEffect(() => {
     applySchoolBrandingAndTypography(schoolSettings);
@@ -159,6 +171,12 @@ export const App: React.FC = () => {
         return 'ถังขยะ';
       case 'accounts':
         return 'จัดการสิทธิ์ 5 บทบาท';
+      case 'mobile-calendar':
+        return 'ปฏิทินงาน';
+      case 'mobile-all-tasks':
+        return 'งานทั้งหมด';
+      case 'mobile-more':
+        return 'เมนู & บัญชี';
       default:
         return `${schoolSettings.classroomSystemTitle} • ${schoolSettings.nameTh}`;
     }
@@ -484,86 +502,127 @@ export const App: React.FC = () => {
 
               {currentView === 'trash' && <TrashManagementView />}
 
-              {currentView === 'accounts' && (
+               {currentView === 'accounts' && (
                 <UserAccountsView
                   activeRole={activeRole}
                   onChangeRole={handleChangeRole}
                 />
               )}
+
+              {currentView === 'mobile-calendar' && (
+                <TeacherCalendarMobileView
+                  todos={teacherCalendarTodoService.getTodayTodos()}
+                  onSelectTask={(task) => setSelectedTaskForModal(task)}
+                  onActionClick={handleDeepNavigate}
+                />
+              )}
+
+              {currentView === 'mobile-all-tasks' && (
+                <TeacherAllTasksMobileView
+                  todos={teacherCalendarTodoService.getTodayTodos()}
+                  onSelectTask={(task) => setSelectedTaskForModal(task)}
+                  onActionClick={handleDeepNavigate}
+                  onToggleTodo={(id) => {
+                    teacherCalendarTodoService.toggleTodoComplete(id);
+                  }}
+                />
+              )}
+
+              {currentView === 'mobile-more' && (
+                <TeacherMoreAccountMobileView
+                  onNavigate={(view) => setCurrentView(view)}
+                  onLogout={() => setCurrentView('school-login')}
+                  activeRole={activeRole}
+                />
+              )}
             </main>
 
-            {/* Mobile Bottom Navigation Bar (กดสลับด้วยนิ้วโป้งมือเดียวในแนวตั้ง: หน้าแรก | เช็คแถวเช้า | เช็คชื่อสอน | คะแนน | เมนู) */}
-            <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 px-2 py-1.5 grid grid-cols-5 gap-1 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] select-none">
+            {/* Mobile Bottom Navigation Bar (ตรงตาม Mockup 4 เมนู: หน้าแรก | ปฏิทิน | งานทั้งหมด | เพิ่มเติม) */}
+            <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-3 py-1.5 grid grid-cols-4 gap-1 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] select-none">
               <button
                 type="button"
                 onClick={() => setCurrentView('home')}
-                className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-colors ${
+                className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
                   currentView === 'home'
-                    ? 'text-[#1967D2] bg-blue-50/80'
+                    ? 'text-[#0C6D5B] bg-teal-50/80'
                     : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
-                <LayoutDashboard className="w-4 h-4 mb-0.5" />
+                <Home
+                  className={`w-4 h-4 mb-0.5 ${
+                    currentView === 'home'
+                      ? 'text-[#0C6D5B] stroke-[2.5]'
+                      : 'text-slate-500'
+                  }`}
+                />
                 <span>หน้าแรก</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => {
-                  setDeepLinkAffairsTab('ASSEMBLY');
-                  setCurrentView('student-affairs');
-                }}
-                className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-colors ${
-                  currentView === 'student-affairs'
-                    ? 'text-amber-700 bg-amber-50'
-                    : 'text-slate-600 hover:text-slate-900'
+                onClick={() => setCurrentView('mobile-calendar')}
+                className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
+                  currentView === 'mobile-calendar'
+                    ? 'text-[#0C6D5B] bg-teal-50/80'
+                    : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
-                <UserCheck className="w-4 h-4 mb-0.5 text-amber-600" />
-                <span>เช็คแถวเช้า</span>
+                <CalendarDays
+                  className={`w-4 h-4 mb-0.5 ${
+                    currentView === 'mobile-calendar'
+                      ? 'text-[#0C6D5B] stroke-[2.5]'
+                      : 'text-slate-500'
+                  }`}
+                />
+                <span>ปฏิทิน</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => {
-                  setDeepLinkClassTab('attendance');
-                  setCurrentView('class-overview');
-                }}
-                className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-colors ${
-                  currentView === 'class-overview' && deepLinkClassTab === 'attendance'
-                    ? 'text-[#1967D2] bg-blue-50/80'
-                    : 'text-slate-600 hover:text-slate-900'
+                onClick={() => setCurrentView('mobile-all-tasks')}
+                className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
+                  currentView === 'mobile-all-tasks'
+                    ? 'text-[#0C6D5B] bg-teal-50/80'
+                    : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
-                <Users className="w-4 h-4 mb-0.5" />
-                <span>เช็คชื่อสอน</span>
+                <ClipboardList
+                  className={`w-4 h-4 mb-0.5 ${
+                    currentView === 'mobile-all-tasks'
+                      ? 'text-[#0C6D5B] stroke-[2.5]'
+                      : 'text-slate-500'
+                  }`}
+                />
+                <span>งานทั้งหมด</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => {
-                  setDeepLinkClassTab('grades');
-                  setCurrentView('class-overview');
-                }}
-                className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-colors ${
-                  currentView === 'class-overview' && deepLinkClassTab === 'grades'
-                    ? 'text-teal-700 bg-teal-50'
-                    : 'text-slate-600 hover:text-slate-900'
+                onClick={() => setCurrentView('mobile-more')}
+                className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
+                  currentView === 'mobile-more'
+                    ? 'text-[#0C6D5B] bg-teal-50/80'
+                    : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
-                <FileSpreadsheet className="w-4 h-4 mb-0.5" />
-                <span>คะแนน ปพ.5</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsMobileSidebarOpen(true)}
-                className="flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold text-slate-600 hover:text-slate-900"
-              >
-                <PenTool className="w-4 h-4 mb-0.5" />
-                <span>เมนูทั้งหมด</span>
+                <MoreHorizontal
+                  className={`w-4 h-4 mb-0.5 ${
+                    currentView === 'mobile-more'
+                      ? 'text-[#0C6D5B] stroke-[2.5]'
+                      : 'text-slate-500'
+                  }`}
+                />
+                <span>เพิ่มเติม</span>
               </button>
             </nav>
+
+            {/* Task Detail Modal (เปิดเมื่อครูกดการ์ดงานจากหน้าปฏิทิน หรือหน้ารวมงาน) */}
+            <TeacherTaskDetailModal
+              task={selectedTaskForModal}
+              isOpen={Boolean(selectedTaskForModal)}
+              onClose={() => setSelectedTaskForModal(null)}
+              onActionClick={handleDeepNavigate}
+            />
           </div>
         </div>
       )}

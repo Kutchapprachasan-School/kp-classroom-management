@@ -46,6 +46,7 @@ export interface SchoolBrandingSettings {
   fontFamily: SchoolFontFamily;
   baseFontSizePx: number;
   morningToClassSyncMode: MorningToClassSyncMode;
+  motto?: string;
 }
 
 export interface SmsUserAccount {
@@ -92,31 +93,32 @@ export const DEFAULT_KUTCHAP_LOGO_SVG = `data:image/svg+xml;utf8,${encodeURIComp
   <circle cx="80" cy="96" r="24" fill="#FEFCE8" stroke="url(#rayGold)" stroke-width="4.5"/>
   <circle cx="80" cy="96" r="19" fill="#FFFFFF" stroke="#FDE047" stroke-width="1.2"/>
   <!-- อักษร กป สีน้ำเงินเข้ม -->
-  <text x="80" y="103" text-anchor="middle" fill="#1E293B" font-family="sans-serif" font-weight="900" font-size="20" letter-spacing="-1">กป</text>
+  <text x="80" y="103" text-anchor="middle" fill="#1E293B" font-family="sans-serif" font-weight="900" font-size="18" letter-spacing="-0.5">คยพ</text>
   <!-- ริบบิ้นสีฟ้าด้านล่าง -->
   <path d="M26 118 L44 112 L48 126 L32 132 Z" fill="#0EA5E9"/>
   <path d="M134 118 L116 112 L112 126 L128 132 Z" fill="#0EA5E9"/>
   <path d="M38 116 C58 126 102 126 122 116 L126 130 C102 140 58 140 34 130 Z" fill="url(#ribbonBlue)" stroke="#FFFFFF" stroke-width="1.5"/>
-  <text x="80" y="130" text-anchor="middle" fill="#FFFFFF" font-family="sans-serif" font-weight="700" font-size="8.5">โรงเรียนกุดจับประชาสรรค์</text>
+  <text x="80" y="130" text-anchor="middle" fill="#FFFFFF" font-family="sans-serif" font-weight="700" font-size="8.5">โรงเรียนคำยางพิทยา</text>
 </svg>
 `)}`;
 
 export const KUTCHAP_SCHOOL_INFO: SchoolBrandingSettings = {
   classroomSystemTitle: 'ระบบจัดการชั้นเรียน',
-  nameTh: 'โรงเรียนกุดจับประชาสรรค์',
-  nameEn: 'Kutchapprachasan School',
-  shortCode: 'ก.ป.ส. • สพม.อุดรธานี',
-  districtProvince: 'อ.กุดจับ จ.อุดรธานี',
+  nameTh: 'โรงเรียนคำยางพิทยา',
+  nameEn: 'Khamyang Pittaya School',
+  shortCode: 'ค.ย.พ. • สพม.อุดรธานี',
+  districtProvince: 'ต.ผาสุก อ.วังสามหมอ จ.อุดรธานี',
   affiliation: 'School Management System',
-  domain: 'kutchap.ac.th',
+  domain: 'khamyang.ac.th',
   academicTerm: 'ภาคเรียนที่ 1/2569',
   logoUrl: DEFAULT_KUTCHAP_LOGO_SVG,
   smsSystemName: 'School Management System',
-  smsApiUrl: 'https://sms.kutchap.ac.th/api/v1/auth-sync',
+  smsApiUrl: 'https://sms.khamyang.ac.th/api/v1/auth-sync',
   smsLastSyncedAt: '30 ก.ย. 2569 • 11:05 น.',
   fontFamily: 'Sarabun',
   baseFontSizePx: 15,
   morningToClassSyncMode: 'AUTO_PREFILL',
+  motto: 'ครูมืออาชีพ สร้างโอกาส พัฒนานักเรียนสู่อนาคต',
 };
 
 const SCHOOL_SETTINGS_STORAGE_KEY = 'kps_school_branding_settings_v1';

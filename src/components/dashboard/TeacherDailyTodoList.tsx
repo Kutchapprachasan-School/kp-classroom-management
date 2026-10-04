@@ -14,12 +14,14 @@ interface TeacherDailyTodoListProps {
   todos: DailyTodoItem[];
   onActionClick: (payload: CrossViewNavigationPayload) => void;
   onToggleTodo: (id: string) => void;
+  onSelectTask?: (task: DailyTodoItem) => void;
 }
 
 export const TeacherDailyTodoList: React.FC<TeacherDailyTodoListProps> = ({
   todos,
   onActionClick,
   onToggleTodo,
+  onSelectTask,
 }) => {
   const completedCount = todos.filter((t) => t.status === 'COMPLETED').length;
   const totalCount = todos.length;
@@ -95,10 +97,13 @@ export const TeacherDailyTodoList: React.FC<TeacherDailyTodoListProps> = ({
                 </div>
 
                 {/* Task Details */}
-                <div className="min-w-0 flex-1">
+                <div
+                  className="min-w-0 flex-1 cursor-pointer"
+                  onClick={() => onSelectTask?.(item)}
+                >
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3
-                      className={`text-xs sm:text-sm font-bold text-slate-900 ${
+                      className={`text-xs sm:text-sm font-bold text-slate-900 group-hover:text-[#0C6D5B] transition-colors ${
                         isDone ? 'line-through text-slate-500' : ''
                       }`}
                     >

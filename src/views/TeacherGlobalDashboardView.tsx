@@ -8,6 +8,8 @@ import {
 import { TeacherOverviewStatCards } from '../components/dashboard/TeacherOverviewStatCards';
 import { TeacherDailyTodoList } from '../components/dashboard/TeacherDailyTodoList';
 import { TeacherMonthCalendarHeatmap } from '../components/dashboard/TeacherMonthCalendarHeatmap';
+import { TeacherMobileHomeHero } from '../components/dashboard/TeacherMobileHomeHero';
+import { TeacherTaskDetailModal } from '../components/dashboard/TeacherTaskDetailModal';
 import {
   PaperRegisterLedger,
   type PaperLedgerMode,
@@ -29,6 +31,8 @@ export const TeacherGlobalDashboardView: React.FC<
   const [todos, setTodos] = useState<DailyTodoItem[]>(() =>
     teacherCalendarTodoService.getTodayTodos()
   );
+  const [selectedTaskForModal, setSelectedTaskForModal] =
+    useState<DailyTodoItem | null>(null);
   const [isFullLedgerModalOpen, setIsFullLedgerModalOpen] = useState(false);
   const [ledgerInitialMode, setLedgerInitialMode] =
     useState<PaperLedgerMode>('HOMEWORK_CHECK');
@@ -52,15 +56,27 @@ export const TeacherGlobalDashboardView: React.FC<
 
   return (
     <div className="max-w-7xl mx-auto space-y-4 pb-20 select-none">
-      {/* 1. แถว 4 การ์ดสถิติด้านบน (วันนี้ / คาบสอนวันนี้ 4 / นร. 120 / งานตรวจ 2) */}
-      <TeacherOverviewStatCards
-        periodsTodayCount={4}
-        totalStudentsCount={120}
-        pendingGradingCount={2}
-        termLabel="ภาคเรียนที่ 1/2569"
-      />
+      {/* 1. Mobile Greeting Hero Banner (เฉพาะบนมือถือ < 768px ตรงตาม Screen 1) */}
+      <div className="md:hidden">
+        <TeacherMobileHomeHero
+          teacherName="ปัญจพล เกษรัตน์"
+          department="กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ"
+          pendingCount={todos.filter((t) => t.status !== 'COMPLETED').length}
+          totalTasksCount={12}
+        />
+      </div>
 
-      {/* 2. สองคอลัมน์หลัก: To-Do List (ซ้าย ~68%) และ ปฏิทินงาน & ตารางสอน (ขวา ~32%) */}
+      {/* 2. แถว 4 การ์ดสถิติด้านบน (แสดงบน Tablet และ Desktop 768px ขึ้นไป ตรงตาม Mockup) */}
+      <div className="hidden md:block">
+        <TeacherOverviewStatCards
+          periodsTodayCount={4}
+          totalStudentsCount={120}
+          pendingGradingCount={2}
+          termLabel="ภาคเรียนที่ 1/2569"
+        />
+      </div>
+
+      {/* 3. สองคอลัมน์หลัก: To-Do List (ซ้าย ~68%) และ ปฏิทินงาน & ตารางสอน (ขวา ~32%) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         {/* ฝั่งซ้าย: สิ่งที่ต้องทำวันนี้ (To-Do List) */}
         <div className="lg:col-span-8">
@@ -68,14 +84,23 @@ export const TeacherGlobalDashboardView: React.FC<
             todos={todos}
             onActionClick={handleActionClick}
             onToggleTodo={handleToggleTodo}
+            onSelectTask={(task) => setSelectedTaskForModal(task)}
           />
         </div>
 
-        {/* ฝั่งขวา: ปฏิทินงาน & ตารางสอน */}
+        {/* ฝั่งขวา: ปฏิทินงาน & ตารางสอน (แสดงตลอดบน Tablet/Desktop) */}
         <div className="lg:col-span-4">
           <TeacherMonthCalendarHeatmap onActionClick={handleActionClick} />
         </div>
       </div>
+
+      {/* Task Detail Modal / Bottom Sheet (ตรงตาม Screen 2 เมื่อกดรายการงาน) */}
+      <TeacherTaskDetailModal
+        task={selectedTaskForModal}
+        isOpen={Boolean(selectedTaskForModal)}
+        onClose={() => setSelectedTaskForModal(null)}
+        onActionClick={handleActionClick}
+      />
 
       {/* Floating or bottom trigger for full paper ledger if teacher wants complete view */}
       <div className="flex justify-end pt-2">

@@ -52,7 +52,10 @@ export type TeacherViewKey =
   | 'settings'
   | 'trash'
   | 'accounts'
-  | 'student-portal';
+  | 'student-portal'
+  | 'mobile-calendar'
+  | 'mobile-all-tasks'
+  | 'mobile-more';
 
 interface TeacherSidebarProps {
   currentView: TeacherViewKey;
@@ -278,7 +281,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
               {schoolSettings.nameTh}
             </div>
             <div className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
-              สพม.อุดรธานี
+              {schoolSettings.districtProvince || 'ต.ผาสุก อ.วังสามหมอ จ.อุดรธานี'}
             </div>
           </div>
         </div>

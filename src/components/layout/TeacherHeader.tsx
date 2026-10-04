@@ -19,6 +19,7 @@ import {
   type CrossViewNavigationPayload,
   type UrgentTriageItem,
 } from '../../services/teacherCopilotService';
+import { getSchoolSettings } from '../../config/schoolRoles';
 
 interface TeacherHeaderProps {
   title: string;
@@ -136,14 +137,22 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
     setTimeout(() => setBellFeedback(null), 3500);
   };
 
+  const schoolSettings = getSchoolSettings();
+
   return (
     <header className="h-14 bg-white border-b border-slate-200/80 px-3.5 sm:px-6 flex items-center justify-between gap-2 sticky top-0 z-20 select-none">
-      {/* Left: Hamburger Menu (Mobile), Back Arrow, and Title */}
+      {/* Left: Mobile Logo, Hamburger Menu (Mobile), Back Arrow, and Title */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <img
+          src={schoolSettings.logoUrl}
+          alt={schoolSettings.nameTh}
+          className="w-7 h-7 object-contain rounded-lg lg:hidden shrink-0 shadow-2xs"
+        />
+
         {onOpenMobileMenu && (
           <button
             onClick={onOpenMobileMenu}
-            className="lg:hidden px-2.5 py-1.5 -ml-1 text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors shrink-0 flex items-center gap-1.5 text-xs font-bold"
+            className="lg:hidden px-2.5 py-1.5 text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors shrink-0 flex items-center gap-1.5 text-xs font-bold"
             aria-label="เปิดเมนูหลัก"
           >
             <Menu className="w-4 h-4" />
@@ -169,6 +178,16 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
             ครูปัญจพล เกษรัตน์ | กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ
           </span>
         </div>
+      </div>
+
+      {/* Center: School Motto matching Mockup Image 2 */}
+      <div className="hidden xl:flex flex-col items-center justify-center text-center px-2">
+        <span className="text-xs font-bold text-slate-700 tracking-wide">
+          {schoolSettings.motto || 'ครูมืออาชีพ สร้างโอกาส พัฒนานักเรียนสู่อนาคต'}
+        </span>
+        <span className="text-[10px] text-slate-400">
+          {schoolSettings.nameTh} • {schoolSettings.districtProvince}
+        </span>
       </div>
 
       {/* Right Actions */}
@@ -455,7 +474,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
             <span className="text-xs font-bold text-slate-900">
               ปัญจพล เกษรัตน์
             </span>
-            <span className="text-[10px] text-slate-500 mt-0.5">ครู</span>
+            <span className="text-[10px] text-slate-500 mt-0.5">ครู • ม.5</span>
           </div>
           <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden md:block" />
         </div>
