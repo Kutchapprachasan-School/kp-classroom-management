@@ -1,74 +1,134 @@
+// src/components/student/StudentHeader.tsx
+// แถบด้านบนของนักเรียน (ตรงตามภาพอ้างอิง media_1791203662191.png พร้อมฟอนต์ Prompt)
+
 import React from 'react';
-import { Sparkles, LogOut, PanelLeft, PanelLeftClose } from 'lucide-react';
+import {
+  Bell,
+  LogOut,
+  Menu,
+  Calendar,
+  Sparkles,
+  Settings,
+} from 'lucide-react';
+import { studentBannerService } from '../../services/studentBannerService';
+import type { SchoolUserRole } from '../../config/schoolRoles';
 
 interface StudentHeaderProps {
   onExit: () => void;
   totalXp?: number;
+  studentName?: string;
+  studentRole?: 'STUDENT_GENERAL' | 'STUDENT_COUNCIL';
+  activeRole?: SchoolUserRole;
   onOpenMobileMenu?: () => void;
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
+  onOpenAdminBannerModal?: () => void;
 }
 
 export const StudentHeader: React.FC<StudentHeaderProps> = ({
   onExit,
-  totalXp = 0,
+  totalXp = 670,
+  studentName = 'ด.ช. ทัศธน คำปั้น',
+  activeRole,
   onOpenMobileMenu,
-  isSidebarOpen = true,
-  onToggleSidebar,
+  onToggleSidebar: _onToggleSidebar,
+  onOpenAdminBannerModal,
 }) => {
+  const isAdmin = studentBannerService.canManageBanners(activeRole);
+
   return (
-    <header className="h-14 bg-white border-b border-slate-200/80 px-3.5 sm:px-6 flex items-center justify-between gap-2 sticky top-0 z-20 select-none">
-      {/* Left: Mobile Hamburger / Toggle Sidebar + Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs text-slate-500 font-medium min-w-0">
-        {(onToggleSidebar || onOpenMobileMenu) && (
+    <header className="h-16 bg-white border-b border-slate-200/80 px-4 sm:px-6 flex items-center justify-between gap-4 sticky top-0 z-20 font-['Prompt',sans-serif] select-none">
+      {/* Left: Mobile Toggle + Student Greeting with Anime Avatar */}
+      <div className="flex items-center gap-3 min-w-0">
+        {onOpenMobileMenu && (
           <button
             type="button"
-            onClick={onToggleSidebar || onOpenMobileMenu}
-            className={`px-2.5 py-1.5 rounded-xl transition-all shrink-0 flex items-center gap-1.5 text-xs font-bold cursor-pointer shadow-2xs ${
-              isSidebarOpen
-                ? 'text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200/90'
-                : 'text-white bg-emerald-600 hover:bg-emerald-700 ring-2 ring-emerald-600/20'
-            }`}
-            title={
-              isSidebarOpen
-                ? 'พับเก็บเมนูข้าง (ซ่อน Sidebar) - Ctrl+B'
-                : 'เปิดเมนูหลัก (แสดง Sidebar) - Ctrl+B'
-            }
-            aria-label="สลับการแสดงผลเมนูข้าง"
+            onClick={onOpenMobileMenu}
+            className="lg:hidden p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
+            title="เปิดเมนู"
+            aria-label="เปิดเมนู"
           >
-            {isSidebarOpen ? (
-              <PanelLeftClose className="w-4 h-4" />
-            ) : (
-              <PanelLeft className="w-4 h-4" />
-            )}
-            <span className="hidden sm:inline">
-              {isSidebarOpen ? 'ซ่อนเมนู' : 'เปิดเมนู'}
-            </span>
-            <span className="sm:hidden">เมนู</span>
+            <Menu className="w-5 h-5" />
           </button>
         )}
-        <span className="hidden sm:inline">ห้องเรียนของฉัน</span>
-        <span className="text-slate-300 hidden sm:inline">/</span>
-        <span className="text-slate-800 font-semibold truncate">พื้นที่ของฉัน</span>
+
+        {/* Student Avatar (Circular Anime Profile from Screenshot) */}
+        <div className="relative shrink-0">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full border-2 border-sky-100 overflow-hidden shadow-2xs bg-sky-50 flex items-center justify-center">
+            <img
+              src="/images/banners/student-avatar.png"
+              alt={studentName}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLElement).setAttribute(
+                  'src',
+                  'https://api.dicebear.com/7.x/bottts/svg?seed=student'
+                );
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Greeting & Subtitle */}
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <h2 className="text-sm sm:text-base font-bold text-slate-800 leading-tight truncate">
+              สวัสดีครับ {studentName} 👋
+            </h2>
+          </div>
+          <p className="text-[11px] sm:text-xs text-slate-400 font-medium truncate mt-0.5">
+            ตั้งใจเรียน พัฒนาตัวเอง สู่อนาคตที่ดีกว่า ✨
+          </p>
+        </div>
       </div>
 
-      {/* Right: Term, XP Badge, Exit */}
-      <div className="flex items-center gap-2 sm:gap-4 text-xs font-medium shrink-0">
-        <span className="text-slate-500 hidden md:inline">ภาคเรียนที่ 1 / 2569</span>
+      {/* Right: Admin Shortcut (if Admin), Notifications Bell, Date, XP Pill, Logout */}
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        {/* Admin Banner Management Trigger (Only visible to Admin) */}
+        {isAdmin && onOpenAdminBannerModal && (
+          <button
+            type="button"
+            onClick={onOpenAdminBannerModal}
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold shadow-xs transition-all hover:scale-102 cursor-pointer"
+            title="จัดการแบนเนอร์หน้านักเรียนทั้ง 3 ส่วน (สิทธิ์ Admin)"
+          >
+            <Settings className="w-3.5 h-3.5" />
+            <span>ปรับแต่ง Banner (Admin)</span>
+          </button>
+        )}
 
-        {/* XP Star Pill */}
-        <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-amber-50 border border-amber-200 text-amber-700 rounded-full font-semibold shadow-xs">
+        {/* Notification Bell with Badge '3' */}
+        <button
+          type="button"
+          className="relative w-9 h-9 rounded-xl bg-sky-50 hover:bg-sky-100/80 text-sky-600 flex items-center justify-center transition-colors cursor-pointer border border-sky-100/60"
+          title="การแจ้งเตือน (3 รายการ)"
+        >
+          <Bell className="w-4 h-4" />
+          <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center shadow-xs">
+            3
+          </span>
+        </button>
+
+        {/* Date Chip */}
+        <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200/90 bg-slate-50/70 text-xs font-medium text-slate-700 shadow-2xs">
+          <Calendar className="w-3.5 h-3.5 text-slate-500" />
+          <span>อังคารที่ 1 ตุลาคม 2569</span>
+        </div>
+
+        {/* XP Badge */}
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 font-bold text-xs shadow-2xs">
           <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
           <span>{totalXp} XP</span>
         </div>
 
+        {/* Logout Square Icon Button */}
         <button
+          type="button"
           onClick={onExit}
-          className="flex items-center gap-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 px-2 sm:px-2.5 py-1 rounded-lg transition-colors"
-          title="กลับสู่มุมมองครู"
+          className="w-9 h-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 flex items-center justify-center transition-colors cursor-pointer shadow-2xs"
+          title="ออกจากระบบ"
         >
-          <LogOut className="w-3.5 h-3.5" />
-          <span>ออก</span>
+          <LogOut className="w-4 h-4 text-slate-500" />
         </button>
       </div>
     </header>

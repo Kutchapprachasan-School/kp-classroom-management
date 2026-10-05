@@ -115,7 +115,7 @@ export const KUTCHAP_SCHOOL_INFO: SchoolBrandingSettings = {
   smsSystemName: 'School Management System',
   smsApiUrl: 'https://sms.khamyang.ac.th/api/v1/auth-sync',
   smsLastSyncedAt: '30 ก.ย. 2569 • 11:05 น.',
-  fontFamily: 'Sarabun',
+  fontFamily: 'Prompt',
   baseFontSizePx: 15,
   morningToClassSyncMode: 'AUTO_PREFILL',
   motto: 'ครูมืออาชีพ สร้างโอกาส พัฒนานักเรียนสู่อนาคต',
@@ -133,7 +133,7 @@ export function applySchoolBrandingAndTypography(settings?: SchoolBrandingSettin
   if (typeof document === 'undefined') return;
   const current = settings || getSchoolSettings();
   const clampedPx = clampFontSize11To20(current.baseFontSizePx);
-  const font = current.fontFamily || 'Sarabun';
+  const font = current.fontFamily || 'Prompt';
 
   // Ensure Google Fonts stylesheet for Thai fonts is loaded
   const fontLinkId = 'kps-google-fonts-thai';
@@ -165,7 +165,7 @@ export function getSchoolSettings(): SchoolBrandingSettings {
       ...parsed,
       logoUrl: parsed.logoUrl?.trim() ? parsed.logoUrl : DEFAULT_KUTCHAP_LOGO_SVG,
       baseFontSizePx: clampFontSize11To20(parsed.baseFontSizePx),
-      fontFamily: parsed.fontFamily || 'Sarabun',
+      fontFamily: parsed.fontFamily || 'Prompt',
       morningToClassSyncMode: parsed.morningToClassSyncMode || 'AUTO_PREFILL',
     };
   } catch {

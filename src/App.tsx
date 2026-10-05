@@ -42,6 +42,7 @@ import {
   ChevronDown,
   ChevronUp,
   ShieldCheck,
+  MessageSquare,
 } from 'lucide-react';
 import { TeacherCalendarMobileView } from './components/dashboard/TeacherCalendarMobileView';
 import { TeacherAllTasksMobileView } from './components/dashboard/TeacherAllTasksMobileView';
@@ -419,6 +420,7 @@ export const App: React.FC = () => {
           studentRole={
             activeRole === 'STUDENT_COUNCIL' ? 'STUDENT_COUNCIL' : 'STUDENT_GENERAL'
           }
+          activeRole={activeRole}
           onChangeStudentRole={(stuRole) => setActiveRole(stuRole)}
           onSwitchToTeacherRole={(tRole) => handleChangeRole(tRole)}
           onExit={() => setCurrentView('school-login')}
@@ -450,6 +452,9 @@ export const App: React.FC = () => {
               isSidebarOpen={isDesktopSidebarOpen}
               onToggleSidebar={handleToggleSidebar}
               termLabel="ภาคเรียนที่ 1/2569"
+              activeRole={activeRole}
+              onChangeRole={handleChangeRole}
+              onLogout={() => setCurrentView('school-login')}
               onDeepNavigate={handleDeepNavigate}
             />
 
@@ -457,6 +462,7 @@ export const App: React.FC = () => {
             <main className="flex-1 p-3.5 sm:p-6 md:p-8 overflow-y-auto overflow-x-hidden">
               {currentView === 'home' && (
                 <TeacherGlobalDashboardView
+                  activeRole={activeRole}
                   onNavigateToClass={() => setCurrentView('class-overview')}
                   onNavigateToAttendance={() => {
                     setDeepLinkClassTab('attendance');
@@ -583,78 +589,81 @@ export const App: React.FC = () => {
               )}
             </main>
 
-            {/* Mobile Bottom Navigation Bar (ตรงตาม Mockup 4 เมนู: หน้าแรก | ปฏิทิน | งานทั้งหมด | เพิ่มเติม) */}
+            {/* Mobile Bottom Navigation Bar (ตรงตาม Mockup Image 2: หน้าหลัก | งาน | ข้อความ | เพิ่มเติม) */}
             <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-3 py-1.5 grid grid-cols-4 gap-1 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] select-none">
               <button
                 type="button"
                 onClick={() => setCurrentView('home')}
                 className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
                   currentView === 'home'
-                    ? 'text-[#0C6D5B] bg-teal-50/80'
+                    ? 'text-blue-600 bg-blue-50/80'
                     : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
                 <Home
                   className={`w-4 h-4 mb-0.5 ${
                     currentView === 'home'
-                      ? 'text-[#0C6D5B] stroke-[2.5]'
+                      ? 'text-blue-600 stroke-[2.5]'
                       : 'text-slate-500'
                   }`}
                 />
-                <span>หน้าแรก</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setCurrentView('mobile-calendar')}
-                className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
-                  currentView === 'mobile-calendar'
-                    ? 'text-[#0C6D5B] bg-teal-50/80'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                <CalendarDays
-                  className={`w-4 h-4 mb-0.5 ${
-                    currentView === 'mobile-calendar'
-                      ? 'text-[#0C6D5B] stroke-[2.5]'
-                      : 'text-slate-500'
-                  }`}
-                />
-                <span>ปฏิทิน</span>
+                <span>หน้าหลัก</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setCurrentView('mobile-all-tasks')}
                 className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
-                  currentView === 'mobile-all-tasks'
-                    ? 'text-[#0C6D5B] bg-teal-50/80'
+                  currentView === 'mobile-all-tasks' || currentView === 'assignments'
+                    ? 'text-blue-600 bg-blue-50/80'
                     : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
                 <ClipboardList
                   className={`w-4 h-4 mb-0.5 ${
-                    currentView === 'mobile-all-tasks'
-                      ? 'text-[#0C6D5B] stroke-[2.5]'
+                    currentView === 'mobile-all-tasks' || currentView === 'assignments'
+                      ? 'text-blue-600 stroke-[2.5]'
                       : 'text-slate-500'
                   }`}
                 />
-                <span>งานทั้งหมด</span>
+                <span>งาน</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCurrentView('student-affairs')}
+                className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer relative ${
+                  currentView === 'student-affairs'
+                    ? 'text-blue-600 bg-blue-50/80'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                <div className="relative">
+                  <MessageSquare
+                    className={`w-4 h-4 mb-0.5 ${
+                      currentView === 'student-affairs'
+                        ? 'text-blue-600 stroke-[2.5]'
+                        : 'text-slate-500'
+                    }`}
+                  />
+                  <span className="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-rose-500" />
+                </div>
+                <span>ข้อความ</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setCurrentView('mobile-more')}
                 className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
-                  currentView === 'mobile-more'
-                    ? 'text-[#0C6D5B] bg-teal-50/80'
+                  currentView === 'mobile-more' || currentView === 'settings'
+                    ? 'text-blue-600 bg-blue-50/80'
                     : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
                 <MoreHorizontal
                   className={`w-4 h-4 mb-0.5 ${
-                    currentView === 'mobile-more'
-                      ? 'text-[#0C6D5B] stroke-[2.5]'
+                    currentView === 'mobile-more' || currentView === 'settings'
+                      ? 'text-blue-600 stroke-[2.5]'
                       : 'text-slate-500'
                   }`}
                 />

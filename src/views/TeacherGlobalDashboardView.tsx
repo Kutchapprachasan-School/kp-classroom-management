@@ -1,21 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { FileSpreadsheet, X } from 'lucide-react';
+// src/views/TeacherGlobalDashboardView.tsx
+// หน้า Dashboard หลักของครู ตามภาพต้นแบบ Mockup Image 1 (Desktop) และ Image 2 (Mobile First)
+
+import React, { useState } from 'react';
 import type { CrossViewNavigationPayload } from '../services/teacherCopilotService';
-import {
-  teacherCalendarTodoService,
-  type DailyTodoItem,
-} from '../services/teacherCalendarTodoService';
-import { TeacherOverviewStatCards } from '../components/dashboard/TeacherOverviewStatCards';
-import { TeacherDailyTodoList } from '../components/dashboard/TeacherDailyTodoList';
-import { TeacherMonthCalendarHeatmap } from '../components/dashboard/TeacherMonthCalendarHeatmap';
+import type { SchoolUserRole } from '../config/schoolRoles';
+import { TeacherHeroBanner } from '../components/dashboard/TeacherHeroBanner';
+import { TeacherBottomBanner } from '../components/dashboard/TeacherBottomBanner';
+import { TeacherTodayTimetableCard } from '../components/dashboard/TeacherTodayTimetableCard';
+import { TeacherQuickShortcuts } from '../components/dashboard/TeacherQuickShortcuts';
+import { TeacherCalendarActivityWidget } from '../components/dashboard/TeacherCalendarActivityWidget';
+import { TeacherWeeklyTasksWidget } from '../components/dashboard/TeacherWeeklyTasksWidget';
+import { TeacherAnnouncementsWidget } from '../components/dashboard/TeacherAnnouncementsWidget';
 import { TeacherMobileHomeHero } from '../components/dashboard/TeacherMobileHomeHero';
-import { TeacherTaskDetailModal } from '../components/dashboard/TeacherTaskDetailModal';
-import {
-  PaperRegisterLedger,
-  type PaperLedgerMode,
-} from '../components/teacher/PaperRegisterLedger';
+import { AdminTeacherBannerModal } from '../components/teacher/AdminTeacherBannerModal';
+import type { TeacherBannerKey } from '../services/teacherBannerService';
 
 interface TeacherGlobalDashboardViewProps {
+  activeRole?: SchoolUserRole;
   onNavigateToClass?: (classId: string) => void;
   onNavigateToAttendance?: () => void;
   onNavigateToReadiness?: () => void;
@@ -27,124 +28,99 @@ interface TeacherGlobalDashboardViewProps {
 
 export const TeacherGlobalDashboardView: React.FC<
   TeacherGlobalDashboardViewProps
-> = ({ onDeepNavigate }) => {
-  const [todos, setTodos] = useState<DailyTodoItem[]>(() =>
-    teacherCalendarTodoService.getTodayTodos()
-  );
-  const [selectedTaskForModal, setSelectedTaskForModal] =
-    useState<DailyTodoItem | null>(null);
-  const [isFullLedgerModalOpen, setIsFullLedgerModalOpen] = useState(false);
-  const [ledgerInitialMode, setLedgerInitialMode] =
-    useState<PaperLedgerMode>('HOMEWORK_CHECK');
+> = ({
+  activeRole = 'TEACHER_GENERAL',
+  onNavigateToAttendance,
+  onNavigateToAcademicYear,
+  onNavigateToCourses,
+  onDeepNavigate,
+}) => {
+  const [isAdminBannerModalOpen, setIsAdminBannerModalOpen] = useState(false);
+  const [bannerModalInitialKey, setBannerModalInitialKey] = useState<TeacherBannerKey>('hero');
 
-  useEffect(() => {
-    const handleUpdate = () => {
-      setTodos([...teacherCalendarTodoService.getTodayTodos()]);
-    };
-    window.addEventListener('kp-todo-updated', handleUpdate);
-    return () => window.removeEventListener('kp-todo-updated', handleUpdate);
-  }, []);
-
-  const handleToggleTodo = (id: string) => {
-    teacherCalendarTodoService.toggleTodoComplete(id);
-    setTodos([...teacherCalendarTodoService.getTodayTodos()]);
-  };
-
-  const handleActionClick = (payload: CrossViewNavigationPayload) => {
-    onDeepNavigate?.(payload);
+  const handleOpenBannerModal = (key: TeacherBannerKey = 'hero') => {
+    setBannerModalInitialKey(key);
+    setIsAdminBannerModalOpen(true);
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-4 pb-20 select-none">
-      {/* 1. Mobile Greeting Hero Banner (เฉพาะบนมือถือ < 768px ตรงตาม Screen 1) */}
+    <div className="max-w-[1440px] mx-auto space-y-4 sm:space-y-5 pb-20 select-none font-sans">
+      {/* 1. Mobile Greeting Hero (เฉพาะบนหน้าจอมือถือ < 768px ตามภาพต้นแบบ Screen 1 Mobile First) */}
       <div className="md:hidden">
         <TeacherMobileHomeHero
-          teacherName="ปัญจพล เกษรัตน์"
-          department="กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ"
-          pendingCount={todos.filter((t) => t.status !== 'COMPLETED').length}
-          totalTasksCount={12}
+          teacherName="นายปัญจพล เกษรัตน์"
+          department="กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ (ภาษาญี่ปุ่น)"
+          avatarUrl="/images/teacher/teacher_avatar.png"
         />
       </div>
 
-      {/* 2. แถว 4 การ์ดสถิติด้านบน (แสดงบน Tablet และ Desktop 768px ขึ้นไป ตรงตาม Mockup) */}
-      <div className="hidden md:block">
-        <TeacherOverviewStatCards
-          periodsTodayCount={4}
-          totalStudentsCount={120}
-          pendingGradingCount={2}
-          termLabel="ภาคเรียนที่ 1/2569"
-        />
-      </div>
+      {/* 2. สองคอลัมน์หลักซ้าย-ขวา ตามภาพต้นแบบ Mockup Image 1 (Desktop Dashboard) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 items-start">
+        {/* ฝั่งซ้าย (Main Stream Column ~65-68% / lg:col-span-8) */}
+        <div className="lg:col-span-8 space-y-4 sm:space-y-5 min-w-0">
+          {/* 2.1 Hero Banner (ส่วนที่ 1 ของแบนเนอร์ครู) */}
+          <TeacherHeroBanner
+            activeRole={activeRole}
+            onOpenAdminModal={() => handleOpenBannerModal('hero')}
+          />
 
-      {/* 3. สองคอลัมน์หลัก: To-Do List (ซ้าย ~68%) และ ปฏิทินงาน & ตารางสอน (ขวา ~32%) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-        {/* ฝั่งซ้าย: สิ่งที่ต้องทำวันนี้ (To-Do List) */}
-        <div className="lg:col-span-8">
-          <TeacherDailyTodoList
-            todos={todos}
-            onActionClick={handleActionClick}
-            onToggleTodo={handleToggleTodo}
-            onSelectTask={(task) => setSelectedTaskForModal(task)}
+          {/* 2.2 ตารางสอนวันนี้ 5 คาบ พร้อมปุ่ม [เช็คชื่อ], [ให้คะแนน], [รายละเอียด >] */}
+          <TeacherTodayTimetableCard
+            onNavigateToFullTimetable={() => {
+              if (onDeepNavigate) {
+                onDeepNavigate({
+                  view: 'timetable',
+                  highlightBanner: 'ตารางสอนรวมทุกภาคเรียน',
+                });
+              }
+            }}
+            onDeepNavigate={onDeepNavigate}
+          />
+
+          {/* 2.3 Bottom Banner (ส่วนที่ 3 ของแบนเนอร์ครู แนวนอนด้านล่าง) */}
+          <TeacherBottomBanner
+            activeRole={activeRole}
+            onOpenAdminModal={() => handleOpenBannerModal('bottom')}
           />
         </div>
 
-        {/* ฝั่งขวา: ปฏิทินงาน & ตารางสอน (แสดงตลอดบน Tablet/Desktop) */}
-        <div className="lg:col-span-4">
-          <TeacherMonthCalendarHeatmap onActionClick={handleActionClick} />
+        {/* ฝั่งขวา (Side Stream Column ~32-35% / lg:col-span-4) */}
+        <div className="lg:col-span-4 space-y-4 sm:space-y-5 min-w-0">
+          {/* 2.4 ทางลัดสำหรับครู (สร้างแผนการสอน, เช็คชื่อนักเรียน, ให้คะแนน, อัปโหลดสื่อ/ไฟล์) */}
+          <TeacherQuickShortcuts
+            onDeepNavigate={onDeepNavigate}
+            onNavigateToLessons={onNavigateToCourses}
+            onNavigateToAttendance={onNavigateToAttendance}
+          />
+
+          {/* 2.5 ปฏิทินการสอน / กิจกรรม (ตุลาคม 2569 & สรุปวันนี้ 5 คาบ) */}
+          <TeacherCalendarActivityWidget
+            onNavigateToCalendar={onNavigateToAcademicYear}
+            onDeepNavigate={onDeepNavigate}
+          />
+
+          {/* 2.6 งานที่ต้องทำ (สัปดาห์นี้) [ด่วน], [ปกติ] */}
+          <TeacherWeeklyTasksWidget onDeepNavigate={onDeepNavigate} />
+
+          {/* 2.7 ข่าวสาร / ประกาศ (2 รายการ) */}
+          <TeacherAnnouncementsWidget
+            onViewAll={() => {
+              onDeepNavigate?.({
+                view: 'home',
+                highlightBanner: 'ข่าวสารและประกาศทั้งหมดของโรงเรียน',
+              });
+            }}
+          />
         </div>
       </div>
 
-      {/* Task Detail Modal / Bottom Sheet (ตรงตาม Screen 2 เมื่อกดรายการงาน) */}
-      <TeacherTaskDetailModal
-        task={selectedTaskForModal}
-        isOpen={Boolean(selectedTaskForModal)}
-        onClose={() => setSelectedTaskForModal(null)}
-        onActionClick={handleActionClick}
+      {/* Admin Banner Customization Modal (สิทธิ์เฉพาะ ACADEMIC_ADMIN / ADMIN) */}
+      <AdminTeacherBannerModal
+        isOpen={isAdminBannerModalOpen}
+        onClose={() => setIsAdminBannerModalOpen(false)}
+        activeRole={activeRole}
+        initialBannerKey={bannerModalInitialKey}
       />
-
-      {/* Floating or bottom trigger for full paper ledger if teacher wants complete view */}
-      <div className="flex justify-end pt-2">
-        <button
-          type="button"
-          onClick={() => {
-            setLedgerInitialMode('HOMEWORK_CHECK');
-            setIsFullLedgerModalOpen(true);
-          }}
-          className="text-xs text-slate-500 hover:text-[#0C6D5B] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-slate-200/80 shadow-2xs"
-        >
-          <FileSpreadsheet className="w-4 h-4 text-[#0C6D5B]" />
-          <span>เปิดสมุด ปพ.5 แบบเต็ม (กระดาษ)</span>
-        </button>
-      </div>
-
-      {/* Modal เปิดสมุด ปพ.5 แบบกระดาษ */}
-      {isFullLedgerModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-          <div className="bg-white w-full max-w-7xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-              <div className="flex items-center gap-2">
-                <FileSpreadsheet className="w-5 h-5 text-[#0C6D5B]" />
-                <h3 className="font-bold text-slate-800 text-sm sm:text-base">
-                  สมุด ปพ.5 แบบกระดาษ (ภาพรวมทั้งห้อง)
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsFullLedgerModalOpen(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-4 overflow-y-auto">
-              <PaperRegisterLedger
-                initialMode={ledgerInitialMode}
-                onModeChange={setLedgerInitialMode}
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

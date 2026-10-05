@@ -8,6 +8,8 @@ import {
   Shield,
   Lock,
   FileSpreadsheet,
+  Upload,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { sgsExportService, type SgsSnapshotRecord } from '../services/sgsExportService';
 import {
@@ -21,6 +23,18 @@ import {
   type SchoolUserRole,
   type SchoolBrandingSettings,
 } from '../config/schoolRoles';
+import {
+  studentBannerService,
+  STUDENT_BANNERS_EVENT,
+  type StudentBannerKey,
+  type StudentBannerItem,
+} from '../services/studentBannerService';
+import {
+  teacherBannerService,
+  TEACHER_BANNERS_EVENT,
+  type TeacherBannerKey,
+  type TeacherBannerItem,
+} from '../services/teacherBannerService';
 
 interface SettingsBackupViewProps {
   activeRole?: SchoolUserRole;
@@ -46,6 +60,103 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
     sgsRosterAndSubmissionService.getCourseStorageSummaries()
   );
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [studentBanners, setStudentBanners] = useState<Record<StudentBannerKey, StudentBannerItem>>(() =>
+    studentBannerService.getBanners()
+  );
+  const [bannerUploadingKey, setBannerUploadingKey] = useState<StudentBannerKey | null>(null);
+
+  const [teacherBanners, setTeacherBanners] = useState<Record<TeacherBannerKey, TeacherBannerItem>>(() =>
+    teacherBannerService.getBanners()
+  );
+  const [teacherBannerUploadingKey, setTeacherBannerUploadingKey] = useState<TeacherBannerKey | null>(null);
+
+  useEffect(() => {
+    const onBannersChange = () => setStudentBanners(studentBannerService.getBanners());
+    window.addEventListener(STUDENT_BANNERS_EVENT, onBannersChange);
+    return () => window.removeEventListener(STUDENT_BANNERS_EVENT, onBannersChange);
+  }, []);
+
+  useEffect(() => {
+    const onTeacherBannersChange = () => setTeacherBanners(teacherBannerService.getBanners());
+    window.addEventListener(TEACHER_BANNERS_EVENT, onTeacherBannersChange);
+    return () => window.removeEventListener(TEACHER_BANNERS_EVENT, onTeacherBannersChange);
+  }, []);
+
+  const handleBannerUpload = async (key: StudentBannerKey, file: File) => {
+    if (activeRole !== 'ACADEMIC_ADMIN') {
+      showToast('เฉพาะแอดมินฝ่ายวิชาการเท่านั้นที่สามารถอัปโหลดแบนเนอร์ได้');
+      return;
+    }
+    setBannerUploadingKey(key);
+    try {
+      const maxWidth = key === 'hero' ? 1200 : key === 'sidebar' ? 600 : 800;
+      const maxHeight = key === 'hero' ? 400 : key === 'sidebar' ? 600 : 250;
+      const dataUrl = await studentBannerService.compressImage(file, maxWidth, maxHeight, 0.85);
+      const res = studentBannerService.updateBanner(
+        key,
+        { customUrl: dataUrl },
+        activeRole,
+        'แอดมินฝ่ายวิชาการ'
+      );
+      if (res.success) {
+        setStudentBanners(studentBannerService.getBanners());
+        showToast(res.message);
+      } else {
+        showToast(res.message);
+      }
+    } catch {
+      showToast('เกิดข้อผิดพลาดในการประมวลผลรูปภาพ');
+    } finally {
+      setBannerUploadingKey(null);
+    }
+  };
+
+  const handleBannerReset = (key: StudentBannerKey) => {
+    if (activeRole !== 'ACADEMIC_ADMIN') return;
+    const res = studentBannerService.resetBanner(key, activeRole);
+    if (res.success) {
+      setStudentBanners(studentBannerService.getBanners());
+      showToast(res.message);
+    }
+  };
+
+  const handleTeacherBannerUpload = async (key: TeacherBannerKey, file: File) => {
+    if (activeRole !== 'ACADEMIC_ADMIN') {
+      showToast('เฉพาะแอดมินฝ่ายวิชาการเท่านั้นที่สามารถอัปโหลดแบนเนอร์ได้');
+      return;
+    }
+    setTeacherBannerUploadingKey(key);
+    try {
+      const maxWidth = key === 'hero' ? 1200 : key === 'sidebar' ? 600 : 1200;
+      const maxHeight = key === 'hero' ? 400 : key === 'sidebar' ? 450 : 250;
+      const dataUrl = await teacherBannerService.compressImage(file, maxWidth, maxHeight, 0.86);
+      const res = teacherBannerService.updateBanner(
+        key,
+        { customUrl: dataUrl },
+        activeRole,
+        'แอดมินฝ่ายวิชาการ'
+      );
+      if (res.success) {
+        setTeacherBanners(teacherBannerService.getBanners());
+        showToast(res.message);
+      } else {
+        showToast(res.message);
+      }
+    } catch {
+      showToast('เกิดข้อผิดพลาดในการประมวลผลรูปภาพ');
+    } finally {
+      setTeacherBannerUploadingKey(null);
+    }
+  };
+
+  const handleTeacherBannerReset = (key: TeacherBannerKey) => {
+    if (activeRole !== 'ACADEMIC_ADMIN') return;
+    const res = teacherBannerService.resetBanner(key, activeRole);
+    if (res.success) {
+      setTeacherBanners(teacherBannerService.getBanners());
+      showToast(res.message);
+    }
+  };
 
   const handleSaveBranding = (e: React.FormEvent) => {
     e.preventDefault();
@@ -480,6 +591,451 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
           </div>
         </div>
       </form>
+
+      {/* Section: จัดการแบนเนอร์หน้านักเรียน 3 ส่วน (สิทธิ์ Admin เป็นผู้อัปโหลดเท่านั้น) */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-blue-50 text-blue-700 rounded-xl">
+              <ImageIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-slate-900">
+                  จัดการแบนเนอร์หน้านักเรียน 3 ส่วน (Student Dashboard Banners)
+                </h2>
+                <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">
+                  เฉพาะแอดมินฝ่ายวิชาการ (Admin Only)
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                อัปโหลดรูปภาพ ปรับเปลี่ยน และรีเซ็ตแบนเนอร์ทั้ง 3 จุดในหน้าแดชบอร์ดของนักเรียน เพื่อสร้างแรงบันดาลใจและประชาสัมพันธ์
+              </p>
+            </div>
+          </div>
+
+          {roleMode === 'ADMIN' && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('ต้องการรีเซ็ตแบนเนอร์ทั้ง 3 ส่วนกลับเป็นค่าเริ่มต้นหรือไม่?')) {
+                  const res = studentBannerService.resetAllBanners(activeRole);
+                  if (res.success) {
+                    setStudentBanners(studentBannerService.getBanners());
+                    showToast(res.message);
+                  }
+                }
+              }}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-600 cursor-pointer"
+            >
+              รีเซ็ตทั้ง 3 แบนเนอร์กลับค่าเริ่มต้น
+            </button>
+          )}
+        </div>
+
+        {roleMode !== 'ADMIN' ? (
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-500 flex items-center gap-2">
+            <span>🔒 ส่วนนี้สงวนสิทธิ์เฉพาะผู้ดูแลระบบฝ่ายวิชาการ (Admin) เท่านั้น ครูผู้สอนทั่วไปไม่สามารถแก้ไขหรืออัปโหลดแบนเนอร์ได้</span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Banner 1: Hero Banner */}
+            <div className="bg-slate-50/70 rounded-2xl border border-slate-200/90 p-4 flex flex-col justify-between space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800">
+                    1. แบนเนอร์หลักกึ่งกลาง (Hero)
+                  </span>
+                  <span className="text-[10px] bg-white border border-slate-200 px-2 py-0.5 rounded-md font-medium text-slate-500">
+                    {studentBanners.hero.dimensionGuide}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  {studentBanners.hero.locationLabel}
+                </p>
+
+                {/* Preview Image */}
+                <div className="rounded-xl overflow-hidden border border-slate-200 bg-white h-28 flex items-center justify-center shadow-2xs">
+                  <img
+                    src={studentBannerService.getEffectiveBannerUrl('hero')}
+                    alt="Hero Banner"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1">
+                  <span>🕒 {studentBanners.hero.updatedAt}</span>
+                  <span>{studentBanners.hero.customUrl ? 'รูปภาพคัสตอม' : 'รูปเริ่มต้น'}</span>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-200/70 flex items-center gap-2">
+                <label className="flex-1 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{bannerUploadingKey === 'hero' ? 'กำลังอัปโหลด...' : 'อัปโหลดภาพใหม่'}</span>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    disabled={bannerUploadingKey === 'hero'}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleBannerUpload('hero', file);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+                {studentBanners.hero.customUrl && (
+                  <button
+                    type="button"
+                    onClick={() => handleBannerReset('hero')}
+                    className="py-2 px-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold"
+                    title="รีเซ็ตกลับเป็นภาพเริ่มต้น"
+                  >
+                    รีเซ็ต
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Banner 2: Sidebar Banner */}
+            <div className="bg-slate-50/70 rounded-2xl border border-slate-200/90 p-4 flex flex-col justify-between space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800">
+                    2. แบนเนอร์เมนูข้าง (Sidebar)
+                  </span>
+                  <span className="text-[10px] bg-white border border-slate-200 px-2 py-0.5 rounded-md font-medium text-slate-500">
+                    {studentBanners.sidebar.dimensionGuide}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  {studentBanners.sidebar.locationLabel}
+                </p>
+
+                {/* Preview Image */}
+                <div className="rounded-xl overflow-hidden border border-slate-200 bg-white h-28 flex items-center justify-center shadow-2xs">
+                  <img
+                    src={studentBannerService.getEffectiveBannerUrl('sidebar')}
+                    alt="Sidebar Banner"
+                    className="h-full w-auto object-contain"
+                  />
+                </div>
+                <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1">
+                  <span>🕒 {studentBanners.sidebar.updatedAt}</span>
+                  <span>{studentBanners.sidebar.customUrl ? 'รูปภาพคัสตอม' : 'รูปเริ่มต้น'}</span>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-200/70 flex items-center gap-2">
+                <label className="flex-1 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{bannerUploadingKey === 'sidebar' ? 'กำลังอัปโหลด...' : 'อัปโหลดภาพใหม่'}</span>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    disabled={bannerUploadingKey === 'sidebar'}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleBannerUpload('sidebar', file);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+                {studentBanners.sidebar.customUrl && (
+                  <button
+                    type="button"
+                    onClick={() => handleBannerReset('sidebar')}
+                    className="py-2 px-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold"
+                    title="รีเซ็ตกลับเป็นภาพเริ่มต้น"
+                  >
+                    รีเซ็ต
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Banner 3: Bottom Motivational Banner */}
+            <div className="bg-slate-50/70 rounded-2xl border border-slate-200/90 p-4 flex flex-col justify-between space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800">
+                    3. แบนเนอร์มุมขวาล่าง (Motivational)
+                  </span>
+                  <span className="text-[10px] bg-white border border-slate-200 px-2 py-0.5 rounded-md font-medium text-slate-500">
+                    {studentBanners.bottom.dimensionGuide}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  {studentBanners.bottom.locationLabel}
+                </p>
+
+                {/* Preview Image */}
+                <div className="rounded-xl overflow-hidden border border-slate-200 bg-white h-28 flex items-center justify-center shadow-2xs">
+                  <img
+                    src={studentBannerService.getEffectiveBannerUrl('bottom')}
+                    alt="Bottom Banner"
+                    className="w-full h-auto max-h-full object-cover"
+                  />
+                </div>
+                <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1">
+                  <span>🕒 {studentBanners.bottom.updatedAt}</span>
+                  <span>{studentBanners.bottom.customUrl ? 'รูปภาพคัสตอม' : 'รูปเริ่มต้น'}</span>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-200/70 flex items-center gap-2">
+                <label className="flex-1 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{bannerUploadingKey === 'bottom' ? 'กำลังอัปโหลด...' : 'อัปโหลดภาพใหม่'}</span>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    disabled={bannerUploadingKey === 'bottom'}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleBannerUpload('bottom', file);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+                {studentBanners.bottom.customUrl && (
+                  <button
+                    type="button"
+                    onClick={() => handleBannerReset('bottom')}
+                    className="py-2 px-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold"
+                    title="รีเซ็ตกลับเป็นภาพเริ่มต้น"
+                  >
+                    รีเซ็ต
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Section: จัดการแบนเนอร์หน้าครู 3 ส่วน (Teacher Dashboard Banners) */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+              <ImageIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-slate-900">
+                  จัดการแบนเนอร์หน้าครู 3 ส่วน (Teacher Dashboard Banners)
+                </h2>
+                <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">
+                  เฉพาะแอดมินฝ่ายวิชาการ (Admin Only)
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                อัปโหลดรูปภาพ ปรับเปลี่ยน และรีเซ็ตแบนเนอร์ทั้ง 3 จุดในหน้าแดชบอร์ดของครู (แบนเนอร์หลัก Hero, เมนูข้าง Sidebar, และแนวนอนล่าง Bottom)
+              </p>
+            </div>
+          </div>
+
+          {roleMode === 'ADMIN' && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('ต้องการรีเซ็ตแบนเนอร์หน้าครูทั้ง 3 ส่วนกลับเป็นค่าเริ่มต้นหรือไม่?')) {
+                  const res = teacherBannerService.resetAllBanners(activeRole);
+                  if (res.success) {
+                    setTeacherBanners(teacherBannerService.getBanners());
+                    showToast(res.message);
+                  }
+                }
+              }}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-600 cursor-pointer"
+            >
+              รีเซ็ตทั้ง 3 แบนเนอร์หน้าครูกลับค่าเริ่มต้น
+            </button>
+          )}
+        </div>
+
+        {roleMode !== 'ADMIN' ? (
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-500 flex items-center gap-2">
+            <span>🔒 ส่วนนี้สงวนสิทธิ์เฉพาะผู้ดูแลระบบฝ่ายวิชาการ (Admin) เท่านั้น ครูผู้สอนทั่วไปไม่สามารถแก้ไขหรืออัปโหลดแบนเนอร์ได้</span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Banner 1: Hero Banner */}
+            <div className="bg-slate-50/70 rounded-2xl border border-slate-200/90 p-4 flex flex-col justify-between space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800">
+                    1. แบนเนอร์หลักด้านบน (Hero Banner)
+                  </span>
+                  <span className="text-[10px] bg-white border border-slate-200 px-2 py-0.5 rounded-md font-medium text-slate-500">
+                    {teacherBanners.hero.dimensionGuide}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  {teacherBanners.hero.locationLabel}
+                </p>
+
+                <div className="rounded-xl overflow-hidden border border-slate-200 bg-white h-28 flex items-center justify-center shadow-2xs">
+                  <img
+                    src={teacherBannerService.getEffectiveBannerUrl('hero')}
+                    alt="Teacher Hero Banner"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1">
+                  <span>🕒 {teacherBanners.hero.updatedAt}</span>
+                  <span>{teacherBanners.hero.customUrl ? 'รูปภาพคัสตอม' : 'รูปเริ่มต้น'}</span>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-200/70 flex items-center gap-2">
+                <label className="flex-1 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{teacherBannerUploadingKey === 'hero' ? 'กำลังอัปโหลด...' : 'อัปโหลดภาพใหม่'}</span>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    disabled={teacherBannerUploadingKey === 'hero'}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleTeacherBannerUpload('hero', file);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+                {teacherBanners.hero.customUrl && (
+                  <button
+                    type="button"
+                    onClick={() => handleTeacherBannerReset('hero')}
+                    className="py-2 px-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold"
+                    title="รีเซ็ตกลับเป็นภาพเริ่มต้น"
+                  >
+                    รีเซ็ต
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Banner 2: Sidebar Banner */}
+            <div className="bg-slate-50/70 rounded-2xl border border-slate-200/90 p-4 flex flex-col justify-between space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800">
+                    2. แบนเนอร์เมนูข้าง (Sidebar Banner)
+                  </span>
+                  <span className="text-[10px] bg-white border border-slate-200 px-2 py-0.5 rounded-md font-medium text-slate-500">
+                    {teacherBanners.sidebar.dimensionGuide}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  {teacherBanners.sidebar.locationLabel}
+                </p>
+
+                <div className="rounded-xl overflow-hidden border border-slate-200 bg-white h-28 flex items-center justify-center shadow-2xs">
+                  <img
+                    src={teacherBannerService.getEffectiveBannerUrl('sidebar')}
+                    alt="Teacher Sidebar Banner"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1">
+                  <span>🕒 {teacherBanners.sidebar.updatedAt}</span>
+                  <span>{teacherBanners.sidebar.customUrl ? 'รูปภาพคัสตอม' : 'รูปเริ่มต้น'}</span>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-200/70 flex items-center gap-2">
+                <label className="flex-1 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{teacherBannerUploadingKey === 'sidebar' ? 'กำลังอัปโหลด...' : 'อัปโหลดภาพใหม่'}</span>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    disabled={teacherBannerUploadingKey === 'sidebar'}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleTeacherBannerUpload('sidebar', file);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+                {teacherBanners.sidebar.customUrl && (
+                  <button
+                    type="button"
+                    onClick={() => handleTeacherBannerReset('sidebar')}
+                    className="py-2 px-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold"
+                    title="รีเซ็ตกลับเป็นภาพเริ่มต้น"
+                  >
+                    รีเซ็ต
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Banner 3: Bottom Banner */}
+            <div className="bg-slate-50/70 rounded-2xl border border-slate-200/90 p-4 flex flex-col justify-between space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800">
+                    3. แบนเนอร์แนวนอนล่าง (Bottom Banner)
+                  </span>
+                  <span className="text-[10px] bg-white border border-slate-200 px-2 py-0.5 rounded-md font-medium text-slate-500">
+                    {teacherBanners.bottom.dimensionGuide}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  {teacherBanners.bottom.locationLabel}
+                </p>
+
+                <div className="rounded-xl overflow-hidden border border-slate-200 bg-white h-28 flex items-center justify-center shadow-2xs">
+                  <img
+                    src={teacherBannerService.getEffectiveBannerUrl('bottom')}
+                    alt="Teacher Bottom Banner"
+                    className="w-full h-auto max-h-full object-cover"
+                  />
+                </div>
+                <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1">
+                  <span>🕒 {teacherBanners.bottom.updatedAt}</span>
+                  <span>{teacherBanners.bottom.customUrl ? 'รูปภาพคัสตอม' : 'รูปเริ่มต้น'}</span>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-200/70 flex items-center gap-2">
+                <label className="flex-1 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{teacherBannerUploadingKey === 'bottom' ? 'กำลังอัปโหลด...' : 'อัปโหลดภาพใหม่'}</span>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    disabled={teacherBannerUploadingKey === 'bottom'}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleTeacherBannerUpload('bottom', file);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+                {teacherBanners.bottom.customUrl && (
+                  <button
+                    type="button"
+                    onClick={() => handleTeacherBannerReset('bottom')}
+                    className="py-2 px-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold"
+                    title="รีเซ็ตกลับเป็นภาพเริ่มต้น"
+                  >
+                    รีเซ็ต
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Section 1: ภาพรวมการใช้พื้นที่ R2 แยกตามครูผู้สอนแต่ละคน (Per-Teacher Storage Cards) */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
