@@ -753,6 +753,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
               initialMode="CLASS_ATTENDANCE"
               defaultRoom={selectedClassroom}
               subjectLabel="ศ23101 ศิลปะ"
+              hideModeSwitcher={true}
             />
           )}
 

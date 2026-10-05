@@ -12,6 +12,8 @@ import { StudentGradebookView } from './StudentGradebookView';
 import { StudentTrophyView } from './StudentTrophyView';
 import { StudentHomeVisitFormView } from './StudentHomeVisitFormView';
 import { StudentCouncilAffairsPortalView } from './StudentCouncilAffairsPortalView';
+import { StudentGachaView } from './StudentGachaView';
+import { StudentMobileCareView } from '../components/student/StudentMobileCareView';
 import { studentAdventureQuests } from '../data/mockData';
 import type { StudentQuestItem } from '../types/viewModels';
 import { gamificationService } from '../services/gamificationService';
@@ -24,6 +26,8 @@ import {
   Megaphone,
   ShieldCheck,
   CheckCircle2,
+  Sparkles,
+  Smartphone,
 } from 'lucide-react';
 import {
   KUTCHAP_SCHOOL_INFO,
@@ -114,6 +118,25 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => setActiveTab('gacha')}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-black transition-all shadow-sm hover:scale-105 cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4 text-yellow-300 animate-pulse" />
+                    <span>สุ่มคู่หู (Gacha)</span>
+                    <span className="px-1.5 py-0.2 rounded-full bg-white/20 text-[9px] font-extrabold">
+                      12 ใบ
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('mobile-care')}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#0C6D5B] hover:bg-[#095748] text-white text-xs font-bold transition-all shadow-sm hover:scale-105 cursor-pointer"
+                  >
+                    <Smartphone className="w-4 h-4 text-emerald-300" />
+                    <span>ดูแล นร. (9 หน้าจอ)</span>
+                  </button>
+
                   <button
                     onClick={() => setActiveTab('home-visit')}
                     className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition-colors shadow-xs"
@@ -225,7 +248,8 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                     level={2}
                     currentXp={650}
                     nextLevelXp={1000}
-                    onChangeCompanion={() => setActiveTab('trophy')}
+                    onChangeCompanion={() => setActiveTab('gacha')}
+                    onOpenGacha={() => setActiveTab('gacha')}
                   />
 
                   {/* 5. Milestone Badges */}
@@ -237,13 +261,31 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
             </div>
           )}
 
+          {activeTab === 'gacha' && (
+            <StudentGachaView
+              onBack={() => setActiveTab('home')}
+              onSelectBuddy={() => {
+                setActiveTab('home');
+              }}
+            />
+          )}
+
+          {activeTab === 'mobile-care' && (
+            <StudentMobileCareView onExit={() => setActiveTab('home')} />
+          )}
+
           {activeTab === 'missions' && <StudentMissionsView />}
 
           {activeTab === 'arena' && <StudentArenaView />}
 
           {activeTab === 'gradebook' && <StudentGradebookView />}
 
-          {activeTab === 'trophy' && <StudentTrophyView />}
+          {activeTab === 'trophy' && (
+            <StudentTrophyView
+              onNavigateToGacha={() => setActiveTab('gacha')}
+              onNavigateToMissions={() => setActiveTab('missions')}
+            />
+          )}
 
           {activeTab === 'home-visit' && (
             <StudentHomeVisitFormView

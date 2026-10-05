@@ -451,7 +451,11 @@ export const App: React.FC = () => {
                 />
               )}
 
-              {currentView === 'readiness' && <EndTermReadinessView />}
+              {currentView === 'readiness' && (
+                <EndTermReadinessView
+                  onNavigateToAssignments={() => setCurrentView('assignments')}
+                />
+              )}
 
               {currentView === 'sar' && <CrossClassSarView />}
 

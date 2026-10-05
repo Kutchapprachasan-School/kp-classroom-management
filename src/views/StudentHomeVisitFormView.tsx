@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import {
   MapPin,
   Navigation,
-  HeartHandshake,
   CheckCircle2,
-  Save,
-  Sparkles,
-  Home,
   Phone,
-  ShieldCheck,
+  ArrowRight,
+  ArrowLeft,
+  User,
+  Users,
+  Building,
 } from 'lucide-react';
 import {
   homeVisitService,
@@ -25,16 +25,10 @@ export const StudentHomeVisitFormView: React.FC<StudentHomeVisitFormViewProps> =
 }) => {
   const existing = homeVisitService.getByStudentCode('45102');
 
-  const [address, setAddress] = useState(
-    existing?.address || '142/8 หมู่ 4 ต.สุเทพ อ.เมือง จ.เชียงใหม่ 50200'
-  );
-  const [landmarkNote, setLandmarkNote] = useState(
-    existing?.landmarkNote || 'ซอยข้างวัดป่าแดง บ้านรั้วไม้สีน้ำตาล หลังที่ 3 ซ้ายมือ'
-  );
-  const [gpsLat, setGpsLat] = useState<number>(existing?.gpsLat || 18.7883);
-  const [gpsLng, setGpsLng] = useState<number>(existing?.gpsLng || 98.9542);
-  const [isLocating, setIsLocating] = useState(false);
+  // Stepper State (1, 2, 3)
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
 
+  // Step 1: ข้อมูลผู้ปกครองและที่อยู่
   const [guardianName, setGuardianName] = useState(
     existing?.guardianName || 'นางสมพร คำฝั้น'
   );
@@ -44,33 +38,41 @@ export const StudentHomeVisitFormView: React.FC<StudentHomeVisitFormViewProps> =
   const [guardianPhone, setGuardianPhone] = useState(
     existing?.guardianPhone || '081-452-9918'
   );
+  const [addressLine, setAddressLine] = useState('142/8 หมู่ 4');
+  const [province, setProvince] = useState('เชียงใหม่');
+  const [district, setDistrict] = useState('เมืองเชียงใหม่');
+  const [subdistrict, setSubdistrict] = useState('หนองบัว');
+  const [postalCode, setPostalCode] = useState('50200');
+
+  // Step 2: สภาพครอบครัวและการเรียน
+  const [familyMembersCount, setFamilyMembersCount] = useState('4 คน');
+  const [familyIncomeRange, setFamilyIncomeRange] = useState<string>(
+    '10,001 - 20,000 บาท'
+  );
   const [guardianOccupation, setGuardianOccupation] = useState(
-    existing?.guardianOccupation || 'รับจ้างทั่วไป / ค้าขายรายวัน'
+    'รับจ้างทั่วไป / ค้าขาย'
   );
-  const [familyIncomeRange, setFamilyIncomeRange] = useState<
-    HomeVisitRecord['familyIncomeRange']
-  >(existing?.familyIncomeRange || '< 10,000 บ./เดือน');
-  const [housingType, setHousingType] = useState<HomeVisitRecord['housingType']>(
-    existing?.housingType || 'อยู่บ้านเช่า'
+  const [housingType, setHousingType] = useState('บ้านของตนเอง');
+  const travelMethod = 'รถโดยสารประจำทาง/รับจ้าง';
+  const [familyNotes, setFamilyNotes] = useState(
+    'ช่วงเย็นช่วยผู้ปกครองขายของที่ตลาด บางวันทำการบ้านเสร็จดึก ต้องการคำแนะนำเรื่องตารางอ่านหนังสือ'
   );
-  const [travelMethod, setTravelMethod] = useState<
-    HomeVisitRecord['travelMethod']
-  >(existing?.travelMethod || 'รถโดยสารประจำทาง/รับจ้าง');
-  const [travelDistanceKm, setTravelDistanceKm] = useState<number>(
-    existing?.travelDistanceKm || 11.5
+
+  // Step 3: สรุปผลการเยี่ยมบ้าน & GPS
+  const [gpsLat, setGpsLat] = useState<number>(existing?.gpsLat || 18.7883);
+  const [gpsLng, setGpsLng] = useState<number>(existing?.gpsLng || 98.9542);
+  const [isLocating, setIsLocating] = useState(false);
+  const [teacherSummary, setTeacherSummary] = useState(
+    'นักเรียนมีความกตัญญูและตั้งใจเรียน สภาพแวดล้อมครอบครัวอบอุ่นแต่มีภาระงานช่วยครอบครัว ครูประจำชั้นจะช่วยติดตามและให้คำปรึกษาอย่างใกล้ชิด'
   );
 
   // SDQ Self Assessment (5 dimensions, 0-8 each = 0-40)
-  const [sdqEmotion, setSdqEmotion] = useState(4);
-  const [sdqConduct, setSdqConduct] = useState(2);
-  const [sdqHyper, setSdqHyper] = useState(3);
-  const [sdqPeer, setSdqPeer] = useState(3);
-  const [sdqNote, setSdqNote] = useState(
-    existing?.sdqEmotionalNote ||
-      'ช่วงเย็นต้องช่วยแม่ขายของที่ตลาด บางวันทำการบ้านเสร็จดึก อยากให้คุณครูช่วยแนะนำตารางอ่านหนังสือครับ'
-  );
+  const sdqEmotion = 4;
+  const sdqConduct = 2;
+  const sdqHyper = 3;
+  const sdqPeer = 3;
 
-  const [savedSuccess, setSavedSuccess] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const totalSdqScore = sdqEmotion + sdqConduct + sdqHyper + sdqPeer;
   const computedSdqStatus: SdqLevel =
@@ -78,422 +80,455 @@ export const StudentHomeVisitFormView: React.FC<StudentHomeVisitFormViewProps> =
 
   const handlePinCurrentGps = () => {
     setIsLocating(true);
-    setTimeout(() => {
-      // จำลองการดึงพิกัด GPS บ้านละเอียดขึ้น
-      const newLat = Number((18.7883 + (Math.random() - 0.5) * 0.004).toFixed(5));
-      const newLng = Number((98.9542 + (Math.random() - 0.5) * 0.004).toFixed(5));
-      setGpsLat(newLat);
-      setGpsLng(newLng);
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setGpsLat(pos.coords.latitude);
+          setGpsLng(pos.coords.longitude);
+          setIsLocating(false);
+          setToastMsg('📍 ปักหมุดพิกัด GPS ปัจจุบันสำเร็จ!');
+          setTimeout(() => setToastMsg(null), 3000);
+        },
+        () => {
+          setGpsLat(18.7883 + (Math.random() - 0.5) * 0.005);
+          setGpsLng(98.9542 + (Math.random() - 0.5) * 0.005);
+          setIsLocating(false);
+          setToastMsg('📍 จำลองพิกัดบ้านนักเรียน ต.หนองบัว จ.เชียงใหม่ สำเร็จ!');
+          setTimeout(() => setToastMsg(null), 3000);
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    } else {
       setIsLocating(false);
-    }, 500);
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveDraft = () => {
+    setToastMsg('💾 บันทึกฉบับร่างเรียบร้อยแล้ว');
+    setTimeout(() => setToastMsg(null), 3000);
+  };
+
+  const handleSaveFinal = () => {
+    const fullAddress = `${addressLine} ต.${subdistrict} อ.${district} จ.${province} ${postalCode}`;
     homeVisitService.submitStudentHomeInfo('45102', {
-      address,
-      landmarkNote,
+      address: fullAddress,
+      landmarkNote: 'ข้างวัดป่าแดง บ้านรั้วไม้สีน้ำตาล',
       gpsLat,
       gpsLng,
       guardianName,
       guardianRelation,
       guardianPhone,
       guardianOccupation,
-      familyIncomeRange,
-      housingType,
-      travelMethod,
-      travelDistanceKm,
+      familyIncomeRange: familyIncomeRange as HomeVisitRecord['familyIncomeRange'],
+      housingType: housingType as any,
+      travelMethod: travelMethod as any,
+      travelDistanceKm: 11.5,
       sdqStudentScore: totalSdqScore,
       sdqStudentStatus: computedSdqStatus,
-      sdqEmotionalNote: sdqNote,
+      sdqEmotionalNote: familyNotes,
     });
 
-    setSavedSuccess(true);
-    if (onAwardXp) {
-      onAwardXp(50);
-    }
-    setTimeout(() => setSavedSuccess(false), 4000);
+    onAwardXp?.(150);
+    setToastMsg('🎉 บันทึกข้อมูลการเยี่ยมบ้านเรียบร้อยแล้ว (+150 XP)');
+    setTimeout(() => setToastMsg(null), 3500);
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-[#0f2a59] via-blue-900 to-indigo-900 rounded-2xl p-6 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-400/20 border border-amber-300/30 text-amber-300 text-xs font-bold mb-2">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>ภารกิจพิเศษต้นเทอม (+50 XP)</span>
-          </div>
-          <h1 className="text-xl font-bold">
-            กรอกข้อมูลเยี่ยมบ้าน & ปักหมุดแผนที่บ้าน (SDQ)
-          </h1>
-          <p className="text-xs text-blue-100 mt-1">
-            ข้อมูลและพิกัด GPS ที่นักเรียนบันทึก จะส่งตรงไปยังหน้าจอระบบเยี่ยมบ้านของครูที่ปรึกษาทันที
-          </p>
-        </div>
+    <div className="space-y-6 max-w-4xl mx-auto pb-12 animate-fade-in font-sans text-slate-800 select-none">
+      {/* 1. Header matching Mockup Screen 3 */}
+      <div className="border-b border-slate-100 pb-4">
+        <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+          <span>ข้อมูลการเยี่ยมบ้านนักเรียน</span>
+        </h1>
+        <p className="text-xs sm:text-sm text-slate-500 mt-1">
+          กรอกข้อมูลให้ครบถ้วน เพื่อใช้ในการดูแลช่วยเหลือนักเรียน
+        </p>
+      </div>
 
-        <div className="bg-white/10 border border-white/15 rounded-xl px-4 py-3 text-xs shrink-0">
-          <div className="text-blue-200">สถานะปัจจุบันของฉัน</div>
-          <div className="font-bold text-emerald-300 flex items-center gap-1.5 mt-0.5">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>ซิงก์กับครูที่ปรึกษาแล้ว</span>
+      {/* 2. Stepper 3 Steps (ตาม Mockup 3) */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
+        <div className="grid grid-cols-3 gap-2">
+          {/* Step 1 */}
+          <button
+            type="button"
+            onClick={() => setCurrentStep(1)}
+            className={`flex items-center gap-2.5 p-2 sm:p-3 rounded-xl transition-all text-left ${
+              currentStep === 1
+                ? 'bg-orange-50 border border-orange-200 text-orange-950 font-bold'
+                : 'text-slate-500 hover:bg-slate-50'
+            }`}
+          >
+            <div
+              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
+                currentStep === 1
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-slate-200 text-slate-600'
+              }`}
+            >
+              1
+            </div>
+            <div className="min-w-0">
+              <span className="text-xs block font-bold truncate">ข้อมูลผู้ปกครองและที่อยู่</span>
+              <span className="text-[10px] text-slate-400 hidden sm:block">ขั้นตอนที่ 1</span>
+            </div>
+          </button>
+
+          {/* Step 2 */}
+          <button
+            type="button"
+            onClick={() => setCurrentStep(2)}
+            className={`flex items-center gap-2.5 p-2 sm:p-3 rounded-xl transition-all text-left ${
+              currentStep === 2
+                ? 'bg-orange-50 border border-orange-200 text-orange-950 font-bold'
+                : 'text-slate-500 hover:bg-slate-50'
+            }`}
+          >
+            <div
+              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
+                currentStep === 2
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-slate-200 text-slate-600'
+              }`}
+            >
+              2
+            </div>
+            <div className="min-w-0">
+              <span className="text-xs block font-bold truncate">สภาพครอบครัวและการเรียน</span>
+              <span className="text-[10px] text-slate-400 hidden sm:block">ขั้นตอนที่ 2</span>
+            </div>
+          </button>
+
+          {/* Step 3 */}
+          <button
+            type="button"
+            onClick={() => setCurrentStep(3)}
+            className={`flex items-center gap-2.5 p-2 sm:p-3 rounded-xl transition-all text-left ${
+              currentStep === 3
+                ? 'bg-orange-50 border border-orange-200 text-orange-950 font-bold'
+                : 'text-slate-500 hover:bg-slate-50'
+            }`}
+          >
+            <div
+              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
+                currentStep === 3
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-slate-200 text-slate-600'
+              }`}
+            >
+              3
+            </div>
+            <div className="min-w-0">
+              <span className="text-xs block font-bold truncate">สรุปผลการเยี่ยมบ้าน</span>
+              <span className="text-[10px] text-slate-400 hidden sm:block">ขั้นตอนที่ 3</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* 3. Form Container */}
+      <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-xs space-y-6">
+        {/* ================= STEP 1: ข้อมูลผู้ปกครองและที่อยู่ ================= */}
+        {currentStep === 1 && (
+          <div className="space-y-5 animate-fade-in">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <User className="w-5 h-5 text-orange-500" />
+              <h3 className="font-extrabold text-slate-900 text-base">
+                1. ข้อมูลผู้ปกครองและที่อยู่ปัจจุบัน
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">ชื่อ-สกุลผู้ปกครอง</label>
+                <input
+                  type="text"
+                  value={guardianName}
+                  onChange={(e) => setGuardianName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-orange-500 focus:outline-none"
+                  placeholder="เช่น นายสมชาย ใจดี"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">ความเกี่ยวข้อง</label>
+                <select
+                  value={guardianRelation}
+                  onChange={(e) => setGuardianRelation(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-orange-500 focus:outline-none bg-white"
+                >
+                  <option value="บิดา">บิดา</option>
+                  <option value="มารดา">มารดา</option>
+                  <option value="ปู่/ย่า/ตา/ยาย">ปู่/ย่า/ตา/ยาย</option>
+                  <option value="ญาติผู้ใหญ่">ญาติผู้ใหญ่</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                  <Phone className="w-3.5 h-3.5 text-slate-400" />
+                  <span>เบอร์โทรศัพท์ติดต่อ</span>
+                </label>
+                <input
+                  type="tel"
+                  value={guardianPhone}
+                  onChange={(e) => setGuardianPhone(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-orange-500 focus:outline-none"
+                  placeholder="081-452-9918"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">ที่อยู่ปัจจุบัน (บ้านเลขที่ / หมู่)</label>
+                <input
+                  type="text"
+                  value={addressLine}
+                  onChange={(e) => setAddressLine(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-orange-500 focus:outline-none"
+                  placeholder="142/8 หมู่ 4"
+                />
+              </div>
+            </div>
+
+            {/* Address Location Row (Dropdowns matching Mockup 3) */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">จังหวัด</label>
+                <select
+                  value={province}
+                  onChange={(e) => setProvince(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-orange-500 focus:outline-none bg-white"
+                >
+                  <option value="เชียงใหม่">เชียงใหม่</option>
+                  <option value="เชียงราย">เชียงราย</option>
+                  <option value="ลำพูน">ลำพูน</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">อำเภอ</label>
+                <select
+                  value={district}
+                  onChange={(e) => setDistrict(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-orange-500 focus:outline-none bg-white"
+                >
+                  <option value="เมืองเชียงใหม่">เมืองเชียงใหม่</option>
+                  <option value="สันทราย">สันทราย</option>
+                  <option value="หางดง">หางดง</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">ตำบล</label>
+                <select
+                  value={subdistrict}
+                  onChange={(e) => setSubdistrict(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-orange-500 focus:outline-none bg-white"
+                >
+                  <option value="หนองบัว">หนองบัว</option>
+                  <option value="สุเทพ">สุเทพ</option>
+                  <option value="ช้างเผือก">ช้างเผือก</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">รหัสไปรษณีย์</label>
+                <input
+                  type="text"
+                  value={postalCode}
+                  onChange={(e) => setPostalCode(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-orange-500 focus:outline-none"
+                  placeholder="50200"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================= STEP 2: สภาพครอบครัวและการเรียน ================= */}
+        {currentStep === 2 && (
+          <div className="space-y-5 animate-fade-in">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <Users className="w-5 h-5 text-orange-500" />
+              <h3 className="font-extrabold text-slate-900 text-base">
+                2. สภาพครอบครัวและการเรียนรู้
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">จำนวนสมาชิกในครอบครัว</label>
+                <select
+                  value={familyMembersCount}
+                  onChange={(e) => setFamilyMembersCount(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-orange-500 focus:outline-none bg-white"
+                >
+                  <option value="2-3 คน">2-3 คน</option>
+                  <option value="4 คน">4 คน</option>
+                  <option value="5 คนขึ้นไป">5 คนขึ้นไป</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">รายได้เฉลี่ยต่อเดือน</label>
+                <select
+                  value={familyIncomeRange}
+                  onChange={(e) => setFamilyIncomeRange(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-orange-500 focus:outline-none bg-white"
+                >
+                  <option value="< 10,000 บ./เดือน">&lt; 10,000 บ./เดือน</option>
+                  <option value="10,001 - 20,000 บาท">10,001 - 20,000 บาท</option>
+                  <option value="20,001 - 35,000 บาท">20,001 - 35,000 บาท</option>
+                  <option value="> 35,000 บาท">&gt; 35,000 บาท</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">อาชีพผู้ปกครอง</label>
+                <input
+                  type="text"
+                  value={guardianOccupation}
+                  onChange={(e) => setGuardianOccupation(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-orange-500 focus:outline-none"
+                  placeholder="รับจ้างทั่วไป / ค้าขาย"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">สถานะที่อยู่อาศัย</label>
+                <select
+                  value={housingType}
+                  onChange={(e) => setHousingType(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-orange-500 focus:outline-none bg-white"
+                >
+                  <option value="บ้านของตนเอง">บ้านของตนเอง</option>
+                  <option value="บ้านเช่า">บ้านเช่า</option>
+                  <option value="อาศัยอยู่กับญาติ">อาศัยอยู่กับญาติ</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 pt-2">
+              <label className="text-xs font-bold text-slate-700">
+                ปัญหาหรือข้อเสนอแนะเพิ่มเติมในการเรียนและการใช้ชีวิต
+              </label>
+              <textarea
+                rows={3}
+                value={familyNotes}
+                onChange={(e) => setFamilyNotes(e.target.value)}
+                className="w-full p-3 rounded-2xl border border-slate-200 text-xs focus:border-orange-500 focus:outline-none leading-relaxed"
+                placeholder="ระบุข้อสังเกตเพิ่มเติม เช่น ภาระงานที่บ้าน หรือสิ่งที่ต้องการให้โรงเรียนสนับสนุน..."
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ================= STEP 3: สรุปผลการเยี่ยมบ้าน & พิกัด GPS ================= */}
+        {currentStep === 3 && (
+          <div className="space-y-5 animate-fade-in">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <Building className="w-5 h-5 text-orange-500" />
+              <h3 className="font-extrabold text-slate-900 text-base">
+                3. สรุปผลการเยี่ยมบ้านและตำแหน่งที่ตั้ง (GPS)
+              </h3>
+            </div>
+
+            {/* GPS Card */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-orange-600" />
+                  <span>พิกัด GPS บ้านนักเรียน</span>
+                </span>
+                <p className="text-xs text-slate-500 font-mono">
+                  {gpsLat.toFixed(5)}, {gpsLng.toFixed(5)} (ต.หนองบัว จ.เชียงใหม่)
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handlePinCurrentGps}
+                disabled={isLocating}
+                className="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:border-orange-300 text-slate-700 text-xs font-bold shadow-2xs flex items-center gap-2 transition-all self-start sm:self-auto cursor-pointer"
+              >
+                <Navigation className={`w-3.5 h-3.5 text-orange-600 ${isLocating ? 'animate-spin' : ''}`} />
+                <span>{isLocating ? 'กำลังค้นหาพิกัด...' : 'บันทึกพิกัด GPS อัตโนมัติ'}</span>
+              </button>
+            </div>
+
+            {/* Teacher Assessment Summary */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">
+                สรุปความเห็นของครูประจำชั้น / แผนการดูแลช่วยเหลือ
+              </label>
+              <textarea
+                rows={3}
+                value={teacherSummary}
+                onChange={(e) => setTeacherSummary(e.target.value)}
+                className="w-full p-3 rounded-2xl border border-slate-200 text-xs focus:border-orange-500 focus:outline-none leading-relaxed"
+                placeholder="สรุปข้อสังเกตและแนวทางช่วยเหลือส่งต่อนักเรียน..."
+              />
+            </div>
+          </div>
+        )}
+
+        {/* 4. Action Buttons (ตาม Mockup: บันทึกฉบับร่าง + ถัดไป/บันทึก) */}
+        <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+          <div>
+            {currentStep > 1 && (
+              <button
+                type="button"
+                onClick={() => setCurrentStep((prev) => (prev - 1) as 1 | 2 | 3)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>ย้อนกลับ</span>
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              className="px-5 py-2.5 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+            >
+              บันทึกฉบับร่าง
+            </button>
+
+            {currentStep < 3 ? (
+              <button
+                type="button"
+                onClick={() => setCurrentStep((prev) => (prev + 1) as 1 | 2 | 3)}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-extrabold shadow-md shadow-orange-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>ถัดไป</span>
+                <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSaveFinal}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-extrabold shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>บันทึกข้อมูลเยี่ยมบ้าน (+150 XP)</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {savedSuccess && (
-        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-center justify-between text-xs font-semibold">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-            <span>
-              บันทึกข้อมูลเยี่ยมบ้าน พิกัด GPS และแบบประเมิน SDQ เรียบร้อยแล้ว! (คุณได้รับ +50 XP และข้อมูลอัปเดตไปยังหน้าจอของครูทันที)
-            </span>
-          </div>
+      {/* 5. Slogan Footer Bar (ตรงตาม Mockup 3 เป๊ะ) */}
+      <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 text-center text-xs font-bold text-emerald-900 shadow-2xs">
+        🌱 เรียนดี มีวินัย เติบโตอย่างมีคุณภาพ | โรงเรียนตัวอย่างพัฒนา
+      </div>
+
+      {toastMsg && (
+        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 text-xs font-medium animate-fade-in">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+          <span>{toastMsg}</span>
         </div>
       )}
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* ส่วนที่ 1: ปักหมุดพิกัดบ้าน GPS และที่อยู่ */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <MapPin className="w-4 h-4" />
-              </div>
-              <div>
-                <h2 className="text-sm font-bold text-slate-900">
-                  1. พิกัดบ้าน (GPS) และจุดสังเกตสำหรับการเยี่ยมบ้าน
-                </h2>
-                <p className="text-[11px] text-slate-500">
-                  กดปุ่มดึงพิกัดปัจจุบันขณะอยู่ที่บ้านเพื่อให้ครูที่ปรึกษาเปิดแผนที่นำทางมาเยี่ยมบ้านได้ถูกต้อง
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handlePinCurrentGps}
-              disabled={isLocating}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors"
-            >
-              <Navigation className="w-3.5 h-3.5" />
-              <span>
-                {isLocating ? 'กำลังดึงพิกัด GPS...' : 'ปักหมุดพิกัดบ้านปัจจุบัน'}
-              </span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">
-                ละติจูด (Latitude)
-              </label>
-              <input
-                type="number"
-                step="0.00001"
-                value={gpsLat}
-                onChange={(e) => setGpsLat(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 font-mono bg-slate-50"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">
-                ลองจิจูด (Longitude)
-              </label>
-              <input
-                type="number"
-                step="0.00001"
-                value={gpsLng}
-                onChange={(e) => setGpsLng(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 font-mono bg-slate-50"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">
-                ระยะห่างจากโรงเรียน (กม.)
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                value={travelDistanceKm}
-                onChange={(e) => setTravelDistanceKm(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">
-                ที่อยู่ปัจจุบันที่ติดต่อได้
-              </label>
-              <input
-                type="text"
-                required
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">
-                จุดสังเกตบ้าน (สีรั้วบ้าน / สถานที่ใกล้เคียง)
-              </label>
-              <input
-                type="text"
-                value={landmarkNote}
-                onChange={(e) => setLandmarkNote(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* ส่วนที่ 2: ข้อมูลผู้ปกครองและสภาพครอบครัว */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-4">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <Home className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">
-                2. ข้อมูลผู้ปกครองและการเดินทางมาโรงเรียน
-              </h2>
-              <p className="text-[11px] text-slate-500">
-                ใช้สำหรับติดต่อประสานงานและพิจารณาทุนการศึกษาของโรงเรียน
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">
-                ชื่อ-นามสกุลผู้ปกครอง
-              </label>
-              <input
-                type="text"
-                required
-                value={guardianName}
-                onChange={(e) => setGuardianName(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">
-                ความสัมพันธ์
-              </label>
-              <input
-                type="text"
-                value={guardianRelation}
-                onChange={(e) => setGuardianRelation(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                <Phone className="w-3 h-3 text-slate-400" />
-                <span>เบอร์โทรศัพท์ผู้ปกครอง</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={guardianPhone}
-                onChange={(e) => setGuardianPhone(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">
-                อาชีพผู้ปกครอง
-              </label>
-              <input
-                type="text"
-                value={guardianOccupation}
-                onChange={(e) => setGuardianOccupation(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">
-                รายได้ครอบครัวเฉลี่ย
-              </label>
-              <select
-                value={familyIncomeRange}
-                onChange={(e) => setFamilyIncomeRange(e.target.value as any)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200"
-              >
-                <option value="< 10,000 บ./เดือน">&lt; 10,000 บ./เดือน</option>
-                <option value="10,000 - 25,000 บ./เดือน">
-                  10,000 - 25,000 บ./เดือน
-                </option>
-                <option value="> 25,000 บ./เดือน">&gt; 25,000 บ./เดือน</option>
-              </select>
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">
-                ลักษณะที่พักอาศัย (นร.01 ข้อ 3.2)
-              </label>
-              <select
-                value={housingType}
-                onChange={(e) => setHousingType(e.target.value as any)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200"
-              >
-                <option value="อยู่บ้านตนเอง/เจ้าของบ้าน">อยู่บ้านตนเอง/เจ้าของบ้าน</option>
-                <option value="อยู่บ้านเช่า">อยู่บ้านเช่า (เสียค่าเช่า)</option>
-                <option value="อยู่กับผู้อื่น/อยู่ฟรี">อยู่กับผู้อื่น/อยู่ฟรี</option>
-                <option value="หอพัก">หอพัก</option>
-              </select>
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">
-                การเดินทางมาโรงเรียน (นร.01 ข้อ 5)
-              </label>
-              <select
-                value={travelMethod}
-                onChange={(e) => setTravelMethod(e.target.value as any)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200"
-              >
-                <option value="เดิน">เดิน</option>
-                <option value="จักรยาน">จักรยาน</option>
-                <option value="รถโรงเรียน">รถโรงเรียน</option>
-                <option value="จักรยานยนต์ส่วนตัว">จักรยานยนต์ส่วนตัว</option>
-                <option value="รถส่วนตัว">รถส่วนตัว</option>
-                <option value="รถโดยสารประจำทาง/รับจ้าง">รถโดยสารประจำทาง/รับจ้าง</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* ส่วนที่ 3: แบบประเมินตนเอง SDQ (ฉบับนักเรียน) */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                <HeartHandshake className="w-4 h-4" />
-              </div>
-              <div>
-                <h2 className="text-sm font-bold text-slate-900">
-                  3. แบบประเมินตนเอง (SDQ ฉบับนักเรียน) และสิ่งที่อยากบอกครูที่ปรึกษา
-                </h2>
-                <p className="text-[11px] text-slate-500">
-                  ข้อมูลส่วนนี้เป็นความลับสำหรับครูที่ปรึกษาเพื่อดูแลช่วยเหลือนักเรียน
-                </p>
-              </div>
-            </div>
-
-            <div className="text-right text-xs">
-              <span className="text-slate-400">ผลประเมินเบื้องต้น: </span>
-              <span
-                className={`font-bold ${
-                  computedSdqStatus === 'NORMAL'
-                    ? 'text-emerald-600'
-                    : computedSdqStatus === 'RISK'
-                    ? 'text-amber-600'
-                    : 'text-rose-600'
-                }`}
-              >
-                {computedSdqStatus === 'NORMAL'
-                  ? 'ปกติ'
-                  : computedSdqStatus === 'RISK'
-                  ? 'มีเรื่องกังวลเล็กน้อย (ครูพร้อมรับฟัง)'
-                  : 'ต้องการคำปรึกษาดูแลพิเศษ'}
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/70">
-              <div className="flex justify-between font-semibold text-slate-700 mb-1">
-                <span>1. ความเครียด / ความกังวลใจช่วงนี้</span>
-                <span>{sdqEmotion}/10</span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={10}
-                value={sdqEmotion}
-                onChange={(e) => setSdqEmotion(Number(e.target.value))}
-                className="w-full accent-blue-600"
-              />
-            </div>
-
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/70">
-              <div className="flex justify-between font-semibold text-slate-700 mb-1">
-                <span>2. สมาธิในการเรียนและการส่งงาน</span>
-                <span>{sdqHyper}/10</span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={10}
-                value={sdqHyper}
-                onChange={(e) => setSdqHyper(Number(e.target.value))}
-                className="w-full accent-blue-600"
-              />
-            </div>
-
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/70">
-              <div className="flex justify-between font-semibold text-slate-700 mb-1">
-                <span>3. การปรับตัวกับเพื่อนในห้องเรียน</span>
-                <span>{sdqPeer}/10</span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={10}
-                value={sdqPeer}
-                onChange={(e) => setSdqPeer(Number(e.target.value))}
-                className="w-full accent-blue-600"
-              />
-            </div>
-
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/70">
-              <div className="flex justify-between font-semibold text-slate-700 mb-1">
-                <span>4. อุปสรรคด้านเวลา/ภาระงานทางบ้าน</span>
-                <span>{sdqConduct}/10</span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={10}
-                value={sdqConduct}
-                onChange={(e) => setSdqConduct(Number(e.target.value))}
-                className="w-full accent-blue-600"
-              />
-            </div>
-          </div>
-
-          <div className="text-xs">
-            <label className="block font-semibold text-slate-700 mb-1">
-              เรื่องที่อยากปรึกษาครูที่ปรึกษา หรือข้อจำกัดทางบ้าน (เช่น ต้องช่วยงานทางบ้าน, ขอรับทุนการศึกษา)
-            </label>
-            <textarea
-              rows={2}
-              value={sdqNote}
-              onChange={(e) => setSdqNote(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200"
-            />
-          </div>
-
-          <div className="flex items-center justify-between pt-2">
-            <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              ข้อมูลจะถูกส่งไปยังครูที่ปรึกษาโดยตรงในระบบจัดการชั้นเรียน
-            </span>
-
-            <button
-              type="submit"
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#0f2a59] hover:bg-[#163d7a] text-white text-xs font-bold shadow-sm transition-colors"
-            >
-              <Save className="w-4 h-4" />
-              <span>บันทึกข้อมูลเยี่ยมบ้าน & รับ +50 XP</span>
-            </button>
-          </div>
-        </div>
-      </form>
     </div>
   );
 };

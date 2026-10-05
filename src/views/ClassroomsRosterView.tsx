@@ -14,10 +14,7 @@ import {
 import { classroomService } from '../services/classroomService';
 import { studentService, type StudentRecord } from '../services/studentService';
 import { trashService } from '../services/trashService';
-import {
-  sgsRosterAndSubmissionService,
-  type SgsStudentRecord,
-} from '../services/sgsRosterAndSubmissionService';
+
 import type { ClassroomRosterItem, AtRiskStudent } from '../types/viewModels';
 
 interface ClassroomsRosterViewProps {
@@ -32,9 +29,6 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
   const [classrooms, setClassrooms] = useState<ClassroomRosterItem[]>([]);
   const [selectedClass, setSelectedClass] = useState<ClassroomRosterItem | null>(null);
   const [students, setStudents] = useState<StudentRecord[]>([]);
-  const [centralSgsRoster, setCentralSgsRoster] = useState<SgsStudentRecord[]>(() =>
-    sgsRosterAndSubmissionService.getSgsRoster()
-  );
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -240,127 +234,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
         })}
       </div>
 
-      {/* จัดลำดับเลขที่ใบรายชื่อ SGS ประจำห้อง */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/60">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold text-slate-900">
-              ลำดับเลขที่ใบรายชื่อ SGS ประจำห้อง (ซิงค์ทุกวิชา)
-            </h2>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              const sorted = sgsRosterAndSubmissionService.sortRosterMaleFirstSgs();
-              setCentralSgsRoster(sorted);
-            }}
-            className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors"
-          >
-            เรียงลำดับ ชาย ➔ หญิง อัตโนมัติ
-          </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-semibold">
-                <th className="text-center w-20">เลขที่</th>
-                <th className="w-24">รหัส</th>
-                <th>ชื่อ - นามสกุล</th>
-                <th className="w-40">สถานะ</th>
-                <th className="text-right w-28">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {centralSgsRoster.map((stu) => (
-                <tr
-                  key={stu.studentCode}
-                  className={
-                    stu.transferState === 'TRANSFERRED_OUT'
-                      ? 'bg-slate-50/80 text-slate-400'
-                      : 'hover:bg-slate-50/80'
-                  }
-                >
-                  <td className="text-center font-medium text-slate-500 tabular-nums whitespace-nowrap">
-                    <div className="inline-flex items-center gap-1">
-                      <span className="w-5 text-center">{stu.sgsSeatNo}</span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setCentralSgsRoster(
-                            sgsRosterAndSubmissionService.moveStudentSeat(
-                              stu.studentCode,
-                              'UP'
-                            )
-                          )
-                        }
-                        className="px-1 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[9px] text-slate-600 leading-none"
-                      >
-                        ▲
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setCentralSgsRoster(
-                            sgsRosterAndSubmissionService.moveStudentSeat(
-                              stu.studentCode,
-                              'DOWN'
-                            )
-                          )
-                        }
-                        className="px-1 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[9px] text-slate-600 leading-none"
-                      >
-                        ▼
-                      </button>
-                    </div>
-                  </td>
-                  <td className="font-mono text-slate-400">{stu.studentCode}</td>
-                  <td
-                    className={`font-medium ${
-                      stu.transferState === 'TRANSFERRED_OUT'
-                        ? 'line-through text-slate-400'
-                        : 'text-slate-800'
-                    }`}
-                  >
-                    {stu.studentName}
-                  </td>
-                  <td>
-                    {stu.transferState === 'TRANSFERRED_OUT' ? (
-                      <span className="text-slate-400 text-[11px]">
-                        ย้ายออก (คงเลขที่ #{stu.sgsSeatNo})
-                      </span>
-                    ) : stu.transferState === 'TRANSFERRED_IN' ? (
-                      <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-medium">
-                        ย้ายเข้าใหม่
-                      </span>
-                    ) : (
-                      <span className="text-slate-500 text-[11px]">ปกติ</span>
-                    )}
-                  </td>
-                  <td className="text-right">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCentralSgsRoster(
-                          sgsRosterAndSubmissionService.toggleStudentTransferOut(
-                            stu.studentCode
-                          )
-                        )
-                      }
-                      className="px-2 py-0.5 rounded border border-slate-200 hover:bg-slate-100 text-[10px] font-medium text-slate-600"
-                    >
-                      {stu.transferState === 'TRANSFERRED_OUT'
-                        ? 'คืนสถานะ'
-                        : 'แจ้งย้ายออก'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Single Unified Student Table */}
       {selectedClass && (
         <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
@@ -373,7 +247,25 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const isMale = (name: string) => name.startsWith('ด.ช.') || name.startsWith('นาย');
+                  const sorted = [...students].sort((a, b) => {
+                    const aMale = isMale(a.name);
+                    const bMale = isMale(b.name);
+                    if (aMale && !bMale) return -1;
+                    if (!aMale && bMale) return 1;
+                    return a.name.localeCompare(b.name, 'th');
+                  }).map((stu, idx) => ({ ...stu, studentNo: idx + 1 }));
+                  setStudents(sorted);
+                  alert('จัดเรียงลำดับ ชาย ➔ หญิง อัตโนมัติเรียบร้อยแล้ว');
+                }}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
+              >
+                เรียง ชาย ➔ หญิง
+              </button>
               <div className="relative w-full sm:w-64">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input

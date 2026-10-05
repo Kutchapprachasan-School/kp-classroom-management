@@ -14,6 +14,8 @@ import {
   Megaphone,
   ClipboardCheck,
   Lock,
+  Sparkles,
+  Smartphone,
 } from 'lucide-react';
 import {
   KUTCHAP_SCHOOL_INFO,
@@ -23,6 +25,8 @@ import {
 
 export type StudentTabKey =
   | 'home'
+  | 'gacha'
+  | 'mobile-care'
   | 'missions'
   | 'arena'
   | 'gradebook'
@@ -120,6 +124,49 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
                 }`}
               />
               <span className="truncate">หน้าแรกของฉัน</span>
+            </button>
+
+            <button
+              onClick={() => handleTabClick('gacha')}
+              className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-left transition-all ${
+                activeTab === 'gacha'
+                  ? 'bg-gradient-to-r from-purple-50 to-indigo-50 text-purple-900 font-bold border border-purple-300 shadow-2xs'
+                  : 'text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2.5 min-w-0">
+                <Sparkles
+                  className={`w-4 h-4 shrink-0 ${
+                    activeTab === 'gacha' ? 'text-purple-600' : 'text-purple-400'
+                  }`}
+                />
+                <span className="truncate font-semibold">สุ่มคู่หู (Gacha)</span>
+              </span>
+              <span className="px-1.5 py-0.2 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white text-[9px] font-black shrink-0 shadow-2xs">
+                ใหม่!
+              </span>
+            </button>
+
+            {/* ระบบดูแลช่วยเหลือนักเรียน (คำยางพิทยา 9 หน้าจอ Mobile First) */}
+            <button
+              onClick={() => handleTabClick('mobile-care')}
+              className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-left transition-colors ${
+                activeTab === 'mobile-care'
+                  ? 'bg-teal-50 text-teal-900 font-bold border border-teal-300 shadow-2xs'
+                  : 'text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2.5 min-w-0">
+                <Smartphone
+                  className={`w-4 h-4 shrink-0 ${
+                    activeTab === 'mobile-care' ? 'text-[#0C6D5B]' : 'text-teal-600'
+                  }`}
+                />
+                <span className="truncate font-semibold">ดูแลนักเรียน (คำยาง 9 หน้า)</span>
+              </span>
+              <span className="px-1.5 py-0.2 rounded-full bg-[#0C6D5B] text-white text-[9px] font-black shrink-0 shadow-2xs">
+                9 หน้าจอ
+              </span>
             </button>
 
             <button

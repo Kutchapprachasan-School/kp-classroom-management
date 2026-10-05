@@ -61,7 +61,13 @@ const INITIAL_READINESS_STUDENTS = [
   { no: 7, name: 'ด.ช. ธนภัทร เขอหมือ', score: '' },
 ];
 
-export const EndTermReadinessView: React.FC = () => {
+interface EndTermReadinessViewProps {
+  onNavigateToAssignments?: () => void;
+}
+
+export const EndTermReadinessView: React.FC<EndTermReadinessViewProps> = ({
+  onNavigateToAssignments,
+}) => {
   const isSgsResolvedInCopilot = () =>
     teacherCopilotService
       .getState()
@@ -358,12 +364,22 @@ export const EndTermReadinessView: React.FC = () => {
                     <td className="py-3.5 px-4 text-right whitespace-nowrap">
                       {task.emptyCount > 0 ? (
                         <div className="inline-flex items-center gap-1.5">
-                          <button
-                            onClick={() => setGradingTask(task)}
-                            className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold transition-colors"
-                          >
-                            กรอกคะแนน
-                          </button>
+                          {task.type === 'box' && onNavigateToAssignments ? (
+                            <button
+                              onClick={onNavigateToAssignments}
+                              className="px-2.5 py-1.5 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-800 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1"
+                              title="ไปกรอกคะแนนและตรวจงานที่หน้า งาน/มอบหมาย"
+                            >
+                              <span>ไปหน้างาน/มอบหมาย</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setGradingTask(task)}
+                              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold transition-colors"
+                            >
+                              กรอกคะแนน
+                            </button>
+                          )}
                           {task.hasCloseBtn && (
                             <button
                               onClick={() => handleCloseTask(task.id, task.title)}

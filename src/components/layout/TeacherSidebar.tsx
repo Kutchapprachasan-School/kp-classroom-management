@@ -180,7 +180,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       ];
     }
 
-    // Default: TEACHER_GENERAL (ตรงกับแบบ Mockup เป๊ะๆ 9 รายการ)
+    // Default: TEACHER_GENERAL (ตรงกับแบบ Mockup เป๊ะๆ พร้อมเมนูแยกข้อสอบและแผนการสอนตามข้อ ค)
     return [
       {
         key: 'home',
@@ -208,14 +208,24 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
         icon: Award,
       },
       {
-        key: 'academic-year',
-        label: 'ปฏิทินงาน',
-        icon: Calendar,
+        key: 'exams',
+        label: 'ข้อสอบกลาง/ปลายภาค',
+        icon: PenTool,
+      },
+      {
+        key: 'lessons',
+        label: 'แผนการสอน',
+        icon: BookMarked,
       },
       {
         key: 'roster',
         label: 'ข้อมูลนักเรียน',
         icon: Users,
+      },
+      {
+        key: 'academic-year',
+        label: 'ปฏิทินงาน',
+        icon: Calendar,
       },
       {
         key: 'sar',
@@ -233,12 +243,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
   // เมนูเสริมสำหรับการปฏิบัติงาน (ไม่มีเมนูตั้งค่าระบบปะปน)
   const getSecondaryOperationalMenus = (): NavMenuItem[] => {
     if (activeRole === 'TEACHER_GENERAL') {
-      return [
-        { key: 'exams', label: 'ข้อสอบกลางภาค / ปลายภาค', icon: PenTool },
-        { key: 'lessons', label: 'แผนการสอนของฉัน', icon: FileText },
-        { key: 'timetable', label: 'ตารางสอนของฉัน', icon: CalendarDays },
-        { key: 'roster', label: 'รายชื่อนักเรียนห้องที่ปรึกษา', icon: School },
-      ];
+      return [];
     }
     if (activeRole === 'STUDENT_AFFAIRS') {
       return [
@@ -351,22 +356,23 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
           </div>
         </div>
 
-        {/* หมวดเครื่องมือปฏิบัติงานเสริมตามบทบาท (พับเก็บได้ และไม่มีการตั้งค่าปะปน) */}
-        <div className="pt-2 border-t border-slate-200/70">
-          <button
-            onClick={() => setShowMoreOperational((prev) => !prev)}
-            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-          >
-            <span className="flex items-center gap-2 truncate">
-              <FolderOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              <span className="truncate">เครื่องมือปฏิบัติงานเพิ่มเติม</span>
-            </span>
-            {showMoreOperational ? (
-              <ChevronUp className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            ) : (
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            )}
-          </button>
+        {/* หมวดเครื่องมือปฏิบัติงานเสริมตามบทบาท (พับเก็บได้เฉพาะบทบาทที่มีเมนูเสริม) */}
+        {secondaryMenus.length > 0 && (
+          <div className="pt-2 border-t border-slate-200/70">
+            <button
+              onClick={() => setShowMoreOperational((prev) => !prev)}
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+            >
+              <span className="flex items-center gap-2 truncate">
+                <FolderOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span className="truncate">เครื่องมือปฏิบัติงานเพิ่มเติม</span>
+              </span>
+              {showMoreOperational ? (
+                <ChevronUp className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              )}
+            </button>
 
           {showMoreOperational && (
             <div className="mt-1 space-y-0.5 pl-1 text-xs">
@@ -404,7 +410,8 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             </div>
           )}
         </div>
-      </div>
+      )}
+    </div>
 
       {/* ============================================================================
           ZONE C: โซนการตั้งค่าระบบ (System Settings Zone — แยกขาดจากหน้าใช้งานอยู่ด้านล่างสุด)
