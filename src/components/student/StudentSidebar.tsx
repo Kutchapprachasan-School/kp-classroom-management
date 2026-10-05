@@ -10,6 +10,7 @@ import {
   Vote,
   FileCheck2,
   X,
+  PanelLeftClose,
   ShieldCheck,
   Megaphone,
   ClipboardCheck,
@@ -46,6 +47,8 @@ interface StudentSidebarProps {
   onLogout: () => void;
   isOpen?: boolean;
   onClose?: () => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export const StudentSidebar: React.FC<StudentSidebarProps> = ({
@@ -57,12 +60,16 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
   onLogout,
   isOpen = false,
   onClose,
+  isCollapsed = false,
+  onToggleCollapse,
 }) => {
   const activeProfile = SCHOOL_ROLE_PROFILES[studentRole];
 
   const handleTabClick = (tab: StudentTabKey) => {
     onSelectTab(tab);
-    onClose?.();
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      onClose?.();
+    }
   };
 
   const sidebarContent = (
@@ -90,13 +97,24 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
             </div>
           </div>
 
-          {onClose && (
+          {(onClose || onToggleCollapse) && (
             <button
-              onClick={onClose}
-              className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
-              aria-label="ปิดเมนู"
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                  onClose?.();
+                } else if (onToggleCollapse) {
+                  onToggleCollapse();
+                } else {
+                  onClose?.();
+                }
+              }}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0 flex items-center justify-center cursor-pointer"
+              title="พับเก็บเมนูข้าง (Ctrl+B)"
+              aria-label="พับเก็บเมนูข้าง"
             >
-              <X className="w-4 h-4" />
+              <PanelLeftClose className="w-4 h-4 hidden lg:block" />
+              <X className="w-4 h-4 lg:hidden" />
             </button>
           )}
         </div>
@@ -422,8 +440,18 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
 
   return (
     <>
-      <aside className="hidden lg:flex w-56 bg-white border-r border-slate-200/80 flex-col shrink-0 min-h-screen text-xs text-slate-600 font-sans select-none">
-        {sidebarContent}
+      {/* Desktop Collapsible Sidebar */}
+      <aside
+        className={`hidden lg:flex flex-col shrink-0 min-h-screen bg-white border-r border-slate-200/80 text-xs text-slate-600 font-sans select-none transition-all duration-300 ease-in-out ${
+          isCollapsed
+            ? 'w-0 opacity-0 -translate-x-full overflow-hidden border-r-0 pointer-events-none'
+            : 'w-56 lg:w-60 opacity-100 translate-x-0'
+        }`}
+        aria-hidden={isCollapsed}
+      >
+        <div className="w-56 lg:w-60 h-full flex flex-col shrink-0">
+          {sidebarContent}
+        </div>
       </aside>
 
       {isOpen && (

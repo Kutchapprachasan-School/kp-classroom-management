@@ -51,10 +51,46 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<StudentTabKey>('home');
   const [currentXp, setCurrentXp] = useState(650);
+  const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = window.localStorage.getItem('kp_student_sidebar_open');
+      if (saved !== null) return saved === 'true';
+    }
+    return true;
+  });
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [councilNotice, setCouncilNotice] = useState<string | null>(null);
 
   const profile = SCHOOL_ROLE_PROFILES[studentRole];
+
+  // Toggle sidebar for both mobile drawer and desktop collapsible panel
+  const handleToggleSidebar = React.useCallback(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setIsMobileSidebarOpen((prev) => !prev);
+    } else {
+      setIsDesktopSidebarOpen((prev) => {
+        const next = !prev;
+        try {
+          window.localStorage.setItem('kp_student_sidebar_open', String(next));
+        } catch {
+          // ignore
+        }
+        return next;
+      });
+    }
+  }, []);
+
+  // Keyboard shortcut Ctrl+B or Cmd+B to toggle sidebar
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        handleToggleSidebar();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleToggleSidebar]);
 
   useEffect(() => {
     gamificationService.claimDailyCheckin('stu-2').then((res) => {
@@ -84,14 +120,18 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
         onLogout={onExit}
         isOpen={isMobileSidebarOpen}
         onClose={() => setIsMobileSidebarOpen(false)}
+        isCollapsed={!isDesktopSidebarOpen}
+        onToggleCollapse={handleToggleSidebar}
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
         <StudentHeader
           onExit={onExit}
           totalXp={currentXp}
           onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
+          isSidebarOpen={isDesktopSidebarOpen}
+          onToggleSidebar={handleToggleSidebar}
         />
 
         <main className="flex-1 p-3.5 sm:p-6 md:p-8 overflow-y-auto overflow-x-hidden">

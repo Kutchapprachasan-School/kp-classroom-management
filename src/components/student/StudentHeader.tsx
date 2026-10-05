@@ -1,28 +1,50 @@
 import React from 'react';
-import { Sparkles, LogOut, Menu } from 'lucide-react';
+import { Sparkles, LogOut, PanelLeft, PanelLeftClose } from 'lucide-react';
 
 interface StudentHeaderProps {
   onExit: () => void;
   totalXp?: number;
   onOpenMobileMenu?: () => void;
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 export const StudentHeader: React.FC<StudentHeaderProps> = ({
   onExit,
   totalXp = 0,
   onOpenMobileMenu,
+  isSidebarOpen = true,
+  onToggleSidebar,
 }) => {
   return (
     <header className="h-14 bg-white border-b border-slate-200/80 px-3.5 sm:px-6 flex items-center justify-between gap-2 sticky top-0 z-20 select-none">
-      {/* Left: Mobile Hamburger + Breadcrumb */}
+      {/* Left: Mobile Hamburger / Toggle Sidebar + Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-slate-500 font-medium min-w-0">
-        {onOpenMobileMenu && (
+        {(onToggleSidebar || onOpenMobileMenu) && (
           <button
-            onClick={onOpenMobileMenu}
-            className="lg:hidden p-2 -ml-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors shrink-0"
-            aria-label="เปิดเมนูนักเรียน"
+            type="button"
+            onClick={onToggleSidebar || onOpenMobileMenu}
+            className={`px-2.5 py-1.5 rounded-xl transition-all shrink-0 flex items-center gap-1.5 text-xs font-bold cursor-pointer shadow-2xs ${
+              isSidebarOpen
+                ? 'text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200/90'
+                : 'text-white bg-emerald-600 hover:bg-emerald-700 ring-2 ring-emerald-600/20'
+            }`}
+            title={
+              isSidebarOpen
+                ? 'พับเก็บเมนูข้าง (ซ่อน Sidebar) - Ctrl+B'
+                : 'เปิดเมนูหลัก (แสดง Sidebar) - Ctrl+B'
+            }
+            aria-label="สลับการแสดงผลเมนูข้าง"
           >
-            <Menu className="w-5 h-5" />
+            {isSidebarOpen ? (
+              <PanelLeftClose className="w-4 h-4" />
+            ) : (
+              <PanelLeft className="w-4 h-4" />
+            )}
+            <span className="hidden sm:inline">
+              {isSidebarOpen ? 'ซ่อนเมนู' : 'เปิดเมนู'}
+            </span>
+            <span className="sm:hidden">เมนู</span>
           </button>
         )}
         <span className="hidden sm:inline">ห้องเรียนของฉัน</span>

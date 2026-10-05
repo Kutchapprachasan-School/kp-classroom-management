@@ -67,10 +67,48 @@ export const App: React.FC = () => {
   const [activeRole, setActiveRole] = useState<SchoolUserRole>('TEACHER_GENERAL');
   const [loginChannel, setLoginChannel] = useState<TeacherLoginChannel>('E_LEAVE');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = window.localStorage.getItem('kp_teacher_sidebar_open');
+      if (saved !== null) {
+        return saved === 'true';
+      }
+    }
+    return true;
+  });
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isQuickBarOpen, setIsQuickBarOpen] = useState(false);
   const [isDevToolbarVisible, setIsDevToolbarVisible] = useState(false);
   const [selectedTaskForModal, setSelectedTaskForModal] = useState<DailyTodoItem | null>(null);
+
+  // Toggle sidebar for both mobile drawer and desktop collapsible panel
+  const handleToggleSidebar = React.useCallback(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setIsMobileSidebarOpen((prev) => !prev);
+    } else {
+      setIsDesktopSidebarOpen((prev) => {
+        const next = !prev;
+        try {
+          window.localStorage.setItem('kp_teacher_sidebar_open', String(next));
+        } catch {
+          // ignore storage error
+        }
+        return next;
+      });
+    }
+  }, []);
+
+  // Keyboard shortcut Ctrl+B or Cmd+B to toggle sidebar
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        handleToggleSidebar();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleToggleSidebar]);
 
   React.useEffect(() => {
     applySchoolBrandingAndTypography(schoolSettings);
@@ -82,7 +120,7 @@ export const App: React.FC = () => {
     window.addEventListener('kps-school-settings-updated', handleSettingsChange);
     return () =>
       window.removeEventListener('kps-school-settings-updated', handleSettingsChange);
-  }, []);
+  }, [schoolSettings]);
 
   // Context-Aware Deep-Link Navigation States
   const [deepLinkClassTab, setDeepLinkClassTab] = useState<ClassSubTab>('attendance');
@@ -397,16 +435,20 @@ export const App: React.FC = () => {
             onNavigate={(view) => setCurrentView(view)}
             isOpen={isMobileSidebarOpen}
             onClose={() => setIsMobileSidebarOpen(false)}
+            isCollapsed={!isDesktopSidebarOpen}
+            onToggleCollapse={handleToggleSidebar}
           />
 
           {/* Right Main Working Area */}
-          <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
             {/* Topbar */}
             <TeacherHeader
               title={getHeaderTitle()}
               onBack={currentView !== 'home' ? handleBack : undefined}
               onOpenSearch={() => setIsSearchOpen(true)}
               onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
+              isSidebarOpen={isDesktopSidebarOpen}
+              onToggleSidebar={handleToggleSidebar}
               termLabel="ภาคเรียนที่ 1/2569"
               onDeepNavigate={handleDeepNavigate}
             />

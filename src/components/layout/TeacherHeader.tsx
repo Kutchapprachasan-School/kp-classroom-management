@@ -4,7 +4,8 @@ import {
   Search,
   Bell,
   ChevronDown,
-  Menu,
+  PanelLeft,
+  PanelLeftClose,
   Check,
   Minus,
   Plus,
@@ -24,6 +25,8 @@ interface TeacherHeaderProps {
   onBack?: () => void;
   onOpenSearch: () => void;
   onOpenMobileMenu?: () => void;
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
   termLabel?: string;
   onDeepNavigate?: (payload: CrossViewNavigationPayload) => void;
 }
@@ -48,6 +51,8 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
   onBack,
   onOpenSearch,
   onOpenMobileMenu,
+  isSidebarOpen = true,
+  onToggleSidebar,
   termLabel = 'ภาคเรียนที่ 1/2569',
   onDeepNavigate,
 }) => {
@@ -140,17 +145,36 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
         <img
           src={schoolSettings.logoUrl}
           alt={schoolSettings.nameTh}
-          className="w-7 h-7 object-contain rounded-lg lg:hidden shrink-0 shadow-2xs"
+          className={`w-7 h-7 object-contain rounded-lg shrink-0 shadow-2xs ${
+            isSidebarOpen ? 'lg:hidden' : 'block'
+          }`}
         />
 
-        {onOpenMobileMenu && (
+        {(onToggleSidebar || onOpenMobileMenu) && (
           <button
-            onClick={onOpenMobileMenu}
-            className="lg:hidden px-2.5 py-1.5 text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors shrink-0 flex items-center gap-1.5 text-xs font-bold"
-            aria-label="เปิดเมนูหลัก"
+            type="button"
+            onClick={onToggleSidebar || onOpenMobileMenu}
+            className={`px-2.5 py-1.5 rounded-xl transition-all shrink-0 flex items-center gap-1.5 text-xs font-bold cursor-pointer shadow-2xs ${
+              isSidebarOpen
+                ? 'text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200/90'
+                : 'text-white bg-[#0C6D5B] hover:bg-[#095748] ring-2 ring-[#0C6D5B]/20'
+            }`}
+            title={
+              isSidebarOpen
+                ? 'พับเก็บเมนูข้าง (ซ่อน Sidebar) - Ctrl+B'
+                : 'เปิดเมนูหลัก (แสดง Sidebar) - Ctrl+B'
+            }
+            aria-label="สลับการแสดงผลเมนูข้าง"
           >
-            <Menu className="w-4 h-4" />
-            <span>เมนู</span>
+            {isSidebarOpen ? (
+              <PanelLeftClose className="w-4 h-4" />
+            ) : (
+              <PanelLeft className="w-4 h-4" />
+            )}
+            <span className="hidden sm:inline">
+              {isSidebarOpen ? 'ซ่อนเมนู' : 'เปิดเมนู'}
+            </span>
+            <span className="sm:hidden">เมนู</span>
           </button>
         )}
 
