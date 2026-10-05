@@ -14,6 +14,7 @@ import { StudentHomeVisitFormView } from './StudentHomeVisitFormView';
 import { StudentCouncilAffairsPortalView } from './StudentCouncilAffairsPortalView';
 import { StudentGachaView } from './StudentGachaView';
 import { StudentMobileCareView } from '../components/student/StudentMobileCareView';
+import { StudentAnimeAppView } from '../components/student/StudentAnimeAppView';
 import { studentAdventureQuests } from '../data/mockData';
 import type { StudentQuestItem } from '../types/viewModels';
 import { gamificationService } from '../services/gamificationService';
@@ -135,6 +136,17 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                   >
                     <Smartphone className="w-4 h-4 text-emerald-300" />
                     <span>ดูแล นร. (9 หน้าจอ)</span>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('anime-app')}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white text-xs font-bold transition-all shadow-sm hover:scale-105 cursor-pointer"
+                  >
+                    <Smartphone className="w-4 h-4 text-sky-200" />
+                    <span>แอปนักเรียน (10 หน้าจออนิเมะ)</span>
+                    <span className="px-1.5 py-0.2 rounded-full bg-white/20 text-[9px] font-black">
+                      ใหม่!
+                    </span>
                   </button>
 
                   <button
@@ -272,6 +284,10 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
           {activeTab === 'mobile-care' && (
             <StudentMobileCareView onExit={() => setActiveTab('home')} />
+          )}
+
+          {activeTab === 'anime-app' && (
+            <StudentAnimeAppView onExit={() => setActiveTab('home')} />
           )}
 
           {activeTab === 'missions' && <StudentMissionsView />}

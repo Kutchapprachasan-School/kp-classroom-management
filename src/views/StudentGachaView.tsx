@@ -6,7 +6,6 @@ import {
   RefreshCw,
   Star,
   Heart,
-  Info,
   Zap,
 } from 'lucide-react';
 import {
@@ -143,20 +142,20 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
         </div>
       )}
 
-      {/* Top Navigation Bar */}
+      {/* Top Navigation Bar: Matching Mockup Image 2 */}
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           {onBack && (
             <button
               onClick={onBack}
-              className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors shadow-2xs"
+              className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors shadow-2xs cursor-pointer font-bold text-xs"
             >
               ← กลับ
             </button>
           )}
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+              <span className="text-base sm:text-lg md:text-xl font-black text-slate-900 tracking-tight">
                 ศูนย์รวมคู่หูนักเรียน (Student Buddy Gacha)
               </span>
               <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-[11px] font-bold">
@@ -169,9 +168,9 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
           </div>
         </div>
 
-        {/* Currency Display & Active Buddy Pill */}
+        {/* Currency Display & Active Buddy Pill (Matches Image 2) */}
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
             <span className="text-xs font-bold text-slate-600">คู่หูปัจจุบัน:</span>
             <span className="font-extrabold text-xs text-teal-800">
               {activeBuddy.name}
@@ -188,7 +187,7 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
             </span>
             <button
               onClick={() => setIsAddTicketsOpen(true)}
-              className="w-5 h-5 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center text-xs font-bold transition-transform hover:scale-110 ml-0.5"
+              className="w-5 h-5 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center text-xs font-bold transition-transform hover:scale-110 ml-0.5 cursor-pointer"
               title="รับตั๋วเพิ่ม"
             >
               +
@@ -199,108 +198,100 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
 
       <div className="max-w-7xl mx-auto px-4 space-y-6">
         {/* ============================================================================
-            SECTION 1: TOP 3-COLUMN HERO BANNER & RATE SYSTEM (เป๊ะตาม Mockup)
+            SECTION 1: TOP 3-COLUMN HERO BANNER & RATE SYSTEM (เป๊ะตาม Mockup Image 2)
         ============================================================================ */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-          {/* 1.1 MAIN GACHA BANNER (7 Cols) */}
-          <div className="lg:col-span-6 xl:col-span-6 rounded-3xl overflow-hidden shadow-md relative bg-gradient-to-br from-[#77B5FE] via-[#A0C4FF] to-[#D0E1FD] flex flex-col justify-between p-6 sm:p-7 min-h-[360px] border border-blue-200">
-            {/* Background Graphic / Anime Scene Illustration */}
-            <div className="absolute inset-0 z-0 opacity-40 mix-blend-overlay pointer-events-none">
+          {/* 1.1 MAIN GACHA BANNER (6 Cols) */}
+          <div className="lg:col-span-6 xl:col-span-6 flex flex-col gap-2">
+            <div className="rounded-3xl overflow-hidden shadow-md relative border border-blue-200 aspect-[526/311] select-none group bg-slate-900">
+              {/* Crisp High-Definition Banner Artwork from Image 2 */}
               <img
-                src="/images/gacha-banner.jpg"
-                alt="Buddy Gacha Banner"
-                className="w-full h-full object-cover object-top"
-                onError={(e) => {
-                  // Fallback decorative gradient
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
+                src="/images/buddies/banner_art.jpg"
+                alt="สุ่มคู่หูนักเรียน"
+                className="w-full h-full object-cover select-none pointer-events-none"
               />
-            </div>
-            {/* Cloud & Light Ray Overlays */}
-            <div className="absolute inset-0 bg-gradient-to-t from-blue-900/60 via-transparent to-white/40 z-0 pointer-events-none" />
 
-            {/* Top Bar inside Banner */}
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md text-white text-xs font-bold border border-white/20 shadow-xs">
-                <Ticket className="w-3.5 h-3.5 text-amber-300" />
-                <span>Gacha</span>
-              </div>
-
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-slate-800 text-xs font-bold border border-white/40 shadow-xs">
-                <Ticket className="w-3.5 h-3.5 text-purple-600" />
-                <span className="tabular-nums font-extrabold">{gachaState.tickets}</span>
+              {/* Dynamic Live Ticket Pill overlay (top-right on banner) */}
+              <div className="absolute top-[3%] right-[2.5%] w-[19%] h-[9%] min-h-[24px] flex items-center justify-between px-2 sm:px-2.5 rounded-full bg-white/95 backdrop-blur-md shadow-xs border border-white/60 text-slate-800 text-[11px] sm:text-xs font-bold z-10">
+                <div className="flex items-center gap-1 min-w-0">
+                  <Ticket className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-600 shrink-0" />
+                  <span className="tabular-nums font-black text-xs sm:text-sm">{gachaState.tickets}</span>
+                </div>
                 <button
+                  type="button"
                   onClick={() => setIsAddTicketsOpen(true)}
-                  className="w-4 h-4 rounded-full bg-purple-600 text-white flex items-center justify-center text-[10px] font-bold"
+                  className="w-4 h-4 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center text-[10px] font-bold transition-transform hover:scale-110 cursor-pointer shrink-0"
+                  title="รับตั๋วเพิ่ม"
                 >
                   +
                 </button>
               </div>
-            </div>
 
-            {/* Main Title & Catchphrase */}
-            <div className="relative z-10 my-auto py-4">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white drop-shadow-[0_2px_4px_rgba(15,23,42,0.8)] tracking-tight">
-                สุ่มคู่หูนักเรียน
-              </h1>
-              <p className="text-sm sm:text-base font-bold text-white/95 drop-shadow-[0_1px_3px_rgba(15,23,42,0.7)] mt-1.5">
-                พบกับเพื่อนร่วมทางคนใหม่ <span className="text-yellow-200">“ทุกการสุ่ม...อาจเจอคนที่ใช่”</span>
-              </p>
-            </div>
-
-            {/* Bottom Controls: Info Button + 1x & 10x Pull Buttons */}
-            <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 pt-2">
+              {/* Interactive Hotspot 1: ข้อมูลรายละเอียด (bottom-left) */}
               <button
                 type="button"
                 onClick={() => setIsDetailModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-white/80 hover:bg-white text-slate-800 text-xs font-bold backdrop-blur-md border border-white/40 shadow-xs transition-all hover:scale-105 cursor-pointer"
+                className="absolute bottom-[3.5%] left-[1.5%] w-[21%] h-[12%] rounded-2xl cursor-pointer transition-all hover:bg-white/20 hover:ring-2 hover:ring-white/80 active:scale-95 z-10 flex items-center justify-center"
+                title="ดูข้อมูลรายละเอียดและอัตราสุ่ม"
+              />
+
+              {/* Interactive Hotspot 2: สุ่ม 1 ครั้ง (Yellow Gold button) */}
+              <button
+                type="button"
+                disabled={isPulling}
+                onClick={handlePull1}
+                className="absolute bottom-[3.5%] left-[45%] w-[28.5%] h-[23%] rounded-2xl cursor-pointer transition-all hover:ring-3 hover:ring-amber-300 hover:shadow-lg active:scale-95 disabled:opacity-50 z-10 flex items-center justify-center bg-transparent hover:bg-amber-400/20"
+                title="สุ่ม 1 ครั้ง (ใช้ตั๋ว 1 ใบ)"
               >
-                <Info className="w-3.5 h-3.5 text-slate-600" />
-                <span>ข้อมูลรายละเอียด</span>
+                {isPulling && (
+                  <span className="px-2 py-0.5 rounded-full bg-amber-950/80 text-white text-[10px] font-bold animate-pulse">
+                    กำลังสุ่ม...
+                  </span>
+                )}
               </button>
 
-              <div className="flex items-center gap-2.5">
-                {/* 1x Pull Button (Yellow Gold) */}
-                <button
-                  type="button"
-                  disabled={isPulling}
-                  onClick={handlePull1}
-                  className="group relative px-5 py-2.5 rounded-2xl bg-gradient-to-b from-[#FFE259] to-[#FFA751] hover:from-[#FFEC70] hover:to-[#FFB266] text-amber-950 font-black text-sm shadow-md border border-amber-300 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer flex flex-col items-center justify-center min-w-[120px]"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <Ticket className="w-4 h-4 text-amber-900 group-hover:rotate-12 transition-transform" />
-                    <span>สุ่ม 1 ครั้ง</span>
-                  </div>
-                  <span className="text-[10px] text-amber-900/80 font-bold -mt-0.5">
-                    🎟️ x1
+              {/* Interactive Hotspot 3: สุ่ม 10 ครั้ง (Purple Violet button) */}
+              <button
+                type="button"
+                disabled={isPulling}
+                onClick={handlePull10}
+                className="absolute bottom-[3.5%] left-[74%] w-[25%] h-[23%] rounded-2xl cursor-pointer transition-all hover:ring-3 hover:ring-purple-400 hover:shadow-lg active:scale-95 disabled:opacity-50 z-10 flex items-center justify-center bg-transparent hover:bg-purple-500/20"
+                title="สุ่ม 10 ครั้ง (ใช้ตั๋ว 10 ใบ)"
+              >
+                {isPulling && (
+                  <span className="px-2 py-0.5 rounded-full bg-purple-950/80 text-white text-[10px] font-bold animate-pulse">
+                    กำลังสุ่ม...
                   </span>
-                </button>
+                )}
+              </button>
+            </div>
 
-                {/* 10x Pull Button (Purple Violet) */}
-                <button
-                  type="button"
-                  disabled={isPulling}
-                  onClick={handlePull10}
-                  className="group relative px-6 py-2.5 rounded-2xl bg-gradient-to-b from-[#A18CD1] to-[#6A11CB] hover:from-[#B19CD9] hover:to-[#7B2CBF] text-white font-black text-sm shadow-md border border-purple-400 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer flex flex-col items-center justify-center min-w-[130px]"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-yellow-300 group-hover:rotate-12 transition-transform" />
-                    <span>สุ่ม 10 ครั้ง</span>
-                  </div>
-                  <span className="text-[10px] text-purple-200 font-bold -mt-0.5">
-                    🎟️ x10
-                  </span>
-                </button>
-              </div>
+            {/* Mobile Quick Action Buttons (shown only on small screens for easy tap) */}
+            <div className="flex sm:hidden items-center gap-2 pt-1">
+              <button
+                onClick={handlePull1}
+                disabled={isPulling}
+                className="flex-1 py-2.5 rounded-2xl bg-gradient-to-b from-[#FFE259] to-[#FFA751] text-amber-950 font-black text-xs shadow-md border border-amber-300 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Ticket className="w-4 h-4 text-amber-900" />
+                <span>สุ่ม 1 ครั้ง (x1)</span>
+              </button>
+              <button
+                onClick={handlePull10}
+                disabled={isPulling}
+                className="flex-1 py-2.5 rounded-2xl bg-gradient-to-b from-[#A18CD1] to-[#6A11CB] text-white font-black text-xs shadow-md border border-purple-400 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 text-yellow-300" />
+                <span>สุ่ม 10 ครั้ง (x10)</span>
+              </button>
             </div>
           </div>
 
-          {/* 1.2 RATE & PITY SYSTEM CARD (3 Cols) */}
-          <div className="lg:col-span-3 xl:col-span-3 bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm flex flex-col justify-between space-y-4">
+          {/* 1.2 RATE & PITY SYSTEM CARD (3 Cols - Matches Image 2) */}
+          <div className="lg:col-span-3 xl:col-span-3 bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-4">
             <div>
               <h2 className="text-sm font-black text-slate-900 mb-3 flex items-center justify-between">
                 <span>อัตราการได้รับ</span>
-                <span className="text-[11px] text-slate-400 font-normal">กฏ 100%</span>
               </h2>
 
               {/* Rarity Rates List */}
@@ -399,7 +390,7 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
             </div>
           </div>
 
-          {/* 1.3 SIDEBAR INFO & MASCOT BENEFIT CARD (3 Cols) */}
+          {/* 1.3 SIDEBAR INFO & MASCOT BENEFIT CARD (3 Cols - Matches Image 2) */}
           <div className="lg:col-span-3 xl:col-span-3 flex flex-col justify-between gap-3">
             {/* Top Search Button */}
             <button
@@ -410,33 +401,24 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
               <Search className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors" />
             </button>
 
-            {/* Cute Cat Mascot Speech Card */}
-            <div className="bg-gradient-to-br from-blue-50 via-indigo-50/50 to-white rounded-3xl p-4 border border-blue-100 shadow-sm flex items-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-white border border-blue-200 shadow-xs flex items-center justify-center shrink-0">
-                {/* Cute Cat SVG Icon */}
-                <svg viewBox="0 0 60 60" className="w-11 h-11">
-                  <circle cx="30" cy="32" r="20" fill="#E0F2FE" />
-                  <polygon points="16,20 22,10 26,20" fill="#38BDF8" />
-                  <polygon points="44,20 38,10 34,20" fill="#38BDF8" />
-                  <ellipse cx="23" cy="30" rx="3" ry="4" fill="#0369A1" />
-                  <ellipse cx="37" cy="30" rx="3" ry="4" fill="#0369A1" />
-                  <circle cx="22" cy="28.5" r="1.2" fill="#FFFFFF" />
-                  <circle cx="36" cy="28.5" r="1.2" fill="#FFFFFF" />
-                  <polygon points="30,34 28,37 32,37" fill="#F43F5E" />
-                  <path d="M26,38 Q30,41 34,38" stroke="#0369A1" strokeWidth="1.5" fill="none" />
-                  <circle cx="17" cy="34" r="2.5" fill="#FDA4AF" opacity="0.6" />
-                  <circle cx="43" cy="34" r="2.5" fill="#FDA4AF" opacity="0.6" />
-                </svg>
+            {/* Cute Cat Mascot Speech Card from Image 2 */}
+            <div className="bg-gradient-to-br from-blue-50/70 via-indigo-50/40 to-white rounded-3xl p-3 sm:p-3.5 border border-blue-100 shadow-2xs flex items-center gap-3">
+              <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-blue-200 shadow-2xs flex items-center justify-center shrink-0 overflow-hidden p-1">
+                <img
+                  src="/images/buddies/cat_mascot.png"
+                  alt="มาสคอตคู่หู"
+                  className="w-full h-full object-contain rounded-xl"
+                />
               </div>
-              <p className="text-[11px] text-blue-900 font-bold leading-snug">
+              <p className="text-[11px] sm:text-xs text-blue-900 font-bold leading-snug">
                 “ยิ่งสุ่มมาก ยิ่งมีโอกาสได้เพื่อนพิเศษระดับสูง มาร่วมเดินทางไปด้วยกัน!”
               </p>
             </div>
 
-            {/* 3 Benefit Feature Pills */}
+            {/* 3 Benefit Feature Pills (Matches Image 2) */}
             <div className="space-y-2">
-              <div className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-xs">
-                <div className="p-1.5 rounded-xl bg-slate-100 text-slate-700 shrink-0">
+              <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-xs">
+                <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 shrink-0">
                   <RefreshCw className="w-4 h-4 text-blue-600" />
                 </div>
                 <div>
@@ -445,9 +427,9 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-xs">
-                <div className="p-1.5 rounded-xl bg-amber-50 text-amber-700 shrink-0">
-                  <Star className="w-4 h-4 text-amber-500" />
+              <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-xs">
+                <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 shrink-0">
+                  <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
                 </div>
                 <div>
                   <div className="font-bold text-slate-800 text-[11px]">มีสกิลเฉพาะตัว</div>
@@ -455,9 +437,9 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-xs">
-                <div className="p-1.5 rounded-xl bg-rose-50 text-rose-700 shrink-0">
-                  <Heart className="w-4 h-4 text-rose-500" />
+              <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-xs">
+                <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 shrink-0">
+                  <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />
                 </div>
                 <div>
                   <div className="font-bold text-slate-800 text-[11px]">เพิ่มความสนุก</div>
@@ -469,7 +451,7 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
         </div>
 
         {/* ============================================================================
-            SECTION 2: CHIBI BUDDIES PREVIEW ROSTER (เป๊ะตาม Mockup ด้านล่าง)
+            SECTION 2: CHIBI BUDDIES PREVIEW ROSTER (เป๊ะตาม Mockup Image 2)
         ============================================================================ */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -481,19 +463,19 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                 ตัวอย่างคู่หูนักเรียน (64bit)
               </h2>
             </div>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-slate-500 font-semibold">
               ปลดล็อกแล้ว {gachaState.unlockedBuddyIds.length} / {ALL_BUDDIES.length} คน
             </span>
           </div>
 
-          {/* 6 Rarity Tier Columns (Scrollable or 6-Column Grid) */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5 items-stretch overflow-x-auto pb-2">
+          {/* 6 Rarity Tier Columns side by side */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 items-stretch overflow-x-auto pb-2">
             {/* 1. Common (40.0%) */}
-            <div className="bg-white rounded-3xl border border-slate-200/90 p-3 shadow-xs flex flex-col justify-between">
+            <div className="bg-white rounded-3xl border border-slate-200/90 p-3 shadow-2xs flex flex-col justify-between">
               <div>
-                <div className="py-1 px-2.5 rounded-xl bg-slate-100 flex items-center justify-between mb-3">
+                <div className="py-1 px-2.5 rounded-xl bg-slate-100 flex items-center justify-between mb-3 border border-slate-200/60">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-slate-400 flex items-center justify-center text-[7px] text-white">★</span>
                     <span className="text-xs font-bold text-slate-700">Common</span>
                   </div>
                   <span className="text-[11px] font-extrabold text-slate-500">40.0%</span>
@@ -505,7 +487,8 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                       key={b.id}
                       buddy={b}
                       size="sm"
-                      isUnlocked={gachaState.unlockedBuddyIds.includes(b.id)}
+                      isUnlocked={true}
+                      showLock={false}
                       isAnimated={true}
                       onClick={() => setSelectedBuddyDetail(b)}
                     />
@@ -518,11 +501,11 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
             </div>
 
             {/* 2. Uncommon (35.0%) */}
-            <div className="bg-white rounded-3xl border border-emerald-200 p-3 shadow-xs flex flex-col justify-between">
+            <div className="bg-white rounded-3xl border border-emerald-200 p-3 shadow-2xs flex flex-col justify-between">
               <div>
                 <div className="py-1 px-2.5 rounded-xl bg-emerald-50 flex items-center justify-between mb-3 border border-emerald-200">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 flex items-center justify-center text-[7px] text-white">★</span>
                     <span className="text-xs font-bold text-emerald-800">Uncommon</span>
                   </div>
                   <span className="text-[11px] font-extrabold text-emerald-700">35.0%</span>
@@ -534,7 +517,8 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                       key={b.id}
                       buddy={b}
                       size="sm"
-                      isUnlocked={gachaState.unlockedBuddyIds.includes(b.id)}
+                      isUnlocked={true}
+                      showLock={false}
                       isAnimated={true}
                       onClick={() => setSelectedBuddyDetail(b)}
                     />
@@ -547,11 +531,11 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
             </div>
 
             {/* 3. Rare (18.0%) */}
-            <div className="bg-white rounded-3xl border border-blue-200 p-3 shadow-xs flex flex-col justify-between">
+            <div className="bg-white rounded-3xl border border-blue-200 p-3 shadow-2xs flex flex-col justify-between">
               <div>
                 <div className="py-1 px-2.5 rounded-xl bg-blue-50 flex items-center justify-between mb-3 border border-blue-200">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 flex items-center justify-center text-[7px] text-white">★</span>
                     <span className="text-xs font-bold text-blue-800">Rare</span>
                   </div>
                   <span className="text-[11px] font-extrabold text-blue-700">18.0%</span>
@@ -563,7 +547,8 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                       key={b.id}
                       buddy={b}
                       size="sm"
-                      isUnlocked={gachaState.unlockedBuddyIds.includes(b.id)}
+                      isUnlocked={true}
+                      showLock={false}
                       isAnimated={true}
                       onClick={() => setSelectedBuddyDetail(b)}
                     />
@@ -576,11 +561,11 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
             </div>
 
             {/* 4. Epic (5.0%) */}
-            <div className="bg-white rounded-3xl border border-purple-200 p-3 shadow-xs flex flex-col justify-between">
+            <div className="bg-white rounded-3xl border border-purple-200 p-3 shadow-2xs flex flex-col justify-between">
               <div>
                 <div className="py-1 px-2.5 rounded-xl bg-purple-50 flex items-center justify-between mb-3 border border-purple-200">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-purple-500" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-purple-500 flex items-center justify-center text-[7px] text-white">★</span>
                     <span className="text-xs font-bold text-purple-800">Epic</span>
                   </div>
                   <span className="text-[11px] font-extrabold text-purple-700">5.0%</span>
@@ -592,7 +577,8 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                       key={b.id}
                       buddy={b}
                       size="sm"
-                      isUnlocked={gachaState.unlockedBuddyIds.includes(b.id)}
+                      isUnlocked={true}
+                      showLock={false}
                       isAnimated={true}
                       onClick={() => setSelectedBuddyDetail(b)}
                     />
@@ -605,11 +591,11 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
             </div>
 
             {/* 5. Legendary (1.8%) */}
-            <div className="bg-white rounded-3xl border border-amber-300 p-3 shadow-xs flex flex-col justify-between bg-gradient-to-b from-amber-50/30 to-white">
+            <div className="bg-white rounded-3xl border border-amber-300 p-3 shadow-2xs flex flex-col justify-between bg-gradient-to-b from-amber-50/20 to-white">
               <div>
                 <div className="py-1 px-2.5 rounded-xl bg-amber-100/70 flex items-center justify-between mb-3 border border-amber-300">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 flex items-center justify-center text-[7px] text-white">★</span>
                     <span className="text-xs font-bold text-amber-900">Legendary</span>
                   </div>
                   <span className="text-[11px] font-extrabold text-amber-800">1.8%</span>
@@ -621,7 +607,8 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                       key={b.id}
                       buddy={b}
                       size="sm"
-                      isUnlocked={gachaState.unlockedBuddyIds.includes(b.id)}
+                      isUnlocked={true}
+                      showLock={false}
                       isAnimated={true}
                       onClick={() => setSelectedBuddyDetail(b)}
                     />
@@ -634,23 +621,24 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
             </div>
 
             {/* 6. Mythic (0.2%) */}
-            <div className="bg-white rounded-3xl border border-rose-300 p-3 shadow-xs flex flex-col justify-between bg-gradient-to-b from-rose-50/40 to-white">
+            <div className="bg-white rounded-3xl border border-rose-300 p-3 shadow-2xs flex flex-col justify-between bg-gradient-to-b from-rose-50/30 to-white">
               <div>
                 <div className="py-1 px-2.5 rounded-xl bg-rose-100/70 flex items-center justify-between mb-3 border border-rose-300">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping-slow" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping-slow flex items-center justify-center text-[7px] text-white">✦</span>
                     <span className="text-xs font-bold text-rose-900">Mythic</span>
                   </div>
                   <span className="text-[11px] font-extrabold text-rose-800">0.2%</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col items-center gap-2">
                   {mythicBuddies.map((b) => (
                     <ChibiBuddyAvatar
                       key={b.id}
                       buddy={b}
                       size="sm"
-                      isUnlocked={gachaState.unlockedBuddyIds.includes(b.id)}
+                      isUnlocked={true}
+                      showLock={false}
                       isAnimated={true}
                       onClick={() => setSelectedBuddyDetail(b)}
                     />
@@ -665,16 +653,16 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
         </div>
 
         {/* ============================================================================
-            SECTION 3: FOOTER BANNER & INSPIRATIONAL QUOTE
+            SECTION 3: FOOTER BANNER & INSPIRATIONAL QUOTE (เป๊ะตาม Mockup Image 2)
         ============================================================================ */}
-        <div className="py-3 px-5 rounded-2xl bg-indigo-50/80 border border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-indigo-900 font-medium shadow-2xs">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-purple-600 shrink-0" />
+        <div className="py-2.5 px-5 rounded-2xl bg-[#D6E0FB]/80 border border-[#B8CAFB] flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-indigo-950 font-medium shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <span className="text-purple-600 text-sm">👤</span>
             <span>
               “ไม่ว่าคุณจะได้ใคร... ทุกคนล้วนมีเรื่องราว และพร้อมอยู่เคียงข้างคุณในเส้นทางการเรียนรู้”
             </span>
           </div>
-          <span className="font-extrabold text-indigo-800 shrink-0">Buddy Gacha ♡</span>
+          <span className="font-extrabold text-indigo-900 shrink-0">Buddy Gacha ♡</span>
         </div>
       </div>
 
@@ -699,7 +687,7 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
               </div>
               <button
                 onClick={() => setIsResultOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer"
               >
                 ✕
               </button>
@@ -723,7 +711,7 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                     }`}
                   >
                     <div className="relative mb-2">
-                      <ChibiBuddyAvatar buddy={b} size="md" showName={false} />
+                      <ChibiBuddyAvatar buddy={b} size="md" showName={false} isUnlocked={true} showLock={false} />
                       {res.isNew && (
                         <span className="absolute -top-1 -right-2 px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[9px] font-black shadow-xs animate-bounce">
                           NEW!
@@ -766,13 +754,13 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                     if (pullResults.length === 1) handlePull1();
                     else handlePull10();
                   }}
-                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-xs"
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
                 >
                   สุ่มอีกครั้ง ({pullResults.length === 1 ? '1x' : '10x'})
                 </button>
                 <button
                   onClick={() => setIsResultOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors"
+                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors cursor-pointer"
                 >
                   ตกลง
                 </button>
@@ -794,14 +782,14 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
               </span>
               <button
                 onClick={() => setSelectedBuddyDetail(null)}
-                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-xs"
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-xs cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             <div className="flex items-center gap-4">
-              <ChibiBuddyAvatar buddy={selectedBuddyDetail} size="lg" showName={false} />
+              <ChibiBuddyAvatar buddy={selectedBuddyDetail} size="lg" showName={false} isUnlocked={true} showLock={false} />
               <div>
                 <h3 className="text-xl font-black text-slate-900">
                   {selectedBuddyDetail.name}
@@ -844,7 +832,7 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                       handleSetActive(selectedBuddyDetail.id);
                       setSelectedBuddyDetail(null);
                     }}
-                    className="w-full py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-xs transition-colors"
+                    className="w-full py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
                   >
                     ตั้งเป็นคู่หูหลัก
                   </button>
@@ -879,7 +867,7 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
               </div>
               <button
                 onClick={() => setIsAllBuddiesOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer"
               >
                 ✕
               </button>
@@ -892,7 +880,7 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                   <button
                     key={r}
                     onClick={() => setFilterRarity(r)}
-                    className={`px-3 py-1 rounded-xl font-bold transition-colors ${
+                    className={`px-3 py-1 rounded-xl font-bold transition-colors cursor-pointer ${
                       filterRarity === r
                         ? 'bg-slate-900 text-white shadow-2xs'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -925,6 +913,7 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                       buddy={b}
                       size="sm"
                       isUnlocked={isUnlocked}
+                      showLock={false}
                       showName={false}
                     />
                     <div className="mt-2 w-full">
@@ -956,7 +945,7 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
               </h3>
               <button
                 onClick={() => setIsAddTicketsOpen(false)}
-                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-xs"
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-xs cursor-pointer"
               >
                 ✕
               </button>
@@ -1003,7 +992,7 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
               </h3>
               <button
                 onClick={() => setIsDetailModalOpen(false)}
-                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-xs"
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-xs cursor-pointer"
               >
                 ✕
               </button>
@@ -1022,7 +1011,7 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                   <li><strong>Common (40.0%):</strong> น้องโอม, น้องแป้ง, น้องซัน, น้องมายด์</li>
                   <li><strong>Uncommon (35.0%):</strong> น้องพิมพ์, น้องต้น, น้องเจน, น้องพีค</li>
                   <li><strong>Rare (18.0%):</strong> น้องคิน, น้องโนจิ, น้องฟ้า, น้องเบส</li>
-                  <li><strong>Epic (5.0%):</strong> น้องลิน, น้องเซน, น้องมิ้น, น้องคิว</li>
+                  <li><strong>Epic (5.0%):</strong> น้องริน, น้องเชน, น้องมิ้น, น้องคิว</li>
                   <li><strong>Legendary (1.8%):</strong> น้องวาเลน, น้องเรย์, น้องอามิ, น้องไทเกอร์</li>
                   <li><strong>Mythic (0.2%):</strong> น้องเซเรน, น้องไนท์</li>
                 </ul>
@@ -1046,7 +1035,7 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
             <div className="pt-2">
               <button
                 onClick={() => setIsDetailModalOpen(false)}
-                className="w-full py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs"
+                className="w-full py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs cursor-pointer"
               >
                 เข้าใจแล้ว
               </button>

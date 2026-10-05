@@ -25,6 +25,7 @@ import {
 
 export type StudentTabKey =
   | 'home'
+  | 'anime-app'
   | 'gacha'
   | 'mobile-care'
   | 'missions'
@@ -124,6 +125,28 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
                 }`}
               />
               <span className="truncate">หน้าแรกของฉัน</span>
+            </button>
+
+            {/* เมนู 10 หน้าจออนิเมะคำยางพิทยา (Full Prototype) */}
+            <button
+              onClick={() => handleTabClick('anime-app')}
+              className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-left transition-all ${
+                activeTab === 'anime-app'
+                  ? 'bg-gradient-to-r from-sky-50 to-blue-50 text-sky-900 font-bold border border-sky-300 shadow-2xs'
+                  : 'text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2.5 min-w-0">
+                <Sparkles
+                  className={`w-4 h-4 shrink-0 ${
+                    activeTab === 'anime-app' ? 'text-sky-600' : 'text-sky-500'
+                  }`}
+                />
+                <span className="truncate font-semibold">แอปนักเรียน (10 หน้าจออนิเมะ)</span>
+              </span>
+              <span className="px-1.5 py-0.2 rounded-full bg-gradient-to-r from-sky-500 to-blue-600 text-white text-[9px] font-black shrink-0 shadow-2xs">
+                10 หน้า
+              </span>
             </button>
 
             <button
