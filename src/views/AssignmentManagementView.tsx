@@ -30,6 +30,7 @@ import {
   type GradingQueueItem,
   type AssignmentBundleConfig,
 } from '../services/teacherCourseAssignmentService';
+import { ArtworkPreviewModal } from '../components/teacher/ArtworkPreviewModal';
 
 export type QuickFilterMode = 'ALL' | 'MISSING_OR_R' | 'PENDING_REVIEW';
 export type AssignmentViewMode = 'QUEUE' | 'ROOM_MATRIX' | 'BUNDLES';
@@ -57,6 +58,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
   const [selectedQueueIndex, setSelectedQueueIndex] = useState<number>(0);
   const [gradeInput, setGradeInput] = useState<string>('');
   const [feedbackInput, setFeedbackInput] = useState<string>('');
+  const [cardImgError, setCardImgError] = useState<boolean>(false);
 
   // Classroom Submission Matrix State
   const [roster, setRoster] = useState<SgsStudentRecord[]>(() =>
@@ -79,10 +81,13 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
   const [previewItem, setPreviewItem] = useState<{
     title: string;
     studentName: string;
+    studentCode?: string;
+    classroom?: string;
+    seatNo?: number;
     type: 'IMAGE' | 'PDF' | 'LINK';
     url?: string;
     fileName?: string;
-    platform?: string;
+    platform?: 'CANVA' | 'GOOGLE_DOCS' | 'GOOGLE_DRIVE' | 'YOUTUBE' | 'FIGMA' | 'OTHER';
   } | null>(null);
 
   // Toast feedback
@@ -491,15 +496,28 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                       </span>
                     </div>
 
-                    {/* Preview Area Based on Type (Image upload vs External Link) */}
+                    {/* Preview Area Based on Type (Image upload vs PDF vs Canva Link) */}
                     {activeQueueItem.submissionChannel === 'IMAGE_UPLOAD' ? (
                       <div className="space-y-2.5">
                         <div className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-900/5 max-h-72 flex items-center justify-center">
-                          <img
-                            src={activeQueueItem.filePreviewUrl}
-                            alt="ผลงานนักเรียน"
-                            className="w-full h-auto max-h-72 object-contain"
-                          />
+                          {!cardImgError && activeQueueItem.filePreviewUrl ? (
+                            <img
+                              src={activeQueueItem.filePreviewUrl}
+                              alt="ผลงานนักเรียน"
+                              onError={() => setCardImgError(true)}
+                              className="w-full h-auto max-h-72 object-contain"
+                            />
+                          ) : (
+                            <div className="p-8 text-center space-y-2 text-teal-800 bg-teal-50/80 w-full">
+                              <span className="text-3xl">🎨</span>
+                              <p className="text-xs font-bold text-slate-800">
+                                {activeQueueItem.fileName}
+                              </p>
+                              <p className="text-[11px] text-slate-500">
+                                ภาพวาดระบายสีน้ำ/แรเงาของ {activeQueueItem.studentName}
+                              </p>
+                            </div>
+                          )}
                           <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                             <button
                               type="button"
@@ -507,6 +525,9 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                                 setPreviewItem({
                                   title: activeQueueItem.assignmentTitle,
                                   studentName: activeQueueItem.studentName,
+                                  studentCode: activeQueueItem.studentCode,
+                                  classroom: activeQueueItem.classroom,
+                                  seatNo: activeQueueItem.seatNo,
                                   type: 'IMAGE',
                                   url: activeQueueItem.filePreviewUrl,
                                   fileName: activeQueueItem.fileName,
@@ -527,43 +548,66 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                             setPreviewItem({
                               title: activeQueueItem.assignmentTitle,
                               studentName: activeQueueItem.studentName,
+                              studentCode: activeQueueItem.studentCode,
+                              classroom: activeQueueItem.classroom,
+                              seatNo: activeQueueItem.seatNo,
                               type: 'IMAGE',
                               url: activeQueueItem.filePreviewUrl,
                               fileName: activeQueueItem.fileName,
                             })
                           }
-                          className="w-full py-2 rounded-xl border border-teal-300 bg-teal-50 hover:bg-teal-100 text-teal-900 text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+                          className="w-full py-2.5 rounded-xl border border-teal-300 bg-teal-50 hover:bg-teal-100 text-teal-900 text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
                         >
                           <Eye className="w-4 h-4 text-teal-600" />
-                          <span>ดูงานภาพวาด / เอกสาร Preview ขยายใหญ่</span>
+                          <span>ดูงานภาพวาด {activeQueueItem.fileName?.endsWith('.jpg') ? 'JPG' : 'PNG'} Preview ขยายใหญ่</span>
                         </button>
                       </div>
                     ) : activeQueueItem.submissionChannel === 'PDF_UPLOAD' ? (
-                      <div className="p-6 rounded-xl border border-slate-200 bg-white text-center space-y-3">
-                        <FileText className="w-12 h-12 text-rose-500 mx-auto" />
-                        <div>
-                          <p className="text-xs font-bold text-slate-900">
-                            {activeQueueItem.fileName}
-                          </p>
-                          <p className="text-[11px] text-slate-500">
-                            เอกสาร PDF แนบส่งผ่านระบบ
-                          </p>
+                      <div className="p-4 rounded-xl border border-rose-200 bg-rose-50/40 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white font-black text-[10px]">
+                              PDF PORTFOLIO
+                            </span>
+                            <span className="text-xs font-bold text-rose-950 truncate max-w-xs">
+                              {activeQueueItem.fileName}
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-slate-500 font-semibold">
+                            3 หน้าเอกสาร
+                          </span>
                         </div>
+
+                        <div className="p-3 bg-white rounded-xl border border-rose-200/80 flex items-center gap-3">
+                          <FileText className="w-8 h-8 text-rose-500 shrink-0" />
+                          <div>
+                            <p className="text-xs font-bold text-slate-900">
+                              แฟ้มสะสมงานทัศนศิลป์ (Art Portfolio 3 หน้า)
+                            </p>
+                            <p className="text-[11px] text-slate-500">
+                              หน้า 1: ปก • หน้า 2: ผลงานสายธารกุดจับ • หน้า 3: รูบริกส์
+                            </p>
+                          </div>
+                        </div>
+
                         <button
                           type="button"
                           onClick={() =>
                             setPreviewItem({
                               title: activeQueueItem.assignmentTitle,
                               studentName: activeQueueItem.studentName,
+                              studentCode: activeQueueItem.studentCode,
+                              classroom: activeQueueItem.classroom,
+                              seatNo: activeQueueItem.seatNo,
                               type: 'PDF',
                               url: activeQueueItem.filePreviewUrl,
                               fileName: activeQueueItem.fileName,
                             })
                           }
-                          className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold shadow-xs hover:bg-slate-800 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                          className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
                         >
                           <Eye className="w-4 h-4 text-teal-400" />
-                          <span>เปิดดูเอกสาร PDF Preview</span>
+                          <span>เปิดดูเอกสาร PDF Preview เต็มตา (3 หน้า)</span>
                         </button>
                       </div>
                     ) : (
@@ -571,42 +615,64 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                       <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/50 space-y-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="px-2 py-0.5 rounded-md bg-indigo-600 text-white font-extrabold text-[11px]">
-                              {activeQueueItem.externalPlatform || 'LINK'}
+                            <span className="px-2 py-0.5 rounded-md bg-gradient-to-r from-[#00C4CC] to-purple-600 text-white font-black text-[11px]">
+                              {activeQueueItem.externalPlatform || 'CANVA'}
                             </span>
                             <span className="text-xs font-bold text-indigo-950 truncate max-w-xs">
-                              {activeQueueItem.externalLinkUrl}
+                              {activeQueueItem.fileName || 'Canva โปสเตอร์ศิลปวัฒนธรรม'}
                             </span>
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2">
-                          <a
-                            href={activeQueueItem.externalLinkUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex-1 py-2 px-3 rounded-xl bg-[#00C4CC] hover:bg-[#00b2b8] text-white text-xs font-extrabold shadow-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                            <span>เปิดดูงานใน Canva / ลิงก์ต้นฉบับ ↗</span>
-                          </a>
+                        {/* Canva Live Preview Banner */}
+                        <div className="bg-gradient-to-r from-slate-900 to-indigo-950 text-white p-3.5 rounded-xl border border-slate-800 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2.5">
+                            <Sparkles className="w-5 h-5 text-cyan-400 shrink-0" />
+                            <div>
+                              <p className="text-xs font-black text-white">
+                                โปสเตอร์ศิลปวัฒนธรรมกุดจับร่วมสมัย 2026
+                              </p>
+                              <p className="text-[10px] text-cyan-300">
+                                ออกแบบด้วย Canva Pro • ลายกนกสามเหลี่ยม & วงจรสี
+                              </p>
+                            </div>
+                          </div>
+                          <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 px-2 py-0.5 rounded font-bold">
+                            Live Canvas
+                          </span>
+                        </div>
 
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
                             onClick={() =>
                               setPreviewItem({
                                 title: activeQueueItem.assignmentTitle,
                                 studentName: activeQueueItem.studentName,
+                                studentCode: activeQueueItem.studentCode,
+                                classroom: activeQueueItem.classroom,
+                                seatNo: activeQueueItem.seatNo,
                                 type: 'LINK',
                                 url: activeQueueItem.externalLinkUrl,
-                                platform: activeQueueItem.externalPlatform,
+                                fileName: activeQueueItem.fileName,
+                                platform: activeQueueItem.externalPlatform || 'CANVA',
                               })
                             }
-                            className="py-2 px-3 rounded-xl border border-indigo-300 bg-white hover:bg-indigo-50 text-indigo-900 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                            className="flex-1 py-2 px-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-black shadow-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                           >
-                            <Eye className="w-4 h-4 text-indigo-600" />
-                            <span>พรีวิวในหน้าจอ</span>
+                            <Eye className="w-4 h-4 text-amber-300" />
+                            <span>เปิดดูงาน Canva Preview (ขยายใหญ่ในจอ)</span>
                           </button>
+
+                          <a
+                            href={activeQueueItem.externalLinkUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="py-2 px-3 rounded-xl bg-[#00C4CC] hover:bg-[#00b2b8] text-white text-xs font-bold shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>เปิดใน Canva ↗</span>
+                          </a>
                         </div>
                       </div>
                     )}
@@ -912,15 +978,21 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                               // 🟠 สีส้ม: รอตรวจ (มีปุ่ม Preview ทันที)
                               <button
                                 type="button"
-                                onClick={() =>
+                                onClick={() => {
+                                  const isCanva = (sub?.workTitle || '').includes('Canva') || (asg.id === 'asg-5' && stu.studentCode === '45102');
+                                  const isPdf = (sub?.workTitle || '').endsWith('.pdf') || (asg.id === 'asg-5' && stu.studentCode === '45101');
                                   setPreviewItem({
                                     title: asg.title,
                                     studentName: stu.studentName,
-                                    type: 'IMAGE',
-                                    url: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=1200&q=80',
-                                    fileName: sub.workTitle || 'ผลงานรอตรวจ.jpg',
-                                  })
-                                }
+                                    studentCode: stu.studentCode,
+                                    classroom: selectedRoom,
+                                    seatNo: stu.sgsSeatNo,
+                                    type: isCanva ? 'LINK' : isPdf ? 'PDF' : 'IMAGE',
+                                    url: isCanva ? 'https://www.canva.com/design/DAFkutchap-art3/view' : undefined,
+                                    fileName: sub?.workTitle || `${asg.title}_${stu.studentName}.${isPdf ? 'pdf' : isCanva ? 'canva' : 'jpg'}`,
+                                    platform: isCanva ? 'CANVA' : undefined,
+                                  });
+                                }}
                                 title="คลิกเพื่อ Preview ดูงาน"
                                 className="w-full py-1.5 px-2 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-[11px] font-extrabold transition-colors cursor-pointer flex items-center justify-center gap-1 shadow-2xs"
                               >
@@ -1180,96 +1252,21 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       )}
 
       {/* ==================================================================== */}
-      {/* PREVIEW MODAL: สำหรับดูงานรูปภาพ, PDF หรือลิงก์ Canva/Docs ขยายเต็มจอ */}
+      {/* ARTWORK PREVIEW MODAL: สำหรับดูงานรูปภาพ JPG/PNG, PDF หลายหน้า, ลิงก์ Canva/Docs */}
       {/* ==================================================================== */}
-      {previewItem && (
-        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl border border-slate-200">
-            {/* Modal Header */}
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
-              <div>
-                <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
-                  {previewItem.title}
-                </h3>
-                <p className="text-xs text-slate-500 font-semibold">
-                  ผลงานของ: {previewItem.studentName} • {previewItem.fileName || 'Preview'}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setPreviewItem(null)}
-                className="w-8 h-8 rounded-full bg-slate-200/80 hover:bg-slate-300 flex items-center justify-center text-slate-700 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-slate-950/5">
-              {previewItem.type === 'IMAGE' ? (
-                <img
-                  src={previewItem.url}
-                  alt="ผลงานนักเรียนขนาดใหญ่"
-                  className="max-w-full max-h-[70vh] object-contain rounded-xl shadow-md"
-                />
-              ) : previewItem.type === 'PDF' ? (
-                <div className="w-full h-[65vh] flex flex-col items-center justify-center p-6 bg-white rounded-2xl border border-slate-200 space-y-4">
-                  <FileText className="w-16 h-16 text-rose-500" />
-                  <div className="text-center">
-                    <h4 className="font-extrabold text-sm text-slate-900">
-                      {previewItem.fileName}
-                    </h4>
-                    <p className="text-xs text-slate-500 mt-1">
-                      เอกสาร PDF แสดงผลตัวอย่างพร้อมสำหรับการตรวจประเมิน
-                    </p>
-                  </div>
-                  <a
-                    href={previewItem.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs hover:bg-slate-800"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span>เปิดดูในแท็บใหม่</span>
-                  </a>
-                </div>
-              ) : (
-                <div className="w-full h-[65vh] flex flex-col items-center justify-center p-6 bg-white rounded-2xl border border-slate-200 space-y-4">
-                  <ExternalLink className="w-16 h-16 text-indigo-600" />
-                  <div className="text-center max-w-md">
-                    <h4 className="font-extrabold text-sm text-slate-900">
-                      ลิงก์ผลงานภายนอก ({previewItem.platform || 'Canva / Web'})
-                    </h4>
-                    <p className="text-xs text-slate-500 mt-1 font-mono break-all">
-                      {previewItem.url}
-                    </p>
-                  </div>
-                  <a
-                    href={previewItem.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-5 py-2.5 rounded-xl bg-[#00C4CC] text-white font-extrabold text-xs flex items-center gap-2 shadow-md hover:bg-[#00b2b8]"
-                  >
-                    <span>เปิดดูงานใน Canva / ลิงก์ต้นฉบับ ↗</span>
-                  </a>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="px-5 py-3 border-t border-slate-200 flex items-center justify-end bg-slate-50/80">
-              <button
-                type="button"
-                onClick={() => setPreviewItem(null)}
-                className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs cursor-pointer hover:bg-slate-800"
-              >
-                ปิดหน้าต่าง Preview
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ArtworkPreviewModal
+        isOpen={Boolean(previewItem)}
+        onClose={() => setPreviewItem(null)}
+        title={previewItem?.title || 'ผลงานนักเรียน'}
+        studentName={previewItem?.studentName || ''}
+        studentCode={previewItem?.studentCode}
+        classroom={previewItem?.classroom || selectedRoom}
+        seatNo={previewItem?.seatNo}
+        type={previewItem?.type || 'IMAGE'}
+        url={previewItem?.url}
+        fileName={previewItem?.fileName}
+        platform={previewItem?.platform}
+      />
     </div>
   );
 };
