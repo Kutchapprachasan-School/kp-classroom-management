@@ -187,7 +187,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       ];
     }
 
-    // Default: TEACHER_GENERAL (ตรงกับแบบ Mockup เป๊ะๆ พร้อมเมนูแยกข้อสอบและแผนการสอนตามข้อ ค)
+    // Default: TEACHER_GENERAL (แยกเช็คแถวเช้าห้องที่ปรึกษา ม.3/1 ออกจากเช็คชื่อเข้าเรียนรายวิชาตามคำสั่ง)
     return [
       {
         key: 'home',
@@ -195,24 +195,34 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
         icon: Home,
       },
       {
-        key: 'timetable',
-        label: 'ตารางสอน',
-        icon: CalendarDays,
+        key: 'student-affairs',
+        label: 'เช็คแถวเช้า (ที่ปรึกษา ม.3/1)',
+        icon: ShieldAlert,
+        badge: '07:45',
+        badgeStyle: 'bg-amber-100 text-amber-800 font-extrabold',
+        highlightStyle: true,
       },
       {
         key: 'class-overview',
-        label: 'เช็คชื่อ / เข้าเรียน',
+        label: 'เช็คชื่อเข้าเรียน (รายวิชา)',
         icon: CheckSquare,
       },
       {
         key: 'assignments',
-        label: 'งาน/มอบหมาย',
+        label: 'ตรวจงาน / ส่งงาน',
         icon: FileText,
+        badge: 'FIFO',
+        badgeStyle: 'bg-teal-100 text-teal-800 font-bold',
       },
       {
         key: 'readiness',
-        label: 'ผลการเรียน',
+        label: 'คะแนน ปพ.5 / ผลการเรียน',
         icon: Award,
+      },
+      {
+        key: 'timetable',
+        label: 'ตารางสอน',
+        icon: CalendarDays,
       },
       {
         key: 'exams',

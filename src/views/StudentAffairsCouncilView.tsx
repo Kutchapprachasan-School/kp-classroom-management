@@ -314,14 +314,14 @@ export const StudentAffairsCouncilView: React.FC<
                 {assemblyViewMode === 'PAPER_LEDGER' ? (
                   <PaperRegisterLedger
                     initialMode="MORNING_ASSEMBLY"
-                    defaultRoom="ม.2/1"
-                    subjectLabel="กิจกรรมหน้าเสาธง 07:45 น."
+                    defaultRoom="ม.3/1"
+                    subjectLabel="กิจกรรมหน้าเสาธง 07:45 น. • ห้องที่ปรึกษา ม.3/1"
                   />
                 ) : (
                   <MobileVerticalAttendanceSheet
-                    defaultRoom="ม.2/1"
-                    availableRooms={['ม.2/1', 'ม.3/1', 'ม.1/8']}
-                    activityLine="การเช็คชื่อตอนเช้า กิจกรรมหน้าเสาธง"
+                    defaultRoom="ม.3/1"
+                    availableRooms={['ม.3/1', 'ม.3/2', 'ม.2/1', 'ม.1/8']}
+                    activityLine="การเช็คชื่อตอนเช้า กิจกรรมหน้าเสาธง (ห้องที่ปรึกษา ม.3/1)"
                     dateLine="ประจำวันจันทร์ ที่ 28 กันยายน 2569"
                     defaultStatus="ABSENT"
                     onSaveSuccess={(summary) => {

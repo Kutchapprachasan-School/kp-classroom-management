@@ -187,17 +187,26 @@ interface PaperRegisterLedgerProps {
   defaultRoom?: string;
   subjectLabel?: string;
   hideModeSwitcher?: boolean;
+  hideMorningAssembly?: boolean;
   onModeChange?: (mode: PaperLedgerMode) => void;
+  onNavigateToMorningAssembly?: () => void;
 }
 
 export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
   initialMode = 'HOMEWORK_CHECK',
-  defaultRoom = 'ม.2/1',
-  subjectLabel = 'ศ23101 ศิลปะ',
+  defaultRoom = 'ม.3/1',
+  subjectLabel = 'ศ23101 ศิลปะ 3',
   hideModeSwitcher = false,
+  hideMorningAssembly = false,
   onModeChange,
+  onNavigateToMorningAssembly,
 }) => {
-  const [mode, setMode] = useState<PaperLedgerMode>(initialMode);
+  const [mode, setMode] = useState<PaperLedgerMode>(() => {
+    if (hideMorningAssembly && initialMode === 'MORNING_ASSEMBLY') {
+      return 'CLASS_ATTENDANCE';
+    }
+    return initialMode;
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const [selectedRoom, setSelectedRoom] = useState<string>(defaultRoom);
   const [attendanceViewType, setAttendanceViewType] = useState<'MULTI_PERIOD' | 'TODAY_SINGLE'>('MULTI_PERIOD');
@@ -574,53 +583,75 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
           </span>
         </div>
 
-        {/* ปุ่มสลับหน้ากระดาษ (4 งานหลักของครู) */}
+        {/* ปุ่มสลับหน้ากระดาษ (งานของครู) */}
         {!hideModeSwitcher && (
-          <div className="flex flex-wrap items-center gap-1 bg-white/90 p-0.5 rounded-xl border border-cyan-300">
-            <button
-              type="button"
-              onClick={() => switchMode('MORNING_ASSEMBLY')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                mode === 'MORNING_ASSEMBLY'
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              1. เช็คแถวเช้า
-            </button>
-            <button
-              type="button"
-              onClick={() => switchMode('CLASS_ATTENDANCE')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                mode === 'CLASS_ATTENDANCE'
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              2. เช็คชื่อเรียน
-            </button>
-            <button
-              type="button"
-              onClick={() => switchMode('HOMEWORK_CHECK')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                mode === 'HOMEWORK_CHECK'
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              3. ตรวจงาน (1–4)
-            </button>
-            <button
-              type="button"
-              onClick={() => switchMode('SCORE_GRADEBOOK')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                mode === 'SCORE_GRADEBOOK'
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              4. คะแนน ปพ.5 (100)
-            </button>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1 bg-white/90 p-0.5 rounded-xl border border-cyan-300">
+              {!hideMorningAssembly && (
+                <button
+                  type="button"
+                  onClick={() => switchMode('MORNING_ASSEMBLY')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                    mode === 'MORNING_ASSEMBLY'
+                      ? 'bg-slate-900 text-white'
+                      : 'text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  1. เช็คแถวเช้า
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => switchMode('CLASS_ATTENDANCE')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                  mode === 'CLASS_ATTENDANCE'
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                {hideMorningAssembly ? '1. เช็คชื่อเรียน (รายคาบ)' : '2. เช็คชื่อเรียน'}
+              </button>
+              <button
+                type="button"
+                onClick={() => switchMode('HOMEWORK_CHECK')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                  mode === 'HOMEWORK_CHECK'
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                {hideMorningAssembly ? '2. ตรวจงาน (1–4)' : '3. ตรวจงาน (1–4)'}
+              </button>
+              <button
+                type="button"
+                onClick={() => switchMode('SCORE_GRADEBOOK')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                  mode === 'SCORE_GRADEBOOK'
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                {hideMorningAssembly ? '3. คะแนน ปพ.5 (100)' : '4. คะแนน ปพ.5 (100)'}
+              </button>
+            </div>
+
+            {/* ทางลัดไปเช็คแถวเช้าห้องที่ปรึกษา ม.3/1 (แยกตามคำสั่ง) */}
+            {hideMorningAssembly && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onNavigateToMorningAssembly) {
+                    onNavigateToMorningAssembly();
+                  } else {
+                    switchMode('MORNING_ASSEMBLY');
+                  }
+                }}
+                className="px-2.5 py-1 rounded-xl bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
+                title="สลับไปหน้าเช็คแถวเช้า 07:45 น. ห้องที่ปรึกษา ม.3/1"
+              >
+                <span>☀️ ไปเช็คแถวเช้า ม.3/1 (ที่ปรึกษา) ↗</span>
+              </button>
+            )}
           </div>
         )}
 

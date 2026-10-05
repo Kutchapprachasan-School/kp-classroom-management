@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Calendar,
   Plus,
@@ -35,6 +35,10 @@ import {
   type SgsStudentRecord,
 } from '../services/sgsRosterAndSubmissionService';
 import { PaperRegisterLedger } from '../components/teacher/PaperRegisterLedger';
+import {
+  TEACHER_SUBJECTS_LIST,
+  HOMEROOM_ADVISORY,
+} from '../services/teacherCourseAssignmentService';
 
 
 interface TeacherOverviewViewProps {
@@ -79,9 +83,24 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
   initialAssignmentFilter = 'ALL',
   initialHighlightBanner = null,
 }) => {
-  // เริ่มต้นที่แท็บ "เช็คชื่อแถวตอนเช้า & เข้าเรียน" เป็นอันดับแรกสุดก่อนเริ่มสอน หรือตาม Deep-Link ที่ส่งมา
+  // เริ่มต้นที่แท็บ "เช็คชื่อเข้าเรียน" เป็นอันดับแรกสุดก่อนเริ่มสอน หรือตาม Deep-Link ที่ส่งมา
   const [activeTab, setActiveTab] = useState<ClassSubTab>(initialTab);
-  const [selectedClassroom, _setSelectedClassroom] = useState<'ม.3/1' | 'ม.3/2' | 'ม.1/8'>('ม.3/1');
+  const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>('ศ23101');
+  const [selectedClassroom, setSelectedClassroom] = useState<string>('ม.3/1');
+
+  const currentSubject = useMemo(() => {
+    return (
+      TEACHER_SUBJECTS_LIST.find((s) => s.code === selectedSubjectCode) ||
+      TEACHER_SUBJECTS_LIST[0]
+    );
+  }, [selectedSubjectCode]);
+
+  useEffect(() => {
+    if (currentSubject && !currentSubject.classrooms.includes(selectedClassroom)) {
+      setSelectedClassroom(currentSubject.classrooms[0] || 'ม.3/1');
+    }
+  }, [currentSubject, selectedClassroom]);
+
   const [attendanceSubMode, setAttendanceSubMode] = useState<'MORNING_AND_TODAY' | 'TERM_HISTORY'>('MORNING_AND_TODAY');
   const [attendanceSearch, setAttendanceSearch] = useState('');
 
@@ -497,6 +516,46 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
         </div>
       )}
 
+      {/* แถบเลือกรายวิชา & ห้องเรียน (รองรับครูสอนหลายวิชา หลายห้อง) พร้อมป้ายห้องที่ปรึกษา ม.3/1 */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-3 sm:p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs shadow-2xs">
+            <span className="font-semibold text-slate-500">วิชาที่สอน:</span>
+            <select
+              value={selectedSubjectCode}
+              onChange={(e) => setSelectedSubjectCode(e.target.value)}
+              className="font-extrabold text-slate-900 bg-transparent focus:outline-none cursor-pointer"
+            >
+              {TEACHER_SUBJECTS_LIST.map((subj) => (
+                <option key={subj.code} value={subj.code}>
+                  {subj.code} {subj.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs shadow-2xs">
+            <span className="font-semibold text-slate-500">ห้องเรียน:</span>
+            <select
+              value={selectedClassroom}
+              onChange={(e) => setSelectedClassroom(e.target.value)}
+              className="font-extrabold text-slate-900 bg-transparent focus:outline-none cursor-pointer"
+            >
+              {currentSubject.classrooms.map((rm) => (
+                <option key={rm} value={rm}>
+                  ชั้น {rm}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 self-start sm:self-auto bg-amber-50 border border-amber-200 rounded-xl px-3 py-1.5 text-xs font-bold text-amber-900">
+          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+          <span>☀️ {HOMEROOM_ADVISORY.roleTitle} (เช็คแถวเช้า 07:45 แยกต่างหาก)</span>
+        </div>
+      </div>
+
       {/* แถบไอคอน 3 งานหลักของครู (เช็คชื่อเข้าเรียน | คะแนน ปพ.5 | สั่งงาน) เน้นกดง่ายในแนวตั้ง */}
       <div className="max-w-xl mx-auto flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl border border-slate-200">
         {(
@@ -752,8 +811,9 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
             <PaperRegisterLedger
               initialMode="CLASS_ATTENDANCE"
               defaultRoom={selectedClassroom}
-              subjectLabel="ศ23101 ศิลปะ"
+              subjectLabel={`${selectedSubjectCode} ${currentSubject.name}`}
               hideModeSwitcher={true}
+              hideMorningAssembly={true}
             />
           )}
 
@@ -992,7 +1052,8 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
           <PaperRegisterLedger
             initialMode="SCORE_GRADEBOOK"
             defaultRoom={selectedClassroom}
-            subjectLabel="ศ23101 ศิลปะ"
+            subjectLabel={`${selectedSubjectCode} ${currentSubject.name}`}
+            hideMorningAssembly={true}
           />
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
