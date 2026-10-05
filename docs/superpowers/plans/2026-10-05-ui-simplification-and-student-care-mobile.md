@@ -38,12 +38,12 @@
 - `PaperRegisterLedgerProps`: ใช้ `hideModeSwitcher={true}` และกำหนด `initialMode="CLASS_ATTENDANCE"`
 - ย้ายตัวเลือกห้องเรียนขึ้นมาที่ Header แถบเดียว
 
-- [ ] **Step 1: ปรับ `TeacherOverviewView.tsx` ให้ซ่อน Mode Switcher ใน `PaperRegisterLedger`**
+- [x] **Step 1: ปรับ `TeacherOverviewView.tsx` ให้ซ่อน Mode Switcher ใน `PaperRegisterLedger`**
   - ในแท็บ `attendance` ให้ส่ง `hideModeSwitcher={true}` ไปยัง `<PaperRegisterLedger />`
   - ลบตารางส่งงานซ้ำซ้อนที่อยู่ด้านล่างออก ให้เหลือเฉพาะการเช็คชื่อเข้าเรียน
-- [ ] **Step 2: ปรับ Header แถบควบคุมห้องเรียนของ `TeacherOverviewView.tsx`**
+- [x] **Step 2: ปรับ Header แถบควบคุมห้องเรียนของ `TeacherOverviewView.tsx`**
   - ให้ตัวเลือกห้อง ม.3/1, ม.3/2, ม.1/8 แสดงผลชัดเจนในแถบควบคุมด้านบน
-- [ ] **Step 3: ตรวจสอบความถูกต้องและ Build**
+- [x] **Step 3: ตรวจสอบความถูกต้องและ Build**
   - รัน `npm run build` ตรวจสอบข้อผิดพลาด
 
 ---
@@ -56,10 +56,10 @@
 **Interfaces:**
 - ปรับแต่ง Card "07:45 เช็คแถวเช้า" ในหน้า Daily Command Center ให้เปิด Modal หรือเปิดหน้าเช็คแถวเช้าเฉพาะครูที่ปรึกษาได้ทันที 1-Tap
 
-- [ ] **Step 1: ตรวจสอบและเชื่อมโยงปุ่มเช็คแถวเช้าใน `TeacherDailyTodoList.tsx`**
+- [x] **Step 1: ตรวจสอบและเชื่อมโยงปุ่มเช็คแถวเช้าใน `TeacherDailyTodoList.tsx`**
   - ให้ปุ่ม "เช็คแถวเช้า" เปิดแผ่นบันทึกแถวเช้าโดยเฉพาะ (Mode: `MORNING_ASSEMBLY`)
   - แยกบริบทของแถวเช้า ไม่ให้ปนกับรายวิชา ศ23101
-- [ ] **Step 2: ทดสอบการทำงานของเช็คแถวเช้า**
+- [x] **Step 2: ทดสอบการทำงานของเช็คแถวเช้า**
   - รัน `npm run build`
 
 ---
@@ -73,11 +73,11 @@
 - `EndTermReadinessView`: เปลี่ยนช่องคะแนนเก็บชิ้นงานให้เป็นโหมดแสดงผล (Read-Only) พร้อมปุ่ม/ลิงก์ "ไปกรอกคะแนนที่หน้า งาน/มอบหมาย"
 - คะแนนสอบกลางภาค และคะแนนสอบปลายภาค ยังคงกรอกได้ในหน้านี้ตามมาตรฐาน ปพ.5 / SGS
 
-- [ ] **Step 1: อัปเดต `EndTermReadinessView.tsx` ให้ช่องคะแนนงานเป็น Read-Only**
+- [x] **Step 1: อัปเดต `EndTermReadinessView.tsx` ให้ช่องคะแนนงานเป็น Read-Only**
   - ใส่ Tooltip หรือปุ่มลัดนำทางไปยัง `AssignmentManagementView` เมื่อครูต้องการแก้ไขคะแนนงาน
-- [ ] **Step 2: ยืนยันว่า `AssignmentManagementView.tsx` รองรับการกรอกคะแนนและตรวจงานครบถ้วน**
+- [x] **Step 2: ยืนยันว่า `AssignmentManagementView.tsx` รองรับการกรอกคะแนนและตรวจงานครบถ้วน**
   - มีทั้งตารางส่งงาน ปุ่มกรอกคะแนน และการตรวจงานรายบุคคล
-- [ ] **Step 3: ตรวจสอบและ Build**
+- [x] **Step 3: ตรวจสอบและ Build**
   - รัน `npm run build`
 
 ---
@@ -92,9 +92,9 @@
 - ลบเมนูที่ซ้ำซ้อน เช่น "ตารางสอนของฉัน" ที่ซ้ำกับ "ตารางสอน"
 - ซ่อนปุ่ม "ย้อนกลับ" ในหน้าที่เข้าจากเมนูหลักโดยตรง
 
-- [ ] **Step 1: ตรวจสอบและปรับปรุงรายการเมนูใน `TeacherSidebar.tsx`**
+- [x] **Step 1: ตรวจสอบและปรับปรุงรายการเมนูใน `TeacherSidebar.tsx`**
   - ตรวจสอบให้แน่ใจว่าเมนูชัดเจน ไม่รกรุงรัง และไม่ซ้ำซ้อน
-- [ ] **Step 2: ตรวจสอบและ Build**
+- [x] **Step 2: ตรวจสอบและ Build**
   - รัน `npm run build`
 
 ---
@@ -107,9 +107,9 @@
 - รวมตาราง "ลำดับเลขที่ SGS" กับ "บัญชีรายชื่อห้อง" ให้เหลือตารางเดียวที่ชัดเจน
 - ย้ายปุ่มเครื่องมือทะเบียน (นำเข้า / จัดเรียงอัตโนมัติ / แจ้งย้าย) ไปไว้ใน Dropdown "จัดการรายชื่อ"
 
-- [ ] **Step 1: รวมตารางรายชื่อใน `ClassroomsRosterView.tsx`**
-- [ ] **Step 2: รวมปุ่มจัดการเป็นเมนูดรอปดาวน์**
-- [ ] **Step 3: ตรวจสอบและ Build**
+- [x] **Step 1: รวมตารางรายชื่อใน `ClassroomsRosterView.tsx`**
+- [x] **Step 2: รวมปุ่มจัดการเป็นเมนูดรอปดาวน์**
+- [x] **Step 3: ตรวจสอบและ Build**
   - รัน `npm run build`
 
 ---
@@ -129,8 +129,8 @@
   - อันดับประจำสัปดาห์ (Leaderboard Top 5): ด.ญ. สุภาวดี ใจดี (1,420 XP), ด.ช. กิตติศักดิ์ แสงทอง (1,280 XP), ด.ญ. พิมพ์ชนก วงศ์ศรี (980 XP), ด.ช. นที ธรรมชาติ (850 XP), ด.ญ. อรวรรณ ศรีสุข (720 XP)
   - แถบ ACTIVE BUFF: สมาธิเพิ่มขึ้น (XP x1.2) สีเขียวมรกต
 
-- [ ] **Step 1: ปรับ JSX และ Styling ใน `StudentMissionsView.tsx` ให้ตรงตาม Mockup เป๊ะ**
-- [ ] **Step 2: ตรวจสอบการแสดงผลและ Build**
+- [x] **Step 1: ปรับ JSX และ Styling ใน `StudentMissionsView.tsx` ให้ตรงตาม Mockup เป๊ะ**
+- [x] **Step 2: ตรวจสอบการแสดงผลและ Build**
   - รัน `npm run build`
 
 ---
@@ -153,8 +153,8 @@
     5. ชนะเลิศกิจกรรม ร.ร. (ยังไม่ปลดล็อก)
     6. นักเรียนตัวอย่าง (ระดับสูง) (ยังไม่ปลดล็อก)
 
-- [ ] **Step 1: ปรับ JSX และ Components ใน `StudentTrophyView.tsx` ให้ตรงตาม Mockup**
-- [ ] **Step 2: ตรวจสอบและ Build**
+- [x] **Step 1: ปรับ JSX และ Components ใน `StudentTrophyView.tsx` ให้ตรงตาม Mockup**
+- [x] **Step 2: ตรวจสอบและ Build**
   - รัน `npm run build`
 
 ---
@@ -173,8 +173,8 @@
   - ปุ่มแอ็กชัน: `บันทึกฉบับร่าง` (ขาว) และ `ถัดไป ->` (ส้ม)
   - แถบปิดท้าย: "🌱 เรียนดี มีวินัย เติบโตอย่างมีคุณภาพ | โรงเรียนตัวอย่างพัฒนา"
 
-- [ ] **Step 1: ปรับปรุงฟอร์มและ Stepper ใน `StudentHomeVisitFormView.tsx`**
-- [ ] **Step 2: ตรวจสอบและ Build**
+- [x] **Step 1: ปรับปรุงฟอร์มและ Stepper ใน `StudentHomeVisitFormView.tsx`**
+- [x] **Step 2: ตรวจสอบและ Build**
   - รัน `npm run build`
 
 ---
@@ -191,9 +191,9 @@
 - Selected student state, active bottom tab, date, filter chips, mood state
 - Responsive container: ออกแบบแบบ Mobile First (390px-430px) พร้อมขยายเต็มจอบนมือถือจริง และจัดให้อยู่กึ่งกลางสวยงามบนแท็บเล็ต/เดสก์ท็อป
 
-- [ ] **Step 1: สร้างโครงสร้างหลักและ State Machine ใน `StudentMobileCareView.tsx`**
-- [ ] **Step 2: ทำ Bottom Navigation 4 ปุ่ม (`หน้าหลัก` | `นักเรียน` | `กิจกรรม/รายงาน` | `ตั้งค่า`)**
-- [ ] **Step 3: ตรวจสอบการสลับหน้าจอ**
+- [x] **Step 1: สร้างโครงสร้างหลักและ State Machine ใน `StudentMobileCareView.tsx`**
+- [x] **Step 2: ทำ Bottom Navigation 4 ปุ่ม (`หน้าหลัก` | `นักเรียน` | `กิจกรรม/รายงาน` | `ตั้งค่า`)**
+- [x] **Step 3: ตรวจสอบการสลับหน้าจอ**
   - รัน `npm run build`
 
 ---
@@ -221,9 +221,9 @@
   - ป้ายระบุจำนวน: `32 คน`
   - รายการนักเรียนการ์ดมน: อวตาร, ชื่อ-สกุล (เช่น ด.ญ. ปรียากานต์ ชัยแก้ว เลขที่ 1, ด.ช. กฤษณะ ศรีสมบูรณ์ เลขที่ 2), Badge สถานะ (`ปกติ` เขียว, `เสี่ยง` ส้ม), ลูกศร >
 
-- [ ] **Step 1: สร้างหน้า Dashboard (Screen 1) ใน `StudentMobileCareView.tsx`**
-- [ ] **Step 2: สร้างหน้ารายชื่อนักเรียน (Screen 2) ใน `StudentMobileCareView.tsx`**
-- [ ] **Step 3: ตรวจสอบและ Build**
+- [x] **Step 1: สร้างหน้า Dashboard (Screen 1) ใน `StudentMobileCareView.tsx`**
+- [x] **Step 2: สร้างหน้ารายชื่อนักเรียน (Screen 2) ใน `StudentMobileCareView.tsx`**
+- [x] **Step 3: ตรวจสอบและ Build**
   - รัน `npm run build`
 
 ---
@@ -256,9 +256,9 @@
   - ช่องข้อความ: "หมายเหตุ (ถ้ามี)", placeholder: "เช่น วันนี้มีอาการเหนื่อย ไม่ค่อยมีสมาธิ", ตัวนับ 0/200
   - ปุ่มบันทึก: `บันทึก` (เขียวเข้ม)
 
-- [ ] **Step 1: สร้างหน้ารายละเอียดนักเรียน (Screen 3)**
-- [ ] **Step 2: สร้างหน้าบันทึกพฤติกรรม (Screen 4)**
-- [ ] **Step 3: ตรวจสอบและ Build**
+- [x] **Step 1: สร้างหน้ารายละเอียดนักเรียน (Screen 3)**
+- [x] **Step 2: สร้างหน้าบันทึกพฤติกรรม (Screen 4)**
+- [x] **Step 3: ตรวจสอบและ Build**
   - รัน `npm run build`
 
 ---
@@ -287,9 +287,9 @@
   - ช่องข้อความ: "ข้อความถึงครู (ถ้ามี)", placeholder: "อยากบอกอะไรครูไหม...", ตัวนับ 0/200
   - ปุ่ม: `บันทึก` (เขียวเข้ม)
 
-- [ ] **Step 1: สร้างหน้าห้องรางวัล & สัตว์เลี้ยง (Screen 5)**
-- [ ] **Step 2: สร้างหน้าสุขภาพจิตและสังคม (Screen 6)**
-- [ ] **Step 3: ตรวจสอบและ Build**
+- [x] **Step 1: สร้างหน้าห้องรางวัล & สัตว์เลี้ยง (Screen 5)**
+- [x] **Step 2: สร้างหน้าสุขภาพจิตและสังคม (Screen 6)**
+- [x] **Step 3: ตรวจสอบและ Build**
   - รัน `npm run build`
 
 ---
@@ -323,10 +323,10 @@
   - เปลี่ยนรหัสผ่าน >
   - ออกจากระบบ (สีแดง/เทา)
 
-- [ ] **Step 1: สร้างหน้าแจ้งเตือน (Screen 7)**
-- [ ] **Step 2: สร้างหน้ารายงานและสถิติ (Screen 8)**
-- [ ] **Step 3: สร้างหน้าตั้งค่า (Screen 9)**
-- [ ] **Step 4: ตรวจสอบและ Build**
+- [x] **Step 1: สร้างหน้าแจ้งเตือน (Screen 7)**
+- [x] **Step 2: สร้างหน้ารายงานและสถิติ (Screen 8)**
+- [x] **Step 3: สร้างหน้าตั้งค่า (Screen 9)**
+- [x] **Step 4: ตรวจสอบและ Build**
   - รัน `npm run build`
 
 ---
@@ -335,10 +335,10 @@
 **Files:**
 - Modify: `src/views/StudentPortalView.tsx`
 
-- [ ] **Step 1: เชื่อมโยง `StudentMobileCareView` ใน `StudentPortalView`**
+- [x] **Step 1: เชื่อมโยง `StudentMobileCareView` ใน `StudentPortalView`**
   - แสดงผลระบบ Mobile First บนอุปกรณ์มือถืออัตโนมัติ
   - เพิ่มปุ่มสลับมุมมอง "Mobile Care View (คำยางพิทยา 9 หน้าจอ)" เพื่อให้ครูและผู้ใช้สามารถสลับทดสอบและใช้งานได้ทุกอุปกรณ์
-- [ ] **Step 2: ตรวจสอบและ Build**
+- [x] **Step 2: ตรวจสอบและ Build**
   - รัน `npm run build`
 
 ---
@@ -346,7 +346,7 @@
 ### Phase 4: การตรวจสอบคุณภาพและส่งมอบ (Verification & QA)
 
 #### Task 15: ตรวจสอบ Type Checking, Build และความสอดคล้องกับรูปภาพต้นฉบับ
-- [ ] **Step 1: รัน `npm run build` เพื่อยืนยันว่าไม่มี Error ใน TypeScript / Bundler**
-- [ ] **Step 2: ตรวจสอบการทำงานของทั้ง 9 หน้าจอ Mobile ว่าสามารถคลิกไป-มาได้ครบถ้วน**
-- [ ] **Step 3: ตรวจสอบ 3 หน้าจอ Desktop ว่าครบตามรายละเอียดในภาพ**
-- [ ] **Step 4: ตรวจสอบฝั่งครูว่า 1 หน้า = 1 งานหลัก ไม่มีความซ้ำซ้อน**
+- [x] **Step 1: รัน `npm run build` เพื่อยืนยันว่าไม่มี Error ใน TypeScript / Bundler**
+- [x] **Step 2: ตรวจสอบการทำงานของทั้ง 9 หน้าจอ Mobile ว่าสามารถคลิกไป-มาได้ครบถ้วน**
+- [x] **Step 3: ตรวจสอบ 3 หน้าจอ Desktop ว่าครบตามรายละเอียดในภาพ**
+- [x] **Step 4: ตรวจสอบฝั่งครูว่า 1 หน้า = 1 งานหลัก ไม่มีความซ้ำซ้อน**
