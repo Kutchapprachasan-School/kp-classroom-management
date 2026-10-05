@@ -10,10 +10,11 @@ import {
   ArrowRight,
   BookOpen,
   Calendar,
-  Apple,
+  Zap,
   Dices,
 } from 'lucide-react';
-import { PixelPet } from '../components/common/PixelPet';
+import { gachaService } from '../services/gachaService';
+import { ChibiBuddyAvatar } from '../components/student/ChibiBuddyAvatar';
 
 export interface TrophyBadgeItem {
   id: string;
@@ -82,26 +83,37 @@ export const StudentTrophyView: React.FC<StudentTrophyViewProps> = ({
   onNavigateToGacha,
   onNavigateToMissions,
 }) => {
-  const [petName, setPetName] = useState('น้องเขียว');
+  const currentBuddy = gachaService.getActiveBuddy();
+  const [buddyCustomName, setBuddyCustomName] = useState(currentBuddy.name);
   const [isEditingName, setIsEditingName] = useState(false);
-  const [petHappiness, setPetHappiness] = useState(85);
-  const [petQuote, setPetQuote] = useState('พร้อมเรียนรู้ เติบโตไปด้วยกัน');
-  const [isPetJumping, setIsPetJumping] = useState(false);
+  const [buddyMorale, setBuddyMorale] = useState(100);
+  const [buddyQuote, setBuddyQuote] = useState(() => {
+    return currentBuddy.id === 'buddy-l1'
+      ? 'เพลิงแห่งความมุ่งมั่นลุกโชนแล้ว! ลุยการบ้านกันเลย!'
+      : 'พร้อมเรียนรู้และผจญภัยเคียงข้างคุณทุกวันครับ! ✨';
+  });
+  const [isBuddyJumping, setIsBuddyJumping] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  const handlePetAction = () => {
-    setIsPetJumping(true);
-    setPetHappiness((prev) => Math.min(100, prev + 5));
-    setPetQuote('เย้! วันนี้เราพร้อมเรียนรู้ไปด้วยกันแล้วครับเจ้านาย! 🍃✨');
+  const handleBuddyAction = () => {
+    setIsBuddyJumping(true);
+    setBuddyMorale((prev) => Math.min(100, prev + 5));
+    const quotes = [
+      `เย้! วันนี้เราพร้อมลุยไปด้วยกันแล้วครับ! ⚡`,
+      `ความพยายามวันนี้ จะพาเราไปสู่ความสำเร็จ! ✨`,
+      `บัฟ ${currentBuddy.skillName} พร้อมทำงานเต็มที่แล้ว! 🔥`,
+      `สู้ๆ นะครับ! ส่งงานครบแล้วเลเวลอัปแน่นอน! 🎯`,
+    ];
+    setBuddyQuote(quotes[Math.floor(Math.random() * quotes.length)]);
     setTimeout(() => {
-      setIsPetJumping(false);
+      setIsBuddyJumping(false);
     }, 600);
   };
 
-  const handleFeed = () => {
-    setPetHappiness(100);
-    setToastMsg('🍏 ให้อาหารน้องเขียวเรียบร้อย! ความสุขเต็ม 100%');
-    setPetQuote('งั่มๆ แอปเปิ้ลอร่อยมากเลย ขอบคุณนะเจ้านาย! 💚');
+  const handleCheerBuddy = () => {
+    setBuddyMorale(100);
+    setToastMsg(`✨ เสริมพลังใจให้น้อง${currentBuddy.name} เรียบร้อย! กำลังใจเต็ม 100%`);
+    setBuddyQuote(`ขอบคุณที่ส่งกำลังใจให้นะครับ! พลังใจพร้อมลุยเต็ม 100% แล้ว! 💖`);
     setTimeout(() => setToastMsg(null), 3000);
   };
 
@@ -109,14 +121,14 @@ export const StudentTrophyView: React.FC<StudentTrophyViewProps> = ({
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-12 animate-fade-in font-sans text-slate-800 select-none">
-      {/* 1. Header matching Screen 2 of Mockup */}
+      {/* 1. Header: หอเกียรติยศและคู่หูบัดดี้ */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <span>ผู้เกียรติยศและสัตว์เลี้ยง (Trophy Room & Sanctuary)</span>
+            <span>หอเกียรติยศและคู่หูบัดดี้ (Trophy Room & Buddy Sanctuary)</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            สะสมคะแนนเพื่ออัปเลเวลสัตว์เลี้ยง และรับเหรียญตราความสำเร็จ
+            สะสมคะแนนเพื่ออัปเลเวลคู่หูบัดดี้ ปลดล็อกสกิลบัฟ และรับเหรียญตราความสำเร็จ
           </p>
         </div>
 
@@ -139,33 +151,49 @@ export const StudentTrophyView: React.FC<StudentTrophyViewProps> = ({
         </div>
       </div>
 
-      {/* 2. Main Pet Hero Card (น้องเขียว Pixel Pet - ตาม Mockup 2) */}
+      {toastMsg && (
+        <div className="p-3 bg-emerald-500 text-white text-xs font-bold rounded-2xl shadow-md text-center animate-in fade-in slide-in-from-top-2 duration-300">
+          {toastMsg}
+        </div>
+      )}
+
+      {/* 2. Main Buddy Hero Card (คู่หูบัดดี้ประจำตัว) */}
       <div className="bg-gradient-to-b from-emerald-50/70 via-teal-50/40 to-white rounded-3xl border-2 border-emerald-200/90 p-6 sm:p-7 shadow-sm relative overflow-hidden">
         {/* Glow behind */}
         <div className="absolute top-0 right-0 w-72 h-72 bg-emerald-200/25 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
 
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
-          {/* Pet Sprite & Info */}
+          {/* Buddy Sprite & Info */}
           <div className="flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
-            {/* Interactive Pixel Sprite */}
+            {/* Interactive Anime Avatar */}
             <div
-              onClick={handlePetAction}
-              className={`p-3 bg-white/80 backdrop-blur rounded-3xl border border-emerald-200 shadow-sm cursor-pointer transition-transform duration-300 select-none ${
-                isPetJumping ? '-translate-y-3 scale-110' : 'hover:scale-105'
+              onClick={handleBuddyAction}
+              className={`p-3 bg-white/90 backdrop-blur rounded-3xl border-2 border-emerald-200 shadow-sm cursor-pointer transition-transform duration-300 select-none relative ${
+                isBuddyJumping ? '-translate-y-3 scale-110' : 'hover:scale-105'
               }`}
-              title="คลิกลูบหัวน้องเขียว!"
+              title={`คลิกทักทายน้อง${currentBuddy.name}!`}
             >
-              <PixelPet size={108} className="drop-shadow-md mx-auto" />
+              <ChibiBuddyAvatar
+                buddy={currentBuddy}
+                size="lg"
+                showName={false}
+                isAnimated={true}
+              />
+              <span
+                className={`absolute -bottom-2 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full text-[10px] font-black shadow-xs tracking-wider z-10 ${currentBuddy.badgeBg}`}
+              >
+                {currentBuddy.rarity}
+              </span>
             </div>
 
             <div className="space-y-2">
-              {/* Pet Name with Edit Button */}
+              {/* Buddy Name with Edit Button */}
               <div className="flex items-center justify-center sm:justify-start gap-2">
                 {isEditingName ? (
                   <input
                     type="text"
-                    value={petName}
-                    onChange={(e) => setPetName(e.target.value)}
+                    value={buddyCustomName}
+                    onChange={(e) => setBuddyCustomName(e.target.value)}
                     onBlur={() => setIsEditingName(false)}
                     onKeyDown={(e) => e.key === 'Enter' && setIsEditingName(false)}
                     className="text-lg font-black text-slate-900 border-b-2 border-emerald-500 bg-white px-2 py-0.5 rounded focus:outline-none"
@@ -173,28 +201,31 @@ export const StudentTrophyView: React.FC<StudentTrophyViewProps> = ({
                   />
                 ) : (
                   <h2 className="text-xl sm:text-2xl font-black text-slate-900">
-                    {petName}
+                    {buddyCustomName}
                   </h2>
                 )}
                 <button
                   type="button"
                   onClick={() => setIsEditingName(!isEditingName)}
-                  className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-emerald-100 rounded-lg transition-colors"
-                  title="แก้ไขชื่อสัตว์เลี้ยง"
+                  className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-emerald-100 rounded-lg transition-colors cursor-pointer"
+                  title="แก้ไขชื่อเรียกคู่หูบัดดี้"
                 >
                   <Edit3 className="w-4 h-4" />
                 </button>
               </div>
 
               {/* Subtitle / Quote */}
+              <p className="text-xs text-slate-500 font-semibold">
+                {currentBuddy.title}
+              </p>
               <p className="text-xs sm:text-sm font-medium text-emerald-800">
-                &ldquo;{petQuote}&rdquo;
+                &ldquo;{buddyQuote}&rdquo;
               </p>
 
               {/* Level & XP Progress */}
               <div className="space-y-1.5 pt-1 w-64 sm:w-80">
                 <div className="flex justify-between text-xs font-bold text-slate-700">
-                  <span className="text-emerald-700 font-extrabold">เลเวล 4</span>
+                  <span className="text-emerald-700 font-extrabold">เลเวล 2</span>
                   <span className="tabular-nums">650 / 1,000 XP (65%)</span>
                 </div>
                 <div className="w-full bg-slate-200/80 h-3 rounded-full overflow-hidden p-0.5">
@@ -205,35 +236,37 @@ export const StudentTrophyView: React.FC<StudentTrophyViewProps> = ({
                 </div>
               </div>
 
-              {/* Stats: Happiness & Food */}
-              <div className="flex items-center justify-center sm:justify-start gap-4 pt-1 text-xs font-bold">
+              {/* Stats: Morale & Active Buff */}
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 sm:gap-3 pt-1 text-xs font-bold">
                 <div className="flex items-center gap-1.5 text-rose-600 bg-white px-3 py-1 rounded-xl border border-rose-100 shadow-2xs">
                   <Heart className="w-3.5 h-3.5 fill-rose-500 text-rose-500" />
-                  <span>ความสุข {petHappiness}%</span>
+                  <span>กำลังใจ {buddyMorale}%</span>
                 </div>
-                <div className="flex items-center gap-1.5 text-emerald-700 bg-white px-3 py-1 rounded-xl border border-emerald-100 shadow-2xs">
-                  <Apple className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>อาหาร: เพียงพอ</span>
+                <div className="flex items-center gap-1.5 text-purple-700 bg-white px-3 py-1 rounded-xl border border-purple-100 shadow-2xs">
+                  <Zap className="w-3.5 h-3.5 text-purple-600 fill-purple-400" />
+                  <span className="truncate max-w-[160px] sm:max-w-[200px]" title={currentBuddy.skillDesc}>
+                    บัฟ: {currentBuddy.skillName}
+                  </span>
                 </div>
                 <button
                   type="button"
-                  onClick={handleFeed}
+                  onClick={handleCheerBuddy}
                   className="px-2.5 py-1 text-xs font-bold rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-800 transition-colors cursor-pointer"
                 >
-                  🍏 ให้อาหาร
+                  ✨ เสริมพลังใจคู่หู
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Action Button: ดูภารกิจสัตว์เลี้ยง -> */}
+          {/* Action Button: ดูภารกิจคู่หูบัดดี้ -> */}
           <div className="shrink-0 flex flex-col items-center sm:items-end gap-2">
             <button
               type="button"
               onClick={onNavigateToMissions}
               className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-sm shadow-lg shadow-orange-500/25 hover:shadow-orange-500/35 transition-all flex items-center gap-2 cursor-pointer transform hover:-translate-y-0.5"
             >
-              <span>ดูภารกิจสัตว์เลี้ยง</span>
+              <span>ดูภารกิจคู่หูบัดดี้</span>
               <ArrowRight className="w-4 h-4 stroke-[2.5]" />
             </button>
             <span className="text-[11px] text-slate-400 font-medium">

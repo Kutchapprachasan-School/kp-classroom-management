@@ -268,7 +268,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                 </div>
               )}
 
-              {/* Two-Column Grid: Left (Adventure + Quests) vs Right (Pet + Badges) */}
+              {/* Two-Column Grid: Left (Adventure + Quests) vs Right (Buddy + Badges) */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                 {/* Left Column (8 cols) */}
                 <div className="lg:col-span-8 space-y-6">
@@ -293,7 +293,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
                 {/* Right Column (4 cols) */}
                 <div className="lg:col-span-4 space-y-6">
-                  {/* 4. Companion Pet Card */}
+                  {/* 4. Companion Buddy Card */}
                   <CompanionCard
                     name="โมจิ"
                     title="จิ้งจอกใบไม้ · เติบโตไปด้วยกัน"

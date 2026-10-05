@@ -36,7 +36,7 @@ export const CompanionCard: React.FC<CompanionCardProps> = ({
         <div className="flex items-center gap-1.5">
           <Sparkles className="w-4 h-4 text-purple-600" />
           <h3 className="font-extrabold text-slate-800 text-xs sm:text-sm">
-            คู่หูการเรียนรู้
+            คู่หูบัดดี้ประจำตัว
           </h3>
         </div>
         <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${currentBuddy.badgeBg}`}>
@@ -71,7 +71,7 @@ export const CompanionCard: React.FC<CompanionCardProps> = ({
       {/* Level & XP Progress Bar */}
       <div className="space-y-1.5 text-left pt-1">
         <div className="flex justify-between text-xs text-slate-600 font-bold">
-          <span>ความผูกพัน</span>
+          <span>ระดับพลังคู่หู (Buddy Progress)</span>
           <span className="tabular-nums">
             {currentXp} / {nextLevelXp} XP
           </span>
@@ -99,7 +99,7 @@ export const CompanionCard: React.FC<CompanionCardProps> = ({
           className="py-2 px-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
         >
           <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-          <span>สุ่มกาชา</span>
+          <span>สุ่มคู่หู (Gacha)</span>
         </button>
       </div>
     </div>
