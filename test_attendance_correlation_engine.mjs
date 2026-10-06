@@ -292,4 +292,157 @@ assert.ok(typeof stats.lateCount === 'number');
 assert.ok(typeof stats.attendanceRate === 'number');
 console.log(`  ✓ Morning Assembly Stats: ${stats.totalStudents} students, ${stats.attendanceRate}% attendance rate`);
 
-console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE UNIT CHECKS PASSED!');
+// ----------------------------------------------------
+// Step 3: Subject Icons System & Multi-Strand Icon Configuration Verification
+// ----------------------------------------------------
+console.log('\n--- 3. Checking Subject Icons System & Multi-Strand Auto-Detection ---');
+const subjectIconsPath = './src/config/subjectIcons.ts';
+assert.ok(existsSync(subjectIconsPath), 'src/config/subjectIcons.ts must exist');
+
+const {
+  ALL_SUBJECT_ICONS,
+  DEFAULT_SUBJECT_ICON,
+  getSubjectIcon,
+  getSubjectBadgeClasses,
+  getSubjectBadgeProps,
+  renderSubjectIconBadge,
+} = await import('./src/config/subjectIcons.ts');
+
+assert.ok(Array.isArray(ALL_SUBJECT_ICONS), 'ALL_SUBJECT_ICONS must be an array');
+assert.strictEqual(ALL_SUBJECT_ICONS.length >= 20, true, 'ALL_SUBJECT_ICONS must contain at least 20 subjects');
+
+// Check required subjects exist in catalog
+const requiredSubjectIds = [
+  'japanese', 'chinese', 'korean', 'english', 'french',
+  'thai', 'math', 'physics', 'chemistry', 'biology',
+  'science', 'computing', 'social', 'history', 'pe',
+  'art', 'music', 'vocational', 'guidance', 'scout'
+];
+for (const id of requiredSubjectIds) {
+  const found = ALL_SUBJECT_ICONS.find((item) => item.id === id);
+  assert.ok(found, `Subject icon catalog must contain ${id}`);
+  assert.ok(found.symbol, `${id} must have a symbol`);
+  assert.ok(found.bgClass, `${id} must have a bgClass`);
+  assert.ok(found.textClass, `${id} must have a textClass`);
+  assert.ok(found.name, `${id} must have a Thai name`);
+  assert.ok(found.strand, `${id} must have a learning strand`);
+}
+console.log(`  ✓ All ${requiredSubjectIds.length} multi-strand subject icon configurations verified`);
+
+// Detection Test 1: Japanese (ญ31201)
+const iconJap = getSubjectIcon('ญ31201');
+assert.strictEqual(iconJap.id, 'japanese');
+assert.strictEqual(iconJap.symbol, 'あ');
+assert.strictEqual(iconJap.bgClass, 'bg-rose-500');
+
+// Detection Test 2: Chemistry (ว30221 เคมี 1)
+const iconChem = getSubjectIcon('ว30221 เคมี 1');
+assert.strictEqual(iconChem.id, 'chemistry');
+assert.strictEqual(iconChem.symbol, '🧪');
+assert.strictEqual(iconChem.bgClass, 'bg-teal-500');
+
+// Detection Test 3: Korean (ภาษาเกาหลี 1)
+const iconKor = getSubjectIcon('ภาษาเกาหลี 1');
+assert.strictEqual(iconKor.id, 'korean');
+assert.strictEqual(iconKor.symbol, '한');
+assert.strictEqual(iconKor.bgClass, 'bg-blue-600');
+
+// Detection Test 4: Physics (ว30201 ฟิสิกส์ 1)
+const iconPhy = getSubjectIcon('ว30201 ฟิสิกส์ 1');
+assert.strictEqual(iconPhy.id, 'physics');
+assert.strictEqual(iconPhy.symbol, '⚡');
+assert.strictEqual(iconPhy.bgClass, 'bg-amber-500');
+
+// Detection Test 5: Computing (ว21103 วิทยาการคำนวณ or คอมพิวเตอร์)
+const iconComp1 = getSubjectIcon('ว21103 วิทยาการคำนวณ');
+assert.strictEqual(iconComp1.id, 'computing');
+assert.strictEqual(iconComp1.symbol, '💻');
+assert.strictEqual(iconComp1.bgClass, 'bg-cyan-600');
+const iconComp2 = getSubjectIcon('คอมพิวเตอร์');
+assert.strictEqual(iconComp2.id, 'computing');
+
+// Detection Test 6: Math (ค21101)
+const iconMath = getSubjectIcon('ค21101');
+assert.strictEqual(iconMath.id, 'math');
+assert.strictEqual(iconMath.symbol, '∑');
+assert.strictEqual(iconMath.bgClass, 'bg-blue-600');
+
+// Detection Test 7: Thai (ท21101)
+const iconThai = getSubjectIcon('ท21101');
+assert.strictEqual(iconThai.id, 'thai');
+assert.strictEqual(iconThai.symbol, 'ก');
+assert.strictEqual(iconThai.bgClass, 'bg-orange-500');
+
+// Detection Test 8: PE (พ21101 or สุขศึกษาและพลศึกษา)
+const iconPE1 = getSubjectIcon('พ21101');
+assert.strictEqual(iconPE1.id, 'pe');
+assert.strictEqual(iconPE1.symbol, '⚽');
+assert.strictEqual(iconPE1.bgClass, 'bg-orange-500');
+const iconPE2 = getSubjectIcon('สุขศึกษาและพลศึกษา');
+assert.strictEqual(iconPE2.id, 'pe');
+
+// Detection Test 9: Arts (ศ21101 or ทัศนศิลป์)
+const iconArt = getSubjectIcon('ศ21101 ทัศนศิลป์');
+assert.strictEqual(iconArt.id, 'art');
+assert.strictEqual(iconArt.symbol, '🎨');
+assert.strictEqual(iconArt.bgClass, 'bg-pink-500');
+
+// Detection Test 10: Guidance (ก21901 or กิจกรรมแนะแนว)
+const iconGuidance = getSubjectIcon('ก21901', 'กิจกรรมแนะแนว');
+assert.strictEqual(iconGuidance.id, 'guidance');
+assert.strictEqual(iconGuidance.symbol, '🧭');
+assert.strictEqual(iconGuidance.bgClass, 'bg-teal-600');
+
+// Detection Test 11: Music (ศ21102 ดนตรี-นาฏศิลป์)
+const iconMusic = getSubjectIcon('ศ21102 ดนตรี-นาฏศิลป์');
+assert.strictEqual(iconMusic.id, 'music');
+assert.strictEqual(iconMusic.symbol, '🎵');
+
+// Detection Test 12: History (ส21102 ประวัติศาสตร์)
+const iconHistory = getSubjectIcon('ส21102 ประวัติศาสตร์ 1');
+assert.strictEqual(iconHistory.id, 'history');
+assert.strictEqual(iconHistory.symbol, '🏛️');
+
+// Detection Test 13: Biology (ว30241 ชีววิทยา 1)
+const iconBio = getSubjectIcon('ว30241 ชีววิทยา 1');
+assert.strictEqual(iconBio.id, 'biology');
+assert.strictEqual(iconBio.symbol, '🧬');
+
+// Detection Test 14: French (ฝ31201)
+const iconFrench = getSubjectIcon('ฝ31201');
+assert.strictEqual(iconFrench.id, 'french');
+assert.strictEqual(iconFrench.symbol, 'FR');
+
+// Detection Test 15: Chinese (จ31201)
+const iconChinese = getSubjectIcon('จ31201');
+assert.strictEqual(iconChinese.id, 'chinese');
+assert.strictEqual(iconChinese.symbol, '中');
+
+// Detection Test 16: Scout (ลูกเสือ)
+const iconScout = getSubjectIcon('ลูกเสือ-เนตรนารี');
+assert.strictEqual(iconScout.id, 'scout');
+assert.strictEqual(iconScout.symbol, '⚜️');
+
+// Detection Test 17: Unknown fallback to default
+const iconUnknown = getSubjectIcon('XYZ99999');
+assert.strictEqual(iconUnknown.id, 'general');
+assert.strictEqual(iconUnknown.symbol, '📚');
+
+// Render Badge helper test
+const badgeClasses = getSubjectBadgeClasses(iconChem, 'sm');
+assert.ok(badgeClasses.includes('bg-teal-500'));
+assert.ok(badgeClasses.includes('w-6 h-6'));
+
+const badgeProps = getSubjectBadgeProps(iconChem, 'md');
+assert.strictEqual(badgeProps.symbol, '🧪');
+assert.strictEqual(badgeProps.bgClass, 'bg-teal-500');
+
+const renderedBadge = renderSubjectIconBadge(iconChem, 'lg');
+assert.ok(renderedBadge);
+assert.strictEqual(renderedBadge.props.children, '🧪');
+assert.ok(renderedBadge.props.className.includes('bg-teal-500'));
+assert.ok(renderedBadge.props.className.includes('w-10 h-10'));
+
+console.log('  ✓ Multi-strand intelligent detection and badge render helpers verified successfully');
+
+console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE & SUBJECT ICON CHECKS PASSED!');
