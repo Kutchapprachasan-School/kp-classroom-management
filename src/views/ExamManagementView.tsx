@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   PenTool,
+  Plus,
   Lock,
   Unlock,
   BarChart2,
@@ -659,8 +660,10 @@ export const ExamManagementView: React.FC = () => {
       {/* 1. Header & Create Exam Action matching Screenshot */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2.5">
-            <PenTool className="w-6 h-6 text-blue-600 shrink-0" />
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-50/80 text-blue-600 flex items-center justify-center shrink-0">
+              <PenTool className="w-5 h-5 text-blue-600" />
+            </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
                 จัดการการสอบ (Exam Management)
@@ -677,20 +680,21 @@ export const ExamManagementView: React.FC = () => {
           onClick={() => setIsCreateModalOpen(true)}
           className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer self-start sm:self-auto"
         >
+          <Plus className="w-3.5 h-3.5" />
           <span>+ สร้างชุดข้อสอบใหม่</span>
         </button>
       </div>
 
       {/* 2. Filter Tabs and Search Bar matching Screenshot */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+      <div className="bg-white rounded-2xl border border-slate-100 p-2 sm:px-4 sm:py-2 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-1 text-xs w-full sm:w-auto overflow-x-auto">
           <button
             type="button"
             onClick={() => setFilter('ALL')}
-            className={`px-3.5 py-1.5 rounded-full font-medium transition-colors cursor-pointer whitespace-nowrap ${
+            className={`px-4 py-1.5 rounded-full text-xs transition-colors cursor-pointer whitespace-nowrap ${
               filter === 'ALL'
                 ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                : 'text-slate-600 hover:text-slate-900'
+                : 'text-slate-600 hover:text-slate-900 font-medium'
             }`}
           >
             ทั้งหมด ({exams.length})
@@ -698,10 +702,10 @@ export const ExamManagementView: React.FC = () => {
           <button
             type="button"
             onClick={() => setFilter('GRADING')}
-            className={`px-3.5 py-1.5 rounded-full font-medium transition-colors cursor-pointer whitespace-nowrap ${
+            className={`px-3 py-1.5 rounded-full text-xs transition-colors cursor-pointer whitespace-nowrap ${
               filter === 'GRADING'
                 ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                : 'text-slate-600 hover:text-slate-900'
+                : 'text-slate-600 hover:text-slate-900 font-medium'
             }`}
           >
             กำลังกรอกคะแนน
@@ -709,10 +713,10 @@ export const ExamManagementView: React.FC = () => {
           <button
             type="button"
             onClick={() => setFilter('LOCKED')}
-            className={`px-3.5 py-1.5 rounded-full font-medium transition-colors cursor-pointer whitespace-nowrap ${
+            className={`px-3 py-1.5 rounded-full text-xs transition-colors cursor-pointer whitespace-nowrap ${
               filter === 'LOCKED'
                 ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                : 'text-slate-600 hover:text-slate-900'
+                : 'text-slate-600 hover:text-slate-900 font-medium'
             }`}
           >
             ล็อคคะแนนแล้ว (Locked)
@@ -720,10 +724,10 @@ export const ExamManagementView: React.FC = () => {
           <button
             type="button"
             onClick={() => setFilter('UPCOMING')}
-            className={`px-3.5 py-1.5 rounded-full font-medium transition-colors cursor-pointer whitespace-nowrap ${
+            className={`px-3 py-1.5 rounded-full text-xs transition-colors cursor-pointer whitespace-nowrap ${
               filter === 'UPCOMING'
                 ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                : 'text-slate-600 hover:text-slate-900'
+                : 'text-slate-600 hover:text-slate-900 font-medium'
             }`}
           >
             เร็วๆ นี้
@@ -737,7 +741,7 @@ export const ExamManagementView: React.FC = () => {
             placeholder="ค้นหาชื่อการสอบหรือรหัสวิชา..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3.5 py-1.5 text-xs bg-white border border-slate-200/90 rounded-full focus:outline-none focus:border-blue-500 shadow-2xs transition-colors"
+            className="w-full pl-9 pr-3.5 py-1.5 text-xs bg-slate-50/80 border border-slate-200/90 rounded-full focus:outline-none focus:border-blue-500 focus:bg-white shadow-2xs transition-colors"
           />
         </div>
       </div>
@@ -794,7 +798,7 @@ export const ExamManagementView: React.FC = () => {
             {/* Score Stats if Graded */}
             <div className="my-3.5">
               {exam.averageScore !== undefined ? (
-                <div className="p-3 bg-slate-50/80 rounded-xl text-xs grid grid-cols-3 text-center border border-slate-100/60">
+                <div className="p-3 bg-slate-50/80 rounded-xl text-xs grid grid-cols-3 text-center">
                   <div>
                     <div className="text-[10px] text-slate-400">เฉลี่ย</div>
                     <div className="font-bold text-slate-800 text-sm mt-0.5">{exam.averageScore}</div>
@@ -814,7 +818,7 @@ export const ExamManagementView: React.FC = () => {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-2 pt-1 border-t border-slate-50">
+            <div className="flex items-center gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => setScoreGridExam(exam)}
@@ -825,7 +829,7 @@ export const ExamManagementView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setAnalysisExam(exam)}
-                className="p-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-400 hover:text-blue-600 rounded-xl transition-colors cursor-pointer flex items-center justify-center shrink-0"
+                className="p-2 bg-blue-50/80 hover:bg-blue-100 text-blue-600 rounded-xl transition-colors cursor-pointer flex items-center justify-center shrink-0 w-9 h-9"
                 title="วิเคราะห์คุณภาพข้อสอบ (Item Analysis)"
               >
                 <BarChart2 className="w-4 h-4" />
