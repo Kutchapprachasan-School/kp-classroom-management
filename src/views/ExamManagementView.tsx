@@ -27,7 +27,6 @@ import {
   ClipboardList,
   Clock,
 } from 'lucide-react';
-import { examsData } from '../data/mockData';
 import type { ExamItem } from '../types/viewModels';
 
 const EXAMS_STORAGE_KEY = 'kp_exams_management_data_v1';
@@ -68,19 +67,149 @@ interface ItemAnalysisRecord {
   status: 'EXCELLENT' | 'GOOD' | 'NEEDS_REVISION' | 'POOR';
 }
 
+export interface ExtendedExamItem extends ExamItem {
+  category?: 'QUIZ' | 'MIDTERM' | 'FINAL';
+  examTime?: string;
+  dueDate?: string;
+  dueRemark?: string;
+  statusRatio?: string;
+  typeBadge?: string;
+  badgeColor?: string;
+}
+
+export const DEFAULT_MOCKUP_EXAMS: ExtendedExamItem[] = [
+  {
+    id: 'ex-1',
+    title: 'แบบทดสอบย่อยที่ 1 (บทที่ 1)',
+    subjectCode: 'ญี่ปุ่น ม.3/1',
+    roomName: 'ม.3/1',
+    category: 'QUIZ',
+    typeBadge: 'เก็บคะแนน',
+    badgeColor: 'bg-blue-500 text-white',
+    sgsUnitName: 'สอบเก็บคะแนนหน่วยที่ 1 (คำศัพท์และไวยากรณ์)',
+    maxScore: 10,
+    date: '12 ก.ย. 2569',
+    examTime: '(08:00 - 09:00 น.)',
+    dueDate: '12 ก.ย. 2569',
+    dueRemark: '(ภายในวันสอบ)',
+    status: 'LOCKED',
+    statusRatio: '38/39',
+    averageScore: 9.2,
+    highestScore: 10,
+    lowestScore: 6.5,
+  },
+  {
+    id: 'ex-2',
+    title: 'แบบทดสอบย่อยที่ 2 (บทที่ 2)',
+    subjectCode: 'ญี่ปุ่น ม.3/1',
+    roomName: 'ม.3/1',
+    category: 'QUIZ',
+    typeBadge: 'เก็บคะแนน',
+    badgeColor: 'bg-blue-500 text-white',
+    sgsUnitName: 'สอบเก็บคะแนนหน่วยที่ 2 (คันจิและการอ่าน)',
+    maxScore: 10,
+    date: '19 ก.ย. 2569',
+    examTime: '(08:00 - 09:00 น.)',
+    dueDate: '19 ก.ย. 2569',
+    dueRemark: '(ภายในวันสอบ)',
+    status: 'LOCKED',
+    statusRatio: '38/39',
+    averageScore: 8.8,
+    highestScore: 10,
+    lowestScore: 5.0,
+  },
+  {
+    id: 'ex-3',
+    title: 'สอบกลางภาค ภาคเรียนที่ 1/2569',
+    subjectCode: 'ญี่ปุ่น ม.3/1',
+    roomName: 'ม.3/1',
+    category: 'MIDTERM',
+    typeBadge: 'กลางภาค',
+    badgeColor: 'bg-emerald-600 text-white',
+    sgsUnitName: 'วัดผลกลางภาคเรียน (หน่วยที่ 1-2)',
+    maxScore: 20,
+    date: '28 ส.ค. 2569',
+    examTime: '(09:00 - 11:00 น.)',
+    dueDate: '1 ก.ย. 2569',
+    dueRemark: '(ภายใน 3 วัน)',
+    status: 'LOCKED',
+    statusRatio: '38/39',
+    averageScore: 16.4,
+    highestScore: 20,
+    lowestScore: 8.5,
+  },
+  {
+    id: 'ex-4',
+    title: 'สอบปลายภาค ภาคเรียนที่ 1/2569',
+    subjectCode: 'ญี่ปุ่น ม.3/1',
+    roomName: 'ม.3/1',
+    category: 'FINAL',
+    typeBadge: 'ปลายภาค',
+    badgeColor: 'bg-amber-500 text-white',
+    sgsUnitName: 'วัดผลปลายภาคเรียน',
+    maxScore: 30,
+    date: '4 ต.ค. 2569',
+    examTime: '(09:00 - 11:00 น.)',
+    dueDate: '8 ต.ค. 2569',
+    dueRemark: '(ภายใน 3 วัน)',
+    status: 'GRADING',
+    statusRatio: '0/39',
+    averageScore: 22.5,
+    highestScore: 29,
+    lowestScore: 12,
+  },
+  {
+    id: 'ex-5',
+    title: 'แบบทดสอบย่อยที่ 3 (บทที่ 3)',
+    subjectCode: 'ญี่ปุ่น ม.3/2',
+    roomName: 'ม.3/2',
+    category: 'QUIZ',
+    typeBadge: 'เก็บคะแนน',
+    badgeColor: 'bg-blue-500 text-white',
+    sgsUnitName: 'สอบเก็บคะแนนหน่วยที่ 3 (บทสนทนา)',
+    maxScore: 10,
+    date: '15 ก.ย. 2569',
+    examTime: '(08:00 - 09:00 น.)',
+    dueDate: '15 ก.ย. 2569',
+    dueRemark: '(ภายในวันสอบ)',
+    status: 'UPCOMING',
+    statusRatio: '0/39',
+  },
+  {
+    id: 'ex-6',
+    title: 'สอบปลายภาค ภาคเรียนที่ 1/2569',
+    subjectCode: 'ญี่ปุ่น ม.3/2',
+    roomName: 'ม.3/2',
+    category: 'FINAL',
+    typeBadge: 'ปลายภาค',
+    badgeColor: 'bg-amber-500 text-white',
+    sgsUnitName: 'วัดผลปลายภาคเรียน',
+    maxScore: 30,
+    date: '5 ต.ค. 2569',
+    examTime: '(09:00 - 11:00 น.)',
+    dueDate: '9 ต.ค. 2569',
+    dueRemark: '(ภายใน 3 วัน)',
+    status: 'UPCOMING',
+    statusRatio: '0/39',
+  },
+];
+
 export const ExamManagementView: React.FC = () => {
-  // 1. Exams State
-  const [exams, setExams] = useState<ExamItem[]>(() => {
+  // 1. Exams State initialized with the 6 exams matching Reference Image 2
+  const [exams, setExams] = useState<ExtendedExamItem[]>(() => {
     try {
       const saved = localStorage.getItem(EXAMS_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const hasMockup = parsed.some((e: any) => e.title?.includes('แบบทดสอบย่อยที่ 1'));
+          if (hasMockup) return parsed;
+        }
       }
     } catch {
       // ignore parse error
     }
-    return examsData;
+    return DEFAULT_MOCKUP_EXAMS;
   });
 
   const [filter, setFilter] = useState<'ALL' | 'GRADING' | 'LOCKED' | 'UPCOMING'>('ALL');
@@ -91,8 +220,22 @@ export const ExamManagementView: React.FC = () => {
 
   // 2. Interactive Modals State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [scoreGridExam, setScoreGridExam] = useState<ExamItem | null>(null);
-  const [analysisExam, setAnalysisExam] = useState<ExamItem | null>(null);
+  const [scoreGridExam, setScoreGridExam] = useState<ExtendedExamItem | null>(null);
+  const [analysisExam, setAnalysisExam] = useState<ExtendedExamItem | null>(null);
+
+  // Dynamic counts for category summary cards and tabs
+  const quizCount = useMemo(
+    () => exams.filter((e) => e.category === 'QUIZ' || e.title.includes('เก็บคะแนน') || e.title.includes('ย่อย')).length,
+    [exams]
+  );
+  const midtermCount = useMemo(
+    () => exams.filter((e) => e.category === 'MIDTERM' || e.title.includes('กลางภาค')).length,
+    [exams]
+  );
+  const finalCount = useMemo(
+    () => exams.filter((e) => e.category === 'FINAL' || e.title.includes('ปลายภาค')).length,
+    [exams]
+  );
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -104,7 +247,7 @@ export const ExamManagementView: React.FC = () => {
     }, 3500);
   };
 
-  const saveExamsToStorage = (updatedExams: ExamItem[]) => {
+  const saveExamsToStorage = (updatedExams: ExtendedExamItem[]) => {
     setExams(updatedExams);
     try {
       localStorage.setItem(EXAMS_STORAGE_KEY, JSON.stringify(updatedExams));
@@ -113,10 +256,30 @@ export const ExamManagementView: React.FC = () => {
     }
   };
 
-  // Filtered exams according to active tab and search query
+  // Filtered exams according to active tab, room filter, and search query
   const filteredExams = useMemo(() => {
     return exams.filter((exam) => {
       const matchesFilter = filter === 'ALL' || exam.status === filter;
+      if (!matchesFilter) return false;
+
+      // Category tab filter
+      if (categoryTabFilter === 'QUIZ') {
+        const isQuiz = exam.category === 'QUIZ' || exam.title.includes('เก็บคะแนน') || exam.title.includes('ย่อย');
+        if (!isQuiz) return false;
+      } else if (categoryTabFilter === 'MIDTERM') {
+        const isMidterm = exam.category === 'MIDTERM' || exam.title.includes('กลางภาค');
+        if (!isMidterm) return false;
+      } else if (categoryTabFilter === 'FINAL') {
+        const isFinal = exam.category === 'FINAL' || exam.title.includes('ปลายภาค');
+        if (!isFinal) return false;
+      }
+
+      // Room dropdown filter
+      if (roomDropdownFilter !== 'ALL' && exam.roomName !== roomDropdownFilter) {
+        return false;
+      }
+
+      // Search term
       const q = searchTerm.toLowerCase().trim();
       const matchesSearch =
         !q ||
@@ -124,18 +287,18 @@ export const ExamManagementView: React.FC = () => {
         exam.subjectCode.toLowerCase().includes(q) ||
         exam.sgsUnitName.toLowerCase().includes(q) ||
         exam.roomName.toLowerCase().includes(q);
-      return matchesFilter && matchesSearch;
+      return matchesSearch;
     });
-  }, [exams, filter, searchTerm]);
+  }, [exams, filter, categoryTabFilter, roomDropdownFilter, searchTerm]);
 
   // ----------------------------------------------------
   // Form State for "สร้างชุดข้อสอบใหม่" (Modal 1)
   // ----------------------------------------------------
   const [newTitle, setNewTitle] = useState('');
-  const [newSubjectCode, setNewSubjectCode] = useState('ศ23101 ศิลปะ');
-  const [newRoomName, setNewRoomName] = useState('ม.3/1 - ม.3/8');
-  const [newSgsUnitName, setNewSgsUnitName] = useState('สอบเก็บคะแนนหน่วยที่ 1');
-  const [newMaxScore, setNewMaxScore] = useState<number>(20);
+  const [newSubjectCode, setNewSubjectCode] = useState('ญี่ปุ่น ม.3/1');
+  const [newRoomName, setNewRoomName] = useState('ม.3/1');
+  const [newSgsUnitName, setNewSgsUnitName] = useState('สอบเก็บคะแนนหน่วยที่ 4');
+  const [newMaxScore, setNewMaxScore] = useState<number>(10);
   const [newDate, setNewDate] = useState('18 ต.ค. 2569');
   const [newStatus, setNewStatus] = useState<'UPCOMING' | 'GRADING'>('GRADING');
 
@@ -143,15 +306,26 @@ export const ExamManagementView: React.FC = () => {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
-    const newExam: ExamItem = {
+    const examCategory: 'QUIZ' | 'MIDTERM' | 'FINAL' =
+      newTitle.includes('ปลายภาค') ? 'FINAL' :
+      newTitle.includes('กลางภาค') ? 'MIDTERM' : 'QUIZ';
+
+    const newExam: ExtendedExamItem = {
       id: `ex-${Date.now()}`,
       title: newTitle.trim(),
-      subjectCode: newSubjectCode.trim() || 'ศ23101 ศิลปะ',
-      roomName: newRoomName.trim() || 'ม.3/1 - ม.3/8',
+      subjectCode: newSubjectCode.trim() || 'ญี่ปุ่น ม.3/1',
+      roomName: newRoomName.trim() || 'ม.3/1',
       sgsUnitName: newSgsUnitName.trim() || 'สอบเก็บคะแนนหน่วยการเรียนรู้',
       maxScore: Number(newMaxScore) || 20,
       date: newDate.trim() || '18 ต.ค. 2569',
+      examTime: '(08:00 - 09:00 น.)',
+      dueDate: newDate.trim() || '18 ต.ค. 2569',
+      dueRemark: '(ภายในวันสอบ)',
+      category: examCategory,
+      typeBadge: examCategory === 'QUIZ' ? 'เก็บคะแนน' : examCategory === 'MIDTERM' ? 'กลางภาค' : 'ปลายภาค',
+      badgeColor: examCategory === 'QUIZ' ? 'bg-blue-500 text-white' : examCategory === 'MIDTERM' ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white',
       status: newStatus,
+      statusRatio: '0/39',
     };
 
     const updated = [newExam, ...exams];
@@ -168,23 +342,23 @@ export const ExamManagementView: React.FC = () => {
     switch (presetType) {
       case 'MIDTERM':
         setNewTitle('สอบกลางภาค ภาคเรียนที่ 1/2569');
-        setNewSgsUnitName('สอบกลางภาค (หน่วยที่ 3)');
+        setNewSgsUnitName('วัดผลกลางภาคเรียน (หน่วยที่ 1-2)');
         setNewMaxScore(20);
-        setNewSubjectCode('ศ23101 ศิลปะ');
-        setNewRoomName('ม.3/1 - ม.3/8');
+        setNewSubjectCode('ญี่ปุ่น ม.3/1');
+        setNewRoomName('ม.3/1');
         break;
       case 'FINAL':
         setNewTitle('สอบปลายภาค ภาคเรียนที่ 1/2569');
-        setNewSgsUnitName('สอบปลายภาค');
+        setNewSgsUnitName('วัดผลปลายภาคเรียน');
         setNewMaxScore(30);
-        setNewSubjectCode('ศ23101 ศิลปะ');
-        setNewRoomName('ม.3/1 - ม.3/8');
+        setNewSubjectCode('ญี่ปุ่น ม.3/1');
+        setNewRoomName('ม.3/1');
         break;
       case 'QUIZ':
-        setNewTitle('สอบเก็บคะแนนย่อย ทฤษฎีศิลปวัฒนธรรม');
-        setNewSgsUnitName('ความรู้พื้นฐานศิลปะ (หน่วยที่ 1)');
+        setNewTitle('แบบทดสอบย่อยที่ 4 (บทที่ 4)');
+        setNewSgsUnitName('เก็บคะแนนหน่วยที่ 4 (คำกริยาและการผันรูป)');
         setNewMaxScore(10);
-        setNewSubjectCode('ศ23101 ศิลปะ');
+        setNewSubjectCode('ญี่ปุ่น ม.3/1');
         setNewRoomName('ม.3/1');
         break;
       case 'PRACTICAL':
@@ -222,15 +396,21 @@ export const ExamManagementView: React.FC = () => {
     }
 
     if (Object.keys(loadedScores).length === 0) {
-      // Pre-fill realistic scores reflecting the exam's status
+      // Pre-fill realistic scores reflecting the exam's status and maxScore
       DEFAULT_STUDENTS_LIST.forEach((stu) => {
-        if (scoreGridExam.id === 'ex-1') {
-          // Locked exam: all students scored with realistic values matching avg 16.4
-          const preScore = [18, 19.5, 15, 17, 20, 16.5, 14, 8.5, 17.5, 18][stu.studentNo - 1] ?? 16;
+        if (scoreGridExam.status === 'LOCKED' || scoreGridExam.id === 'ex-1' || scoreGridExam.id === 'ex-2' || scoreGridExam.id === 'ex-3') {
+          // Locked / completed exam: all students scored with realistic values
+          const preScore = scoreGridExam.maxScore === 10
+            ? [9.5, 10, 8, 9, 10, 8.5, 7, 6.5, 9, 9.5][stu.studentNo - 1] ?? 8.5
+            : scoreGridExam.maxScore === 20
+            ? [18, 19.5, 15, 17, 20, 16.5, 14, 8.5, 17.5, 18][stu.studentNo - 1] ?? 16
+            : [26, 28, 22, 25, 29, 24, 20, 14, 25, 27][stu.studentNo - 1] ?? 23;
           loadedScores[stu.id] = preScore;
-        } else if (scoreGridExam.id === 'ex-2') {
+        } else if (scoreGridExam.status === 'GRADING' || scoreGridExam.id === 'ex-4') {
           // Grading exam: some scored, some pending
-          const preScore = [15, 13.5, null, 12, null, 14, 6, null, 14.5, 13][stu.studentNo - 1] ?? null;
+          const preScore = scoreGridExam.maxScore === 30
+            ? [24, 27, null, 22, null, 25, 15, null, 26, 23][stu.studentNo - 1] ?? null
+            : [15, 13.5, null, 12, null, 14, 6, null, 14.5, 13][stu.studentNo - 1] ?? null;
           loadedScores[stu.id] = preScore;
         } else {
           // Upcoming or new exam: empty
@@ -352,14 +532,17 @@ export const ExamManagementView: React.FC = () => {
     showToast('ล้างคะแนนทั้งหมดในตารางเรียบร้อย');
   };
 
-  const handleToggleLockStatus = () => {
-    if (!scoreGridExam) return;
-    const nextStatus = scoreGridExam.status === 'LOCKED' ? 'GRADING' : 'LOCKED';
-    const updatedExam: ExamItem = {
-      ...scoreGridExam,
+  const handleToggleExamLock = (targetExam?: ExtendedExamItem | null) => {
+    const examToToggle = targetExam || scoreGridExam;
+    if (!examToToggle) return;
+    const nextStatus = examToToggle.status === 'LOCKED' ? 'GRADING' : 'LOCKED';
+    const updatedExam: ExtendedExamItem = {
+      ...examToToggle,
       status: nextStatus,
     };
-    setScoreGridExam(updatedExam);
+    if (scoreGridExam && scoreGridExam.id === updatedExam.id) {
+      setScoreGridExam(updatedExam);
+    }
     const nextList = exams.map((ex) => (ex.id === updatedExam.id ? updatedExam : ex));
     saveExamsToStorage(nextList);
     showToast(
@@ -367,6 +550,10 @@ export const ExamManagementView: React.FC = () => {
         ? '🔒 ล็อกคะแนนสอบเรียบร้อยแล้ว (คะแนนถูกป้องกันการแก้ไข)'
         : '🔓 ปลดล็อกคะแนนสอบเรียบร้อยแล้ว (สามารถแก้ไขคะแนนได้ตามปกติ)'
     );
+  };
+
+  const handleToggleLockStatus = () => {
+    handleToggleExamLock(scoreGridExam);
   };
 
   const handleSaveGridScores = () => {
@@ -501,6 +688,116 @@ export const ExamManagementView: React.FC = () => {
           highGroupCorrectRate: 0.81,
           lowGroupCorrectRate: 0.36,
           difficulty: 0.59,
+          discrimination: 0.45,
+          interpretation: 'ข้อสอบคุณภาพดี (คัดเลือกไว้ใช้)',
+          status: 'GOOD',
+        },
+      ];
+    }
+
+    const isJapanese =
+      analysisExam?.subjectCode.includes('ญี่ปุ่น') ||
+      analysisExam?.subjectCode.includes('ญ') ||
+      analysisExam?.title.includes('ญี่ปุ่น');
+
+    if (isJapanese) {
+      return [
+        {
+          itemNo: 1,
+          indicator: 'ต 1.1 ม.3/1 ปฏิบัติตามคำขอร้อง คำแนะนำ คำชี้แจง และคำอธิบายภาษาญี่ปุ่น',
+          highGroupCorrectRate: 0.96,
+          lowGroupCorrectRate: 0.42,
+          difficulty: 0.69,
+          discrimination: 0.54,
+          interpretation: 'ข้อสอบคุณภาพดีเยี่ยม (คัดเลือกไว้ใช้)',
+          status: 'EXCELLENT',
+        },
+        {
+          itemNo: 2,
+          indicator: 'ต 1.1 ม.3/2 อ่านออกเสียงข้อความ ข่าว และบทสนทนาภาษาญี่ปุ่นถูกต้องตามหลักการออกเสียง',
+          highGroupCorrectRate: 0.92,
+          lowGroupCorrectRate: 0.38,
+          difficulty: 0.65,
+          discrimination: 0.54,
+          interpretation: 'ข้อสอบคุณภาพดีเยี่ยม (คัดเลือกไว้ใช้)',
+          status: 'EXCELLENT',
+        },
+        {
+          itemNo: 3,
+          indicator: 'ต 1.1 ม.3/4 เลือก/ระบุหัวข้อเรื่อง ใจความสำคัญ และบอกรายละเอียดสนับสนุนจากเรื่องที่อ่าน',
+          highGroupCorrectRate: 0.88,
+          lowGroupCorrectRate: 0.32,
+          difficulty: 0.60,
+          discrimination: 0.56,
+          interpretation: 'ข้อสอบคุณภาพดีเยี่ยม (คัดเลือกไว้ใช้)',
+          status: 'EXCELLENT',
+        },
+        {
+          itemNo: 4,
+          indicator: 'ต 1.2 ม.3/1 สนทนาและเขียนโต้ตอบข้อมูลเกี่ยวกับตนเอง เรื่องใกล้ตัว และสถานการณ์ต่าง ๆ',
+          highGroupCorrectRate: 0.95,
+          lowGroupCorrectRate: 0.76,
+          difficulty: 0.86,
+          discrimination: 0.19,
+          interpretation: 'ค่อนข้างง่าย / ควรปรับปรุงตัวลวง (Distractor)',
+          status: 'NEEDS_REVISION',
+        },
+        {
+          itemNo: 5,
+          indicator: 'ต 1.2 ม.3/2 ใช้คำขอร้อง คำแนะนำ และคำชี้แจงตามสถานการณ์ในชีวิตประจำวัน',
+          highGroupCorrectRate: 0.84,
+          lowGroupCorrectRate: 0.34,
+          difficulty: 0.59,
+          discrimination: 0.50,
+          interpretation: 'ข้อสอบคุณภาพดี (คัดเลือกไว้ใช้)',
+          status: 'GOOD',
+        },
+        {
+          itemNo: 6,
+          indicator: 'ต 1.3 ม.3/1 พูดและเขียนบรรยายเกี่ยวกับตนเอง ประสบการณ์ และกิจกรรมในโรงเรียน',
+          highGroupCorrectRate: 0.79,
+          lowGroupCorrectRate: 0.29,
+          difficulty: 0.54,
+          discrimination: 0.50,
+          interpretation: 'ข้อสอบคุณภาพดีเยี่ยม (คัดเลือกไว้ใช้)',
+          status: 'EXCELLENT',
+        },
+        {
+          itemNo: 7,
+          indicator: 'ต 2.1 ม.3/1 บรรยายเกี่ยวกับเทศกาล วันสำคัญ งานฉลอง และชีวิตความเป็นอยู่ของชาวญี่ปุ่น',
+          highGroupCorrectRate: 0.61,
+          lowGroupCorrectRate: 0.46,
+          difficulty: 0.54,
+          discrimination: 0.15,
+          interpretation: 'อำนาจจำแนกต่ำ / ปรับปรุงข้อคำถาม',
+          status: 'POOR',
+        },
+        {
+          itemNo: 8,
+          indicator: 'ต 2.2 ม.3/1 เปรียบเทียบและอธิบายความเหมือนและความต่างระหว่างวัฒนธรรมญี่ปุ่นกับวัฒนธรรมไทย',
+          highGroupCorrectRate: 0.86,
+          lowGroupCorrectRate: 0.41,
+          difficulty: 0.64,
+          discrimination: 0.45,
+          interpretation: 'ข้อสอบคุณภาพดี (คัดเลือกไว้ใช้)',
+          status: 'GOOD',
+        },
+        {
+          itemNo: 9,
+          indicator: 'ต 3.1 ม.3/1 ค้นคว้า รวบรวม และสรุปข้อมูลที่เกี่ยวข้องกับกลุ่มสาระการเรียนรู้อื่นจากแหล่งเรียนรู้ภาษาญี่ปุ่น',
+          highGroupCorrectRate: 0.91,
+          lowGroupCorrectRate: 0.46,
+          difficulty: 0.69,
+          discrimination: 0.45,
+          interpretation: 'ข้อสอบคุณภาพดีเยี่ยม (คัดเลือกไว้ใช้)',
+          status: 'EXCELLENT',
+        },
+        {
+          itemNo: 10,
+          indicator: 'ต 4.1 ม.3/1 ใช้ภาษาญี่ปุ่นสื่อสารในสถานการณ์จริงหรือสถานการณ์จำลองที่เกิดขึ้นในห้องเรียน',
+          highGroupCorrectRate: 0.82,
+          lowGroupCorrectRate: 0.37,
+          difficulty: 0.60,
           discrimination: 0.45,
           interpretation: 'ข้อสอบคุณภาพดี (คัดเลือกไว้ใช้)',
           status: 'GOOD',
@@ -750,7 +1047,7 @@ export const ExamManagementView: React.FC = () => {
           </div>
 
           <div className="flex items-baseline gap-1.5 pl-1">
-            <span className="text-3xl font-black text-slate-900">6</span>
+            <span className="text-3xl font-black text-slate-900">{quizCount}</span>
             <span className="text-xs text-slate-500 font-semibold">รายการ</span>
           </div>
 
@@ -764,7 +1061,7 @@ export const ExamManagementView: React.FC = () => {
           </button>
         </div>
 
-        {/* Card B: สอบกลางภาค (Midterm) 2 รายการ */}
+        {/* Card B: สอบกลางภาค (Midterm) รายการ */}
         <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-col justify-between space-y-3 hover:border-emerald-300 transition-all">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-2xs shrink-0">
@@ -781,7 +1078,7 @@ export const ExamManagementView: React.FC = () => {
           </div>
 
           <div className="flex items-baseline gap-1.5 pl-1">
-            <span className="text-3xl font-black text-slate-900">2</span>
+            <span className="text-3xl font-black text-slate-900">{midtermCount}</span>
             <span className="text-xs text-slate-500 font-semibold">รายการ</span>
           </div>
 
@@ -795,7 +1092,7 @@ export const ExamManagementView: React.FC = () => {
           </button>
         </div>
 
-        {/* Card C: สอบปลายภาค (Final) 2 รายการ */}
+        {/* Card C: สอบปลายภาค (Final) รายการ */}
         <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-col justify-between space-y-3 hover:border-amber-300 transition-all">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-2xs shrink-0">
@@ -812,7 +1109,7 @@ export const ExamManagementView: React.FC = () => {
           </div>
 
           <div className="flex items-baseline gap-1.5 pl-1">
-            <span className="text-3xl font-black text-slate-900">2</span>
+            <span className="text-3xl font-black text-slate-900">{finalCount}</span>
             <span className="text-xs text-slate-500 font-semibold">รายการ</span>
           </div>
 
@@ -919,7 +1216,7 @@ export const ExamManagementView: React.FC = () => {
                   : 'text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100'
               }`}
             >
-              สอบเก็บคะแนน (6)
+              สอบเก็บคะแนน ({quizCount})
             </button>
             <button
               type="button"
@@ -930,7 +1227,7 @@ export const ExamManagementView: React.FC = () => {
                   : 'text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100'
               }`}
             >
-              สอบกลางภาค (2)
+              สอบกลางภาค ({midtermCount})
             </button>
             <button
               type="button"
@@ -941,7 +1238,7 @@ export const ExamManagementView: React.FC = () => {
                   : 'text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100'
               }`}
             >
-              สอบปลายภาค (2)
+              สอบปลายภาค ({finalCount})
             </button>
           </div>
 
@@ -988,210 +1285,101 @@ export const ExamManagementView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {[
-                {
-                  id: 'row-1',
-                  no: 1,
-                  typeBadge: 'เก็บคะแนน',
-                  typeCategory: 'QUIZ',
-                  badgeColor: 'bg-blue-500 text-white',
-                  title: 'แบบทดสอบย่อยที่ 1 (บทที่ 1)',
-                  subject: 'ญี่ปุ่น ม.3/1',
-                  classroom: 'ม.3/1',
-                  examDate: '12 ก.ย. 2569',
-                  examTime: '(08:00 - 09:00 น.)',
-                  dueDate: '12 ก.ย. 2569',
-                  dueRemark: '(ภายในวันสอบ)',
-                  statusLabel: 'เสร็จสิ้น',
-                  statusRatio: '38/39',
-                  statusTheme: 'COMPLETED',
-                  actionText: 'ดูผลคะแนน',
-                  actionType: 'RESULT',
-                  linkedExamId: 'ex-1',
-                },
-                {
-                  id: 'row-2',
-                  no: 2,
-                  typeBadge: 'เก็บคะแนน',
-                  typeCategory: 'QUIZ',
-                  badgeColor: 'bg-blue-500 text-white',
-                  title: 'แบบทดสอบย่อยที่ 2 (บทที่ 2)',
-                  subject: 'ญี่ปุ่น ม.3/1',
-                  classroom: 'ม.3/1',
-                  examDate: '19 ก.ย. 2569',
-                  examTime: '(08:00 - 09:00 น.)',
-                  dueDate: '19 ก.ย. 2569',
-                  dueRemark: '(ภายในวันสอบ)',
-                  statusLabel: 'เสร็จสิ้น',
-                  statusRatio: '38/39',
-                  statusTheme: 'COMPLETED',
-                  actionText: 'ดูผลคะแนน',
-                  actionType: 'RESULT',
-                  linkedExamId: 'ex-1',
-                },
-                {
-                  id: 'row-3',
-                  no: 3,
-                  typeBadge: 'กลางภาค',
-                  typeCategory: 'MIDTERM',
-                  badgeColor: 'bg-emerald-600 text-white',
-                  title: 'สอบกลางภาค ภาคเรียนที่ 1/2569',
-                  subject: 'ญี่ปุ่น ม.3/1',
-                  classroom: 'ม.3/1',
-                  examDate: '28 ส.ค. 2569',
-                  examTime: '(09:00 - 11:00 น.)',
-                  dueDate: '1 ก.ย. 2569',
-                  dueRemark: '(ภายใน 3 วัน)',
-                  statusLabel: 'เสร็จสิ้น',
-                  statusRatio: '38/39',
-                  statusTheme: 'COMPLETED',
-                  actionText: 'ดูผลคะแนน',
-                  actionType: 'RESULT',
-                  linkedExamId: 'ex-1',
-                },
-                {
-                  id: 'row-4',
-                  no: 4,
-                  typeBadge: 'ปลายภาค',
-                  typeCategory: 'FINAL',
-                  badgeColor: 'bg-amber-500 text-white',
-                  title: 'สอบปลายภาค ภาคเรียนที่ 1/2569',
-                  subject: 'ญี่ปุ่น ม.3/1',
-                  classroom: 'ม.3/1',
-                  examDate: '4 ต.ค. 2569',
-                  examTime: '(09:00 - 11:00 น.)',
-                  dueDate: '8 ต.ค. 2569',
-                  dueRemark: '(ภายใน 3 วัน)',
-                  statusLabel: 'รอส่งคะแนน',
-                  statusRatio: '0/39',
-                  statusTheme: 'PENDING',
-                  actionText: 'จัดการคะแนน',
-                  actionType: 'GRADING',
-                  linkedExamId: 'ex-2',
-                },
-                {
-                  id: 'row-5',
-                  no: 5,
-                  typeBadge: 'เก็บคะแนน',
-                  typeCategory: 'QUIZ',
-                  badgeColor: 'bg-blue-500 text-white',
-                  title: 'แบบทดสอบย่อยที่ 3 (บทที่ 3)',
-                  subject: 'ญี่ปุ่น ม.3/2',
-                  classroom: 'ม.3/2',
-                  examDate: '15 ก.ย. 2569',
-                  examTime: '(08:00 - 09:00 น.)',
-                  dueDate: '15 ก.ย. 2569',
-                  dueRemark: '(ภายในวันสอบ)',
-                  statusLabel: 'ยังไม่ถึงกำหนด',
-                  statusRatio: '0/39',
-                  statusTheme: 'UPCOMING',
-                  actionText: 'ดูรายละเอียด',
-                  actionType: 'DETAIL',
-                  linkedExamId: 'ex-3',
-                },
-                {
-                  id: 'row-6',
-                  no: 6,
-                  typeBadge: 'ปลายภาค',
-                  typeCategory: 'FINAL',
-                  badgeColor: 'bg-amber-500 text-white',
-                  title: 'สอบปลายภาค ภาคเรียนที่ 1/2569',
-                  subject: 'ญี่ปุ่น ม.3/2',
-                  classroom: 'ม.3/2',
-                  examDate: '5 ต.ค. 2569',
-                  examTime: '(09:00 - 11:00 น.)',
-                  dueDate: '9 ต.ค. 2569',
-                  dueRemark: '(ภายใน 3 วัน)',
-                  statusLabel: 'ยังไม่ถึงกำหนด',
-                  statusRatio: '0/39',
-                  statusTheme: 'UPCOMING',
-                  actionText: 'ดูรายละเอียด',
-                  actionType: 'DETAIL',
-                  linkedExamId: 'ex-3',
-                },
-              ]
-                .filter((r) => {
-                  if (categoryTabFilter === 'QUIZ' && r.typeCategory !== 'QUIZ') return false;
-                  if (categoryTabFilter === 'MIDTERM' && r.typeCategory !== 'MIDTERM') return false;
-                  if (categoryTabFilter === 'FINAL' && r.typeCategory !== 'FINAL') return false;
-                  if (roomDropdownFilter !== 'ALL' && r.classroom !== roomDropdownFilter) return false;
-                  if (searchTerm.trim()) {
-                    const q = searchTerm.toLowerCase().trim();
-                    return (
-                      r.title.toLowerCase().includes(q) ||
-                      r.subject.toLowerCase().includes(q) ||
-                      r.classroom.toLowerCase().includes(q)
-                    );
-                  }
-                  return true;
-                })
-                .map((row) => {
-                  const linkedExam = exams.find((e) => e.id === row.linkedExamId) || exams[0];
+              {filteredExams.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-8 text-center text-slate-400">
+                    ไม่พบข้อมูลการสอบที่ตรงกับเงื่อนไขการค้นหา
+                  </td>
+                </tr>
+              ) : (
+                filteredExams.map((exam, index) => {
+                  const typeBadge =
+                    exam.typeBadge ||
+                    (exam.category === 'MIDTERM'
+                      ? 'กลางภาค'
+                      : exam.category === 'FINAL'
+                      ? 'ปลายภาค'
+                      : 'เก็บคะแนน');
+                  const badgeColor =
+                    exam.badgeColor ||
+                    (exam.category === 'MIDTERM'
+                      ? 'bg-emerald-600 text-white'
+                      : exam.category === 'FINAL'
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-blue-500 text-white');
+                  const examTime = exam.examTime || '(08:00 - 09:00 น.)';
+                  const dueDate = exam.dueDate || exam.date;
+                  const dueRemark = exam.dueRemark || '(ภายในวันสอบ)';
+
+                  const isGrading = exam.status === 'GRADING';
+                  const isUpcoming = exam.status === 'UPCOMING';
+                  const isCompleted = exam.status === 'LOCKED';
+
                   return (
-                    <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
+                    <tr key={exam.id} className="hover:bg-slate-50/80 transition-colors">
                       {/* 1. ลำดับ */}
-                      <td className="py-3 px-3 font-bold text-slate-700">{row.no}</td>
+                      <td className="py-3 px-3 font-bold text-slate-700">{index + 1}</td>
 
                       {/* 2. ประเภทการสอบ */}
                       <td className="py-3 px-3">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${row.badgeColor}`}>
-                          {row.typeBadge}
+                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${badgeColor}`}>
+                          {typeBadge}
                         </span>
                       </td>
 
                       {/* 3. ชื่อการสอบ / รายวิชา */}
                       <td className="py-3 px-3">
-                        <div className="font-bold text-slate-900 leading-snug">{row.title}</div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">{row.subject}</div>
+                        <div className="font-bold text-slate-900 leading-snug">{exam.title}</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">{exam.subjectCode}</div>
                       </td>
 
                       {/* 4. ห้องเรียน */}
-                      <td className="py-3 px-3 font-semibold text-slate-700">{row.classroom}</td>
+                      <td className="py-3 px-3 font-semibold text-slate-700">{exam.roomName}</td>
 
                       {/* 5. วันที่สอบ */}
                       <td className="py-3 px-3">
-                        <div className="font-semibold text-slate-800">{row.examDate}</div>
-                        <div className="text-[10px] text-slate-400">{row.examTime}</div>
+                        <div className="font-semibold text-slate-800">{exam.date}</div>
+                        <div className="text-[10px] text-slate-400">{examTime}</div>
                       </td>
 
                       {/* 6. กำหนดส่งคะแนน */}
                       <td className="py-3 px-3">
-                        <div className="font-semibold text-slate-800">{row.dueDate}</div>
-                        <div className="text-[10px] text-slate-400">{row.dueRemark}</div>
+                        <div className="font-semibold text-slate-800">{dueDate}</div>
+                        <div className="text-[10px] text-slate-400">{dueRemark}</div>
                       </td>
 
                       {/* 7. สถานะ matching Image 2 */}
                       <td className="py-3 px-3">
-                        {row.statusTheme === 'COMPLETED' && (
+                        {isCompleted && (
                           <div className="space-y-0.5">
                             <div className="text-emerald-600 font-bold text-xs flex items-center gap-1.5">
                               <span className="w-0.5 h-3 bg-emerald-500 rounded-full inline-block" />
-                              <span>{row.statusLabel}</span>
+                              <span>เสร็จสิ้น</span>
                             </div>
                             <div className="text-[11px] text-slate-400 font-mono pl-2">
-                              {row.statusRatio}
+                              {exam.statusRatio || '38/39'}
                             </div>
                           </div>
                         )}
-                        {row.statusTheme === 'PENDING' && (
+                        {isGrading && (
                           <div className="space-y-0.5">
                             <div className="text-amber-600 font-bold text-xs flex items-center gap-1">
                               <Clock className="w-3 h-3 text-amber-500" />
-                              <span>{row.statusLabel}</span>
+                              <span>รอส่งคะแนน</span>
                             </div>
                             <div className="text-[11px] text-slate-400 font-mono pl-4">
-                              {row.statusRatio}
+                              {exam.statusRatio || '0/39'}
                             </div>
                           </div>
                         )}
-                        {row.statusTheme === 'UPCOMING' && (
+                        {isUpcoming && (
                           <div className="space-y-0.5">
                             <div className="text-blue-500 font-bold text-xs flex items-center gap-1">
                               <Plus className="w-3 h-3 text-blue-500" />
-                              <span>{row.statusLabel}</span>
+                              <span>ยังไม่ถึงกำหนด</span>
                             </div>
                             <div className="text-[11px] text-slate-400 font-mono pl-4">
-                              {row.statusRatio}
+                              {exam.statusRatio || '0/39'}
                             </div>
                           </div>
                         )}
@@ -1203,27 +1391,33 @@ export const ExamManagementView: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => {
-                              if (row.actionType === 'RESULT' || row.actionType === 'GRADING') {
-                                setScoreGridExam(linkedExam);
+                              if (isGrading || isCompleted) {
+                                setScoreGridExam(exam);
                               } else {
-                                setAnalysisExam(linkedExam);
+                                setAnalysisExam(exam);
                               }
                             }}
                             className="px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1 border border-blue-400 text-blue-600 bg-white hover:bg-blue-50 shadow-2xs"
                           >
-                            {row.actionType === 'GRADING' ? (
+                            {isGrading ? (
                               <Edit3 className="w-3 h-3 text-blue-600" />
                             ) : (
                               <Eye className="w-3 h-3 text-blue-600" />
                             )}
-                            <span>{row.actionText}</span>
+                            <span>
+                              {isGrading
+                                ? 'จัดการคะแนน'
+                                : isCompleted
+                                ? 'ดูผลคะแนน'
+                                : 'ดูรายละเอียด'}
+                            </span>
                           </button>
 
                           {/* 3-dots dropdown menu */}
                           <button
                             type="button"
                             onClick={() =>
-                              setActionMenuOpenId((prev) => (prev === row.id ? null : row.id))
+                              setActionMenuOpenId((prev) => (prev === exam.id ? null : exam.id))
                             }
                             className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
                             title="ตัวเลือกเพิ่มเติม"
@@ -1231,13 +1425,13 @@ export const ExamManagementView: React.FC = () => {
                             <MoreVertical className="w-4 h-4" />
                           </button>
 
-                          {actionMenuOpenId === row.id && (
+                          {actionMenuOpenId === exam.id && (
                             <div className="absolute right-0 top-8 z-30 bg-white rounded-2xl border border-slate-200 shadow-xl p-1.5 min-w-[200px] text-left text-xs animate-scale-up">
                               <button
                                 type="button"
                                 onClick={() => {
                                   setActionMenuOpenId(null);
-                                  setScoreGridExam(linkedExam);
+                                  setScoreGridExam(exam);
                                 }}
                                 className="w-full text-left px-3 py-2 rounded-xl hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 font-semibold"
                               >
@@ -1248,7 +1442,7 @@ export const ExamManagementView: React.FC = () => {
                                 type="button"
                                 onClick={() => {
                                   setActionMenuOpenId(null);
-                                  setAnalysisExam(linkedExam);
+                                  setAnalysisExam(exam);
                                 }}
                                 className="w-full text-left px-3 py-2 rounded-xl hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 font-semibold"
                               >
@@ -1259,7 +1453,7 @@ export const ExamManagementView: React.FC = () => {
                                 type="button"
                                 onClick={() => {
                                   setActionMenuOpenId(null);
-                                  handleToggleLockStatus();
+                                  handleToggleExamLock(exam);
                                 }}
                                 className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-50 flex items-center gap-2 font-semibold"
                               >
@@ -1270,7 +1464,7 @@ export const ExamManagementView: React.FC = () => {
                                 type="button"
                                 onClick={() => {
                                   setActionMenuOpenId(null);
-                                  setAnalysisExam(linkedExam);
+                                  setAnalysisExam(exam);
                                   handleExportAnalysisCSV();
                                 }}
                                 className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-50 flex items-center gap-2 font-semibold"
@@ -1284,14 +1478,17 @@ export const ExamManagementView: React.FC = () => {
                       </td>
                     </tr>
                   );
-                })}
+                })
+              )}
             </tbody>
           </table>
         </div>
 
-        {/* Table Footer: แสดง 1-6 และ Pagination */}
+        {/* Table Footer: แสดง 1-N และ Pagination */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-100 text-xs text-slate-500">
-          <div>แสดง 1 - 6 จาก 6 รายการ</div>
+          <div>
+            แสดง {filteredExams.length > 0 ? 1 : 0} - {filteredExams.length} จาก {exams.length} รายการ
+          </div>
           <div className="flex items-center gap-1.5 font-bold">
             <button
               type="button"

@@ -346,6 +346,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
   // Mode toggle: ครู vs นักเรียน
   const [roleFilter, setRoleFilter] = useState<'TEACHER' | 'STUDENT'>('TEACHER');
   const [viewMode, setViewMode] = useState<'MONTH' | 'WEEK' | 'DAY'>('MONTH');
+  const [selectedMonthOffset, setSelectedMonthOffset] = useState<number>(0); // -1 = ก.ย., 0 = ต.ค., 1 = พ.ย.
   const [events, setEvents] = useState<CalendarEventItem[]>(INITIAL_OCTOBER_EVENTS);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEventItem | null>(null);
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
@@ -403,6 +404,14 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
     e.preventDefault();
     if (!newEventTitle.trim()) return;
 
+    const colorToCategoryMap: Record<CalendarLegendColor, CalendarEventItem['category']> = {
+      BLUE: 'MEETING',
+      ORANGE: 'SUBMISSION',
+      GREEN: 'ACADEMIC',
+      RED: 'STUDENT',
+      PURPLE: 'OTHER',
+    };
+
     const newItem: CalendarEventItem = {
       id: `act-${Date.now()}`,
       day: newEventDay,
@@ -410,7 +419,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
       year: 2569,
       time: newEventTime.trim() || undefined,
       title: newEventTitle.trim(),
-      category: newEventColor === 'RED' ? 'STUDENT' : newEventColor === 'ORANGE' ? 'SUBMISSION' : 'MEETING',
+      category: colorToCategoryMap[newEventColor] || 'OTHER',
       colorType: newEventColor,
       targetRole: newEventTargetRole,
       location: newEventLocation.trim() || undefined,
@@ -588,6 +597,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                onClick={() => setSelectedMonthOffset((prev) => Math.max(-1, prev - 1))}
                 className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
                 title="เดือนก่อนหน้า"
               >
@@ -596,11 +606,16 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
               <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 border border-slate-200 rounded-xl">
                 <CalendarDays className="w-4 h-4 text-blue-600" />
                 <span className="text-sm font-extrabold text-slate-900">
-                  ตุลาคม 2569
+                  {selectedMonthOffset === -1
+                    ? 'กันยายน 2569'
+                    : selectedMonthOffset === 1
+                    ? 'พฤศจิกายน 2569'
+                    : 'ตุลาคม 2569'}
                 </span>
               </div>
               <button
                 type="button"
+                onClick={() => setSelectedMonthOffset((prev) => Math.min(1, prev + 1))}
                 className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
                 title="เดือนถัดไป"
               >
@@ -646,6 +661,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
               <button
                 type="button"
                 onClick={() => {
+                  setSelectedMonthOffset(0);
                   setViewMode('MONTH');
                   const todayItem = events.find((e) => e.day === 2);
                   if (todayItem) setSelectedEvent(todayItem);

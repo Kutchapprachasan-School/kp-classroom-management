@@ -111,7 +111,7 @@ export const KUTCHAP_SCHOOL_INFO: SchoolBrandingSettings = {
   nameTh: 'โรงเรียนคำยางพิทยา',
   nameEn: 'Khamyang Pittaya School',
   shortCode: 'ค.ย.พ. • สพม.อุดรธานี',
-  districtProvince: 'ต.ผาสุก อ.วังสามหมอ จ.อุดรธานี',
+  districtProvince: 'ต.นาสูง อ.วังสามหมอ จ.อุดรธานี',
   affiliation: 'School Management System',
   domain: 'khamyang.ac.th',
   academicTerm: 'ภาคเรียนที่ 1/2569',

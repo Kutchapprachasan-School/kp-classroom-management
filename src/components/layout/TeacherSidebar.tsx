@@ -204,7 +204,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
               {schoolSettings.nameTh}
             </h1>
             <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate mt-0.5">
-              {schoolSettings.districtProvince || 'ต.ผาสุก อ.วังสามหมอ จ.อุดรธานี'}
+              {schoolSettings.districtProvince || 'ต.นาสูง อ.วังสามหมอ จ.อุดรธานี'}
             </p>
           </div>
         </div>
