@@ -64,16 +64,26 @@ export interface WeekDayInfo {
 
 export interface ComputedWeekInfo {
   weekNumber: number;
+  totalWeeks: number;
   dateRangeLabel: string;
   days: WeekDayInfo[];
+  canPrev: boolean;
+  canNext: boolean;
 }
 
 export const computeWeekInfo = (offset: number): ComputedWeekInfo => {
-  // Base anchor Monday: 29 Sep 2026 (2569 BE)
+  // Base semester instructional duration is 20 weeks
+  // Anchor current week at week 16
+  const baseWeek = 16;
+  const totalWeeks = 20;
+  const weekNumber = Math.min(totalWeeks, Math.max(1, baseWeek + offset));
+  const effectiveOffset = weekNumber - baseWeek;
+
+  // Base anchor Monday: 29 Sep 2026 (2569 BE) - corresponds to week 16
   // Base Thursday (Today): 2 Oct 2026 (2569 BE)
   const baseMonday = new Date(2026, 8, 29); // 0-indexed month 8 = September
   const startMonday = new Date(baseMonday);
-  startMonday.setDate(baseMonday.getDate() + offset * 7);
+  startMonday.setDate(baseMonday.getDate() + effectiveOffset * 7);
 
   const endSunday = new Date(startMonday);
   endSunday.setDate(startMonday.getDate() + 6);
@@ -99,14 +109,17 @@ export const computeWeekInfo = (offset: number): ComputedWeekInfo => {
     return {
       key,
       dateLabel: formatThaiDate(cur),
-      isToday: offset === 0 && key === 'พฤหัสบดี',
+      isToday: effectiveOffset === 0 && key === 'พฤหัสบดี',
     };
   });
 
   return {
-    weekNumber: 29 + offset,
+    weekNumber,
+    totalWeeks,
     dateRangeLabel: `${formatThaiDate(startMonday)} – ${formatThaiDate(endSunday)}`,
     days,
+    canPrev: weekNumber > 1,
+    canNext: weekNumber < totalWeeks,
   };
 };
 
