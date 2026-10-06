@@ -37,7 +37,6 @@ import {
 import { PaperRegisterLedger } from '../components/teacher/PaperRegisterLedger';
 import {
   TEACHER_SUBJECTS_LIST,
-  HOMEROOM_ADVISORY,
 } from '../services/teacherCourseAssignmentService';
 
 
@@ -550,10 +549,6 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto bg-amber-50 border border-amber-200 rounded-xl px-3 py-1.5 text-xs font-bold text-amber-900">
-          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-          <span>☀️ {HOMEROOM_ADVISORY.roleTitle} (เช็คแถวเช้า 07:45 แยกต่างหาก)</span>
-        </div>
       </div>
 
       {/* แถบไอคอน 3 งานหลักของครู (เช็คชื่อเข้าเรียน | คะแนน ปพ.5 | สั่งงาน) เน้นกดง่ายในแนวตั้ง */}

@@ -26,7 +26,6 @@ import {
 import {
   teacherCourseAssignmentService,
   TEACHER_SUBJECTS_LIST,
-  HOMEROOM_ADVISORY,
   type GradingQueueItem,
   type AssignmentBundleConfig,
 } from '../services/teacherCourseAssignmentService';
@@ -327,13 +326,6 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
             </div>
           </div>
 
-          {/* ป้ายเตือนห้องที่ปรึกษา ม.3/1 (แยกชัดเจนตามคำสั่ง) */}
-          <div className="flex items-center gap-2 self-start lg:self-auto bg-amber-50 border border-amber-200/90 rounded-xl px-3 py-1.5">
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
-            <span className="text-xs font-bold text-amber-900">
-              ☀️ {HOMEROOM_ADVISORY.roleTitle} (เช็คแถวเช้า 07:45 แยกต่างหาก)
-            </span>
-          </div>
         </div>
 
         {/* ==================================================================== */}
