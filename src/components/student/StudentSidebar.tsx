@@ -3,22 +3,20 @@
 // มีแบนเนอร์ส่วนที่ 1 (Sidebar Banner) ด้านล่าง ที่ Admin สามารถอัปโหลดปรับเปลี่ยนได้
 
 import React, { useState, useEffect } from 'react';
-import {
-  Home,
-  BookOpen,
-  ClipboardList,
-  BarChart2,
-  Calendar,
-  Megaphone,
-  User,
-  MessageCircle,
-  LogOut,
-  X,
-  PanelLeftClose,
-  Sparkles,
-  Smartphone,
-  ShieldCheck,
-} from 'lucide-react';
+import Home1Regular from '@mingcute/react/core-regular/home-1';
+import Book2Regular from '@mingcute/react/core-regular/book-2';
+import ClipboardRegular from '@mingcute/react/core-regular/clipboard';
+import ChartBarRegular from '@mingcute/react/core-regular/chart-bar';
+import Calendar2Regular from '@mingcute/react/core-regular/calendar-2';
+import AnnouncementRegular from '@mingcute/react/core-regular/announcement';
+import User3Regular from '@mingcute/react/core-regular/user-3';
+import Chat2Regular from '@mingcute/react/core-regular/chat-2';
+import ExitDoorRegular from '@mingcute/react/core-regular/exit-door';
+import CloseRegular from '@mingcute/react/core-regular/close';
+import LayoutLeftbarCloseRegular from '@mingcute/react/core-regular/layout-leftbar-close';
+import SparklesRegular from '@mingcute/react/core-regular/sparkles';
+import CellphoneRegular from '@mingcute/react/core-regular/cellphone';
+import SafeShieldRegular from '@mingcute/react/core-regular/safe-shield';
 import {
   KUTCHAP_SCHOOL_INFO,
   type SchoolUserRole,
@@ -92,19 +90,19 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
   };
 
   const navItems = [
-    { key: 'home' as StudentTabKey, label: 'หน้าหลัก', icon: Home, badge: null },
-    { key: 'courses' as StudentTabKey, label: 'รายวิชาของฉัน', icon: BookOpen, badge: null },
+    { key: 'home' as StudentTabKey, label: 'หน้าหลัก', icon: Home1Regular, badge: null },
+    { key: 'courses' as StudentTabKey, label: 'รายวิชาของฉัน', icon: Book2Regular, badge: null },
     {
       key: 'missions' as StudentTabKey,
       label: 'งานที่ได้รับมอบหมาย',
-      icon: ClipboardList,
+      icon: ClipboardRegular,
       badge: 3,
     },
-    { key: 'gradebook' as StudentTabKey, label: 'ผลการเรียน', icon: BarChart2, badge: null },
-    { key: 'timetable' as StudentTabKey, label: 'ตารางเรียน', icon: Calendar, badge: null },
-    { key: 'announcements' as StudentTabKey, label: 'กิจกรรม / ประกาศ', icon: Megaphone, badge: null },
-    { key: 'profile' as StudentTabKey, label: 'ข้อมูลส่วนตัว', icon: User, badge: null },
-    { key: 'contact' as StudentTabKey, label: 'ติดต่อครู', icon: MessageCircle, badge: null },
+    { key: 'gradebook' as StudentTabKey, label: 'ผลการเรียน', icon: ChartBarRegular, badge: null },
+    { key: 'timetable' as StudentTabKey, label: 'ตารางเรียน', icon: Calendar2Regular, badge: null },
+    { key: 'announcements' as StudentTabKey, label: 'กิจกรรม / ประกาศ', icon: AnnouncementRegular, badge: null },
+    { key: 'profile' as StudentTabKey, label: 'ข้อมูลส่วนตัว', icon: User3Regular, badge: null },
+    { key: 'contact' as StudentTabKey, label: 'ติดต่อครู', icon: Chat2Regular, badge: null },
   ];
 
   const sidebarContent = (
@@ -147,8 +145,8 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
               className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0 flex items-center justify-center cursor-pointer"
               title="พับเก็บเมนูข้าง"
             >
-              <PanelLeftClose className="w-4 h-4 hidden lg:block" />
-              <X className="w-4 h-4 lg:hidden" />
+              <LayoutLeftbarCloseRegular className="w-4 h-4 hidden lg:block" />
+              <CloseRegular className="w-4 h-4 lg:hidden" />
             </button>
           )}
         </div>
@@ -207,7 +205,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
               }`}
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                <ShieldCheck className="w-4 h-4 shrink-0 text-purple-600" />
+                <SafeShieldRegular className="w-4 h-4 shrink-0 text-purple-600" />
                 <span className="truncate">ตรวจแถวเช้าสภาฯ</span>
               </div>
               <span className="px-1.5 py-0.2 rounded bg-purple-200 text-purple-800 text-[9px] font-bold">
@@ -230,7 +228,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
             }`}
           >
             <span className="flex items-center gap-2">
-              <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+              <SparklesRegular className="w-3.5 h-3.5 text-purple-500" />
               <span>สุ่มคู่หู (Gacha)</span>
             </span>
             <span className="text-[10px] bg-purple-100 text-purple-700 px-1 rounded">Lv.2</span>
@@ -243,7 +241,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
             }`}
           >
             <span className="flex items-center gap-2">
-              <Smartphone className="w-3.5 h-3.5 text-teal-600" />
+              <CellphoneRegular className="w-3.5 h-3.5 text-teal-600" />
               <span>ดูแลนักเรียน 9 หน้า</span>
             </span>
           </button>
@@ -276,7 +274,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
           }}
           className="w-full py-2.5 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-100/80 text-xs font-semibold text-slate-700 hover:text-slate-900 transition-colors flex items-center justify-center gap-2 shadow-2xs cursor-pointer"
         >
-          <LogOut className="w-4 h-4 text-slate-500" />
+          <ExitDoorRegular className="w-4 h-4 text-slate-500" />
           <span>ออกจากระบบ</span>
         </button>
       </div>

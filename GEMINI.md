@@ -13,7 +13,6 @@ All UI development and components in this project must strictly comply with the 
   - Text: Primary `#163A66`, Secondary `#6B7C93`, Muted `#94A3B8`
 - **Typography**: Thai-first (Noto Sans Thai, LINE Seed Sans Thai, Anuphan)
 - **Cards & Elements**: White background, 1px solid `#E6EEF7`, Radius `16-20px`, soft subtle shadows.
-- **Icon & Category Mapping**:
-  - Advisory Teacher Group (กลุ่มครูที่ปรึกษา): `UserRoundCheck`, Blue/Green
-  - Classroom Group (กลุ่มห้องเรียน): `School` / `Users`, Purple/Cyan
+- **Icon System**: **MingCute Icons** (`@mingcute/react`), rounded, cute, friendly. (Optional fallback: `lucide-react`).
 - **Tone**: Friendly, approachable, professional school SaaS. Avoid dark themes, neon gradients, and gaming UI.
+

@@ -620,27 +620,39 @@ const settingsViewPath = './src/views/SettingsBackupView.tsx';
 assert.ok(existsSync(settingsViewPath), 'src/views/SettingsBackupView.tsx must exist');
 const settingsSource = readFileSync(settingsViewPath, 'utf8');
 
+const bellServicePath = './src/services/bellScheduleService.ts';
+assert.ok(existsSync(bellServicePath), 'src/services/bellScheduleService.ts must exist');
+const bellServiceSource = readFileSync(bellServicePath, 'utf8');
+
 // 6.1 Interface & Type Checks
 assert.ok(
-  settingsSource.includes('export interface SchoolBellScheduleConfig'),
-  'SettingsBackupView must export SchoolBellScheduleConfig interface'
+  bellServiceSource.includes('export interface SchoolBellScheduleConfig'),
+  'bellScheduleService must export SchoolBellScheduleConfig interface'
 );
-assert.ok(settingsSource.includes('morningAssemblyStart: string'), 'Config must have morningAssemblyStart: string');
-assert.ok(settingsSource.includes('morningAssemblyEnd: string'), 'Config must have morningAssemblyEnd: string');
-assert.ok(settingsSource.includes('firstPeriodStart: string'), 'Config must have firstPeriodStart: string');
-assert.ok(settingsSource.includes('periodDurationMinutes: number'), 'Config must have periodDurationMinutes: number');
-assert.ok(settingsSource.includes('totalPeriodsPerDay: number'), 'Config must have totalPeriodsPerDay: number');
-assert.ok(settingsSource.includes('lunchBreakMode:'), 'Config must have lunchBreakMode');
-assert.ok(settingsSource.includes("'NUMBERED_PERIOD'"), "lunchBreakMode must support 'NUMBERED_PERIOD'");
-assert.ok(settingsSource.includes("'SKIPPED_BREAK_SLOT'"), "lunchBreakMode must support 'SKIPPED_BREAK_SLOT'");
-assert.ok(settingsSource.includes('lunchBreakSlot: number'), 'Config must have lunchBreakSlot: number');
-assert.ok(settingsSource.includes('lunchDurationMinutes: number'), 'Config must have lunchDurationMinutes: number');
+assert.ok(
+  settingsSource.includes('SchoolBellScheduleConfig'),
+  'SettingsBackupView must re-export or use SchoolBellScheduleConfig'
+);
+assert.ok(bellServiceSource.includes('morningAssemblyStart: string'), 'Config must have morningAssemblyStart: string');
+assert.ok(bellServiceSource.includes('morningAssemblyEnd: string'), 'Config must have morningAssemblyEnd: string');
+assert.ok(bellServiceSource.includes('firstPeriodStart: string'), 'Config must have firstPeriodStart: string');
+assert.ok(bellServiceSource.includes('periodDurationMinutes: number'), 'Config must have periodDurationMinutes: number');
+assert.ok(bellServiceSource.includes('totalPeriodsPerDay: number'), 'Config must have totalPeriodsPerDay: number');
+assert.ok(bellServiceSource.includes('lunchBreakMode:'), 'Config must have lunchBreakMode');
+assert.ok(bellServiceSource.includes("'NUMBERED_PERIOD'"), "lunchBreakMode must support 'NUMBERED_PERIOD'");
+assert.ok(bellServiceSource.includes("'SKIPPED_BREAK_SLOT'"), "lunchBreakMode must support 'SKIPPED_BREAK_SLOT'");
+assert.ok(bellServiceSource.includes('lunchBreakSlot: number'), 'Config must have lunchBreakSlot: number');
+assert.ok(bellServiceSource.includes('lunchDurationMinutes: number'), 'Config must have lunchDurationMinutes: number');
 console.log('  ✓ SchoolBellScheduleConfig interface structure and modes verified');
 
 // 6.2 Storage Key & Defaults
 assert.ok(
-  settingsSource.includes("'kp_school_bell_schedule'"),
-  "SettingsBackupView must use localStorage key 'kp_school_bell_schedule'"
+  settingsSource.includes('BELL_SCHEDULE_STORAGE_KEY') || settingsSource.includes("'kp_school_bell_schedule'"),
+  "SettingsBackupView must use BELL_SCHEDULE_STORAGE_KEY or 'kp_school_bell_schedule'"
+);
+assert.ok(
+  bellServiceSource.includes("'kp_school_bell_schedule'"),
+  "bellScheduleService must define 'kp_school_bell_schedule'"
 );
 assert.ok(
   settingsSource.includes('DEFAULT_BELL_SCHEDULE_CONFIG'),
@@ -800,6 +812,75 @@ assert.strictEqual(modeBSchedule[7].periodNumber, 6);
 assert.strictEqual(modeBSchedule[8].periodNumber, 7);
 console.log('  ✓ Mode B (Skipped Break Slot): Period 4 -> [Lunch Break] -> Period 5 Afternoon verified');
 
-console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE, SUBJECT ICONS, BANNER COMPRESSOR, SIDEBAR UX & BELL SCHEDULE CHECKS PASSED!');
+// ----------------------------------------------------
+// Step 7: Morning Assembly View Parity & Mobile Ergonomics Verification
+// ----------------------------------------------------
+console.log('\n--- 7. Checking Morning Assembly View Parity, Mini-Calendar & Mobile Ergonomics ---');
+
+const morningViewCheckPath = './src/views/MorningAssemblyView.tsx';
+assert.ok(existsSync(morningViewCheckPath), 'src/views/MorningAssemblyView.tsx must exist');
+const morningSource = readFileSync(morningViewCheckPath, 'utf8');
+
+// 7.1 Advisory Room Lock & Today Default
+assert.ok(morningSource.includes("ADVISORY_ROOM = 'room-3-1'"), 'Morning assembly must be locked to advisory room room-3-1');
+assert.ok(morningSource.includes('ม.3/1 (ห้องประจำชั้น)'), 'Must display homeroom advisory label ม.3/1 (ห้องประจำชั้น)');
+assert.ok(morningSource.includes("DEFAULT_TODAY = '2026-10-02'"), 'Must default to today 2026-10-02');
+assert.ok(morningSource.includes('โฮมรูม'), 'Must render โฮมรูม badge adjacent to title');
+console.log('  ✓ Advisory homeroom lock and today default verified');
+
+// 7.2 Action Buttons & 5 KPI Metric Cards Parity with media_1791314921886.png
+assert.ok(morningSource.includes('✓ มาแถวครบทุกคน'), 'Must have ✓ มาแถวครบทุกคน button');
+assert.ok(morningSource.includes('ตรวจความสอดคล้อง'), 'Must have ตรวจความสอดคล้อง button');
+assert.ok(morningSource.includes('นักเรียนทั้งหมด'), 'Must have นักเรียนทั้งหมด metric card');
+assert.ok(morningSource.includes('มาแถว ('), 'Must have มาแถว rate metric card');
+assert.ok(morningSource.includes('สาย'), 'Must have สาย metric card');
+assert.ok(morningSource.includes('ขาด'), 'Must have ขาด metric card');
+assert.ok(morningSource.includes('ลา / กิจกรรม'), 'Must have ลา / กิจกรรม metric card');
+console.log('  ✓ Action buttons and 5 KPI metric cards parity verified');
+
+// 7.3 Lock 3 Decoupled Morning Late Rule Banner
+assert.ok(
+  morningSource.includes('ระบบตรวจสอบความสอดคล้องอัตโนมัติ (Lock 3 - Decoupled Morning Late Rule)'),
+  'Must include Lock 3 title in information banner'
+);
+assert.ok(
+  morningSource.includes('หากนักเรียนถูกเช็ค') && morningSource.includes('ในแถวเช้า แต่นักเรียนเข้าเรียนในคาบที่ 1'),
+  'Must include Lock 3 explanation text in information banner'
+);
+console.log('  ✓ Lock 3 automated correlation banner verified');
+
+// 7.4 Expandable Mini-Calendar for Retroactive Checking
+assert.ok(morningSource.includes('isCalendarOpen'), 'Must implement isCalendarOpen state for expandable mini-calendar');
+assert.ok(morningSource.includes('bg-emerald-50 text-emerald-800'), 'Must format checked days with green styling');
+assert.ok(morningSource.includes('bg-rose-50 text-rose-800'), 'Must format unchecked past weekdays with red styling');
+console.log('  ✓ Expandable mini-calendar with green/red historical status verified');
+
+// 7.5 Classroom Cumulative Term Statistics Modal
+assert.ok(morningSource.includes('isStatsModalOpen'), 'Must implement isStatsModalOpen state');
+assert.ok(morningSource.includes('ดูสถิติรวมทั้งห้อง'), 'Must have ดูสถิติรวมทั้งห้อง button');
+assert.ok(morningSource.includes('สถิติการเข้าแถวเคารพธงชาติ (ภาคเรียนที่ 1/2569)'), 'Modal must have term stats title');
+console.log('  ✓ Classroom cumulative stats modal verified');
+
+// 7.6 Mobile Fast-Check Mode (No side scrolling, big thumb touch targets)
+assert.ok(morningSource.includes('mobileMode'), 'Must implement mobileMode state');
+assert.ok(morningSource.includes('grid grid-cols-5 gap-1.5'), 'Must render thumb-friendly touch button grid on mobile');
+assert.ok(morningSource.includes('md:hidden'), 'Must include mobile responsive adaptations');
+console.log('  ✓ Ergonomic mobile fast-check mode with large touch targets verified');
+
+// 7.7 Runtime test of getClassroomCumulativeStats and getAssemblyCalendarMonthStatus
+const cumulativeStats = attendanceCorrelationService.getClassroomCumulativeStats('room-3-1');
+assert.ok(cumulativeStats.students.length >= 8, 'Cumulative stats must include all homeroom students');
+assert.ok(cumulativeStats.totalAssemblyDays >= 1, 'Cumulative stats must compute total assembly days');
+assert.ok(cumulativeStats.averageRate > 0, 'Cumulative stats must compute average rate');
+
+const octDays = attendanceCorrelationService.getAssemblyCalendarMonthStatus('room-3-1', 2026, 10, '2026-10-02');
+assert.strictEqual(octDays.length, 31, 'October must have 31 days in calendar');
+const oct1 = octDays.find((d) => d.date === '2026-10-01');
+assert.ok(oct1.isWeekday, 'Oct 1 is Thursday weekday');
+assert.strictEqual(oct1.isChecked, true, 'Oct 1 is checked (Green)');
+
+console.log('  ✓ Runtime execution of cumulative stats and calendar month status passed');
+
+console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE, SUBJECT ICONS, BANNER COMPRESSOR, SIDEBAR UX, BELL SCHEDULE & MORNING ASSEMBLY CHECKS PASSED!');
 
 

@@ -1,16 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import {
-  Menu,
-  Search,
-  Calendar,
-  Bell,
-  MessageSquare,
-  ChevronDown,
-  Settings,
-  LogOut,
-  CheckCircle2,
-  Clock,
-} from 'lucide-react';
+import MenuRegular from '@mingcute/react/core-regular/menu';
+import Search2Regular from '@mingcute/react/core-regular/search-2';
+import Calendar2Regular from '@mingcute/react/core-regular/calendar-2';
+import NotificationRegular from '@mingcute/react/core-regular/notification';
+import Message1Regular from '@mingcute/react/core-regular/message-1';
+import DownSmallRegular from '@mingcute/react/core-regular/down-small';
+import Settings3Regular from '@mingcute/react/core-regular/settings-3';
+import ExitDoorRegular from '@mingcute/react/core-regular/exit-door';
+import CheckCircleRegular from '@mingcute/react/core-regular/check-circle';
+import TimeRegular from '@mingcute/react/core-regular/time';
 import type { SchoolUserRole } from '../../config/schoolRoles';
 
 interface AdminHeaderProps {
@@ -92,13 +90,13 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             title="เปิด/ปิดแถบเมนูด้านข้าง"
             aria-label="Toggle Sidebar"
           >
-            <Menu className="w-5 h-5" />
+            <MenuRegular className="w-5 h-5" />
           </button>
 
           {/* Search Bar Input */}
           <div className="relative flex-1">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-              <Search className="w-4 h-4 text-slate-400" />
+              <Search2Regular className="w-4 h-4 text-slate-400" />
             </div>
             <input
               type="text"
@@ -121,9 +119,9 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
               onClick={() => setIsTermDropdownOpen(!isTermDropdownOpen)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200/80 border border-slate-200/70 transition-colors cursor-pointer"
             >
-              <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <Calendar2Regular className="w-3.5 h-3.5 text-blue-600 shrink-0" />
               <span>{selectedTerm}</span>
-              <ChevronDown className="w-3 h-3 text-slate-400 ml-0.5" />
+              <DownSmallRegular className="w-3 h-3 text-slate-400 ml-0.5" />
             </button>
 
             {isTermDropdownOpen && (
@@ -141,7 +139,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                     }`}
                   >
                     <span>{t}</span>
-                    {selectedTerm === t && <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />}
+                    {selectedTerm === t && <CheckCircleRegular className="w-3.5 h-3.5 text-blue-600" />}
                   </button>
                 ))}
               </div>
@@ -156,7 +154,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
               className="relative p-2 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
               title="การแจ้งเตือนสำคัญ (3 รายการ)"
             >
-              <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
+              <NotificationRegular className="w-4 h-4 sm:w-5 sm:h-5" />
               <span className="absolute top-1 right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold shadow-xs">
                 3
               </span>
@@ -177,7 +175,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                       <div className="font-bold text-slate-800">อนุมัติคำขอจัดซื้ออุปกรณ์วิทย์</div>
                       <div className="text-[11px] text-slate-500 mt-0.5">ฝ่ายการเงิน & พัสดุ ส่งคำขอเร่งด่วน</div>
                       <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> 10 นาทีที่แล้ว
+                        <TimeRegular className="w-3 h-3" /> 10 นาทีที่แล้ว
                       </div>
                     </div>
                   </div>
@@ -188,7 +186,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                       <div className="font-bold text-slate-800">นักเรียนกลุ่มเสี่ยงขาดเรียน ม.3/2</div>
                       <div className="text-[11px] text-slate-500 mt-0.5">ระบบตรวจพบคลิกรายงานติดตามพิเศษ 6 คน</div>
                       <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> 45 นาทีที่แล้ว
+                        <TimeRegular className="w-3 h-3" /> 45 นาทีที่แล้ว
                       </div>
                     </div>
                   </div>
@@ -199,7 +197,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                       <div className="font-bold text-slate-800">ส่งเกรด SGS ครบ 100% กลุ่มสาระคณิต</div>
                       <div className="text-[11px] text-slate-500 mt-0.5">ครูผู้สอนส่งครบทุกห้องแล้ว</div>
                       <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> 2 ชั่วโมงที่แล้ว
+                        <TimeRegular className="w-3 h-3" /> 2 ชั่วโมงที่แล้ว
                       </div>
                     </div>
                   </div>
@@ -216,7 +214,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
               className="relative p-2 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
               title="ข้อความและการสื่อสาร"
             >
-              <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
+              <Message1Regular className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
 
             {isMessagesOpen && (
@@ -272,7 +270,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                 </div>
               </div>
 
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:block" />
+              <DownSmallRegular className="w-3.5 h-3.5 text-slate-400 hidden sm:block" />
             </button>
 
             {isProfileOpen && (
@@ -345,7 +343,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                     }}
                     className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors text-left cursor-pointer"
                   >
-                    <Settings className="w-4 h-4 text-slate-400" />
+                    <Settings3Regular className="w-4 h-4 text-slate-400" />
                     <span>ตั้งค่าระบบโรงเรียน</span>
                   </button>
 
@@ -357,7 +355,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                     }}
                     className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-rose-600 hover:bg-rose-50 font-medium transition-colors text-left cursor-pointer"
                   >
-                    <LogOut className="w-4 h-4 text-rose-500" />
+                    <ExitDoorRegular className="w-4 h-4 text-rose-500" />
                     <span>ออกจากระบบ</span>
                   </button>
                 </div>

@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Search, X, BookOpen, User, Sparkles, ArrowRight } from 'lucide-react';
+import Search2Regular from '@mingcute/react/core-regular/search-2';
+import CloseRegular from '@mingcute/react/core-regular/close';
+import Book2Regular from '@mingcute/react/core-regular/book-2';
+import User3Regular from '@mingcute/react/core-regular/user-3';
+import SparklesRegular from '@mingcute/react/core-regular/sparkles';
+import ArrowRightRegular from '@mingcute/react/core-regular/arrow-right';
 
 interface QuickSearchModalProps {
   isOpen: boolean;
@@ -34,25 +39,25 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
     {
       title: 'ศ23101 ศิลปะ — ม.3/1',
       subtitle: 'ภาพรวมชั้นเรียน และนักเรียนที่ต้องดูแล',
-      icon: BookOpen,
+      icon: Book2Regular,
       action: () => onSelectAction('overview'),
     },
     {
       title: 'ด.ช. ทัตธน คำฝั้น (เลขที่ 15)',
       subtitle: 'วิเคราะห์รายบุคคล & Radar Chart 5 มิติ',
-      icon: User,
+      icon: User3Regular,
       action: () => onSelectAction('student'),
     },
     {
       title: 'เทียบผลข้ามห้อง (SAR / PA)',
       subtitle: 'รายงานสรุปผลการสอน และการกระจายเกรด',
-      icon: Sparkles,
+      icon: SparklesRegular,
       action: () => onSelectAction('sar'),
     },
     {
       title: 'ห้องเรียนผจญภัย (มุมมองนักเรียน)',
       subtitle: 'พอร์ทัลเกมมิฟิเคชัน สัตว์เลี้ยงโมจิ และภารกิจ',
-      icon: ArrowRight,
+      icon: ArrowRightRegular,
       action: () => onSelectAction('student-portal'),
     },
   ];
@@ -67,7 +72,7 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-slate-900/40 backdrop-blur-sm animate-fade-in p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden border border-slate-100">
         <div className="p-4 border-b border-slate-100 flex items-center gap-3">
-          <Search className="w-5 h-5 text-slate-400" />
+          <Search2Regular className="w-5 h-5 text-slate-400" />
           <input
             type="text"
             placeholder="ค้นหานักเรียน, รายวิชา, ห้องเรียน, หรือรายงาน..."
@@ -80,7 +85,7 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
             onClick={onClose}
             className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
           >
-            <X className="w-4 h-4" />
+            <CloseRegular className="w-4 h-4" />
           </button>
         </div>
 

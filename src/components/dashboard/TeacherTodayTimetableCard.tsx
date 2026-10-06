@@ -1,7 +1,7 @@
 // src/components/dashboard/TeacherTodayTimetableCard.tsx
 // การ์ดตารางสอนวันนี้ (รวมเข้าแถวเช้า คาบ 0 + คาบ 1-5) ตามภาพต้นแบบ Mockup Image 1 & Image 2
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Calendar,
   ChevronRight,
@@ -14,6 +14,11 @@ import {
   Eye,
 } from 'lucide-react';
 import type { CrossViewNavigationPayload } from '../../services/teacherCopilotService';
+import {
+  bellScheduleService,
+  BELL_SCHEDULE_UPDATED_EVENT,
+  type SchoolBellScheduleConfig,
+} from '../../services/bellScheduleService';
 
 export interface TodayPeriodItem {
   periodNumber: number;
@@ -108,7 +113,7 @@ interface TeacherTodayTimetableCardProps {
   onCheckAttendance?: (period: TodayPeriodItem) => void;
   onGradeScores?: (period: TodayPeriodItem) => void;
   onViewPeriodDetail?: (period: TodayPeriodItem) => void;
-  onDeepNavigate?: (payload: CrossViewNavigationPayload | { view: string; [key: string]: unknown }) => void;
+  onDeepNavigate?: (payload: CrossViewNavigationPayload) => void;
 }
 
 export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps> = ({
@@ -118,12 +123,41 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
   onViewPeriodDetail,
   onDeepNavigate,
 }) => {
+  const [bellConfig, setBellConfig] = useState<SchoolBellScheduleConfig>(() =>
+    bellScheduleService.getConfig()
+  );
+
+  useEffect(() => {
+    const handleBellUpdate = (e: Event) => {
+      const custom = e as CustomEvent<SchoolBellScheduleConfig>;
+      if (custom.detail) {
+        setBellConfig(custom.detail);
+      }
+    };
+    window.addEventListener(BELL_SCHEDULE_UPDATED_EVENT, handleBellUpdate);
+    return () => {
+      window.removeEventListener(BELL_SCHEDULE_UPDATED_EVENT, handleBellUpdate);
+    };
+  }, []);
+
+  const periodsList = useMemo(() => {
+    return TODAY_PERIODS_MOCK.map((item) => {
+      if (item.periodNumber === 0) {
+        return {
+          ...item,
+          timeRange: `${bellConfig.morningAssemblyStart} - ${bellConfig.morningAssemblyEnd}`,
+        };
+      }
+      return item;
+    });
+  }, [bellConfig]);
+
   // ติดตามคาบที่ดำเนินการเช็คชื่อเรียบร้อยแล้ว (mock ค่าเริ่มต้น: คาบ 0 เช็คแถวเช้าเสร็จแล้ว)
   const [completedPeriods, setCompletedPeriods] = useState<number[]>([0]);
   const [hideCompleted, setHideCompleted] = useState<boolean>(false);
 
   // ค้นหาคาบถัดไปที่ต้องทำ (คาบแรกที่ยังไม่ได้เช็คชื่อ)
-  const nextActionPeriodNumber = TODAY_PERIODS_MOCK.find(
+  const nextActionPeriodNumber = periodsList.find(
     (p) => !(p.isCompleted || completedPeriods.includes(p.periodNumber))
   )?.periodNumber ?? null;
 
@@ -187,7 +221,7 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
   };
 
   // กรองคาบเรียนตามปุ่มสลับ ซ่อนคาบที่เสร็จแล้ว
-  const displayedPeriods = TODAY_PERIODS_MOCK.filter((period) => {
+  const displayedPeriods = periodsList.filter((period) => {
     const isCompleted = period.isCompleted || completedPeriods.includes(period.periodNumber);
     if (hideCompleted && isCompleted) return false;
     return true;

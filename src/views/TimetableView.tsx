@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   CalendarDays,
   Calendar,
@@ -15,10 +15,18 @@ import {
   AlertTriangle,
   LayoutGrid,
   ListFilter,
+  Plus,
+  Edit3,
 } from 'lucide-react';
 import type { CrossViewNavigationPayload } from '../services/teacherCopilotService';
 import { studentAffairsCouncilService } from '../services/studentAffairsCouncilService';
 import { getSubjectIcon, renderSubjectIconBadge } from '../config/subjectIcons';
+import { AddEditTimetableSlotModal } from '../components/timetable/AddEditTimetableSlotModal';
+import {
+  bellScheduleService,
+  BELL_SCHEDULE_UPDATED_EVENT,
+  type SchoolBellScheduleConfig,
+} from '../services/bellScheduleService';
 
 import {
   type TimetableColorTheme,
@@ -48,25 +56,77 @@ interface TimetableViewProps {
   onNavigateToCalendar?: () => void;
 }
 
+const MATRIX_STORAGE_KEY = 'kp_teacher_matrix_slots';
+
+const loadSavedMatrixSlots = (): TimetableMatrixSlot[] => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const stored = window.localStorage.getItem(MATRIX_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return INITIAL_MATRIX_SLOTS;
+};
+
 export const TimetableView: React.FC<TimetableViewProps> = () => {
   // ------------------------------------------
   // State
   // ------------------------------------------
   const [weekOffset, setWeekOffset] = useState<number>(0);
-  const [matrixSlots, setMatrixSlots] =
-    useState<TimetableMatrixSlot[]>(INITIAL_MATRIX_SLOTS);
-  const [selectedSlot, setSelectedSlot] = useState<TimetableMatrixSlot | null>(
-    null
-  );
-  const [filterMode, setFilterMode] = useState<'ALL' | 'UNCHECKED' | 'CHECKED'>(
-    'ALL'
-  );
+  const [matrixSlots, setMatrixSlots] = useState<TimetableMatrixSlot[]>(loadSavedMatrixSlots);
+  const [selectedSlot, setSelectedSlot] = useState<TimetableMatrixSlot | null>(null);
+  const [filterMode, setFilterMode] = useState<'ALL' | 'UNCHECKED' | 'CHECKED'>('ALL');
   const [mobileDay, setMobileDay] = useState<string>('พฤหัสบดี');
   const [mobileViewMode, setMobileViewMode] = useState<'CARDS' | 'TABLE'>('CARDS');
 
+  // Add / Edit Timetable Slot Modal State
+  const [isAddEditModalOpen, setIsAddEditModalOpen] = useState<boolean>(false);
+  const [editingSlot, setEditingSlot] = useState<Partial<TimetableMatrixSlot> | null>(null);
+
+  // School Bell Schedule Settings (Dynamic Period Times & Lunch Mode)
+  const [bellConfig, setBellConfig] = useState<SchoolBellScheduleConfig>(() =>
+    bellScheduleService.getConfig()
+  );
+
+  useEffect(() => {
+    const handleBellUpdate = (e: Event) => {
+      const custom = e as CustomEvent<SchoolBellScheduleConfig>;
+      if (custom.detail) {
+        setBellConfig(custom.detail);
+      }
+    };
+    window.addEventListener(BELL_SCHEDULE_UPDATED_EVENT, handleBellUpdate);
+    return () => {
+      window.removeEventListener(BELL_SCHEDULE_UPDATED_EVENT, handleBellUpdate);
+    };
+  }, []);
+
+  // Compute active teaching periods and lunch slot from bellScheduleService
+  const activePeriods = useMemo(() => {
+    const timeline = bellScheduleService.getTimeline();
+    const teachingList = timeline
+      .filter((t) => t.type === 'PERIOD' || (t.type === 'LUNCH' && t.periodNumber !== undefined))
+      .map((t) => ({
+        period: t.periodNumber || 1,
+        timeRange: t.timeRange,
+        label: t.label,
+        isLunch: t.isLunch,
+      }));
+    return teachingList.length > 0 ? teachingList : PERIOD_DEFINITIONS;
+  }, [bellConfig]);
+
+  const lunchBreakItem = useMemo(() => {
+    const timeline = bellScheduleService.getTimeline();
+    return timeline.find((t) => t.type === 'LUNCH' && t.periodNumber === undefined) || null;
+  }, [bellConfig]);
+
   // Modals state
-  const [isDetailSummaryModalOpen, setIsDetailSummaryModalOpen] =
-    useState<boolean>(false);
+  const [isDetailSummaryModalOpen, setIsDetailSummaryModalOpen] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   // Student Roll-Call State inside Modal
@@ -148,13 +208,64 @@ export const TimetableView: React.FC<TimetableViewProps> = () => {
   };
 
   const handleOpenSlot = (slot: TimetableMatrixSlot) => {
-    if (slot.isFreePeriod) {
-      showToast('คาบนี้เป็นคาบว่าง ไม่มีภาระงานสอน');
+    if (slot.isFreePeriod || slot.category === 'free') {
+      setEditingSlot({
+        day: slot.day,
+        period: slot.period,
+        room: 'ม.3/1',
+        colorTheme: 'blue',
+        isFreePeriod: false,
+      });
+      setIsAddEditModalOpen(true);
       return;
     }
     setAttendanceRecords(buildInitialAttendance());
     setOverrideConfirmConflicts([]);
     setSelectedSlot(slot);
+  };
+
+  const handleOpenFreeSlot = (day: string, period: number) => {
+    setEditingSlot({
+      day: day as TimetableMatrixSlot['day'],
+      period,
+      room: 'ม.3/1',
+      colorTheme: 'blue',
+      isFreePeriod: false,
+    });
+    setIsAddEditModalOpen(true);
+  };
+
+  const handleSaveSlot = (slotToSave: TimetableMatrixSlot) => {
+    setMatrixSlots((prev) => {
+      const existingIdx = prev.findIndex(
+        (s) => s.id === slotToSave.id || (s.day === slotToSave.day && s.period === slotToSave.period)
+      );
+      let updated: TimetableMatrixSlot[];
+      if (existingIdx >= 0) {
+        updated = [...prev];
+        updated[existingIdx] = slotToSave;
+      } else {
+        updated = [...prev, slotToSave];
+      }
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(MATRIX_STORAGE_KEY, JSON.stringify(updated));
+      }
+      return updated;
+    });
+    showToast(`บันทึกรายวิชา ${slotToSave.subjectCode} (${slotToSave.day} คาบที่ ${slotToSave.period}) สำเร็จ`);
+  };
+
+  const handleDeleteSlot = (slotId: string) => {
+    setMatrixSlots((prev) => {
+      const updated = prev.map((s) =>
+        s.id === slotId ? { ...s, isFreePeriod: true, category: 'free' as const } : s
+      );
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(MATRIX_STORAGE_KEY, JSON.stringify(updated));
+      }
+      return updated;
+    });
+    showToast('ลบรายวิชาออกจากตารางสอนเรียบร้อย');
   };
 
   const handleMarkAllPresent = () => {
@@ -269,51 +380,67 @@ export const TimetableView: React.FC<TimetableViewProps> = () => {
           </div>
         </div>
 
-        {/* Unified Week Selector Toolbar matching 20-Week Term Boundary */}
-        <div className="flex items-center p-1 rounded-2xl border border-slate-200/90 bg-white shadow-2xs self-start md:self-auto gap-1">
-          {/* Previous Week */}
+        {/* Right Controls: Add Subject & Week Selector Toolbar */}
+        <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
+          {/* Add Subject to Timetable Button */}
           <button
             type="button"
-            onClick={() => weekInfo.canPrev && setWeekOffset((prev) => prev - 1)}
-            disabled={!weekInfo.canPrev}
-            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
-              weekInfo.canPrev
-                ? 'hover:bg-blue-50 text-blue-600 cursor-pointer'
-                : 'text-slate-300 cursor-not-allowed opacity-50'
-            }`}
-            title="สัปดาห์ก่อนหน้า"
-            aria-label="สัปดาห์ก่อนหน้า"
+            onClick={() => {
+              setEditingSlot(null);
+              setIsAddEditModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
           >
-            <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span>+ เพิ่มรายวิชาในตารางสอน</span>
           </button>
 
-          {/* Date range pill */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50/40 text-xs font-semibold text-slate-800 border border-blue-100/60">
-            <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-            <span className="whitespace-nowrap">{weekInfo.dateRangeLabel}</span>
-          </div>
+          {/* Unified Week Selector Toolbar matching 20-Week Term Boundary */}
+          <div className="flex items-center p-1 rounded-2xl border border-slate-200/90 bg-white shadow-2xs gap-1">
+            {/* Previous Week */}
+            <button
+              type="button"
+              onClick={() => weekInfo.canPrev && setWeekOffset((prev) => prev - 1)}
+              disabled={!weekInfo.canPrev}
+              className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
+                weekInfo.canPrev
+                  ? 'hover:bg-blue-50 text-blue-600 cursor-pointer'
+                  : 'text-slate-300 cursor-not-allowed opacity-50'
+              }`}
+              title="สัปดาห์ก่อนหน้า"
+              aria-label="สัปดาห์ก่อนหน้า"
+            >
+              <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
+            </button>
 
-          {/* 20-Week number pill */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 text-xs font-semibold text-slate-700 border border-slate-200/60">
-            <CalendarDays className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-            <span className="whitespace-nowrap">{`สัปดาห์ที่ ${weekInfo.weekNumber} / 20 สัปดาห์`}</span>
-          </div>
+            {/* Date range pill */}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50/40 text-xs font-semibold text-slate-800 border border-blue-100/60">
+              <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <span className="whitespace-nowrap">{weekInfo.dateRangeLabel}</span>
+            </div>
 
-          {/* Next Week */}
-          <button
-            type="button"
-            onClick={() => weekInfo.canNext && setWeekOffset((prev) => prev + 1)}
-            disabled={!weekInfo.canNext}
-            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
-              weekInfo.canNext
-                ? 'hover:bg-blue-50 text-blue-600 cursor-pointer'
-                : 'text-slate-300 cursor-not-allowed opacity-50'
-            }`}
-            title="สัปดาห์ถัดไป"
-            aria-label="สัปดาห์ถัดไป"
-          >
-            <ChevronRight className="w-4 h-4 stroke-[2.5]" />
-          </button>
+            {/* 20-Week number pill */}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 text-xs font-semibold text-slate-700 border border-slate-200/60">
+              <CalendarDays className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+              <span className="whitespace-nowrap">{`สัปดาห์ที่ ${weekInfo.weekNumber} / 20 สัปดาห์`}</span>
+            </div>
+
+            {/* Next Week */}
+            <button
+              type="button"
+              onClick={() => weekInfo.canNext && setWeekOffset((prev) => prev + 1)}
+              disabled={!weekInfo.canNext}
+              className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
+                weekInfo.canNext
+                  ? 'hover:bg-blue-50 text-blue-600 cursor-pointer'
+                  : 'text-slate-300 cursor-not-allowed opacity-50'
+              }`}
+              title="สัปดาห์ถัดไป"
+              aria-label="สัปดาห์ถัดไป"
+            >
+              <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -501,70 +628,90 @@ export const TimetableView: React.FC<TimetableViewProps> = () => {
           </div>
 
           <div className="space-y-2.5">
-            {PERIOD_DEFINITIONS.map((periodDef) => {
+            {activePeriods.map((periodDef) => {
               const slot = getSlot(mobileDay, periodDef.period);
-              if (!slot || slot.isFreePeriod || slot.category === 'free') {
-                return (
-                  <div
-                    key={periodDef.period}
-                    className="p-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 flex items-center justify-between text-xs text-slate-400 select-none"
-                  >
-                    <span className="font-semibold text-slate-600">
-                      คาบที่ {periodDef.period} ({periodDef.timeRange})
-                    </span>
-                    <span className="text-[11px] font-semibold text-slate-400 bg-white px-2 py-0.5 rounded-md border border-slate-200">
-                      คาบว่าง
-                    </span>
-                  </div>
-                );
-              }
-
-              const cardStyle = getSlotStyle(slot.colorTheme, slot.isConducted);
-              const subjectIcon = getSubjectIcon(slot.subjectCode, slot.subjectName);
+              const showLunchBeforeThis =
+                lunchBreakItem && periodDef.period === bellConfig.lunchBreakSlot + 1;
 
               return (
-                <div
-                  key={periodDef.period}
-                  onClick={() => handleOpenSlot(slot)}
-                  className={`p-3.5 rounded-xl border cursor-pointer transition-all ${cardStyle} hover:shadow-xs`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-1 min-w-0 flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-semibold opacity-70">
-                          คาบที่ {periodDef.period} • {periodDef.timeRange}
-                        </span>
-                        <span className="shrink-0">
-                          {renderSubjectIconBadge(subjectIcon, 'xs')}
-                        </span>
+                <React.Fragment key={periodDef.period}>
+                  {showLunchBeforeThis && (
+                    <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200 text-amber-800 flex items-center justify-between text-xs font-bold shadow-2xs">
+                      <span className="flex items-center gap-1.5">
+                        <span>🍽️</span>
+                        <span>{lunchBreakItem.label} ({lunchBreakItem.timeRange})</span>
+                      </span>
+                      <span className="text-[10px] text-amber-600 bg-white px-2 py-0.5 rounded-md border border-amber-200">
+                        พักกลางวัน
+                      </span>
+                    </div>
+                  )}
+
+                  {!slot || slot.isFreePeriod || slot.category === 'free' ? (
+                    <div
+                      key={periodDef.period}
+                      onClick={() => handleOpenFreeSlot(mobileDay, periodDef.period)}
+                      className="p-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 hover:bg-blue-50/50 hover:border-blue-300 transition-all flex items-center justify-between text-xs text-slate-400 select-none cursor-pointer group"
+                    >
+                      <span className="font-semibold text-slate-600 group-hover:text-blue-600">
+                        {periodDef.label} ({periodDef.timeRange})
+                      </span>
+                      <span className="text-[11px] font-semibold text-slate-400 group-hover:text-blue-600 group-hover:border-blue-200 bg-white px-2 py-0.5 rounded-md border border-slate-200 flex items-center gap-1">
+                        <Plus className="w-3 h-3" />
+                        <span>คาบว่าง • คลิกเพื่อเพิ่มวิชา</span>
+                      </span>
+                    </div>
+                  ) : (
+                    <div
+                      key={periodDef.period}
+                      onClick={() => handleOpenSlot(slot)}
+                      className={`p-3.5 rounded-xl border cursor-pointer transition-all ${getSlotStyle(
+                        slot.colorTheme,
+                        slot.isConducted
+                      )} hover:shadow-xs`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-semibold opacity-70">
+                              {periodDef.label} • {periodDef.timeRange}
+                            </span>
+                            <span className="shrink-0">
+                              {renderSubjectIconBadge(
+                                getSubjectIcon(slot.subjectCode, slot.subjectName),
+                                'xs'
+                              )}
+                            </span>
+                          </div>
+                          <div className="font-extrabold text-sm truncate">
+                            {slot.subjectCode} • {slot.room ? (slot.room.startsWith('ม.') ? `${slot.room} • ห้อง 324` : `ม.3/1 • ห้อง ${slot.room}`) : 'ม.3/1 • ห้อง 324'}
+                          </div>
+                          <div className="line-clamp-2 text-xs font-bold text-slate-800 leading-snug">
+                            {slot.subjectName || slot.subjectCode}
+                          </div>
+                        </div>
                       </div>
-                      <div className="font-extrabold text-sm truncate">
-                        {slot.subjectCode} • {slot.room ? (slot.room.startsWith('ม.') ? `${slot.room} • ห้อง 324` : `ม.3/1 • ห้อง ${slot.room}`) : 'ม.3/1 • ห้อง 324'}
-                      </div>
-                      <div className="line-clamp-2 text-xs font-bold text-slate-800 leading-snug">
-                        {slot.subjectName || slot.subjectCode}
+                      <div className="mt-2 flex items-center justify-between pt-2 border-t border-slate-100/60">
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          {slot.room ? (slot.room.startsWith('ม.') ? slot.room : 'ม.3/1') : 'ม.3/1'}
+                        </span>
+                        {slot.isConducted ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                            <span>✓ เช็คแล้ว</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                            <span className="w-3.5 h-3.5 rounded-full bg-rose-600 text-white flex items-center justify-center text-[9px] font-black shrink-0">
+                              !
+                            </span>
+                            <span>! ยังไม่เช็ค</span>
+                          </span>
+                        )}
                       </div>
                     </div>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between pt-2 border-t border-slate-100/60">
-                    <span className="text-[11px] text-slate-500 font-medium">
-                      {slot.room ? (slot.room.startsWith('ม.') ? slot.room : 'ม.3/1') : 'ม.3/1'}
-                    </span>
-                    {slot.isConducted ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                        <Check className="w-3.5 h-3.5 stroke-[3]" />
-                        <span>✓ เช็คแล้ว</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
-                        <span className="w-3.5 h-3.5 rounded-full bg-rose-600 text-white flex items-center justify-center text-[9px] font-black shrink-0">
-                          !
-                        </span>
-                        <span>! ยังไม่เช็ค</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
+                  )}
+                </React.Fragment>
               );
             })}
           </div>
@@ -624,127 +771,151 @@ export const TimetableView: React.FC<TimetableViewProps> = () => {
             </thead>
 
             <tbody className="divide-y divide-slate-100">
-              {PERIOD_DEFINITIONS.map((periodDef, pIndex) => {
-                const isLastPeriod = pIndex === PERIOD_DEFINITIONS.length - 1;
+              {activePeriods.map((periodDef, pIndex) => {
+                const isLastPeriod = pIndex === activePeriods.length - 1;
+                const showLunchBeforeThis =
+                  lunchBreakItem !== null &&
+                  bellConfig.lunchBreakMode === 'SKIPPED_BREAK_SLOT' &&
+                  periodDef.period === bellConfig.lunchBreakSlot + 1;
 
                 return (
-                  <tr key={periodDef.period} className="transition-colors">
-                    {/* Time cell */}
-                    <td className="py-3.5 px-3 text-left font-medium text-slate-500 align-middle bg-slate-50/40">
-                      <div className="font-bold text-[11px] text-slate-700">
-                        {periodDef.timeRange}
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-normal mt-0.5">
-                        ({periodDef.label})
-                      </div>
-                    </td>
+                  <React.Fragment key={periodDef.period}>
+                    {/* Mode B: Insert skipped lunch break row if applicable */}
+                    {showLunchBeforeThis && (
+                      <tr className="bg-amber-50/60 border-y border-amber-200/80">
+                        <td className="py-2.5 px-3 text-left font-bold text-amber-900 align-middle">
+                          <div className="text-[11px] font-bold">{lunchBreakItem.timeRange}</div>
+                          <div className="text-[10px] text-amber-700 font-medium">พักกลางวัน</div>
+                        </td>
+                        <td colSpan={weekInfo.days.length} className="py-2 px-3 text-center">
+                          <div className="inline-flex items-center gap-2 px-3.5 py-1 bg-amber-100/80 border border-amber-300/80 rounded-full text-xs font-bold text-amber-900 shadow-2xs">
+                            <span>🍱 พักรับประทานอาหารกลางวัน ({lunchBreakItem.timeRange})</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
 
-                    {/* Day cells */}
-                    {weekInfo.days.map((dayObj) => {
-                      const slot = getSlot(dayObj.key, periodDef.period);
-                      const isToday = dayObj.isToday;
+                    <tr className="transition-colors">
+                      {/* Time cell */}
+                      <td className="py-3.5 px-3 text-left font-medium text-slate-500 align-middle bg-slate-50/40">
+                        <div className="font-bold text-[11px] text-slate-700">
+                          {periodDef.timeRange}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-normal mt-0.5">
+                          ({periodDef.label})
+                        </div>
+                      </td>
 
-                      // Highlight filter matching
-                      const isDimmed =
-                        filterMode === 'UNCHECKED'
-                          ? slot && slot.isConducted
-                          : filterMode === 'CHECKED'
-                          ? slot && !slot.isConducted && !slot.isFreePeriod
-                          : false;
+                      {/* Day cells */}
+                      {weekInfo.days.map((dayObj) => {
+                        const slot = getSlot(dayObj.key, periodDef.period);
+                        const isToday = dayObj.isToday;
 
-                      // Active Thursday column enclosure
-                      const columnHighlightClass = isToday
-                        ? `bg-blue-50/20 border-x border-blue-200/60 ${
-                            isLastPeriod ? 'rounded-b-xl border-b' : ''
-                          }`
-                        : '';
+                        // Highlight filter matching
+                        const isDimmed =
+                          filterMode === 'UNCHECKED'
+                            ? slot && slot.isConducted
+                            : filterMode === 'CHECKED'
+                            ? slot && !slot.isConducted && !slot.isFreePeriod
+                            : false;
 
-                      if (!slot || slot.isFreePeriod || slot.category === 'free') {
+                        // Active Thursday column enclosure
+                        const columnHighlightClass = isToday
+                          ? `bg-blue-50/20 border-x border-blue-200/60 ${
+                              isLastPeriod ? 'rounded-b-xl border-b' : ''
+                            }`
+                          : '';
+
+                        if (!slot || slot.isFreePeriod || slot.category === 'free') {
+                          return (
+                            <td
+                              key={dayObj.key}
+                              onClick={() => handleOpenFreeSlot(dayObj.key, periodDef.period)}
+                              className={`p-1.5 align-middle cursor-pointer group ${columnHighlightClass}`}
+                              title="คลิกเพื่อเพิ่มรายวิชาในคาบนี้"
+                            >
+                              <div className="h-32 min-h-[128px] w-full bg-slate-50/60 border border-dashed border-slate-200 group-hover:border-blue-400 group-hover:bg-blue-50/40 rounded-xl flex flex-col items-center justify-center text-slate-400 group-hover:text-blue-600 text-xs transition-all select-none">
+                                <span className="font-semibold text-slate-500 group-hover:text-blue-600 flex items-center gap-1">
+                                  <Plus className="w-3.5 h-3.5" />
+                                  <span>คาบว่าง</span>
+                                </span>
+                                <span className="text-[10px] text-slate-400 group-hover:text-blue-500 mt-0.5">
+                                  คลิกเพื่อเพิ่มวิชา
+                                </span>
+                              </div>
+                            </td>
+                          );
+                        }
+
+                        // Subject period card
+                        const cardStyle = getSlotStyle(
+                          slot.colorTheme,
+                          slot.isConducted,
+                          isToday
+                        );
+                        const subjectIcon = getSubjectIcon(slot.subjectCode, slot.subjectName);
+
                         return (
                           <td
                             key={dayObj.key}
-                            className={`p-1.5 align-middle ${columnHighlightClass}`}
+                            onClick={() => handleOpenSlot(slot)}
+                            className={`p-1.5 align-middle cursor-pointer group ${columnHighlightClass}`}
                           >
-                            <div className="h-32 min-h-[128px] w-full bg-slate-50/60 border border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-400 text-xs select-none">
-                              <span className="font-semibold text-slate-500">
-                                คาบว่าง
-                              </span>
-                              <span className="text-[10px] text-slate-400 mt-0.5">
-                                —
-                              </span>
+                            <div
+                              className={`h-32 min-h-[128px] w-full p-2.5 rounded-xl border flex flex-col justify-between text-left transition-all ${cardStyle} ${
+                                isDimmed
+                                  ? 'opacity-30'
+                                  : 'hover:shadow-xs group-hover:-translate-y-0.5'
+                              } ${
+                                isToday && !slot.isConducted
+                                  ? 'ring-1 ring-amber-300/80 shadow-2xs'
+                                  : ''
+                              }`}
+                            >
+                              {/* 1. Top row: Course code + Subject Icon badge */}
+                              <div className="flex items-center justify-between gap-1.5">
+                                <span className="font-extrabold text-xs tracking-tight truncate">
+                                  {slot.subjectCode}
+                                </span>
+                                <span className="shrink-0">
+                                  {renderSubjectIconBadge(subjectIcon, 'xs')}
+                                </span>
+                              </div>
+
+                              {/* 2. Course name: 2 lines */}
+                              <div className="line-clamp-2 text-xs font-bold text-slate-800 leading-snug">
+                                {slot.subjectName || slot.subjectCode}
+                              </div>
+
+                              {/* 3. Classroom & Room */}
+                              <div className="text-[11px] text-slate-500 font-medium truncate">
+                                {slot.room
+                                  ? (slot.room.startsWith('ม.') ? `${slot.room} • ห้อง 324` : `ม.3/1 • ห้อง ${slot.room}`)
+                                  : 'ม.3/1 • ห้อง 324'}
+                              </div>
+
+                              {/* 4. Status badge */}
+                              <div className="flex items-center justify-start">
+                                {slot.isConducted ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                                    <Check className="w-3 h-3 stroke-[3]" />
+                                    <span>✓ เช็คแล้ว</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                                    <span className="w-3.5 h-3.5 rounded-full bg-rose-600 text-white flex items-center justify-center text-[9px] font-black shrink-0">
+                                      !
+                                    </span>
+                                    <span>! ยังไม่เช็ค</span>
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </td>
                         );
-                      }
-
-                      // Subject period card
-                      const cardStyle = getSlotStyle(
-                        slot.colorTheme,
-                        slot.isConducted,
-                        isToday
-                      );
-                      const subjectIcon = getSubjectIcon(slot.subjectCode, slot.subjectName);
-
-                      return (
-                        <td
-                          key={dayObj.key}
-                          onClick={() => handleOpenSlot(slot)}
-                          className={`p-1.5 align-middle cursor-pointer group ${columnHighlightClass}`}
-                        >
-                          <div
-                            className={`h-32 min-h-[128px] w-full p-2.5 rounded-xl border flex flex-col justify-between text-left transition-all ${cardStyle} ${
-                              isDimmed
-                                ? 'opacity-30'
-                                : 'hover:shadow-xs group-hover:-translate-y-0.5'
-                            } ${
-                              isToday && !slot.isConducted
-                                ? 'ring-1 ring-amber-300/80 shadow-2xs'
-                                : ''
-                            }`}
-                          >
-                            {/* 1. Top row: Course code + Subject Icon badge */}
-                            <div className="flex items-center justify-between gap-1.5">
-                              <span className="font-extrabold text-xs tracking-tight truncate">
-                                {slot.subjectCode}
-                              </span>
-                              <span className="shrink-0">
-                                {renderSubjectIconBadge(subjectIcon, 'xs')}
-                              </span>
-                            </div>
-
-                            {/* 2. Course name: 2 lines */}
-                            <div className="line-clamp-2 text-xs font-bold text-slate-800 leading-snug">
-                              {slot.subjectName || slot.subjectCode}
-                            </div>
-
-                            {/* 3. Classroom & Room */}
-                            <div className="text-[11px] text-slate-500 font-medium truncate">
-                              {slot.room
-                                ? (slot.room.startsWith('ม.') ? `${slot.room} • ห้อง 324` : `ม.3/1 • ห้อง ${slot.room}`)
-                                : 'ม.3/1 • ห้อง 324'}
-                            </div>
-
-                            {/* 4. Status badge */}
-                            <div className="flex items-center justify-start">
-                              {slot.isConducted ? (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                                  <Check className="w-3 h-3 stroke-[3]" />
-                                  <span>✓ เช็คแล้ว</span>
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
-                                  <span className="w-3.5 h-3.5 rounded-full bg-rose-600 text-white flex items-center justify-center text-[9px] font-black shrink-0">
-                                    !
-                                  </span>
-                                  <span>! ยังไม่เช็ค</span>
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
+                      })}
+                    </tr>
+                  </React.Fragment>
                 );
               })}
             </tbody>
@@ -988,21 +1159,37 @@ export const TimetableView: React.FC<TimetableViewProps> = () => {
             )}
 
             {/* Modal Footer */}
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-3 border-t border-slate-100">
               <button
                 type="button"
-                onClick={() => setSelectedSlot(null)}
-                className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-xs font-semibold cursor-pointer"
+                onClick={() => {
+                  const toEdit = { ...selectedSlot };
+                  setSelectedSlot(null);
+                  setEditingSlot(toEdit);
+                  setIsAddEditModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-200 hover:border-blue-300 bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-xl text-xs font-bold transition-all cursor-pointer self-start sm:self-auto"
+                title="แก้ไขข้อมูลวิชาหรือเปลี่ยนไอคอน"
               >
-                ยกเลิก
+                <Edit3 className="w-3.5 h-3.5 text-blue-600" />
+                <span>✏️ แก้ไขวิชา / เปลี่ยนไอคอน</span>
               </button>
-              <button
-                type="button"
-                onClick={handleSaveAttendance}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
-              >
-                บันทึกการเช็คชื่อ
-              </button>
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setSelectedSlot(null)}
+                  className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-xs font-semibold cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveAttendance}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
+                >
+                  บันทึกการเช็คชื่อ
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1108,6 +1295,21 @@ export const TimetableView: React.FC<TimetableViewProps> = () => {
           </div>
         </div>
       )}
+
+      {/* ========================================================
+          MODAL 3: ADD / EDIT TIMETABLE SLOT MODAL
+          ======================================================== */}
+      <AddEditTimetableSlotModal
+        isOpen={isAddEditModalOpen}
+        onClose={() => {
+          setIsAddEditModalOpen(false);
+          setEditingSlot(null);
+        }}
+        onSaveSlot={handleSaveSlot}
+        onDeleteSlot={handleDeleteSlot}
+        initialSlot={editingSlot}
+        maxPeriods={activePeriods.length}
+      />
     </div>
   );
 };

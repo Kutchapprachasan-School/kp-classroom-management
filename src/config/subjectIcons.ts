@@ -20,10 +20,10 @@ export interface SubjectIconConfig {
 }
 
 export const ALL_SUBJECT_ICONS: SubjectIconConfig[] = [
-  // 1. ภาษาญี่ปุ่น
+  // 1. ภาษาญี่ปุ่น (あ)
   {
     id: 'japanese',
-    name: 'ภาษาญี่ปุ่น',
+    name: 'ภาษาญี่ปุ่น (あ)',
     strand: 'ภาษาต่างประเทศ',
     symbol: 'あ',
     iconType: 'text',
@@ -32,7 +32,35 @@ export const ALL_SUBJECT_ICONS: SubjectIconConfig[] = [
     textColorClass: 'text-white',
     colorClass: 'text-white',
     borderClass: 'border-rose-400',
-    description: 'กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ (ภาษาญี่ปุ่น)',
+    description: 'กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ (ภาษาญี่ปุ่น - あ)',
+  },
+  // 1b. ภาษาญี่ปุ่น (日本)
+  {
+    id: 'japanese-nihon',
+    name: 'ภาษาญี่ปุ่น (日本)',
+    strand: 'ภาษาต่างประเทศ',
+    symbol: '日本',
+    iconType: 'text',
+    bgClass: 'bg-[#9333EA]',
+    textClass: 'text-white',
+    textColorClass: 'text-white',
+    colorClass: 'text-white',
+    borderClass: 'border-purple-400',
+    description: 'กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ (ภาษาญี่ปุ่น - 日本)',
+  },
+  // 1c. ภาษาญี่ปุ่น (⛩️)
+  {
+    id: 'japanese-torii',
+    name: 'ภาษาญี่ปุ่น (⛩️)',
+    strand: 'ภาษาต่างประเทศ',
+    symbol: '⛩️',
+    iconType: 'text',
+    bgClass: 'bg-[#3B82F6]',
+    textClass: 'text-white',
+    textColorClass: 'text-white',
+    colorClass: 'text-white',
+    borderClass: 'border-blue-400',
+    description: 'กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ (ภาษาญี่ปุ่น - เสาโทริอิ)',
   },
   // 2. ภาษาจีน
   {
@@ -313,6 +341,20 @@ export const ALL_SUBJECT_ICONS: SubjectIconConfig[] = [
     borderClass: 'border-yellow-500',
     description: 'กิจกรรมพัฒนาผู้เรียน (ลูกเสือ/เนตรนารี/ยุวกาชาด)',
   },
+  // 21. กิจกรรมพัฒนาผู้เรียน / โฮมรูม
+  {
+    id: 'activity-counselor',
+    name: 'กิจกรรมพัฒนาผู้เรียน',
+    strand: 'กิจกรรมพัฒนาผู้เรียน',
+    symbol: '👥',
+    iconType: 'text',
+    bgClass: 'bg-[#10B981]',
+    textClass: 'text-white',
+    textColorClass: 'text-white',
+    colorClass: 'text-white',
+    borderClass: 'border-emerald-400',
+    description: 'กิจกรรมพัฒนาผู้เรียน / กิจกรรมแนะแนว / โฮมรูม',
+  },
 ];
 
 export const DEFAULT_SUBJECT_ICON: SubjectIconConfig = {
@@ -387,6 +429,17 @@ export function getSubjectIcon(codeOrName: string = '', subjectName?: string): S
   // Arts Strand specific sub-disciplines
   if (combined.includes('ดนตรี') || combined.includes('นาฏศิลป์') || combined.includes('music')) {
     return findIcon('music');
+  }
+
+  // Specific mock courses from system mockup (media_1791288377041.png)
+  if (codeStr.includes('ญ33201') || combined.includes('ญ33201')) {
+    return findIcon('japanese-nihon');
+  }
+  if (codeStr.includes('ญ21202') || combined.includes('ญ21202')) {
+    return findIcon('japanese-torii');
+  }
+  if (combined.includes('กิจกรรมพัฒนาผู้เรียน') || combined.includes('โฮมรูม')) {
+    return findIcon('activity-counselor');
   }
 
   // Learner Development Activities specific
@@ -513,10 +566,10 @@ export function getSubjectBadgeClasses(
   size: SubjectBadgeSize = 'md'
 ): string {
   const sizeMap: Record<SubjectBadgeSize, string> = {
-    xs: 'w-5 h-5 text-[10px] rounded',
-    sm: 'w-6 h-6 text-xs rounded-md',
-    md: 'w-8 h-8 text-sm rounded-lg',
-    lg: 'w-10 h-10 text-base rounded-xl',
+    xs: 'w-5 h-5 text-[10px] rounded-full',
+    sm: 'w-6 h-6 text-xs rounded-full',
+    md: 'w-8 h-8 text-sm rounded-full',
+    lg: 'w-10 h-10 text-base rounded-full',
   };
 
   const borderPart = icon.borderClass ? `border ${icon.borderClass}` : '';

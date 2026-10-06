@@ -69,147 +69,22 @@ import {
   type DayOfWeek,
 } from '../services/academicCalendarService';
 
-export interface SchoolBellScheduleConfig {
-  morningAssemblyStart: string;     // e.g. '07:45'
-  morningAssemblyEnd: string;       // e.g. '08:15'
-  firstPeriodStart: string;         // e.g. '08:30'
-  periodDurationMinutes: number;    // e.g. 50
-  totalPeriodsPerDay: number;       // e.g. 7 (options: 6, 7, 8, 9)
-  lunchBreakMode: 'NUMBERED_PERIOD' | 'SKIPPED_BREAK_SLOT'; // Mode A vs Mode B
-  lunchBreakSlot: number;           // e.g. 4 (พักหลังคาบ 4) or 5 (คาบ 5 คือพักเที่ยง)
-  lunchDurationMinutes: number;     // e.g. 50 (or 60)
-}
-
-const BELL_SCHEDULE_STORAGE_KEY = 'kp_school_bell_schedule';
-
-const DEFAULT_BELL_SCHEDULE_CONFIG: SchoolBellScheduleConfig = {
-  morningAssemblyStart: '07:45',
-  morningAssemblyEnd: '08:15',
-  firstPeriodStart: '08:30',
-  periodDurationMinutes: 50,
-  totalPeriodsPerDay: 7,
-  lunchBreakMode: 'NUMBERED_PERIOD',
-  lunchBreakSlot: 4,
-  lunchDurationMinutes: 50,
-};
-
-export interface BellScheduleTimelineItem {
-  id: string;
-  type: 'ASSEMBLY' | 'PERIOD' | 'LUNCH';
-  periodNumber?: number;
-  label: string;
-  startTime: string;
-  endTime: string;
-  durationMinutes: number;
-  isLunch: boolean;
-}
-
-const addMinutesToTimeStr = (timeStr: string, minutesToAdd: number): string => {
-  const [hStr, mStr] = (timeStr || '08:00').split(':');
-  const totalMinutes = (parseInt(hStr, 10) || 0) * 60 + (parseInt(mStr, 10) || 0) + minutesToAdd;
-  const wrappedMinutes = ((totalMinutes % 1440) + 1440) % 1440;
-  const h = Math.floor(wrappedMinutes / 60);
-  const m = wrappedMinutes % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-};
-
-const calculateMinutesDifference = (startTime: string, endTime: string): number => {
-  const [sh, sm] = (startTime || '00:00').split(':').map((n) => parseInt(n, 10) || 0);
-  const [eh, em] = (endTime || '00:00').split(':').map((n) => parseInt(n, 10) || 0);
-  let diff = (eh * 60 + em) - (sh * 60 + sm);
-  if (diff < 0) diff += 1440;
-  return diff;
-};
-
-const generateBellScheduleTimeline = (
-  config: SchoolBellScheduleConfig
-): BellScheduleTimelineItem[] => {
-  const items: BellScheduleTimelineItem[] = [];
-
-  const assemblyDuration = calculateMinutesDifference(
-    config.morningAssemblyStart,
-    config.morningAssemblyEnd
-  );
-  items.push({
-    id: 'slot-assembly',
-    type: 'ASSEMBLY',
-    label: 'เข้าแถวเคารพธงชาติ & โฮมรูม',
-    startTime: config.morningAssemblyStart,
-    endTime: config.morningAssemblyEnd,
-    durationMinutes: assemblyDuration > 0 ? assemblyDuration : 30,
-    isLunch: false,
-  });
-
-  let currentTime = config.firstPeriodStart;
-
-  if (config.lunchBreakMode === 'NUMBERED_PERIOD') {
-    const lunchPeriodNum = Math.min(config.lunchBreakSlot + 1, config.totalPeriodsPerDay);
-
-    for (let p = 1; p <= config.totalPeriodsPerDay; p++) {
-      if (p === lunchPeriodNum) {
-        const endTime = addMinutesToTimeStr(currentTime, config.lunchDurationMinutes);
-        items.push({
-          id: `slot-period-${p}-lunch`,
-          type: 'LUNCH',
-          periodNumber: p,
-          label: `คาบที่ ${p} (พักกลางวัน)`,
-          startTime: currentTime,
-          endTime,
-          durationMinutes: config.lunchDurationMinutes,
-          isLunch: true,
-        });
-        currentTime = endTime;
-      } else {
-        const endTime = addMinutesToTimeStr(currentTime, config.periodDurationMinutes);
-        items.push({
-          id: `slot-period-${p}`,
-          type: 'PERIOD',
-          periodNumber: p,
-          label: `คาบที่ ${p}`,
-          startTime: currentTime,
-          endTime,
-          durationMinutes: config.periodDurationMinutes,
-          isLunch: false,
-        });
-        currentTime = endTime;
-      }
-    }
-  } else {
-    const breakAfter = Math.min(config.lunchBreakSlot, config.totalPeriodsPerDay);
-
-    for (let p = 1; p <= config.totalPeriodsPerDay; p++) {
-      const endTime = addMinutesToTimeStr(currentTime, config.periodDurationMinutes);
-      items.push({
-        id: `slot-period-${p}`,
-        type: 'PERIOD',
-        periodNumber: p,
-        label: `คาบที่ ${p}`,
-        startTime: currentTime,
-        endTime,
-        durationMinutes: config.periodDurationMinutes,
-        isLunch: false,
-      });
-      currentTime = endTime;
-
-      if (p === breakAfter) {
-        const lunchEndTime = addMinutesToTimeStr(currentTime, config.lunchDurationMinutes);
-        items.push({
-          id: 'slot-lunch-break',
-          type: 'LUNCH',
-          periodNumber: undefined,
-          label: 'พักกลางวัน (ไม่นับคาบ)',
-          startTime: currentTime,
-          endTime: lunchEndTime,
-          durationMinutes: config.lunchDurationMinutes,
-          isLunch: true,
-        });
-        currentTime = lunchEndTime;
-      }
-    }
-  }
-
-  return items;
-};
+export {
+  type SchoolBellScheduleConfig,
+  type BellScheduleTimelineItem,
+  BELL_SCHEDULE_STORAGE_KEY,
+  DEFAULT_BELL_SCHEDULE_CONFIG,
+  addMinutesToTimeStr,
+  calculateMinutesDifference,
+  generateBellScheduleTimeline,
+  bellScheduleService,
+} from '../services/bellScheduleService';
+import {
+  type SchoolBellScheduleConfig,
+  BELL_SCHEDULE_STORAGE_KEY,
+  DEFAULT_BELL_SCHEDULE_CONFIG,
+  generateBellScheduleTimeline,
+} from '../services/bellScheduleService';
 
 interface SettingsBackupViewProps {
   activeRole?: SchoolUserRole;

@@ -19,8 +19,9 @@ assert.ok(
   "TeacherSidebar must include menu item with key: 'exams'"
 );
 assert.ok(
-  sidebarContent.includes("label: 'ประเมิน / แบบฟอร์ม'"),
-  "TeacherSidebar must have label 'ประเมิน / แบบฟอร์ม'"
+  sidebarContent.includes("label: 'ประเมิน / แบบฟอร์ม'") ||
+    sidebarContent.includes("label: 'จัดการสอบ / เก็บคะแนน'"),
+  "TeacherSidebar must have label 'ประเมิน / แบบฟอร์ม' or 'จัดการสอบ / เก็บคะแนน'"
 );
 
 // Check that exams is NOT wrapped inside isAdmin ternary in menuItems

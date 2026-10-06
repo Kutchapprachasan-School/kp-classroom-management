@@ -2,14 +2,12 @@
 // แถบด้านบนของนักเรียน (ตรงตามภาพอ้างอิง media_1791203662191.png พร้อมฟอนต์ Prompt)
 
 import React from 'react';
-import {
-  Bell,
-  LogOut,
-  Menu,
-  Calendar,
-  Sparkles,
-  Settings,
-} from 'lucide-react';
+import NotificationRegular from '@mingcute/react/core-regular/notification';
+import ExitDoorRegular from '@mingcute/react/core-regular/exit-door';
+import MenuRegular from '@mingcute/react/core-regular/menu';
+import Calendar2Regular from '@mingcute/react/core-regular/calendar-2';
+import SparklesRegular from '@mingcute/react/core-regular/sparkles';
+import Settings3Regular from '@mingcute/react/core-regular/settings-3';
 import { studentBannerService } from '../../services/studentBannerService';
 import type { SchoolUserRole } from '../../config/schoolRoles';
 
@@ -48,7 +46,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
             title="เปิดเมนู"
             aria-label="เปิดเมนู"
           >
-            <Menu className="w-5 h-5" />
+            <MenuRegular className="w-5 h-5" />
           </button>
         )}
 
@@ -92,7 +90,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
             className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold shadow-xs transition-all hover:scale-102 cursor-pointer"
             title="จัดการแบนเนอร์หน้านักเรียนทั้ง 3 ส่วน (สิทธิ์ Admin)"
           >
-            <Settings className="w-3.5 h-3.5" />
+            <Settings3Regular className="w-3.5 h-3.5" />
             <span>ปรับแต่ง Banner (Admin)</span>
           </button>
         )}
@@ -103,7 +101,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
           className="relative w-9 h-9 rounded-xl bg-sky-50 hover:bg-sky-100/80 text-sky-600 flex items-center justify-center transition-colors cursor-pointer border border-sky-100/60"
           title="การแจ้งเตือน (3 รายการ)"
         >
-          <Bell className="w-4 h-4" />
+          <NotificationRegular className="w-4 h-4" />
           <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center shadow-xs">
             3
           </span>
@@ -111,13 +109,13 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
 
         {/* Date Chip */}
         <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200/90 bg-slate-50/70 text-xs font-medium text-slate-700 shadow-2xs">
-          <Calendar className="w-3.5 h-3.5 text-slate-500" />
+          <Calendar2Regular className="w-3.5 h-3.5 text-slate-500" />
           <span>อังคารที่ 1 ตุลาคม 2569</span>
         </div>
 
         {/* XP Badge */}
         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 font-bold text-xs shadow-2xs">
-          <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
+          <SparklesRegular className="w-3.5 h-3.5 text-amber-500" />
           <span>{totalXp} XP</span>
         </div>
 
@@ -128,7 +126,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
           className="w-9 h-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 flex items-center justify-center transition-colors cursor-pointer shadow-2xs"
           title="ออกจากระบบ"
         >
-          <LogOut className="w-4 h-4 text-slate-500" />
+          <ExitDoorRegular className="w-4 h-4 text-slate-500" />
         </button>
       </div>
     </header>

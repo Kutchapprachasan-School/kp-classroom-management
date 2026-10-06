@@ -26,7 +26,9 @@ export type DeepLinkTargetView =
   | 'exams'
   | 'sar'
   | 'timetable'
-  | 'settings';
+  | 'settings'
+  | 'morning-assembly'
+  | 'classroom-attendance';
 
 export interface CrossViewNavigationPayload {
   view: DeepLinkTargetView;

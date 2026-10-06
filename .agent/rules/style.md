@@ -204,63 +204,31 @@ Danger:
 ==================================================
 
 ใช้ Icon เพื่อช่วยให้ผู้ใช้เข้าใจ Function
+Icon Set หลักของโปรเจกต์: **MingCute Icons** (`@mingcute/react`)
+สไตล์: มนกลม นุ่มนวล น่ารัก เข้ากับบรรยากาศ Pastel Anime และระบบการศึกษา
 
 แนะนำ:
-- Lucide
-- Phosphor
-- Tabler Icons
+- MingCute Icons (`@mingcute/react/core-regular` หรือ `@mingcute/react/core-filled`)
+- Lucide Icons (`lucide-react` เป็นตัวเลือกรอง/สำรอง)
 
 Style:
-- Rounded
-- Simple
-- Consistent stroke width
+- Rounded / Soft
+- Simple & Friendly
+- Consistent stroke width และขนาดสอดคล้องกับข้อความ
 
-Icon ต้องมีขนาดและน้ำหนักใกล้เคียงกันทั้งระบบ
-
-ตัวอย่าง Mapping:
-
-Dashboard = Home
-Schedule = Calendar
-Assignment = Clipboard
-Message = MessageSquare
-Student = Users
-Teacher Group = UserRoundCheck
-Class Group = School / UsersRound
-Report = BarChart3
-Settings = Settings
-File = Folder
-Notification = Bell
+ตัวอย่างการ Import และใช้งาน:
+```tsx
+import { Home1Regular, User3Regular, CalendarRegular } from '@mingcute/react/core-regular';
+// หรือ Direct Import:
+import Home1Regular from '@mingcute/react/core-regular/home-1';
+```
 
 ==================================================
-9. IMPORTANT:
-   GROUP / CATEGORY VISUALIZATION
+9. GROUP / CATEGORY VISUALIZATION (EXAMPLE)
 ==================================================
 
-ในหน้าที่มีหลายประเภทข้อมูล
-ต้องแยก Category ด้วย Icon + Color + Label
-
-ตัวอย่าง:
-
-กลุ่มครูที่ปรึกษา
-Icon = UserRoundCheck
-Color = Blue / Green
-
-กลุ่มห้องเรียน
-Icon = School / Users
-Color = Purple / Cyan
-
-อย่าใช้ Icon เดียวกันกับทุกประเภท Group
-
-ตัวอย่าง:
-
-[ 👥 ] กลุ่มครูที่ปรึกษา
-     สื่อสารกับนักเรียนในที่ปรึกษา
-
-[ 🏫 ] กลุ่มห้องเรียน
-     พูดคุยกับนักเรียนในแต่ละห้อง
-
-ผู้ใช้ต้องสามารถเข้าใจประเภทของข้อมูลได้
-โดยไม่จำเป็นต้องอ่านรายละเอียดทั้งหมด
+ในหน้าที่มีข้อมูลหลายหมวดหมู่พร้อมกัน
+ให้แยก Category ด้วย Icon + Color + Label ให้ชัดเจน เพื่อให้ผู้ใช้แยกแยะประเภทได้ทันทีโดยไม่ต้องอ่านข้อความทั้งหมด
 
 ==================================================
 10. AVATAR & CHARACTER

@@ -143,6 +143,43 @@ export interface MorningAssemblyStats {
   attendanceRate: number;
 }
 
+export interface StudentCumulativeStats {
+  studentCode: string;
+  studentName: string;
+  presentDays: number;
+  lateDays: number;
+  absentDays: number;
+  leaveDays: number;
+  activityDays: number;
+  totalDays: number;
+  earnedDays: number;
+  attendanceRate: number;
+  statusTag: 'NORMAL' | 'WARNING' | 'CRITICAL';
+}
+
+export interface ClassroomTermStatsSummary {
+  classroomId: string;
+  totalStudents: number;
+  totalAssemblyDays: number;
+  averageRate: number;
+  students: StudentCumulativeStats[];
+}
+
+export interface AssemblyCalendarDayInfo {
+  date: string; // YYYY-MM-DD
+  dayOfMonth: number;
+  dayOfWeek: number; // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  isWeekday: boolean;
+  isChecked: boolean;
+  isToday: boolean;
+  isPastOrToday: boolean;
+  totalStudents: number;
+  presentCount: number;
+  lateCount: number;
+  absentCount: number;
+  leaveCount: number;
+}
+
 // ----------------------------------------------------
 // Storage Keys & Universal Storage Adapter
 // ----------------------------------------------------
@@ -974,6 +1011,160 @@ export const attendanceCorrelationService = {
       studentCourseRecords,
       totalScheduledPeriodsParam
     );
+  },
+
+  /**
+   * Get classroom-wide cumulative assembly statistics across all recorded term days
+   */
+  getClassroomCumulativeStats(classroomId: string): ClassroomTermStatsSummary {
+    const targetRoom = normalizeClassroomId(classroomId);
+    let allMorning = this.getAllMorningRecords().filter(
+      (r) => normalizeClassroomId(r.classroomId) === targetRoom
+    );
+
+    if (allMorning.length === 0) {
+      allMorning = generateMockMorningRecords().filter(
+        (r) => normalizeClassroomId(r.classroomId) === targetRoom
+      );
+      this.saveMorningRecords(allMorning);
+    }
+
+    const uniqueDates = Array.from(new Set(allMorning.map((r) => r.date))).sort();
+    const totalAssemblyDays = uniqueDates.length;
+
+    // Map records by student code
+    const studentMap = new Map<string, { name: string; records: MorningAssemblyRecord[] }>();
+    for (const r of allMorning) {
+      if (!studentMap.has(r.studentCode)) {
+        studentMap.set(r.studentCode, { name: r.studentName, records: [] });
+      }
+      studentMap.get(r.studentCode)!.records.push(r);
+    }
+
+    // Baseline students
+    for (const stu of ROOM_3_1_STUDENTS) {
+      if (!studentMap.has(stu.code)) {
+        studentMap.set(stu.code, { name: stu.name, records: [] });
+      }
+    }
+
+    const students: StudentCumulativeStats[] = [];
+
+    studentMap.forEach(({ name, records }, code) => {
+      let presentDays = 0;
+      let lateDays = 0;
+      let absentDays = 0;
+      let leaveDays = 0;
+      let activityDays = 0;
+
+      for (const rec of records) {
+        if (rec.status === 'PRESENT') presentDays++;
+        else if (rec.status === 'LATE') lateDays++;
+        else if (rec.status === 'ABSENT') absentDays++;
+        else if (rec.status === 'LEAVE') leaveDays++;
+        else if (rec.status === 'ACTIVITY') activityDays++;
+      }
+
+      const totalDays = records.length > 0 ? records.length : totalAssemblyDays;
+      const earnedDays = presentDays + lateDays + activityDays;
+      const attendanceRate = totalDays > 0 ? Number(((earnedDays / totalDays) * 100).toFixed(1)) : 100;
+      const statusTag: 'NORMAL' | 'WARNING' | 'CRITICAL' =
+        attendanceRate >= 85 ? 'NORMAL' : attendanceRate >= 80 ? 'WARNING' : 'CRITICAL';
+
+      students.push({
+        studentCode: code,
+        studentName: name,
+        presentDays,
+        lateDays,
+        absentDays,
+        leaveDays,
+        activityDays,
+        totalDays,
+        earnedDays,
+        attendanceRate,
+        statusTag,
+      });
+    });
+
+    students.sort((a, b) => a.studentCode.localeCompare(b.studentCode));
+    const averageRate =
+      students.length > 0
+        ? Number((students.reduce((acc, s) => acc + s.attendanceRate, 0) / students.length).toFixed(1))
+        : 100;
+
+    return {
+      classroomId: targetRoom,
+      totalStudents: students.length,
+      totalAssemblyDays,
+      averageRate,
+      students,
+    };
+  },
+
+  /**
+   * Get calendar day status for a given month (identifies green vs red days)
+   */
+  getAssemblyCalendarMonthStatus(
+    classroomId: string,
+    year: number,
+    month: number,
+    referenceDate = '2026-10-02'
+  ): AssemblyCalendarDayInfo[] {
+    const targetRoom = normalizeClassroomId(classroomId);
+    let allRecords = this.getAllMorningRecords().filter(
+      (r) => normalizeClassroomId(r.classroomId) === targetRoom
+    );
+
+    if (allRecords.length === 0) {
+      allRecords = generateMockMorningRecords().filter(
+        (r) => normalizeClassroomId(r.classroomId) === targetRoom
+      );
+      this.saveMorningRecords(allRecords);
+    }
+
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const result: AssemblyCalendarDayInfo[] = [];
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const d = new Date(year, month - 1, day);
+      const dayOfWeek = d.getDay(); // 0 = Sun, 6 = Sat
+      const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
+      const isPastOrToday = dateStr <= referenceDate;
+      const isToday = dateStr === referenceDate;
+
+      const dayRecords = allRecords.filter((r) => r.date === dateStr);
+      const isChecked = dayRecords.length > 0;
+
+      let presentCount = 0;
+      let lateCount = 0;
+      let absentCount = 0;
+      let leaveCount = 0;
+
+      for (const r of dayRecords) {
+        if (r.status === 'PRESENT') presentCount++;
+        else if (r.status === 'LATE') lateCount++;
+        else if (r.status === 'ABSENT') absentCount++;
+        else if (r.status === 'LEAVE' || r.status === 'ACTIVITY') leaveCount++;
+      }
+
+      result.push({
+        date: dateStr,
+        dayOfMonth: day,
+        dayOfWeek,
+        isWeekday,
+        isChecked,
+        isToday,
+        isPastOrToday,
+        totalStudents: dayRecords.length,
+        presentCount,
+        lateCount,
+        absentCount,
+        leaveCount,
+      });
+    }
+
+    return result;
   },
 };
 

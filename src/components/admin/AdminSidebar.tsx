@@ -1,24 +1,22 @@
 import React from 'react';
-import {
-  Home,
-  Users,
-  Award,
-  GraduationCap,
-  BookOpen,
-  CalendarCheck,
-  Wallet,
-  Building2,
-  FileText,
-  MessageSquare,
-  BarChart3,
-  Shield,
-  Settings,
-  Database,
-  ArrowLeftRight,
-  Cpu,
-  ChevronRight,
-  X,
-} from 'lucide-react';
+import Home1Regular from '@mingcute/react/core-regular/home-1';
+import User3Regular from '@mingcute/react/core-regular/user-3';
+import AwardRegular from '@mingcute/react/core-regular/award';
+import CertificateRegular from '@mingcute/react/core-regular/certificate';
+import Book2Regular from '@mingcute/react/core-regular/book-2';
+import CalendarDayRegular from '@mingcute/react/core-regular/calendar-day';
+import WalletRegular from '@mingcute/react/core-regular/wallet';
+import Building1Regular from '@mingcute/react/core-regular/building-1';
+import Document2Regular from '@mingcute/react/core-regular/document-2';
+import Message1Regular from '@mingcute/react/core-regular/message-1';
+import ChartBarRegular from '@mingcute/react/core-regular/chart-bar';
+import ShieldRegular from '@mingcute/react/core-regular/shield';
+import Settings3Regular from '@mingcute/react/core-regular/settings-3';
+import ServerRegular from '@mingcute/react/core-regular/server';
+import Transfer2Regular from '@mingcute/react/core-regular/transfer-2';
+import ChipRegular from '@mingcute/react/core-regular/chip';
+import RightSmallRegular from '@mingcute/react/core-regular/right-small';
+import CloseRegular from '@mingcute/react/core-regular/close';
 import { AdminSchoolLogo } from './AdminSchoolLogo';
 
 export type AdminMenuKey =
@@ -50,7 +48,7 @@ interface AdminSidebarProps {
 interface NavItemDef {
   key: AdminMenuKey;
   label: string;
-  icon: React.FC<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string; size?: number | string }>;
   badge?: string;
   badgeColor?: string;
 }
@@ -63,25 +61,25 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   isCollapsed = false,
 }) => {
   const mainNavItems: NavItemDef[] = [
-    { key: 'home', label: 'หน้าหลัก', icon: Home },
-    { key: 'personnel-hr', label: 'บุคลากร & HR', icon: Users },
-    { key: 'evaluation', label: 'ระบบประเมินบุคลากร', icon: Award },
-    { key: 'students-parents', label: 'นักเรียน & ผู้ปกครอง', icon: GraduationCap },
-    { key: 'academic-results', label: 'วิชาการ & ผลการเรียน', icon: BookOpen },
-    { key: 'attendance', label: 'การเข้าเรียน', icon: CalendarCheck },
-    { key: 'finance-procurement', label: 'การเงิน & พัสดุ', icon: Wallet },
-    { key: 'buildings-repairs', label: 'อาคาร & งานซ่อม', icon: Building2 },
-    { key: 'documents-admin', label: 'เอกสาร & งานธุรการ', icon: FileText },
-    { key: 'school-comm', label: 'สื่อสารโรงเรียน', icon: MessageSquare },
-    { key: 'reports-dashboard', label: 'รายงาน & Dashboard', icon: BarChart3 },
+    { key: 'home', label: 'หน้าหลัก', icon: Home1Regular },
+    { key: 'personnel-hr', label: 'บุคลากร & HR', icon: User3Regular },
+    { key: 'evaluation', label: 'ระบบประเมินบุคลากร', icon: AwardRegular },
+    { key: 'students-parents', label: 'นักเรียน & ผู้ปกครอง', icon: CertificateRegular },
+    { key: 'academic-results', label: 'วิชาการ & ผลการเรียน', icon: Book2Regular },
+    { key: 'attendance', label: 'การเข้าเรียน', icon: CalendarDayRegular },
+    { key: 'finance-procurement', label: 'การเงิน & พัสดุ', icon: WalletRegular },
+    { key: 'buildings-repairs', label: 'อาคาร & งานซ่อม', icon: Building1Regular },
+    { key: 'documents-admin', label: 'เอกสาร & งานธุรการ', icon: Document2Regular },
+    { key: 'school-comm', label: 'สื่อสารโรงเรียน', icon: Message1Regular },
+    { key: 'reports-dashboard', label: 'รายงาน & Dashboard', icon: ChartBarRegular },
   ];
 
   const systemNavItems: NavItemDef[] = [
-    { key: 'users-permissions', label: 'ผู้ใช้งาน / สิทธิ์การใช้งาน', icon: Shield },
-    { key: 'system-settings', label: 'ตั้งค่าระบบ', icon: Settings },
-    { key: 'backup-restore', label: 'สำรองข้อมูล', icon: Database },
-    { key: 'import-export', label: 'Import / Export', icon: ArrowLeftRight },
-    { key: 'api-integration', label: 'API & Integration', icon: Cpu },
+    { key: 'users-permissions', label: 'ผู้ใช้งาน / สิทธิ์การใช้งาน', icon: ShieldRegular },
+    { key: 'system-settings', label: 'ตั้งค่าระบบ', icon: Settings3Regular },
+    { key: 'backup-restore', label: 'สำรองข้อมูล', icon: ServerRegular },
+    { key: 'import-export', label: 'Import / Export', icon: Transfer2Regular },
+    { key: 'api-integration', label: 'API & Integration', icon: ChipRegular },
   ];
 
   const sidebarClasses = `
@@ -131,7 +129,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
               onClick={onClose}
               className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
             >
-              <X className="w-5 h-5" />
+              <CloseRegular className="w-5 h-5" />
             </button>
           )}
         </div>
@@ -167,7 +165,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                     {!isCollapsed && <span className="truncate">{item.label}</span>}
                   </div>
                   {!isCollapsed && (
-                    <ChevronRight
+                    <RightSmallRegular
                       className={`w-3.5 h-3.5 shrink-0 ${
                         isActive ? 'text-white/80' : 'text-slate-300 group-hover:text-slate-500'
                       }`}
