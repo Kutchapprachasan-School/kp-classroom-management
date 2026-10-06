@@ -275,7 +275,11 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       <div className="px-3 py-2 shrink-0">
         <div className="relative rounded-2xl overflow-hidden border border-blue-100 shadow-2xs group bg-gradient-to-b from-sky-50 to-blue-50">
           <img
-            src={sidebarBanner.customUrl || sidebarBanner.defaultUrl}
+            src={
+              currentView === 'messages'
+                ? '/images/banners/sidebar-banner.png'
+                : (sidebarBanner.customUrl || sidebarBanner.defaultUrl)
+            }
             alt={sidebarBanner.name}
             className="w-full h-auto object-cover max-h-32"
           />
