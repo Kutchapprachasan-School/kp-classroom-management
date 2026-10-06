@@ -445,4 +445,106 @@ assert.ok(renderedBadge.props.className.includes('w-10 h-10'));
 
 console.log('  ✓ Multi-strand intelligent detection and badge render helpers verified successfully');
 
-console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE & SUBJECT ICON CHECKS PASSED!');
+// ----------------------------------------------------
+// Step 4: Client-Side Canvas Image Resizer & Compressor Verification
+// ----------------------------------------------------
+console.log('\n--- 4. Checking Client-Side Banner Image Resizer & Compressor ---');
+const compressorPath = './src/utils/imageCompressor.ts';
+assert.ok(existsSync(compressorPath), 'src/utils/imageCompressor.ts must exist');
+
+const compressorSource = readFileSync(compressorPath, 'utf8');
+assert.ok(compressorSource.includes('1200'), 'Must enforce maxWidth 1200px');
+assert.ok(compressorSource.includes('360'), 'Must enforce maxHeight 360px');
+assert.ok(compressorSource.includes('153600'), 'Must guard payload size under 150KB (153,600 bytes)');
+assert.ok(compressorSource.includes('imageSmoothingEnabled'), 'Must enable high quality canvas smoothing');
+assert.ok(compressorSource.includes("'high'"), 'Must set imageSmoothingQuality to high');
+assert.ok(compressorSource.includes('image/webp'), 'Must support WebP encoding');
+assert.ok(compressorSource.includes('image/jpeg'), 'Must support JPEG fallback');
+console.log('  ✓ Static source checks for dimensions, smoothing, and format fallback passed');
+
+const {
+  compressSubjectBannerImage,
+  estimateBase64SizeBytes,
+  dataUrlToBlob,
+  calculateAspectRatioDimensions,
+  formatBytes,
+  isImageFile,
+  DEFAULT_BANNER_COMPRESSION_OPTIONS,
+} = await import('./src/utils/imageCompressor.ts');
+
+assert.ok(typeof compressSubjectBannerImage === 'function', 'compressSubjectBannerImage must be exported');
+assert.ok(typeof estimateBase64SizeBytes === 'function', 'estimateBase64SizeBytes must be exported');
+assert.ok(typeof dataUrlToBlob === 'function', 'dataUrlToBlob must be exported');
+assert.ok(DEFAULT_BANNER_COMPRESSION_OPTIONS.maxWidth === 1200);
+assert.ok(DEFAULT_BANNER_COMPRESSION_OPTIONS.maxHeight === 360);
+assert.ok(DEFAULT_BANNER_COMPRESSION_OPTIONS.maxSizeBytes === 153600);
+
+// Test 4.1: Base64 byte size estimation accuracy with padding and schemes
+console.log('  Testing 4.1: Base64 byte size estimation accuracy...');
+assert.strictEqual(estimateBase64SizeBytes(''), 0);
+assert.strictEqual(estimateBase64SizeBytes('TWFu'), 3, 'TWFu (no pad) must be 3 bytes');
+assert.strictEqual(estimateBase64SizeBytes('TWE='), 2, 'TWE= (1 pad) must be 2 bytes');
+assert.strictEqual(estimateBase64SizeBytes('TQ=='), 1, 'TQ== (2 pad) must be 1 byte');
+assert.strictEqual(estimateBase64SizeBytes('data:image/webp;base64,TWFu'), 3, 'Data URL must be parsed correctly');
+assert.strictEqual(estimateBase64SizeBytes('data:image/jpeg;base64,TQ==\n'), 1, 'Data URL with whitespace must be stripped');
+
+// Exact 150KB synthetic test string (204,800 chars of base64 = 153,600 bytes)
+const synthetic150KB = 'A'.repeat(204800);
+assert.strictEqual(estimateBase64SizeBytes(synthetic150KB), 153600, 'Synthetic 204,800 base64 chars must equal 153,600 bytes');
+console.log('  ✓ Base64 byte size estimator accurately calculates bytes and handles padding');
+
+// Test 4.2: DataUrl to Blob conversion
+console.log('  Testing 4.2: Data URL to Blob conversion...');
+const testBlob = dataUrlToBlob('data:image/webp;base64,TWFu');
+assert.ok(testBlob instanceof Blob, 'dataUrlToBlob must return a Blob instance');
+assert.strictEqual(testBlob.type, 'image/webp', 'Blob mime type must match header');
+assert.strictEqual(testBlob.size, 3, 'Blob size must match encoded byte length');
+console.log('  ✓ Data URL to Blob conversion verified');
+
+// Test 4.3: Proportional aspect ratio calculations
+console.log('  Testing 4.3: Proportional aspect ratio calculations...');
+const dim1 = calculateAspectRatioDimensions(2400, 720, 1200, 360);
+assert.strictEqual(dim1.width, 1200);
+assert.strictEqual(dim1.height, 360);
+
+const dim2 = calculateAspectRatioDimensions(1920, 1080, 1200, 360);
+assert.strictEqual(dim2.width, 640);
+assert.strictEqual(dim2.height, 360);
+
+const dim3 = calculateAspectRatioDimensions(800, 240, 1200, 360);
+assert.strictEqual(dim3.width, 800, 'Dimensions smaller than max should be preserved');
+assert.strictEqual(dim3.height, 240);
+console.log('  ✓ Proportional aspect ratio calculations verified');
+
+// Test 4.4: compressSubjectBannerImage SSR fallback and quota enforcement
+console.log('  Testing 4.4: compressSubjectBannerImage SSR fallback and quota guard...');
+const mockBannerContent = 'mock-banner-image-payload-kutchapprachasan-2026';
+const mockBannerBlob = new Blob([mockBannerContent], { type: 'image/webp' });
+const compressed = await compressSubjectBannerImage(mockBannerBlob);
+
+assert.ok(compressed.dataUrl.startsWith('data:image/webp;base64,'), 'Result dataUrl must be WebP data URL');
+assert.strictEqual(compressed.width, 1200);
+assert.strictEqual(compressed.height, 360);
+assert.strictEqual(compressed.mimeType, 'image/webp');
+assert.strictEqual(compressed.sizeBytes, mockBannerContent.length);
+assert.strictEqual(compressed.isWithinQuota, true, 'Small mock image must be within 150KB quota');
+assert.strictEqual(compressed.compressionRatio, 1.0);
+
+// Quota violation guard test: large payload exceeding 150KB (153,600 bytes)
+const largePayload = new Uint8Array(200000);
+const largeBlob = new Blob([largePayload], { type: 'image/jpeg' });
+const largeResult = await compressSubjectBannerImage(largeBlob);
+assert.strictEqual(largeResult.isWithinQuota, false, 'Payload > 153,600 bytes must trigger isWithinQuota = false');
+console.log('  ✓ Compression result interface and quota guard verified');
+
+// Test 4.5: Utility helpers (formatBytes, isImageFile)
+console.log('  Testing 4.5: Utility formatting helpers...');
+assert.strictEqual(formatBytes(0), '0 B');
+assert.strictEqual(formatBytes(1024), '1 KB');
+assert.strictEqual(formatBytes(153600), '150 KB');
+assert.strictEqual(isImageFile(mockBannerBlob), true);
+assert.strictEqual(isImageFile(new Blob(['hello'], { type: 'text/plain' })), false);
+console.log('  ✓ Utility formatting helpers verified');
+
+console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE, SUBJECT ICONS & BANNER COMPRESSOR CHECKS PASSED!');
+
