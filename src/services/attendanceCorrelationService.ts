@@ -584,7 +584,11 @@ export const attendanceCorrelationService = {
   },
 
   getPeriodRecordsByDateAndRoom(classroomId: string, date: string): PeriodAttendanceRecord[] {
-    const list = readStorage<PeriodAttendanceRecord[]>(STORAGE_KEYS.PERIOD_ATTENDANCE, []);
+    let list = readStorage<PeriodAttendanceRecord[]>(STORAGE_KEYS.PERIOD_ATTENDANCE, []);
+    if (list.length === 0) {
+      list = generateMockPeriodRecords();
+      writeStorage(STORAGE_KEYS.PERIOD_ATTENDANCE, list);
+    }
     const targetRoom = normalizeClassroomId(classroomId);
     return list.filter((r) => r.date === date && normalizeClassroomId(r.classroomId) === targetRoom);
   },
@@ -776,6 +780,38 @@ export const attendanceCorrelationService = {
     let periodChanged = false;
 
     // --------------------------------------------------
+    // Lock 3: Decoupled Morning Late Promotion (Evaluated First for Single-Pass Correlation)
+    // --------------------------------------------------
+    for (const record of morningRecords) {
+      // Must obey Lock 1: shield overridden records from auto-update
+      if (!record.isOverridden && record.status === 'ABSENT') {
+        // Find Period 1 attendance for this student
+        const p1Record = periodRecords.find(
+          (p) => p.studentCode === record.studentCode && p.periodNo === 1
+        );
+
+        if (p1Record && (p1Record.status === 'PRESENT' || p1Record.status === 'LATE')) {
+          const oldStatus = record.status;
+          record.status = 'LATE';
+          record.source = 'SYSTEM_CORRELATION';
+          record.correlationNote =
+            'ปรับเป็นสายอัตโนมัติ: พบนักเรียนเข้าเรียนในคาบที่ 1 (มิได้ขาดเรียนทั้งวัน)';
+
+          changes.push({
+            type: 'MORNING_LATE_PROMOTION',
+            recordId: record.id,
+            studentCode: record.studentCode,
+            studentName: record.studentName,
+            oldStatus,
+            newStatus: 'LATE',
+            reason: 'พบนักเรียนเข้าเรียนในคาบที่ 1 ปรับสถานะแถวเช้าเป็นมาสายโดยอัตโนมัติ',
+          });
+          morningChanged = true;
+        }
+      }
+    }
+
+    // --------------------------------------------------
     // Lock 2: Truancy Candidate & Promotion
     // --------------------------------------------------
     for (const record of periodRecords) {
@@ -822,38 +858,6 @@ export const attendanceCorrelationService = {
             });
             periodChanged = true;
           }
-        }
-      }
-    }
-
-    // --------------------------------------------------
-    // Lock 3: Decoupled Morning Late Promotion
-    // --------------------------------------------------
-    for (const record of morningRecords) {
-      // Must obey Lock 1: shield overridden records from auto-update
-      if (!record.isOverridden && record.status === 'ABSENT') {
-        // Find Period 1 attendance for this student
-        const p1Record = periodRecords.find(
-          (p) => p.studentCode === record.studentCode && p.periodNo === 1
-        );
-
-        if (p1Record && (p1Record.status === 'PRESENT' || p1Record.status === 'LATE')) {
-          const oldStatus = record.status;
-          record.status = 'LATE';
-          record.source = 'SYSTEM_CORRELATION';
-          record.correlationNote =
-            'ปรับเป็นสายอัตโนมัติ: พบนักเรียนเข้าเรียนในคาบที่ 1 (มิได้ขาดเรียนทั้งวัน)';
-
-          changes.push({
-            type: 'MORNING_LATE_PROMOTION',
-            recordId: record.id,
-            studentCode: record.studentCode,
-            studentName: record.studentName,
-            oldStatus,
-            newStatus: 'LATE',
-            reason: 'พบนักเรียนเข้าเรียนในคาบที่ 1 ปรับสถานะแถวเช้าเป็นมาสายโดยอัตโนมัติ',
-          });
-          morningChanged = true;
         }
       }
     }
