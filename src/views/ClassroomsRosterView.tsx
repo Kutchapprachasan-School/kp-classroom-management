@@ -557,17 +557,8 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-1.5">
-                  <span>บัญชีรายชื่อนักเรียน :</span>
-                  <button
-                    type="button"
-                    onClick={() => setIsClassDropdownOpen((prev) => !prev)}
-                    className="text-blue-600 hover:text-blue-800 flex items-center gap-1 font-extrabold cursor-pointer transition-colors"
-                    title="คลิกเพื่อสลับชั้น/ห้องเรียน"
-                  >
-                    <span>{selectedClass?.roomNumber || 'ม.3/1'}</span>
-                    <ChevronDown className="w-4 h-4 text-slate-400" />
-                  </button>
+                <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                  บัญชีรายชื่อนักเรียน
                 </h2>
                 {(selectedClass?.roomNumber || 'ม.3/1') === 'ม.3/1' && (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
@@ -576,27 +567,27 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                 )}
               </div>
               <p className="text-xs text-slate-500 font-medium">
-                รวม {students.length} คน • คลิกที่ชื่อนักเรียนเพื่อดู Radar Chart 5 มิติ
+                ห้อง {selectedClass?.roomNumber || 'ม.3/1'} • รวม {students.length} คน • คลิกที่ชื่อนักเรียนเพื่อดู Radar Chart 5 มิติ
               </p>
             </div>
           </div>
 
           {/* Header Right: Controls (Dropdown เลือกห้อง, ค้นหา, เรียง, แสดงตัวกรอง) */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-            {/* Dropdown เลือกชั้น/ห้อง (ฟีเจอร์หลักตามโจทย์) */}
+            {/* Single Consolidated Classroom Dropdown */}
             <div className="flex items-center gap-1.5">
               <div className="relative" ref={classDropdownRef}>
                 <button
                   type="button"
                   onClick={() => setIsClassDropdownOpen((prev) => !prev)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-blue-200 bg-blue-50/60 hover:bg-blue-100 text-blue-800 text-xs font-bold shadow-2xs transition-all cursor-pointer"
                   title="เลือกชั้น/ห้องเรียน"
                 >
-                  <Layers className="w-3.5 h-3.5 text-blue-600" />
-                  <span className="max-w-[120px] sm:max-w-[160px] truncate">
+                  <Layers className="w-4 h-4 text-blue-600" />
+                  <span className="max-w-[140px] truncate">
                     ห้อง {selectedClass?.roomNumber || 'ม.3/1'}
                   </span>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                  <ChevronDown className="w-3.5 h-3.5 text-blue-600" />
                 </button>
 
                 {isClassDropdownOpen && (
