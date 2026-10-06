@@ -24,6 +24,9 @@ import {
   FileText,
   Users,
   X,
+  Bell,
+  Utensils,
+  RotateCcw,
 } from 'lucide-react';
 import {
   schoolLeaveSettingsService,
@@ -66,6 +69,148 @@ import {
   type DayOfWeek,
 } from '../services/academicCalendarService';
 
+export interface SchoolBellScheduleConfig {
+  morningAssemblyStart: string;     // e.g. '07:45'
+  morningAssemblyEnd: string;       // e.g. '08:15'
+  firstPeriodStart: string;         // e.g. '08:30'
+  periodDurationMinutes: number;    // e.g. 50
+  totalPeriodsPerDay: number;       // e.g. 7 (options: 6, 7, 8, 9)
+  lunchBreakMode: 'NUMBERED_PERIOD' | 'SKIPPED_BREAK_SLOT'; // Mode A vs Mode B
+  lunchBreakSlot: number;           // e.g. 4 (พักหลังคาบ 4) or 5 (คาบ 5 คือพักเที่ยง)
+  lunchDurationMinutes: number;     // e.g. 50 (or 60)
+}
+
+const BELL_SCHEDULE_STORAGE_KEY = 'kp_school_bell_schedule';
+
+const DEFAULT_BELL_SCHEDULE_CONFIG: SchoolBellScheduleConfig = {
+  morningAssemblyStart: '07:45',
+  morningAssemblyEnd: '08:15',
+  firstPeriodStart: '08:30',
+  periodDurationMinutes: 50,
+  totalPeriodsPerDay: 7,
+  lunchBreakMode: 'NUMBERED_PERIOD',
+  lunchBreakSlot: 4,
+  lunchDurationMinutes: 50,
+};
+
+export interface BellScheduleTimelineItem {
+  id: string;
+  type: 'ASSEMBLY' | 'PERIOD' | 'LUNCH';
+  periodNumber?: number;
+  label: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  isLunch: boolean;
+}
+
+const addMinutesToTimeStr = (timeStr: string, minutesToAdd: number): string => {
+  const [hStr, mStr] = (timeStr || '08:00').split(':');
+  const totalMinutes = (parseInt(hStr, 10) || 0) * 60 + (parseInt(mStr, 10) || 0) + minutesToAdd;
+  const wrappedMinutes = ((totalMinutes % 1440) + 1440) % 1440;
+  const h = Math.floor(wrappedMinutes / 60);
+  const m = wrappedMinutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+};
+
+const calculateMinutesDifference = (startTime: string, endTime: string): number => {
+  const [sh, sm] = (startTime || '00:00').split(':').map((n) => parseInt(n, 10) || 0);
+  const [eh, em] = (endTime || '00:00').split(':').map((n) => parseInt(n, 10) || 0);
+  let diff = (eh * 60 + em) - (sh * 60 + sm);
+  if (diff < 0) diff += 1440;
+  return diff;
+};
+
+const generateBellScheduleTimeline = (
+  config: SchoolBellScheduleConfig
+): BellScheduleTimelineItem[] => {
+  const items: BellScheduleTimelineItem[] = [];
+
+  const assemblyDuration = calculateMinutesDifference(
+    config.morningAssemblyStart,
+    config.morningAssemblyEnd
+  );
+  items.push({
+    id: 'slot-assembly',
+    type: 'ASSEMBLY',
+    label: 'เข้าแถวเคารพธงชาติ & โฮมรูม',
+    startTime: config.morningAssemblyStart,
+    endTime: config.morningAssemblyEnd,
+    durationMinutes: assemblyDuration > 0 ? assemblyDuration : 30,
+    isLunch: false,
+  });
+
+  let currentTime = config.firstPeriodStart;
+
+  if (config.lunchBreakMode === 'NUMBERED_PERIOD') {
+    const lunchPeriodNum = Math.min(config.lunchBreakSlot + 1, config.totalPeriodsPerDay);
+
+    for (let p = 1; p <= config.totalPeriodsPerDay; p++) {
+      if (p === lunchPeriodNum) {
+        const endTime = addMinutesToTimeStr(currentTime, config.lunchDurationMinutes);
+        items.push({
+          id: `slot-period-${p}-lunch`,
+          type: 'LUNCH',
+          periodNumber: p,
+          label: `คาบที่ ${p} (พักกลางวัน)`,
+          startTime: currentTime,
+          endTime,
+          durationMinutes: config.lunchDurationMinutes,
+          isLunch: true,
+        });
+        currentTime = endTime;
+      } else {
+        const endTime = addMinutesToTimeStr(currentTime, config.periodDurationMinutes);
+        items.push({
+          id: `slot-period-${p}`,
+          type: 'PERIOD',
+          periodNumber: p,
+          label: `คาบที่ ${p}`,
+          startTime: currentTime,
+          endTime,
+          durationMinutes: config.periodDurationMinutes,
+          isLunch: false,
+        });
+        currentTime = endTime;
+      }
+    }
+  } else {
+    const breakAfter = Math.min(config.lunchBreakSlot, config.totalPeriodsPerDay);
+
+    for (let p = 1; p <= config.totalPeriodsPerDay; p++) {
+      const endTime = addMinutesToTimeStr(currentTime, config.periodDurationMinutes);
+      items.push({
+        id: `slot-period-${p}`,
+        type: 'PERIOD',
+        periodNumber: p,
+        label: `คาบที่ ${p}`,
+        startTime: currentTime,
+        endTime,
+        durationMinutes: config.periodDurationMinutes,
+        isLunch: false,
+      });
+      currentTime = endTime;
+
+      if (p === breakAfter) {
+        const lunchEndTime = addMinutesToTimeStr(currentTime, config.lunchDurationMinutes);
+        items.push({
+          id: 'slot-lunch-break',
+          type: 'LUNCH',
+          periodNumber: undefined,
+          label: 'พักกลางวัน (ไม่นับคาบ)',
+          startTime: currentTime,
+          endTime: lunchEndTime,
+          durationMinutes: config.lunchDurationMinutes,
+          isLunch: true,
+        });
+        currentTime = lunchEndTime;
+      }
+    }
+  }
+
+  return items;
+};
+
 interface SettingsBackupViewProps {
   activeRole?: SchoolUserRole;
   initialTab?: 'CALENDAR' | 'BRANDING' | 'STORAGE' | 'BANNERS';
@@ -107,6 +252,23 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
   const [activeSettingsTab, setActiveSettingsTab] = useState<
     'CALENDAR' | 'BRANDING' | 'STORAGE' | 'BANNERS'
   >(initialTab);
+
+  // School Bell Schedule State
+  const [bellSchedule, setBellSchedule] = useState<SchoolBellScheduleConfig>(() => {
+    try {
+      const saved = localStorage.getItem(BELL_SCHEDULE_STORAGE_KEY);
+      if (saved) {
+        return { ...DEFAULT_BELL_SCHEDULE_CONFIG, ...JSON.parse(saved) };
+      }
+    } catch (e) {
+      console.error('Error reading bell schedule:', e);
+    }
+    return DEFAULT_BELL_SCHEDULE_CONFIG;
+  });
+
+  const timelineSchedule = useMemo(() => {
+    return generateBellScheduleTimeline(bellSchedule);
+  }, [bellSchedule]);
 
   // Sub-tab for Separated School Basic Info vs Leave System
   const [brandingSubTab, setBrandingSubTab] = useState<'SCHOOL_INFO' | 'LEAVE_SYSTEM'>('SCHOOL_INFO');
@@ -549,6 +711,34 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
     }
   };
 
+  const handleSaveBellSchedule = () => {
+    try {
+      localStorage.setItem(BELL_SCHEDULE_STORAGE_KEY, JSON.stringify(bellSchedule));
+      window.dispatchEvent(
+        new CustomEvent('kp_school_bell_schedule_updated', { detail: bellSchedule })
+      );
+      showToast('บันทึกการตั้งค่าโครงสร้างเวลาเรียบร้อยแล้ว');
+    } catch (err) {
+      console.error(err);
+      showToast('เกิดข้อผิดพลาดในการบันทึกโครงสร้างเวลา');
+    }
+  };
+
+  const handleResetBellSchedule = () => {
+    if (confirm('คุณต้องการคืนค่าโครงสร้างเวลาเข้าแถวและคาบเรียนเป็นค่าเริ่มต้นมาตรฐานโรงเรียนใช่หรือไม่?')) {
+      setBellSchedule(DEFAULT_BELL_SCHEDULE_CONFIG);
+      try {
+        localStorage.setItem(BELL_SCHEDULE_STORAGE_KEY, JSON.stringify(DEFAULT_BELL_SCHEDULE_CONFIG));
+        window.dispatchEvent(
+          new CustomEvent('kp_school_bell_schedule_updated', { detail: DEFAULT_BELL_SCHEDULE_CONFIG })
+        );
+        showToast('คืนค่าเริ่มต้นโครงสร้างเวลาเรียบร้อยแล้ว');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in font-sans text-slate-800 select-none">
       {toastMsg && (
@@ -653,8 +843,40 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
       {/* TAB 1: ปีการศึกษา, ภาคเรียน, วันเปิด-ปิดเทอม, วันหยุดพิเศษ, และวันมาเรียนพิเศษ เสาร์-อาทิตย์ */}
       {activeSettingsTab === 'CALENDAR' && (
         <div className="space-y-6">
+          {/* Quick Sub-Navigation Pills for Tab 1 */}
+          <div className="flex flex-wrap items-center gap-2 pb-1 text-xs">
+            <a
+              href="#terms-section"
+              className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold transition-colors inline-flex items-center gap-1.5 shadow-2xs"
+            >
+              <Calendar className="w-3.5 h-3.5 text-blue-600" />
+              <span>1.1 ปีการศึกษา & ภาคเรียน</span>
+            </a>
+            <a
+              href="#bell-schedule-section"
+              className="px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 hover:bg-blue-100 font-bold transition-colors inline-flex items-center gap-1.5 shadow-2xs"
+            >
+              <Bell className="w-3.5 h-3.5 text-blue-600" />
+              <span>1.2 เวลาเข้าแถว & โครงสร้างคาบเรียน (Bell Schedule)</span>
+            </a>
+            <a
+              href="#holidays-section"
+              className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold transition-colors inline-flex items-center gap-1.5 shadow-2xs"
+            >
+              <Sun className="w-3.5 h-3.5 text-amber-600" />
+              <span>1.3 วันหยุดพิเศษ</span>
+            </a>
+            <a
+              href="#weekends-section"
+              className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold transition-colors inline-flex items-center gap-1.5 shadow-2xs"
+            >
+              <Clock className="w-3.5 h-3.5 text-indigo-600" />
+              <span>1.4 วันมาเรียนพิเศษ ส.-อา.</span>
+            </a>
+          </div>
+
           {/* Part 1.1: Academic Year and Terms Management */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+          <div id="terms-section" className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-blue-50 text-blue-700 rounded-xl">
@@ -777,8 +999,444 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
             </div>
           </div>
 
-          {/* Part 1.2: Special Holidays Management */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+          {/* Part 1.2: เวลาเข้าแถว & โครงสร้างคาบเรียน (School Bell Schedule) */}
+          <div id="bell-schedule-section" className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+                  <Bell className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-bold text-slate-900">
+                      เวลาเข้าแถว & โครงสร้างคาบเรียน (School Bell Schedule)
+                    </h2>
+                    <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-full font-bold">
+                      มาตรฐานโรงเรียนกุดจับประชาสรรค์
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    กำหนดเวลาเช็คแถวหน้าเสาธง เวลาเริ่มคาบเรียน และโหมดการนับคาบพักเที่ยง (นับเป็นคาบที่ หรือข้ามคาบ)
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleResetBellSchedule}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+                  title="คืนค่ามาตรฐานโรงเรียน"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                  <span>คืนค่าเริ่มต้น</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveBellSchedule}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>💾 บันทึกการตั้งค่าโครงสร้างเวลา</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Grid 1: เวลาเข้าแถวเคารพธงชาติ & โครงสร้างเวลาเรียนรายคาบ */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* 1. เวลาเข้าแถวเคารพธงชาติ */}
+              <div className="rounded-2xl border border-slate-200 p-4.5 bg-slate-50/50 space-y-3.5">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wide">
+                    1. เวลาเข้าแถวเคารพธงชาติ (Morning Assembly)
+                  </h3>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  เวลาสำหรับเช็คแถวหน้าเสาธงและกิจกรรมโฮมรูมประจำชั้น
+                </p>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      เวลาเริ่มเข้าแถว
+                    </label>
+                    <input
+                      type="time"
+                      value={bellSchedule.morningAssemblyStart}
+                      onChange={(e) =>
+                        setBellSchedule((prev) => ({
+                          ...prev,
+                          morningAssemblyStart: e.target.value,
+                        }))
+                      }
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      เวลาสิ้นสุดเข้าแถว
+                    </label>
+                    <input
+                      type="time"
+                      value={bellSchedule.morningAssemblyEnd}
+                      onChange={(e) =>
+                        setBellSchedule((prev) => ({
+                          ...prev,
+                          morningAssemblyEnd: e.target.value,
+                        }))
+                      }
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. โครงสร้างเวลาเรียนรายคาบ */}
+              <div className="rounded-2xl border border-slate-200 p-4.5 bg-slate-50/50 space-y-3.5">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-600" />
+                  <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wide">
+                    2. โครงสร้างเวลาเรียนรายคาบ (Daily Period Structure)
+                  </h3>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  กำหนดเวลาเริ่มคาบแรก ระยะเวลาต่อคาบ และจำนวนคาบเรียนปกติในหนึ่งวัน
+                </p>
+
+                <div className="grid grid-cols-3 gap-2.5 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      เวลาเริ่มคาบที่ 1
+                    </label>
+                    <input
+                      type="time"
+                      value={bellSchedule.firstPeriodStart}
+                      onChange={(e) =>
+                        setBellSchedule((prev) => ({
+                          ...prev,
+                          firstPeriodStart: e.target.value,
+                        }))
+                      }
+                      className="w-full px-2.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      ระยะเวลาเรียนต่อคาบ
+                    </label>
+                    <select
+                      value={bellSchedule.periodDurationMinutes}
+                      onChange={(e) =>
+                        setBellSchedule((prev) => ({
+                          ...prev,
+                          periodDurationMinutes: Number(e.target.value),
+                        }))
+                      }
+                      className="w-full px-2 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value={45}>45 นาที</option>
+                      <option value={50}>50 นาที (มาตรฐาน)</option>
+                      <option value={60}>60 นาที</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      จำนวนคาบต่อวัน
+                    </label>
+                    <select
+                      value={bellSchedule.totalPeriodsPerDay}
+                      onChange={(e) =>
+                        setBellSchedule((prev) => ({
+                          ...prev,
+                          totalPeriodsPerDay: Number(e.target.value),
+                        }))
+                      }
+                      className="w-full px-2 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value={6}>6 คาบ</option>
+                      <option value={7}>7 คาบ</option>
+                      <option value={8}>8 คาบ</option>
+                      <option value={9}>9 คาบ</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. โหมดการนับคาบพักเที่ยง (Lunch Break Mode - สำคัญมาก) */}
+            <div className="rounded-2xl border border-slate-200 p-4.5 bg-slate-50/30 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-rose-50 text-rose-600 rounded-lg">
+                    <Utensils className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wide">
+                      3. โหมดการนับคาบพักเที่ยง (Lunch Break Mode - สำคัญมาก)
+                    </h3>
+                    <p className="text-[11px] text-slate-500">
+                      เลือกรูปแบบการนับเลขคาบเรียนหลังพักเที่ยงตามระเบียบของโรงเรียน
+                    </p>
+                  </div>
+                </div>
+
+                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                  โหมดปัจจุบัน: {bellSchedule.lunchBreakMode === 'NUMBERED_PERIOD' ? 'โหมด A' : 'โหมด B'}
+                </span>
+              </div>
+
+              {/* Radio Selection Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {/* Mode A */}
+                <div
+                  onClick={() =>
+                    setBellSchedule((prev) => ({
+                      ...prev,
+                      lunchBreakMode: 'NUMBERED_PERIOD',
+                    }))
+                  }
+                  className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                    bellSchedule.lunchBreakMode === 'NUMBERED_PERIOD'
+                      ? 'border-blue-500 bg-blue-50/40 shadow-xs'
+                      : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                          bellSchedule.lunchBreakMode === 'NUMBERED_PERIOD'
+                            ? 'border-blue-600 bg-blue-600'
+                            : 'border-slate-300 bg-white'
+                        }`}
+                      >
+                        {bellSchedule.lunchBreakMode === 'NUMBERED_PERIOD' && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                        )}
+                      </div>
+                      <span className="text-xs font-bold text-slate-900">
+                        โหมด A: นับพักเที่ยงเป็นคาบที่ (Numbered Period)
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                      ยอดนิยมแบบที่ 1
+                    </span>
+                  </div>
+
+                  <div className="mt-3 bg-white/80 p-2.5 rounded-lg border border-blue-100 text-xs font-mono font-bold text-blue-900">
+                    คาบที่ 4 เรียน → คาบที่ 5 พักเที่ยง → คาบที่ 6 เรียนภาคบ่าย
+                  </div>
+
+                  <p className="mt-2 text-[11px] text-slate-500 leading-relaxed">
+                    เหมาะสำหรับโรงเรียนที่กำหนดให้ช่วงพักรับประทานอาหารกลางวันเป็นคาบที่ในตารางสอน (เช่น คาบ 5 คือพักเที่ยง แล้วบ่ายเรียนคาบ 6)
+                  </p>
+                </div>
+
+                {/* Mode B */}
+                <div
+                  onClick={() =>
+                    setBellSchedule((prev) => ({
+                      ...prev,
+                      lunchBreakMode: 'SKIPPED_BREAK_SLOT',
+                    }))
+                  }
+                  className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                    bellSchedule.lunchBreakMode === 'SKIPPED_BREAK_SLOT'
+                      ? 'border-blue-500 bg-blue-50/40 shadow-xs'
+                      : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                          bellSchedule.lunchBreakMode === 'SKIPPED_BREAK_SLOT'
+                            ? 'border-blue-600 bg-blue-600'
+                            : 'border-slate-300 bg-white'
+                        }`}
+                      >
+                        {bellSchedule.lunchBreakMode === 'SKIPPED_BREAK_SLOT' && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                        )}
+                      </div>
+                      <span className="text-xs font-bold text-slate-900">
+                        โหมด B: ข้ามคาบพักเที่ยง ไม่นับเป็นคาบที่ (Skipped Break Slot)
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                      ยอดนิยมแบบที่ 2
+                    </span>
+                  </div>
+
+                  <div className="mt-3 bg-white/80 p-2.5 rounded-lg border border-emerald-100 text-xs font-mono font-bold text-emerald-900">
+                    คาบที่ 4 เรียน → [พักเที่ยง] → คาบที่ 5 เรียนภาคบ่าย (คาบต่อไปยังคงเป็นคาบที่ 5)
+                  </div>
+
+                  <p className="mt-2 text-[11px] text-slate-500 leading-relaxed">
+                    เหมาะสำหรับโรงเรียนที่นับเฉพาะคาบเรียนจริง โดยพักเที่ยงเป็นแถบคั่นเวลา เมื่อเข้าเรียนภาคบ่ายจะเริ่มนับเป็นคาบที่ 5 ต่อทันที
+                  </p>
+                </div>
+              </div>
+
+              {/* Sub-controls for Lunch Position & Duration */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2 border-t border-slate-100">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    เลือกตำแหน่งพักเที่ยง: พักหลังคาบที่
+                  </label>
+                  <select
+                    value={bellSchedule.lunchBreakSlot}
+                    onChange={(e) =>
+                      setBellSchedule((prev) => ({
+                        ...prev,
+                        lunchBreakSlot: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value={4}>คาบที่ 4 (พักหลังคาบ 4)</option>
+                    <option value={5}>คาบที่ 5 (พักหลังคาบ 5)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    ระยะเวลาพักเที่ยง
+                  </label>
+                  <select
+                    value={bellSchedule.lunchDurationMinutes}
+                    onChange={(e) =>
+                      setBellSchedule((prev) => ({
+                        ...prev,
+                        lunchDurationMinutes: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value={40}>40 นาที</option>
+                    <option value={50}>50 นาที (มาตรฐาน)</option>
+                    <option value={60}>60 นาที (1 ชั่วโมงเต็ม)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* 4. Preview Timeline Schedule (ไทม์ไลน์จำลองตารางเรียนประจำวัน) */}
+            <div className="rounded-2xl border border-slate-200 p-4.5 bg-slate-50/50 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-1 bg-blue-100 text-blue-700 rounded-md">
+                    <Clock className="w-3.5 h-3.5" />
+                  </div>
+                  <h3 className="text-xs font-extrabold text-slate-900">
+                    ไทม์ไลน์จำลองตารางเรียนประจำวัน (Preview Timeline Schedule)
+                  </h3>
+                </div>
+                <div className="flex items-center gap-2 text-[11px]">
+                  <span className="font-semibold text-slate-500">
+                    จำนวนคาบเรียนทั้งหมด: {bellSchedule.totalPeriodsPerDay} คาบ
+                  </span>
+                  <span className="text-slate-300">•</span>
+                  <span className="font-semibold text-blue-600">
+                    {bellSchedule.lunchBreakMode === 'NUMBERED_PERIOD'
+                      ? 'โหมด A: นับพักเที่ยงเป็นคาบ'
+                      : 'โหมด B: ข้ามคาบพักเที่ยง'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Timeline Cards Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2 pt-1">
+                {timelineSchedule.map((slot) => {
+                  if (slot.type === 'ASSEMBLY') {
+                    return (
+                      <div
+                        key={slot.id}
+                        className="rounded-xl border border-amber-200 bg-amber-50/70 p-2.5 text-center space-y-1 shadow-2xs"
+                      >
+                        <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-amber-200/80 text-amber-900 block truncate">
+                          ☀️ เข้าแถว
+                        </span>
+                        <div className="text-[11px] font-mono font-bold text-amber-900 whitespace-nowrap">
+                          {slot.startTime} - {slot.endTime}
+                        </div>
+                        <span className="text-[10px] text-amber-700 block">
+                          {slot.durationMinutes} นาที
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  if (slot.isLunch) {
+                    return (
+                      <div
+                        key={slot.id}
+                        className="rounded-xl border-2 border-rose-300 bg-rose-50 p-2.5 text-center space-y-1 shadow-2xs"
+                      >
+                        <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-rose-200 text-rose-900 block truncate">
+                          🍲 {slot.label}
+                        </span>
+                        <div className="text-[11px] font-mono font-bold text-rose-900 whitespace-nowrap">
+                          {slot.startTime} - {slot.endTime}
+                        </div>
+                        <span className="text-[10px] text-rose-700 font-semibold block">
+                          พัก {slot.durationMinutes} นาที
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={slot.id}
+                      className="rounded-xl border border-slate-200 bg-white p-2.5 text-center space-y-1 shadow-2xs hover:border-blue-300 transition-colors"
+                    >
+                      <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 block truncate">
+                        📖 {slot.label}
+                      </span>
+                      <div className="text-[11px] font-mono font-bold text-slate-800 whitespace-nowrap">
+                        {slot.startTime} - {slot.endTime}
+                      </div>
+                      <span className="text-[10px] text-slate-400 block">
+                        {slot.durationMinutes} นาที
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Bottom Actions Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+              <span className="text-[11px] text-slate-400">
+                * การเปลี่ยนแปลงโครงสร้างคาบเรียนจะมีผลต่อการแสดงตารางสอนและการบันทึกเวลาเรียนของครูผู้สอนทุกคน
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleResetBellSchedule}
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 inline mr-1 text-slate-500" />
+                  คืนค่าเริ่มต้น
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveBellSchedule}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5 inline mr-1" />
+                  💾 บันทึกการตั้งค่าโครงสร้างเวลา
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Part 1.3: Special Holidays Management */}
+          <div id="holidays-section" className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-amber-50 text-amber-700 rounded-xl">
@@ -863,8 +1521,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
             </div>
           </div>
 
-          {/* Part 1.3: Weekend Makeup Days Management */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+          {/* Part 1.4: Weekend Makeup Days Management */}
+          <div id="weekends-section" className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-indigo-50 text-indigo-700 rounded-xl">

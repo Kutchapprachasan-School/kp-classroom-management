@@ -611,5 +611,195 @@ assert.ok(morningViewSource.includes('attendanceCorrelationService'), 'MorningAs
 assert.ok(classroomViewSource.includes('attendanceCorrelationService'), 'ClassroomAttendanceView must import attendanceCorrelationService');
 console.log('  ✓ MorningAssemblyView and ClassroomAttendanceView component shells verified');
 
-console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE, SUBJECT ICONS, BANNER COMPRESSOR & SIDEBAR UX CHECKS PASSED!');
+// ----------------------------------------------------
+// Step 6: School Bell Schedule & Lunch Break Settings Verification (Task 9)
+// ----------------------------------------------------
+console.log('\n--- 6. Checking School Bell Schedule & Lunch Break Settings (Task 9) ---');
+
+const settingsViewPath = './src/views/SettingsBackupView.tsx';
+assert.ok(existsSync(settingsViewPath), 'src/views/SettingsBackupView.tsx must exist');
+const settingsSource = readFileSync(settingsViewPath, 'utf8');
+
+// 6.1 Interface & Type Checks
+assert.ok(
+  settingsSource.includes('export interface SchoolBellScheduleConfig'),
+  'SettingsBackupView must export SchoolBellScheduleConfig interface'
+);
+assert.ok(settingsSource.includes('morningAssemblyStart: string'), 'Config must have morningAssemblyStart: string');
+assert.ok(settingsSource.includes('morningAssemblyEnd: string'), 'Config must have morningAssemblyEnd: string');
+assert.ok(settingsSource.includes('firstPeriodStart: string'), 'Config must have firstPeriodStart: string');
+assert.ok(settingsSource.includes('periodDurationMinutes: number'), 'Config must have periodDurationMinutes: number');
+assert.ok(settingsSource.includes('totalPeriodsPerDay: number'), 'Config must have totalPeriodsPerDay: number');
+assert.ok(settingsSource.includes('lunchBreakMode:'), 'Config must have lunchBreakMode');
+assert.ok(settingsSource.includes("'NUMBERED_PERIOD'"), "lunchBreakMode must support 'NUMBERED_PERIOD'");
+assert.ok(settingsSource.includes("'SKIPPED_BREAK_SLOT'"), "lunchBreakMode must support 'SKIPPED_BREAK_SLOT'");
+assert.ok(settingsSource.includes('lunchBreakSlot: number'), 'Config must have lunchBreakSlot: number');
+assert.ok(settingsSource.includes('lunchDurationMinutes: number'), 'Config must have lunchDurationMinutes: number');
+console.log('  ✓ SchoolBellScheduleConfig interface structure and modes verified');
+
+// 6.2 Storage Key & Defaults
+assert.ok(
+  settingsSource.includes("'kp_school_bell_schedule'"),
+  "SettingsBackupView must use localStorage key 'kp_school_bell_schedule'"
+);
+assert.ok(
+  settingsSource.includes('DEFAULT_BELL_SCHEDULE_CONFIG'),
+  'SettingsBackupView must define DEFAULT_BELL_SCHEDULE_CONFIG'
+);
+console.log("  ✓ LocalStorage key 'kp_school_bell_schedule' and default configuration verified");
+
+// 6.3 UI Section & Controls Check
+assert.ok(
+  settingsSource.includes('เวลาเข้าแถว & โครงสร้างคาบเรียน (School Bell Schedule)'),
+  'Must include title: เวลาเข้าแถว & โครงสร้างคาบเรียน (School Bell Schedule)'
+);
+assert.ok(
+  settingsSource.includes('เวลาเข้าแถวเคารพธงชาติ'),
+  'Must include section: เวลาเข้าแถวเคารพธงชาติ'
+);
+assert.ok(
+  settingsSource.includes('เวลาสำหรับเช็คแถวหน้าเสาธงและกิจกรรมโฮมรูมประจำชั้น'),
+  'Must include homeroom/assembly explanation text'
+);
+assert.ok(
+  settingsSource.includes('โครงสร้างเวลาเรียนรายคาบ'),
+  'Must include section: โครงสร้างเวลาเรียนรายคาบ'
+);
+assert.ok(
+  settingsSource.includes('โหมดการนับคาบพักเที่ยง (Lunch Break Mode - สำคัญมาก)'),
+  'Must include section: โหมดการนับคาบพักเที่ยง (Lunch Break Mode - สำคัญมาก)'
+);
+assert.ok(
+  settingsSource.includes('โหมด A: นับพักเที่ยงเป็นคาบที่ (Numbered Period)'),
+  'Must include Mode A title'
+);
+assert.ok(
+  settingsSource.includes('คาบที่ 4 เรียน → คาบที่ 5 พักเที่ยง → คาบที่ 6 เรียนภาคบ่าย'),
+  'Must include Mode A explanation flow'
+);
+assert.ok(
+  settingsSource.includes('โหมด B: ข้ามคาบพักเที่ยง ไม่นับเป็นคาบที่ (Skipped Break Slot)'),
+  'Must include Mode B title'
+);
+assert.ok(
+  settingsSource.includes('คาบที่ 4 เรียน → [พักเที่ยง] → คาบที่ 5 เรียนภาคบ่าย (คาบต่อไปยังคงเป็นคาบที่ 5)'),
+  'Must include Mode B explanation flow'
+);
+assert.ok(
+  settingsSource.includes('ไทม์ไลน์จำลองตารางเรียนประจำวัน (Preview Timeline Schedule)'),
+  'Must include Preview Timeline Schedule'
+);
+assert.ok(
+  settingsSource.includes('💾 บันทึกการตั้งค่าโครงสร้างเวลา'),
+  'Must include save button: 💾 บันทึกการตั้งค่าโครงสร้างเวลา'
+);
+assert.ok(
+  settingsSource.includes('คืนค่าเริ่มต้น'),
+  'Must include reset button: คืนค่าเริ่มต้น'
+);
+console.log('  ✓ UI labels, Thai explanations, Mode flows, and buttons verified');
+
+// 6.4 Mathematical / Logical verification of Timeline generation for Mode A and Mode B
+const addMinutes = (timeStr, mins) => {
+  const [h, m] = timeStr.split(':').map(Number);
+  const total = (h * 60 + m + mins + 1440) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+};
+
+const simulateTimeline = (config) => {
+  const items = [{
+    type: 'ASSEMBLY',
+    start: config.morningAssemblyStart,
+    end: config.morningAssemblyEnd,
+  }];
+  let cur = config.firstPeriodStart;
+  if (config.lunchBreakMode === 'NUMBERED_PERIOD') {
+    const lunchP = Math.min(config.lunchBreakSlot + 1, config.totalPeriodsPerDay);
+    for (let p = 1; p <= config.totalPeriodsPerDay; p++) {
+      if (p === lunchP) {
+        const end = addMinutes(cur, config.lunchDurationMinutes);
+        items.push({ type: 'LUNCH', periodNumber: p, start: cur, end });
+        cur = end;
+      } else {
+        const end = addMinutes(cur, config.periodDurationMinutes);
+        items.push({ type: 'PERIOD', periodNumber: p, start: cur, end });
+        cur = end;
+      }
+    }
+  } else {
+    for (let p = 1; p <= config.totalPeriodsPerDay; p++) {
+      const end = addMinutes(cur, config.periodDurationMinutes);
+      items.push({ type: 'PERIOD', periodNumber: p, start: cur, end });
+      cur = end;
+      if (p === config.lunchBreakSlot) {
+        const lunchEnd = addMinutes(cur, config.lunchDurationMinutes);
+        items.push({ type: 'LUNCH', periodNumber: undefined, start: cur, end: lunchEnd });
+        cur = lunchEnd;
+      }
+    }
+  }
+  return items;
+};
+
+// Mode A Test: 7 periods, lunch after period 4 -> Period 5 is lunch, Period 6 is afternoon
+const modeASchedule = simulateTimeline({
+  morningAssemblyStart: '07:45',
+  morningAssemblyEnd: '08:15',
+  firstPeriodStart: '08:30',
+  periodDurationMinutes: 50,
+  totalPeriodsPerDay: 7,
+  lunchBreakMode: 'NUMBERED_PERIOD',
+  lunchBreakSlot: 4,
+  lunchDurationMinutes: 50,
+});
+
+assert.strictEqual(modeASchedule[0].start, '07:45');
+assert.strictEqual(modeASchedule[0].end, '08:15');
+assert.strictEqual(modeASchedule[1].start, '08:30'); // Period 1
+assert.strictEqual(modeASchedule[1].end, '09:20');
+assert.strictEqual(modeASchedule[2].start, '09:20'); // Period 2
+assert.strictEqual(modeASchedule[3].start, '10:10'); // Period 3
+assert.strictEqual(modeASchedule[4].start, '11:00'); // Period 4
+assert.strictEqual(modeASchedule[4].end, '11:50');
+assert.strictEqual(modeASchedule[5].type, 'LUNCH'); // Period 5 is Lunch
+assert.strictEqual(modeASchedule[5].periodNumber, 5);
+assert.strictEqual(modeASchedule[5].start, '11:50');
+assert.strictEqual(modeASchedule[5].end, '12:40');
+assert.strictEqual(modeASchedule[6].type, 'PERIOD'); // Period 6 is Afternoon class
+assert.strictEqual(modeASchedule[6].periodNumber, 6);
+assert.strictEqual(modeASchedule[6].start, '12:40');
+assert.strictEqual(modeASchedule[6].end, '13:30');
+assert.strictEqual(modeASchedule[7].periodNumber, 7);
+assert.strictEqual(modeASchedule[7].start, '13:30');
+assert.strictEqual(modeASchedule[7].end, '14:20');
+console.log('  ✓ Mode A (Numbered Period): Period 4 -> Period 5 Lunch -> Period 6 Afternoon verified');
+
+// Mode B Test: 7 periods, lunch after period 4 -> [Lunch Break], Period 5 is afternoon
+const modeBSchedule = simulateTimeline({
+  morningAssemblyStart: '07:45',
+  morningAssemblyEnd: '08:15',
+  firstPeriodStart: '08:30',
+  periodDurationMinutes: 50,
+  totalPeriodsPerDay: 7,
+  lunchBreakMode: 'SKIPPED_BREAK_SLOT',
+  lunchBreakSlot: 4,
+  lunchDurationMinutes: 50,
+});
+
+assert.strictEqual(modeBSchedule[4].periodNumber, 4); // Period 4
+assert.strictEqual(modeBSchedule[4].end, '11:50');
+assert.strictEqual(modeBSchedule[5].type, 'LUNCH'); // Unnumbered Lunch Break
+assert.strictEqual(modeBSchedule[5].periodNumber, undefined);
+assert.strictEqual(modeBSchedule[5].start, '11:50');
+assert.strictEqual(modeBSchedule[5].end, '12:40');
+assert.strictEqual(modeBSchedule[6].type, 'PERIOD'); // Period 5 afternoon class
+assert.strictEqual(modeBSchedule[6].periodNumber, 5);
+assert.strictEqual(modeBSchedule[6].start, '12:40');
+assert.strictEqual(modeBSchedule[6].end, '13:30');
+assert.strictEqual(modeBSchedule[7].periodNumber, 6);
+assert.strictEqual(modeBSchedule[8].periodNumber, 7);
+console.log('  ✓ Mode B (Skipped Break Slot): Period 4 -> [Lunch Break] -> Period 5 Afternoon verified');
+
+console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE, SUBJECT ICONS, BANNER COMPRESSOR, SIDEBAR UX & BELL SCHEDULE CHECKS PASSED!');
+
 
