@@ -210,7 +210,7 @@ export const App: React.FC = () => {
       case 'student':
         return 'ข้อมูลนักเรียน';
       case 'timetable':
-        return 'ตารางสอน';
+        return 'ตารางสอน / ภาระงานวันนี้';
       case 'academic-year':
         return 'ตั้งค่าปีการศึกษา';
       case 'settings':
@@ -371,7 +371,7 @@ export const App: React.FC = () => {
                 { key: 'readiness', label: '6. ความพร้อมก่อนปิดเทอม', icon: CheckCircle2 },
                 { key: 'student', label: '7. วิเคราะห์รายคน', icon: UserCheck },
                 { key: 'sar', label: '8. เทียบผลข้ามห้อง (SAR)', icon: FileSpreadsheet },
-                { key: 'timetable', label: '9. ตารางสอน', icon: CalendarDays },
+                { key: 'timetable', label: '9. ตารางสอน/วันนี้', icon: CalendarDays },
                 { key: 'exams', label: '10. สอบ/งาน', icon: PenTool },
                 { key: 'student-portal', label: '11. พอร์ทัลนักเรียน', icon: GraduationCap },
               ].map((item) => {
@@ -576,7 +576,13 @@ export const App: React.FC = () => {
                 <StudentDetailView onOpenHomeVisit={() => setCurrentView('home-visit')} />
               )}
 
-              {currentView === 'timetable' && <TimetableView />}
+              {currentView === 'timetable' && (
+                <TimetableView
+                  onDeepNavigate={handleDeepNavigate}
+                  onNavigateToAssignments={() => setCurrentView('assignments')}
+                  onNavigateToCalendar={() => setCurrentView('academic-year')}
+                />
+              )}
 
               {currentView === 'academic-year' && <AcademicTermsView />}
 

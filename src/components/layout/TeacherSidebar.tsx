@@ -125,7 +125,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       : []),
     {
       key: 'timetable',
-      label: 'ตารางสอนวันนี้',
+      label: 'ตารางสอน/วันนี้',
       icon: Calendar,
     },
     {
@@ -227,7 +227,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             currentView === item.key ||
             (item.key === 'timetable' && currentView === 'timetable') ||
             (item.key === 'settings' &&
-              ['settings', 'academic-year', 'accounts', 'trash'].includes(currentView));
+              ['settings', 'accounts', 'trash'].includes(currentView));
 
           return (
             <button
