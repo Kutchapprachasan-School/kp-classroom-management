@@ -44,6 +44,7 @@ import {
   ChevronUp,
   ShieldCheck,
   MessageSquare,
+  Folder,
 } from 'lucide-react';
 import { TeacherCalendarMobileView } from './components/dashboard/TeacherCalendarMobileView';
 import { TeacherAllTasksMobileView } from './components/dashboard/TeacherAllTasksMobileView';
@@ -204,7 +205,7 @@ export const App: React.FC = () => {
       case 'courses':
         return 'รายวิชา';
       case 'lessons':
-        return 'แผนการสอน';
+        return 'สื่อการสอน / ไฟล์';
       case 'roster':
         return 'รายชื่อนักเรียน';
       case 'student':
@@ -372,6 +373,7 @@ export const App: React.FC = () => {
                 { key: 'student', label: '7. วิเคราะห์รายคน', icon: UserCheck },
                 { key: 'sar', label: '8. เทียบผลข้ามห้อง (SAR)', icon: FileSpreadsheet },
                 { key: 'timetable', label: '9. ตารางสอน/วันนี้', icon: CalendarDays },
+                { key: 'lessons', label: 'แผนการสอน/สื่อ', icon: Folder },
                 { key: 'exams', label: '10. สอบ/งาน', icon: PenTool },
                 { key: 'student-portal', label: '11. พอร์ทัลนักเรียน', icon: GraduationCap },
               ].map((item) => {
@@ -503,6 +505,7 @@ export const App: React.FC = () => {
                   onNavigateToReadiness={() => setCurrentView('readiness')}
                   onNavigateToAcademicYear={() => setCurrentView('academic-year')}
                   onNavigateToCourses={() => setCurrentView('courses')}
+                  onNavigateToLessons={() => setCurrentView('lessons')}
                   onNavigateToMorningAssembly={() => setCurrentView('student-affairs')}
                   onDeepNavigate={handleDeepNavigate}
                 />

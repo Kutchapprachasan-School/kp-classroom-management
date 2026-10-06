@@ -22,6 +22,7 @@ interface TeacherGlobalDashboardViewProps {
   onNavigateToReadiness?: () => void;
   onNavigateToAcademicYear?: () => void;
   onNavigateToCourses?: () => void;
+  onNavigateToLessons?: () => void;
   onNavigateToMorningAssembly?: () => void;
   onDeepNavigate?: (payload: CrossViewNavigationPayload) => void;
 }
@@ -33,6 +34,7 @@ export const TeacherGlobalDashboardView: React.FC<
   onNavigateToAttendance,
   onNavigateToAcademicYear,
   onNavigateToCourses,
+  onNavigateToLessons,
   onDeepNavigate,
 }) => {
   const [isAdminBannerModalOpen, setIsAdminBannerModalOpen] = useState(false);
@@ -89,8 +91,9 @@ export const TeacherGlobalDashboardView: React.FC<
           {/* 2.4 ทางลัดสำหรับครู (สร้างแผนการสอน, เช็คชื่อนักเรียน, ให้คะแนน, อัปโหลดสื่อ/ไฟล์) */}
           <TeacherQuickShortcuts
             onDeepNavigate={onDeepNavigate}
-            onNavigateToLessons={onNavigateToCourses}
+            onNavigateToLessons={onNavigateToLessons || onNavigateToCourses}
             onNavigateToAttendance={onNavigateToAttendance}
+            onNavigateToFiles={onNavigateToLessons}
           />
 
           {/* 2.5 ปฏิทินการสอน / กิจกรรม (ตุลาคม 2569 & สรุปวันนี้ 5 คาบ) */}
