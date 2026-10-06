@@ -151,15 +151,11 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       label: 'สื่อการสอน / ไฟล์',
       icon: Folder,
     },
-    ...(isAdmin
-      ? [
-          {
-            key: 'exams' as TeacherViewKey,
-            label: 'ประเมิน / แบบฟอร์ม',
-            icon: ClipboardList,
-          },
-        ]
-      : []),
+    {
+      key: 'exams',
+      label: 'ประเมิน / แบบฟอร์ม',
+      icon: ClipboardList,
+    },
     {
       key: 'academic-year',
       label: 'ปฏิทินกิจกรรม',

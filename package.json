@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "test": "node test_calendar_messaging_sync.mjs && node test_admin_dashboard_fidelity.mjs && node test_teacher_dashboard.mjs",
+    "test": "node test_calendar_messaging_sync.mjs && node test_admin_dashboard_fidelity.mjs && node test_teacher_dashboard.mjs && node test_exam_management_fidelity.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

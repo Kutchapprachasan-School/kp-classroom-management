@@ -18,6 +18,7 @@ import {
   Settings,
   ChevronRight,
   Info,
+  PenTool,
 } from 'lucide-react';
 import {
   academicCalendarService,
@@ -154,10 +155,12 @@ const STORAGE_KEY_ACTIVITIES = 'kp_school_activity_events_v1';
 
 interface AcademicTermsViewProps {
   onNavigateToSettings?: () => void;
+  onNavigateToExams?: () => void;
 }
 
 export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
   onNavigateToSettings,
+  onNavigateToExams,
 }) => {
   const [activeTerm, setActiveTerm] = useState<AcademicTermRecord>(() =>
     academicCalendarService.getActiveTerm()
@@ -298,17 +301,30 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
           </div>
         </div>
 
-        {onNavigateToSettings && (
-          <button
-            type="button"
-            onClick={onNavigateToSettings}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold shadow-2xs transition-colors shrink-0 cursor-pointer"
-          >
-            <Settings className="w-3.5 h-3.5 text-blue-600" />
-            <span>ไปที่ตั้งค่าปีการศึกษา</span>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {onNavigateToExams && (
+            <button
+              type="button"
+              onClick={onNavigateToExams}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors shrink-0 cursor-pointer"
+            >
+              <PenTool className="w-3.5 h-3.5" />
+              <span>จัดการการสอบ & วัดผล (Exams)</span>
+              <ChevronRight className="w-3.5 h-3.5 text-blue-200" />
+            </button>
+          )}
+          {onNavigateToSettings && (
+            <button
+              type="button"
+              onClick={onNavigateToSettings}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold shadow-2xs transition-colors shrink-0 cursor-pointer"
+            >
+              <Settings className="w-3.5 h-3.5 text-blue-600" />
+              <span>ไปที่ตั้งค่าปีการศึกษา</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 2. Top Header & Action Controls */}
@@ -399,6 +415,33 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
       </div>
 
       {/* 4. Events Timeline Cards List */}
+      {categoryFilter === 'EXAM' && (
+        <div className="bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-teal-500/10 border border-blue-200 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-blue-600 text-white rounded-xl shadow-xs">
+              <PenTool className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-extrabold text-slate-900 text-sm">
+                ตารางชุดข้อสอบและการวัดผล (3 รายการที่ลงทะเบียนไว้)
+              </h4>
+              <p className="text-xs text-slate-500">
+                ศ23101 ศิลปะ (สอบกลางภาค, ปลายภาค) • ศ20221 ดนตรีปฏิบัติ 1 (สอบอ่านโน้ต)
+              </p>
+            </div>
+          </div>
+          {onNavigateToExams && (
+            <button
+              type="button"
+              onClick={onNavigateToExams}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
+            >
+              เปิดระบบจัดการการสอบ (Exam Management) →
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="space-y-3.5">
         {filteredActivities.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400">
@@ -473,6 +516,20 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                         <span>•</span>
                         <span>กลุ่มเป้าหมาย: <span className="text-slate-600">{act.targetAudience}</span></span>
                       </div>
+
+                      {act.category === 'EXAM' && onNavigateToExams && (
+                        <div className="pt-1.5">
+                          <button
+                            type="button"
+                            onClick={onNavigateToExams}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200 transition-colors cursor-pointer"
+                          >
+                            <PenTool className="w-3.5 h-3.5" />
+                            <span>เปิดระบบจัดการการสอบ & บันทึกคะแนน (Exam Management)</span>
+                            <ChevronRight className="w-3.5 h-3.5 text-blue-500" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
 

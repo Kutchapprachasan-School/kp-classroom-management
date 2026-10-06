@@ -193,7 +193,7 @@ export const App: React.FC = () => {
       case 'class-overview':
         return 'ศ23101 ศิลปะ';
       case 'exams':
-        return 'ข้อสอบ';
+        return 'จัดการการสอบ (Exam Management)';
       case 'assignments':
         return 'สั่งงาน / R2';
       case 'readiness':
@@ -606,6 +606,7 @@ export const App: React.FC = () => {
                     setSettingsInitialTab('CALENDAR');
                     setCurrentView('settings');
                   }}
+                  onNavigateToExams={() => setCurrentView('exams')}
                 />
               )}
 
