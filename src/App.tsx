@@ -20,6 +20,7 @@ import { StudentPortalView } from './views/StudentPortalView';
 import { SchoolPortalView, type TeacherLoginChannel } from './views/SchoolPortalView';
 import { HomeVisitSdqView } from './views/HomeVisitSdqView';
 import { StudentAffairsCouncilView } from './views/StudentAffairsCouncilView';
+import { AdminExecutiveDashboardView } from './views/AdminExecutiveDashboardView';
 import { QuickSearchModal } from './components/common/QuickSearchModal';
 import type { AtRiskStudent } from './types/viewModels';
 import {
@@ -140,17 +141,23 @@ export const App: React.FC = () => {
       return;
     }
 
+    if (nextRole === 'ACADEMIC_ADMIN') {
+      setCurrentView('admin-dashboard');
+      return;
+    }
+
     const defaultTarget = SCHOOL_ROLE_PROFILES[nextRole].defaultView as TeacherViewKey;
-    if (currentView === 'student-portal' || currentView === 'school-login') {
+    if (
+      currentView === 'student-portal' ||
+      currentView === 'school-login' ||
+      currentView === 'admin-dashboard'
+    ) {
       setCurrentView(defaultTarget);
       return;
     }
 
     // หากสลับออกจากฝ่ายวิชาการขณะที่เปิดหน้าตั้งค่าระบบเฉพาะแอดมิน ให้พากลับหน้าหลักของบทบาทนั้น
-    if (
-      nextRole !== 'ACADEMIC_ADMIN' &&
-      ['academic-year', 'accounts', 'trash'].includes(currentView)
-    ) {
+    if (['academic-year', 'accounts', 'trash'].includes(currentView)) {
       setCurrentView(defaultTarget);
     }
   };
@@ -176,6 +183,8 @@ export const App: React.FC = () => {
     switch (currentView) {
       case 'home':
         return 'หน้าแรก';
+      case 'admin-dashboard':
+        return 'แดชบอร์ดผู้บริหาร • โรงเรียนศึกษาวิทยา';
       case 'class-overview':
         return 'ศ23101 ศิลปะ';
       case 'exams':
@@ -226,7 +235,9 @@ export const App: React.FC = () => {
   };
 
   const handleBack = () => {
-    if (currentView !== 'home') {
+    if (activeRole === 'ACADEMIC_ADMIN') {
+      setCurrentView('admin-dashboard');
+    } else if (currentView !== 'home') {
       setCurrentView('home');
     }
   };
@@ -301,7 +312,10 @@ export const App: React.FC = () => {
                 2. ฝ่ายกิจการ
               </button>
               <button
-                onClick={() => handleChangeRole('ACADEMIC_ADMIN')}
+                onClick={() => {
+                  handleChangeRole('ACADEMIC_ADMIN');
+                  setCurrentView('admin-dashboard');
+                }}
                 className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${
                   currentView !== 'school-login' &&
                   currentView !== 'student-portal' &&
@@ -310,7 +324,7 @@ export const App: React.FC = () => {
                     : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                 }`}
               >
-                3. ฝ่ายวิชาการ/แอดมิน
+                3. ผู้บริหาร/แอดมิน
               </button>
               <button
                 onClick={() => handleChangeRole('STUDENT_GENERAL')}
@@ -348,7 +362,8 @@ export const App: React.FC = () => {
             <div className="max-w-7xl mx-auto flex items-center gap-1.5 flex-wrap mt-2 pt-2 border-t border-slate-800">
               {[
                 { key: 'school-login', label: 'หน้า Login', icon: LogIn },
-                { key: 'home', label: '1. หน้าหลัก', icon: LayoutDashboard },
+                { key: 'admin-dashboard', label: '★ Dashboard ผู้บริหาร', icon: LayoutDashboard },
+                { key: 'home', label: '1. หน้าหลักครู', icon: Home },
                 { key: 'class-overview', label: '2. ชั้นเรียนของฉัน', icon: Users },
                 { key: 'home-visit', label: '3. เยี่ยมบ้าน นร.01 (CCT)', icon: HeartHandshake },
                 { key: 'student-affairs', label: '4. กิจการนักเรียน & ใบลา', icon: ShieldAlert },
@@ -398,7 +413,7 @@ export const App: React.FC = () => {
         </button>
       )}
 
-      {/* Conditional Rendering: Direct Login Screen vs Student Portal vs Classroom Management */}
+      {/* Conditional Rendering: Direct Login Screen vs Student Portal vs Admin Executive Dashboard vs Classroom Management */}
       {currentView === 'school-login' ? (
         <SchoolPortalView
           onEnterClassroomPortal={(target, channel, role) => {
@@ -408,7 +423,11 @@ export const App: React.FC = () => {
             if (role) {
               setActiveRole(role);
             }
-            setCurrentView((target as TeacherViewKey) || 'home');
+            if (role === 'ACADEMIC_ADMIN') {
+              setCurrentView('admin-dashboard');
+            } else {
+              setCurrentView((target as TeacherViewKey) || 'home');
+            }
           }}
           onEnterStudentPortal={(stuRole) => {
             setActiveRole(stuRole || 'STUDENT_GENERAL');
@@ -424,6 +443,19 @@ export const App: React.FC = () => {
           onChangeStudentRole={(stuRole) => setActiveRole(stuRole)}
           onSwitchToTeacherRole={(tRole) => handleChangeRole(tRole)}
           onExit={() => setCurrentView('school-login')}
+        />
+      ) : currentView === 'admin-dashboard' || (activeRole === 'ACADEMIC_ADMIN' && currentView === 'home') ? (
+        <AdminExecutiveDashboardView
+          activeRole={activeRole}
+          onChangeRole={handleChangeRole}
+          onNavigateToView={(viewKey) => {
+            if (viewKey === 'home' || viewKey === 'admin-dashboard') {
+              setCurrentView('admin-dashboard');
+            } else {
+              setCurrentView(viewKey as TeacherViewKey);
+            }
+          }}
+          onLogout={() => setCurrentView('school-login')}
         />
       ) : (
         /* Teacher Mode Layout */

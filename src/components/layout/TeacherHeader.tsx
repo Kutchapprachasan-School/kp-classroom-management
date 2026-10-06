@@ -268,12 +268,12 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
             <span
               className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
                 activeRole === 'ACADEMIC_ADMIN'
-                  ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                  ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
                   : 'bg-blue-100 text-blue-800 border border-blue-200'
               }`}
             >
               {activeRole === 'ACADEMIC_ADMIN'
-                ? '⭐ แอดมินฝ่ายวิชาการ (Admin)'
+                ? '⭐ ผู้บริหาร / แอดมิน (Admin)'
                 : 'ครูผู้สอน (Teacher)'}
             </span>
           </div>
@@ -305,14 +305,15 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
             onClick={() => {
               onChangeRole?.('ACADEMIC_ADMIN');
               setIsProfileOpen(false);
+              onDeepNavigate?.({ view: 'admin-dashboard' });
             }}
             className={`flex-1 py-1.5 px-2 rounded-lg text-center font-bold text-[11px] transition-colors cursor-pointer ${
               activeRole === 'ACADEMIC_ADMIN'
-                ? 'bg-amber-500 text-white shadow-xs'
+                ? 'bg-indigo-600 text-white shadow-xs'
                 : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
             }`}
           >
-            แอดมิน (Admin)
+            ผู้บริหาร (Admin)
           </button>
         </div>
       </div>

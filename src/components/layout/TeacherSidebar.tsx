@@ -30,6 +30,7 @@ import { AdminTeacherBannerModal } from '../teacher/AdminTeacherBannerModal';
 export type TeacherViewKey =
   | 'school-login'
   | 'home'
+  | 'admin-dashboard'
   | 'class-overview'
   | 'exams'
   | 'assignments'
@@ -111,6 +112,17 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       label: 'หน้าหลัก',
       icon: Home,
     },
+    ...(isAdmin
+      ? [
+          {
+            key: 'admin-dashboard' as TeacherViewKey,
+            label: 'Dashboard ผู้บริหาร',
+            icon: Sparkles,
+            badge: 'Admin',
+            badgeStyle: 'bg-indigo-600 text-white font-black',
+          },
+        ]
+      : []),
     {
       key: 'timetable',
       label: 'ตารางสอนวันนี้',
