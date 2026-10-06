@@ -8,6 +8,7 @@ import {
   HelpCircle,
   LogOut,
   ChevronRight,
+  MessageSquare,
 } from 'lucide-react';
 import { getSchoolSettings, type SchoolUserRole } from '../../config/schoolRoles';
 import type { TeacherViewKey } from '../layout/TeacherSidebar';
@@ -52,6 +53,13 @@ export const TeacherMoreAccountMobileView: React.FC<TeacherMoreAccountMobileView
       label: 'เอกสาร / แบบฟอร์ม',
       iconColor: 'text-amber-600',
       bgColor: 'bg-amber-50',
+    },
+    {
+      key: 'messages' as TeacherViewKey,
+      icon: MessageSquare,
+      label: 'ข้อความ & แชท',
+      iconColor: 'text-indigo-600',
+      bgColor: 'bg-indigo-50',
     },
     {
       key: 'settings' as TeacherViewKey,

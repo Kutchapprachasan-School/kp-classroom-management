@@ -563,6 +563,14 @@ export const classroomsListData: ClassroomRosterItem[] = [
     studentCount: 34,
   },
   {
+    id: 'room-1-2',
+    name: 'มัธยมศึกษาปีที่ 1/2',
+    level: 'ม.1',
+    roomNumber: 'ม.1/2',
+    adviser: 'ครูพิมพ์ใจ สิทธิเดช',
+    studentCount: 32,
+  },
+  {
     id: 'room-2-1',
     name: 'มัธยมศึกษาปีที่ 2/1',
     level: 'ม.2',

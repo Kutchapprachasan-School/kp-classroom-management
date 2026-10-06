@@ -45,6 +45,7 @@ export type TeacherViewKey =
   | 'student'
   | 'timetable'
   | 'academic-year'
+  | 'messages'
   | 'settings'
   | 'trash'
   | 'accounts'
@@ -165,12 +166,21 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       icon: CalendarDays,
     },
     {
-      key: 'student-affairs',
+      key: 'messages',
       label: 'ข้อความ',
       icon: MessageSquare,
       badge: '5',
       badgeStyle: 'bg-rose-500 text-white font-extrabold',
     },
+    ...(activeRole === 'STUDENT_AFFAIRS'
+      ? [
+          {
+            key: 'student-affairs' as TeacherViewKey,
+            label: 'กิจการนักเรียน',
+            icon: Users,
+          },
+        ]
+      : []),
     {
       key: 'settings',
       label: 'ตั้งค่า',

@@ -11,6 +11,8 @@ export interface StudentRecord {
   status: 'NORMAL' | 'AT_RISK';
   avatarUrl?: string;
   gender?: 'MALE' | 'FEMALE';
+  classroomId?: string;
+  studentCode?: string;
 }
 
 const STORAGE_PREFIX = 'cls_students_';
@@ -26,7 +28,7 @@ export const defaultStudents: StudentRecord[] = [
   { id: 'stu-23', no: 23, code: '45123', name: 'ด.ญ. ปริยาภรณ์ ชัยแก้ว', attendance: '8/8', score: 95.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
 ];
 
-const mockStudentsByRoom: Record<string, StudentRecord[]> = {
+export const mockStudentsByRoom: Record<string, StudentRecord[]> = {
   'room-3-1': defaultStudents,
   'ม.3/1': defaultStudents,
   'room-3-2': [
@@ -93,6 +95,18 @@ const mockStudentsByRoom: Record<string, StudentRecord[]> = {
     { id: 'stu-11-3', no: 3, code: '47003', name: 'ด.ญ. กัญญาวีร์ สิทธิโชค', attendance: '8/8', score: 91.5, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
     { id: 'stu-11-4', no: 4, code: '47004', name: 'ด.ญ. ปานวาด ประเสริฐยิ่ง', attendance: '5/8', score: 45.0, status: 'AT_RISK', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
   ],
+  'room-1-2': [
+    { id: 'stu-12-1', no: 1, code: '47101', name: 'ด.ช. ภัทรพล สิทธิเดช', attendance: '8/8', score: 88.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-12-2', no: 2, code: '47102', name: 'ด.ช. ณัฐวุฒิ บุญช่วย', attendance: '8/8', score: 82.5, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-12-3', no: 3, code: '47103', name: 'ด.ญ. พรประภา ศิริพร', attendance: '8/8', score: 94.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+    { id: 'stu-12-4', no: 4, code: '47104', name: 'ด.ญ. กัญญารัตน์ ชาญศิลป์', attendance: '7/8', score: 76.5, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'ม.1/2': [
+    { id: 'stu-12-1', no: 1, code: '47101', name: 'ด.ช. ภัทรพล สิทธิเดช', attendance: '8/8', score: 88.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-12-2', no: 2, code: '47102', name: 'ด.ช. ณัฐวุฒิ บุญช่วย', attendance: '8/8', score: 82.5, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-12-3', no: 3, code: '47103', name: 'ด.ญ. พรประภา ศิริพร', attendance: '8/8', score: 94.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+    { id: 'stu-12-4', no: 4, code: '47104', name: 'ด.ญ. กัญญารัตน์ ชาญศิลป์', attendance: '7/8', score: 76.5, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
   'room-2-1': [
     { id: 'stu-21-1', no: 1, code: '46001', name: 'ด.ช. กันต์ริศย์ ทวีเศรษฐกร', attendance: '8/8', score: 88.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
     { id: 'stu-21-2', no: 2, code: '46002', name: 'ด.ช. พงศกร มหาวงศ์', attendance: '8/8', score: 84.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
@@ -158,12 +172,18 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) return parsed;
     } catch {
       // fallback
     }
   }
-  return mockStudentsByRoom[classroomId] || defaultStudents;
+  if (mockStudentsByRoom[classroomId]) {
+    return mockStudentsByRoom[classroomId];
+  }
+  if (classroomId === 'room-3-1' || classroomId === 'ม.3/1') {
+    return defaultStudents;
+  }
+  return [];
 };
 
 const saveLocalStudents = (classroomId: string, items: StudentRecord[]) => {
@@ -171,6 +191,46 @@ const saveLocalStudents = (classroomId: string, items: StudentRecord[]) => {
 };
 
 export const studentService = {
+  getLocalStudents,
+  saveLocalStudents,
+  mockStudentsByRoom,
+
+  // ค้นหานักเรียนและห้องเรียนปัจจุบันจากรหัส
+  findStudentByCode(code: string): { student: StudentRecord; classroomId: string } | null {
+    // 1. ตรวจสอบ keys ทั้งหมดใน localStorage ก่อน
+    if (typeof window !== 'undefined') {
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith(STORAGE_PREFIX)) {
+            const raw = localStorage.getItem(k);
+            if (raw) {
+              const list = JSON.parse(raw);
+              if (Array.isArray(list)) {
+                const match = list.find((s: StudentRecord) => s.code === code || s.id === code);
+                if (match) {
+                  return { student: match, classroomId: k.slice(STORAGE_PREFIX.length) };
+                }
+              }
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // 2. Fallback ค้นหาจากห้องที่มีข้อมูล mock
+    for (const key of Object.keys(mockStudentsByRoom)) {
+      const list = getLocalStudents(key);
+      const match = list.find((s) => s.code === code || s.id === code);
+      if (match) {
+        return { student: match, classroomId: key };
+      }
+    }
+    return null;
+  },
+
   // READ: List students in classroom
   async getByClassroom(classroomId: string): Promise<StudentRecord[]> {
     if (isSupabaseConfigured) {

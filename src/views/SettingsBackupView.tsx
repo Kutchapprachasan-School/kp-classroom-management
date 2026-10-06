@@ -10,6 +10,13 @@ import {
   FileSpreadsheet,
   Upload,
   Image as ImageIcon,
+  CalendarDays,
+  Calendar,
+  Plus,
+  Trash2,
+  Clock,
+  Sun,
+  Edit2,
 } from 'lucide-react';
 import { sgsExportService, type SgsSnapshotRecord } from '../services/sgsExportService';
 import {
@@ -35,13 +42,22 @@ import {
   type TeacherBannerKey,
   type TeacherBannerItem,
 } from '../services/teacherBannerService';
+import {
+  academicCalendarService,
+  ACADEMIC_CALENDAR_EVENT,
+  type AcademicTermRecord,
+  type HolidayType,
+  type DayOfWeek,
+} from '../services/academicCalendarService';
 
 interface SettingsBackupViewProps {
   activeRole?: SchoolUserRole;
+  initialTab?: 'CALENDAR' | 'BRANDING' | 'STORAGE' | 'BANNERS';
 }
 
 export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
   activeRole = 'ACADEMIC_ADMIN',
+  initialTab = 'CALENDAR',
 }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isBackingUp, setIsBackingUp] = useState(false);
@@ -69,6 +85,54 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
     teacherBannerService.getBanners()
   );
   const [teacherBannerUploadingKey, setTeacherBannerUploadingKey] = useState<TeacherBannerKey | null>(null);
+
+  // Academic Calendar State
+  const [calendarConfig, setCalendarConfig] = useState(() => academicCalendarService.getConfig());
+  const [activeSettingsTab, setActiveSettingsTab] = useState<
+    'CALENDAR' | 'BRANDING' | 'STORAGE' | 'BANNERS'
+  >(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveSettingsTab(initialTab);
+    }
+  }, [initialTab]);
+
+  // Modals for Term, Holiday, Weekend
+  const [isCreateTermModalOpen, setIsCreateTermModalOpen] = useState(false);
+  const [isAddHolidayModalOpen, setIsAddHolidayModalOpen] = useState(false);
+  const [isAddWeekendModalOpen, setIsAddWeekendModalOpen] = useState(false);
+  const [editingTerm, setEditingTerm] = useState<AcademicTermRecord | null>(null);
+
+  // New Term Form State
+  const [newTermYear, setNewTermYear] = useState<number>(2570);
+  const [newTermSemester, setNewTermSemester] = useState<1 | 2>(1);
+  const [newTermStartDate, setNewTermStartDate] = useState('15 พ.ค. 2570');
+  const [newTermEndDate, setNewTermEndDate] = useState('10 ต.ค. 2570');
+  const [newTermNote, setNewTermNote] = useState('');
+
+  // New Holiday Form State
+  const [newHolidayName, setNewHolidayName] = useState('');
+  const [newHolidayDate, setNewHolidayDate] = useState('');
+  const [newHolidayType, setNewHolidayType] = useState<HolidayType>('GOVERNMENT');
+  const [newHolidayNote, setNewHolidayNote] = useState('');
+
+  // New Weekend Makeup Day Form State
+  const [newWeekendTitle, setNewWeekendTitle] = useState('');
+  const [newWeekendDate, setNewWeekendDate] = useState('');
+  const [newWeekendDayOfWeek, setNewWeekendDayOfWeek] = useState<DayOfWeek>('SATURDAY');
+  const [newWeekendReason, setNewWeekendReason] = useState('');
+  const [newWeekendTarget, setNewWeekendTarget] = useState('ทุกระดับชั้น (ม.1 - ม.6)');
+  const [newWeekendSubDate, setNewWeekendSubDate] = useState('');
+  const [newWeekendPeriods, setNewWeekendPeriods] = useState<number>(6);
+
+  useEffect(() => {
+    const handleCalendarChange = () => {
+      setCalendarConfig(academicCalendarService.getConfig());
+    };
+    window.addEventListener(ACADEMIC_CALENDAR_EVENT, handleCalendarChange);
+    return () => window.removeEventListener(ACADEMIC_CALENDAR_EVENT, handleCalendarChange);
+  }, []);
 
   useEffect(() => {
     const onBannersChange = () => setStudentBanners(studentBannerService.getBanners());
@@ -285,6 +349,118 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
     }
   };
 
+  const handleSwitchActiveTerm = (termId: string) => {
+    const target = academicCalendarService.setActiveTerm(termId);
+    if (target) {
+      setCalendarConfig(academicCalendarService.getConfig());
+      showToast(`สลับใช้งานเป็น ${target.termName}/${target.year} เรียบร้อยแล้ว`);
+    }
+  };
+
+  const handleCreateTermSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTermYear || !newTermStartDate.trim() || !newTermEndDate.trim()) return;
+    academicCalendarService.createTerm({
+      year: newTermYear,
+      semesterNo: newTermSemester,
+      startDate: newTermStartDate.trim(),
+      endDate: newTermEndDate.trim(),
+      note: newTermNote.trim() || undefined,
+    });
+    setCalendarConfig(academicCalendarService.getConfig());
+    setIsCreateTermModalOpen(false);
+    showToast(`สร้างภาคเรียนที่ ${newTermSemester}/${newTermYear} เรียบร้อยแล้ว`);
+  };
+
+  const handleUpdateTermDatesSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTerm) return;
+    academicCalendarService.updateTerm(editingTerm.id, {
+      startDate: editingTerm.startDate,
+      endDate: editingTerm.endDate,
+      note: editingTerm.note,
+    });
+    setCalendarConfig(academicCalendarService.getConfig());
+    setEditingTerm(null);
+    showToast(`อัปเดตวันเปิด-ปิดเทอมของ ${editingTerm.termName}/${editingTerm.year} เรียบร้อยแล้ว`);
+  };
+
+  const handleDeleteTerm = (id: string, name: string) => {
+    if (confirm(`คุณต้องการลบ ${name} ใช่หรือไม่?`)) {
+      const ok = academicCalendarService.deleteTerm(id);
+      if (ok) {
+        setCalendarConfig(academicCalendarService.getConfig());
+        showToast(`ลบ ${name} เรียบร้อยแล้ว`);
+      } else {
+        showToast('ไม่สามารถลบภาคเรียนที่กำลังเปิดใช้งาน (Active) อยู่ได้');
+      }
+    }
+  };
+
+  const handleAddHolidaySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newHolidayName.trim() || !newHolidayDate.trim()) return;
+    academicCalendarService.addHoliday({
+      name: newHolidayName.trim(),
+      date: newHolidayDate.trim(),
+      type: newHolidayType,
+      note: newHolidayNote.trim() || undefined,
+    });
+    setCalendarConfig(academicCalendarService.getConfig());
+    setIsAddHolidayModalOpen(false);
+    setNewHolidayName('');
+    setNewHolidayDate('');
+    setNewHolidayNote('');
+    showToast('เพิ่มวันหยุดพิเศษเรียบร้อยแล้ว');
+  };
+
+  const handleToggleHoliday = (id: string) => {
+    academicCalendarService.toggleHoliday(id);
+    setCalendarConfig(academicCalendarService.getConfig());
+  };
+
+  const handleDeleteHoliday = (id: string, name: string) => {
+    if (confirm(`คุณต้องการลบวันหยุด "${name}" ใช่หรือไม่?`)) {
+      academicCalendarService.deleteHoliday(id);
+      setCalendarConfig(academicCalendarService.getConfig());
+      showToast(`ลบวันหยุด "${name}" เรียบร้อยแล้ว`);
+    }
+  };
+
+  const handleAddWeekendMakeupSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newWeekendTitle.trim() || !newWeekendDate.trim() || !newWeekendReason.trim()) return;
+    academicCalendarService.addWeekendMakeupDay({
+      title: newWeekendTitle.trim(),
+      date: newWeekendDate.trim(),
+      dayOfWeek: newWeekendDayOfWeek,
+      reason: newWeekendReason.trim(),
+      targetClasses: newWeekendTarget.trim(),
+      substituteForDate: newWeekendSubDate.trim() || undefined,
+      periodCount: newWeekendPeriods,
+    });
+    setCalendarConfig(academicCalendarService.getConfig());
+    setIsAddWeekendModalOpen(false);
+    setNewWeekendTitle('');
+    setNewWeekendDate('');
+    setNewWeekendReason('');
+    setNewWeekendSubDate('');
+    showToast('เพิ่มวันมาเรียนพิเศษ (เสาร์-อาทิตย์) เรียบร้อยแล้ว');
+  };
+
+  const handleToggleWeekendMakeup = (id: string) => {
+    academicCalendarService.toggleWeekendMakeupDay(id);
+    setCalendarConfig(academicCalendarService.getConfig());
+  };
+
+  const handleDeleteWeekendMakeup = (id: string, name: string) => {
+    if (confirm(`คุณต้องการลบวันมาเรียนพิเศษ "${name}" ใช่หรือไม่?`)) {
+      academicCalendarService.deleteWeekendMakeupDay(id);
+      setCalendarConfig(academicCalendarService.getConfig());
+      showToast(`ลบวันมาเรียนพิเศษเรียบร้อยแล้ว`);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in font-sans text-slate-800 select-none">
       {toastMsg && (
@@ -342,7 +518,362 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         </div>
       </div>
 
+      {/* 4-Section Settings Navigation Tab Bar */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+        {[
+          {
+            key: 'CALENDAR',
+            label: '1. ปีการศึกษา & ปฏิทินกำหนดการ (เปิด-ปิดเทอม / วันหยุด / เรียนพิเศษ)',
+            icon: CalendarDays,
+          },
+          {
+            key: 'BRANDING',
+            label: '2. ข้อมูลโรงเรียน & อัตลักษณ์',
+            icon: Settings,
+          },
+          {
+            key: 'STORAGE',
+            label: '3. พื้นที่ Cloudflare R2 & สำรองข้อมูล',
+            icon: Database,
+          },
+          {
+            key: 'BANNERS',
+            label: '4. จัดการภาพแบนเนอร์',
+            icon: ImageIcon,
+          },
+        ].map((tab) => {
+          const IconComp = tab.icon;
+          const isActive = activeSettingsTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveSettingsTab(tab.key as any)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all whitespace-nowrap cursor-pointer ${
+                isActive
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+              }`}
+            >
+              <IconComp className="w-4 h-4" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* TAB 1: ปีการศึกษา, ภาคเรียน, วันเปิด-ปิดเทอม, วันหยุดพิเศษ, และวันมาเรียนพิเศษ เสาร์-อาทิตย์ */}
+      {activeSettingsTab === 'CALENDAR' && (
+        <div className="space-y-6">
+          {/* Part 1.1: Academic Year and Terms Management */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-50 text-blue-700 rounded-xl">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-bold text-slate-900">
+                      การตั้งค่าปีการศึกษา & ภาคเรียน (Academic Terms Management)
+                    </h2>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">
+                      ย้ายมาจากปฏิทินกิจกรรม
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    กำหนดปี พ.ศ. สลับภาคเรียนปัจจุบัน (Active) และตั้งค่าวันเปิดเทอม - วันปิดเทอมของโรงเรียน
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsCreateTermModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ สร้างปีการศึกษา/ภาคเรียนใหม่</span>
+              </button>
+            </div>
+
+            {/* Terms List Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {calendarConfig.terms.map((term) => (
+                <div
+                  key={term.id}
+                  className={`rounded-2xl border p-4.5 space-y-3 transition-all ${
+                    term.isActive
+                      ? 'border-2 border-emerald-500 bg-emerald-50/20 shadow-xs'
+                      : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-base font-extrabold text-slate-900">
+                          {term.termName}/{term.year}
+                        </span>
+                        {term.isActive && (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        ID: {term.id}
+                      </span>
+                    </div>
+
+                    {!term.isActive && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTerm(term.id, `${term.termName}/${term.year}`)}
+                        className="text-slate-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 transition-colors"
+                        title="ลบภาคเรียนนี้"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100 text-xs space-y-1.5">
+                    <div className="flex justify-between items-center text-slate-600">
+                      <span className="text-slate-400">วันเปิดเทอม:</span>
+                      <strong className="text-slate-800">{term.startDate}</strong>
+                    </div>
+                    <div className="flex justify-between items-center text-slate-600">
+                      <span className="text-slate-400">วันปิดเทอม:</span>
+                      <strong className="text-slate-800">{term.endDate}</strong>
+                    </div>
+                    <div className="flex justify-between items-center text-slate-600 pt-1 border-t border-slate-200/60">
+                      <span className="text-slate-400">นักเรียน / ห้อง:</span>
+                      <span>{term.studentCount} คน • {term.classCount} ห้อง</span>
+                    </div>
+                  </div>
+
+                  {term.note && (
+                    <p className="text-[11px] text-slate-500 italic line-clamp-1">
+                      {term.note}
+                    </p>
+                  )}
+
+                  <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                    {!term.isActive ? (
+                      <button
+                        type="button"
+                        onClick={() => handleSwitchActiveTerm(term.id)}
+                        className="flex-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition-colors text-center cursor-pointer"
+                      >
+                        สลับเป็นภาคเรียนปัจจุบัน
+                      </button>
+                    ) : (
+                      <span className="flex-1 py-1.5 text-center text-[11px] font-bold text-emerald-700 bg-emerald-50 rounded-xl">
+                        กำลังเปิดสอนในระบบ
+                      </span>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => setEditingTerm(term)}
+                      className="px-2.5 py-1.5 border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                      title="แก้ไขวันเปิด-ปิดเทอม"
+                    >
+                      <Edit2 className="w-3 h-3 text-slate-500" />
+                      <span>แก้ไข</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Part 1.2: Special Holidays Management */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-50 text-amber-700 rounded-xl">
+                  <Sun className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">
+                    วันหยุดพิเศษ (Special Holidays & School Observance Days)
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    วันหยุดราชการ วันหยุดกรณีพิเศษของโรงเรียน และวันหยุดชดเชยตามประกาศ สพฐ.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAddHolidayModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ เพิ่มวันหยุดพิเศษ</span>
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 text-slate-400 font-medium">
+                    <th className="py-2.5 px-3">ชื่อวันหยุดพิเศษ</th>
+                    <th className="py-2.5 px-3 w-32">วันที่</th>
+                    <th className="py-2.5 px-3 w-40">ประเภท</th>
+                    <th className="py-2.5 px-3">หมายเหตุ / ประกาศ</th>
+                    <th className="py-2.5 px-3 w-28 text-center">สถานะ</th>
+                    <th className="py-2.5 px-3 w-20 text-right">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {calendarConfig.holidays.map((hol) => (
+                    <tr key={hol.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3 px-3 font-bold text-slate-800">
+                        {hol.name}
+                      </td>
+                      <td className="py-3 px-3 font-semibold text-blue-600 whitespace-nowrap">
+                        {hol.date}
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                          {hol.typeLabel}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-slate-500 text-[11px]">
+                        {hol.note || '—'}
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleHoliday(hol.id)}
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-colors ${
+                            hol.isActive
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              : 'bg-slate-100 text-slate-400 border border-slate-200'
+                          }`}
+                        >
+                          {hol.isActive ? 'เปิดใช้' : 'ปิดชั่วคราว'}
+                        </button>
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteHoliday(hol.id, hol.name)}
+                          className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          title="ลบวันหยุดนี้"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Part 1.3: Weekend Makeup Days Management */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-50 text-indigo-700 rounded-xl">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">
+                    วันมาเรียนพิเศษ เสาร์-อาทิตย์ (Weekend Makeup School Days)
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    วันเรียนชดเชยเสาร์-อาทิตย์ ค่ายติว O-NET/TGAT และการจัดสอนเสริมตามเกณฑ์เวลาเรียน
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAddWeekendModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ เพิ่มวันมาเรียนพิเศษ</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {calendarConfig.weekendMakeupDays.map((wm) => (
+                <div
+                  key={wm.id}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2.5 hover:border-indigo-200 transition-all shadow-2xs"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <span className="font-extrabold text-slate-900 text-xs line-clamp-1">
+                        {wm.title}
+                      </span>
+                      <div className="flex items-center gap-1.5 text-[11px]">
+                        <span className="font-mono font-bold text-indigo-600">{wm.date}</span>
+                        <span className="px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 font-bold text-[10px]">
+                          {wm.dayOfWeek === 'SATURDAY' ? 'วันเสาร์' : 'วันอาทิตย์'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteWeekendMakeup(wm.id, wm.title)}
+                      className="text-slate-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 transition-colors"
+                      title="ลบวันเรียนพิเศษนี้"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <p className="text-[11px] text-slate-600 line-clamp-2">
+                    {wm.reason}
+                  </p>
+
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-[11px] space-y-1 text-slate-500">
+                    <div className="flex justify-between">
+                      <span>กลุ่มเป้าหมาย:</span>
+                      <strong className="text-slate-700">{wm.targetClasses}</strong>
+                    </div>
+                    {wm.substituteForDate && (
+                      <div className="flex justify-between">
+                        <span>ชดเชยสำหรับ:</span>
+                        <span className="text-indigo-600 font-medium">{wm.substituteForDate}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span>จำนวนคาบสอน:</span>
+                      <strong className="text-slate-700">{wm.periodCount} คาบ</strong>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleWeekendMakeup(wm.id)}
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-colors ${
+                        wm.isActive
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          : 'bg-slate-100 text-slate-400 border border-slate-200'
+                      }`}
+                    >
+                      {wm.isActive ? '✓ เปิดสอนชดเชย' : 'ระงับชั่วคราว'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Section 0: ตั้งค่าระบบจัดการชั้นเรียน (ชื่อระบบ, โลโก้, ฟอนต์, ขนาดอักษร 11px–20px และการดึงเช็คชื่อแถวเช้าเข้าคาบเรียน) */}
+      {activeSettingsTab === 'BRANDING' && (
       <form
         onSubmit={handleSaveBranding}
         className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4"
@@ -591,10 +1122,13 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
           </div>
         </div>
       </form>
+      )}
 
-      {/* Section: จัดการแบนเนอร์หน้านักเรียน 3 ส่วน (สิทธิ์ Admin เป็นผู้อัปโหลดเท่านั้น) */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+      {/* TAB 4: จัดการแบนเนอร์หน้านักเรียน & ครู 3 ส่วน (สิทธิ์ Admin เป็นผู้อัปโหลดเท่านั้น) */}
+      {activeSettingsTab === 'BANNERS' && (
+        <>
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-blue-50 text-blue-700 rounded-xl">
               <ImageIcon className="w-5 h-5" />
@@ -1036,10 +1570,14 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
           </div>
         )}
       </div>
+      </>
+      )}
 
-      {/* Section 1: ภาพรวมการใช้พื้นที่ R2 แยกตามครูผู้สอนแต่ละคน (Per-Teacher Storage Cards) */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+      {/* TAB 3: พื้นที่จัดเก็บไฟล์ Cloudflare R2 & สำรองข้อมูลฐานข้อมูล / SGS Snapshot */}
+      {activeSettingsTab === 'STORAGE' && (
+        <>
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
             <h2 className="text-sm font-bold text-slate-900">
               1. สถานะการใช้พื้นที่ Cloudflare R2 ของครูแต่ละคน & การโอนเก็บเข้า Google Drive โรงเรียน (100 TB Workspace)
@@ -1427,6 +1965,473 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
           </table>
         </div>
       </div>
+      </>
+      )}
+
+      {/* Modal 1: สร้างปีการศึกษา / ภาคเรียนใหม่ */}
+      {isCreateTermModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base">
+                    สร้างปีการศึกษา / ภาคเรียนใหม่
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    กำหนดปี พ.ศ. ภาคเรียน และวันเปิด-ปิดเทอม
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateTermModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateTermSubmit} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    ปีการศึกษา (พ.ศ.) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={2560}
+                    max={2590}
+                    value={newTermYear}
+                    onChange={(e) => setNewTermYear(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    ภาคเรียน <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={newTermSemester}
+                    onChange={(e) => setNewTermSemester(Number(e.target.value) as 1 | 2)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold"
+                  >
+                    <option value={1}>ภาคเรียนที่ 1</option>
+                    <option value={2}>ภาคเรียนที่ 2</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    วันเปิดเทอม <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="เช่น 15 พ.ค. 2570"
+                    value={newTermStartDate}
+                    onChange={(e) => setNewTermStartDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    วันปิดเทอม <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="เช่น 10 ต.ค. 2570"
+                    value={newTermEndDate}
+                    onChange={(e) => setNewTermEndDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  หมายเหตุ / คำอธิบายเพิ่มเติม
+                </label>
+                <input
+                  type="text"
+                  placeholder="เช่น กำหนดการตามประกาศ สพฐ."
+                  value={newTermNote}
+                  onChange={(e) => setNewTermNote(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateTermModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-xs cursor-pointer"
+                >
+                  บันทึกภาคเรียน
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 2: แก้ไขวันเปิด-ปิดเทอม */}
+      {editingTerm && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                  <Edit2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base">
+                    แก้ไขวันเปิด-ปิดเทอม ({editingTerm.termName}/{editingTerm.year})
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    ปรับเปลี่ยนช่วงเวลาทำการเรียนการสอนของภาคเรียนนี้
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingTerm(null)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateTermDatesSubmit} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    วันเปิดเทอม <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingTerm.startDate}
+                    onChange={(e) =>
+                      setEditingTerm({ ...editingTerm, startDate: e.target.value })
+                    }
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    วันปิดเทอม <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingTerm.endDate}
+                    onChange={(e) =>
+                      setEditingTerm({ ...editingTerm, endDate: e.target.value })
+                    }
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  หมายเหตุ
+                </label>
+                <input
+                  type="text"
+                  value={editingTerm.note || ''}
+                  onChange={(e) =>
+                    setEditingTerm({ ...editingTerm, note: e.target.value })
+                  }
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingTerm(null)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-xs cursor-pointer"
+                >
+                  บันทึกการแก้ไข
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 3: เพิ่มวันหยุดพิเศษ */}
+      {isAddHolidayModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-amber-50 text-amber-700 rounded-xl">
+                  <Sun className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base">
+                    เพิ่มวันหยุดพิเศษ
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    วันหยุดราชการ วันหยุดพิเศษโรงเรียน และวันหยุดชดเชย
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddHolidayModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAddHolidaySubmit} className="space-y-3.5 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  ชื่อวันหยุด <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="เช่น วันหยุดพิเศษประจำโรงเรียน"
+                  value={newHolidayName}
+                  onChange={(e) => setNewHolidayName(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    วันที่ <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="เช่น 15 ส.ค. 2569"
+                    value={newHolidayDate}
+                    onChange={(e) => setNewHolidayDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    ประเภทวันหยุด
+                  </label>
+                  <select
+                    value={newHolidayType}
+                    onChange={(e) => setNewHolidayType(e.target.value as HolidayType)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                  >
+                    <option value="GOVERNMENT">วันหยุดราชการ</option>
+                    <option value="SCHOOL_SPECIAL">วันหยุดกรณีพิเศษโรงเรียน</option>
+                    <option value="BRIDGE_DAY">วันหยุดชดเชย/กรณีพิเศษ</option>
+                    <option value="RELIGIOUS">วันสำคัญทางศาสนา</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  หมายเหตุ / คำสั่งโรงเรียน
+                </label>
+                <input
+                  type="text"
+                  placeholder="เช่น ประกาศวันหยุดตามมติคณะกรรมการบริหารสถานศึกษา"
+                  value={newHolidayNote}
+                  onChange={(e) => setNewHolidayNote(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAddHolidayModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-xs cursor-pointer"
+                >
+                  บันทึกวันหยุด
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 4: เพิ่มวันมาเรียนพิเศษ เสาร์-อาทิตย์ */}
+      {isAddWeekendModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-indigo-50 text-indigo-700 rounded-xl">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base">
+                    เพิ่มวันมาเรียนพิเศษ (เสาร์-อาทิตย์)
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    กำหนดวันเรียนชดเชย ค่ายติว หรือกิจกรรมเสริมหลักสูตร
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddWeekendModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAddWeekendMakeupSubmit} className="space-y-3.5 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  หัวข้อวันเรียนพิเศษ <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="เช่น เรียนชดเชยวันเสาร์ (ชดเชยวันหยุดกิจกรรม)"
+                  value={newWeekendTitle}
+                  onChange={(e) => setNewWeekendTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    วันที่ <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="เช่น 19 ก.ย. 2569"
+                    value={newWeekendDate}
+                    onChange={(e) => setNewWeekendDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    วันในสัปดาห์
+                  </label>
+                  <select
+                    value={newWeekendDayOfWeek}
+                    onChange={(e) => setNewWeekendDayOfWeek(e.target.value as DayOfWeek)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                  >
+                    <option value="SATURDAY">วันเสาร์</option>
+                    <option value="SUNDAY">วันอาทิตย์</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  เหตุผล / วัตถุประสงค์ <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="เช่น เรียนชดเชยตามตารางวันศุกร์"
+                  value={newWeekendReason}
+                  onChange={(e) => setNewWeekendReason(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    กลุ่มเป้าหมาย / ระดับชั้น
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="เช่น ทุกระดับชั้น (ม.1 - ม.6)"
+                    value={newWeekendTarget}
+                    onChange={(e) => setNewWeekendTarget(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    จำนวนคาบเรียน
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={newWeekendPeriods}
+                    onChange={(e) => setNewWeekendPeriods(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  ชดเชยสำหรับวันที่ (ถ้ามี)
+                </label>
+                <input
+                  type="text"
+                  placeholder="เช่น วันหยุด 4 ก.ย. 2569"
+                  value={newWeekendSubDate}
+                  onChange={(e) => setNewWeekendSubDate(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAddWeekendModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-xs cursor-pointer"
+                >
+                  บันทึกวันเรียนพิเศษ
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

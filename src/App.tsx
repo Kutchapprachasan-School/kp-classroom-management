@@ -13,6 +13,7 @@ import { LessonPlansView } from './views/LessonPlansView';
 import { ClassroomsRosterView } from './views/ClassroomsRosterView';
 import { TimetableView } from './views/TimetableView';
 import { AcademicTermsView } from './views/AcademicTermsView';
+import { MessagesView } from './views/MessagesView';
 import { SettingsBackupView } from './views/SettingsBackupView';
 import { TrashManagementView } from './views/TrashManagementView';
 import { UserAccountsView } from './views/UserAccountsView';
@@ -134,6 +135,9 @@ export const App: React.FC = () => {
   const [deepLinkAssignmentFilter, setDeepLinkAssignmentFilter] =
     useState<QuickFilterMode>('ALL');
   const [deepLinkBanner, setDeepLinkBanner] = useState<string | null>(null);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<
+    'CALENDAR' | 'BRANDING' | 'STORAGE' | 'BANNERS'
+  >('CALENDAR');
 
   const handleChangeRole = (nextRole: SchoolUserRole) => {
     setActiveRole(nextRole);
@@ -213,7 +217,9 @@ export const App: React.FC = () => {
       case 'timetable':
         return 'ตารางสอน / ภาระงานวันนี้';
       case 'academic-year':
-        return 'ตั้งค่าปีการศึกษา';
+        return 'ปฏิทินกิจกรรมโรงเรียน';
+      case 'messages':
+        return 'ระบบข้อความ & แชทกลุ่มห้องเรียน';
       case 'settings':
         return 'ตั้งค่า & พื้นที่ R2';
       case 'trash':
@@ -594,10 +600,24 @@ export const App: React.FC = () => {
                 />
               )}
 
-              {currentView === 'academic-year' && <AcademicTermsView />}
+              {currentView === 'academic-year' && (
+                <AcademicTermsView
+                  onNavigateToSettings={() => {
+                    setSettingsInitialTab('CALENDAR');
+                    setCurrentView('settings');
+                  }}
+                />
+              )}
+
+              {currentView === 'messages' && (
+                <MessagesView activeRole={activeRole} />
+              )}
 
               {currentView === 'settings' && (
-                <SettingsBackupView activeRole={activeRole} />
+                <SettingsBackupView
+                  activeRole={activeRole}
+                  initialTab={settingsInitialTab}
+                />
               )}
 
               {currentView === 'trash' && <TrashManagementView />}
@@ -679,9 +699,9 @@ export const App: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => setCurrentView('student-affairs')}
+                onClick={() => setCurrentView('messages')}
                 className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer relative ${
-                  currentView === 'student-affairs'
+                  currentView === 'messages'
                     ? 'text-blue-600 bg-blue-50/80'
                     : 'text-slate-500 hover:text-slate-900'
                 }`}
@@ -689,7 +709,7 @@ export const App: React.FC = () => {
                 <div className="relative">
                   <MessageSquare
                     className={`w-4 h-4 mb-0.5 ${
-                      currentView === 'student-affairs'
+                      currentView === 'messages'
                         ? 'text-blue-600 stroke-[2.5]'
                         : 'text-slate-500'
                     }`}
