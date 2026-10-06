@@ -494,6 +494,13 @@ export const studentAffairsCouncilService = {
     return updated;
   },
 
+  approveStudentLeave(
+    id: string,
+    status: StudentLeaveRequest['status']
+  ): StudentLeaveRequest[] {
+    return this.updateStudentLeaveStatus(id, status);
+  },
+
   approveAllPendingLeaves(classroomFilter?: string): StudentLeaveRequest[] {
     const leaves = this.getStudentLeaves();
     const pendingToApprove = leaves.filter(

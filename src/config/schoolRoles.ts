@@ -47,6 +47,10 @@ export interface SchoolBrandingSettings {
   baseFontSizePx: number;
   morningToClassSyncMode: MorningToClassSyncMode;
   motto?: string;
+  vision?: string;
+  mission?: string;
+  postalCode?: string;
+  phoneNumber?: string;
 }
 
 export interface SmsUserAccount {
@@ -118,7 +122,11 @@ export const KUTCHAP_SCHOOL_INFO: SchoolBrandingSettings = {
   fontFamily: 'Prompt',
   baseFontSizePx: 15,
   morningToClassSyncMode: 'AUTO_PREFILL',
-  motto: 'ครูมืออาชีพ สร้างโอกาส พัฒนานักเรียนสู่อนาคต',
+  motto: 'ร่วมสร้างโอกาส พัฒนาผู้เรียน สู่อนาคตที่ดีกว่า',
+  vision: 'มุ่งมั่นพัฒนาผู้เรียนให้มีความรู้ คู่คุณธรรม ก้าวทันเทคโนโลยี มีทักษะในศตวรรษที่ 21',
+  mission: 'ส่งเสริมการจัดการเรียนรู้เชิงรุก (Active Learning) พัฒนาระบบดิจิทัลเพื่อการศึกษา และสร้างเสริมสุขภาวะที่ดีของผู้เรียน',
+  postalCode: '41280',
+  phoneNumber: '042-298-123',
 };
 
 const SCHOOL_SETTINGS_STORAGE_KEY = 'kps_school_branding_settings_v1';

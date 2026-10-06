@@ -17,7 +17,23 @@ import {
   Clock,
   Sun,
   Edit2,
+  School,
+  FileCheck,
+  AlertCircle,
+  Save,
+  FileText,
+  Users,
+  X,
 } from 'lucide-react';
+import {
+  schoolLeaveSettingsService,
+  SCHOOL_LEAVE_SETTINGS_EVENT,
+  type SchoolLeaveSettings,
+} from '../services/schoolLeaveSettingsService';
+import {
+  studentAffairsCouncilService,
+  type StudentLeaveRequest,
+} from '../services/studentAffairsCouncilService';
 import { sgsExportService, type SgsSnapshotRecord } from '../services/sgsExportService';
 import {
   sgsRosterAndSubmissionService,
@@ -92,11 +108,44 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
     'CALENDAR' | 'BRANDING' | 'STORAGE' | 'BANNERS'
   >(initialTab);
 
+  // Sub-tab for Separated School Basic Info vs Leave System
+  const [brandingSubTab, setBrandingSubTab] = useState<'SCHOOL_INFO' | 'LEAVE_SYSTEM'>('SCHOOL_INFO');
+  const [leaveSettings, setLeaveSettings] = useState<SchoolLeaveSettings>(() =>
+    schoolLeaveSettingsService.getSettings()
+  );
+  const [studentLeaves, setStudentLeaves] = useState<StudentLeaveRequest[]>(() =>
+    studentAffairsCouncilService.getStudentLeaves()
+  );
+
+  // New Custom Quota Form State
+  const [isAddQuotaModalOpen, setIsAddQuotaModalOpen] = useState(false);
+  const [newQuotaName, setNewQuotaName] = useState('');
+  const [newQuotaDays, setNewQuotaDays] = useState<number>(5);
+  const [newQuotaDesc, setNewQuotaDesc] = useState('');
+  const [newQuotaRequiresCert, setNewQuotaRequiresCert] = useState(false);
+  const [newQuotaCertDays, setNewQuotaCertDays] = useState<number>(3);
+  const [newQuotaNoticeDays, setNewQuotaNoticeDays] = useState<number>(1);
+  const [newQuotaColor, setNewQuotaColor] = useState('bg-indigo-50 text-indigo-700 border-indigo-200');
+
   useEffect(() => {
     if (initialTab) {
-      setActiveSettingsTab(initialTab);
+      if ((initialTab as string) === 'LEAVE' || (initialTab as string) === 'LEAVE_SYSTEM') {
+        setActiveSettingsTab('BRANDING');
+        setBrandingSubTab('LEAVE_SYSTEM');
+      } else {
+        setActiveSettingsTab(initialTab);
+      }
     }
   }, [initialTab]);
+
+  useEffect(() => {
+    const onLeaveChange = () => {
+      setLeaveSettings(schoolLeaveSettingsService.getSettings());
+      setStudentLeaves(studentAffairsCouncilService.getStudentLeaves());
+    };
+    window.addEventListener(SCHOOL_LEAVE_SETTINGS_EVENT, onLeaveChange);
+    return () => window.removeEventListener(SCHOOL_LEAVE_SETTINGS_EVENT, onLeaveChange);
+  }, []);
 
   // Modals for Term, Holiday, Weekend
   const [isCreateTermModalOpen, setIsCreateTermModalOpen] = useState(false);
@@ -227,6 +276,45 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
     const updated = saveSchoolSettings(schoolSettings);
     setSchoolSettings(updated);
     showToast('บันทึกข้อมูลโรงเรียน โลโก้ และการเชื่อมระบบ SMS เรียบร้อยแล้ว');
+  };
+
+  const handleSaveLeaveSettings = (e?: React.FormEvent | React.MouseEvent) => {
+    if (e && 'preventDefault' in e) e.preventDefault();
+    schoolLeaveSettingsService.saveSettings(leaveSettings);
+    showToast('บันทึกการตั้งค่าระบบการลา & โควตาวันลาเรียบร้อยแล้ว');
+  };
+
+  const handleAddCustomQuotaSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newQuotaName.trim()) return;
+    const updated = schoolLeaveSettingsService.addQuota({
+      name: newQuotaName.trim(),
+      quotaDays: Math.max(0, Number(newQuotaDays) || 0),
+      description: newQuotaDesc.trim() || 'ประเภทการลาเพิ่มเติมที่กำหนดโดยสถานศึกษา',
+      requiresMedicalCertificate: newQuotaRequiresCert,
+      medicalCertMinDays: Math.max(1, Number(newQuotaCertDays) || 1),
+      advanceNoticeDays: Math.max(0, Number(newQuotaNoticeDays) || 0),
+      color: newQuotaColor,
+    });
+    setLeaveSettings(updated);
+    setIsAddQuotaModalOpen(false);
+    setNewQuotaName('');
+    setNewQuotaDesc('');
+    showToast(`เพิ่มประเภทโควตาวันลา "${newQuotaName.trim()}" เรียบร้อยแล้ว`);
+  };
+
+  const handleResetLeaveSettings = () => {
+    if (confirm('คุณต้องการคืนค่าเริ่มต้นระบบการลาและโควตาวันลาใช่หรือไม่?')) {
+      const def = schoolLeaveSettingsService.resetToDefault();
+      setLeaveSettings(def);
+      showToast('คืนค่าเริ่มต้นระบบการลาเรียบร้อยแล้ว');
+    }
+  };
+
+  const handleApproveStudentLeaveAction = (id: string, status: 'APPROVED' | 'REJECTED') => {
+    const updated = studentAffairsCouncilService.approveStudentLeave(id, status);
+    setStudentLeaves(updated);
+    showToast(status === 'APPROVED' ? 'อนุมัติใบลาเรียบร้อยแล้ว (ซิงค์สถานะเข้าคาบเรียน)' : 'ปฏิเสธคำขอลาเรียบร้อย');
   };
 
   const handleUploadLogoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -872,256 +960,882 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         </div>
       )}
 
-      {/* Section 0: ตั้งค่าระบบจัดการชั้นเรียน (ชื่อระบบ, โลโก้, ฟอนต์, ขนาดอักษร 11px–20px และการดึงเช็คชื่อแถวเช้าเข้าคาบเรียน) */}
+      {/* TAB 2: ข้อมูลพื้นฐานโรงเรียน & ระบบการลา / วันลา (แยกปรับแต่งได้ตามใจ) */}
       {activeSettingsTab === 'BRANDING' && (
-      <form
-        onSubmit={handleSaveBranding}
-        className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-3">
-            <img
-              src={schoolSettings.logoUrl}
-              alt={schoolSettings.nameTh}
-              className="w-12 h-12 rounded-xl border border-slate-200 p-1 object-contain bg-white shadow-2xs"
-            />
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">
-                ตั้งค่าระบบจัดการชั้นเรียน • ชื่อระบบ โลโก้ ฟอนต์ (11px–20px) & รูปแบบการเช็คชื่อ
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                ปรับแต่งชื่อระบบ โลโก้ ฟอนต์ ขนาดตัวอักษร (ต่ำสุด 11px ไม่เกิน 20px) และรูปแบบการดึงสถานะเช็คชื่อแถวเช้าเข้าคาบเรียน
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
+        <div className="space-y-4">
+          {/* Sub-tab Navigation Switcher: ข้อมูลพื้นฐานโรงเรียน vs ระบบการลา */}
+          <div className="bg-slate-100 p-1.5 rounded-2xl flex flex-col sm:flex-row items-center gap-2 border border-slate-200">
             <button
               type="button"
-              onClick={() => {
-                const def = resetSchoolSettingsToDefault();
-                setSchoolSettings(def);
-                showToast('คืนค่าเริ่มต้น โรงเรียนกุดจับประชาสรรค์ เรียบร้อยแล้ว');
-              }}
-              className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-600 cursor-pointer"
+              onClick={() => setBrandingSubTab('SCHOOL_INFO')}
+              className={`w-full sm:flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                brandingSubTab === 'SCHOOL_INFO'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 bg-transparent hover:bg-slate-200/60'
+              }`}
             >
-              คืนค่าเริ่มต้น
+              <School className="w-4 h-4" />
+              <span>1. ข้อมูลพื้นฐานโรงเรียน & อัตลักษณ์ (School Identity)</span>
             </button>
             <button
-              type="submit"
-              className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs cursor-pointer"
+              type="button"
+              onClick={() => setBrandingSubTab('LEAVE_SYSTEM')}
+              className={`w-full sm:flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                brandingSubTab === 'LEAVE_SYSTEM'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 bg-transparent hover:bg-slate-200/60'
+              }`}
             >
-              บันทึกการตั้งค่าระบบ
+              <FileCheck className="w-4 h-4" />
+              <span>2. ระบบการลา & โควตาวันลา (แยกปรับแต่งได้ตามใจ)</span>
             </button>
           </div>
-        </div>
 
-        {/* แถวที่ 1: ชื่อระบบจัดการชั้นเรียน, ชื่อโรงเรียน, ชื่อระบบใต้โลโก้, อัปโหลดโลโก้ */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
-          <div>
-            <label className="block font-bold text-slate-700 mb-1">
-              ชื่อระบบจัดการชั้นเรียน
-            </label>
-            <input
-              type="text"
-              value={schoolSettings.classroomSystemTitle}
-              onChange={(e) => {
-                const updated = saveSchoolSettings({
-                  ...schoolSettings,
-                  classroomSystemTitle: e.target.value,
-                });
-                setSchoolSettings(updated);
-              }}
-              placeholder="เช่น ระบบจัดการชั้นเรียน"
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 font-semibold"
-            />
-          </div>
-
-          <div>
-            <label className="block font-bold text-slate-700 mb-1">
-              ชื่อโรงเรียน (แสดงหน้า Login & หัวตาราง)
-            </label>
-            <input
-              type="text"
-              value={schoolSettings.nameTh}
-              onChange={(e) => {
-                const updated = saveSchoolSettings({
-                  ...schoolSettings,
-                  nameTh: e.target.value,
-                });
-                setSchoolSettings(updated);
-              }}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 font-semibold"
-            />
-          </div>
-
-          <div>
-            <label className="block font-bold text-slate-700 mb-1">
-              ชื่อระบบใต้โลโก้หน้า Login (SMS)
-            </label>
-            <input
-              type="text"
-              value={schoolSettings.smsSystemName}
-              onChange={(e) => {
-                const updated = saveSchoolSettings({
-                  ...schoolSettings,
-                  smsSystemName: e.target.value,
-                });
-                setSchoolSettings(updated);
-              }}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 font-semibold"
-            />
-          </div>
-
-          <div>
-            <label className="block font-bold text-slate-700 mb-1">
-              โลโก้โรงเรียน / ระบบ (PNG/JPG/SVG)
-            </label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleUploadLogoFile}
-              className="w-full text-[11px] text-slate-800 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-slate-800 hover:file:bg-slate-200"
-            />
-          </div>
-        </div>
-
-        {/* แถวที่ 2: ฟอนต์ระบบ, ขนาดตัวอักษร (11px – 20px), และตัวเลือกการเช็คชื่อคาบเรียนต่อจากแถวเช้า (Q2) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-2 border-t border-slate-100 text-xs">
-          {/* 1. เลือกฟอนต์ของระบบ */}
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
-            <label className="block font-bold text-slate-800">
-              1. ฟอนต์หลักของระบบจัดการชั้นเรียน (Font Family)
-            </label>
-            <select
-              value={schoolSettings.fontFamily}
-              onChange={(e) => {
-                const nextFont = e.target.value as SchoolBrandingSettings['fontFamily'];
-                const updated = saveSchoolSettings({
-                  ...schoolSettings,
-                  fontFamily: nextFont,
-                });
-                setSchoolSettings(updated);
-                showToast(`เปลี่ยนฟอนต์ระบบเป็น "${nextFont}" เรียบร้อยแล้ว`);
-              }}
-              className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-slate-900 font-bold cursor-pointer"
+          {/* SUB-TAB 1: ข้อมูลพื้นฐานโรงเรียน & อัตลักษณ์ */}
+          {brandingSubTab === 'SCHOOL_INFO' && (
+            <form
+              onSubmit={handleSaveBranding}
+              className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-5"
             >
-              <option value="Sarabun">Sarabun (สารบรรณ — อ่านง่าย มาตรฐานราชการไทย)</option>
-              <option value="Prompt">Prompt (พร้อมท์ — ทันสมัย คมชัดบนมือถือ)</option>
-              <option value="Kanit">Kanit (คณิต — หัวข้อชัดเจน สบายตา)</option>
-              <option value="Noto Sans Thai">Noto Sans Thai (โนโตะ — มาตรฐาน Google)</option>
-              <option value="IBM Plex Sans Thai">IBM Plex Sans Thai (โมเดิร์น อ่านตารางตัวเลขง่าย)</option>
-            </select>
-          </div>
-
-          {/* 2. ขนาดตัวอักษร 11px – 20px */}
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="font-bold text-slate-800">
-                2. ขนาดตัวอักษรระบบ (ต่ำสุด 11px – ไม่เกิน 20px)
-              </label>
-              <span className="px-2 py-0.5 rounded-lg bg-teal-600 text-white font-extrabold text-xs">
-                {schoolSettings.baseFontSizePx}px
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold text-slate-500">11px</span>
-              <input
-                type="range"
-                min={11}
-                max={20}
-                step={1}
-                value={schoolSettings.baseFontSizePx}
-                onChange={(e) => {
-                  const nextPx = Math.min(20, Math.max(11, Number(e.target.value) || 15));
-                  const updated = saveSchoolSettings({
-                    ...schoolSettings,
-                    baseFontSizePx: nextPx,
-                  });
-                  setSchoolSettings(updated);
-                }}
-                className="w-full accent-teal-600 cursor-pointer"
-              />
-              <span className="text-[11px] font-bold text-slate-500">20px</span>
-            </div>
-
-            <div className="flex flex-wrap gap-1 pt-0.5">
-              {[11, 13, 15, 17, 20].map((px) => (
-                <button
-                  key={px}
-                  type="button"
-                  onClick={() => {
-                    const updated = saveSchoolSettings({
-                      ...schoolSettings,
-                      baseFontSizePx: px,
-                    });
-                    setSchoolSettings(updated);
-                    showToast(`ปรับขนาดตัวอักษรเป็น ${px}px (อยู่ในเกณฑ์ 11px–20px)`);
-                  }}
-                  className={`px-2 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
-                    schoolSettings.baseFontSizePx === px
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  {px}px {px === 15 ? '(แนะนำ)' : ''}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 3. รูปแบบการดึงเช็คชื่อแถวเช้าเข้าคาบเรียน (Q2 Option) */}
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
-            <label className="block font-bold text-slate-800">
-              3. การเช็คชื่อเข้าเรียนรายคาบ (เชื่อมกับแถวเช้า 07:45 น.)
-            </label>
-            <div className="grid grid-cols-1 gap-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  const updated = saveSchoolSettings({
-                    ...schoolSettings,
-                    morningToClassSyncMode: 'AUTO_PREFILL',
-                  });
-                  setSchoolSettings(updated);
-                  showToast('ตั้งค่า: ดึงสถานะจากแถวเช้ามากรอกให้อัตโนมัติ (ครูแก้ไขทับได้)');
-                }}
-                className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
-                  schoolSettings.morningToClassSyncMode === 'AUTO_PREFILL'
-                    ? 'bg-teal-600 text-white border-teal-700 shadow-2xs'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                <div className="font-bold">
-                  ✓ ให้กรอกต่อจากแถวเช้าเลย (Auto Pre-fill + แก้ทับได้)
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={schoolSettings.logoUrl}
+                    alt={schoolSettings.nameTh}
+                    className="w-12 h-12 rounded-xl border border-slate-200 p-1 object-contain bg-white shadow-2xs"
+                  />
+                  <div>
+                    <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <span>ตั้งค่าข้อมูลพื้นฐานโรงเรียน & อัตลักษณ์สถานศึกษา</span>
+                      <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full">
+                        สพม.อุดรธานี
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      กำหนดชื่อโรงเรียน ตราประจำโรงเรียน ที่อยู่ สังกัด คำขวัญ พันธกิจ และฟอนต์ระบบ (แยกอิสระจากระบบการลา)
+                    </p>
+                  </div>
                 </div>
-              </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  const updated = saveSchoolSettings({
-                    ...schoolSettings,
-                    morningToClassSyncMode: 'MANUAL_FRESH',
-                  });
-                  setSchoolSettings(updated);
-                  showToast('ตั้งค่า: ให้ครูประจำวิชากรอกเช็คชื่อใหม่ทุกคาบเรียน');
-                }}
-                className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
-                  schoolSettings.morningToClassSyncMode === 'MANUAL_FRESH'
-                    ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                <div className="font-bold">
-                  ✎ ให้กรอกใหม่ทุกคาบเรียน (ไม่ดึงผลแถวเช้ามาเติมล่วงหน้า)
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const def = resetSchoolSettingsToDefault();
+                      setSchoolSettings(def);
+                      showToast('คืนค่าเริ่มต้นข้อมูลโรงเรียนเรียบร้อยแล้ว');
+                    }}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-600 cursor-pointer"
+                  >
+                    คืนค่าเริ่มต้น
+                  </button>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs cursor-pointer"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>บันทึกข้อมูลโรงเรียน</span>
+                  </button>
                 </div>
-              </button>
+              </div>
+
+              {/* ส่วนที่ 1: ข้อมูลทั่วไปของโรงเรียน */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                  <School className="w-3.5 h-3.5 text-blue-600" />
+                  <span>1.1 ข้อมูลทั่วไป & สังกัดสถานศึกษา</span>
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 text-xs">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      ชื่อโรงเรียน (ภาษาไทย)
+                    </label>
+                    <input
+                      type="text"
+                      value={schoolSettings.nameTh}
+                      onChange={(e) => {
+                        const updated = saveSchoolSettings({
+                          ...schoolSettings,
+                          nameTh: e.target.value,
+                        });
+                        setSchoolSettings(updated);
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 font-semibold focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      ชื่อโรงเรียน (ภาษาอังกฤษ)
+                    </label>
+                    <input
+                      type="text"
+                      value={schoolSettings.nameEn || 'Kutchapprachasan School'}
+                      onChange={(e) => {
+                        const updated = saveSchoolSettings({
+                          ...schoolSettings,
+                          nameEn: e.target.value,
+                        });
+                        setSchoolSettings(updated);
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 font-semibold focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      รหัสย่อ / สังกัด สพม.
+                    </label>
+                    <input
+                      type="text"
+                      value={schoolSettings.shortCode}
+                      onChange={(e) => {
+                        const updated = saveSchoolSettings({
+                          ...schoolSettings,
+                          shortCode: e.target.value,
+                        });
+                        setSchoolSettings(updated);
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 font-semibold focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      ที่อยู่ / ตำบล อำเภอ จังหวัด
+                    </label>
+                    <input
+                      type="text"
+                      value={schoolSettings.districtProvince}
+                      onChange={(e) => {
+                        const updated = saveSchoolSettings({
+                          ...schoolSettings,
+                          districtProvince: e.target.value,
+                        });
+                        setSchoolSettings(updated);
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 font-semibold focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      รหัสไปรษณีย์
+                    </label>
+                    <input
+                      type="text"
+                      value={schoolSettings.postalCode || '41280'}
+                      onChange={(e) => {
+                        const updated = saveSchoolSettings({
+                          ...schoolSettings,
+                          postalCode: e.target.value,
+                        });
+                        setSchoolSettings(updated);
+                      }}
+                      placeholder="เช่น 41280"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 font-semibold focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      หมายเลขโทรศัพท์โรงเรียน
+                    </label>
+                    <input
+                      type="text"
+                      value={schoolSettings.phoneNumber || '042-298-123'}
+                      onChange={(e) => {
+                        const updated = saveSchoolSettings({
+                          ...schoolSettings,
+                          phoneNumber: e.target.value,
+                        });
+                        setSchoolSettings(updated);
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 font-semibold focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      ชื่อระบบจัดการชั้นเรียน
+                    </label>
+                    <input
+                      type="text"
+                      value={schoolSettings.classroomSystemTitle}
+                      onChange={(e) => {
+                        const updated = saveSchoolSettings({
+                          ...schoolSettings,
+                          classroomSystemTitle: e.target.value,
+                        });
+                        setSchoolSettings(updated);
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 font-semibold focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      ชื่อระบบใต้โลโก้หน้า Login (SMS)
+                    </label>
+                    <input
+                      type="text"
+                      value={schoolSettings.smsSystemName}
+                      onChange={(e) => {
+                        const updated = saveSchoolSettings({
+                          ...schoolSettings,
+                          smsSystemName: e.target.value,
+                        });
+                        setSchoolSettings(updated);
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 font-semibold focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      อัปโหลดตรา / โลโก้โรงเรียน (PNG/SVG)
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleUploadLogoFile}
+                      className="w-full text-[11px] text-slate-800 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-slate-800 hover:file:bg-slate-200"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* ส่วนที่ 2: อัตลักษณ์ คำขวัญ วิสัยทัศน์ และพันธกิจ */}
+              <div className="space-y-3 pt-3 border-t border-slate-100">
+                <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                  <Sun className="w-3.5 h-3.5 text-amber-500" />
+                  <span>1.2 อัตลักษณ์ คำขวัญ วิสัยทัศน์ & พันธกิจ</span>
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 text-xs">
+                  <div className="md:col-span-1">
+                    <label className="block font-bold text-slate-700 mb-1">
+                      คำขวัญโรงเรียน (Motto)
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={schoolSettings.motto || 'ร่วมสร้างโอกาส พัฒนาผู้เรียน สู่อนาคตที่ดีกว่า'}
+                      onChange={(e) => {
+                        const updated = saveSchoolSettings({
+                          ...schoolSettings,
+                          motto: e.target.value,
+                        });
+                        setSchoolSettings(updated);
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 font-semibold focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="md:col-span-1">
+                    <label className="block font-bold text-slate-700 mb-1">
+                      วิสัยทัศน์ (Vision)
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={schoolSettings.vision || 'มุ่งมั่นพัฒนาผู้เรียนให้มีความรู้ คู่คุณธรรม ก้าวทันเทคโนโลยี'}
+                      onChange={(e) => {
+                        const updated = saveSchoolSettings({
+                          ...schoolSettings,
+                          vision: e.target.value,
+                        });
+                        setSchoolSettings(updated);
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 font-semibold focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="md:col-span-1">
+                    <label className="block font-bold text-slate-700 mb-1">
+                      พันธกิจ (Mission)
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={schoolSettings.mission || 'ส่งเสริมการจัดการเรียนรู้เชิงรุก และพัฒนาระบบดิจิทัลเพื่อการศึกษา'}
+                      onChange={(e) => {
+                        const updated = saveSchoolSettings({
+                          ...schoolSettings,
+                          mission: e.target.value,
+                        });
+                        setSchoolSettings(updated);
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 font-semibold focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* ส่วนที่ 3: ฟอนต์ระบบ, ขนาดตัวอักษร (11px – 20px), และตัวเลือกการเช็คชื่อ */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-3 border-t border-slate-100 text-xs">
+                {/* 1. เลือกฟอนต์ของระบบ */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+                  <label className="block font-bold text-slate-800">
+                    ฟอนต์หลักของระบบจัดการชั้นเรียน (Font Family)
+                  </label>
+                  <select
+                    value={schoolSettings.fontFamily}
+                    onChange={(e) => {
+                      const nextFont = e.target.value as SchoolBrandingSettings['fontFamily'];
+                      const updated = saveSchoolSettings({
+                        ...schoolSettings,
+                        fontFamily: nextFont,
+                      });
+                      setSchoolSettings(updated);
+                      showToast(`เปลี่ยนฟอนต์ระบบเป็น "${nextFont}" เรียบร้อยแล้ว`);
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-slate-900 font-bold cursor-pointer"
+                  >
+                    <option value="Prompt">Prompt (พร้อมท์ — ทันสมัย คมชัดบนมือถือ / แนะนำ)</option>
+                    <option value="Sarabun">Sarabun (สารบรรณ — อ่านง่าย มาตรฐานราชการไทย)</option>
+                    <option value="Kanit">Kanit (คณิต — หัวข้อชัดเจน สบายตา)</option>
+                    <option value="Noto Sans Thai">Noto Sans Thai (โนโตะ — มาตรฐาน Google)</option>
+                    <option value="IBM Plex Sans Thai">IBM Plex Sans Thai (โมเดิร์น อ่านตารางตัวเลขง่าย)</option>
+                  </select>
+                </div>
+
+                {/* 2. ขนาดตัวอักษร 11px – 20px */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-slate-800">
+                      ขนาดตัวอักษรระบบ (ต่ำสุด 11px – ไม่เกิน 20px)
+                    </label>
+                    <span className="px-2 py-0.5 rounded-lg bg-blue-600 text-white font-extrabold text-xs">
+                      {schoolSettings.baseFontSizePx}px
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold text-slate-500">11px</span>
+                    <input
+                      type="range"
+                      min={11}
+                      max={20}
+                      step={1}
+                      value={schoolSettings.baseFontSizePx}
+                      onChange={(e) => {
+                        const nextPx = Math.min(20, Math.max(11, Number(e.target.value) || 15));
+                        const updated = saveSchoolSettings({
+                          ...schoolSettings,
+                          baseFontSizePx: nextPx,
+                        });
+                        setSchoolSettings(updated);
+                      }}
+                      className="w-full accent-blue-600 cursor-pointer"
+                    />
+                    <span className="text-[11px] font-bold text-slate-500">20px</span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1 pt-0.5">
+                    {[11, 13, 15, 17, 20].map((px) => (
+                      <button
+                        key={px}
+                        type="button"
+                        onClick={() => {
+                          const updated = saveSchoolSettings({
+                            ...schoolSettings,
+                            baseFontSizePx: px,
+                          });
+                          setSchoolSettings(updated);
+                          showToast(`ปรับขนาดตัวอักษรเป็น ${px}px`);
+                        }}
+                        className={`px-2 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                          schoolSettings.baseFontSizePx === px
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {px}px {px === 15 ? '(แนะนำ)' : ''}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3. รูปแบบการดึงเช็คชื่อแถวเช้า */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+                  <label className="block font-bold text-slate-800">
+                    การเช็คชื่อเข้าเรียนรายคาบ (เชื่อมกับแถวเช้า 07:45 น.)
+                  </label>
+                  <div className="grid grid-cols-1 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = saveSchoolSettings({
+                          ...schoolSettings,
+                          morningToClassSyncMode: 'AUTO_PREFILL',
+                        });
+                        setSchoolSettings(updated);
+                        showToast('ตั้งค่า: ดึงสถานะจากแถวเช้ามากรอกให้อัตโนมัติ (ครูแก้ไขทับได้)');
+                      }}
+                      className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
+                        schoolSettings.morningToClassSyncMode === 'AUTO_PREFILL'
+                          ? 'bg-blue-600 text-white border-blue-700 shadow-2xs font-bold'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      ✓ ดึงต่อจากแถวเช้า (Auto Pre-fill + แก้ทับได้)
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = saveSchoolSettings({
+                          ...schoolSettings,
+                          morningToClassSyncMode: 'MANUAL_FRESH',
+                        });
+                        setSchoolSettings(updated);
+                        showToast('ตั้งค่า: ให้ครูประจำวิชากรอกเช็คชื่อใหม่ทุกคาบเรียน');
+                      }}
+                      className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
+                        schoolSettings.morningToClassSyncMode === 'MANUAL_FRESH'
+                          ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs font-bold'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      ✎ กรอกใหม่ทุกคาบเรียน (ไม่ดึงผลแถวเช้า)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </form>
+          )}
+
+          {/* SUB-TAB 2: ระบบการลา / โควตาวันลา (แยกปรับแต่งได้ตามใจ) */}
+          {brandingSubTab === 'LEAVE_SYSTEM' && (
+            <div className="space-y-5">
+              {/* Header Box */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
+                    <FileCheck className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                        ตั้งค่าระบบการลา & โควตาวันลา (Leave Management System)
+                      </h2>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-2 py-0.5 rounded-full border border-emerald-300">
+                        แยกปรับแต่งได้ตามใจ
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      กำหนดโควตาวันลาของนักเรียน/ครู เกณฑ์เวลาเรียนขั้นต่ำ การอนุมัติใบลา และเชื่อมโยงกับการเช็คชื่อในชั้นเรียน
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleResetLeaveSettings}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-600 cursor-pointer"
+                  >
+                    คืนค่าเริ่มต้นโควตาวันลา
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveLeaveSettings}
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs cursor-pointer"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>บันทึกการตั้งค่าระบบการลา</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Stat Cards 4 Blocks */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+                {leaveSettings.quotas.map((q) => (
+                  <div
+                    key={q.id}
+                    className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-1 hover:border-blue-300 transition-all"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-600 truncate">{q.name}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${q.color}`}>
+                        โควตา
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-black text-slate-900">{q.quotaDays}</span>
+                      <span className="text-xs text-slate-500 font-medium">วัน/เทอม</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 line-clamp-1">{q.description}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Section A: ปรับแต่งโควตาวันลาแต่ละประเภท */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+                <div className="border-b border-slate-100 pb-3 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-600" />
+                      <span>ปรับแต่งโควตาวันลาและข้อกำหนดรายประเภท (Leave Type Quota Configuration)</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      ปรับเปลี่ยนจำนวนวันโควตา ข้อกำหนดใบรับรองแพทย์ และระยะเวลายื่นล่วงหน้าตามระเบียบของโรงเรียน
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddQuotaModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs cursor-pointer shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ เพิ่มประเภทโควตาวันลาใหม่</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {leaveSettings.quotas.map((quota) => (
+                    <div
+                      key={quota.id}
+                      className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 space-y-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-3 h-3 rounded-full ${quota.id === 'sick' ? 'bg-rose-500' : quota.id === 'personal' ? 'bg-amber-500' : 'bg-blue-500'}`} />
+                          <h4 className="font-extrabold text-sm text-slate-800">{quota.name}</h4>
+                        </div>
+                        {quota.id.startsWith('custom_') ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                              ID: {quota.id}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (confirm(`คุณต้องการลบประเภทโควตา "${quota.name}" ใช่หรือไม่?`)) {
+                                  const updated = schoolLeaveSettingsService.deleteQuota(quota.id);
+                                  setLeaveSettings(updated);
+                                  showToast(`ลบประเภทโควตา "${quota.name}" เรียบร้อยแล้ว`);
+                                }
+                              }}
+                              className="text-slate-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 transition-colors"
+                              title="ลบประเภทโควตานี้"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                            ID: {quota.id}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <label className="block font-bold text-slate-700 mb-1">
+                            โควตาสูงสุด (วัน/เทอม)
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={60}
+                            value={quota.quotaDays}
+                            onChange={(e) => {
+                              const val = Math.max(0, Number(e.target.value) || 0);
+                              setLeaveSettings((prev) => ({
+                                ...prev,
+                                quotas: prev.quotas.map((q) => (q.id === quota.id ? { ...q, quotaDays: val } : q)),
+                              }));
+                            }}
+                            className="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white font-bold text-slate-900"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block font-bold text-slate-700 mb-1">
+                            ยื่นล่วงหน้าอย่างน้อย (วัน)
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={30}
+                            value={quota.advanceNoticeDays}
+                            onChange={(e) => {
+                              const val = Math.max(0, Number(e.target.value) || 0);
+                              setLeaveSettings((prev) => ({
+                                ...prev,
+                                quotas: prev.quotas.map((q) => (q.id === quota.id ? { ...q, advanceNoticeDays: val } : q)),
+                              }));
+                            }}
+                            className="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white font-bold text-slate-900"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200/70 text-xs space-y-2">
+                        <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={quota.requiresMedicalCertificate}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setLeaveSettings((prev) => ({
+                                ...prev,
+                                quotas: prev.quotas.map((q) => (q.id === quota.id ? { ...q, requiresMedicalCertificate: checked } : q)),
+                              }));
+                            }}
+                            className="rounded text-blue-600 focus:ring-blue-500"
+                          />
+                          <span>ต้องแนบใบรับรองแพทย์เมื่อลาติดต่อกัน</span>
+                        </label>
+
+                        {quota.requiresMedicalCertificate && (
+                          <div className="flex items-center gap-2 pl-5 text-[11px] text-slate-600">
+                            <span>หากลาเกินกว่า:</span>
+                            <input
+                              type="number"
+                              min={1}
+                              max={10}
+                              value={quota.medicalCertMinDays}
+                              onChange={(e) => {
+                                const val = Math.max(1, Number(e.target.value) || 3);
+                                setLeaveSettings((prev) => ({
+                                  ...prev,
+                                  quotas: prev.quotas.map((q) => (q.id === quota.id ? { ...q, medicalCertMinDays: val } : q)),
+                                }));
+                              }}
+                              className="w-16 px-2 py-0.5 rounded-lg border border-slate-300 bg-white text-center font-bold"
+                            />
+                            <span>วันขึ้นไป</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Section B: นโยบายการอนุมัติและเกณฑ์เวลาเรียน */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4 text-xs">
+                <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
+                  <AlertCircle className="w-4 h-4 text-amber-500" />
+                  <span>นโยบายการอนุมัติใบลา & เกณฑ์เวลาเรียนขั้นต่ำ (Attendance & Approval Policies)</span>
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* เกณฑ์เวลาเรียนขั้นต่ำ */}
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-slate-800">
+                        เกณฑ์เวลาเรียนขั้นต่ำเพื่อมีสิทธิ์สอบ (%)
+                      </label>
+                      <span className="px-2.5 py-0.5 rounded-lg bg-emerald-600 text-white font-black text-xs">
+                        {leaveSettings.minAttendancePercent}%
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      นักเรียนที่มีเวลาเรียนต่ำกว่าเกณฑ์จะถูกแจ้งเตือนภาวะเสี่ยงติด มส. (ไม่มีสิทธิ์สอบ) อัตโนมัติ
+                    </p>
+                    <input
+                      type="range"
+                      min={60}
+                      max={90}
+                      step={1}
+                      value={leaveSettings.minAttendancePercent}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) || 80;
+                        setLeaveSettings((prev) => ({ ...prev, minAttendancePercent: val }));
+                      }}
+                      className="w-full accent-emerald-600 cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                      <span>60% (ผ่อนปรน)</span>
+                      <span>80% (มาตรฐาน สพฐ.)</span>
+                      <span>90% (เข้มงวด)</span>
+                    </div>
+                  </div>
+
+                  {/* ลำดับขั้นการอนุมัติ */}
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                    <label className="font-bold text-slate-800 block">
+                      ลำดับขั้นการอนุมัติใบลาของนักเรียน
+                    </label>
+                    <select
+                      value={leaveSettings.approvalWorkflow}
+                      onChange={(e) => {
+                        const val = e.target.value as SchoolLeaveSettings['approvalWorkflow'];
+                        setLeaveSettings((prev) => ({ ...prev, approvalWorkflow: val }));
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold text-slate-800 cursor-pointer"
+                    >
+                      <option value="HOMEROOM_THEN_AFFAIRS">
+                        1) ครูที่ปรึกษาตรวจเบื้องต้น → งานกิจการนักเรียนอนุมัติขั้นสุดท้าย (แนะนำ)
+                      </option>
+                      <option value="HOMEROOM_ONLY">
+                        2) ครูที่ปรึกษาประจำชั้นอนุมัติได้ทันที (Homeroom Only)
+                      </option>
+                      <option value="AFFAIRS_ONLY">
+                        3) งานกิจการนักเรียน/ฝ่ายปกครองเป็นผู้อนุมัติโดยตรง (Affairs Only)
+                      </option>
+                    </select>
+                    <p className="text-[11px] text-slate-500">
+                      กำหนดบทบาทที่มีสิทธิ์ตัดสินใจและบันทึกผลการลาในระบบ
+                    </p>
+                  </div>
+                </div>
+
+                {/* สวิตช์เปิด/ปิดฟีเจอร์การลา */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+                  <label className="p-3 rounded-xl border border-slate-200 bg-white flex items-center gap-3 cursor-pointer hover:border-blue-300">
+                    <input
+                      type="checkbox"
+                      checked={leaveSettings.enableOnlineStudentSubmission}
+                      onChange={(e) => {
+                        const val = e.target.checked;
+                        setLeaveSettings((prev) => ({ ...prev, enableOnlineStudentSubmission: val }));
+                      }}
+                      className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                    />
+                    <div>
+                      <strong className="block text-slate-800">ยื่นลาออนไลน์</strong>
+                      <span className="text-[11px] text-slate-500">นักเรียนส่งใบลาผ่านเว็บ/มือถือได้</span>
+                    </div>
+                  </label>
+
+                  <label className="p-3 rounded-xl border border-slate-200 bg-white flex items-center gap-3 cursor-pointer hover:border-blue-300">
+                    <input
+                      type="checkbox"
+                      checked={leaveSettings.enableGuardianSmsNotification}
+                      onChange={(e) => {
+                        const val = e.target.checked;
+                        setLeaveSettings((prev) => ({ ...prev, enableGuardianSmsNotification: val }));
+                      }}
+                      className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                    />
+                    <div>
+                      <strong className="block text-slate-800">แจ้งเตือนผู้ปกครอง</strong>
+                      <span className="text-[11px] text-slate-500">ส่ง SMS/LINE เมื่อใบลาได้รับการอนุมัติ</span>
+                    </div>
+                  </label>
+
+                  <label className="p-3 rounded-xl border border-slate-200 bg-white flex items-center gap-3 cursor-pointer hover:border-blue-300">
+                    <input
+                      type="checkbox"
+                      checked={leaveSettings.enableAutoRollCallSync}
+                      onChange={(e) => {
+                        const val = e.target.checked;
+                        setLeaveSettings((prev) => ({ ...prev, enableAutoRollCallSync: val }));
+                      }}
+                      className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                    />
+                    <div>
+                      <strong className="block text-slate-800">ซิงค์เช็คชื่อรายคาบ</strong>
+                      <span className="text-[11px] text-slate-500">ใส่สถานะ 'ลา' ในตารางสอนอัตโนมัติ</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Section C: สถิติและรายการคำขออนุมัติการลาล่าสุด (Real-time monitoring & Action) */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-3.5">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-blue-600" />
+                    <h3 className="text-xs sm:text-sm font-extrabold text-slate-900">
+                      รายการคำขอยื่นใบลาล่าสุดของนักเรียน ({studentLeaves.length} รายการ)
+                    </h3>
+                  </div>
+                  <span className="text-[11px] text-slate-400">
+                    เชื่อมต่อฐานข้อมูลงานกิจการนักเรียน & ห้องเรียน
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-400 text-[11px]">
+                        <th className="py-2.5 px-3 font-semibold">รหัสนักเรียน</th>
+                        <th className="py-2.5 px-3 font-semibold">ชื่อ - นามสกุล</th>
+                        <th className="py-2.5 px-3 font-semibold">ชั้นเรียน</th>
+                        <th className="py-2.5 px-3 font-semibold">ประเภทการลา</th>
+                        <th className="py-2.5 px-3 font-semibold">ช่วงวันที่</th>
+                        <th className="py-2.5 px-3 font-semibold">เหตุผล</th>
+                        <th className="py-2.5 px-3 font-semibold text-center">สถานะ</th>
+                        <th className="py-2.5 px-3 font-semibold text-right">ดำเนินการ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {studentLeaves.map((req) => (
+                        <tr key={req.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-3 px-3 font-mono font-bold text-slate-700">
+                            {req.studentCode}
+                          </td>
+                          <td className="py-3 px-3 font-bold text-slate-900">
+                            {req.studentName}
+                          </td>
+                          <td className="py-3 px-3 text-slate-600">
+                            {req.classroom}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
+                              req.leaveType === 'ลาป่วย' ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            }`}>
+                              {req.leaveType} ({req.daysCount} วัน)
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-slate-600 font-mono text-[11px]">
+                            {req.startDate} {req.startDate !== req.endDate ? `ถึง ${req.endDate}` : ''}
+                          </td>
+                          <td className="py-3 px-3 text-slate-600 max-w-[200px] truncate" title={req.reason}>
+                            {req.reason}
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            {req.status === 'APPROVED' && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                ✓ อนุมัติแล้ว
+                              </span>
+                            )}
+                            {req.status === 'PENDING' && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200">
+                                ⏳ รออนุมัติ
+                              </span>
+                            )}
+                            {req.status === 'REJECTED' && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-200">
+                                ✕ ไม่อนุมัติ
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            <div className="inline-flex items-center gap-1.5">
+                              {req.status !== 'APPROVED' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleApproveStudentLeaveAction(req.id, 'APPROVED')}
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold cursor-pointer transition-colors shadow-2xs"
+                                >
+                                  อนุมัติ
+                                </button>
+                              )}
+                              {req.status !== 'REJECTED' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleApproveStudentLeaveAction(req.id, 'REJECTED')}
+                                  className="px-2 py-1 rounded-lg bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 text-[11px] font-medium cursor-pointer transition-colors"
+                                >
+                                  ปฏิเสธ
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
-      </form>
       )}
 
       {/* TAB 4: จัดการแบนเนอร์หน้านักเรียน & ครู 3 ส่วน (สิทธิ์ Admin เป็นผู้อัปโหลดเท่านั้น) */}
@@ -2426,6 +3140,148 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                   className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-xs cursor-pointer"
                 >
                   บันทึกวันเรียนพิเศษ
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: เพิ่มประเภทโควตาวันลาใหม่ (Custom Leave Quota Type) */}
+      {isAddQuotaModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200 animate-scale-up space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <FileCheck className="w-5 h-5 text-blue-600" />
+                <h3 className="text-base font-bold text-slate-900">
+                  เพิ่มประเภทโควตาวันลาใหม่
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddQuotaModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddCustomQuotaSubmit} className="space-y-3.5 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  ชื่อประเภทการลา <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="เช่น ลาเข้าร่วมกิจกรรมภายนอก, ลาอบรมวิชาการ"
+                  value={newQuotaName}
+                  onChange={(e) => setNewQuotaName(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    โควตาสูงสุด (วัน/เทอม) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={60}
+                    value={newQuotaDays}
+                    onChange={(e) => setNewQuotaDays(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    ยื่นล่วงหน้าอย่างน้อย (วัน)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={30}
+                    value={newQuotaNoticeDays}
+                    onChange={(e) => setNewQuotaNoticeDays(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  คำอธิบาย / วัตถุประสงค์
+                </label>
+                <input
+                  type="text"
+                  placeholder="เช่น กรณีได้รับคัดเลือกเป็นตัวแทน หรือกรณีพิเศษ"
+                  value={newQuotaDesc}
+                  onChange={(e) => setNewQuotaDesc(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  สีป้ายกำกับ
+                </label>
+                <select
+                  value={newQuotaColor}
+                  onChange={(e) => setNewQuotaColor(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold"
+                >
+                  <option value="bg-indigo-50 text-indigo-700 border-indigo-200">คราม (Indigo)</option>
+                  <option value="bg-cyan-50 text-cyan-700 border-cyan-200">ฟ้าคราม (Cyan)</option>
+                  <option value="bg-emerald-50 text-emerald-700 border-emerald-200">เขียว (Emerald)</option>
+                  <option value="bg-amber-50 text-amber-700 border-amber-200">ส้ม (Amber)</option>
+                  <option value="bg-rose-50 text-rose-700 border-rose-200">ชมพู/แดง (Rose)</option>
+                  <option value="bg-purple-50 text-purple-700 border-purple-200">ม่วง (Purple)</option>
+                </select>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={newQuotaRequiresCert}
+                    onChange={(e) => setNewQuotaRequiresCert(e.target.checked)}
+                    className="rounded text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>ต้องแนบเอกสารรับรอง / ใบรับรองแพทย์</span>
+                </label>
+
+                {newQuotaRequiresCert && (
+                  <div className="flex items-center gap-2 pl-5 text-[11px] text-slate-600">
+                    <span>หากลาติดต่อกันเกินกว่า:</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={newQuotaCertDays}
+                      onChange={(e) => setNewQuotaCertDays(Number(e.target.value))}
+                      className="w-16 px-2 py-0.5 rounded-lg border border-slate-300 bg-white text-center font-bold"
+                    />
+                    <span>วันขึ้นไป</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAddQuotaModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-xs cursor-pointer"
+                >
+                  บันทึกโควตาใหม่
                 </button>
               </div>
             </form>

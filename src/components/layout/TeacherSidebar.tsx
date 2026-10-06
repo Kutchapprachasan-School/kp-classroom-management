@@ -153,7 +153,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     },
     {
       key: 'exams',
-      label: 'ประเมิน / แบบฟอร์ม',
+      label: 'จัดการสอบ / เก็บคะแนน', /* label: 'ประเมิน / แบบฟอร์ม' */
       icon: ClipboardList,
     },
     {
@@ -309,14 +309,14 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
         </div>
       </div>
 
-      {/* 4. Logout Button matching Image 1 */}
+      {/* 4. Logout Button matching Image 1 & Image 2 */}
       <div className="p-3 border-t border-slate-100 shrink-0">
         <button
           type="button"
           onClick={() => handleSelect('school-login')}
-          className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-rose-200/80 bg-rose-50/50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+          className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-blue-200/90 bg-white hover:bg-blue-50 text-blue-600 text-xs font-bold transition-all cursor-pointer shadow-2xs"
         >
-          <LogOut className="w-4 h-4 text-rose-500 shrink-0" />
+          <LogOut className="w-4 h-4 text-blue-600 shrink-0" />
           <span>ออกจากระบบ</span>
         </button>
       </div>
