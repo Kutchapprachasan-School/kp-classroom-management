@@ -1,36 +1,67 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  School,
   Upload,
   Plus,
   Search,
-  ArrowRight,
-  UserCheck,
   AlertCircle,
   FileSpreadsheet,
   Trash2,
   X,
+  Users,
+  ChevronDown,
+  ChevronRight,
+  MoreVertical,
+  Filter,
+  Check,
+  Lightbulb,
+  BarChart2,
+  Layers,
+  UserPlus,
+  Bell,
+  User,
 } from 'lucide-react';
 import { classroomService } from '../services/classroomService';
-import { studentService, type StudentRecord } from '../services/studentService';
+import { classroomsListData } from '../data/mockData';
+import { studentService, defaultStudents, type StudentRecord } from '../services/studentService';
 import { trashService } from '../services/trashService';
-
 import type { ClassroomRosterItem, AtRiskStudent } from '../types/viewModels';
+import type { SchoolUserRole } from '../config/schoolRoles';
 
 interface ClassroomsRosterViewProps {
   onSelectStudent: (student: AtRiskStudent) => void;
   onSelectClassroom: (classroomId: string) => void;
+  activeRole?: SchoolUserRole;
+  onChangeRole?: (role: SchoolUserRole) => void;
 }
+
+type SortOption =
+  | 'gender-male-first'
+  | 'gender-female-first'
+  | 'no-asc'
+  | 'score-desc'
+  | 'name-asc';
 
 export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
   onSelectStudent,
   onSelectClassroom,
+  activeRole = 'TEACHER_GENERAL',
+  onChangeRole: _onChangeRole,
 }) => {
-  const [classrooms, setClassrooms] = useState<ClassroomRosterItem[]>([]);
-  const [selectedClass, setSelectedClass] = useState<ClassroomRosterItem | null>(null);
-  const [students, setStudents] = useState<StudentRecord[]>([]);
+  const [allClassrooms, setAllClassrooms] = useState<ClassroomRosterItem[]>(classroomsListData);
+  const [selectedClass, setSelectedClass] = useState<ClassroomRosterItem | null>(
+    () => classroomsListData.find((c) => c.roomNumber === 'ม.3/1') || classroomsListData[0] || null
+  );
+  const [students, setStudents] = useState<StudentRecord[]>(defaultStudents);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [sortOption, setSortOption] = useState<SortOption>('gender-male-first');
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'NORMAL' | 'AT_RISK'>('ALL');
+  const [showFilterBar, setShowFilterBar] = useState(false);
+
+  // Dropdown menus
+  const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
+  const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
 
   // Modals state
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -49,15 +80,25 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
   const [newSubjectName, setNewSubjectName] = useState('ศิลปะ');
   const [newAdviser, setNewAdviser] = useState('ครูภาสภูมิ เรืองปราชญ์');
 
-  // Load classrooms on mount
+  const classDropdownRef = useRef<HTMLDivElement>(null);
+  const sortDropdownRef = useRef<HTMLDivElement>(null);
+
+  // สิทธิ์การเข้าถึงข้อมูลตามบทบาท:
+  // - ครูทั่วไป (TEACHER_GENERAL): แสดงเฉพาะห้องที่ปรึกษา และห้องที่สอนเท่านั้น
+  // - ครูกิจการ (STUDENT_AFFAIRS / STUDENT_COUNCIL), ผอ. (ACADEMIC_ADMIN / DIRECTOR), แอดมิน (ADMIN): ดูได้ทุกคน ทุกห้อง
+  const isFullAccess =
+    activeRole === 'ACADEMIC_ADMIN' ||
+    activeRole === 'STUDENT_AFFAIRS' ||
+    activeRole === 'STUDENT_COUNCIL' ||
+    (activeRole as string) === 'ADMIN' ||
+    (activeRole as string) === 'DIRECTOR';
+
+  // โหลดรายการห้องเรียนทั้งหมด
   const loadClassrooms = async () => {
     setIsLoading(true);
     try {
       const cls = await classroomService.getAll();
-      setClassrooms(cls);
-      if (cls.length > 0 && !selectedClass) {
-        setSelectedClass(cls[0]);
-      }
+      setAllClassrooms(cls);
     } finally {
       setIsLoading(false);
     }
@@ -67,15 +108,141 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
     loadClassrooms();
   }, []);
 
-  // Load students when selected classroom changes
+  // กรองห้องเรียนตามสิทธิ์ผู้ใช้งาน
+  const allowedClassrooms = useMemo(() => {
+    if (isFullAccess) {
+      return allClassrooms;
+    }
+    // ครูทั่วไป (ครูภาสภูมิ): ห้องที่ปรึกษา ม.3/1 และห้องที่สอน (ม.1/8, ม.2/8, ม.3/1, ม.3/2, ม.3/8)
+    const advisoryRooms = ['room-3-1', 'ม.3/1'];
+    const teachingRooms = [
+      'room-1-8',
+      'room-2-8',
+      'room-3-2',
+      'room-3-5',
+      'room-3-6',
+      'room-3-7',
+      'room-3-8',
+      'ม.1/8',
+      'ม.2/8',
+      'ม.3/2',
+      'ม.3/5',
+      'ม.3/6',
+      'ม.3/7',
+      'ม.3/8',
+    ];
+
+    return allClassrooms.filter(
+      (c) =>
+        advisoryRooms.includes(c.id) ||
+        advisoryRooms.includes(c.roomNumber) ||
+        teachingRooms.includes(c.id) ||
+        teachingRooms.includes(c.roomNumber) ||
+        c.adviser.includes('ครูภาสภูมิ')
+    );
+  }, [allClassrooms, isFullAccess]);
+
+  // ตั้งค่าห้องเรียนเริ่มต้นเมื่อสิทธิ์หรือข้อมูลเปลี่ยน
+  useEffect(() => {
+    if (allowedClassrooms.length > 0) {
+      if (!selectedClass || !allowedClassrooms.some((c) => c.id === selectedClass.id)) {
+        // ให้ความสำคัญกับห้อง ม.3/1 (ห้องที่ปรึกษา) เป็นค่าเริ่มต้น
+        const defaultClass =
+          allowedClassrooms.find((c) => c.roomNumber === 'ม.3/1' || c.name.includes('3/1')) ||
+          allowedClassrooms[0];
+        setSelectedClass(defaultClass);
+      }
+    }
+  }, [allowedClassrooms, selectedClass]);
+
+  // โหลดรายชื่อนักเรียนเมื่อเปลี่ยนห้องเรียน
   useEffect(() => {
     if (selectedClass) {
-      studentService.getByClassroom(selectedClass.id).then((stuList) => {
-        setStudents(stuList);
-        setNewStudentNo(stuList.length + 1);
-      });
+      setIsLoading(true);
+      studentService
+        .getByClassroom(selectedClass.id)
+        .then((stuList) => {
+          setStudents(stuList);
+          setNewStudentNo(stuList.length + 1);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
     }
   }, [selectedClass]);
+
+  // ปิด dropdown เมื่อคลิกข้างนอก
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        classDropdownRef.current &&
+        !classDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsClassDropdownOpen(false);
+      }
+      if (
+        sortDropdownRef.current &&
+        !sortDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsSortDropdownOpen(false);
+      }
+      if (openActionMenuId && !(event.target as HTMLElement).closest('.action-menu-container')) {
+        setOpenActionMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openActionMenuId]);
+
+  // ตัวช่วยระบุเพศจากคำนำหน้าชื่อ
+  const isMaleStudent = (stu: StudentRecord) => {
+    if (stu.gender) return stu.gender === 'MALE';
+    return stu.name.startsWith('ด.ช.') || stu.name.startsWith('นาย');
+  };
+
+  // จัดเรียงและกรองนักเรียน
+  const filteredAndSortedStudents = useMemo(() => {
+    let result = students.filter((s) => {
+      const matchSearch =
+        s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.code.includes(searchTerm) ||
+        s.no.toString() === searchTerm;
+
+      const matchFilter =
+        filterStatus === 'ALL' ? true : s.status === filterStatus;
+
+      return matchSearch && matchFilter;
+    });
+
+    result = [...result].sort((a, b) => {
+      switch (sortOption) {
+        case 'gender-male-first': {
+          const aMale = isMaleStudent(a);
+          const bMale = isMaleStudent(b);
+          if (aMale && !bMale) return -1;
+          if (!aMale && bMale) return 1;
+          return a.no - b.no;
+        }
+        case 'gender-female-first': {
+          const aMale = isMaleStudent(a);
+          const bMale = isMaleStudent(b);
+          if (!aMale && bMale) return -1;
+          if (aMale && !bMale) return 1;
+          return a.no - b.no;
+        }
+        case 'no-asc':
+          return a.no - b.no;
+        case 'score-desc':
+          return b.score - a.score;
+        case 'name-asc':
+          return a.name.localeCompare(b.name, 'th');
+        default:
+          return a.no - b.no;
+      }
+    });
+
+    return result;
+  }, [students, searchTerm, filterStatus, sortOption]);
 
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,22 +300,47 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
 
   const handleDeleteStudent = async (stu: StudentRecord) => {
     if (!selectedClass) return;
-    if (confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบ "${stu.name}" ออกจากห้องเรียน? รายการจะถูกย้ายไปที่ถังขยะและกู้คืนได้ภายใน 30 วัน`)) {
+    if (
+      confirm(
+        `คุณแน่ใจหรือไม่ว่าต้องการลบ "${stu.name}" ออกจากห้องเรียน? รายการจะถูกย้ายไปที่ถังขยะและกู้คืนได้ภายใน 30 วัน`
+      )
+    ) {
       await studentService.delete(selectedClass.id, stu.id);
       await trashService.moveToTrash(stu.id, 'นักเรียน', stu.name);
       const updated = await studentService.getByClassroom(selectedClass.id);
       setStudents(updated);
+      setOpenActionMenuId(null);
       alert(`ย้าย "${stu.name}" ไปยังถังขยะเรียบร้อยแล้ว`);
     }
   };
 
   const handleBatchImport = async () => {
     if (!selectedClass) return;
-    // Simulate importing 3 students from SGS format
     const batch = [
-      { no: 27, code: '45127', name: 'ด.ช. พัทธดนย์ ศรีวิชัย', attendance: '8/8', score: 80, status: 'NORMAL' as const },
-      { no: 28, code: '45128', name: 'ด.ญ. กานต์พิชชา ใจมั่น', attendance: '8/8', score: 85, status: 'NORMAL' as const },
-      { no: 29, code: '45129', name: 'ด.ญ. ธัญญาภรณ์ แก้วอินทร์', attendance: '8/8', score: 90, status: 'NORMAL' as const },
+      {
+        no: 27,
+        code: '45127',
+        name: 'ด.ช. พัทธดนย์ ศรีวิชัย',
+        attendance: '8/8',
+        score: 80,
+        status: 'NORMAL' as const,
+      },
+      {
+        no: 28,
+        code: '45128',
+        name: 'ด.ญ. กานต์พิชชา ใจมั่น',
+        attendance: '8/8',
+        score: 85,
+        status: 'NORMAL' as const,
+      },
+      {
+        no: 29,
+        code: '45129',
+        name: 'ด.ญ. ธัญญาภรณ์ แก้วอินทร์',
+        attendance: '8/8',
+        score: 90,
+        status: 'NORMAL' as const,
+      },
     ];
     await studentService.batchImport(selectedClass.id, batch);
     const updated = await studentService.getByClassroom(selectedClass.id);
@@ -157,248 +349,613 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
     alert(`นำเข้าบัญชีรายชื่อนักเรียนจาก SGS Excel สำเร็จ จำนวน ${batch.length} คน!`);
   };
 
-  const filteredStudents = students.filter(
-    (s) =>
-      s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.code.includes(searchTerm) ||
-      s.no.toString() === searchTerm
+  const handleOpenRadar = (stu: StudentRecord) => {
+    onSelectStudent({
+      enrollmentId: stu.id,
+      studentNo: stu.no,
+      name: stu.name,
+      tags:
+        stu.status === 'AT_RISK'
+          ? [{ text: 'คะแนนต่ำกว่าครึ่ง', type: 'danger' }]
+          : [],
+      attendanceRatio: stu.attendance,
+      totalScore: stu.score,
+    });
+  };
+
+  // หมวดหมู่ห้องเรียนสำหรับ Dropdown
+  const advisoryClass = allowedClassrooms.find(
+    (c) => c.roomNumber === 'ม.3/1' || c.adviser.includes('ครูภาสภูมิ')
+  );
+  const teachingClasses = allowedClassrooms.filter(
+    (c) => c.id !== advisoryClass?.id
   );
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in font-sans text-slate-800 select-none">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-              <School className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-800">
-                ห้องเรียน / นักเรียน (Classrooms & Roster)
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500">
-                จัดการบัญชีรายชื่อนักเรียน นำเข้าไฟล์จาก Excel/SGS และวิเคราะห์พัฒนาการรายบุคคล
-              </p>
-            </div>
-          </div>
+      {/* 1. Hero Banner ตรงตามภาพต้นแบบ Reference Image 1 */}
+      <div className="relative rounded-2xl md:rounded-3xl overflow-hidden border border-sky-100 shadow-sm bg-gradient-to-r from-sky-400/90 via-blue-400/80 to-sky-300/90 min-h-[140px] sm:min-h-[160px] flex items-center justify-between p-5 sm:p-7 text-white">
+        {/* Background Artwork */}
+        <div className="absolute inset-0 z-0">
+          <img
+            src="/images/teacher/hero_banner.png"
+            alt="Hero Banner"
+            className="w-full h-full object-cover object-right md:object-center opacity-85"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-sky-900/60 via-sky-800/40 to-transparent" />
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        {/* Banner Left Content ตรงตาม Reference Image 1 */}
+        <div className="relative z-10 max-w-xl space-y-1 sm:space-y-1.5">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-sm">
+            ห้องเรียน / นักเรียน
+          </h1>
+          <p className="text-xs sm:text-sm text-sky-50 font-medium drop-shadow-sm">
+            จัดการข้อมูลนักเรียนในรายวิชาของคุณได้อย่างง่ายดาย
+          </p>
+        </div>
+
+        {/* Banner Right Action Buttons ตรงตามภาพ Reference Image 1 */}
+        <div className="relative z-10 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5">
           <button
-            onClick={() => setIsAddClassroomOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
+            onClick={() => setIsAddStudentOpen(true)}
+            className="flex items-center justify-center gap-1.5 px-4 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-blue-900/20 hover:shadow-lg transition-all cursor-pointer active:scale-95"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>+ สร้างห้องเรียนใหม่</span>
+            <UserPlus className="w-4 h-4" />
+            <span>+ เพิ่มนักเรียน</span>
           </button>
           <button
             onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 sm:py-2.5 bg-white/95 hover:bg-white text-slate-800 rounded-xl text-xs sm:text-sm font-bold border border-white/80 shadow-md shadow-slate-900/10 hover:shadow-lg transition-all cursor-pointer active:scale-95"
           >
-            <Upload className="w-3.5 h-3.5" />
+            <Upload className="w-4 h-4 text-blue-600" />
             <span>นำเข้ารายชื่อ Excel/SGS</span>
-          </button>
-          <button
-            onClick={() => setIsAddStudentOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span>+ เพิ่มนักเรียน</span>
           </button>
         </div>
       </div>
 
-      {/* Classroom Selector Chips */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {classrooms.map((cls) => {
-          const isSelected = selectedClass?.id === cls.id;
-          return (
-            <div
-              key={cls.id}
-              onClick={() => setSelectedClass(cls)}
-              className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-                isSelected
-                  ? 'bg-blue-50/70 border-blue-300 shadow-sm'
-                  : 'bg-white border-slate-100 shadow-card hover:bg-slate-50'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-bold text-xs text-blue-700">{cls.roomNumber}</span>
-                <span className="text-[11px] text-slate-400">{cls.studentCount || students.length} คน</span>
-              </div>
-              <div className="text-xs font-semibold text-slate-800">{cls.name}</div>
-              <div className="text-[11px] text-slate-400 mt-1 truncate">ครูประจำชั้น: {cls.adviser}</div>
+      {/* 2. Main Roster Card ตรงตามภาพ Reference Image 1 */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+        {/* Card Header & Controls Bar */}
+        <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          {/* Header Left: Icon + Title + Room Subtitle */}
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 to-sky-500 text-white flex items-center justify-center shadow-sm shadow-blue-500/20 shrink-0">
+              <Users className="w-5 h-5" />
             </div>
-          );
-        })}
-      </div>
-
-      {/* Single Unified Student Table */}
-      {selectedClass && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
-              <h2 className="text-base font-bold text-slate-800">
-                บัญชีรายชื่อนักเรียน: {selectedClass.name}
-              </h2>
-              <p className="text-xs text-slate-400">
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-1.5">
+                  <span>บัญชีรายชื่อนักเรียน :</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsClassDropdownOpen((prev) => !prev)}
+                    className="text-blue-600 hover:text-blue-800 flex items-center gap-1 font-extrabold cursor-pointer transition-colors"
+                    title="คลิกเพื่อสลับชั้น/ห้องเรียน"
+                  >
+                    <span>{selectedClass?.roomNumber || 'ม.3/1'}</span>
+                    <ChevronDown className="w-4 h-4 text-slate-400" />
+                  </button>
+                </h2>
+                {(selectedClass?.roomNumber || 'ม.3/1') === 'ม.3/1' && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                    ห้องที่ปรึกษา
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 font-medium">
                 รวม {students.length} คน • คลิกที่ชื่อนักเรียนเพื่อดู Radar Chart 5 มิติ
               </p>
             </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const isMale = (name: string) => name.startsWith('ด.ช.') || name.startsWith('นาย');
-                  const sorted = [...students].sort((a, b) => {
-                    const aMale = isMale(a.name);
-                    const bMale = isMale(b.name);
-                    if (aMale && !bMale) return -1;
-                    if (!aMale && bMale) return 1;
-                    return a.name.localeCompare(b.name, 'th');
-                  }).map((stu, idx) => ({ ...stu, studentNo: idx + 1 }));
-                  setStudents(sorted);
-                  alert('จัดเรียงลำดับ ชาย ➔ หญิง อัตโนมัติเรียบร้อยแล้ว');
-                }}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
-              >
-                เรียง ชาย ➔ หญิง
-              </button>
-              <div className="relative w-full sm:w-64">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="ค้นหาชื่อ เลขที่ หรือรหัส..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"
-                />
-              </div>
-              <button
-                onClick={() => onSelectClassroom(selectedClass.id)}
-                className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors"
-              >
-                เปิดห้องเรียนนี้ →
-              </button>
-            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 text-slate-400 font-medium">
-                  <th className="py-2.5 px-3">เลขที่</th>
-                  <th className="py-2.5 px-3">รหัสนักเรียน</th>
-                  <th className="py-2.5 px-3">ชื่อ-นามสกุล</th>
-                  <th className="py-2.5 px-3">การเข้าเรียน</th>
-                  <th className="py-2.5 px-3">คะแนนรวม</th>
-                  <th className="py-2.5 px-3">สถานะ</th>
-                  <th className="py-2.5 px-3 text-right">การจัดการ</th>
+          {/* Header Right: Controls (Dropdown เลือกห้อง, ค้นหา, เรียง, แสดงตัวกรอง) */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+            {/* Dropdown เลือกชั้น/ห้อง (ฟีเจอร์หลักตามโจทย์) */}
+            <div className="flex items-center gap-1.5">
+              <div className="relative" ref={classDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsClassDropdownOpen((prev) => !prev)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+                  title="เลือกชั้น/ห้องเรียน"
+                >
+                  <Layers className="w-3.5 h-3.5 text-blue-600" />
+                  <span className="max-w-[120px] sm:max-w-[160px] truncate">
+                    ห้อง {selectedClass?.roomNumber || 'ม.3/1'}
+                  </span>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+
+                {isClassDropdownOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-72 sm:w-80 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-2 text-xs space-y-1.5 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-slate-800 block text-xs">
+                        เลือกชั้น / ห้องเรียน
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        {isFullAccess
+                          ? '👑 สิทธิ์ ผอ./Admin/กิจการ: ดูได้ทุกห้อง'
+                          : '🔒 ครูทั่วไป: แสดงเฉพาะห้องที่ปรึกษาและที่สอน'}
+                      </span>
+                    </div>
+                    {isFullAccess && (
+                      <button
+                        onClick={() => {
+                          setIsClassDropdownOpen(false);
+                          setIsAddClassroomOpen(true);
+                        }}
+                        className="text-[11px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-0.5"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>เพิ่มห้อง</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Group 1: ห้องที่ปรึกษา */}
+                  {advisoryClass && (
+                    <div className="px-2 pt-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                        ⭐ ห้องครูที่ปรึกษา (Homeroom)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedClass(advisoryClass);
+                          setIsClassDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
+                          selectedClass?.id === advisoryClass.id
+                            ? 'bg-blue-50 text-blue-700 font-bold border border-blue-200'
+                            : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-blue-600" />
+                          <span>{advisoryClass.name}</span>
+                        </div>
+                        <span className="text-[11px] text-slate-400">
+                          {advisoryClass.studentCount || students.length} คน
+                        </span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Group 2: ห้องที่สอน หรือ ห้องทั้งหมดในโรงเรียน */}
+                  <div className="px-2 pt-1 max-h-56 overflow-y-auto space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                      {isFullAccess ? '🏫 ห้องเรียนทั้งหมดในโรงเรียน' : '📚 ห้องที่สอน (Teaching Classes)'}
+                    </span>
+                    {teachingClasses.map((cls) => {
+                      const isSelected = selectedClass?.id === cls.id;
+                      return (
+                        <button
+                          key={cls.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedClass(cls);
+                            setIsClassDropdownOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
+                            isSelected
+                              ? 'bg-blue-50 text-blue-700 font-bold border border-blue-200'
+                              : 'hover:bg-slate-50 text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-slate-300" />
+                            <div>
+                              <span className="block">{cls.name}</span>
+                              <span className="text-[10px] text-slate-400 block truncate">
+                                ครูประจำชั้น: {cls.adviser}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-[11px] text-slate-400">
+                            {cls.studentCount || 30} คน
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+            {selectedClass && (
+              <button
+                type="button"
+                onClick={() => onSelectClassroom(selectedClass.id)}
+                className="px-2 py-1.5 rounded-xl border border-blue-200 bg-blue-50/60 hover:bg-blue-100 text-blue-700 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer shrink-0"
+                title="เปิดแดชบอร์ดห้องเรียนนี้"
+              >
+                <span className="hidden sm:inline">เปิดห้องนี้</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+            {/* ช่องค้นหา "ค้นหาชื่อ เลขที่ หรือรหัส..." ตรงตามภาพ Reference Image 1 */}
+            <div className="relative w-44 sm:w-56 md:w-64">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="ค้นหาชื่อ เลขที่ หรือรหัส..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* Dropdown เรียง ชาย ➔ หญิง ˇ ตรงตามภาพ Reference Image 1 */}
+            <div className="relative" ref={sortDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setIsSortDropdownOpen((prev) => !prev)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+              >
+                <span>
+                  {sortOption === 'gender-male-first' && 'เรียง ชาย ➔ หญิง'}
+                  {sortOption === 'gender-female-first' && 'เรียง หญิง ➔ ชาย'}
+                  {sortOption === 'no-asc' && 'เรียงตามเลขที่'}
+                  {sortOption === 'score-desc' && 'เรียงตามคะแนนรวม'}
+                  {sortOption === 'name-asc' && 'เรียงตามชื่อ (ก-ฮ)'}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
+              {isSortDropdownOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-1.5 text-xs space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortOption('gender-male-first');
+                      setIsSortDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
+                      sortOption === 'gender-male-first'
+                        ? 'bg-blue-50 text-blue-700 font-bold'
+                        : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <span>เรียง ชาย ➔ หญิง</span>
+                    {sortOption === 'gender-male-first' && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortOption('gender-female-first');
+                      setIsSortDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
+                      sortOption === 'gender-female-first'
+                        ? 'bg-blue-50 text-blue-700 font-bold'
+                        : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <span>เรียง หญิง ➔ ชาย</span>
+                    {sortOption === 'gender-female-first' && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortOption('no-asc');
+                      setIsSortDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
+                      sortOption === 'no-asc'
+                        ? 'bg-blue-50 text-blue-700 font-bold'
+                        : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <span>เรียงตามเลขที่</span>
+                    {sortOption === 'no-asc' && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortOption('score-desc');
+                      setIsSortDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
+                      sortOption === 'score-desc'
+                        ? 'bg-blue-50 text-blue-700 font-bold'
+                        : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <span>คะแนนรวม (มาก ➔ น้อย)</span>
+                    {sortOption === 'score-desc' && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortOption('name-asc');
+                      setIsSortDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
+                      sortOption === 'name-asc'
+                        ? 'bg-blue-50 text-blue-700 font-bold'
+                        : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <span>เรียงตามชื่อ (ก ➔ ฮ)</span>
+                    {sortOption === 'name-asc' && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* ปุ่ม "แสดงตัวกรอง" ตรงตามภาพ Reference Image 1 */}
+            <button
+              type="button"
+              onClick={() => setShowFilterBar((prev) => !prev)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold shadow-2xs transition-colors cursor-pointer ${
+                showFilterBar || filterStatus !== 'ALL'
+                  ? 'bg-blue-50 border-blue-300 text-blue-700'
+                  : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+              }`}
+            >
+              <Filter className="w-3.5 h-3.5 text-blue-600" />
+              <span>แสดงตัวกรอง</span>
+              {filterStatus !== 'ALL' && (
+                <span className="w-2 h-2 rounded-full bg-blue-600" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Filter Bar (เมื่อกดแสดงตัวกรอง) */}
+        {showFilterBar && (
+          <div className="px-6 py-3 bg-slate-50/70 border-b border-slate-100 flex flex-wrap items-center gap-2 animate-fade-in text-xs">
+            <span className="text-slate-500 font-semibold text-[11px] mr-1">สถานะนักเรียน:</span>
+            <button
+              type="button"
+              onClick={() => setFilterStatus('ALL')}
+              className={`px-3 py-1 rounded-full font-semibold transition-colors cursor-pointer ${
+                filterStatus === 'ALL'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              ทั้งหมด ({students.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterStatus('NORMAL')}
+              className={`px-3 py-1 rounded-full font-semibold transition-colors cursor-pointer ${
+                filterStatus === 'NORMAL'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              ปกติ ({students.filter((s) => s.status === 'NORMAL').length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterStatus('AT_RISK')}
+              className={`px-3 py-1 rounded-full font-semibold transition-colors cursor-pointer ${
+                filterStatus === 'AT_RISK'
+                  ? 'bg-rose-600 text-white shadow-2xs'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              กลุ่มเสี่ยง ({students.filter((s) => s.status === 'AT_RISK').length})
+            </button>
+          </div>
+        )}
+
+        {/* Student Table ตรงตามภาพ Reference Image 1 */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-slate-100 text-slate-400 font-semibold bg-slate-50/40">
+                <th className="py-3 px-4 w-14 text-center">ลำดับ</th>
+                <th className="py-3 px-4 w-28">รหัสนักเรียน</th>
+                <th className="py-3 px-4 min-w-[220px]">ชื่อ-นามสกุล</th>
+                <th className="py-3 px-4 w-32">การเข้าเรียน</th>
+                <th className="py-3 px-4 w-28 text-center">คะแนนรวม</th>
+                <th className="py-3 px-4 w-28 text-center">สถานะ</th>
+                <th className="py-3 px-4 w-32 text-right">การจัดการ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                      <span>กำลังโหลดรายชื่อนักเรียน...</span>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-400">กำลังโหลดข้อมูล...</td>
-                  </tr>
-                ) : filteredStudents.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-400">ไม่พบรายชื่อนักเรียน</td>
-                  </tr>
-                ) : (
-                  filteredStudents.map((stu) => (
+              ) : filteredAndSortedStudents.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                    <p className="font-semibold text-slate-600">ไม่พบรายชื่อนักเรียนที่ตรงกับเงื่อนไข</p>
+                    <p className="text-xs text-slate-400 mt-1">ลองเปลี่ยนคำค้นหา หรือรีเซ็ตตัวกรอง</p>
+                  </td>
+                </tr>
+              ) : (
+                filteredAndSortedStudents.map((stu) => {
+                  const isMale = isMaleStudent(stu);
+                  const avatar =
+                    stu.avatarUrl ||
+                    (isMale
+                      ? '/images/banners/student-avatar.png'
+                      : '/images/banners/student-avatar-girl.png');
+
+                  return (
                     <tr
                       key={stu.id}
-                      className="hover:bg-slate-50/80 transition-colors"
+                      className="hover:bg-slate-50/80 transition-colors group"
                     >
-                      <td className="py-3 px-3 font-semibold text-slate-600">{stu.no}</td>
-                      <td className="py-3 px-3 font-mono text-slate-400">{stu.code}</td>
-                      <td className="py-3 px-3">
-                        <button
-                          onClick={() =>
-                            onSelectStudent({
-                              enrollmentId: stu.id,
-                              studentNo: stu.no,
-                              name: stu.name,
-                              tags:
-                                stu.status === 'AT_RISK'
-                                  ? [{ text: 'คะแนนต่ำกว่าครึ่ง', type: 'danger' }]
-                                  : [],
-                              attendanceRatio: stu.attendance,
-                              totalScore: stu.score,
-                            })
-                          }
-                          className="font-bold text-slate-800 hover:text-blue-600 transition-colors text-left"
-                        >
-                          {stu.name}
-                        </button>
+                      {/* ลำดับ (เลขที่) */}
+                      <td className="py-3.5 px-4 text-center font-bold text-slate-600">
+                        {stu.no}
                       </td>
-                      <td className="py-3 px-3">
-                        <span className="flex items-center gap-1 text-slate-600">
-                          <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>{stu.attendance}</span>
-                        </span>
+
+                      {/* รหัสนักเรียน */}
+                      <td className="py-3.5 px-4 font-mono font-medium text-slate-400">
+                        {stu.code}
                       </td>
-                      <td className="py-3 px-3 font-bold text-blue-700">{stu.score}</td>
-                      <td className="py-3 px-3">
-                        {stu.status === 'AT_RISK' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-600 border border-rose-200 rounded-md font-semibold text-[11px]">
-                            <AlertCircle className="w-3 h-3" />
-                            <span>กลุ่มเสี่ยง</span>
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md font-semibold text-[11px]">
-                            ปกติ
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
+
+                      {/* ชื่อ-นามสกุล พร้อมรูป avatar */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2.5">
+                          <img
+                            src={avatar}
+                            alt={stu.name}
+                            onError={(e) => {
+                              // Fallback if image fails to load
+                              (e.target as HTMLElement).style.display = 'none';
+                            }}
+                            className="w-8 h-8 rounded-full border border-slate-200 object-cover shadow-2xs shrink-0"
+                          />
                           <button
-                            onClick={() =>
-                              onSelectStudent({
-                                enrollmentId: stu.id,
-                                studentNo: stu.no,
-                                name: stu.name,
-                                tags:
-                                  stu.status === 'AT_RISK'
-                                    ? [{ text: 'คะแนนต่ำกว่าครึ่ง', type: 'danger' }]
-                                    : [],
-                                attendanceRatio: stu.attendance,
-                                totalScore: stu.score,
-                              })
-                            }
-                            className="text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1"
+                            type="button"
+                            onClick={() => handleOpenRadar(stu)}
+                            className="font-bold text-slate-800 hover:text-blue-600 transition-colors text-left cursor-pointer"
+                            title="คลิกเพื่อดู Radar Chart 5 มิติ"
                           >
-                            <span>โปรไฟล์</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteStudent(stu)}
-                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded"
-                            title="ย้ายไปถังขยะ"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            {stu.name}
                           </button>
                         </div>
                       </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
-      {/* Modal: Add Single Student */}
+                      {/* การเข้าเรียน (👤 8/8) ตรงตามภาพ Reference Image 1 */}
+                      <td className="py-3.5 px-4">
+                        <span className="inline-flex items-center gap-1.5 text-slate-700 font-medium">
+                          <User className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>{stu.attendance}</span>
+                        </span>
+                      </td>
+
+                      {/* คะแนนรวม (ตัวเลขสีน้ำเงินเข้ม) */}
+                      <td className="py-3.5 px-4 text-center font-extrabold text-blue-600 text-sm">
+                        {stu.score % 1 === 0 ? stu.score : stu.score.toFixed(1)}
+                      </td>
+
+                      {/* สถานะ (🔔 ปกติ / ⚠️ กลุ่มเสี่ยง) ตรงตามภาพ Reference Image 1 */}
+                      <td className="py-3.5 px-4 text-center">
+                        {stu.status === 'AT_RISK' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-rose-50 text-rose-600 border border-rose-200/90 rounded-full font-bold text-[11px]">
+                            <AlertCircle className="w-3 h-3 text-rose-500" />
+                            <span>กลุ่มเสี่ยง</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/90 rounded-full font-bold text-[11px]">
+                            <Bell className="w-3 h-3 text-emerald-600" />
+                            <span>ปกติ</span>
+                          </span>
+                        )}
+                      </td>
+
+                      {/* การจัดการ (ดูรายละเอียด > และ ⋮) */}
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenRadar(stu)}
+                            className="text-blue-600 hover:text-blue-800 font-bold text-xs flex items-center gap-0.5 transition-colors cursor-pointer"
+                          >
+                            <span>ดูรายละเอียด</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* ⋮ Action Menu Dropdown */}
+                          <div className="relative action-menu-container">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setOpenActionMenuId(
+                                  openActionMenuId === stu.id ? null : stu.id
+                                )
+                              }
+                              className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                              title="ตัวเลือกเพิ่มเติม"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+
+                            {openActionMenuId === stu.id && (
+                              <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl border border-slate-200 shadow-xl z-50 p-1 text-xs space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleOpenRadar(stu);
+                                    setOpenActionMenuId(null);
+                                  }}
+                                  className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-700 hover:bg-blue-50 hover:text-blue-700 text-left cursor-pointer"
+                                >
+                                  <BarChart2 className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>Radar Chart 5 มิติ</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleDeleteStudent(stu);
+                                  }}
+                                  className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-rose-600 hover:bg-rose-50 text-left cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                                  <span>ย้ายไปถังขยะ</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 3. Bottom Callout Card พร้อมภาพภูเขาไฟฟูจิและดอกซากุระ ตรงตามภาพ Reference Image 1 */}
+      <div className="relative rounded-2xl overflow-hidden border border-sky-100 shadow-sm bg-gradient-to-r from-sky-50/90 via-blue-50/70 to-pink-50/40 p-4 sm:p-5 flex items-center justify-between gap-4">
+        {/* Background Mount Fuji Sakura Art */}
+        <div className="absolute right-0 top-0 bottom-0 h-full w-1/3 sm:w-1/2 pointer-events-none opacity-40 md:opacity-60 overflow-hidden flex justify-end">
+          <img
+            src="/images/teacher/bottom_banner.png"
+            alt="Fuji Sakura Banner"
+            className="h-full object-cover object-right"
+          />
+        </div>
+
+        {/* Content */}
+        <div className="relative z-10 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-blue-500 text-white flex items-center justify-center shadow-sm shadow-blue-500/20 shrink-0">
+            <Lightbulb className="w-4 h-4 text-white" />
+          </div>
+          <p className="text-xs sm:text-sm font-semibold text-slate-700">
+            คลิกที่ชื่อนักเรียนเพื่อดูข้อมูลผลการเรียน และ Radar Chart 5 มิติ ได้ทันที
+          </p>
+        </div>
+      </div>
+
+      {/* Modal: เพิ่มนักเรียนใหม่ */}
       {isAddStudentOpen && selectedClass && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
-          <form onSubmit={handleCreateStudent} className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-md w-full p-6 space-y-4">
+          <form
+            onSubmit={handleCreateStudent}
+            className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-md w-full p-6 space-y-4"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-slate-800 text-base">เพิ่มนักเรียนในห้อง {selectedClass.name}</h3>
+              <h3 className="font-bold text-slate-800 text-base">
+                เพิ่มนักเรียนในห้อง {selectedClass.name}
+              </h3>
               <button
                 type="button"
                 onClick={() => setIsAddStudentOpen(false)}
@@ -421,7 +978,9 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                 />
               </div>
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">รหัสประจำตัวนักเรียน</label>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  รหัสประจำตัวนักเรียน
+                </label>
                 <input
                   type="text"
                   required
@@ -432,7 +991,9 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                 />
               </div>
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">ชื่อ - นามสกุล</label>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  ชื่อ - นามสกุล
+                </label>
                 <input
                   type="text"
                   required
@@ -448,13 +1009,13 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsAddStudentOpen(false)}
-                className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50"
+                className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50 cursor-pointer"
               >
                 ยกเลิก
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs cursor-pointer"
               >
                 บันทึกนักเรียน
               </button>
@@ -463,10 +1024,13 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
         </div>
       )}
 
-      {/* Modal: Add New Classroom */}
+      {/* Modal: สร้างห้องเรียนใหม่ */}
       {isAddClassroomOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
-          <form onSubmit={handleCreateClassroom} className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-md w-full p-6 space-y-4">
+          <form
+            onSubmit={handleCreateClassroom}
+            className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-md w-full p-6 space-y-4"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-bold text-slate-800 text-base">สร้างห้องเรียนใหม่</h3>
               <button
@@ -528,7 +1092,9 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                 />
               </div>
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">ครูประจำชั้น / ที่ปรึกษา</label>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  ครูประจำชั้น / ที่ปรึกษา
+                </label>
                 <input
                   type="text"
                   value={newAdviser}
@@ -542,13 +1108,13 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsAddClassroomOpen(false)}
-                className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50"
+                className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50 cursor-pointer"
               >
                 ยกเลิก
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs cursor-pointer"
               >
                 บันทึกห้องเรียน
               </button>
@@ -557,7 +1123,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
         </div>
       )}
 
-      {/* Modal: Import Excel / SGS */}
+      {/* Modal: นำเข้า Excel / SGS */}
       {isImportModalOpen && selectedClass && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-lg w-full p-6 space-y-4">
@@ -579,8 +1145,12 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
               className="p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center space-y-2 bg-slate-50/50 hover:bg-blue-50/30 transition-colors cursor-pointer"
             >
               <Upload className="w-8 h-8 text-blue-600 mx-auto" />
-              <p className="text-xs font-semibold text-slate-700">ลากไฟล์ Excel (.xlsx, .csv) มาวางที่นี่ (คลิกเพื่อทดสอบ)</p>
-              <p className="text-[11px] text-slate-400">รองรับโครงสร้างคอลัมน์ระบบ SGS สพฐ. (เลขที่, รหัสนักเรียน, คำนำหน้า, ชื่อ, นามสกุล)</p>
+              <p className="text-xs font-semibold text-slate-700">
+                ลากไฟล์ Excel (.xlsx, .csv) มาวางที่นี่ (คลิกเพื่อทดสอบ)
+              </p>
+              <p className="text-[11px] text-slate-400">
+                รองรับโครงสร้างคอลัมน์ระบบ SGS สพฐ. (เลขที่, รหัสนักเรียน, คำนำหน้า, ชื่อ, นามสกุล)
+              </p>
             </div>
 
             <div className="p-3 bg-blue-50 rounded-xl text-xs text-blue-700">
@@ -590,13 +1160,13 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
             <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 onClick={() => setIsImportModalOpen(false)}
-                className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50"
+                className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50 cursor-pointer"
               >
                 ยกเลิก
               </button>
               <button
                 onClick={handleBatchImport}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold cursor-pointer"
               >
                 เริ่มการนำเข้า (3 รายการทดสอบ)
               </button>

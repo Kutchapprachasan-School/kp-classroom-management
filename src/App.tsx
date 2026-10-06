@@ -537,7 +537,12 @@ export const App: React.FC = () => {
                 />
               )}
 
-              {currentView === 'sar' && <CrossClassSarView />}
+              {currentView === 'sar' && (
+                <CrossClassSarView
+                  activeRole={activeRole}
+                  onChangeRole={handleChangeRole}
+                />
+              )}
 
               {currentView === 'home-visit' && <HomeVisitSdqView />}
 
@@ -569,6 +574,8 @@ export const App: React.FC = () => {
                 <ClassroomsRosterView
                   onSelectStudent={handleSelectStudent}
                   onSelectClassroom={() => setCurrentView('class-overview')}
+                  activeRole={activeRole}
+                  onChangeRole={handleChangeRole}
                 />
               )}
 

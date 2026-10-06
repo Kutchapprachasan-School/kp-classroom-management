@@ -9,31 +9,161 @@ export interface StudentRecord {
   attendance: string;
   score: number;
   status: 'NORMAL' | 'AT_RISK';
+  avatarUrl?: string;
+  gender?: 'MALE' | 'FEMALE';
 }
 
 const STORAGE_PREFIX = 'cls_students_';
 
-const defaultStudents: StudentRecord[] = [
-  { id: 'stu-1', no: 1, code: '45101', name: 'ด.ช. กฤษณะ ศรีสมบูรณ์', attendance: '8/8', score: 88.5, status: 'NORMAL' },
-  { id: 'stu-2', no: 2, code: '45102', name: 'ด.ช. จิรายุ เดชปันคำ', attendance: '8/8', score: 92.0, status: 'NORMAL' },
-  { id: 'stu-7', no: 7, code: '45107', name: 'ด.ช. ภูรินท์ บัณฑิต', attendance: '4/8', score: 28.3, status: 'AT_RISK' },
-  { id: 'stu-10', no: 10, code: '45110', name: 'ด.ช. อัศวิน วนเกษตรกุล', attendance: '8/8', score: 34.3, status: 'AT_RISK' },
-  { id: 'stu-12', no: 12, code: '45112', name: 'ด.ช. ชัยมงคล วงศ์บุตร', attendance: '8/8', score: 35.0, status: 'AT_RISK' },
-  { id: 'stu-15', no: 15, code: '45115', name: 'ด.ช. ทัตธน คำฝั้น', attendance: '8/8', score: 78.5, status: 'NORMAL' },
-  { id: 'stu-22', no: 22, code: '45122', name: 'ด.ญ. อคิราห์ วิรากร', attendance: '6/8', score: 39.0, status: 'AT_RISK' },
-  { id: 'stu-23', no: 23, code: '45123', name: 'ด.ญ. ปรียาภรณ์ ชัยแก้ว', attendance: '8/8', score: 95.0, status: 'NORMAL' },
+export const defaultStudents: StudentRecord[] = [
+  { id: 'stu-1', no: 1, code: '45101', name: 'ด.ช. กฤษณะ ศรีสมบูรณ์', attendance: '8/8', score: 88.5, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+  { id: 'stu-2', no: 2, code: '45102', name: 'ด.ช. ธีรานุ เดชปันคำ', attendance: '8/8', score: 92.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+  { id: 'stu-7', no: 7, code: '45107', name: 'ด.ช. ภูรินท์ บัณฑิต', attendance: '4/8', score: 28.3, status: 'AT_RISK', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+  { id: 'stu-10', no: 10, code: '45110', name: 'ด.ช. อัศวิน วนเกษตรกุล', attendance: '8/8', score: 34.3, status: 'AT_RISK', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+  { id: 'stu-12', no: 12, code: '45112', name: 'ด.ช. ชัยมงคล วงศ์บุตร', attendance: '8/8', score: 35.0, status: 'AT_RISK', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+  { id: 'stu-15', no: 15, code: '45115', name: 'ด.ช. หัตเธน คำฝั้น', attendance: '8/8', score: 78.5, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+  { id: 'stu-22', no: 22, code: '45122', name: 'ด.ญ. อดาราน์ จิรากร', attendance: '6/8', score: 39.0, status: 'AT_RISK', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  { id: 'stu-23', no: 23, code: '45123', name: 'ด.ญ. ปริยาภรณ์ ชัยแก้ว', attendance: '8/8', score: 95.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
 ];
+
+const mockStudentsByRoom: Record<string, StudentRecord[]> = {
+  'room-3-1': defaultStudents,
+  'ม.3/1': defaultStudents,
+  'room-3-2': [
+    { id: 'stu-32-1', no: 1, code: '45201', name: 'ด.ช. ธนกร วัฒนศิลป์', attendance: '8/8', score: 86.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-32-2', no: 2, code: '45202', name: 'ด.ช. ภัทรดนัย บุญยัง', attendance: '7/8', score: 81.5, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-32-3', no: 3, code: '45203', name: 'ด.ช. นรวิชญ์ เกษมศรี', attendance: '8/8', score: 90.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-32-4', no: 4, code: '45204', name: 'ด.ช. วรัญญู รุ่งโรจน์', attendance: '5/8', score: 42.0, status: 'AT_RISK', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-32-5', no: 5, code: '45205', name: 'ด.ญ. กัญญารัตน์ โพธิ์ทอง', attendance: '8/8', score: 94.5, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+    { id: 'stu-32-6', no: 6, code: '45206', name: 'ด.ญ. พิชญาภา สุขสมบูรณ์', attendance: '8/8', score: 88.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'ม.3/2': [
+    { id: 'stu-32-1', no: 1, code: '45201', name: 'ด.ช. ธนกร วัฒนศิลป์', attendance: '8/8', score: 86.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-32-2', no: 2, code: '45202', name: 'ด.ช. ภัทรดนัย บุญยัง', attendance: '7/8', score: 81.5, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-32-3', no: 3, code: '45203', name: 'ด.ช. นรวิชญ์ เกษมศรี', attendance: '8/8', score: 90.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-32-4', no: 4, code: '45204', name: 'ด.ช. วรัญญู รุ่งโรจน์', attendance: '5/8', score: 42.0, status: 'AT_RISK', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-32-5', no: 5, code: '45205', name: 'ด.ญ. กัญญารัตน์ โพธิ์ทอง', attendance: '8/8', score: 94.5, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+    { id: 'stu-32-6', no: 6, code: '45206', name: 'ด.ญ. พิชญาภา สุขสมบูรณ์', attendance: '8/8', score: 88.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'room-1-8': [
+    { id: 'stu-18-1', no: 1, code: '47101', name: 'ด.ช. กฤษดา ศรีนคร', attendance: '8/8', score: 75.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-18-2', no: 2, code: '47102', name: 'ด.ช. จิรภัทร ชาญวิทย์', attendance: '6/8', score: 68.5, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-18-3', no: 3, code: '47103', name: 'ด.ช. ธนพล มณีโชติ', attendance: '3/8', score: 32.0, status: 'AT_RISK', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-18-4', no: 4, code: '47104', name: 'ด.ญ. นลินทิพย์ วงศ์ใหญ่', attendance: '8/8', score: 89.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+    { id: 'stu-18-5', no: 5, code: '47105', name: 'ด.ญ. วรินทร อักษรศรี', attendance: '8/8', score: 82.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'ม.1/8': [
+    { id: 'stu-18-1', no: 1, code: '47101', name: 'ด.ช. กฤษดา ศรีนคร', attendance: '8/8', score: 75.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-18-2', no: 2, code: '47102', name: 'ด.ช. จิรภัทร ชาญวิทย์', attendance: '6/8', score: 68.5, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-18-3', no: 3, code: '47103', name: 'ด.ช. ธนพล มณีโชติ', attendance: '3/8', score: 32.0, status: 'AT_RISK', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-18-4', no: 4, code: '47104', name: 'ด.ญ. นลินทิพย์ วงศ์ใหญ่', attendance: '8/8', score: 89.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+    { id: 'stu-18-5', no: 5, code: '47105', name: 'ด.ญ. วรินทร อักษรศรี', attendance: '8/8', score: 82.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'room-2-8': [
+    { id: 'stu-28-1', no: 1, code: '46201', name: 'ด.ช. ภาณุวัฒน์ ใจดี', attendance: '8/8', score: 92.5, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-28-2', no: 2, code: '46202', name: 'ด.ช. ธีรเมธ ศิริชัย', attendance: '8/8', score: 87.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-28-3', no: 3, code: '46203', name: 'ด.ญ. ชนกนันท์ เลิศวิมล', attendance: '8/8', score: 95.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+    { id: 'stu-28-4', no: 4, code: '46204', name: 'ด.ญ. ปรียานุช รุ่งอรุณ', attendance: '8/8', score: 85.5, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'ม.2/8': [
+    { id: 'stu-28-1', no: 1, code: '46201', name: 'ด.ช. ภาณุวัฒน์ ใจดี', attendance: '8/8', score: 92.5, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-28-2', no: 2, code: '46202', name: 'ด.ช. ธีรเมธ ศิริชัย', attendance: '8/8', score: 87.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-28-3', no: 3, code: '46203', name: 'ด.ญ. ชนกนันท์ เลิศวิมล', attendance: '8/8', score: 95.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+    { id: 'stu-28-4', no: 4, code: '46204', name: 'ด.ญ. ปรียานุช รุ่งอรุณ', attendance: '8/8', score: 85.5, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'room-3-8': [
+    { id: 'stu-38-1', no: 1, code: '45801', name: 'ด.ช. กรณ์พัฒน์ สุริยะ', attendance: '8/8', score: 96.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-38-2', no: 2, code: '45802', name: 'ด.ช. ชนสรณ์ เลิศศิลป์', attendance: '8/8', score: 91.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-38-3', no: 3, code: '45803', name: 'ด.ญ. พัทธนันท์ วีระกุล', attendance: '8/8', score: 94.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'ม.3/8': [
+    { id: 'stu-38-1', no: 1, code: '45801', name: 'ด.ช. กรณ์พัฒน์ สุริยะ', attendance: '8/8', score: 96.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-38-2', no: 2, code: '45802', name: 'ด.ช. ชนสรณ์ เลิศศิลป์', attendance: '8/8', score: 91.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-38-3', no: 3, code: '45803', name: 'ด.ญ. พัทธนันท์ วีระกุล', attendance: '8/8', score: 94.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'room-1-1': [
+    { id: 'stu-11-1', no: 1, code: '47001', name: 'ด.ช. ชนะภัย ชัยวัฒน์', attendance: '8/8', score: 85.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-11-2', no: 2, code: '47002', name: 'ด.ช. ปัณณธร ศรีสุข', attendance: '7/8', score: 79.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-11-3', no: 3, code: '47003', name: 'ด.ญ. กัญญาวีร์ สิทธิโชค', attendance: '8/8', score: 91.5, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+    { id: 'stu-11-4', no: 4, code: '47004', name: 'ด.ญ. ปานวาด ประเสริฐยิ่ง', attendance: '5/8', score: 45.0, status: 'AT_RISK', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'ม.1/1': [
+    { id: 'stu-11-1', no: 1, code: '47001', name: 'ด.ช. ชนะภัย ชัยวัฒน์', attendance: '8/8', score: 85.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-11-2', no: 2, code: '47002', name: 'ด.ช. ปัณณธร ศรีสุข', attendance: '7/8', score: 79.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-11-3', no: 3, code: '47003', name: 'ด.ญ. กัญญาวีร์ สิทธิโชค', attendance: '8/8', score: 91.5, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+    { id: 'stu-11-4', no: 4, code: '47004', name: 'ด.ญ. ปานวาด ประเสริฐยิ่ง', attendance: '5/8', score: 45.0, status: 'AT_RISK', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'room-2-1': [
+    { id: 'stu-21-1', no: 1, code: '46001', name: 'ด.ช. กันต์ริศย์ ทวีเศรษฐกร', attendance: '8/8', score: 88.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-21-2', no: 2, code: '46002', name: 'ด.ช. พงศกร มหาวงศ์', attendance: '8/8', score: 84.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-21-3', no: 3, code: '46003', name: 'ด.ญ. ศุภิสรา รัตนโกสินทร์', attendance: '8/8', score: 93.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'ม.2/1': [
+    { id: 'stu-21-1', no: 1, code: '46001', name: 'ด.ช. กันต์ริศย์ ทวีเศรษฐกร', attendance: '8/8', score: 88.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-21-2', no: 2, code: '46002', name: 'ด.ช. พงศกร มหาวงศ์', attendance: '8/8', score: 84.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-21-3', no: 3, code: '46003', name: 'ด.ญ. ศุภิสรา รัตนโกสินทร์', attendance: '8/8', score: 93.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'room-4-1': [
+    { id: 'stu-41-1', no: 1, code: '44101', name: 'นาย ณภัทร เกษมศานติ์', attendance: '8/8', score: 87.5, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-41-2', no: 2, code: '44102', name: 'น.ส. ธัญชนก รักษ์มณี', attendance: '8/8', score: 92.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'ม.4/1': [
+    { id: 'stu-41-1', no: 1, code: '44101', name: 'นาย ณภัทร เกษมศานติ์', attendance: '8/8', score: 87.5, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-41-2', no: 2, code: '44102', name: 'น.ส. ธัญชนก รักษ์มณี', attendance: '8/8', score: 92.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'room-5-1': [
+    { id: 'stu-51-1', no: 1, code: '42018', name: 'น.ส. พิมพ์ชนก วงศ์สวัสดิ์', attendance: '8/8', score: 95.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+    { id: 'stu-51-2', no: 2, code: '43102', name: 'นาย วรรณพงศ์ ศิริชัย', attendance: '7/8', score: 82.5, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+  ],
+  'ม.5/1': [
+    { id: 'stu-51-1', no: 1, code: '42018', name: 'น.ส. พิมพ์ชนก วงศ์สวัสดิ์', attendance: '8/8', score: 95.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+    { id: 'stu-51-2', no: 2, code: '43102', name: 'นาย วรรณพงศ์ ศิริชัย', attendance: '7/8', score: 82.5, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+  ],
+  'room-6-1': [
+    { id: 'stu-61-1', no: 1, code: '42101', name: 'นาย ธีรภัทร อภิบาล', attendance: '8/8', score: 91.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-61-2', no: 2, code: '42102', name: 'น.ส. ชนิกานต์ สุวรรณฉัตร', attendance: '8/8', score: 96.5, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'ม.6/1': [
+    { id: 'stu-61-1', no: 1, code: '42101', name: 'นาย ธีรภัทร อภิบาล', attendance: '8/8', score: 91.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-61-2', no: 2, code: '42102', name: 'น.ส. ชนิกานต์ สุวรรณฉัตร', attendance: '8/8', score: 96.5, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'room-3-5': [
+    { id: 'stu-35-1', no: 1, code: '45501', name: 'ด.ช. พงศ์สิริ ธาราทิพย์', attendance: '8/8', score: 85.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-35-2', no: 2, code: '45502', name: 'ด.ญ. สุทธิดา ทวีโชค', attendance: '8/8', score: 90.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'ม.3/5': [
+    { id: 'stu-35-1', no: 1, code: '45501', name: 'ด.ช. พงศ์สิริ ธาราทิพย์', attendance: '8/8', score: 85.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-35-2', no: 2, code: '45502', name: 'ด.ญ. สุทธิดา ทวีโชค', attendance: '8/8', score: 90.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'room-3-6': [
+    { id: 'stu-36-1', no: 1, code: '45601', name: 'ด.ช. รชต วรพงศ์', attendance: '8/8', score: 82.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-36-2', no: 2, code: '45602', name: 'ด.ญ. วรัญญา พิพัฒน์', attendance: '7/8', score: 79.5, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'ม.3/6': [
+    { id: 'stu-36-1', no: 1, code: '45601', name: 'ด.ช. รชต วรพงศ์', attendance: '8/8', score: 82.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-36-2', no: 2, code: '45602', name: 'ด.ญ. วรัญญา พิพัฒน์', attendance: '7/8', score: 79.5, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'room-3-7': [
+    { id: 'stu-37-1', no: 1, code: '45701', name: 'ด.ช. อนุชา วิเศษศิลป์', attendance: '8/8', score: 88.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-37-2', no: 2, code: '45702', name: 'ด.ญ. กัญญ์ณพัชญ์ ศิริพร', attendance: '8/8', score: 93.5, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+  'ม.3/7': [
+    { id: 'stu-37-1', no: 1, code: '45701', name: 'ด.ช. อนุชา วิเศษศิลป์', attendance: '8/8', score: 88.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-37-2', no: 2, code: '45702', name: 'ด.ญ. กัญญ์ณพัชญ์ ศิริพร', attendance: '8/8', score: 93.5, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+  ],
+};
 
 const getLocalStudents = (classroomId: string): StudentRecord[] => {
   const raw = localStorage.getItem(`${STORAGE_PREFIX}${classroomId}`);
   if (raw) {
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     } catch {
       // fallback
     }
   }
-  return defaultStudents;
+  return mockStudentsByRoom[classroomId] || defaultStudents;
 };
 
 const saveLocalStudents = (classroomId: string, items: StudentRecord[]) => {

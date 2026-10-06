@@ -285,14 +285,14 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
         <span className="text-[11px] font-bold text-slate-500 block">
           สิทธิ์การใช้งาน (RBAC Mode)
         </span>
-        <div className="flex gap-1.5">
+        <div className="grid grid-cols-3 gap-1.5">
           <button
             type="button"
             onClick={() => {
               onChangeRole?.('TEACHER_GENERAL');
               setIsProfileOpen(false);
             }}
-            className={`flex-1 py-1.5 px-2 rounded-lg text-center font-bold text-[11px] transition-colors cursor-pointer ${
+            className={`py-1.5 px-1 rounded-lg text-center font-bold text-[11px] transition-colors cursor-pointer ${
               activeRole === 'TEACHER_GENERAL'
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
@@ -303,17 +303,30 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
           <button
             type="button"
             onClick={() => {
+              onChangeRole?.('STUDENT_AFFAIRS');
+              setIsProfileOpen(false);
+            }}
+            className={`py-1.5 px-1 rounded-lg text-center font-bold text-[11px] transition-colors cursor-pointer ${
+              activeRole === 'STUDENT_AFFAIRS'
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            ครูกิจการ
+          </button>
+          <button
+            type="button"
+            onClick={() => {
               onChangeRole?.('ACADEMIC_ADMIN');
               setIsProfileOpen(false);
-              onDeepNavigate?.({ view: 'admin-dashboard' });
             }}
-            className={`flex-1 py-1.5 px-2 rounded-lg text-center font-bold text-[11px] transition-colors cursor-pointer ${
+            className={`py-1.5 px-1 rounded-lg text-center font-bold text-[11px] transition-colors cursor-pointer ${
               activeRole === 'ACADEMIC_ADMIN'
                 ? 'bg-indigo-600 text-white shadow-xs'
                 : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
             }`}
           >
-            ผู้บริหาร (Admin)
+            ผอ./Admin
           </button>
         </div>
       </div>
@@ -503,7 +516,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
             <input
               type="text"
               readOnly
-              placeholder="ค้นหา..."
+              placeholder="ค้นหานักเรียน..."
               onClick={onOpenSearch}
               className="w-36 md:w-44 pl-9 pr-3.5 py-1.5 rounded-full border border-slate-200 bg-slate-100/80 hover:bg-slate-100 text-xs text-slate-800 placeholder-slate-400 cursor-pointer focus:outline-hidden transition-colors"
             />
