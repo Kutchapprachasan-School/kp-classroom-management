@@ -22,6 +22,8 @@ import { SchoolPortalView, type TeacherLoginChannel } from './views/SchoolPortal
 import { HomeVisitSdqView } from './views/HomeVisitSdqView';
 import { StudentAffairsCouncilView } from './views/StudentAffairsCouncilView';
 import { AdminExecutiveDashboardView } from './views/AdminExecutiveDashboardView';
+import { MorningAssemblyView } from './views/MorningAssemblyView';
+import { ClassroomAttendanceView } from './views/ClassroomAttendanceView';
 import { QuickSearchModal } from './components/common/QuickSearchModal';
 import type { AtRiskStudent } from './types/viewModels';
 import {
@@ -192,6 +194,10 @@ export const App: React.FC = () => {
         return 'แดชบอร์ดผู้บริหาร • โรงเรียนศึกษาวิทยา';
       case 'class-overview':
         return 'ศ23101 ศิลปะ';
+      case 'morning-assembly':
+        return 'เช็คแถวเช้า (Morning Assembly)';
+      case 'classroom-attendance':
+        return 'เช็คชื่อนักเรียน (Classroom Attendance)';
       case 'exams':
         return 'จัดการการสอบ (Exam Management)';
       case 'assignments':
@@ -529,6 +535,14 @@ export const App: React.FC = () => {
                   initialAssignmentFilter={deepLinkAssignmentFilter}
                   initialHighlightBanner={deepLinkBanner}
                 />
+              )}
+
+              {currentView === 'morning-assembly' && (
+                <MorningAssemblyView onDeepNavigate={handleDeepNavigate} />
+              )}
+
+              {currentView === 'classroom-attendance' && (
+                <ClassroomAttendanceView onDeepNavigate={handleDeepNavigate} />
               )}
 
               {currentView === 'exams' && <ExamManagementView />}

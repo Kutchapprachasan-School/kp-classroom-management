@@ -546,5 +546,70 @@ assert.strictEqual(isImageFile(mockBannerBlob), true);
 assert.strictEqual(isImageFile(new Blob(['hello'], { type: 'text/plain' })), false);
 console.log('  ✓ Utility formatting helpers verified');
 
-console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE, SUBJECT ICONS & BANNER COMPRESSOR CHECKS PASSED!');
+// ----------------------------------------------------
+// Step 5: Teacher Sidebar Reorganization & App Navigation Verification (Task 4)
+// ----------------------------------------------------
+console.log('\n--- 5. Checking Teacher Sidebar Reorganization & App Navigation (Task 4) ---');
+
+const sidebarPath = './src/components/layout/TeacherSidebar.tsx';
+assert.ok(existsSync(sidebarPath), 'src/components/layout/TeacherSidebar.tsx must exist');
+const sidebarSource = readFileSync(sidebarPath, 'utf8');
+
+// 5.1 TeacherViewKey & icons
+assert.ok(sidebarSource.includes("'morning-assembly'"), "TeacherSidebar must include 'morning-assembly' in TeacherViewKey");
+assert.ok(sidebarSource.includes("'classroom-attendance'"), "TeacherSidebar must include 'classroom-attendance' in TeacherViewKey");
+assert.ok(sidebarSource.includes('UserCheck'), 'TeacherSidebar must import and use UserCheck icon');
+assert.ok(sidebarSource.includes('ClipboardCheck'), 'TeacherSidebar must import and use ClipboardCheck icon');
+
+// 5.2 Menu order check: timetable -> morning-assembly -> classroom-attendance -> assignments
+const timetableIdx = sidebarSource.indexOf("key: 'timetable'");
+const morningIdx = sidebarSource.indexOf("key: 'morning-assembly'");
+const classroomIdx = sidebarSource.indexOf("key: 'classroom-attendance'");
+const assignmentsIdx = sidebarSource.indexOf("key: 'assignments'");
+assert.ok(timetableIdx !== -1 && morningIdx !== -1 && classroomIdx !== -1 && assignmentsIdx !== -1);
+assert.ok(timetableIdx < morningIdx, 'Timetable must precede morning-assembly');
+assert.ok(morningIdx < classroomIdx, 'Morning-assembly must precede classroom-attendance');
+assert.ok(classroomIdx < assignmentsIdx, 'Classroom-attendance must precede assignments');
+console.log('  ✓ Sidebar menu ordering (timetable -> morning-assembly -> classroom-attendance -> assignments) verified');
+
+// 5.3 Banner position: Banner placed directly below Settings within scroll container, LogOut alone at bottom
+const settingsKeyIdx = sidebarSource.indexOf("key: 'settings'");
+const bannerIdx = sidebarSource.indexOf("sidebarBanner.name");
+const logOutBtnIdx = sidebarSource.indexOf("<LogOut");
+assert.ok(settingsKeyIdx < bannerIdx, 'Mascot banner must be placed below settings menu');
+assert.ok(bannerIdx < logOutBtnIdx, 'Mascot banner must precede logout button (logout alone in bottom section)');
+
+// Check that the banner is within the scroll container before the closing tag of flex-1 overflow-y-auto
+const scrollContainerStart = sidebarSource.indexOf('overflow-y-auto');
+const bottomBorderT = sidebarSource.indexOf('border-t border-slate-100 shrink-0');
+assert.ok(scrollContainerStart !== -1 && bottomBorderT !== -1);
+assert.ok(bannerIdx < bottomBorderT, 'Banner must be inside main container above the isolated bottom logout section');
+console.log('  ✓ Mascot banner placement directly below settings verified');
+
+// 5.4 App.tsx routing
+const appPath = './src/App.tsx';
+assert.ok(existsSync(appPath), 'src/App.tsx must exist');
+const appSource = readFileSync(appPath, 'utf8');
+
+assert.ok(appSource.includes('MorningAssemblyView'), 'App.tsx must import MorningAssemblyView');
+assert.ok(appSource.includes('ClassroomAttendanceView'), 'App.tsx must import ClassroomAttendanceView');
+assert.ok(appSource.includes("case 'morning-assembly'"), "App.tsx must have getHeaderTitle case for 'morning-assembly'");
+assert.ok(appSource.includes("case 'classroom-attendance'"), "App.tsx must have getHeaderTitle case for 'classroom-attendance'");
+assert.ok(appSource.includes("currentView === 'morning-assembly'"), "App.tsx must route currentView === 'morning-assembly'");
+assert.ok(appSource.includes("currentView === 'classroom-attendance'"), "App.tsx must route currentView === 'classroom-attendance'");
+console.log('  ✓ App.tsx routing and title mapping verified');
+
+// 5.5 View components exist and import attendanceCorrelationService
+const morningViewPath = './src/views/MorningAssemblyView.tsx';
+const classroomViewPath = './src/views/ClassroomAttendanceView.tsx';
+assert.ok(existsSync(morningViewPath), 'MorningAssemblyView.tsx must exist');
+assert.ok(existsSync(classroomViewPath), 'ClassroomAttendanceView.tsx must exist');
+
+const morningViewSource = readFileSync(morningViewPath, 'utf8');
+const classroomViewSource = readFileSync(classroomViewPath, 'utf8');
+assert.ok(morningViewSource.includes('attendanceCorrelationService'), 'MorningAssemblyView must import attendanceCorrelationService');
+assert.ok(classroomViewSource.includes('attendanceCorrelationService'), 'ClassroomAttendanceView must import attendanceCorrelationService');
+console.log('  ✓ MorningAssemblyView and ClassroomAttendanceView component shells verified');
+
+console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE, SUBJECT ICONS, BANNER COMPRESSOR & SIDEBAR UX CHECKS PASSED!');
 

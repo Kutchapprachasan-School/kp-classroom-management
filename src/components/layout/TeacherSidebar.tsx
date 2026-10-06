@@ -18,6 +18,8 @@ import {
   X,
   PanelLeftClose,
   Sparkles,
+  UserCheck,
+  ClipboardCheck,
 } from 'lucide-react';
 import { getSchoolSettings, type SchoolUserRole } from '../../config/schoolRoles';
 import {
@@ -32,6 +34,8 @@ export type TeacherViewKey =
   | 'home'
   | 'admin-dashboard'
   | 'class-overview'
+  | 'morning-assembly'
+  | 'classroom-attendance'
   | 'exams'
   | 'assignments'
   | 'readiness'
@@ -106,7 +110,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
   const isAdmin = teacherBannerService.canManageBanners(activeRole);
   const schoolSettings = getSchoolSettings();
 
-  // 10 เมนูหลักของครู ตรงตามภาพต้นแบบ Mockup Image 1
+  // เมนูหลักของครูตามแบบ Pastel Anime Education Dashboard
   const menuItems: NavMenuItem[] = [
     {
       key: 'home',
@@ -128,6 +132,16 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       key: 'timetable',
       label: 'ตารางสอน/วันนี้',
       icon: Calendar,
+    },
+    {
+      key: 'morning-assembly',
+      label: 'เช็คแถวเช้า',
+      icon: UserCheck,
+    },
+    {
+      key: 'classroom-attendance',
+      label: 'เช็คชื่อนักเรียน',
+      icon: ClipboardCheck,
     },
     {
       key: 'assignments',
@@ -153,7 +167,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     },
     {
       key: 'exams',
-      label: 'จัดการสอบ / เก็บคะแนน', /* label: 'ประเมิน / แบบฟอร์ม' */
+      label: 'จัดการสอบ / เก็บคะแนน',
       icon: ClipboardList,
     },
     {
@@ -229,13 +243,15 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
         )}
       </div>
 
-      {/* 2. Navigation Items (10 เมนูตรงตามภาพต้นแบบ Image 1) */}
+      {/* 2. Navigation Items & Mascot Banner directly beneath Settings */}
       <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-1">
         {menuItems.map((item) => {
           const IconComp = item.icon;
           const isActive =
             currentView === item.key ||
             (item.key === 'timetable' && currentView === 'timetable') ||
+            (item.key === 'morning-assembly' && currentView === 'morning-assembly') ||
+            (item.key === 'classroom-attendance' && currentView === 'classroom-attendance') ||
             (item.key === 'settings' &&
               ['settings', 'accounts', 'trash'].includes(currentView));
 
@@ -269,51 +285,51 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             </button>
           );
         })}
-      </div>
 
-      {/* 3. Sidebar Banner (ส่วนที่ 1 ของแบนเนอร์ครู ตามภาพต้นแบบ Image 1) */}
-      <div className="px-3 py-2 shrink-0">
-        <div className="relative rounded-2xl overflow-hidden border border-blue-100 shadow-2xs group bg-gradient-to-b from-sky-50 to-blue-50">
-          <img
-            src={
-              currentView === 'messages'
-                ? '/images/banners/sidebar-banner.png'
-                : (sidebarBanner.customUrl || sidebarBanner.defaultUrl)
-            }
-            alt={sidebarBanner.name}
-            className="w-full h-auto object-cover max-h-32"
-          />
+        {/* 3. Mascot Banner placed directly below Settings */}
+        <div className="pt-2 px-0.5">
+          <div className="relative rounded-2xl overflow-hidden border border-blue-100 shadow-2xs group bg-gradient-to-b from-sky-50 to-blue-50">
+            <img
+              src={
+                currentView === 'messages'
+                  ? '/images/banners/sidebar-banner.png'
+                  : (sidebarBanner.customUrl || sidebarBanner.defaultUrl)
+              }
+              alt={sidebarBanner.name}
+              className="w-full h-auto object-cover max-h-32"
+            />
 
-          {/* Text Overlay if custom image without text */}
-          {sidebarBanner.customUrl && (
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/70 via-transparent to-transparent flex flex-col justify-end p-2.5 text-white">
-              <span className="font-extrabold text-xs leading-tight drop-shadow-xs">
-                {sidebarBanner.quoteText || 'สอนภาษาญี่ปุ่น'}
-              </span>
-              {sidebarBanner.subText && (
-                <span className="text-[10px] text-blue-100 font-medium drop-shadow-2xs mt-0.5">
-                  {sidebarBanner.subText}
+            {/* Text Overlay if custom image without text */}
+            {sidebarBanner.customUrl && (
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-900/70 via-transparent to-transparent flex flex-col justify-end p-2.5 text-white">
+                <span className="font-extrabold text-xs leading-tight drop-shadow-xs">
+                  {sidebarBanner.quoteText || 'สอนภาษาญี่ปุ่น'}
                 </span>
-              )}
-            </div>
-          )}
+                {sidebarBanner.subText && (
+                  <span className="text-[10px] text-blue-100 font-medium drop-shadow-2xs mt-0.5">
+                    {sidebarBanner.subText}
+                  </span>
+                )}
+              </div>
+            )}
 
-          {/* Quick Admin Customize Button */}
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={() => setIsAdminBannerModalOpen(true)}
-              className="absolute top-1.5 right-1.5 opacity-80 hover:opacity-100 p-1 rounded-lg bg-slate-900/80 hover:bg-blue-600 text-white text-[10px] flex items-center gap-1 backdrop-blur-xs transition-opacity cursor-pointer shadow-xs"
-              title="ปรับแต่งแบนเนอร์เมนูข้าง (เฉพาะแอดมิน)"
-            >
-              <Sparkles className="w-3 h-3 text-yellow-300" />
-              <span className="hidden sm:inline">แก้ไข</span>
-            </button>
-          )}
+            {/* Quick Admin Customize Button */}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setIsAdminBannerModalOpen(true)}
+                className="absolute top-1.5 right-1.5 opacity-80 hover:opacity-100 p-1 rounded-lg bg-slate-900/80 hover:bg-blue-600 text-white text-[10px] flex items-center gap-1 backdrop-blur-xs transition-opacity cursor-pointer shadow-xs"
+                title="ปรับแต่งแบนเนอร์เมนูข้าง (เฉพาะแอดมิน)"
+              >
+                <Sparkles className="w-3 h-3 text-yellow-300" />
+                <span className="hidden sm:inline">แก้ไข</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* 4. Logout Button matching Image 1 & Image 2 */}
+      {/* 4. Logout Button matching Image 1 & Image 2 (Bottom contains only LogOut) */}
       <div className="p-3 border-t border-slate-100 shrink-0">
         <button
           type="button"
