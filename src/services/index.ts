@@ -9,3 +9,4 @@ export * from './trashService';
 export * from './gamificationService';
 export * from './authService';
 export * from './sgsExportService';
+export * from './attendanceCorrelationService';
