@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@mingcute/react": "^3.0.2",
+    "@noble/hashes": "^2.4.0",
     "@supabase/supabase-js": "^2.117.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.47.0",

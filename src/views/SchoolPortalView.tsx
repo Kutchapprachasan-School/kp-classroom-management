@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, User, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
 import {
   getSchoolSettings,
-  authenticateSmsUnifiedUser,
   SCHOOL_ROLE_PROFILES,
   type SchoolUserRole,
   type SmsUserAccount,
   type SchoolBrandingSettings,
 } from '../config/schoolRoles';
+import { authService } from '../services/authService';
 
 export type TeacherLoginChannel = 'E_LEAVE' | 'DIRECT_CLASSROOM';
 
@@ -39,6 +39,7 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
   const [registerName, setRegisterName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [forgotResetSuccess, setForgotResetSuccess] = useState(false);
@@ -50,44 +51,111 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
     return () => window.removeEventListener('kps-school-settings-updated', syncSettings);
   }, []);
 
-  // ล็อกอินรวมศูนย์ด้วยบัญชีเดียวกับระบบ School Management System (SMS)
-  const routeBySmsUser = (user: SmsUserAccount) => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('kps_active_sms_user_v1', JSON.stringify(user));
-    }
-    if (user.role === 'STUDENT_GENERAL' || user.role === 'STUDENT_COUNCIL') {
-      onEnterStudentPortal(user.role, user);
-    } else {
-      const targetView = SCHOOL_ROLE_PROFILES[user.role].defaultView;
-      onEnterClassroomPortal(targetView, 'DIRECT_CLASSROOM', user.role, user);
-    }
-  };
-
-  const handleUnifiedLogin = (e: React.FormEvent) => {
+  const handleUnifiedLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanUser = username.trim();
+    const cleanPass = password.trim();
+
+    if (!cleanUser) {
+      setErrorMessage(lang === 'th' ? 'กรุณากรอกชื่อผู้ใช้ รหัสประจำตัว หรืออีเมล' : 'Please enter username or email');
+      return;
+    }
+    if (!cleanPass) {
+      setErrorMessage(lang === 'th' ? 'กรุณากรอกรหัสผ่าน' : 'Please enter password');
+      return;
+    }
+
     setLoading(true);
-    const matchedUser = authenticateSmsUnifiedUser(username || 'passapoom.r@kutchap.ac.th');
-    setTimeout(() => {
+    setErrorMessage(null);
+
+    try {
+      // 1. ถ้ารหัสผู้ใช้เป็นตัวเลข 5 หลัก -> ตรวจสอบการเข้าสู่ระบบของนักเรียน
+      if (/^\d{5}$/.test(cleanUser)) {
+        const studentUser = await authService.loginStudentWithHashedPassword(cleanUser, cleanPass);
+        onEnterStudentPortal('STUDENT_GENERAL', {
+          id: studentUser.id,
+          smsId: studentUser.studentCode || cleanUser,
+          username: studentUser.studentCode || cleanUser,
+          loginAliases: [cleanUser],
+          passwordOrPin: cleanPass,
+          fullName: studentUser.name,
+          role: 'STUDENT_GENERAL',
+          departmentOrClass: studentUser.classroomId || 'นักเรียน',
+          positionTitle: 'นักเรียน',
+          smsGroup: 'STUDENT',
+          smsSynced: true,
+        });
+        return;
+      }
+
+      // 2. ถ้าเป็นครู / บุคลากร -> ตรวจสอบกับฐานข้อมูล Supabase ตาราง User & Account จริง
+      const teacherUser = await authService.loginTeacher(cleanUser, cleanPass);
+      const appRole: SchoolUserRole =
+        teacherUser.role === 'ADMIN'
+          ? 'ACADEMIC_ADMIN'
+          : teacherUser.position?.includes('กิจการ')
+          ? 'STUDENT_AFFAIRS'
+          : 'TEACHER_GENERAL';
+
+      const targetView = SCHOOL_ROLE_PROFILES[appRole].defaultView;
+      onEnterClassroomPortal(targetView, 'DIRECT_CLASSROOM', appRole, {
+        id: teacherUser.id,
+        smsId: teacherUser.username || teacherUser.id,
+        username: teacherUser.username || teacherUser.email || cleanUser,
+        loginAliases: [cleanUser],
+        passwordOrPin: '',
+        fullName: teacherUser.name,
+        role: appRole,
+        departmentOrClass: teacherUser.subjectGroup || 'กลุ่มสาระการเรียนรู้',
+        positionTitle: teacherUser.position || 'ครูผู้สอน',
+        smsGroup: 'PERSONNEL',
+        smsSynced: true,
+      });
+    } catch (err: any) {
+      setErrorMessage(err.message || (lang === 'th' ? 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ' : 'Authentication failed'));
+    } finally {
       setLoading(false);
-      routeBySmsUser(matchedUser);
-    }, 200);
+    }
   };
 
-  const handleSocialLogin = (provider: 'GOOGLE' | 'FACEBOOK' | 'LINE') => {
+  const handleSocialLogin = async (provider: 'GOOGLE' | 'FACEBOOK' | 'LINE') => {
     setLoading(true);
-    // หากกด Social Login ให้ดึง Session ล่าสุดจาก SMS หรือเข้าด้วยผู้ใช้ตามช่องที่กรอก
-    const fallbackQuery =
-      username.trim() ||
-      (provider === 'GOOGLE'
-        ? 'passapoom.r@kutchap.ac.th'
-        : provider === 'LINE'
-        ? 'wiphada.s@kutchap.ac.th'
-        : '45102');
-    const matchedUser = authenticateSmsUnifiedUser(fallbackQuery);
-    setTimeout(() => {
+    setErrorMessage(null);
+    try {
+      if (provider === 'GOOGLE') {
+        const teacherUser = await authService.loginTeacherGoogle();
+        const appRole: SchoolUserRole =
+          teacherUser.role === 'ADMIN'
+            ? 'ACADEMIC_ADMIN'
+            : teacherUser.position?.includes('กิจการ')
+            ? 'STUDENT_AFFAIRS'
+            : 'TEACHER_GENERAL';
+        const targetView = SCHOOL_ROLE_PROFILES[appRole].defaultView;
+        onEnterClassroomPortal(targetView, 'DIRECT_CLASSROOM', appRole, {
+          id: teacherUser.id,
+          smsId: teacherUser.username || teacherUser.id,
+          username: teacherUser.username || teacherUser.email || 'google_user',
+          loginAliases: ['google'],
+          passwordOrPin: '',
+          fullName: teacherUser.name,
+          role: appRole,
+          departmentOrClass: teacherUser.subjectGroup || 'กลุ่มสาระการเรียนรู้',
+          positionTitle: teacherUser.position || 'ครูผู้สอน',
+          smsGroup: 'PERSONNEL',
+          smsSynced: true,
+        });
+      } else {
+        setErrorMessage(
+          lang === 'th'
+            ? `ระบบกำลังพัฒนาการเชื่อมต่อบัญชี ${provider} กรุณาเข้าสู่ระบบด้วยชื่อผู้ใช้/อีเมล หรือ Google Workspace`
+            : `${provider} login is in development. Please use username/password or Google.`
+        );
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Social login failed');
+    } finally {
       setLoading(false);
-      routeBySmsUser(matchedUser);
-    }, 200);
+    }
   };
 
   const handleForgotPasswordSubmit = (e: React.FormEvent) => {
@@ -206,6 +274,12 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
           </form>
         ) : (
           <form onSubmit={handleUnifiedLogin} className="space-y-4">
+            {errorMessage && (
+              <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-800 flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
             {authMode === 'REGISTER' && (
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">

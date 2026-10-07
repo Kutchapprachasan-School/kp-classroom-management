@@ -66,11 +66,30 @@ import {
   SCHOOL_ROLE_PROFILES,
   type SchoolUserRole,
 } from './config/schoolRoles';
+import { authService, type AuthUser } from './services/authService';
 
 export const App: React.FC = () => {
   const [schoolSettings, setSchoolSettings] = useState(() => getSchoolSettings());
-  const [currentView, setCurrentView] = useState<TeacherViewKey>('school-login');
-  const [activeRole, setActiveRole] = useState<SchoolUserRole>('TEACHER_GENERAL');
+  const [currentAuthUser, setCurrentAuthUser] = useState<AuthUser | null>(() => authService.getCurrentUser());
+  const [currentView, setCurrentView] = useState<TeacherViewKey>(() => {
+    const user = authService.getCurrentUser();
+    if (user) {
+      if (user.role === 'STUDENT') return 'student-portal';
+      if (user.role === 'ADMIN') return 'admin-dashboard';
+      return 'home';
+    }
+    return 'school-login';
+  });
+  const [activeRole, setActiveRole] = useState<SchoolUserRole>(() => {
+    const user = authService.getCurrentUser();
+    if (user) {
+      if (user.role === 'STUDENT') return 'STUDENT_GENERAL';
+      if (user.role === 'ADMIN') return 'ACADEMIC_ADMIN';
+      if (user.position?.includes('กิจการ')) return 'STUDENT_AFFAIRS';
+      return 'TEACHER_GENERAL';
+    }
+    return 'TEACHER_GENERAL';
+  });
   const [loginChannel, setLoginChannel] = useState<TeacherLoginChannel>('E_LEAVE');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState<boolean>(() => {
@@ -167,6 +186,12 @@ export const App: React.FC = () => {
     if (['academic-year', 'accounts', 'trash'].includes(currentView)) {
       setCurrentView(defaultTarget);
     }
+  };
+
+  const handleLogout = async () => {
+    await authService.logout();
+    setCurrentAuthUser(null);
+    setCurrentView('school-login');
   };
 
   const handleDeepNavigate = (payload: CrossViewNavigationPayload) => {
@@ -437,6 +462,7 @@ export const App: React.FC = () => {
             if (role) {
               setActiveRole(role);
             }
+            setCurrentAuthUser(authService.getCurrentUser());
             if (role === 'ACADEMIC_ADMIN') {
               setCurrentView('admin-dashboard');
             } else {
@@ -445,6 +471,7 @@ export const App: React.FC = () => {
           }}
           onEnterStudentPortal={(stuRole) => {
             setActiveRole(stuRole || 'STUDENT_GENERAL');
+            setCurrentAuthUser(authService.getCurrentUser());
             setCurrentView('student-portal');
           }}
         />
@@ -456,7 +483,7 @@ export const App: React.FC = () => {
           activeRole={activeRole}
           onChangeStudentRole={(stuRole) => setActiveRole(stuRole)}
           onSwitchToTeacherRole={(tRole) => handleChangeRole(tRole)}
-          onExit={() => setCurrentView('school-login')}
+          onExit={handleLogout}
         />
       ) : currentView === 'admin-dashboard' || (activeRole === 'ACADEMIC_ADMIN' && currentView === 'home') ? (
         <AdminExecutiveDashboardView
@@ -469,7 +496,7 @@ export const App: React.FC = () => {
               setCurrentView(viewKey as TeacherViewKey);
             }
           }}
-          onLogout={() => setCurrentView('school-login')}
+          onLogout={handleLogout}
         />
       ) : (
         /* Teacher Mode Layout */
@@ -480,7 +507,13 @@ export const App: React.FC = () => {
             activeRole={activeRole}
             onChangeRole={handleChangeRole}
             loginChannel={loginChannel}
-            onNavigate={(view) => setCurrentView(view)}
+            onNavigate={(view) => {
+              if (view === 'school-login') {
+                handleLogout();
+              } else {
+                setCurrentView(view);
+              }
+            }}
             isOpen={isMobileSidebarOpen}
             onClose={() => setIsMobileSidebarOpen(false)}
             isCollapsed={!isDesktopSidebarOpen}
@@ -500,7 +533,8 @@ export const App: React.FC = () => {
               termLabel="ภาคเรียนที่ 1/2569"
               activeRole={activeRole}
               onChangeRole={handleChangeRole}
-              onLogout={() => setCurrentView('school-login')}
+              currentUser={currentAuthUser}
+              onLogout={handleLogout}
               onDeepNavigate={handleDeepNavigate}
             />
 

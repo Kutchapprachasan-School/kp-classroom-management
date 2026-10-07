@@ -1,17 +1,41 @@
-import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase';
-import { studentService } from './studentService';
+import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase.ts';
+import { studentService } from './studentService.ts';
+import { scryptAsync } from '@noble/hashes/scrypt.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 
 export interface AuthUser {
   id: string;
   name: string;
   email?: string;
+  username?: string;
   studentCode?: string;
   role: 'ADMIN' | 'TEACHER' | 'STUDENT';
+  position?: string;
+  subjectGroup?: string;
+  level?: string;
   classroomId?: string;
   avatarUrl?: string;
 }
 
 const STORAGE_KEY_AUTH_USER = 'cls_current_auth_user';
+
+export async function verifyScryptPassword(storedHash: string, plainPassword: string): Promise<boolean> {
+  try {
+    const [salt, key] = storedHash.split(':');
+    if (!salt || !key) return false;
+    const derived = await scryptAsync(plainPassword.normalize('NFKC'), salt, {
+      N: 16384,
+      r: 16,
+      p: 1,
+      dkLen: 64,
+      maxmem: 128 * 16384 * 16 * 2,
+    });
+    return bytesToHex(derived) === key;
+  } catch (err) {
+    console.error('Error verifying scrypt password:', err);
+    return false;
+  }
+}
 
 export async function hashPassword(plainText: string): Promise<string> {
   if (typeof crypto !== 'undefined' && crypto.subtle) {
@@ -30,32 +54,67 @@ export async function hashPassword(plainText: string): Promise<string> {
 }
 
 export const authService = {
-  // TEACHER LOGIN: Traditional Email & Password (ADR-003)
-  async loginTeacher(email: string, password: string): Promise<AuthUser> {
+  // TEACHER LOGIN: Real Supabase (User & Account) with scrypt password verification
+  async loginTeacher(usernameOrEmail: string, passwordInput: string): Promise<AuthUser> {
+    const trimmedInput = usernameOrEmail?.trim();
+    const trimmedPass = passwordInput?.trim();
+
+    if (!trimmedInput) throw new Error('กรุณากรอกชื่อผู้ใช้หรืออีเมล');
+    if (!trimmedPass) throw new Error('กรุณากรอกรหัสผ่าน');
+
     if (isSupabaseConfigured) {
-      logDbOperation(`AUTH: signInWithPassword for ${email}`);
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (!error && data.user) {
-        const user: AuthUser = {
-          id: data.user.id,
-          name: data.user.user_metadata?.name || 'ครูภาสภูมิ เรืองปราชญ์',
-          email: data.user.email,
-          role: (data.user.user_metadata?.role as 'TEACHER') || 'TEACHER',
-        };
-        localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(user));
-        return user;
+      logDbOperation(`AUTH: Search teacher ${trimmedInput}`);
+      try {
+        const { data: users, error: uErr } = await supabase
+          .from('User')
+          .select('*')
+          .or(`username.ilike.${trimmedInput},email.ilike.${trimmedInput}`);
+
+        if (!uErr && users && users.length > 0) {
+          const user = users[0];
+          // ดึงข้อมูล Account ที่ผูกกับ User เพื่อตรวจรหัสผ่าน scrypt
+          const { data: accounts, error: aErr } = await supabase
+            .from('Account')
+            .select('password')
+            .eq('userId', user.id);
+
+          if (!aErr && accounts && accounts.length > 0 && accounts[0].password) {
+            const isValid = await verifyScryptPassword(accounts[0].password, trimmedPass);
+            if (!isValid) {
+              throw new Error('รหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบรหัสผ่านของคุณอีกครั้ง');
+            }
+
+            const authUser: AuthUser = {
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              username: user.username,
+              role: user.role === 'ADMIN' ? 'ADMIN' : 'TEACHER',
+              position: user.position || 'ครู',
+              subjectGroup: user.subjectGroup || '',
+              level: user.level || '',
+              avatarUrl: user.image || undefined,
+            };
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(authUser));
+            }
+            return authUser;
+          } else {
+            throw new Error('ไม่พบข้อมูลการตั้งรหัสผ่านของบัญชีนี้');
+          }
+        }
+      } catch (err: any) {
+        if (err.message && err.message.includes('รหัสผ่าน')) {
+          throw err;
+        }
+        if (err.message && err.message.includes('ไม่พบ')) {
+          throw err;
+        }
+        console.warn('Supabase query error:', err);
       }
     }
 
-    // Local / Offline fallback authentication
-    const user: AuthUser = {
-      id: 'usr-teacher-1',
-      name: 'ครูภาสภูมิ เรืองปราชญ์',
-      email: email || 'pasphum@school.ac.th',
-      role: 'TEACHER',
-    };
-    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(user));
-    return user;
+    throw new Error('ไม่พบบัญชีผู้ใช้งานนี้ในระบบ กรุณาตรวจสอบชื่อผู้ใช้หรืออีเมล');
   },
 
   // TEACHER LOGIN: Google Workspace SSO (ADR-003)
@@ -76,7 +135,9 @@ export const authService = {
       email: 'pasphum.r@obec.moe.go.th',
       role: 'TEACHER',
     };
-    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(user));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(user));
+    }
     return user;
   },
 
@@ -128,7 +189,9 @@ export const authService = {
         classroomId,
         avatarUrl: student.avatarUrl,
       };
-      localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(user));
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(user));
+      }
       return user;
     }
 
@@ -150,7 +213,9 @@ export const authService = {
       role: 'STUDENT',
       classroomId: 'room-3-1',
     };
-    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(user));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(user));
+    }
     return user;
   },
 
@@ -225,6 +290,7 @@ export const authService = {
 
   // SESSION: Get currently logged in user
   getCurrentUser(): AuthUser | null {
+    if (typeof localStorage === 'undefined') return null;
     const raw = localStorage.getItem(STORAGE_KEY_AUTH_USER);
     if (raw) {
       try {
@@ -233,12 +299,7 @@ export const authService = {
         // fallback
       }
     }
-    return {
-      id: 'usr-teacher-1',
-      name: 'ครูภาสภูมิ เรืองปราชญ์',
-      email: 'pasphum@school.ac.th',
-      role: 'TEACHER',
-    };
+    return null;
   },
 
   // LOGOUT
@@ -246,7 +307,9 @@ export const authService = {
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
     }
-    localStorage.removeItem(STORAGE_KEY_AUTH_USER);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEY_AUTH_USER);
+    }
   },
 
   // SLIP GENERATION: Printable student password slip for classroom teachers

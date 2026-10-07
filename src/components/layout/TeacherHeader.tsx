@@ -25,6 +25,7 @@ import {
   getSchoolSettings,
   type SchoolUserRole,
 } from '../../config/schoolRoles';
+import type { AuthUser } from '../../services/authService';
 
 interface TeacherHeaderProps {
   title?: string;
@@ -36,6 +37,7 @@ interface TeacherHeaderProps {
   termLabel?: string;
   activeRole?: SchoolUserRole;
   onChangeRole?: (role: SchoolUserRole) => void;
+  currentUser?: AuthUser | null;
   onLogout?: () => void;
   onDeepNavigate?: (payload: CrossViewNavigationPayload) => void;
 }
@@ -63,6 +65,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
   termLabel = 'ภาคเรียนที่ 1 / 2569',
   activeRole = 'TEACHER_GENERAL',
   onChangeRole,
+  currentUser,
   onLogout,
   onDeepNavigate,
 }) => {
@@ -259,10 +262,12 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-extrabold text-slate-900 text-sm truncate">
-            นายปัญจพล เกษรัตน์
+            {currentUser?.name || 'นายปัญจพล เกษรัตน์'}
           </div>
           <div className="text-[11px] text-slate-500 truncate mt-0.5 font-medium">
-            กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ
+            {currentUser?.subjectGroup
+              ? `กลุ่มสาระฯ${currentUser.subjectGroup}`
+              : currentUser?.position || 'กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ'}
           </div>
           <div className="mt-1">
             <span
@@ -665,8 +670,8 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
                 />
               </div>
               <div className="flex flex-col text-left leading-none">
-                <span className="text-xs font-bold text-slate-800">
-                  ครูปัญจพล
+                <span className="text-xs font-bold text-slate-800 truncate max-w-[120px]">
+                  {currentUser?.name ? currentUser.name.replace(/^(นาย|นางสาว|นาง|ด\.ช\.|ด\.ญ\.)\s*/, 'ครู') : 'ครูปัญจพล'}
                 </span>
               </div>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />

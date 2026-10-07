@@ -1,5 +1,5 @@
-import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase';
-import { StudentCreateSchema, type StudentCreateInput } from './types';
+import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase.ts';
+import { StudentCreateSchema, type StudentCreateInput } from './types.ts';
 
 export interface StudentRecord {
   id: string;
@@ -171,13 +171,15 @@ export const mockStudentsByRoom: Record<string, StudentRecord[]> = {
 };
 
 const getLocalStudents = (classroomId: string): StudentRecord[] => {
-  const raw = localStorage.getItem(`${STORAGE_PREFIX}${classroomId}`);
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    } catch {
-      // fallback
+  if (typeof localStorage !== 'undefined') {
+    const raw = localStorage.getItem(`${STORAGE_PREFIX}${classroomId}`);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {
+        // fallback
+      }
     }
   }
   if (mockStudentsByRoom[classroomId]) {
@@ -190,7 +192,9 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
 };
 
 const saveLocalStudents = (classroomId: string, items: StudentRecord[]) => {
-  localStorage.setItem(`${STORAGE_PREFIX}${classroomId}`, JSON.stringify(items));
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(`${STORAGE_PREFIX}${classroomId}`, JSON.stringify(items));
+  }
 };
 
 export const studentService = {
