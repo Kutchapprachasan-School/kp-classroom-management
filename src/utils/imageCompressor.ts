@@ -152,6 +152,8 @@ export function calculateAspectRatioDimensions(
   return { width, height };
 }
 
+export const calculateProportionalDimensions = calculateAspectRatioDimensions;
+
 /**
  * Formats byte size into human readable string (e.g., 142.5 KB).
  */

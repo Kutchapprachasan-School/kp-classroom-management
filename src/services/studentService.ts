@@ -84,16 +84,16 @@ export const mockStudentsByRoom: Record<string, StudentRecord[]> = {
     { id: 'stu-38-3', no: 3, code: '45803', name: 'ด.ญ. พัทธนันท์ วีระกุล', attendance: '8/8', score: 94.0, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
   ],
   'room-1-1': [
-    { id: 'stu-11-1', no: 1, code: '47001', name: 'ด.ช. ชนะภัย ชัยวัฒน์', attendance: '8/8', score: 85.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
-    { id: 'stu-11-2', no: 2, code: '47002', name: 'ด.ช. ปัณณธร ศรีสุข', attendance: '7/8', score: 79.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
-    { id: 'stu-11-3', no: 3, code: '47003', name: 'ด.ญ. กัญญาวีร์ สิทธิโชค', attendance: '8/8', score: 91.5, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
-    { id: 'stu-11-4', no: 4, code: '47004', name: 'ด.ญ. ปานวาด ประเสริฐยิ่ง', attendance: '5/8', score: 45.0, status: 'AT_RISK', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+    { id: 'stu-11-1', no: 1, code: '45101', name: 'ด.ช. กฤษณะ ศรีสมบูรณ์', attendance: '8/8', score: 85.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-11-2', no: 2, code: '45102', name: 'ด.ช. ธีรานุ เดชปันคำ', attendance: '7/8', score: 79.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-11-3', no: 3, code: '45103', name: 'ด.ญ. กัญญาวีร์ สิทธิโชค', attendance: '8/8', score: 91.5, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+    { id: 'stu-11-4', no: 4, code: '45104', name: 'ด.ญ. ปานวาด ประเสริฐยิ่ง', attendance: '5/8', score: 45.0, status: 'AT_RISK', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
   ],
   'ม.1/1': [
-    { id: 'stu-11-1', no: 1, code: '47001', name: 'ด.ช. ชนะภัย ชัยวัฒน์', attendance: '8/8', score: 85.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
-    { id: 'stu-11-2', no: 2, code: '47002', name: 'ด.ช. ปัณณธร ศรีสุข', attendance: '7/8', score: 79.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
-    { id: 'stu-11-3', no: 3, code: '47003', name: 'ด.ญ. กัญญาวีร์ สิทธิโชค', attendance: '8/8', score: 91.5, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
-    { id: 'stu-11-4', no: 4, code: '47004', name: 'ด.ญ. ปานวาด ประเสริฐยิ่ง', attendance: '5/8', score: 45.0, status: 'AT_RISK', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+    { id: 'stu-11-1', no: 1, code: '45101', name: 'ด.ช. กฤษณะ ศรีสมบูรณ์', attendance: '8/8', score: 85.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-11-2', no: 2, code: '45102', name: 'ด.ช. ธีรานุ เดชปันคำ', attendance: '7/8', score: 79.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
+    { id: 'stu-11-3', no: 3, code: '45103', name: 'ด.ญ. กัญญาวีร์ สิทธิโชค', attendance: '8/8', score: 91.5, status: 'NORMAL', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
+    { id: 'stu-11-4', no: 4, code: '45104', name: 'ด.ญ. ปานวาด ประเสริฐยิ่ง', attendance: '5/8', score: 45.0, status: 'AT_RISK', gender: 'FEMALE', avatarUrl: '/images/banners/student-avatar-girl.png' },
   ],
   'room-1-2': [
     { id: 'stu-12-1', no: 1, code: '47101', name: 'ด.ช. ภัทรพล สิทธิเดช', attendance: '8/8', score: 88.0, status: 'NORMAL', gender: 'MALE', avatarUrl: '/images/banners/student-avatar.png' },
@@ -194,6 +194,11 @@ export const studentService = {
   getLocalStudents,
   saveLocalStudents,
   mockStudentsByRoom,
+
+  // ดึงรายชื่อนักเรียนในห้อง
+  getStudents(classroomId: string): StudentRecord[] {
+    return getLocalStudents(classroomId);
+  },
 
   // ค้นหานักเรียนและห้องเรียนปัจจุบันจากรหัส
   findStudentByCode(code: string): { student: StudentRecord; classroomId: string } | null {

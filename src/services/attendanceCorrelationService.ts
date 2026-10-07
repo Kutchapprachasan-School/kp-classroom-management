@@ -254,6 +254,8 @@ export const normalizeCourseCode = (code: string): string => {
 const ROOM_3_1_STUDENTS = [
   { id: 'stu-1', code: '45101', name: 'ด.ช. กฤษณะ ศรีสมบูรณ์' },
   { id: 'stu-2', code: '45102', name: 'ด.ช. ธีรานุ เดชปันคำ' },
+  { id: 'stu-3', code: '45103', name: 'ด.ช. ภูรินท์ บัณฑิต' },
+  { id: 'stu-5', code: '45105', name: 'ด.ช. ชัยมงคล วงศ์บุตร' },
   { id: 'stu-7', code: '45107', name: 'ด.ช. ภูรินท์ บัณฑิต' },
   { id: 'stu-10', code: '45110', name: 'ด.ช. อัศวิน วนเกษตรกุล' },
   { id: 'stu-12', code: '45112', name: 'ด.ช. ชัยมงคล วงศ์บุตร' },
@@ -311,7 +313,7 @@ export const generateMockMorningRecords = (): MorningAssemblyRecord[] => {
     for (const stu of ROOM_3_1_STUDENTS) {
       let status: AttendanceStatusCode = 'PRESENT';
       if (isToday) {
-        if (stu.code === '45107') status = 'ABSENT';
+        if (stu.code === '45107' || stu.code === '45103') status = 'ABSENT';
         else if (stu.code === '45112') status = 'LATE';
         else if (stu.code === '45122') status = 'LEAVE';
         else status = 'PRESENT';
@@ -374,6 +376,32 @@ export const generateMockPeriodRecords = (): PeriodAttendanceRecord[] => {
     });
   }
 
+  // 1.1 Today 2026-10-02: Period 2 (ศ23101 ศิลปะ ม.3/1)
+  for (const stu of ROOM_3_1_STUDENTS) {
+    let status: AttendanceStatusCode = 'PRESENT';
+    let source: AttendanceRecordSource = 'MANUAL';
+
+    if (stu.code === '45105') {
+      status = 'ABSENT'; // Morning PRESENT + Period 2 ABSENT => Lock 2 Truancy candidate
+    }
+
+    records.push({
+      id: `per-20261002-p2-${stu.code}`,
+      date: '2026-10-02',
+      classroomId: 'room-3-1',
+      courseCode: 'ศ23101',
+      courseName: 'ศิลปะ',
+      periodNo: 2,
+      studentId: stu.id,
+      studentCode: stu.code,
+      studentName: stu.name,
+      status,
+      source,
+      isOverridden: false,
+      markedAt: '2026-10-02T09:35:00.000Z',
+    });
+  }
+
   // 2. Historical term records for course ศ23101 to build realistic 80% rule profiles
   const historicalDates = [
     '2026-09-01', '2026-09-03', '2026-09-08', '2026-09-10',
@@ -390,6 +418,8 @@ export const generateMockPeriodRecords = (): PeriodAttendanceRecord[] => {
         hStatus = 'ABSENT';
       } else if (stu.code === '45112' && idx % 5 === 0) {
         hStatus = 'LATE';
+      } else if (stu.code === '45105' && idx % 2 === 0) {
+        hStatus = 'ABSENT'; // 45105 at risk (50% attendance)
       }
 
       records.push({
@@ -862,6 +892,20 @@ export const attendanceCorrelationService = {
       list.push(activity);
     }
     writeStorage(STORAGE_KEYS.APPROVED_ACTIVITIES, list);
+  },
+
+  addApprovedActivity(activity: Partial<ApprovedSchoolActivity> & { title: string; date: string; startPeriod: number; endPeriod: number; participatingStudentCodes: string[] }): ApprovedSchoolActivity {
+    const fullActivity: ApprovedSchoolActivity = {
+      id: activity.id || `act-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      title: activity.title,
+      date: activity.date,
+      startPeriod: activity.startPeriod,
+      endPeriod: activity.endPeriod,
+      approverName: activity.approverName || 'ผู้อำนวยการโรงเรียน',
+      participatingStudentCodes: activity.participatingStudentCodes,
+    };
+    this.saveApprovedActivity(fullActivity);
+    return fullActivity;
   },
 
   getApprovedLeaves(studentCode?: string, date?: string): ApprovedStudentLeave[] {

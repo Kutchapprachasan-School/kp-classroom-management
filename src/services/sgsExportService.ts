@@ -106,7 +106,9 @@ export const sgsExportService = {
       subjectCode,
       fileName: `SGS_Export_${subjectCode}_${classroomId}_${dateCode}.xlsx`,
       storagePath: `sgs-exports/1-2569/${classroomId}/SGS_${dateCode}.xlsx`,
-      checksumSha256: `sha256:${randomHash}98fc1c149afbf4c8996fb92427ae41e4`,
+      checksumSha256: Array.from({ length: 64 }, () =>
+        Math.floor(Math.random() * 16).toString(16)
+      ).join(''),
       studentCount: 26,
       exportedBy,
       createdAt: timestamp.toLocaleDateString('th-TH', {

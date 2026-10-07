@@ -86,6 +86,15 @@ const saveLocalAuditLogs = (items: ScoreAuditLogRecord[]) => {
 };
 
 export const scoreService = {
+  // READ: Get all scores for a classroom (or all scores)
+  getScores(classroomId?: string): ScoreRecord[] {
+    const all = getLocalScores();
+    if (classroomId) {
+      return all.filter((s) => s.classroomId === classroomId);
+    }
+    return all;
+  },
+
   // READ: Get all scores for an assignment
   async getByAssignment(assignmentId: string): Promise<ScoreRecord[]> {
     if (isSupabaseConfigured) {
@@ -171,11 +180,20 @@ export const scoreService = {
   },
 
   // CREATE / UPDATE: Upsert a single score with ADR-001 Invariant validation & Audit Log
-  async upsertScore(input: ScoreUpdateInput): Promise<ScoreRecord> {
-    const validated = ScoreUpdateSchema.parse(input);
+  async upsertScore(input: ScoreUpdateInput | any): Promise<ScoreRecord> {
+    const rawValue = input.value !== undefined ? input.value : input.score;
+    const normalizedInput = {
+      ...input,
+      value: rawValue,
+      state: input.state || 'SUBMITTED',
+    };
+    const validated = ScoreUpdateSchema.parse(normalizedInput);
     const allScores = getLocalScores();
+    const targetScoreId = input.scoreId || input.id;
     const existingIndex = allScores.findIndex(
-      (s) => s.assignmentId === validated.assignmentId && s.enrollmentId === validated.enrollmentId
+      (s) =>
+        (targetScoreId && s.id === targetScoreId) ||
+        (s.assignmentId === validated.assignmentId && s.enrollmentId === validated.enrollmentId)
     );
 
     const now = new Date().toISOString();
@@ -192,6 +210,7 @@ export const scoreService = {
       }
       scoreRecord = {
         ...currentRecord,
+        id: targetScoreId || currentRecord.id,
         score: validated.value,
         maxScore: validated.maxScore,
         isExempt: validated.isExempt ?? false,
@@ -202,7 +221,7 @@ export const scoreService = {
       allScores[existingIndex] = scoreRecord;
     } else {
       scoreRecord = {
-        id: `sc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        id: targetScoreId || `sc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         assignmentId: validated.assignmentId,
         enrollmentId: validated.enrollmentId,
         classroomId: validated.classroomId,

@@ -204,6 +204,18 @@ class BellScheduleService {
     return generateBellScheduleTimeline(this.getConfig());
   }
 
+  public generateBellScheduleTimeline(config: SchoolBellScheduleConfig): BellScheduleTimelineItem[] {
+    return generateBellScheduleTimeline(config);
+  }
+
+  public getBellScheduleConfig(): SchoolBellScheduleConfig {
+    return this.getConfig();
+  }
+
+  public saveBellScheduleConfig(config: SchoolBellScheduleConfig): boolean {
+    return this.saveConfig(config);
+  }
+
   public getTeachingPeriods(): BellScheduleTimelineItem[] {
     return this.getTimeline().filter((t) => t.type === 'PERIOD');
   }

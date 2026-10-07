@@ -118,6 +118,13 @@ const DEFAULT_COURSE_MAPPINGS: CourseClassroomMapping[] = [
 ];
 
 export const messagingService = {
+  // รีเซ็ตข้อมูลกลุ่มแชทกลับเป็นค่าเริ่มต้น Mock Data
+  resetToDefaultData(): ChatGroup[] {
+    const initial = this.generateInitialGroups();
+    this.saveGroups(initial);
+    return initial;
+  },
+
   // ดึงห้องเรียนที่ตรงกับ ID หรือชื่อห้อง
   resolveClassroom(roomKey: string) {
     const match = classroomsListData.find(
