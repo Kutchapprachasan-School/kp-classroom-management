@@ -947,6 +947,123 @@ assert.strictEqual(student1.statusTag, 'NORMAL', 'Student 45101 must have NORMAL
 
 console.log('  ✓ Runtime execution of period calendar status and course cumulative stats passed');
 
-console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE, SUBJECT ICONS, BANNER COMPRESSOR, SIDEBAR UX, BELL SCHEDULE, MORNING ASSEMBLY & CLASSROOM ATTENDANCE CHECKS PASSED!');
+// ----------------------------------------------------
+// Step 9: Multi-Strand Feedback Stickers Catalog Verification
+// ----------------------------------------------------
+console.log('\n--- 9. Checking Multi-Strand Feedback Stickers Catalog (สติกเกอร์คำติชม 1-Tap) ---');
+
+const feedbackCatalogPath = './src/config/feedbackStickersCatalog.ts';
+assert.ok(existsSync(feedbackCatalogPath), 'src/config/feedbackStickersCatalog.ts must exist');
+const feedbackCatalogSource = readFileSync(feedbackCatalogPath, 'utf8');
+
+// 9.1 All 9 Categories declared
+const expectedStrands = ['GENERAL', 'MATH', 'SCIENCE', 'THAI', 'FOREIGN_LANG', 'SOCIAL', 'PE_HEALTH', 'ART_MUSIC', 'CAREER'];
+for (const strand of expectedStrands) {
+  assert.ok(feedbackCatalogSource.includes(`'${strand}'`), `Must support strand category '${strand}'`);
+}
+console.log('  ✓ All 9 subject learning strands present in catalog');
+
+// 9.2 Test runtime auto-detection logic
+const detectFeedbackStrand = (code, name) => {
+  const combined = `${code || ''} ${name || ''}`.toLowerCase();
+  if (combined.includes('ญี่ปุ่น') || combined.includes('japanese') || combined.includes('อังกฤษ') || combined.includes('จีน')) return 'FOREIGN_LANG';
+  if (combined.includes('ศิลปะ') || combined.includes('ดนตรี') || combined.includes('ทัศนศิลป์')) return 'ART_MUSIC';
+  if (combined.includes('คณิต') || combined.includes('math')) return 'MATH';
+  if (combined.includes('วิทย์') || combined.includes('ฟิสิกส์') || combined.includes('เคมี') || combined.includes('คอมพิวเตอร์')) return 'SCIENCE';
+  if (combined.includes('ภาษาไทย') || combined.includes('วรรณคดี')) return 'THAI';
+  if (combined.includes('สังคม') || combined.includes('ประวัติศาสตร์')) return 'SOCIAL';
+  if (combined.includes('สุขศึกษา') || combined.includes('พลศึกษา') || combined.includes('กีฬา')) return 'PE_HEALTH';
+  if (combined.includes('การงาน') || combined.includes('เกษตร')) return 'CAREER';
+  if (code && code.length > 0) {
+    const c = code.charAt(0);
+    if (['ญ', 'อ', 'จ', 'ฝ'].includes(c)) return 'FOREIGN_LANG';
+    if (c === 'ศ') return 'ART_MUSIC';
+    if (c === 'ค') return 'MATH';
+    if (c === 'ว') return 'SCIENCE';
+    if (c === 'ท') return 'THAI';
+    if (c === 'ส') return 'SOCIAL';
+    if (c === 'พ') return 'PE_HEALTH';
+    if (c === 'ง') return 'CAREER';
+  }
+  return 'GENERAL';
+};
+
+assert.strictEqual(detectFeedbackStrand('ญ31201', 'ภาษาญี่ปุ่น 1'), 'FOREIGN_LANG');
+assert.strictEqual(detectFeedbackStrand('ศ23101', 'ศิลปะ 3 (ทัศนศิลป์)'), 'ART_MUSIC');
+assert.strictEqual(detectFeedbackStrand('ค21101', 'คณิตศาสตร์พื้นฐาน'), 'MATH');
+assert.strictEqual(detectFeedbackStrand('ว30221', 'เคมี 1'), 'SCIENCE');
+assert.strictEqual(detectFeedbackStrand('ท21101', 'ภาษาไทย 1'), 'THAI');
+assert.strictEqual(detectFeedbackStrand('ส21101', 'ประวัติศาสตร์ไทย'), 'SOCIAL');
+assert.strictEqual(detectFeedbackStrand('พ21101', 'สุขศึกษาและพลศึกษา'), 'PE_HEALTH');
+assert.strictEqual(detectFeedbackStrand('ง21101', 'การงานอาชีพ'), 'CAREER');
+assert.strictEqual(detectFeedbackStrand('ก21901', 'ลูกเสือเนตรนารี'), 'GENERAL');
+console.log('  ✓ Multi-strand auto-detection correctly detects subject majors');
+
+// 9.3 Verify GradingWorkspaceModal integrates the catalog and custom stickers
+const gradingModalPath = './src/components/teacher/GradingWorkspaceModal.tsx';
+assert.ok(existsSync(gradingModalPath), 'src/components/teacher/GradingWorkspaceModal.tsx must exist');
+const gradingModalSource = readFileSync(gradingModalPath, 'utf8');
+
+assert.ok(gradingModalSource.includes('FEEDBACK_STRAND_CATALOG'), 'Must import FEEDBACK_STRAND_CATALOG in modal');
+assert.ok(gradingModalSource.includes('detectFeedbackStrand'), 'Must import detectFeedbackStrand in modal');
+assert.ok(gradingModalSource.includes('selectedStrand'), 'Must maintain selectedStrand state in modal');
+assert.ok(gradingModalSource.includes('setTeacherPreferredStrand'), 'Must persist teacher preferred strand in modal');
+assert.ok(gradingModalSource.includes('addCustomFeedbackSticker'), 'Must support adding custom stickers');
+assert.ok(gradingModalSource.includes('removeCustomFeedbackSticker'), 'Must support removing custom stickers');
+assert.ok(gradingModalSource.includes('เพิ่มสติกเกอร์ของฉัน'), 'Must render button to add custom sticker');
+console.log('  ✓ GradingWorkspaceModal integrates multi-strand catalog and custom stickers UI');
+
+// ----------------------------------------------------
+// Step 10: Attendance % Calculation Strictly on Elapsed Days to Date Verification
+// ----------------------------------------------------
+console.log('\n--- 10. Checking Attendance % Calculation on Elapsed Days to Date (No 20-Week Fixed Denominator) ---');
+
+// 10.1 Early term scenario: 4 classes conducted so far. Student attended 2, missed 2.
+// Denominator must be 4 elapsed classes, resulting in 50.0% attendance rate and immediate AT-RISK flag!
+const earlyTermRecords = [
+  { status: 'PRESENT' },
+  { status: 'PRESENT' },
+  { status: 'ABSENT' },
+  { status: 'ABSENT' },
+];
+const earlySummary = attendanceCorrelationService.compute80RuleFromRecords('45199', 'ค21101', earlyTermRecords);
+assert.strictEqual(earlySummary.totalScheduledPeriods, 4, 'Must use 4 elapsed periods to date as denominator');
+assert.strictEqual(earlySummary.earnedPeriods, 2, 'Earned 2 periods');
+assert.strictEqual(earlySummary.attendanceRate, 50.0, 'Attendance rate must be exactly 50.0%');
+assert.strictEqual(earlySummary.isEligibleForExam, false, '50% must NOT be eligible for exam');
+assert.strictEqual(earlySummary.isAtRisk, true, 'Student must be immediately flagged at-risk (< 80%)');
+console.log('  ✓ Early-term at-risk detection verified: 2/4 attended = 50.0% at-risk (not obscured by 20 weeks)');
+
+// 10.2 Early term scenario: 5 classes conducted. Student attended 4, absent 1.
+// 4 / 5 = 80.0% -> eligible, not at risk
+const earlyTermPassingRecords = [
+  { status: 'PRESENT' },
+  { status: 'PRESENT' },
+  { status: 'LATE' },
+  { status: 'ACTIVITY' },
+  { status: 'ABSENT' },
+];
+const earlyPassingSummary = attendanceCorrelationService.compute80RuleFromRecords('45200', 'ว21101', earlyTermPassingRecords);
+assert.strictEqual(earlyPassingSummary.totalScheduledPeriods, 5);
+assert.strictEqual(earlyPassingSummary.earnedPeriods, 4);
+assert.strictEqual(earlyPassingSummary.attendanceRate, 80.0);
+assert.strictEqual(earlyPassingSummary.isEligibleForExam, true);
+assert.strictEqual(earlyPassingSummary.isAtRisk, false);
+console.log('  ✓ Early-term passing boundary verified: 4/5 attended = 80.0% eligible');
+
+// 10.3 Dynamic elapsed teaching days in getCourseCumulativeStats
+const courseStats = attendanceCorrelationService.getCourseCumulativeStats('ญ31201', 'room-3-1');
+assert.ok(courseStats.totalAssemblyDays > 0, 'Must have dynamic elapsed teaching days');
+assert.ok(courseStats.totalAssemblyDays <= 31, 'Must reflect conducted days to date');
+for (const s of courseStats.students) {
+  assert.strictEqual(s.totalDays, s.presentDays + s.lateDays + s.absentDays + s.leaveDays + s.activityDays,
+    `Student ${s.studentCode} totalDays must equal sum of their conducted classes to date`);
+  const expectedRate = Number(((s.earnedDays / s.totalDays) * 100).toFixed(1));
+  assert.strictEqual(s.attendanceRate, expectedRate,
+    `Student ${s.studentCode} rate must equal earnedDays / totalDays * 100 to date`);
+}
+console.log('  ✓ getCourseCumulativeStats per-student totalDays strictly matches elapsed conducted days');
+
+console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE, SUBJECT ICONS, BANNER COMPRESSOR, SIDEBAR UX, BELL SCHEDULE, MORNING ASSEMBLY, CLASSROOM ATTENDANCE, STICKERS CATALOG & ELAPSED ATTENDANCE % CHECKS PASSED!');
 
 

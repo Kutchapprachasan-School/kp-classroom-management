@@ -1423,7 +1423,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                     สถิติการเข้าเรียนสะสมตลอดภาคเรียน : ม.3/1
                   </h3>
                   <p className="text-xs text-blue-100 font-medium">
-                    วิชาภาษาญี่ปุ่น (ญ31201) • รวม {classroomStats.totalAssemblyDays} วันที่สอน
+                    วิชาภาษาญี่ปุ่น (ญ31201) • รวม {classroomStats.totalAssemblyDays} วันที่สอนจริงถึงปัจจุบัน (ไม่นับ 20 สัปดาห์ล่วงหน้า)
                   </p>
                 </div>
               </div>

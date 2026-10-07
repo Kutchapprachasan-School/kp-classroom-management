@@ -107,6 +107,7 @@ export interface Attendance80Summary {
   truancyCount: number;
   attendanceRate: number;    // 0 - 100 percentage
   isEligibleForExam: boolean; // attendanceRate >= 80%
+  isAtRisk?: boolean;        // attendanceRate < 80% (ความเสี่ยง มส. ทันที)
 }
 
 export interface CorrelationChange {
@@ -1052,15 +1053,18 @@ export const attendanceCorrelationService = {
     }
 
     const earnedPeriods = presentCount + lateCount + activityCount;
-    const totalScheduledPeriods = totalScheduledPeriodsParam ?? records.length;
+    // Calculate attendance percentage strictly based on elapsed/conducted periods to date (records.length)
+    // NOT the full 20-week semester boundary, so students are aware of risk early in term
+    const totalScheduledPeriods = totalScheduledPeriodsParam ?? (records.length > 0 ? records.length : 1);
 
-    // Rate calculation strictly adhering to 0.8 / 80% threshold
+    // Rate calculation strictly adhering to 0.8 / 80% threshold based on elapsed periods
     const attendanceRate =
       totalScheduledPeriods > 0
         ? Number(((earnedPeriods / totalScheduledPeriods) * 100).toFixed(1))
         : 100.0;
 
     const isEligibleForExam = attendanceRate >= 80.0;
+    const isAtRisk = attendanceRate < 80.0;
 
     return {
       studentCode,
@@ -1075,6 +1079,7 @@ export const attendanceCorrelationService = {
       truancyCount,
       attendanceRate,
       isEligibleForExam,
+      isAtRisk,
     };
   },
 
@@ -1153,7 +1158,9 @@ export const attendanceCorrelationService = {
         else if (rec.status === 'ACTIVITY') activityDays++;
       }
 
-      const totalDays = records.length > 0 ? records.length : totalAssemblyDays;
+      // Calculate total conducted days strictly to date (elapsed days)
+      const conductedDaysToDate = presentDays + lateDays + absentDays + leaveDays + activityDays;
+      const totalDays = conductedDaysToDate > 0 ? conductedDaysToDate : (records.length > 0 ? records.length : (totalAssemblyDays > 0 ? totalAssemblyDays : 1));
       const earnedDays = presentDays + lateDays + activityDays;
       const attendanceRate = totalDays > 0 ? Number(((earnedDays / totalDays) * 100).toFixed(1)) : 100;
       const statusTag: 'NORMAL' | 'WARNING' | 'CRITICAL' =
@@ -1372,7 +1379,6 @@ export const attendanceCorrelationService = {
     }
 
     const students: StudentCumulativeStats[] = [];
-    const totalTeachingDays = 20;
 
     studentMap.forEach(({ name, records }, code) => {
       let presentDays = 0;
@@ -1417,9 +1423,12 @@ export const attendanceCorrelationService = {
         }
       }
 
-      const totalDays = totalTeachingDays;
+      // Elapsed conducted days strictly calculated from actual classes conducted to date
+      // (NOT using a fixed 20-week term denominator so students know immediately if they are at risk)
+      const conductedDaysToDate = presentDays + lateDays + absentDays + leaveDays + activityDays;
+      const totalDays = conductedDaysToDate > 0 ? conductedDaysToDate : (records.length > 0 ? records.length : 1);
       const earnedDays = presentDays + lateDays + activityDays;
-      const attendanceRate = totalDays > 0 ? Number(((earnedDays / totalDays) * 100).toFixed(1)) : 100;
+      const attendanceRate = totalDays > 0 ? Number(((earnedDays / totalDays) * 100).toFixed(1)) : 100.0;
       const statusTag: 'NORMAL' | 'WARNING' | 'CRITICAL' =
         attendanceRate >= 85 ? 'NORMAL' : attendanceRate >= 80 ? 'WARNING' : 'CRITICAL';
 
@@ -1444,10 +1453,13 @@ export const attendanceCorrelationService = {
         ? Number((students.reduce((acc, s) => acc + s.attendanceRate, 0) / students.length).toFixed(1))
         : 100;
 
+    const maxConductedDays = students.length > 0 ? Math.max(...students.map((s) => s.totalDays)) : 0;
+    const totalTeachingDaysToDate = maxConductedDays > 0 ? maxConductedDays : 1;
+
     return {
       classroomId: targetRoom,
       totalStudents: students.length,
-      totalAssemblyDays: totalTeachingDays,
+      totalAssemblyDays: totalTeachingDaysToDate,
       averageRate,
       students,
     };

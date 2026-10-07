@@ -89,7 +89,7 @@ const modalContent = fs.readFileSync(gradingWorkspaceModalPath, 'utf-8');
 
 const hasScoreStepper = modalContent.includes('step="0.5"') && modalContent.includes('setScoreInput');
 const hasQuickPills = modalContent.includes('Math.round(currentItem.maxScore * 0.8)') && modalContent.includes('เต็ม (');
-const hasStickerStamps = modalContent.includes('FEEDBACK_STAMPS') && modalContent.includes('🌟 ยอดเยี่ยมมาก');
+const hasStickerStamps = (modalContent.includes('FEEDBACK_STAMPS') || modalContent.includes('FEEDBACK_STRAND_CATALOG')) && modalContent.includes('สติกเกอร์');
 const hasAutoAdvance = modalContent.includes('onSaveGrade') && modalContent.includes('บันทึกคะแนน & ตรวจคนถัดไป');
 
 if (!hasScoreStepper || !hasQuickPills || !hasStickerStamps || !hasAutoAdvance) {

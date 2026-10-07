@@ -1099,7 +1099,7 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
                     สถิติการเข้าแถวเคารพธงชาติ (ภาคเรียนที่ 1/2569)
                   </h3>
                   <p className="text-xs text-slate-500 font-medium">
-                    ห้อง {ADVISORY_LABEL} • คำนวณสรุปตลอดภาคเรียน ({classroomStats.totalAssemblyDays} วันทำการ)
+                    ห้อง {ADVISORY_LABEL} • รวม {classroomStats.totalAssemblyDays} วันเช็คแถวจริงถึงปัจจุบัน (ไม่นับ 20 สัปดาห์ล่วงหน้า)
                   </p>
                 </div>
               </div>
