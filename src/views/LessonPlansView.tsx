@@ -532,7 +532,7 @@ for (let w = 7; w <= 16; w++) {
 export const LessonPlansView: React.FC = () => {
   const [selectedCourseIndex, setSelectedCourseIndex] = useState(0);
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
-  const [activeWeek, setActiveWeek] = useState(1);
+  const [activeWeek, setActiveWeek] = useState(2);
   const [activeTab, setActiveTab] = useState<'files' | 'activities' | 'reflection'>('files');
   const [fileFilter, setFileFilter] = useState<'ALL' | 'PDF' | 'PPTX' | 'DOCX' | 'MP4'>('ALL');
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
@@ -555,7 +555,9 @@ export const LessonPlansView: React.FC = () => {
 
   // Teacher Custom Subject Banner State
   const [isBannerModalOpen, setIsBannerModalOpen] = useState(false);
-  const [customBannerUrl, setCustomBannerUrl] = useState<string | null>(null);
+  const [customBannerUrl, setCustomBannerUrl] = useState<string | null>(() =>
+    getSubjectBannerUrl(COURSES[0].code)
+  );
 
   useEffect(() => {
     const course = COURSES[selectedCourseIndex];
@@ -843,30 +845,28 @@ export const LessonPlansView: React.FC = () => {
               </div>
             </div>
 
-            {/* Custom Subject Banner Strip if set */}
-            {customBannerUrl && (
-              <div className="relative w-full h-32 sm:h-40 rounded-2xl overflow-hidden border border-slate-200 shadow-inner group">
-                <img
-                  src={customBannerUrl}
-                  alt={`Banner for ${currentCourse.name}`}
-                  className="w-full h-full object-cover object-center group-hover:scale-102 transition-transform duration-500"
-                />
-                <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent flex items-end justify-between p-3.5">
-                  <span className="text-xs font-bold text-white drop-shadow-sm flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                    <span>แบนเนอร์ประจำรายวิชา {currentCourse.code}</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setIsBannerModalOpen(true)}
-                    className="px-2.5 py-1 rounded-lg bg-white/90 hover:bg-white text-slate-800 text-[11px] font-bold shadow-xs cursor-pointer flex items-center gap-1"
-                  >
-                    <Camera className="w-3 h-3 text-blue-600" />
-                    <span>เปลี่ยนภาพ</span>
-                  </button>
+            {/* Panoramic Subject Banner (Always visible with hero_banner.png as default) */}
+            <div className="relative w-full h-36 sm:h-44 md:h-48 rounded-2xl overflow-hidden border border-slate-200/90 shadow-2xs group">
+              <img
+                src={customBannerUrl || '/images/teacher/hero_banner.png'}
+                alt={`Banner for ${currentCourse.name}`}
+                className="w-full h-full object-cover object-center group-hover:scale-[1.01] transition-transform duration-500"
+              />
+              <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent flex items-end justify-between p-3.5 sm:p-4">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/90 backdrop-blur-md border border-white/80 text-[11px] font-bold text-blue-900 shadow-xs">
+                  <span className="text-blue-600">🏷️</span>
+                  <span>แผนการสอนประจำรายวิชา ({currentCourse.code})</span>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setIsBannerModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 hover:bg-white backdrop-blur-md text-slate-800 text-[11px] font-bold border border-white/80 shadow-xs hover:shadow-sm cursor-pointer transition-all"
+                >
+                  <Camera className="w-3.5 h-3.5 text-blue-600" />
+                  <span>เปลี่ยนภาพ</span>
+                </button>
               </div>
-            )}
+            </div>
 
             {/* Week Timeline Carousel / Cards Row */}
             <div className="pt-2 border-t border-slate-100">
@@ -1405,8 +1405,14 @@ export const LessonPlansView: React.FC = () => {
                 {currentWeekPlan.evaluations.map((ev, i) => (
                   <div key={i} className="flex items-center justify-between py-1 text-slate-700">
                     <div className="flex items-center gap-2">
-                      <span className="text-rose-500">
-                        {ev.iconType === 'assignment' ? '📄' : ev.iconType === 'activity' ? '👥' : '📅'}
+                      <span className="text-slate-600">
+                        {ev.iconType === 'assignment' ? (
+                          <FileText className="w-3.5 h-3.5 text-slate-600" />
+                        ) : ev.iconType === 'activity' ? (
+                          <Users className="w-3.5 h-3.5 text-slate-600" />
+                        ) : (
+                          <Calendar className="w-3.5 h-3.5 text-slate-600" />
+                        )}
                       </span>
                       <span className="font-medium text-slate-800">{ev.label}</span>
                     </div>
@@ -1444,11 +1450,11 @@ export const LessonPlansView: React.FC = () => {
                   {/* Left: Icon + Text */}
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     {file.type === 'PDF' ? (
-                      <div className="w-8 h-8 rounded-xl bg-rose-500 text-white font-extrabold text-[10px] flex items-center justify-center shrink-0 shadow-2xs">
+                      <div className="w-8 h-8 rounded-full bg-rose-500 text-white font-extrabold text-[10px] flex items-center justify-center shrink-0 shadow-2xs">
                         PDF
                       </div>
                     ) : (
-                      <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                      <div className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
                         <Play className="w-3.5 h-3.5 fill-white text-white" />
                       </div>
                     )}
