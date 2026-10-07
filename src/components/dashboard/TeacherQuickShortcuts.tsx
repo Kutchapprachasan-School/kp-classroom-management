@@ -44,8 +44,7 @@ export const TeacherQuickShortcuts: React.FC<TeacherQuickShortcutsProps> = ({
         if (onNavigateToAttendance) onNavigateToAttendance();
         else
           onDeepNavigate?.({
-            view: 'class-overview',
-            classSubTab: 'attendance',
+            view: 'classroom-attendance',
             highlightBanner: 'เช็คชื่อนักเรียนประจำคาบ',
           });
       },

@@ -505,8 +505,7 @@ export const teacherCopilotService = {
         isCurrentNow: firstUndone === 1,
         oneClickLabel: '✓ ยืนยันเช็คแถวเช้า & ซิงก์ใบลา 1 คลิก',
         targetPayload: {
-          view: 'student-affairs',
-          affairsSubTab: 'ASSEMBLY',
+          view: 'morning-assembly',
           highlightBanner: 'เปิดหน้าเช็คชื่อแถวตอนเช้า (07:45 น.) & อนุมัติใบลาออนไลน์ก่อนเริ่มคาบเรียน',
         },
       },
@@ -522,8 +521,7 @@ export const teacherCopilotService = {
         isCurrentNow: firstUndone === 2,
         oneClickLabel: '✓ ดึงชื่อจากแถวเช้าเข้าคาบ 7',
         targetPayload: {
-          view: 'class-overview',
-          classSubTab: 'attendance',
+          view: 'classroom-attendance',
           highlightBanner: 'ดึงข้อมูลเช็คชื่อแถวเช้าเข้าสู่คาบเรียนอัตโนมัติ พร้อมตรวจจับเด็กโดดเรียนระหว่างวัน',
         },
       },
@@ -597,8 +595,7 @@ export const teacherCopilotService = {
         quickActionLabel: '✓ ยืนยันเช็คแถวเช้า & ซิงก์ใบลา (1 คลิก)',
         navigateLabel: 'เปิดหน้าเช็คชื่อเสาธง & ใบลา',
         targetPayload: {
-          view: 'student-affairs',
-          affairsSubTab: 'ASSEMBLY',
+          view: 'morning-assembly',
           highlightBanner: 'ลำดับที่ 1: เช็คชื่อแถวเช้า ม.3/1 และอนุมัติใบลาออนไลน์ซิงก์เข้าทุกคาบ',
         },
         isResolved: st.morningAssemblyDone,
@@ -616,8 +613,7 @@ export const teacherCopilotService = {
         quickActionLabel: '✓ ดึงชื่อจากแถวเช้า & บันทึกคาบ 7 ทันที',
         navigateLabel: 'เปิดหน้าเช็คชื่อรายคาบ',
         targetPayload: {
-          view: 'class-overview',
-          classSubTab: 'attendance',
+          view: 'classroom-attendance',
           highlightBanner: 'เช็คชื่อคาบเรียนโดยอ้างอิงสถานะจากแถวตอนเช้าอัตโนมัติ',
         },
         isResolved: st.period7Done,

@@ -35,6 +35,7 @@ import {
   type SgsStudentRecord,
 } from '../services/sgsRosterAndSubmissionService';
 import { PaperRegisterLedger } from '../components/teacher/PaperRegisterLedger';
+import type { CrossViewNavigationPayload } from '../services/teacherCopilotService';
 import {
   TEACHER_SUBJECTS_LIST,
 } from '../services/teacherCourseAssignmentService';
@@ -48,6 +49,7 @@ interface TeacherOverviewViewProps {
   initialGradesFilter?: 'ALL' | 'AT_RISK';
   initialAssignmentFilter?: QuickFilterMode;
   initialHighlightBanner?: string | null;
+  onDeepNavigate?: (payload: CrossViewNavigationPayload) => void;
 }
 
 export type ClassSubTab =
@@ -81,6 +83,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
   initialGradesFilter = 'ALL',
   initialAssignmentFilter = 'ALL',
   initialHighlightBanner = null,
+  onDeepNavigate,
 }) => {
   // เริ่มต้นที่แท็บ "เช็คชื่อเข้าเรียน" เป็นอันดับแรกสุดก่อนเริ่มสอน หรือตาม Deep-Link ที่ส่งมา
   const [activeTab, setActiveTab] = useState<ClassSubTab>(initialTab);
@@ -802,6 +805,30 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
       {/* 3. TAB: เช็คชื่อเข้าเรียนรายวิชา (สมุด ปพ.5 แบบกระดาษ หลายคาบ ทันที) */}
       {activeTab === 'attendance' && (
         <div className="space-y-3">
+          {/* Quick jump to dedicated ClassroomAttendanceView */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">
+                  ระบบเช็คชื่อเข้าเรียนแบบใหม่ (Classroom Attendance View)
+                </h4>
+                <p className="text-xs text-slate-500 font-medium">
+                  ล็อกเฉพาะห้องที่สอน ปฏิทินย้อนหลังสีเขียว/แดง และคำนวณสถิติรวมทั้งห้องตามวันเรียนจริง
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onDeepNavigate?.({ view: 'classroom-attendance' })}
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-xs shrink-0 self-start sm:self-auto cursor-pointer"
+            >
+              เปิดหน้าเช็คชื่อเข้าเรียน →
+            </button>
+          </div>
+
           {attendanceSubMode === 'MORNING_AND_TODAY' && (
             <PaperRegisterLedger
               initialMode="CLASS_ATTENDANCE"

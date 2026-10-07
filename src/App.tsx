@@ -511,14 +511,13 @@ export const App: React.FC = () => {
                   activeRole={activeRole}
                   onNavigateToClass={() => setCurrentView('class-overview')}
                   onNavigateToAttendance={() => {
-                    setDeepLinkClassTab('attendance');
-                    setCurrentView('class-overview');
+                    setCurrentView('classroom-attendance');
                   }}
                   onNavigateToReadiness={() => setCurrentView('readiness')}
                   onNavigateToAcademicYear={() => setCurrentView('academic-year')}
                   onNavigateToCourses={() => setCurrentView('courses')}
                   onNavigateToLessons={() => setCurrentView('lessons')}
-                  onNavigateToMorningAssembly={() => setCurrentView('student-affairs')}
+                  onNavigateToMorningAssembly={() => setCurrentView('morning-assembly')}
                   onDeepNavigate={handleDeepNavigate}
                 />
               )}
@@ -534,6 +533,7 @@ export const App: React.FC = () => {
                   initialGradesFilter={deepLinkGradesFilter}
                   initialAssignmentFilter={deepLinkAssignmentFilter}
                   initialHighlightBanner={deepLinkBanner}
+                  onDeepNavigate={handleDeepNavigate}
                 />
               )}
 

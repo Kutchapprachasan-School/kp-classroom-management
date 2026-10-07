@@ -65,8 +65,7 @@ export const TeacherAllTasksMobileView: React.FC<TeacherAllTasksMobileViewProps>
         iconBg: 'bg-amber-100',
         iconColor: 'text-amber-700',
         targetPayload: {
-          view: 'class-overview',
-          classSubTab: 'attendance',
+          view: 'classroom-attendance',
           highlightBanner: 'วิชาวิทยาศาสตร์ ม.6/1',
         },
       },
@@ -106,8 +105,7 @@ export const TeacherAllTasksMobileView: React.FC<TeacherAllTasksMobileViewProps>
         iconBg: 'bg-rose-100',
         iconColor: 'text-rose-700',
         targetPayload: {
-          view: 'class-overview',
-          classSubTab: 'attendance',
+          view: 'classroom-attendance',
           highlightBanner: 'ชมรม ม.5/1',
         },
       },

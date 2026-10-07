@@ -30,6 +30,7 @@ import {
   Shield,
   BarChart3,
   Edit3,
+  UserCheck,
 } from 'lucide-react';
 import {
   attendanceCorrelationService,
@@ -99,7 +100,7 @@ const THAI_MONTHS = [
 ];
 
 export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = ({
-  onDeepNavigate: _onDeepNavigate,
+  onDeepNavigate,
 }) => {
   // Course, Room, Date state
   const [selectedCourse, setSelectedCourse] = useState<string>('ญ31201');
@@ -461,18 +462,32 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
             <Check className="w-4 h-4" />
             <span>✓ มาครบทุกคน</span>
           </button>
+
+          {onDeepNavigate && (
+            <button
+              type="button"
+              onClick={() => onDeepNavigate({ view: 'morning-assembly' })}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/90 hover:bg-white text-sky-700 border border-sky-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap"
+              title="สลับไปยังหน้าเช็คแถวเช้า & โฮมรูม"
+            >
+              <UserCheck className="w-4 h-4 text-sky-600" />
+              <span>ไปเช็คแถวเช้า →</span>
+            </button>
+          )}
         </div>
 
-        {/* Hero Anime School Mascot Illustration Background Accent */}
-        <div className="absolute right-0 bottom-0 top-0 w-80 pointer-events-none opacity-20 md:opacity-40 flex items-end justify-end">
+        {/* Hero Anime School Mascot Illustration Background Accent - ตรงตามภาพ media_1791315379363.jpg */}
+        <div className="absolute right-0 bottom-0 top-0 w-full sm:w-[540px] md:w-[680px] pointer-events-none flex items-center justify-end overflow-hidden">
           <img
-            src="/images/banners/mascot-teacher.png"
-            alt="Mascot"
-            className="h-full object-contain object-bottom"
+            src="/images/teacher/hero_banner_anime.png"
+            alt="Anime School Illustration"
+            className="h-full w-full object-cover object-right opacity-90 select-none"
             onError={(e) => {
               (e.currentTarget as HTMLElement).style.display = 'none';
             }}
           />
+          {/* Subtle gradient fader from left to right so text remains perfectly readable */}
+          <div className="absolute inset-0 bg-linear-to-r from-[#D9EAFE] via-[#E8F2FE]/70 sm:via-[#E8F2FE]/30 to-transparent" />
         </div>
       </div>
 

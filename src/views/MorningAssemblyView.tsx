@@ -33,6 +33,7 @@ import {
   ChevronDown,
   CalendarDays,
   Printer,
+  ClipboardCheck,
 } from 'lucide-react';
 import {
   attendanceCorrelationService,
@@ -57,7 +58,7 @@ const THAI_MONTH_NAMES = [
   'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
 ];
 
-export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeepNavigate: _onDeepNavigate }) => {
+export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeepNavigate }) => {
   // ----------------------------------------------------
   // Core States
   // ----------------------------------------------------
@@ -284,6 +285,18 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
             <Sparkles className="w-4 h-4 text-blue-600" />
             <span>ตรวจความสอดคล้อง</span>
           </button>
+
+          {onDeepNavigate && (
+            <button
+              type="button"
+              onClick={() => onDeepNavigate({ view: 'classroom-attendance' })}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-blue-50/90 hover:bg-blue-100 active:scale-95 text-blue-700 border border-blue-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap"
+              title="สลับไปยังหน้าเช็คชื่อเข้าเรียนรายคาบ"
+            >
+              <ClipboardCheck className="w-4 h-4 text-blue-600" />
+              <span>ไปเช็คชื่อเข้าเรียน →</span>
+            </button>
+          )}
         </div>
       </div>
 
