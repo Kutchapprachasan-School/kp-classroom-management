@@ -1,640 +1,343 @@
 ---
 name: Style
-description: Pastel Anime Education Dashboard – Clean, Friendly, Modern School SaaS UI Design Rule
+description: Pastel Anime Education Dashboard – Master UI/UX & Information Architecture Design System Rule for KP Classroom Management
 trigger: always_on
 ---
 
-# UI DESIGN RULE
-# Pastel Anime Education Dashboard
+# UI & UX MASTER DESIGN SYSTEM
+# Pastel Anime Education Dashboard (KP Classroom Management)
 
-ออกแบบ UI สำหรับระบบบริหารจัดการโรงเรียน / Learning Platform
-โดยใช้สไตล์ Modern Educational SaaS ผสม Pastel Anime
-เน้นความสะอาด อ่านง่าย ใช้งานจริงได้ และเป็นมิตรกับนักเรียน/ครู
-
-==================================================
-1. DESIGN PRINCIPLE
-==================================================
-
-- Clean first, cute second
-- UI ต้องดูทันสมัยและเป็นระบบ ไม่เหมือนเกมจนเกินไป
-- ใช้ Visual Hierarchy ที่ชัดเจน
-- ลดความหนาแน่นของข้อมูลด้วย Card, Section และ Spacing
-- ทุก Action สำคัญต้องมองเห็นและเข้าใจได้ทันที
-- ใช้ Icon + Label เพื่อช่วยให้ผู้ใช้เข้าใจ Function
-- ใช้สีเพื่อสื่อความหมาย ไม่ใช่ใช้ตกแต่งอย่างเดียว
-- Interface ต้อง Friendly, Approachable และ Professional
-- รองรับการใช้งานภาษาไทยเป็นหลัก
+ระบบบริหารจัดการโรงเรียน / Learning Platform & Classroom Management
+สไตล์: Modern Educational SaaS ผสม Soft Pastel Anime
+หลักการแกนกลาง: สะอาด อ่านง่าย ใช้งานจริงได้ เป็นมิตรกับนักเรียนและครู (Clean first, cute second)
 
 ==================================================
-2. OVERALL VISUAL STYLE
+01. BRAND & VISUAL DIRECTION
 ==================================================
 
-Visual direction:
-- Pastel
-- Soft
-- Bright
-- Friendly
-- Anime-inspired
-- Educational
-- Modern SaaS
-- Minimal but expressive
+- Visual Direction: Pastel, Soft, Bright, Friendly, Anime-inspired, Educational Modern SaaS
+- Mood & Tone: "โรงเรียนยุคใหม่ + แอปการเรียนรู้ + Anime Character เสริมความอบอุ่น"
+- Clean first, cute second: ความน่ารักต้องไม่บดบังความชัดเจนของการทำงาน
+- Visual Hierarchy ต้องชัดเจน ลด cognitive load ของครูและนักเรียน
+- รองรับภาษาไทยเป็นหลัก (Thai-First)
 
-UI ต้องให้ความรู้สึก:
-"โรงเรียนยุคใหม่ + แอปการเรียนรู้ + Anime Character"
-
-หลีกเลี่ยง:
-- Dark UI
-- Neon มากเกินไป
-- Gradient จัดจ้าน
-- Glassmorphism หนักเกินไป
-- Shadow หนัก
-- Border หนา
-- UI ที่ดูเหมือน Gaming Dashboard
-- สีมากเกินไปในหน้าเดียว
+หลีกเลี่ยง (Forbidden):
+- Dark UI / สีทึบดุดัน
+- Neon จัดจ้าน / Gradient รุนแรง
+- Glassmorphism หรือ Blur ที่หนักเกินไป
+- Shadow หนาและดำ
+- เส้นตารางทึบ / Border หนา
+- สไตล์ Gaming Dashboard ที่ดูรกตา
 
 ==================================================
-3. COLOR SYSTEM
+02. COLOR TOKENS (EXACT TOKENS)
 ==================================================
 
-Primary:
-- Soft Blue / Sky Blue
-- ใช้เป็นสีหลักของ Navigation, Button, Active State
+ไม่ใช้หลายเฉดสับสนใน Token เดียว กำหนดค่ารหัสสีมาตรฐานที่แน่นอน:
 
-Secondary:
-- Mint Green
-- Light Cyan
-- Soft Purple
-- Soft Yellow
-- Soft Orange
+### Primary (Action & Active State)
+- Primary: `#3B82F6` (Blue 500)
+- Primary Hover: `#2563EB` (Blue 600)
+- Primary Soft: `#EFF6FF` (Blue 50)
+- Primary Border: `#BFDBFE` (Blue 200)
 
-Background:
-- #F7FAFF
-- #F2F7FC
-- White
+### Background & Surface
+- Background Canvas: `#F7FAFF` (หรือ `#F2F7FC`)
+- Surface / Card: `#FFFFFF`
+- Card Border: `#E6EEF7` (1px solid)
 
-Text:
-- Primary: #163A66
-- Secondary: #6B7C93
-- Muted: #94A3B8
+### Neutral & Text
+- Text Primary: `#163A66` (หัวข้อ, ข้อมูลสำคัญ, ตัวเลขสรุป)
+- Text Secondary: `#6B7C93` (คำอธิบายรอง, Header ตาราง)
+- Text Muted: `#94A3B8` (Placeholder, เวลา, ข้อความที่ถูกปิดใช้งาน)
 
-Semantic Colors:
-- Success = Mint / Green
-- Warning = Yellow / Orange
-- Error = Soft Red
-- Info = Blue
+### Semantic Colors
+- Success (ผ่าน / บันทึกแล้ว / มาเรียน):
+  - Base: `#10B981` (Emerald 500)
+  - Soft: `#ECFDF5` (Emerald 50)
+  - Border: `#A7F3D0` (Emerald 200)
+  - Text: `#065F46` (Emerald 800)
+- Warning (รอดำเนินการ / สาย / แจ้งเตือน):
+  - Base: `#F59E0B` (Amber 500)
+  - Soft: `#FFFBEB` (Amber 50)
+  - Border: `#FDE68A` (Amber 200)
+  - Text: `#92400E` (Amber 800)
+- Danger (ขาด / เลยกำหนด / ข้อผิดพลาด / ลบ):
+  - Base: `#EF4444` (Red 500)
+  - Soft: `#FEF2F2` (Red 50)
+  - Border: `#FECACA` (Red 200)
+  - Text: `#991B1B` (Red 800)
+- Special / Advisory / Club (ลา / งานสภา / กิจกรรมพิเศษ):
+  - Base: `#8B5CF6` (Purple 500)
+  - Soft: `#F5F3FF` (Purple 50)
+  - Border: `#DDD6FE` (Purple 200)
+  - Text: `#5B21B6` (Purple 800)
 
-ใช้สี Accent ประมาณ 1 สีหลัก + 2-3 สีรองต่อหน้า
-อย่าใช้ทุกสีพร้อมกัน
-
-==================================================
-4. TYPOGRAPHY
-==================================================
-
-ใช้ฟอนต์ภาษาไทยที่อ่านง่าย เช่น:
-- Noto Sans Thai
-- IBM Plex Sans Thai
-- Anuphan
-- LINE Seed Sans Thai
-
-Typography:
-- Page Title: 24-32px / Bold
-- Section Title: 18-22px / 600-700
-- Card Title: 15-18px / 600
-- Body: 14-16px
-- Caption: 12-14px
-
-หัวข้อใช้ตัวหนา
-เนื้อหาต้องอ่านง่าย
-อย่าใช้ Font Weight หนักทุกข้อความ
+กฎการใช้สี:
+- ใช้ 1 สีหลัก + ไม่เกิน 2-3 สี Accent ต่อหนึ่งหน้าจอ
+- ห้ามใช้สีอย่างเดียวในการสื่อความหมาย (ต้องมี Icon หรือ Text Label กำกับเสมอ)
 
 ==================================================
-5. LAYOUT
+03. TYPOGRAPHY (THAI-FIRST)
 ==================================================
 
-Desktop Layout:
-- Left Sidebar
-- Top Header
-- Main Content
-- Optional Right Sidebar / Information Panel
+ฟอนต์หลัก: Prompt, Noto Sans Thai, LINE Seed Sans Thai, Anuphan
 
-โครงสร้างหลัก:
+ขนาดและความหนา:
+- Page Title: 24–32px / Bold (700)
+- Section Title: 18–22px / SemiBold (600)
+- Card Title: 15–18px / SemiBold (600)
+- Body: 14–16px / Regular (400) หรือ Medium (500)
+- Caption / Helper: 12–14px / Regular (400)
+- Badges / Tag: 10–12px / SemiBold (600)
 
-┌─────────────────────────────────────────────┐
-│ Sidebar │ Header                           │
-│         ├───────────────────────────────────┤
-│         │ Main Content                      │
-│         │                                   │
-│         │ Cards / Tables / Dashboard        │
-└─────────────────────────────────────────────┘
-
-Sidebar:
-- Width ประมาณ 240-280px
-- Fixed
-- Background สีขาวหรือฟ้าอ่อน
-- Menu เป็น Icon + Label
-- Active menu ใช้ Blue Background
-- Border Radius 12-16px
-- มี Badge สำหรับ Notification
-
-Header:
-- สูงประมาณ 64-80px
-- แสดง Avatar + ชื่อ
-- วัน/ภาคเรียน
-- Search
-- Notification
-- User Menu
+หัวข้อใช้ตัวหนา เนื้อหาต้องอ่านสบายตา อย่าใส่ Font Weight หนักทุกข้อความ
 
 ==================================================
-6. CARD SYSTEM
+04. SPACING, RADIUS & SHADOW
 ==================================================
 
-ใช้ Card เป็น Component หลัก
+### 8px Spacing Grid
+`4px`, `8px`, `12px`, `16px`, `24px`, `32px`, `40px`, `48px`
+- Main Content Padding: `24-32px` (Desktop) / `16px` (Mobile)
+- Section Gap: `24px`
+- Card Gap: `16px`
+- Card Padding: `16-24px`
 
-Card:
-- Background: White
-- Border: 1px solid #E6EEF7
-- Radius: 16-20px
-- Shadow: Soft / subtle
-- Padding: 16-24px
+### Border Radius
+- Small items (Tags, Badges, Pills): `8-10px` หรือ `rounded-full`
+- Button & Form Input: `10-14px` (Default: `12px`)
+- Card & Section Container: `16-20px` (Default: `18px`)
+- Hero Banner & Modal Dialog: `20-24px`
 
-ตัวอย่าง:
-
+### Card Shadow
+```css
 .card {
-  background: white;
+  background: #FFFFFF;
   border: 1px solid #E6EEF7;
   border-radius: 18px;
   box-shadow: 0 4px 16px rgba(40, 90, 140, 0.06);
 }
-
-ไม่ใช้ Shadow หนาและดำ
-
-==================================================
-7. BUTTON
-==================================================
-
-Primary Button:
-- Blue
-- Rounded 12-14px
-- Medium/Bold text
-- มี Icon เมื่อเหมาะสม
-
-Secondary:
-- White / Light Blue
-- มี Border
-
-Success:
-- Mint Green
-
-Warning:
-- Orange
-
-Danger:
-- Soft Red
-
-ปุ่มต้องมี State:
-- hover
-- active
-- disabled
-- loading
-
-หลีกเลี่ยงปุ่มสี่เหลี่ยมแข็ง ๆ
-
-==================================================
-8. ICON SYSTEM
-==================================================
-
-ใช้ Icon เพื่อช่วยให้ผู้ใช้เข้าใจ Function
-Icon Set หลักของโปรเจกต์: **MingCute Icons** (`@mingcute/react`)
-สไตล์: มนกลม นุ่มนวล น่ารัก เข้ากับบรรยากาศ Pastel Anime และระบบการศึกษา
-
-แนะนำ:
-- MingCute Icons (`@mingcute/react/core-regular` หรือ `@mingcute/react/core-filled`)
-- Lucide Icons (`lucide-react` เป็นตัวเลือกรอง/สำรอง)
-
-Style:
-- Rounded / Soft
-- Simple & Friendly
-- Consistent stroke width และขนาดสอดคล้องกับข้อความ
-
-ตัวอย่างการ Import และใช้งาน:
-```tsx
-import { Home1Regular, User3Regular, CalendarRegular } from '@mingcute/react/core-regular';
-// หรือ Direct Import:
-import Home1Regular from '@mingcute/react/core-regular/home-1';
 ```
+ห้ามใช้เงาสีดำทึบหรือเบลอหนา
 
 ==================================================
-9. GROUP / CATEGORY VISUALIZATION (EXAMPLE)
+05. COMPONENTS (BUTTONS, INPUTS, ICONS)
 ==================================================
 
-ในหน้าที่มีข้อมูลหลายหมวดหมู่พร้อมกัน
-ให้แยก Category ด้วย Icon + Color + Label ให้ชัดเจน เพื่อให้ผู้ใช้แยกแยะประเภทได้ทันทีโดยไม่ต้องอ่านข้อความทั้งหมด
+### Button Hierarchy
+1. Primary Button: พื้นหลัง `#3B82F6`, ตัวอักษรสีขาว, Radius 12px, มี hover/active state
+2. Secondary / Outline Button: พื้นหลังขาว, Border 1px solid `#E2E8F0`, ตัวหนังสือ `#163A66`
+3. Ghost Button: โปร่งใส, เปลี่ยนสีเมื่อ Hover
+4. Destructive Button: สีแดงอ่อน / Text สีแดง ป้องกันการเผลอกดลบ
+
+### Icon System
+- Library หลัก: **MingCute Icons** (`@mingcute/react`)
+  - Subpath import: `import Home1Regular from '@mingcute/react/core-regular/home-1'`
+  - หรือ named import จาก `@mingcute/react/core-regular` หรือ `@mingcute/react/core-filled`
+- Library สำรอง: `lucide-react` (เฉพาะกรณีไอคอนเฉพาะทางที่ MingCute ไม่มี)
+- สไตล์: มนกลม นุ่มนวล ไม่แข็งกระด้าง สอดคล้องกับขนาดตัวหนังสือ
 
 ==================================================
-10. AVATAR & CHARACTER
+06. INFORMATION ARCHITECTURE
 ==================================================
 
-ใช้ Anime Character / Student Mascot เป็น Visual Accent
+ทุกหน้าต้องตอบคำถาม 3 ข้อทันทีที่ผู้ใช้เปิดขึ้นมา:
+1. ตอนนี้ฉันอยู่ที่ไหน? (Where am I?)
+2. หน้านี้ใช้ทำอะไร? (What is this page for?)
+3. ฉันควรกดอะไรเป็นอันดับแรก? (What is my primary action?)
 
-ใช้ใน:
-- Header
-- Empty State
-- Welcome Banner
-- Sidebar Illustration
-- Achievement
-- User Profile
-
-Character ต้องเป็น:
-- Friendly
-- School Uniform
-- Soft Anime Style
-- ไม่ควรครอบพื้นที่ UI มากเกินไป
-
-Character เป็น "Supporting Visual"
-ไม่ใช่จุดสนใจมากกว่า Content
+กฎสำคัญ:
+- แต่ละหน้าต้องมี **ONE clear primary task**
+- ห้ามวาง Action ใหญ่ที่มีน้ำหนักสายตาเท่ากันหลายปุ่มในระดับสายตาเดียวกัน
+- Primary Action: ต้องเด่นที่สุดทางสายตา (สีทึบ มีเงาเบาๆ) มักมีเพียง 1 จุดต่อ 1 ส่วนงาน
+- Secondary Actions: ใช้ปุ่ม Outline หรือ Ghost เพื่อไม่แย่งความสนใจ
+- Administrative / Advanced Actions: ซ่อนใน Dropdown, Action Menu (`...`), หรือ Secondary Panel
+- Navigation Flow: ต้องไล่ตามลำดับ **Category → List → Detail → Action**
 
 ==================================================
-11. HERO / BANNER
+07. STANDARD PAGE STRUCTURE
 ==================================================
 
-ใช้ Illustration Banner ในหน้า Dashboard สำคัญ
+โครงสร้างหน้ามาตรฐาน (เรียงลำดับจากบนลงล่าง):
+1. **Page Header**: Icon ประจำหน้า + Title ชัดเจน + Subtitle สั้นๆ (1 บรรทัด) + Primary Action ด้านขวา
+2. **Context / Filters**: ตัวเลือกปีการศึกษา, เทอม, ห้องเรียน, วันที่ หรือช่อง Search
+3. **Summary Stats (เฉพาะเมื่อมีประโยชน์จริง)**: Stat cards ขนาดเล็ก 2-4 ใบ (เช่น มา/ขาด/สาย/ยอดรวม)
+4. **Main Content**: ส่วนแสดงข้อมูลหลัก (Cards, List, หรือ Table)
+5. **Secondary Information**: แท็บเสริม, สถิติย่อย หรือประวัติย้อนหลัง
+6. **Quick Actions**: การส่งออกรายงาน หรือคำสั่งช่วยเหลือ
 
-ลักษณะ:
-- โรงเรียน
-- ท้องฟ้า
-- ต้นไม้
-- นักเรียน Anime
-- Soft Pastel
-
-Overlay:
-- Title
-- Description
-- CTA
-
-Banner มี Radius 20-24px
-
-ไม่ควรใส่ข้อความเยอะเกินไป
+ข้อห้ามเด็ดขาด:
+- **ห้ามใส่ข้อความอธิบายยืดยาวที่ส่วนบนของหน้า**
+- คำอธิบายยาวให้ใช้:
+  - Collapsible ("ดูรายละเอียดเพิ่มเติม")
+  - Tooltip บน Icon ข้อมูล (ⓘ)
+  - Modal แสดงวิธีใช้งานเมื่อต้องการดู
 
 ==================================================
-12. INFORMATION HIERARCHY
+08. DATA-HEAVY PAGES (TABLES & ROSTERS)
 ==================================================
 
-ทุก Section ต้องมี:
+สำหรับหน้าที่มีข้อมูลจำนวนมาก เช่น การเช็คชื่อ, การตรวจการบ้าน, ตารางคะแนน, ทะเบียนนักเรียน:
 
-1. Icon
-2. Title
-3. Description / Context
-4. Main Content
-5. Action
+ลำดับความสำคัญของคอลัมน์:
+1. **Identity**: รูปภาพ/Avatar + เลขประจำตัว + ชื่อ-นามสกุล
+2. **Status**: Badge สถานะชัดเจน (พร้อมสีที่ถูกหลัก)
+3. **Primary Action**: ปุ่ม Action สำคัญ (เช่น ปุ่มเช็คชื่อ, ปุ่มให้คะแนน)
+4. **Metadata**: หมายเหตุ, เวลา, รายละเอียดรอง
 
-ตัวอย่าง:
-
-[📅]
-การตั้งค่าปีการศึกษา
-กำหนดวันเปิด-ปิดภาคเรียน
-
-                    [+ สร้างปีการศึกษา]
-
-------------------------------------------------
-
-ใช้ Heading และ Subheading
-อย่าวางข้อมูลทุกอย่างในระดับความสำคัญเท่ากัน
+กฎการแสดงผล:
+- **Desktop**: ใช้ Table ได้, Header สีอ่อน (`bg-slate-50`), จัดระยะ Row spacing ไม่อึดอัด, มี Hover state
+- **Mobile**:
+  - เปลี่ยนแถวในตารางเป็น Card หรือ Stacked List อัตโนมัติ
+  - Primary Action ต้องมองเห็นและกดได้ทันทีโดยไม่ต้องเลื่อนซ้ายขวา
+  - รายละเอียดรองย้ายเข้าไปอยู่ใน Accordion / Expandable Detail
+- **หลีกเลี่ยง Horizontal Scrolling สำหรับ Flow การทำงานหลัก**
 
 ==================================================
-13. STATUS SYSTEM
+09. MOBILE-FIRST INTERACTION
 ==================================================
 
-ใช้ Badge สำหรับสถานะ
+Mobile ไม่ใช่การย่อส่วน Desktop แต่คือการออกแบบประสบการณ์สัมผัสใหม่:
 
-ตัวอย่าง:
-
-ACTIVE
-✓ Active
-
-SUCCESS
-✓ เปิดใช้งาน
-
-PENDING
-◷ รอตรวจ
-
-WARNING
-! ต้องดำเนินการ
-
-ERROR
-× ผิดพลาด
-
-Badge:
-- Pill
-- Small
-- Soft Background
-- Text สีเข้ม
+- **ห้ามบังคับผู้ใช้เลื่อนหน้าจอแนวนอน (No Horizontal Scroll)** เพื่อกดปุ่มสำคัญ
+- แปลงตารางหลายคอลัมน์เป็น Stacked Cards
+- Primary Action ต้องอยู่ในตำแหน่งที่นิ้วโป้งกดง่าย (Thumb-friendly zone)
+- ใช้ Bottom Sheet / Drawer สำหรับชุดตัวกรอง (Filters)
+- ใช้ Sticky Bottom Action Bar สำหรับขั้นตอนการทำงานที่ต้องยืนยัน (เช่น "บันทึกการเช็คชื่อ")
+- สำหรับงานที่ทำซ้ำๆ (Repetitive tasks):
+  - ปุ่มกดขนาดใหญ่ ไม่ใช้ปุ่มไอคอนจิ๋ว
+  - Touch Target ขั้นต่ำ **44 x 44 px**
+  - ตัวอย่างหน้าเช็คชื่อบนมือถือ:
+    ```text
+    ด.ช. กฤษณะ ศรีสมบูรณ์ (เลขที่ 1)
+    [ มา ] [ สาย ] [ ขาด ] [ ลา ]
+    ```
+    กดเลือกสถานะได้ทันทีด้วยปุ่มใหญ่ แทนการเปิด Dropdown
 
 ==================================================
-14. TABLE
+10. SCHOOL DOMAIN RULES
 ==================================================
 
-Table ต้องอ่านง่าย
-ใช้ Header สีอ่อน
-Row spacing สูงพอ
-ใช้ Badge ใน Column ที่เป็น Status
-ใช้ Icon ใน Action
+ใช้ Semantic Visual Language เดียวกันทั้งระบบโรงเรียน:
 
-Avoid:
-- เส้น Grid เยอะ
-- Border หนาทุก Cell
+### 10.1 Attendance (การเช็คชื่อ / เข้าแถว / คาบเรียน)
+- Green (`#10B981`): **มา** (Present) - ได้เวลาเรียน 100%
+- Yellow (`#F59E0B`): **สาย** (Late) - ได้เวลาเรียน 100% (นับสถิติสาย)
+- Red (`#EF4444`): **ขาด** (Absent) / **โดดเรียน** (Truancy) - ไม่ได้เวลาเรียน 0%
+- Purple (`#8B5CF6`): **ลา** (Leave - ป่วย/กิจ) / **กิจกรรม** (Activity) - มีหลักฐานรองรับ
 
-แนะนำ:
-- Minimal border
-- Hover row
-- Alternate background แบบอ่อนมาก
+### 10.2 Assignments & Submissions (การส่งงาน / การบ้าน)
+- Green: **ส่งแล้ว / ตรวจแล้ว** (Submitted / Graded)
+- Yellow: **รอตรวจ / ส่งช้า** (Pending / Late)
+- Red: **ยังไม่ส่ง / เลยกำหนด** (Missing / Overdue)
+- Blue: **มอบหมายแล้ว / กำลังทำ** (Assigned / In Progress)
 
-==================================================
-15. DASHBOARD CARDS
-==================================================
+### 10.3 Learning & Course Status (วิชาและแผนการเรียน)
+- Blue: **Active / ภาคเรียนปัจจุบัน**
+- Slate / Gray: **Draft / ยังไม่เปิดสอน**
+- Green: **Completed / สำเร็จการศึกษา**
 
-สำหรับ Summary:
-ใช้ Card ขนาดเล็ก
-
-ตัวอย่าง:
-
-[📚]
-วิชาที่เรียน
-6 วิชา
-
-[✅]
-งานที่ต้องทำ
-3 งาน
-
-[🏆]
-คะแนนรวม
-88.5%
-
-แต่ละ Card ควรมี:
-Icon + Label + Value + Optional Trend
+ข้อกำหนด: ห้ามสื่อสารสถานะด้วยสีเพียงอย่างเดียว ต้องมี Icon + ข้อความกำกับเสมอ
 
 ==================================================
-16. SPACING
+11. CALENDAR & DATE INTERACTION
 ==================================================
 
-ใช้ระบบ 8px spacing
-
-4
-8
-12
-16
-24
-32
-40
-48
-
-Main content:
-- Padding 24-32px
-- Section gap 24px
-- Card gap 16px
-
-ไม่ให้ UI แน่นเกินไป
+- **วันที่ปัจจุบัน (Today)**: วงกลมเน้นสีฟ้า Primary (`#3B82F6`)
+- **วันที่บันทึกครบถ้วน (Completed)**: จุดหรือตัวเลขเน้นสีเขียว
+- **วันที่ยังไม่ได้บันทึก / ขาดส่ง (Missing)**: สัญลักษณ์สีแดงเตือน
+- **วันหยุด / ปิดภาคเรียน (Holiday)**: สีเทาอ่อน (Muted)
+- **วันที่ถูกเลือก (Selected Date)**: ขอบ Primary ล้อมรอบชัดเจน
+- ปฏิทินต้องแสดงสถานะสรุปเบื้องต้นได้ทันทีโดยไม่ต้องคลิกเปิดดูทีละวัน
+- การเลือกดูประวัติย้อนหลังต้องเข้าถึงได้รวดเร็วผ่าน Date Picker หรือปุ่มปฏิทินกะทัดรัด
 
 ==================================================
-17. BORDER RADIUS
+12. SETTINGS ARCHITECTURE
 ==================================================
 
-Small:
-8-10px
+หน้าการตั้งค่าต้องจัดกลุ่มตาม Domain เสมอ (ห้ามวาง Form ตั้งค่ายาวเหยียดปะปนกันบนหน้าแรก):
 
-Button:
-10-14px
+### หมวดหมู่หลัก 5 ด้าน:
+1. **ข้อมูลพื้นฐาน (Foundation)**
+   - ข้อมูลโรงเรียน
+   - บัญชีผู้ใช้งาน / สิทธิ์
+   - จัดการห้องเรียน
+   - รายวิชาและกลุ่มสาระ
+2. **การเรียนการสอน (Academics)**
+   - ตารางสอน & คาบเรียน
+   - แผนการสอน
+   - การมอบหมายงาน / แบบฝึกหัด
+   - การสอบและคลังข้อสอบ
+   - แบบฟอร์ม & การประเมิน
+3. **การจัดการนักเรียน (Student Affairs)**
+   - ทะเบียนนักเรียน
+   - การเช็คชื่อแถวเช้า / คาบเรียน
+   - บันทึกพฤติกรรม & เยี่ยมบ้าน
+   - ข้อมูลผู้ปกครอง
+4. **ผลการเรียน & รายงาน (Evaluation & Reports)**
+   - ปพ.5 / ตัดเกรด
+   - รายงานสถิติ & กราฟ
+   - สำรองข้อมูล (Backup & Restore)
+5. **ระบบทั่วไป (System & Preferences)**
+   - การแจ้งเตือน
+   - ปรับแต่งหน้าตา (Theme & Banners)
+   - ความปลอดภัย
+   - ข้อมูลจัดเก็บในเครื่อง (Storage Quota)
 
-Input:
-10-14px
-
-Card:
-16-20px
-
-Hero:
-20-24px
-
-ใช้ Rounded Corner อย่างสม่ำเสมอทั้งระบบ
-
-==================================================
-18. INPUT / SEARCH
-==================================================
-
-Input:
-- White background
-- Soft border
-- Radius 12px
-- Icon ด้านซ้าย
-- Focus state เป็น Blue
-
-Search bar:
-[ 🔍 ค้นหากลุ่ม ห้องเรียน หรือชื่อ... ]
-
-Placeholder ต้องเป็นสีเทาอ่อน
-
-==================================================
-19. RESPONSIVE
-==================================================
-
-Desktop:
-Sidebar เต็มรูปแบบ
-
-Tablet:
-Sidebar ย่อเหลือ Icon
-
-Mobile:
-ใช้ Bottom Navigation หรือ Drawer
-
-Card:
-Desktop = Multi-column
-Tablet = 2 columns
-Mobile = 1 column
-
-Table บนมือถือให้เปลี่ยนเป็น Card/List
-ไม่บังคับผู้ใช้เลื่อนตารางขนาดใหญ่ถ้าไม่จำเป็น
+การนำเสนอในหน้า Settings Hub:
+- แต่ละหมวดหมู่แสดงเป็นการ์ด: `[Icon] + [Title] + [คำอธิบายสั้น 1 บรรทัด] + [ลูกศร ➔]`
+- ฟอร์มการตั้งค่าแบบละเอียดต้องเปิดในหน้าย่อย (Sub-page) หรือ Slide-over Drawer / Modal
+- ห้ามวางฟอร์มบันทึกขนาดยักษ์บนหน้ารวมการตั้งค่า
 
 ==================================================
-20. UX RULE
+13. ANIME ILLUSTRATION RULE
 ==================================================
 
-ทุกหน้าให้ตอบคำถาม 3 ข้อ:
+ภาพ Anime Mascot / Student Illustrations เป็น **"Supporting Visuals"** ไม่ใช่เนื้อหาหลัก:
 
-1. ตอนนี้ฉันอยู่ที่ไหน?
-2. ฉันกำลังดูอะไร?
-3. ฉันสามารถทำอะไรต่อ?
+พื้นที่ที่อนุญาตให้ใช้:
+- Hero Banner ประจำหน้า
+- Empty State (เมื่อยังไม่มีข้อมูล)
+- Sidebar Promo Card / กำลังใจ
+- Welcome Section / Achievement Badge
 
-Primary Action ต้องเด่นที่สุด
-Secondary Action ต้องไม่แย่งความสนใจ
-
-ถ้าเป็นหน้าที่มีข้อมูลจำนวนมาก
-ต้องมี:
-- Search
-- Filter
-- Category
-- Status
-- Clear hierarchy
+ข้อห้ามเด็ดขาด:
+- ❌ ห้ามวางภาพ Anime เป็นพื้นหลังตารางข้อมูล (Tables)
+- ❌ ห้ามวางภาพ Anime หลังฟอร์มกรอกข้อมูล
+- ❌ ห้ามวางภาพ Anime บดบังปุ่ม Action สำคัญ
+- ❌ ห้ามใช้ตัวละครเป็นตัวสื่อสารข้อมูลหลักแทนตัวหนังสือ
+- ภาพการ์ตูนต้องไม่ทำลาย Visual Hierarchy และความชัดเจนของระบบโรงเรียน
 
 ==================================================
-21. EMPTY STATE
+14. ACCESSIBILITY & PERFORMANCE
 ==================================================
 
-เมื่อไม่มีข้อมูล
-อย่าแสดงแค่ "ไม่พบข้อมูล"
-
-ให้ใช้:
-
-[Illustration / Icon]
-
-ยังไม่มีข้อมูล
-ลองสร้างรายการใหม่ หรือเปลี่ยนตัวกรอง
-
-[ + สร้างข้อมูล ]
+- อัตราส่วนความต่างสี (Contrast Ratio): ตัวหนังสือกับพื้นหลังต้องอ่านออกชัดเจน (WCAG AA)
+- Touch Target: ทุกปุ่มบนจอมือถือต้องมีขนาดอย่างน้อย `44 x 44 px`
+- Keyboard Navigation: รองรับ Tab / Enter สำหรับ Interactive Elements
+- Skeleton Loading: เมื่อโหลดข้อมูลให้ใช้ Skeleton สีอ่อนที่มี Radius เท่ากับคอมโพเนนต์จริง แทน Spinner โดดๆ
 
 ==================================================
-22. LOADING STATE
+15. ANTI-PATTERNS (FORBIDDEN)
 ==================================================
 
-ใช้ Skeleton Loading
-แทน Spinner อย่างเดียว
-
-Skeleton ต้องใช้สีอ่อน
-และมี Radius เหมือน Component จริง
-
-==================================================
-23. ANIMATION
-==================================================
-
-Animation ต้อง subtle
-
-แนะนำ:
-- 150-250ms
-- ease-out
-- fade
-- slight slide
-- soft scale
-
-ห้ามใช้ Animation รุนแรง
-ห้ามกระพริบ
-ห้ามเด้งมากเกินไป
+- ❌ ไม่ใช้ Dark Theme ดำล้วน
+- ❌ ไม่ใช้ Gradient ฉูดฉาดสไตล์เว็บบริษัทคริปโตหรือเกม
+- ❌ ไม่ใช้มุมเหลี่ยมแข็งกระด้าง (`rounded-none`)
+- ❌ ไม่ใช้คำอธิบายยาวเหยียดทับถมกันด้านบนสุดของหน้า
+- ❌ ไม่ใช้ Table แนวนอนยักษ์บนหน้าจอมือถือ
+- ❌ ไม่สุ่มใช้สีหลากหลายนอกเหนือจาก Design Tokens
+- ❌ ไม่ใส่ภาพตัวละครจนรกสายตา
 
 ==================================================
-24. ACCESSIBILITY
+16. IMPLEMENTATION RULES FOR AI ASSISTANT
 ==================================================
 
-- Contrast ต้องอ่านได้ชัด
-- Icon สำคัญต้องมี Tooltip / Label
-- ห้ามใช้สีอย่างเดียวเพื่อบอกสถานะ
-- Button ต้องมี Keyboard Focus
-- Font ต้องไม่เล็กเกินไป
-- Touch target อย่างน้อยประมาณ 44px
-
-==================================================
-25. COMPONENT ARCHITECTURE
-==================================================
-
-สร้าง UI แบบ Reusable Components
-
-เช่น:
-
-Layout
-├── Sidebar
-├── Header
-└── MainContent
-
-Components
-├── Card
-├── Button
-├── Badge
-├── Avatar
-├── SearchInput
-├── Tabs
-├── StatCard
-├── GroupCard
-├── Table
-├── EmptyState
-├── Modal
-└── Toast
-
-ห้ามสร้าง Style ซ้ำโดยไม่จำเป็น
-ควรใช้ Design Tokens / CSS Variables
-
-==================================================
-26. DESIGN TOKENS
-==================================================
-
-สร้าง Token กลาง เช่น:
-
---color-primary
---color-primary-soft
---color-success
---color-warning
---color-danger
---color-background
---color-surface
---color-text
---color-text-secondary
-
---radius-sm
---radius-md
---radius-lg
---radius-xl
-
---shadow-card
---shadow-floating
-
---space-1
---space-2
---space-3
---space-4
---space-6
---space-8
-
-ทุกหน้าใช้ Token เหล่านี้
-เพื่อให้ Design Consistency
-
-==================================================
-27. FINAL VISUAL CHECK
-==================================================
-
-ก่อนส่ง UI ให้ตรวจว่า:
-
-- ดูเป็นระบบโรงเรียนสมัยใหม่หรือไม่
-- อ่านง่ายหรือไม่
-- Color hierarchy ชัดหรือไม่
-- Primary action เด่นหรือไม่
-- Icon สื่อความหมายหรือไม่
-- Category ต่าง ๆ แยกกันชัดหรือไม่
-- Card มี spacing เพียงพอหรือไม่
-- UI ดูน่ารักแต่ยัง Professional หรือไม่
-- ภาษาไทยไม่ล้น / ไม่ชน / ไม่ตัดข้อความ
-- Responsive แล้วไม่เสีย hierarchy
-
---------------------------------------------------
-Prompt Guidance for AI Assistant:
-When creating or modifying new pages/components, follow the project's "Pastel Anime Education Dashboard" design system.
-
-Use:
-- pastel blue + mint + soft accent colors
-- white rounded cards
-- soft shadows
-- 16-20px border radius
-- Thai-first typography
-- Lucide/Phosphor rounded icons
-- clear icon + label hierarchy
-- anime school illustrations as supporting visuals
-- modern SaaS layout
-- generous spacing
-- strong visual hierarchy
-- accessible contrast
-- reusable components
-- responsive design
-
-Avoid:
-- dark themes
-- heavy gradients
-- excessive shadows
-- overly colorful UI
-- gaming UI
-- sharp square cards
-- tiny text
-- ambiguous icons
-- dense information without grouping
+เมื่อสร้างหน้าใหม่หรือแก้ไขโค้ด UI:
+1. **ตรวจ Hierarchy**: มี 1 Primary Action เด่นชัดเจนหรือไม่
+2. **ตรวจ Spacing & Radius**: ใช้ Card Radius 18px, Padding 16-24px, Spacing 8px grid
+3. **ตรวจ Icons**: ใช้ MingCute Icons (`@mingcute/react`) เป็นตัวเลือกแรก
+4. **ตรวจ Mobile UX**: หน้านี้แสดงผลบนมือถือแล้วยังกดง่าย ไม่ล้นจอ และแปลง Table เป็น Card หรือไม่
+5. **ตรวจคำอธิบาย**: หน้าเว็บกระชับ ไม่พร่ำเพรื่อ ไม่รก
+6. **ภาษาไทย**: จัดคำอ่านง่าย ไม่ตัดคำหรือตกบรรทัดแปลกตา

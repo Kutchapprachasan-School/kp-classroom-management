@@ -560,15 +560,43 @@ export const attendanceCorrelationService = {
     return readStorage<MorningAssemblyRecord[]>(STORAGE_KEYS.MORNING_ASSEMBLY, []);
   },
 
-  saveMorningRecords(records: MorningAssemblyRecord[]): void {
-    const existing = readStorage<MorningAssemblyRecord[]>(STORAGE_KEYS.MORNING_ASSEMBLY, []);
-    const recordMap = new Map(existing.map((r) => [r.id, r]));
-
-    for (const rec of records) {
-      recordMap.set(rec.id, rec);
+  saveMorningRecords(...args: any[]): void {
+    let records: MorningAssemblyRecord[];
+    if (args.length === 1 && Array.isArray(args[0])) {
+      records = args[0];
+    } else if (args.length >= 3 && Array.isArray(args[2])) {
+      const classroomId = args[0];
+      const date = args[1];
+      records = args[2].map((r: any) => ({
+        ...r,
+        classroomId: r.classroomId || classroomId,
+        date: r.date || date,
+      }));
+    } else if (Array.isArray(args[args.length - 1])) {
+      records = args[args.length - 1];
+    } else {
+      records = [];
     }
 
-    writeStorage(STORAGE_KEYS.MORNING_ASSEMBLY, Array.from(recordMap.values()));
+    const existing = readStorage<MorningAssemblyRecord[]>(STORAGE_KEYS.MORNING_ASSEMBLY, []);
+    const resultList = [...existing];
+
+    for (const rec of records) {
+      const idx = resultList.findIndex(
+        (r) =>
+          r.id === rec.id ||
+          (r.date === rec.date &&
+            r.studentCode === rec.studentCode &&
+            normalizeClassroomId(r.classroomId) === normalizeClassroomId(rec.classroomId))
+      );
+      if (idx >= 0) {
+        resultList[idx] = { ...resultList[idx], ...rec };
+      } else {
+        resultList.push(rec);
+      }
+    }
+
+    writeStorage(STORAGE_KEYS.MORNING_ASSEMBLY, resultList);
   },
 
   markMorningRecord(
@@ -753,15 +781,49 @@ export const attendanceCorrelationService = {
     return readStorage<PeriodAttendanceRecord[]>(STORAGE_KEYS.PERIOD_ATTENDANCE, []);
   },
 
-  savePeriodRecords(records: PeriodAttendanceRecord[]): void {
-    const existing = readStorage<PeriodAttendanceRecord[]>(STORAGE_KEYS.PERIOD_ATTENDANCE, []);
-    const recordMap = new Map(existing.map((r) => [r.id, r]));
-
-    for (const rec of records) {
-      recordMap.set(rec.id, rec);
+  savePeriodRecords(...args: any[]): void {
+    let records: PeriodAttendanceRecord[];
+    if (args.length === 1 && Array.isArray(args[0])) {
+      records = args[0];
+    } else if (args.length >= 5 && Array.isArray(args[4])) {
+      const courseCode = args[0];
+      const classroomId = args[1];
+      const date = args[2];
+      const periodNo = args[3];
+      records = args[4].map((r: any) => ({
+        ...r,
+        courseCode: r.courseCode || courseCode,
+        classroomId: r.classroomId || classroomId,
+        date: r.date || date,
+        periodNo: typeof r.periodNo === 'number' ? r.periodNo : periodNo,
+      }));
+    } else if (Array.isArray(args[args.length - 1])) {
+      records = args[args.length - 1];
+    } else {
+      records = [];
     }
 
-    writeStorage(STORAGE_KEYS.PERIOD_ATTENDANCE, Array.from(recordMap.values()));
+    const existing = readStorage<PeriodAttendanceRecord[]>(STORAGE_KEYS.PERIOD_ATTENDANCE, []);
+    const resultList = [...existing];
+
+    for (const rec of records) {
+      const idx = resultList.findIndex(
+        (r) =>
+          r.id === rec.id ||
+          (r.date === rec.date &&
+            r.periodNo === rec.periodNo &&
+            r.studentCode === rec.studentCode &&
+            normalizeClassroomId(r.classroomId) === normalizeClassroomId(rec.classroomId) &&
+            normalizeCourseCode(r.courseCode) === normalizeCourseCode(rec.courseCode))
+      );
+      if (idx >= 0) {
+        resultList[idx] = { ...resultList[idx], ...rec };
+      } else {
+        resultList.push(rec);
+      }
+    }
+
+    writeStorage(STORAGE_KEYS.PERIOD_ATTENDANCE, resultList);
   },
 
   markPeriodRecord(

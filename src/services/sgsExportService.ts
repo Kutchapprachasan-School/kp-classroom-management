@@ -95,9 +95,6 @@ export const sgsExportService = {
 
     const timestamp = new Date();
     const dateCode = timestamp.toISOString().slice(0, 10).replace(/-/g, '');
-    const randomHash = Array.from({ length: 16 }, () =>
-      Math.floor(Math.random() * 16).toString(16)
-    ).join('');
 
     const newSnapshot: SgsSnapshotRecord = {
       id: `snap-${dateCode}-${Math.floor(Math.random() * 900 + 100)}`,

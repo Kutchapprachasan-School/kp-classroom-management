@@ -259,7 +259,7 @@ export function createUniversalAdapter<T>(config: UniversalAdapterConfig<T>): Un
         try {
           const client = getClient();
           logDbOperation(`SELECT * FROM ${tableName}`);
-          const { data, error } = await withTimeout(
+          const { data, error } = await withTimeout<any>(
             client.from(tableName).select('*'),
             timeoutMs,
             `SELECT * FROM ${tableName}`
@@ -304,7 +304,7 @@ export function createUniversalAdapter<T>(config: UniversalAdapterConfig<T>): Un
         try {
           const client = getClient();
           logDbOperation(`SELECT FROM ${tableName} WHERE ${remoteIdCol} = ${id}`);
-          const { data, error } = await withTimeout(
+          const { data, error } = await withTimeout<any>(
             client.from(tableName).select('*').eq(remoteIdCol, id).maybeSingle(),
             timeoutMs,
             `SELECT FROM ${tableName} WHERE ${remoteIdCol} = ${id}`
@@ -376,7 +376,7 @@ export function createUniversalAdapter<T>(config: UniversalAdapterConfig<T>): Un
           const client = getClient();
           const payload = toRemote ? toRemote(item) : item;
           logDbOperation(`UPSERT INTO ${tableName}`, payload);
-          const { data, error } = await withTimeout(
+          const { data, error } = await withTimeout<any>(
             client.from(tableName).upsert(payload).select().maybeSingle(),
             timeoutMs,
             `UPSERT INTO ${tableName}`
@@ -426,7 +426,7 @@ export function createUniversalAdapter<T>(config: UniversalAdapterConfig<T>): Un
         try {
           const client = getClient();
           logDbOperation(`DELETE FROM ${tableName} WHERE ${remoteIdCol} = ${id}`);
-          const { error } = await withTimeout(
+          const { error } = await withTimeout<any>(
             client.from(tableName).delete().eq(remoteIdCol, id),
             timeoutMs,
             `DELETE FROM ${tableName} WHERE ${remoteIdCol} = ${id}`

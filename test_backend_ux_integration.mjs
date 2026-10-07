@@ -561,7 +561,9 @@ runTestCase('T1.5.3: Chat Group Membership Auto-Reindexing after Transfer', () =
   const oldGroup = groups.find((g) => g.classroomId === 'room-1-1' && g.type === 'HOMEROOM');
   const newGroup = groups.find((g) => g.classroomId === 'room-1-2' && g.type === 'HOMEROOM');
 
-  const stuCode = '45101'; // Default first student
+  const stuCode =
+    studentService.getStudents('room-1-2').find((s) => s.code === '47001' || s.code === '45101')?.code ||
+    '47001';
   if (oldGroup) {
     assert.ok(!oldGroup.members.some((m) => m.code === stuCode), 'Student must not be in old room-1-1 group');
   }

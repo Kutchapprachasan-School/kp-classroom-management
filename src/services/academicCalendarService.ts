@@ -218,6 +218,11 @@ export const academicCalendarService = {
     };
   },
 
+  // Alias for test suite compatibility
+  getAcademicCalendarConfig(): AcademicCalendarConfig {
+    return this.getConfig();
+  },
+
   // บันทึกการตั้งค่าทั้งหมดลง LocalStorage และแจ้งเตือน Event
   saveConfig(
     config: Partial<AcademicCalendarConfig>,
