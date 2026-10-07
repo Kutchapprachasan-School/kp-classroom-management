@@ -10,6 +10,7 @@ import ExitDoorRegular from '@mingcute/react/core-regular/exit-door';
 import CheckCircleRegular from '@mingcute/react/core-regular/check-circle';
 import TimeRegular from '@mingcute/react/core-regular/time';
 import type { SchoolUserRole } from '../../config/schoolRoles';
+import type { AuthUser } from '../../services/authService';
 
 interface AdminHeaderProps {
   onToggleSidebar?: () => void;
@@ -19,6 +20,8 @@ interface AdminHeaderProps {
   onChangeRole?: (role: SchoolUserRole) => void;
   onLogout?: () => void;
   activeRole?: SchoolUserRole;
+  currentUser?: AuthUser | null;
+  schoolName?: string;
 }
 
 export const AdminHeader: React.FC<AdminHeaderProps> = ({
@@ -29,6 +32,8 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
   onChangeRole,
   onLogout,
   activeRole = 'ACADEMIC_ADMIN',
+  currentUser,
+  schoolName,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -252,8 +257,8 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             >
               <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden border border-blue-200 shadow-2xs shrink-0 bg-blue-50 flex items-center justify-center">
                 <img
-                  src="/images/admin/director_avatar.png"
-                  alt="นายสมชาย ใจดี"
+                  src={currentUser?.avatarUrl || "/images/admin/director_avatar.png"}
+                  alt={currentUser?.name || "นายสมชาย ใจดี"}
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     (e.currentTarget as HTMLImageElement).src = '/images/teacher/teacher_avatar.png';
@@ -263,10 +268,10 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
 
               <div className="text-left hidden sm:block">
                 <div className="text-xs font-bold text-slate-900 leading-tight">
-                  นายสมชาย ใจดี
+                  {currentUser?.name || 'นายสมชาย ใจดี'}
                 </div>
                 <div className="text-[10px] text-slate-500 font-medium">
-                  ผู้อำนวยการโรงเรียน
+                  {currentUser?.position || 'ผู้อำนวยการโรงเรียน'}
                 </div>
               </div>
 
@@ -279,19 +284,19 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                   <div className="w-12 h-12 rounded-full overflow-hidden border border-blue-200 shrink-0">
                     <img
                       src="/images/admin/director_avatar.png"
-                      alt="นายสมชาย ใจดี"
+                      alt={currentUser?.name || 'นายสมชาย ใจดี'}
                       className="w-full h-full object-cover"
                     />
                   </div>
                   <div className="min-w-0">
                     <div className="font-bold text-slate-900 text-sm truncate">
-                      นายสมชาย ใจดี
+                      {currentUser?.name || 'นายสมชาย ใจดี'}
                     </div>
                     <div className="text-slate-500 text-[11px] truncate">
-                      ผู้อำนวยการโรงเรียนศึกษาวิทยา
+                      {currentUser?.position || 'ผู้อำนวยการ'} {schoolName || 'โรงเรียนกุดจับประชาสรรค์'}
                     </div>
                     <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold">
-                      ผู้บริหารสูงสุด (Director)
+                      {currentUser?.role === 'ADMIN' ? 'ผู้บริหารสูงสุด (Admin)' : 'ผู้บริหารสถานศึกษา'}
                     </span>
                   </div>
                 </div>

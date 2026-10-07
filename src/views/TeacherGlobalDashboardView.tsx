@@ -15,6 +15,8 @@ import { TeacherMobileHomeHero } from '../components/dashboard/TeacherMobileHome
 import { AdminTeacherBannerModal } from '../components/teacher/AdminTeacherBannerModal';
 import type { TeacherBannerKey } from '../services/teacherBannerService';
 
+import type { AuthUser } from '../services/authService';
+
 interface TeacherGlobalDashboardViewProps {
   activeRole?: SchoolUserRole;
   onNavigateToClass?: (classId: string) => void;
@@ -25,6 +27,7 @@ interface TeacherGlobalDashboardViewProps {
   onNavigateToLessons?: () => void;
   onNavigateToMorningAssembly?: () => void;
   onDeepNavigate?: (payload: CrossViewNavigationPayload) => void;
+  currentUser?: AuthUser | null;
 }
 
 export const TeacherGlobalDashboardView: React.FC<
@@ -36,6 +39,7 @@ export const TeacherGlobalDashboardView: React.FC<
   onNavigateToCourses,
   onNavigateToLessons,
   onDeepNavigate,
+  currentUser,
 }) => {
   const [isAdminBannerModalOpen, setIsAdminBannerModalOpen] = useState(false);
   const [bannerModalInitialKey, setBannerModalInitialKey] = useState<TeacherBannerKey>('hero');
@@ -50,9 +54,12 @@ export const TeacherGlobalDashboardView: React.FC<
       {/* 1. Mobile Greeting Hero (เฉพาะบนหน้าจอมือถือ < 768px ตามภาพต้นแบบ Screen 1 Mobile First) */}
       <div className="md:hidden">
         <TeacherMobileHomeHero
-          teacherName="นายปัญจพล เกษรัตน์"
-          department="กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ (ภาษาญี่ปุ่น)"
-          avatarUrl="/images/teacher/teacher_avatar.png"
+          teacherName={currentUser?.name || 'นายปัญจพล เกษรัตน์'}
+          department={
+            currentUser?.subjectGroup ||
+            (currentUser?.position ? `กลุ่มสาระฯ (${currentUser.position})` : 'กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ (ภาษาญี่ปุ่น)')
+          }
+          avatarUrl={currentUser?.avatarUrl || '/images/teacher/teacher_avatar.png'}
         />
       </div>
 
@@ -77,6 +84,7 @@ export const TeacherGlobalDashboardView: React.FC<
               }
             }}
             onDeepNavigate={onDeepNavigate}
+            currentUser={currentUser}
           />
 
           {/* 2.3 Bottom Banner (ส่วนที่ 3 ของแบนเนอร์ครู แนวนอนด้านล่าง) */}

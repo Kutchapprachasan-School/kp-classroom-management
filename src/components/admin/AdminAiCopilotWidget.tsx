@@ -7,6 +7,7 @@ import {
   ArrowRight,
   ChevronDown,
 } from 'lucide-react';
+import { getSchoolSettings } from '../../config/schoolRoles';
 
 interface ChatMessage {
   id: string;
@@ -99,7 +100,7 @@ export const AdminAiCopilotWidget: React.FC = () => {
           summaryCard: {
             title: 'วิเคราะห์ข้อมูลตามคำสั่งของผู้บริหาร',
             items: [
-              'โรงเรียนศึกษาวิทยา มีนักเรียนรวม 1,248 คน บุคลากร 124 คน',
+              `${getSchoolSettings().nameTh} มีนักเรียนรวม 1,248 คน บุคลากร 124 คน`,
               'อัตราการเข้าเรียนเฉลี่ยสัปดาห์นี้ 95.6% เกณฑ์ปกติ',
               'งานเอกสารและงานรอดำเนินการ 28 รายการ ลดลง 15%',
               'ระบบพร้อมเชื่อมต่อระบบ SGS และ CCT ของกระทรวงฯ',

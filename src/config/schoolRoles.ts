@@ -242,7 +242,7 @@ export const DEFAULT_SMS_USERS: SmsUserAccount[] = [
     passwordOrPin: '123456',
     fullName: 'นายสมชาย ใจดี',
     role: 'ACADEMIC_ADMIN',
-    departmentOrClass: 'ฝ่ายบริหารโรงเรียนศึกษาวิทยา',
+    departmentOrClass: 'ฝ่ายบริหารโรงเรียนคำยางพิทยา',
     positionTitle: 'ผู้อำนวยการโรงเรียน • ผู้บริหารและผู้ดูแลระบบ',
     smsGroup: 'PERSONNEL',
     smsSynced: true,
@@ -415,11 +415,11 @@ export const SCHOOL_ROLE_PROFILES: Record<SchoolUserRole, SchoolRoleProfile> = {
     badgeColor: 'bg-indigo-600 text-white',
     userName: 'นายสมชาย ใจดี',
     userPosition: 'ผู้อำนวยการโรงเรียน • ผู้บริหารและผู้ดูแลระบบ',
-    emailOrCode: 'somchai.j@suksawittaya.ac.th',
-    department: 'ฝ่ายบริหารโรงเรียนศึกษาวิทยา',
+    emailOrCode: 'admin@khamyang.ac.th',
+    department: 'ฝ่ายบริหารโรงเรียนคำยางพิทยา',
     defaultView: 'admin-dashboard',
     description:
-      'แดชบอร์ดผู้บริหารโรงเรียนศึกษาวิทยา กำกับติดตามผลการเรียน การเข้าเรียน ประเมินบุคลากร งบประมาณการเงิน งานซ่อมบำรุง และ AI ผู้ช่วยผู้บริหาร',
+      'แดชบอร์ดผู้บริหารโรงเรียนคำยางพิทยา กำกับติดตามผลการเรียน การเข้าเรียน ประเมินบุคลากร งบประมาณการเงิน งานซ่อมบำรุง และ AI ผู้ช่วยผู้บริหาร',
     keyPermissions: [
       'เข้าถึงแดชบอร์ดผู้บริหารระดับโรงเรียน (Executive School Management Dashboard)',
       'ตรวจสอบและกำกับติดตามผลสัมฤทธิ์ทางการเรียน สรุปเกรดเฉลี่ย (GPA) ทุกระดับชั้น และส่งออก SGS',

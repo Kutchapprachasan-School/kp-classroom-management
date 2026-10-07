@@ -216,7 +216,7 @@ export const App: React.FC = () => {
       case 'home':
         return 'หน้าแรก';
       case 'admin-dashboard':
-        return 'แดชบอร์ดผู้บริหาร • โรงเรียนศึกษาวิทยา';
+        return `แดชบอร์ดผู้บริหาร • ${schoolSettings.nameTh}`;
       case 'class-overview':
         return 'ศ23101 ศิลปะ';
       case 'morning-assembly':
@@ -439,18 +439,6 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* Floating Dev Mode Trigger Button (Subtle & Discreet at bottom-left) */}
-      {!isDevToolbarVisible && currentView !== 'school-login' && (
-        <button
-          type="button"
-          onClick={() => setIsDevToolbarVisible(true)}
-          title="เปิดแถบทดสอบ 5 สิทธิ์ และทางลัด 12 หน้าจอ (สำหรับผู้ดูแล/ทดสอบ)"
-          className="fixed bottom-3 left-3 z-30 opacity-40 hover:opacity-100 transition-opacity bg-slate-900/90 text-slate-300 hover:text-white px-2 py-1 rounded-full text-[10px] font-medium border border-slate-700 shadow-md flex items-center gap-1 cursor-pointer"
-        >
-          <ShieldCheck className="w-3 h-3 text-teal-400" />
-          <span>โหมดทดสอบ</span>
-        </button>
-      )}
 
       {/* Conditional Rendering: Direct Login Screen vs Student Portal vs Admin Executive Dashboard vs Classroom Management */}
       {currentView === 'school-login' ? (
@@ -497,6 +485,8 @@ export const App: React.FC = () => {
             }
           }}
           onLogout={handleLogout}
+          currentUser={currentAuthUser}
+          schoolSettings={schoolSettings}
         />
       ) : (
         /* Teacher Mode Layout */
@@ -553,6 +543,7 @@ export const App: React.FC = () => {
                   onNavigateToLessons={() => setCurrentView('lessons')}
                   onNavigateToMorningAssembly={() => setCurrentView('morning-assembly')}
                   onDeepNavigate={handleDeepNavigate}
+                  currentUser={currentAuthUser}
                 />
               )}
 

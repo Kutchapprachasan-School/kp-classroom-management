@@ -90,7 +90,9 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
   const [newClassLevel, setNewClassLevel] = useState('ม.3');
   const [newSubjectCode, setNewSubjectCode] = useState('ศ23101');
   const [newSubjectName, setNewSubjectName] = useState('ศิลปะ');
-  const [newAdviser, setNewAdviser] = useState('ครูภาสภูมิ เรืองปราชญ์');
+  const [newAdviser, setNewAdviser] = useState(
+    () => authService.getCurrentUser()?.name || 'ครูที่ปรึกษา'
+  );
 
   const classDropdownRef = useRef<HTMLDivElement>(null);
   const sortDropdownRef = useRef<HTMLDivElement>(null);

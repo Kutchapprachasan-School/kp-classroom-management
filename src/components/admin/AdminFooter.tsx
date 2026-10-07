@@ -1,4 +1,5 @@
 import React from 'react';
+import { getSchoolSettings } from '../../config/schoolRoles';
 
 interface AdminFooterProps {
   schoolName?: string;
@@ -7,9 +8,9 @@ interface AdminFooterProps {
 }
 
 export const AdminFooter: React.FC<AdminFooterProps> = ({
-  schoolName = 'โรงเรียนศึกษาวิทยา',
+  schoolName = getSchoolSettings().nameTh,
   version = 'v1.0.0',
-  yearTh = '2568',
+  yearTh = '2569',
 }) => {
   return (
     <footer

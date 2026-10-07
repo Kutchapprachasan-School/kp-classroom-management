@@ -19,6 +19,9 @@ import RightSmallRegular from '@mingcute/react/core-regular/right-small';
 import CloseRegular from '@mingcute/react/core-regular/close';
 import { AdminSchoolLogo } from './AdminSchoolLogo';
 
+import type { SchoolBrandingSettings } from '../../config/schoolRoles';
+import { getSchoolSettings } from '../../config/schoolRoles';
+
 export type AdminMenuKey =
   | 'home'
   | 'personnel-hr'
@@ -43,6 +46,7 @@ interface AdminSidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
   isCollapsed?: boolean;
+  schoolSettings?: SchoolBrandingSettings;
 }
 
 interface NavItemDef {
@@ -59,7 +63,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   isOpen = false,
   onClose,
   isCollapsed = false,
+  schoolSettings,
 }) => {
+  const branding = schoolSettings || getSchoolSettings();
   const mainNavItems: NavItemDef[] = [
     { key: 'home', label: 'หน้าหลัก', icon: Home1Regular },
     { key: 'personnel-hr', label: 'บุคลากร & HR', icon: User3Regular },
@@ -110,13 +116,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
             {!isCollapsed && (
               <div className="min-w-0">
                 <div className="font-extrabold text-slate-900 text-sm leading-tight truncate">
-                  โรงเรียนศึกษาวิทยา
+                  {branding.nameTh}
                 </div>
                 <div className="text-[11px] text-slate-400 font-medium truncate mt-0.5">
-                  Suksawittaya School
+                  {branding.nameEn}
                 </div>
                 <div className="text-[9.5px] text-amber-600 font-semibold truncate mt-0.5">
-                  "เรียนดี มีวินัย ใฝ่ความเป็นเลิศ"
+                  "{branding.districtProvince || 'โรงเรียนคุณภาพ สพฐ.'}"
                 </div>
               </div>
             )}

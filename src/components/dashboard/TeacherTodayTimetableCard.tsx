@@ -19,6 +19,7 @@ import {
   BELL_SCHEDULE_UPDATED_EVENT,
   type SchoolBellScheduleConfig,
 } from '../../services/bellScheduleService';
+import type { AuthUser } from '../../services/authService';
 
 export interface TodayPeriodItem {
   periodNumber: number;
@@ -114,6 +115,7 @@ interface TeacherTodayTimetableCardProps {
   onGradeScores?: (period: TodayPeriodItem) => void;
   onViewPeriodDetail?: (period: TodayPeriodItem) => void;
   onDeepNavigate?: (payload: CrossViewNavigationPayload) => void;
+  currentUser?: AuthUser | null;
 }
 
 export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps> = ({
@@ -122,6 +124,7 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
   onGradeScores,
   onViewPeriodDetail,
   onDeepNavigate,
+  currentUser,
 }) => {
   const [bellConfig, setBellConfig] = useState<SchoolBellScheduleConfig>(() =>
     bellScheduleService.getConfig()
@@ -142,15 +145,36 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
 
   const periodsList = useMemo(() => {
     return TODAY_PERIODS_MOCK.map((item) => {
+      let subjectTitle = item.subjectTitle;
+      let courseCode = item.courseCode;
+
+      // If a real teacher is logged in with a defined subject group (e.g. Science, Thai, etc.)
+      if (currentUser?.subjectGroup && !currentUser.subjectGroup.includes('ญี่ปุ่น')) {
+        if (item.periodNumber === 0) {
+          subjectTitle = `เช็คแถวเช้า & โฮมรูม (${currentUser.classroomId || 'ม.3/1'})`;
+        } else if (item.periodNumber === 5) {
+          subjectTitle = 'กิจกรรมพัฒนาผู้เรียน';
+        } else {
+          subjectTitle = `${currentUser.subjectGroup} (${currentUser.classroomId || `ม.3/${item.periodNumber}`})`;
+          courseCode = currentUser.subjectGroup.slice(0, 6);
+        }
+      }
+
       if (item.periodNumber === 0) {
         return {
           ...item,
+          subjectTitle,
+          courseCode,
           timeRange: `${bellConfig.morningAssemblyStart} - ${bellConfig.morningAssemblyEnd}`,
         };
       }
-      return item;
+      return {
+        ...item,
+        subjectTitle,
+        courseCode,
+      };
     });
-  }, [bellConfig]);
+  }, [bellConfig, currentUser]);
 
   // ติดตามคาบที่ดำเนินการเช็คชื่อเรียบร้อยแล้ว (mock ค่าเริ่มต้น: คาบ 0 เช็คแถวเช้าเสร็จแล้ว)
   const [completedPeriods, setCompletedPeriods] = useState<number[]>([0]);

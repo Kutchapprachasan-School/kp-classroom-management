@@ -32,6 +32,7 @@ import {
   onlineQuizService,
   DEFAULT_SAMPLE_QUESTIONS,
 } from '../services/onlineQuizService';
+import { cleanSlateService } from '../services/cleanSlateService';
 import { StudentExamPlayerModal } from '../components/exam/StudentExamPlayerModal';
 
 const EXAMS_STORAGE_KEY = 'kp_exams_management_data_v1';
@@ -200,21 +201,20 @@ export const DEFAULT_MOCKUP_EXAMS: ExtendedExamItem[] = [
 ];
 
 export const ExamManagementView: React.FC = () => {
-  // 1. Exams State initialized with the 6 exams matching Reference Image 2
+  // 1. Exams State initialized with clean slate support
   const [exams, setExams] = useState<ExtendedExamItem[]>(() => {
     try {
       const saved = localStorage.getItem(EXAMS_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const hasMockup = parsed.some((e: any) => e.title?.includes('แบบทดสอบย่อยที่ 1'));
-          if (hasMockup) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed;
         }
       }
     } catch {
       // ignore parse error
     }
-    return DEFAULT_MOCKUP_EXAMS;
+    return cleanSlateService.isCleanSlateActive() ? [] : DEFAULT_MOCKUP_EXAMS;
   });
 
   const [filter, setFilter] = useState<'ALL' | 'GRADING' | 'LOCKED' | 'UPCOMING'>('ALL');
@@ -1322,8 +1322,34 @@ export const ExamManagementView: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {filteredExams.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-400">
-                    ไม่พบข้อมูลการสอบที่ตรงกับเงื่อนไขการค้นหา
+                  <td colSpan={8} className="py-12 text-center">
+                    <div className="flex flex-col items-center justify-center max-w-sm mx-auto space-y-3">
+                      <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-500 shadow-2xs">
+                        <ClipboardList className="w-7 h-7 text-blue-500" />
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-bold text-slate-800">
+                          {searchTerm || filter !== 'ALL' || categoryTabFilter !== 'ALL' || roomDropdownFilter !== 'ALL'
+                            ? 'ไม่พบข้อมูลการสอบที่ตรงกับเงื่อนไข'
+                            : 'ยังไม่มีชุดข้อสอบในระบบ'}
+                        </h4>
+                        <p className="text-xs text-slate-500 font-medium">
+                          {searchTerm || filter !== 'ALL' || categoryTabFilter !== 'ALL' || roomDropdownFilter !== 'ALL'
+                            ? 'ลองเปลี่ยนคำค้นหาหรือตัวกรองประเภทการสอบ'
+                            : 'เริ่มต้นสร้างชุดข้อสอบเก็บคะแนน กลางภาค หรือปลายภาค เพื่อเริ่มใช้งานและบันทึกคะแนน'}
+                        </p>
+                      </div>
+                      {!(searchTerm || filter !== 'ALL' || categoryTabFilter !== 'ALL' || roomDropdownFilter !== 'ALL') && (
+                        <button
+                          type="button"
+                          onClick={() => setIsCreateModalOpen(true)}
+                          className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>สร้างชุดข้อสอบใหม่</span>
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : (

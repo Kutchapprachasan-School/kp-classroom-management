@@ -42,7 +42,12 @@ class CleanSlateService {
     if (typeof window === 'undefined' || !window.localStorage) {
       return false;
     }
-    return localStorage.getItem(CLEAN_SLATE_FLAG_KEY) === 'true';
+    const val = localStorage.getItem(CLEAN_SLATE_FLAG_KEY);
+    if (val === 'false') {
+      return false;
+    }
+    // หากมีค่า 'true' หรือผู้ใช้เข้าสู่ระบบด้วยบัญชีจริง -> Clean Slate Active เสมอ
+    return val === 'true' || Boolean(localStorage.getItem('cls_current_auth_user'));
   }
 
   /**
@@ -96,7 +101,7 @@ class CleanSlateService {
    */
   deactivateCleanSlate(): void {
     if (typeof window !== 'undefined' && window.localStorage) {
-      localStorage.removeItem(CLEAN_SLATE_FLAG_KEY);
+      localStorage.setItem(CLEAN_SLATE_FLAG_KEY, 'false');
       try {
         window.dispatchEvent(
           new CustomEvent('kps-data-sync-event', {

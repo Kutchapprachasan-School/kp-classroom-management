@@ -1,5 +1,6 @@
 import React from 'react';
 import { Sparkles, Quote } from 'lucide-react';
+import { getSchoolSettings } from '../../config/schoolRoles';
 
 interface AdminHeroBannerProps {
   schoolName?: string;
@@ -7,7 +8,7 @@ interface AdminHeroBannerProps {
 }
 
 export const AdminHeroBanner: React.FC<AdminHeroBannerProps> = ({
-  schoolName = 'โรงเรียนศึกษาวิทยา',
+  schoolName = getSchoolSettings().nameTh,
   quote = 'การศึกษา คือ รากฐาน ของอนาคตที่มั่นคง',
 }) => {
   return (
@@ -17,7 +18,7 @@ export const AdminHeroBanner: React.FC<AdminHeroBannerProps> = ({
         <div className="absolute inset-0 bg-gradient-to-r from-[#EEF4FF] sm:from-[#EEF4FF] via-transparent to-transparent z-10" />
         <img
           src="/images/admin/hero_building.png"
-          alt="โรงเรียนศึกษาวิทยา อาคารเรียน"
+          alt={`${schoolName} อาคารเรียน`}
           className="w-full h-full object-cover object-center sm:object-right"
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).style.display = 'none';

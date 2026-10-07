@@ -476,8 +476,8 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden shrink-0 border-2 border-blue-100 shadow-2xs bg-blue-50 flex items-center justify-center">
               <img
-                src="/images/teacher/teacher_avatar.png"
-                alt="นายปัญจพล เกษรัตน์"
+                src={currentUser?.avatarUrl || "/images/teacher/teacher_avatar.png"}
+                alt={currentUser?.name || "นายปัญจพล เกษรัตน์"}
                 className="w-full h-full object-cover"
                 onError={(e) => {
                   (e.currentTarget as HTMLImageElement).src =
@@ -488,10 +488,10 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
 
             <div className="flex flex-col min-w-0">
               <h1 className="font-extrabold text-slate-800 text-sm sm:text-base leading-snug truncate">
-                นายปัญจพล เกษรัตน์
+                {currentUser?.name || 'นายปัญจพล เกษรัตน์'}
               </h1>
               <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate mt-0.5">
-                ครู | กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ (ภาษาญี่ปุ่น)
+                {currentUser?.position || 'ครู'} | {currentUser?.subjectGroup ? `กลุ่มสาระการเรียนรู้${currentUser.subjectGroup}` : 'กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ (ภาษาญี่ปุ่น)'}
               </p>
             </div>
           </div>

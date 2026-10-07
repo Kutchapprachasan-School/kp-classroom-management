@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
-import type { SchoolUserRole } from '../config/schoolRoles';
+import {
+  getSchoolSettings,
+  type SchoolBrandingSettings,
+  type SchoolUserRole,
+} from '../config/schoolRoles';
+import type { AuthUser } from '../services/authService';
 import { AdminHeader } from '../components/admin/AdminHeader';
 import { AdminSidebar, type AdminMenuKey } from '../components/admin/AdminSidebar';
 import { AdminHeroBanner } from '../components/admin/AdminHeroBanner';
@@ -27,6 +32,8 @@ interface AdminExecutiveDashboardViewProps {
   onChangeRole?: (role: SchoolUserRole) => void;
   onNavigateToView?: (viewKey: string) => void;
   onLogout?: () => void;
+  currentUser?: AuthUser | null;
+  schoolSettings?: SchoolBrandingSettings;
 }
 
 export const AdminExecutiveDashboardView: React.FC<
@@ -36,7 +43,10 @@ export const AdminExecutiveDashboardView: React.FC<
   onChangeRole,
   onNavigateToView,
   onLogout,
+  currentUser,
+  schoolSettings,
 }) => {
+  const branding = schoolSettings || getSchoolSettings();
   const [currentMenu, setCurrentMenu] = useState<AdminMenuKey>('home');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -82,7 +92,7 @@ export const AdminExecutiveDashboardView: React.FC<
           title: `ระบบงาน: ${getMenuLabel(key)}`,
           content: `ระบบบริหารส่วนกลาง "${getMenuLabel(
             key
-          )}" โรงเรียนศึกษาวิทยา กำลังเชื่อมต่อข้อมูลแบบเรียลไทม์กับฐานข้อมูลกลาง`,
+          )}" ${branding.nameTh} กำลังเชื่อมต่อข้อมูลแบบเรียลไทม์กับฐานข้อมูลกลาง`,
         });
         break;
     }
@@ -125,7 +135,7 @@ export const AdminExecutiveDashboardView: React.FC<
     } else if (section === 'communication') {
       setActiveGenericModal({
         isOpen: true,
-        title: 'ช่องทางสื่อสารโรงเรียนศึกษาวิทยา',
+        title: `ช่องทางสื่อสาร${branding.nameTh}`,
         content:
           'LINE Official Account ผู้ติดตาม 8,420 คน, ส่งข้อความแจ้งเตือนผู้ปกครองแล้ว 342 ครั้ง และระบบ Broadcast SMS ส่งแล้ว 1,256 ข้อความ อัตราการเปิดอ่าน 98.4%',
       });
@@ -144,6 +154,7 @@ export const AdminExecutiveDashboardView: React.FC<
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         isCollapsed={isCollapsed}
+        schoolSettings={branding}
       />
 
       {/* Main Content Shell (Padded Left for Desktop Sidebar) */}
@@ -156,9 +167,9 @@ export const AdminExecutiveDashboardView: React.FC<
         <AdminHeader
           onToggleSidebar={() => {
             if (window.innerWidth < 1024) {
-              setIsSidebarOpen((prev) => !prev);
+              setIsSidebarOpen((prev: boolean) => !prev);
             } else {
-              setIsCollapsed((prev) => !prev);
+              setIsCollapsed((prev: boolean) => !prev);
             }
           }}
           termLabel="ภาคเรียนที่ 1/2569"
@@ -167,6 +178,8 @@ export const AdminExecutiveDashboardView: React.FC<
           onChangeRole={onChangeRole}
           onLogout={onLogout}
           activeRole={activeRole}
+          currentUser={currentUser}
+          schoolName={branding.nameTh}
         />
 
         {/* Dashboard Main Workspace matching media_1791209295254.jpg */}
@@ -177,7 +190,7 @@ export const AdminExecutiveDashboardView: React.FC<
             <div className="lg:col-span-8 xl:col-span-9 2xl:col-span-9 space-y-4 sm:space-y-5 min-w-0">
               {/* 1. Hero Greeting Banner */}
               <AdminHeroBanner
-                schoolName="โรงเรียนศึกษาวิทยา"
+                schoolName={branding.nameTh}
                 quote="การศึกษา คือ รากฐาน ของอนาคตที่มั่นคง"
               />
 
@@ -237,9 +250,9 @@ export const AdminExecutiveDashboardView: React.FC<
 
           {/* 6. Footer */}
           <AdminFooter
-            schoolName="โรงเรียนศึกษาวิทยา"
+            schoolName={branding.nameTh}
             version="v1.0.0"
-            yearTh="2568"
+            yearTh="2569"
           />
         </main>
       </div>
