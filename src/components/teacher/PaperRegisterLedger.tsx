@@ -8,6 +8,13 @@ import {
   X,
   Eye,
 } from 'lucide-react';
+import {
+  attendanceCorrelationService,
+  normalizeClassroomId,
+  normalizeCourseCode,
+  type PeriodAttendanceRecord,
+  type MorningAssemblyRecord,
+} from '../../services/attendanceCorrelationService';
 
 export type PaperLedgerMode =
   | 'MORNING_ASSEMBLY'
@@ -352,43 +359,94 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
     }
   };
 
+  const syncAttendanceToCorrelation = (updatedRows: StudentPaperRow[]) => {
+    try {
+      const normalizedRoom = normalizeClassroomId(selectedRoom);
+      const courseCode = subjectLabel.split(' ')[0] || 'ศ23101';
+      const todayIso = new Date().toISOString().split('T')[0];
+
+      if (mode === 'MORNING_ASSEMBLY') {
+        const morningRecords: MorningAssemblyRecord[] = updatedRows.map((r) => ({
+          id: `morn-${todayIso.replace(/-/g, '')}-${r.studentId}`,
+          date: todayIso,
+          classroomId: normalizedRoom,
+          studentId: r.studentId,
+          studentCode: r.studentId.replace('stu-', '4510'),
+          studentName: r.fullName,
+          status: r.morningStatus,
+          source: 'MANUAL',
+          isOverridden: false,
+          markedAt: new Date().toISOString(),
+        }));
+        attendanceCorrelationService.saveMorningRecords(morningRecords);
+        attendanceCorrelationService.runCorrelation(normalizedRoom, todayIso);
+      } else if (mode === 'CLASS_ATTENDANCE') {
+        const periodRecords: PeriodAttendanceRecord[] = updatedRows.map((r) => ({
+          id: `per-${todayIso.replace(/-/g, '')}-p1-${r.studentId}`,
+          date: todayIso,
+          classroomId: normalizedRoom,
+          courseCode: normalizeCourseCode(courseCode),
+          courseName: subjectLabel,
+          periodNo: 1,
+          studentId: r.studentId,
+          studentCode: r.studentId.replace('stu-', '4510'),
+          studentName: r.fullName,
+          status: r.classPeriods[4] || 'PRESENT',
+          source: 'MANUAL',
+          isOverridden: false,
+          markedAt: new Date().toISOString(),
+        }));
+        attendanceCorrelationService.savePeriodRecords(periodRecords);
+        attendanceCorrelationService.runCorrelation(normalizedRoom, todayIso);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   // 1-Tap Select All for Morning Assembly or Today's Single Period
   const handleMarkAllAttendance = (status: AttendanceStatus) => {
-    setRows((prev) =>
-      prev.map((r) => {
+    setRows((prev) => {
+      const next = prev.map((r) => {
         if (mode === 'MORNING_ASSEMBLY') {
           return { ...r, morningStatus: status };
         }
         const updatedPeriods = [...r.classPeriods];
         updatedPeriods[4] = status;
         return { ...r, classPeriods: updatedPeriods };
-      })
-    );
+      });
+      syncAttendanceToCorrelation(next);
+      return next;
+    });
   };
 
   // 1-Tap Mark All Present for a specific Period column
   const handleMarkPeriodAllPresent = (periodIndex: number) => {
-    setRows((prev) =>
-      prev.map((r) => {
+    setRows((prev) => {
+      const next = prev.map((r) => {
         const updatedPeriods = [...r.classPeriods];
         updatedPeriods[periodIndex] = 'PRESENT';
         return { ...r, classPeriods: updatedPeriods };
-      })
-    );
+      });
+      syncAttendanceToCorrelation(next);
+      return next;
+    });
     triggerToast(`เช็ค "มา" คาบที่ ${periodIndex + 1} ครบทั้งห้องเรียบร้อย`);
   };
 
   // 1-Click Cycle Attendance Status in Multi-Period Cell
   const handleCyclePeriodStatus = (studentNo: number, periodIndex: number) => {
-    setRows((prev) =>
-      prev.map((r) => {
+    setRows((prev) => {
+      const next = prev.map((r) => {
         if (r.no !== studentNo) return r;
         const updatedPeriods = [...r.classPeriods];
         const curr = updatedPeriods[periodIndex] || 'PRESENT';
         updatedPeriods[periodIndex] = NEXT_STATUS[curr];
         return { ...r, classPeriods: updatedPeriods };
-      })
-    );
+      });
+      syncAttendanceToCorrelation(next);
+      return next;
+    });
   };
 
   // 1-Tap Toggle Homework Submission Checkbox

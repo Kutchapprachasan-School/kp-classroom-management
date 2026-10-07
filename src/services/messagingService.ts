@@ -628,6 +628,47 @@ export const messagingService = {
         // ignore
       }
 
+      // ซิงค์ข้อมูลประวัติเช็คชื่อใน attendanceCorrelationService (kp_morning_assembly_records & kp_period_attendance_records)
+      try {
+        const rawMorning = localStorage.getItem('kp_morning_assembly_records');
+        if (rawMorning) {
+          const morningList = JSON.parse(rawMorning);
+          if (Array.isArray(morningList)) {
+            let morningUpdated = false;
+            const updatedMorning = morningList.map((m: any) => {
+              if (m.studentCode === student.code || m.studentId === student.id) {
+                morningUpdated = true;
+                return { ...m, classroomId: toRoom.id };
+              }
+              return m;
+            });
+            if (morningUpdated) {
+              localStorage.setItem('kp_morning_assembly_records', JSON.stringify(updatedMorning));
+            }
+          }
+        }
+
+        const rawPeriod = localStorage.getItem('kp_period_attendance_records');
+        if (rawPeriod) {
+          const periodList = JSON.parse(rawPeriod);
+          if (Array.isArray(periodList)) {
+            let periodUpdated = false;
+            const updatedPeriod = periodList.map((p: any) => {
+              if (p.studentCode === student.code || p.studentId === student.id) {
+                periodUpdated = true;
+                return { ...p, classroomId: toRoom.id };
+              }
+              return p;
+            });
+            if (periodUpdated) {
+              localStorage.setItem('kp_period_attendance_records', JSON.stringify(updatedPeriod));
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+
       // ซิงค์ข้อมูลเยี่ยมบ้าน (homeVisitService)
       try {
         const rawHv = localStorage.getItem('cms_home_visit_nor01_cct_v2');

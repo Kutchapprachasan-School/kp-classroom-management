@@ -1064,6 +1064,55 @@ for (const s of courseStats.students) {
 }
 console.log('  ✓ getCourseCumulativeStats per-student totalDays strictly matches elapsed conducted days');
 
-console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE, SUBJECT ICONS, BANNER COMPRESSOR, SIDEBAR UX, BELL SCHEDULE, MORNING ASSEMBLY, CLASSROOM ATTENDANCE, STICKERS CATALOG & ELAPSED ATTENDANCE % CHECKS PASSED!');
+// --- 11. Checking Phase 1 Unified Attendance Architecture & Zero-Silo Integration ---
+console.log('\n--- 11. Checking Phase 1 Unified Attendance Architecture & Zero-Silo Integration ---');
+
+// 11.1 Check TeacherOverviewView.tsx integration
+const teacherOverviewSrc = readFileSync('src/views/TeacherOverviewView.tsx', 'utf8');
+assert.ok(teacherOverviewSrc.includes('attendanceCorrelationService'), 'TeacherOverviewView must import and use attendanceCorrelationService');
+assert.ok(teacherOverviewSrc.includes('kps-data-sync-event'), 'TeacherOverviewView must listen to kps-data-sync-event for reactive sync');
+assert.ok(teacherOverviewSrc.includes('loadAttendanceDataFromCorrelation'), 'TeacherOverviewView must have loadAttendanceDataFromCorrelation');
+assert.ok(teacherOverviewSrc.includes('computedAtRiskStudents'), 'TeacherOverviewView must dynamically compute at-risk students from correlation stats');
+console.log('  ✓ TeacherOverviewView.tsx imports attendanceCorrelationService, dynamic at-risk stats, and listens to kps-data-sync-event');
+
+// 11.2 Check attendanceService.ts delegation bridge
+const attendanceServiceSrc = readFileSync('src/services/attendanceService.ts', 'utf8');
+assert.ok(attendanceServiceSrc.includes('attendanceCorrelationService'), 'attendanceService must bridge to attendanceCorrelationService');
+assert.ok(attendanceServiceSrc.includes('attendanceCorrelationService.savePeriodRecords'), 'attendanceService.saveRollCall must delegate to savePeriodRecords');
+assert.ok(attendanceServiceSrc.includes('attendanceCorrelationService.runCorrelation'), 'attendanceService.saveRollCall must run correlation engine');
+console.log('  ✓ attendanceService.ts successfully bridges to attendanceCorrelationService as single source of truth');
+
+// 11.3 Check cleanSlateService.ts includes legacy attendance keys
+const cleanSlateSrc = readFileSync('src/services/cleanSlateService.ts', 'utf8');
+assert.ok(cleanSlateSrc.includes("'cls_attendance_records'"), 'cleanSlateService must include cls_attendance_records');
+assert.ok(cleanSlateSrc.includes("'cls_timetable_data'"), 'cleanSlateService must include cls_timetable_data');
+console.log('  ✓ cleanSlateService.ts includes legacy cls_attendance_records and cls_timetable_data in purge keys');
+
+// 11.4 Check messagingService.ts transfers attendanceCorrelation records
+const messagingSrc = readFileSync('src/services/messagingService.ts', 'utf8');
+assert.ok(messagingSrc.includes('kp_morning_assembly_records'), 'messagingService must transfer kp_morning_assembly_records');
+assert.ok(messagingSrc.includes('kp_period_attendance_records'), 'messagingService must transfer kp_period_attendance_records');
+console.log('  ✓ messagingService.ts transfers both morning and period correlation records across rooms');
+
+// 11.5 Runtime delegation check: attendanceService -> attendanceCorrelationService
+const { attendanceService } = await import('./src/services/attendanceService.ts');
+await attendanceService.saveRollCall({
+  scheduleId: 'sched-verify-1',
+  classroomId: 'room-3-1',
+  schoolDate: '2026-10-05',
+  records: [
+    { enrollmentId: 'stu-1', status: 'PRESENT' },
+    { enrollmentId: 'stu-2', status: 'LATE' },
+    { enrollmentId: 'stu-3', status: 'ABSENT' },
+  ],
+});
+const verifiedPeriodRecords = attendanceCorrelationService.getPeriodRecordsByDateAndRoom('room-3-1', '2026-10-05');
+assert.ok(verifiedPeriodRecords.length >= 3, 'Must have at least 3 records created via attendanceService delegation');
+const stu1Rec = verifiedPeriodRecords.find((r) => r.studentId === 'stu-1');
+assert.ok(stu1Rec, 'stu-1 record must exist in attendanceCorrelationService');
+assert.strictEqual(stu1Rec.status, 'PRESENT', 'stu-1 status must match');
+console.log('  ✓ Runtime bridge verified: attendanceService.saveRollCall records persist directly into attendanceCorrelationService');
+
+console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE, SUBJECT ICONS, BANNER COMPRESSOR, SIDEBAR UX, BELL SCHEDULE, MORNING ASSEMBLY, CLASSROOM ATTENDANCE, STICKERS CATALOG, ELAPSED ATTENDANCE % & PHASE 1 UNIFIED ARCHITECTURE CHECKS PASSED!');
 
 

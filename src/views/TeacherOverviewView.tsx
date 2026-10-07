@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Calendar,
   Plus,
@@ -23,7 +23,13 @@ import {
 } from '../data/mockData';
 import type { AtRiskStudent } from '../types/viewModels';
 import { assignmentService } from '../services/assignmentService';
-import { attendanceService } from '../services/attendanceService';
+import {
+  attendanceCorrelationService,
+  normalizeClassroomId,
+  normalizeCourseCode,
+  type PeriodAttendanceRecord,
+  type AttendanceStatusCode,
+} from '../services/attendanceCorrelationService';
 import { scoreService } from '../services/scoreService';
 import { behaviorService } from '../services/behaviorService';
 import {
@@ -40,6 +46,37 @@ import {
   TEACHER_SUBJECTS_LIST,
 } from '../services/teacherCourseAssignmentService';
 
+const formatThaiDate = (isoDate: string): string => {
+  if (!isoDate || !isoDate.includes('-')) return isoDate;
+  const [y, m, d] = isoDate.split('-').map(Number);
+  const thaiYear = y + 543;
+  const thaiMonths = [
+    'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+    'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.',
+  ];
+  const dayNames = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+  const dateObj = new Date(y, m - 1, d);
+  const dayName = dayNames[dateObj.getDay()] || '';
+  return `${dayName} ${d} ${thaiMonths[m - 1]} ${thaiYear}`;
+};
+
+const parseToIsoDate = (dateStr: string): string => {
+  if (!dateStr) return new Date().toISOString().split('T')[0];
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  const thaiMonths: Record<string, string> = {
+    'ม.ค.': '01', 'ก.พ.': '02', 'มี.ค.': '03', 'เม.ย.': '04',
+    'พ.ค.': '05', 'มิ.ย.': '06', 'ก.ค.': '07', 'ส.ค.': '08',
+    'ก.ย.': '09', 'ต.ค.': '10', 'พ.ย.': '11', 'ธ.ค.': '12',
+  };
+  const parts = dateStr.trim().split(/\s+/);
+  if (parts.length >= 4) {
+    const d = parts[1].padStart(2, '0');
+    const m = thaiMonths[parts[2]] || '10';
+    const y = String(Number(parts[3]) - 543);
+    return `${y}-${m}-${d}`;
+  }
+  return '2026-10-02';
+};
 
 interface TeacherOverviewViewProps {
   onSelectStudent: (student: AtRiskStudent) => void;
@@ -198,59 +235,159 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
   const [transferInDate, setTransferInDate] = useState('2026-08-15');
   const [transferInU1Score, setTransferInU1Score] = useState(12);
 
-  // Interactive Attendance Rows matching Image 4
+  const [selectedDateIso, setSelectedDateIso] = useState<string>('2026-10-02');
+
+  // Interactive Attendance Rows matching Image 4 and synced with attendanceCorrelationService
   const [attendanceRows, setAttendanceRows] = useState([
     {
+      isoDate: '2026-10-02',
+      date: 'ศ. 2 ต.ค. 2569',
+      period: 'คาบ 1-2',
+      topic: 'การประเมินผลงานและสรุปบทเรียน',
+      status: 'NORMAL' as const,
+      statusLabel: 'สอนปกติ',
+      checkStatus: 'CHECKED',
+      attendedCount: 10 as number | null,
+      leaveCount: 1 as number | null,
+    },
+    {
+      isoDate: '2026-10-01',
       date: 'พฤ. 1 ต.ค. 2569',
       period: 'คาบ 8-9',
       topic: 'สอบปลายภาค',
-      status: 'CANCELED',
+      status: 'CANCELED' as const,
       statusLabel: 'งดสอน',
       checkStatus: 'ยังไม่เช็คชื่อ',
       attendedCount: null as number | null,
       leaveCount: null as number | null,
     },
     {
+      isoDate: '2026-09-24',
       date: 'พฤ. 24 ก.ย. 2569',
       period: 'คาบ 8-9',
       topic: 'การนำเสนอผลงานศิลปะร่วมสมัย',
-      status: 'NORMAL',
+      status: 'NORMAL' as const,
       statusLabel: 'สอนปกติ',
-      checkStatus: 'ยังไม่เช็คชื่อ',
-      attendedCount: null as number | null,
+      checkStatus: 'CHECKED',
+      attendedCount: 14 as number | null,
       leaveCount: null as number | null,
     },
     {
+      isoDate: '2026-09-17',
       date: 'พฤ. 17 ก.ย. 2569',
       period: 'คาบ 8-9',
       topic: 'เทคนิคการไล่น้ำหนักสีโปสเตอร์',
-      status: 'NORMAL',
+      status: 'NORMAL' as const,
       statusLabel: 'สอนปกติ',
       checkStatus: 'CHECKED',
-      attendedCount: 14,
-      leaveCount: 1,
+      attendedCount: 14 as number | null,
+      leaveCount: 1 as number | null,
     },
     {
+      isoDate: '2026-09-10',
       date: 'พฤ. 10 ก.ย. 2569',
       period: 'คาบ 8-9',
       topic: 'ทฤษฎีสีและวงจรสีสากล',
-      status: 'NORMAL',
+      status: 'NORMAL' as const,
       statusLabel: 'สอนปกติ',
       checkStatus: 'CHECKED',
-      attendedCount: 14,
-      leaveCount: 1,
+      attendedCount: 14 as number | null,
+      leaveCount: 1 as number | null,
     },
     {
+      isoDate: '2026-09-03',
       date: 'พฤ. 3 ก.ย. 2569',
       period: 'คาบ 8-9',
       topic: 'องค์ประกอบศิลป์เบื้องต้น',
-      status: 'NORMAL',
+      status: 'NORMAL' as const,
       statusLabel: 'สอนปกติ',
       checkStatus: 'CHECKED',
-      attendedCount: 13,
-      leaveCount: 2,
+      attendedCount: 13 as number | null,
+      leaveCount: 2 as number | null,
     },
   ]);
+
+  const loadAttendanceDataFromCorrelation = useCallback(() => {
+    try {
+      const normalizedRoom = normalizeClassroomId(selectedClassroom);
+      const normalizedCourse = normalizeCourseCode(selectedSubjectCode);
+
+      const allRecords = attendanceCorrelationService
+        .getAllPeriodRecords()
+        .filter(
+          (r) =>
+            normalizeClassroomId(r.classroomId) === normalizedRoom &&
+            normalizeCourseCode(r.courseCode) === normalizedCourse
+        );
+
+      const recordsByDate = new Map<string, PeriodAttendanceRecord[]>();
+      allRecords.forEach((rec) => {
+        if (!recordsByDate.has(rec.date)) {
+          recordsByDate.set(rec.date, []);
+        }
+        recordsByDate.get(rec.date)!.push(rec);
+      });
+
+      const plannedDates = [
+        '2026-10-02',
+        '2026-10-01',
+        '2026-09-24',
+        '2026-09-17',
+        '2026-09-10',
+        '2026-09-03',
+      ];
+
+      const allDates = Array.from(new Set([...recordsByDate.keys(), ...plannedDates])).sort().reverse();
+
+      const defaultTopics: Record<string, string> = {
+        '2026-10-02': 'การประเมินผลงานและสรุปบทเรียน',
+        '2026-10-01': 'สอบปลายภาค',
+        '2026-09-24': 'การนำเสนอผลงานศิลปะร่วมสมัย',
+        '2026-09-17': 'เทคนิคการไล่น้ำหนักสีโปสเตอร์',
+        '2026-09-10': 'ทฤษฎีสีและวงจรสีสากล',
+        '2026-09-03': 'องค์ประกอบศิลป์เบื้องต้น',
+      };
+
+      const rows = allDates.map((d) => {
+        const dayRecords = recordsByDate.get(d) || [];
+        const isChecked = dayRecords.length > 0;
+        const presentCount = dayRecords.filter(
+          (r) => r.status === 'PRESENT' || r.status === 'LATE' || r.status === 'ACTIVITY'
+        ).length;
+        const leaveCount = dayRecords.filter((r) => r.status === 'LEAVE').length;
+
+        return {
+          isoDate: d,
+          date: formatThaiDate(d),
+          period: 'คาบ 8-9',
+          topic: defaultTopics[d] || 'คาบสอนเพิ่มเติม',
+          status: d === '2026-10-01' ? ('CANCELED' as const) : ('NORMAL' as const),
+          statusLabel: d === '2026-10-01' ? 'งดสอน' : 'สอนปกติ',
+          checkStatus: isChecked ? 'CHECKED' : 'ยังไม่เช็คชื่อ',
+          attendedCount: isChecked ? presentCount : null,
+          leaveCount: isChecked && leaveCount > 0 ? leaveCount : null,
+        };
+      });
+
+      if (rows.length > 0) {
+        setAttendanceRows(rows);
+      }
+    } catch {
+      // ignore
+    }
+  }, [selectedClassroom, selectedSubjectCode]);
+
+  useEffect(() => {
+    loadAttendanceDataFromCorrelation();
+  }, [loadAttendanceDataFromCorrelation]);
+
+  useEffect(() => {
+    const handleSync = () => {
+      loadAttendanceDataFromCorrelation();
+    };
+    window.addEventListener('kps-data-sync-event', handleSync);
+    return () => window.removeEventListener('kps-data-sync-event', handleSync);
+  }, [loadAttendanceDataFromCorrelation]);
 
   // Roll-call interactive student states synced with SGS Roster + Morning Assembly & Approved Leave
   const [rollCallList, setRollCallList] = useState(() =>
@@ -454,35 +591,44 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
   };
 
   const handleSaveRollCall = async () => {
-    const presentCount = rollCallList.filter((s) => s.status === 'PRESENT').length;
+    const targetIso =
+      selectedDateIso ||
+      (selectedDateForRollCall ? parseToIsoDate(selectedDateForRollCall) : '2026-10-02');
+    const normalizedRoom = normalizeClassroomId(selectedClassroom);
+    const normalizedCourse = normalizeCourseCode(selectedSubjectCode);
+
+    const presentCount = rollCallList.filter((s) => s.status === 'PRESENT' || s.status === 'LATE').length;
     const leaveCount = rollCallList.filter((s) => s.status === 'LEAVE').length;
     const overriddenLeaveStudents = rollCallList.filter(
       (s) => s.hasApprovedLeave && s.status !== 'LEAVE'
     );
 
-    await attendanceService.saveRollCall({
-      scheduleId: 'sched-1',
-      classroomId: 'room-3-1',
-      schoolDate: selectedDateForRollCall || 'วันนี้',
-      records: rollCallList.map((s) => ({
-        enrollmentId: `stu-${s.no}`,
-        status: s.status as 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE',
-      })),
+    const periodRecords: PeriodAttendanceRecord[] = rollCallList.map((stu) => {
+      const isOverridden = stu.hasApprovedLeave && stu.status !== 'LEAVE';
+      return {
+        id: `per-${targetIso.replace(/-/g, '')}-p1-${stu.code}`,
+        date: targetIso,
+        classroomId: normalizedRoom,
+        courseCode: normalizedCourse,
+        courseName: currentSubject?.name || 'ศิลปะ',
+        periodNo: 1,
+        studentId: `stu-${stu.no}`,
+        studentCode: stu.code,
+        studentName: stu.name,
+        status: stu.status as AttendanceStatusCode,
+        source: 'MANUAL',
+        isOverridden,
+        overrideReason: isOverridden ? 'ครูผู้สอนบันทึกสถานะเองแม้มีใบลา' : undefined,
+        markedAt: new Date().toISOString(),
+      };
     });
 
-    setAttendanceRows((prev) =>
-      prev.map((r) => {
-        if (r.date === selectedDateForRollCall) {
-          return {
-            ...r,
-            checkStatus: 'CHECKED',
-            attendedCount: presentCount,
-            leaveCount: leaveCount > 0 ? leaveCount : null,
-          };
-        }
-        return r;
-      })
-    );
+    // Save with 4 Integrity Locks provenance & notify event bus
+    attendanceCorrelationService.savePeriodRecords(periodRecords);
+    attendanceCorrelationService.runCorrelation(normalizedRoom, targetIso);
+
+    // Refresh UI rows
+    loadAttendanceDataFromCorrelation();
 
     setIsRollCallOpen(false);
     if (overriddenLeaveStudents.length > 0) {
@@ -497,8 +643,92 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
     }
   };
 
-  const openRollCallModal = (date: string) => {
-    setSelectedDateForRollCall(date);
+  const openRollCallModal = (dateStr: string, explicitIso?: string) => {
+    const targetIso = explicitIso || parseToIsoDate(dateStr);
+    setSelectedDateForRollCall(dateStr);
+    setSelectedDateIso(targetIso);
+
+    const normalizedRoom = normalizeClassroomId(selectedClassroom);
+    const normalizedCourse = normalizeCourseCode(selectedSubjectCode);
+
+    // 1. Get existing period records for this room, course, date
+    const existingRecords = attendanceCorrelationService.getPeriodRecords(
+      normalizedCourse,
+      normalizedRoom,
+      targetIso,
+      1
+    );
+
+    // 2. Get morning assembly records for this room & date
+    const morningRecords = attendanceCorrelationService.getMorningRecords(normalizedRoom, targetIso);
+    const morningMap = new Map(morningRecords.map((m) => [m.studentCode, m]));
+
+    // 3. Get approved leaves
+    const approvedLeaves = attendanceCorrelationService.getApprovedLeaves(undefined, targetIso);
+    const leaveMap = new Map(approvedLeaves.map((l) => [l.studentCode, l]));
+
+    const roster = sgsRosterAndSubmissionService
+      .getSgsRoster()
+      .filter((s) => s.transferState !== 'TRANSFERRED_OUT');
+
+    if (existingRecords.length > 0) {
+      const recordMap = new Map(existingRecords.map((r) => [r.studentCode, r]));
+      setRollCallList(
+        roster.map((s) => {
+          const existing = recordMap.get(s.studentCode);
+          const morning = morningMap.get(s.studentCode);
+          const hasApprovedLeave = leaveMap.has(s.studentCode) || existing?.status === 'LEAVE';
+          const assemblyLabel = morning
+            ? morning.status === 'LATE'
+              ? 'สายเสาธง (08:12)'
+              : morning.status === 'ABSENT'
+              ? 'ขาดเข้าแถวเสาธง'
+              : morning.status === 'LEAVE'
+              ? 'ลาป่วย (อนุมัติแล้ว)'
+              : 'เข้าแถวปกติ'
+            : hasApprovedLeave
+            ? 'ลาป่วย (อนุมัติแล้ว)'
+            : 'เข้าแถวปกติ';
+
+          return {
+            no: s.sgsSeatNo,
+            code: s.studentCode,
+            name: s.studentName,
+            status: (existing?.status as any) || (hasApprovedLeave ? 'LEAVE' : 'PRESENT'),
+            hasApprovedLeave,
+            assemblyLabel,
+          };
+        })
+      );
+    } else {
+      setRollCallList(
+        roster.map((s) => {
+          const morning = morningMap.get(s.studentCode);
+          const hasApprovedLeave = leaveMap.has(s.studentCode);
+          const assemblyLabel = morning
+            ? morning.status === 'LATE'
+              ? 'สายเสาธง (08:12)'
+              : morning.status === 'ABSENT'
+              ? 'ขาดเข้าแถวเสาธง'
+              : morning.status === 'LEAVE'
+              ? 'ลาป่วย (อนุมัติแล้ว)'
+              : 'เข้าแถวปกติ'
+            : hasApprovedLeave
+            ? 'ลาป่วย (อนุมัติแล้ว)'
+            : 'เข้าแถวปกติ';
+
+          return {
+            no: s.sgsSeatNo,
+            code: s.studentCode,
+            name: s.studentName,
+            status: hasApprovedLeave ? 'LEAVE' : morning?.status === 'ABSENT' ? 'ABSENT' : 'PRESENT',
+            hasApprovedLeave,
+            assemblyLabel,
+          };
+        })
+      );
+    }
+
     setIsRollCallOpen(true);
   };
 
@@ -508,6 +738,36 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
       row.topic.toLowerCase().includes(attendanceSearch.toLowerCase()) ||
       row.statusLabel.toLowerCase().includes(attendanceSearch.toLowerCase())
   );
+
+  const computedAtRiskStudents = useMemo(() => {
+    try {
+      const stats = attendanceCorrelationService.getCourseCumulativeStats(
+        selectedSubjectCode,
+        selectedClassroom
+      );
+      const atRiskFromCorrelation = stats.students
+        .filter((s) => s.attendanceRate < 80 || s.statusTag !== 'NORMAL')
+        .map((s, idx) => ({
+          enrollmentId: `stu-${idx + 1}`,
+          studentNo: idx + 1,
+          name: s.studentName,
+          tags: [
+            {
+              text: `เวลาเรียน ${s.attendanceRate}% (ต่ำกว่าเกณฑ์ 80%)`,
+              type: 'danger' as const,
+            },
+          ],
+          attendanceRatio: `${s.earnedDays} / ${s.totalDays}`,
+          totalScore: 35.0,
+        }));
+      if (atRiskFromCorrelation.length > 0) {
+        return atRiskFromCorrelation;
+      }
+    } catch {
+      // fallback
+    }
+    return atRiskStudentsData;
+  }, [selectedSubjectCode, selectedClassroom]);
 
   return (
     <div className="space-y-4 max-w-7xl mx-auto pb-12 animate-fade-in font-sans text-slate-800 select-none">
@@ -648,7 +908,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
       {activeTab === 'overview' && (
         <div className="space-y-5">
           <AtRiskCard
-            students={atRiskStudentsData}
+            students={computedAtRiskStudents}
             onSelectStudent={onSelectStudent}
             onViewFullTable={onViewFullTable}
           />
@@ -890,8 +1150,10 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!newPeriodDate.trim()) return;
+                const parsedIso = parseToIsoDate(newPeriodDate.trim());
                 setAttendanceRows([
                   {
+                    isoDate: parsedIso,
                     date: newPeriodDate.trim(),
                     period: 'คาบ 8-9',
                     topic: newPeriodTopic.trim() || 'คาบสอนเพิ่มเติม',
@@ -1017,14 +1279,14 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                       <div className="flex items-center justify-end gap-2 text-[11px]">
                         {row.checkStatus === 'CHECKED' ? (
                           <button
-                            onClick={() => openRollCallModal(row.date)}
+                            onClick={() => openRollCallModal(row.date, row.isoDate)}
                             className="px-2.5 py-1 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg font-semibold"
                           >
                             แก้เช็คชื่อ
                           </button>
                         ) : (
                           <button
-                            onClick={() => openRollCallModal(row.date)}
+                            onClick={() => openRollCallModal(row.date, row.isoDate)}
                             className="px-3 py-1 border border-emerald-300 bg-emerald-50/50 hover:bg-emerald-100/60 text-emerald-800 rounded-lg font-semibold"
                           >
                             เช็คชื่อ

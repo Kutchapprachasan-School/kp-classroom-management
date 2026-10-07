@@ -1,7 +1,13 @@
-import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase';
-import { timetableScheduleData } from '../data/mockData';
-import type { TimetableSlot } from '../types/viewModels';
-import { RollCallBatchSchema, type RollCallBatchInput } from './types';
+import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase.ts';
+import { timetableScheduleData } from '../data/mockData.ts';
+import type { TimetableSlot } from '../types/viewModels.ts';
+import { RollCallBatchSchema, type RollCallBatchInput } from './types.ts';
+import {
+  attendanceCorrelationService,
+  normalizeClassroomId,
+  type PeriodAttendanceRecord,
+  type AttendanceStatusCode,
+} from './attendanceCorrelationService.ts';
 
 export interface AttendanceRecordItem {
   id: string;
@@ -16,8 +22,27 @@ export interface AttendanceRecordItem {
 const STORAGE_KEY_TIMETABLE = 'cls_timetable_data';
 const STORAGE_KEY_ATTENDANCE = 'cls_attendance_records';
 
+const memoryStore = new Map<string, string>();
+const getStorage = () => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    return window.localStorage;
+  }
+  if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
+    return (globalThis as any).localStorage;
+  }
+  return {
+    getItem: (key: string) => memoryStore.get(key) ?? null,
+    setItem: (key: string, val: string) => {
+      memoryStore.set(key, val);
+    },
+    removeItem: (key: string) => {
+      memoryStore.delete(key);
+    },
+  };
+};
+
 const getLocalTimetable = (): TimetableSlot[] => {
-  const raw = localStorage.getItem(STORAGE_KEY_TIMETABLE);
+  const raw = getStorage().getItem(STORAGE_KEY_TIMETABLE);
   if (raw) {
     try {
       return JSON.parse(raw);
@@ -29,11 +54,11 @@ const getLocalTimetable = (): TimetableSlot[] => {
 };
 
 const saveLocalTimetable = (items: TimetableSlot[]) => {
-  localStorage.setItem(STORAGE_KEY_TIMETABLE, JSON.stringify(items));
+  getStorage().setItem(STORAGE_KEY_TIMETABLE, JSON.stringify(items));
 };
 
 const getLocalAttendance = (): AttendanceRecordItem[] => {
-  const raw = localStorage.getItem(STORAGE_KEY_ATTENDANCE);
+  const raw = getStorage().getItem(STORAGE_KEY_ATTENDANCE);
   if (raw) {
     try {
       return JSON.parse(raw);
@@ -41,17 +66,11 @@ const getLocalAttendance = (): AttendanceRecordItem[] => {
       // fallback
     }
   }
-  return [
-    { id: 'att-1', scheduleId: 'sched-1', classroomId: 'room-3-1', enrollmentId: 'stu-1', schoolDate: '2026-08-20', status: 'PRESENT', updatedAt: '2026-08-20T08:45:00Z' },
-    { id: 'att-2', scheduleId: 'sched-1', classroomId: 'room-3-1', enrollmentId: 'stu-2', schoolDate: '2026-08-20', status: 'PRESENT', updatedAt: '2026-08-20T08:45:00Z' },
-    { id: 'att-3', scheduleId: 'sched-1', classroomId: 'room-3-1', enrollmentId: 'stu-7', schoolDate: '2026-08-20', status: 'ABSENT', updatedAt: '2026-08-20T08:45:00Z' },
-    { id: 'att-4', scheduleId: 'sched-1', classroomId: 'room-3-1', enrollmentId: 'stu-10', schoolDate: '2026-08-20', status: 'ABSENT', updatedAt: '2026-08-20T08:45:00Z' },
-    { id: 'att-5', scheduleId: 'sched-1', classroomId: 'room-3-1', enrollmentId: 'stu-12', schoolDate: '2026-08-20', status: 'LATE', updatedAt: '2026-08-20T08:50:00Z' },
-  ];
+  return [];
 };
 
 const saveLocalAttendance = (items: AttendanceRecordItem[]) => {
-  localStorage.setItem(STORAGE_KEY_ATTENDANCE, JSON.stringify(items));
+  getStorage().setItem(STORAGE_KEY_ATTENDANCE, JSON.stringify(items));
 };
 
 export const attendanceService = {
@@ -85,8 +104,20 @@ export const attendanceService = {
     }
   },
 
-  // READ: Get attendance records for a classroom and date
+  // READ: Get attendance records for a classroom and date (bridged to attendanceCorrelationService)
   async getByDate(classroomId: string, date: string): Promise<Record<string, 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE'>> {
+    // 1. Primary: read from canonical attendanceCorrelationService
+    const correlationRecords = attendanceCorrelationService.getPeriodRecordsByDateAndRoom(classroomId, date);
+    if (correlationRecords.length > 0) {
+      const result: Record<string, 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE'> = {};
+      for (const item of correlationRecords) {
+        const mappedStatus =
+          item.status === 'ACTIVITY' ? 'PRESENT' : item.status === 'TRUANCY' ? 'ABSENT' : item.status;
+        result[item.studentId] = mappedStatus as 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE';
+      }
+      return result;
+    }
+
     if (isSupabaseConfigured) {
       logDbOperation(`SELECT * FROM AttendanceRecord WHERE classroomId = ${classroomId} AND schoolDate = ${date}`);
       const { data, error } = await supabase
@@ -103,6 +134,7 @@ export const attendanceService = {
         return result;
       }
     }
+
     const all = getLocalAttendance();
     const filtered = all.filter((a) => a.classroomId === classroomId && a.schoolDate === date);
     const result: Record<string, 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE'> = {};
@@ -112,12 +144,34 @@ export const attendanceService = {
     return result;
   },
 
-  // CREATE / BATCH SAVE: Save roll call records for a class session
+  // CREATE / BATCH SAVE: Save roll call records for a class session (bridged to attendanceCorrelationService)
   async saveRollCall(input: RollCallBatchInput): Promise<number> {
     const validated = RollCallBatchSchema.parse(input);
-    const all = getLocalAttendance();
     const now = new Date().toISOString();
+    const normRoom = normalizeClassroomId(validated.classroomId);
 
+    // 1. Delegate to attendanceCorrelationService with 4 Integrity Locks
+    const periodRecords: PeriodAttendanceRecord[] = validated.records.map((rec) => ({
+      id: `per-${validated.schoolDate.replace(/-/g, '')}-p1-${rec.enrollmentId}`,
+      date: validated.schoolDate,
+      classroomId: normRoom,
+      courseCode: 'ศ23101',
+      courseName: 'วิชาเรียน',
+      periodNo: 1,
+      studentId: rec.enrollmentId,
+      studentCode: rec.enrollmentId.replace('stu-', '4510'),
+      studentName: `นักเรียน ${rec.enrollmentId}`,
+      status: rec.status as AttendanceStatusCode,
+      source: 'MANUAL',
+      isOverridden: false,
+      markedAt: now,
+    }));
+
+    attendanceCorrelationService.savePeriodRecords(periodRecords);
+    attendanceCorrelationService.runCorrelation(normRoom, validated.schoolDate);
+
+    // 2. Also keep local legacy cache in sync
+    const all = getLocalAttendance();
     let savedCount = 0;
     for (const rec of validated.records) {
       const idx = all.findIndex(
@@ -174,8 +228,21 @@ export const attendanceService = {
     });
   },
 
-  // SUMMARY: Get attendance percentage for a classroom
+  // SUMMARY: Get attendance percentage for a classroom (bridged to attendanceCorrelationService)
   async getSummary(classroomId: string): Promise<{ total: number; presentRate: number; absentRate: number }> {
+    try {
+      const stats = attendanceCorrelationService.getClassroomCumulativeStats(classroomId);
+      if (stats.totalStudents > 0) {
+        return {
+          total: stats.totalStudents,
+          presentRate: Math.round(stats.averageRate),
+          absentRate: Math.round(100 - stats.averageRate),
+        };
+      }
+    } catch {
+      // fallback
+    }
+
     const all = getLocalAttendance().filter((a) => a.classroomId === classroomId);
     if (all.length === 0) return { total: 0, presentRate: 100, absentRate: 0 };
 
