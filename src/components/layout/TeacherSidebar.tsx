@@ -140,7 +140,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     },
     {
       key: 'classroom-attendance',
-      label: 'เช็คชื่อนักเรียน',
+      label: 'เช็คชื่อเข้าเรียน',
       icon: ClipboardCheck,
     },
     {

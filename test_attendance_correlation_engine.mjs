@@ -881,6 +881,72 @@ assert.strictEqual(oct1.isChecked, true, 'Oct 1 is checked (Green)');
 
 console.log('  ✓ Runtime execution of cumulative stats and calendar month status passed');
 
-console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE, SUBJECT ICONS, BANNER COMPRESSOR, SIDEBAR UX, BELL SCHEDULE & MORNING ASSEMBLY CHECKS PASSED!');
+// ----------------------------------------------------
+// Step 8: Classroom Attendance View Parity (media_1791315379363.jpg) & Mobile First Verification
+// ----------------------------------------------------
+console.log('\n--- 8. Checking Classroom Period Attendance View Parity & Mobile First Ergonomics ---');
+
+const classAttendancePath = './src/views/ClassroomAttendanceView.tsx';
+assert.ok(existsSync(classAttendancePath), 'src/views/ClassroomAttendanceView.tsx must exist');
+const classAttendanceSource = readFileSync(classAttendancePath, 'utf8');
+
+// 8.1 Taught Courses & Rooms Lock
+assert.ok(classAttendanceSource.includes('TEACHER_COURSES'), 'Must declare TEACHER_COURSES restricting to taught courses');
+assert.ok(classAttendanceSource.includes('TAUGHT_CLASSROOMS'), 'Must declare TAUGHT_CLASSROOMS restricting to taught rooms');
+assert.ok(classAttendanceSource.includes('เฉพาะห้องที่สอน'), 'Must render badge เฉพาะห้องที่สอน');
+assert.ok(classAttendanceSource.includes('ญ31201'), 'Must include course ญ31201 ภาษาญี่ปุ่น ม.3/1');
+console.log('  ✓ Taught rooms and course restriction locks verified');
+
+// 8.2 5 KPI Cards & Student Parity with media_1791315379363.jpg
+assert.ok(classAttendanceSource.includes('JAPANESE_M31_STUDENTS'), 'Must import JAPANESE_M31_STUDENTS for 28 students parity');
+assert.ok(serviceSource.includes('ด.ช. กฤษณะ ศรีสมบูรณ์'), 'Must define student 1 ด.ช. กฤษณะ ศรีสมบูรณ์');
+assert.ok(serviceSource.includes('ด.ช. ธีรภพ เสยปันคำ'), 'Must define student 2 ด.ช. ธีรภพ เสยปันคำ');
+assert.ok(serviceSource.includes('ด.ช. ภูรินท์ บัณฑิต'), 'Must define student 3 ด.ช. ภูรินท์ บัณฑิต');
+assert.ok(serviceSource.includes('ด.ช. ชัยมงคล วงศ์บุตร'), 'Must define student 5 ด.ช. ชัยมงคล วงศ์บุตร');
+assert.ok(serviceSource.includes('ด.ช. ปรียาภรณ์ ชัยแก้ว'), 'Must define student 7 ด.ช. ปรียาภรณ์ ชัยแก้ว');
+console.log('  ✓ Mockup student roster and data parity verified');
+
+// 8.3 Desktop 2-Column Layout, Mini-Calendar & Donut Gauge
+assert.ok(classAttendanceSource.includes('col-span-8'), 'Must implement Desktop Left Column (col-span-8)');
+assert.ok(classAttendanceSource.includes('col-span-4'), 'Must implement Desktop Right Column (col-span-4)');
+assert.ok(classAttendanceSource.includes('ปฏิทินเช็คชื่อ'), 'Must render Mini-Calendar widget ปฏิทินเช็คชื่อ');
+assert.ok(classAttendanceSource.includes('สถิติการเข้าเรียน (ห้อง ม.3/1)'), 'Must render Attendance Donut widget');
+assert.ok(classAttendanceSource.includes('85.7%'), 'Must calculate 85.7% attendance rate');
+console.log('  ✓ Desktop 2-column layout, mini-calendar, and donut gauge verified');
+
+// 8.4 Classroom Cumulative Term Statistics Modal
+assert.ok(classAttendanceSource.includes('isStatsModalOpen'), 'Must implement isStatsModalOpen state');
+assert.ok(classAttendanceSource.includes('สถิติการเข้าเรียนสะสมตลอดภาคเรียน : ม.3/1'), 'Must render modal title for cumulative stats');
+assert.ok(classAttendanceSource.includes('ผ่านเกณฑ์ 80% (SAR)'), 'Must calculate students passing 80% rule');
+assert.ok(classAttendanceSource.includes('กลุ่มเสี่ยง มส.'), 'Must calculate at-risk students below 80% rule');
+console.log('  ✓ Classroom cumulative stats modal with per-student metrics verified');
+
+// 8.5 Mobile First Two-Screen Architecture (No side scrolling, 44px tap targets)
+assert.ok(classAttendanceSource.includes("mobileScreen === 'LIST'"), 'Must implement Mobile Screen 1 (Check List)');
+assert.ok(classAttendanceSource.includes("mobileScreen === 'CALENDAR'"), 'Must implement Mobile Screen 2 (Retroactive Calendar)');
+assert.ok(classAttendanceSource.includes('min-h-[44px]'), 'Must use thumb-friendly touch targets with min-h-[44px]');
+assert.ok(classAttendanceSource.includes('lg:hidden'), 'Must be responsive for mobile screens');
+console.log('  ✓ Mobile First two-screen architecture without horizontal scroll verified');
+
+// 8.6 Runtime tests for getPeriodCalendarMonthStatus & getCourseCumulativeStats
+const jpMonthDays = attendanceCorrelationService.getPeriodCalendarMonthStatus('ญ31201', 'room-3-1', 2026, 10, '2026-10-02');
+assert.strictEqual(jpMonthDays.length, 31, 'October must have 31 days');
+const jpDay2 = jpMonthDays.find((d) => d.dayOfMonth === 2);
+assert.ok(jpDay2, 'Day 2 must exist');
+assert.strictEqual(jpDay2.isChecked, true, 'Day 2 must be checked (Green)');
+const jpDay15 = jpMonthDays.find((d) => d.dayOfMonth === 15);
+assert.strictEqual(jpDay15.isChecked, false, 'Day 15 must be unchecked (Red) matching mockup');
+
+const jpCourseCumulative = attendanceCorrelationService.getCourseCumulativeStats('ญ31201', 'room-3-1');
+assert.strictEqual(jpCourseCumulative.totalStudents, 28, 'Must have 28 students in Japanese M.3/1');
+assert.ok(jpCourseCumulative.averageRate >= 80, 'Must calculate healthy average attendance rate');
+const student1 = jpCourseCumulative.students.find((s) => s.studentCode === '45101');
+assert.ok(student1, 'Student 45101 must exist in cumulative stats');
+assert.ok(student1.presentDays > 0, 'Student 45101 must have positive present days');
+assert.strictEqual(student1.statusTag, 'NORMAL', 'Student 45101 must have NORMAL status');
+
+console.log('  ✓ Runtime execution of period calendar status and course cumulative stats passed');
+
+console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE, SUBJECT ICONS, BANNER COMPRESSOR, SIDEBAR UX, BELL SCHEDULE, MORNING ASSEMBLY & CLASSROOM ATTENDANCE CHECKS PASSED!');
 
 

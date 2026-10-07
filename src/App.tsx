@@ -197,7 +197,7 @@ export const App: React.FC = () => {
       case 'morning-assembly':
         return 'เช็คแถวเช้า (Morning Assembly)';
       case 'classroom-attendance':
-        return 'เช็คชื่อนักเรียน (Classroom Attendance)';
+        return 'เช็คชื่อเข้าเรียน (Classroom Attendance)';
       case 'exams':
         return 'จัดการการสอบ (Exam Management)';
       case 'assignments':
