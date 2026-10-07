@@ -103,6 +103,38 @@ export const classroomService = {
     return updatedItem;
   },
 
+  // UPDATE ADVISERS: Set primary advisor and co-advisor with event notification
+  async updateAdvisers(id: string, adviser: string, coAdviser?: string): Promise<ClassroomRosterItem> {
+    const current = getLocalClassrooms();
+    const index = current.findIndex((c) => c.id === id || c.roomNumber === id);
+    if (index === -1) throw new Error('ไม่พบชั้นเรียนที่ต้องการแก้ไข');
+
+    const updatedItem: ClassroomRosterItem = {
+      ...current[index],
+      adviser,
+      coAdviser: coAdviser || undefined,
+    };
+    current[index] = updatedItem;
+    saveLocalClassrooms(current);
+
+    if (isSupabaseConfigured) {
+      logDbOperation(`UPDATE Classroom SET adviser = ${adviser}, co_adviser = ${coAdviser} WHERE id = ${id}`);
+      await supabase.from('Classroom').update({ adviser, co_adviser: coAdviser }).eq('id', id);
+    }
+
+    try {
+      window.dispatchEvent(
+        new CustomEvent('kps-data-sync-event', {
+          detail: { type: 'CLASSROOM_ADVISERS_UPDATED', classroomId: id, adviser, coAdviser },
+        })
+      );
+    } catch {
+      // safe SSR
+    }
+
+    return updatedItem;
+  },
+
   // DELETE: Soft delete classroom (Move to Trash)
   async delete(id: string): Promise<boolean> {
     const current = getLocalClassrooms();

@@ -127,6 +127,12 @@ export interface ExamItem {
   averageScore?: number;
   highestScore?: number;
   lowestScore?: number;
+  isOnlineQuiz?: boolean;
+  isOpen?: boolean;
+  passingScore?: number;
+  allowRetake?: boolean;
+  maxRetakeAttempts?: number;
+  maxBlurWarnings?: number;
 }
 
 export interface TeacherAssignment {
@@ -173,6 +179,7 @@ export interface ClassroomRosterItem {
   level: string;
   roomNumber: string;
   adviser: string;
+  coAdviser?: string;
   studentCount: number;
 }
 

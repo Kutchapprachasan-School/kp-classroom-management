@@ -88,6 +88,9 @@ import {
 
 import { sgsExportService, type SgsSnapshotRecord } from '../services/sgsExportService';
 import { TEACHER_SUBJECTS_LIST } from '../services/teacherCourseAssignmentService';
+import { classroomService } from '../services/classroomService';
+import { cleanSlateService } from '../services/cleanSlateService';
+import type { ClassroomRosterItem } from '../types/viewModels';
 import { SettingsHeroBanner } from '../components/settings/SettingsHeroBanner';
 import { SettingsCategoryCard } from '../components/settings/SettingsCategoryCard';
 import { SettingsSubModal } from '../components/settings/SettingsSubModal';
@@ -178,6 +181,25 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
   // Backups & Snapshots
   const [snapshots, setSnapshots] = useState<SgsSnapshotRecord[]>([]);
 
+  // Classrooms & Advisors
+  const [classrooms, setClassrooms] = useState<ClassroomRosterItem[]>([]);
+  const AVAILABLE_TEACHERS = useMemo(
+    () => [
+      'ครูภาสภูมิ เรืองปราชญ์',
+      'ครูวิภาดา สมบูรณ์',
+      'ครูเอกชัย มิ่งขวัญ',
+      'ครูชนิกา ทรัพย์สุข',
+      'ครูปิยพล เกษรัตน์',
+      'ครูประภาส เกษมสันต์',
+      'ครูพิมพ์ใจ สิทธิเดช',
+      'ครูสมคิด สุวรรณโชติ',
+      'ครูสมทรง วงศ์ใหญ่',
+      'ครูศิริพร บุญช่วย',
+      'ครูกานดา มณีรัตน์',
+    ],
+    []
+  );
+
   // Toast
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const showToast = (msg: string) => {
@@ -185,9 +207,15 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
     setTimeout(() => setToastMsg(null), 3200);
   };
 
-  // Sync with window events and fetch snapshots
+  // Sync with window events and fetch snapshots & classrooms
   useEffect(() => {
     sgsExportService.getSnapshots().then(setSnapshots).catch(() => {});
+    classroomService.getAll().then(setClassrooms).catch(() => {});
+
+    const handleClassroomChange = () => {
+      classroomService.getAll().then(setClassrooms).catch(() => {});
+    };
+    window.addEventListener('kps-data-sync-event', handleClassroomChange);
 
     const handleCalendarChange = () => setCalendarConfig(academicCalendarService.getConfig());
     const onLeaveChange = () => setLeaveSettings(schoolLeaveSettingsService.getSettings());
@@ -760,36 +788,132 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
       </SettingsSubModal>
 
       {/* ------------------------------------------------------------------ */}
-      {/* MODAL 1.3: ห้องเรียน / ชั้น */}
+      {/* MODAL 1.3: ห้องเรียน / ครูที่ปรึกษา */}
       {/* ------------------------------------------------------------------ */}
       <SettingsSubModal
         isOpen={activeModalKey === 'classrooms'}
         onClose={() => setActiveModalKey(null)}
-        title="จัดการห้องเรียนและระดับชั้น"
-        subtitle="โครงสร้างห้องเรียน ระดับชั้น ม.1 - ม.6 และครูประจำชั้น"
+        title="จัดการห้องเรียน & ตั้งค่าครูที่ปรึกษา"
+        subtitle="กำหนดครูที่ปรึกษาหลัก และครูที่ปรึกษาร่วม ประจำแต่ละห้องเรียน (ม.1 - ม.6)"
         icon={<Presentation className="w-5 h-5" />}
         iconBgClass="bg-indigo-50"
         iconColorClass="text-indigo-600"
-        showSaveButton={false}
+        showSaveButton={activeRole === 'STUDENT_AFFAIRS' || activeRole === 'ACADEMIC_ADMIN'}
+        saveButtonText="💾 บันทึกการตั้งค่าครูที่ปรึกษา"
+        onSave={async () => {
+          try {
+            for (const cls of classrooms) {
+              await classroomService.updateAdvisers(cls.id, cls.adviser, cls.coAdviser);
+            }
+            showToast('✓ บันทึกการตั้งค่าครูที่ปรึกษาเรียบร้อยแล้ว');
+            setActiveModalKey(null);
+          } catch {
+            showToast('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+          }
+        }}
       >
         <div className="space-y-4">
           <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-            <h3 className="text-sm font-extrabold text-slate-900">รายชื่อห้องเรียนที่เปิดสอน</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                { name: 'ม.3/1', tag: 'ห้องที่ปรึกษา', students: '23 คน' },
-                { name: 'ม.3/2', tag: 'ห้องสอน', students: '25 คน' },
-                { name: 'ม.2/1', tag: 'ห้องสอน', students: '28 คน' },
-                { name: 'ม.1/8', tag: 'ห้องสอน', students: '24 คน' },
-              ].map((c) => (
-                <div key={c.name} className="p-3 rounded-xl border border-blue-200 bg-blue-50/40 text-center space-y-1">
-                  <span className="text-lg font-black text-blue-950 block">{c.name}</span>
-                  <span className="text-[10px] font-bold text-blue-700 bg-white px-2 py-0.5 rounded-full border border-blue-200 inline-block">
-                    {c.tag}
-                  </span>
-                  <p className="text-[11px] text-slate-500 font-medium">{c.students}</p>
-                </div>
-              ))}
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-900">กำหนดครูประจำชั้น / ครูที่ปรึกษา</h3>
+                <p className="text-xs text-slate-500">
+                  สิทธิ์การตั้งค่า: ครูกิจการนักเรียน (Student Affairs) และ ครูวิชาการ (Academic Admin)
+                </p>
+              </div>
+              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                รวม {classrooms.length} ห้องเรียน
+              </span>
+            </div>
+
+            <div className="space-y-2.5 pt-2 max-h-[55vh] overflow-y-auto pr-1">
+              {classrooms.map((cls) => {
+                const canEdit =
+                  activeRole === 'STUDENT_AFFAIRS' ||
+                  activeRole === 'ACADEMIC_ADMIN';
+
+                return (
+                  <div
+                    key={cls.id}
+                    className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-9 h-9 rounded-xl bg-blue-600 text-white font-black text-xs flex items-center justify-center shrink-0">
+                        {cls.roomNumber || cls.name}
+                      </span>
+                      <div>
+                        <span className="text-xs font-bold text-slate-800 block">
+                          {cls.name} ({cls.level})
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          นักเรียน: {cls.studentCount || 0} คน
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                      {/* ครูที่ปรึกษาหลัก */}
+                      <div className="flex flex-col">
+                        <label className="text-[10px] font-bold text-slate-500 mb-0.5">
+                          ครูที่ปรึกษาหลัก:
+                        </label>
+                        {canEdit ? (
+                          <select
+                            value={cls.adviser || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setClassrooms((prev) =>
+                                prev.map((c) => (c.id === cls.id ? { ...c, adviser: val } : c))
+                              );
+                            }}
+                            className="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 font-medium text-slate-800 focus:outline-blue-500 cursor-pointer"
+                          >
+                            {AVAILABLE_TEACHERS.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-xs font-bold text-slate-700 bg-white px-2 py-1 rounded border border-slate-200">
+                            {cls.adviser}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* ครูที่ปรึกษาร่วม */}
+                      <div className="flex flex-col">
+                        <label className="text-[10px] font-bold text-slate-500 mb-0.5">
+                          ครูที่ปรึกษาร่วม:
+                        </label>
+                        {canEdit ? (
+                          <select
+                            value={cls.coAdviser || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setClassrooms((prev) =>
+                                prev.map((c) => (c.id === cls.id ? { ...c, coAdviser: val || undefined } : c))
+                              );
+                            }}
+                            className="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 font-medium text-slate-800 focus:outline-blue-500 cursor-pointer"
+                          >
+                            <option value="">-- ไม่มีครูร่วม --</option>
+                            {AVAILABLE_TEACHERS.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-xs font-medium text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">
+                            {cls.coAdviser || 'ไม่มี'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -1548,6 +1672,46 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                   </div>
                 ))
               )}
+            </div>
+          </div>
+
+          {/* SECTION: ล้างข้อมูลจำลองเพื่อเริ่มใช้งานจริง (Clean Slate Production MVP) */}
+          <div className="bg-amber-50/70 rounded-2xl border border-amber-200 p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-extrabold text-amber-950">
+                    เริ่มใช้งานจริง: ล้างข้อมูลจำลอง (Clean Slate MVP)
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900">
+                    Production Ready
+                  </span>
+                </div>
+                <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                  ล้างข้อมูลจำลองสำหรับการทดสอบ (คะแนนเก็บ, เช็คชื่อย้อนหลัง, ข้อสอบ และแชททดสอบ) 
+                  โดยยังคงรักษาข้อมูลโรงเรียน, ตารางระฆังคาบเรียน, และห้องเรียน ม.1 - ม.6 ไว้อย่างครบถ้วน 
+                  เพื่อให้คุณครูนำเข้ารายชื่อนักเรียนจริงได้ทันที (ไม่กระทบระบบการลาหลักของโรงเรียน)
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      'ยืนยันการล้างข้อมูลจำลองเพื่อเตรียมระบบพร้อมใช้งานจริง (MVP)?\nข้อมูลโรงเรียนและห้องเรียนจะยังคงอยู่ครบถ้วน'
+                    )
+                  ) {
+                    cleanSlateService.purgeTransactionalMockData();
+                    showToast('✓ ล้างข้อมูลจำลองเรียบร้อยแล้ว ระบบพร้อมสำหรับการใช้งานจริง');
+                  }
+                }}
+                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>ล้างข้อมูลจำลองเพื่อเริ่มใช้งานจริง</span>
+              </button>
             </div>
           </div>
         </div>

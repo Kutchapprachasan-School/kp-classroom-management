@@ -21,10 +21,12 @@ import {
   Bell,
   User,
   ArrowRightLeft,
+  KeyRound,
 } from 'lucide-react';
 import { classroomService } from '../services/classroomService';
 import { classroomsListData } from '../data/mockData';
 import { studentService, defaultStudents, type StudentRecord } from '../services/studentService';
+import { authService } from '../services/authService';
 import { trashService } from '../services/trashService';
 import { messagingService, STUDENT_TRANSFERRED_EVENT } from '../services/messagingService';
 import type { ClassroomRosterItem, AtRiskStudent } from '../types/viewModels';
@@ -411,6 +413,21 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
       attendanceRatio: stu.attendance,
       totalScore: stu.score,
     });
+  };
+
+  const handleResetPassword = async (stu: StudentRecord) => {
+    if (
+      window.confirm(
+        `ต้องการรีเซ็ตรหัสผ่านของ ${stu.name} (รหัส ${stu.code}) ใช่หรือไม่?\nรหัสผ่านจะถูกคืนค่ากลับเป็นรหัสนักเรียน 5 หลัก (${stu.code}) เพื่อให้นักเรียนเข้าสู่ระบบใหม่ได้ทันที`
+      )
+    ) {
+      try {
+        await authService.resetStudentPasswordByAdvisor(stu.code, 'ครูที่ปรึกษา');
+        alert(`✓ รีเซ็ตรหัสผ่านของ ${stu.name} เป็นรหัส 5 หลัก (${stu.code}) เรียบร้อยแล้ว`);
+      } catch (err: any) {
+        alert(err.message || 'ไม่สามารถรีเซ็ตรหัสผ่านได้');
+      }
+    }
   };
 
   const handleOpenTransferModal = (stu: StudentRecord) => {
@@ -1031,6 +1048,17 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                                 >
                                   <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-600" />
                                   <span>ย้ายห้องเรียน (ซิงค์กลุ่มแชท)</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleResetPassword(stu);
+                                    setOpenActionMenuId(null);
+                                  }}
+                                  className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-amber-700 hover:bg-amber-50 text-left cursor-pointer"
+                                >
+                                  <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                                  <span>รีเซ็ตรหัสผ่าน (5 หลัก)</span>
                                 </button>
                                 <button
                                   type="button"

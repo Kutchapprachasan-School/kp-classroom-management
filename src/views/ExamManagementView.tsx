@@ -28,6 +28,11 @@ import {
   Clock,
 } from 'lucide-react';
 import type { ExamItem } from '../types/viewModels';
+import {
+  onlineQuizService,
+  DEFAULT_SAMPLE_QUESTIONS,
+} from '../services/onlineQuizService';
+import { StudentExamPlayerModal } from '../components/exam/StudentExamPlayerModal';
 
 const EXAMS_STORAGE_KEY = 'kp_exams_management_data_v1';
 
@@ -301,6 +306,11 @@ export const ExamManagementView: React.FC = () => {
   const [newMaxScore, setNewMaxScore] = useState<number>(10);
   const [newDate, setNewDate] = useState('18 ต.ค. 2569');
   const [newStatus, setNewStatus] = useState<'UPCOMING' | 'GRADING'>('GRADING');
+  const [isOnlineQuiz, setIsOnlineQuiz] = useState<boolean>(true);
+  const [passingScore, setPassingScore] = useState<number>(5.0);
+  const [allowRetake, setAllowRetake] = useState<boolean>(true);
+  const [maxBlurWarnings, setMaxBlurWarnings] = useState<number>(3);
+  const [playerExam, setPlayerExam] = useState<ExtendedExamItem | null>(null);
 
   const handleCreateExam = (e: React.FormEvent) => {
     e.preventDefault();
@@ -326,7 +336,32 @@ export const ExamManagementView: React.FC = () => {
       badgeColor: examCategory === 'QUIZ' ? 'bg-blue-500 text-white' : examCategory === 'MIDTERM' ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white',
       status: newStatus,
       statusRatio: '0/39',
+      isOnlineQuiz,
+      isOpen: true,
+      passingScore: Number(passingScore) || 5.0,
+      allowRetake,
+      maxRetakeAttempts: 0,
+      maxBlurWarnings: Number(maxBlurWarnings) || 3,
     };
+
+    if (isOnlineQuiz) {
+      onlineQuizService.saveQuiz({
+        id: `quiz-${newExam.id}`,
+        examId: newExam.id,
+        title: newExam.title,
+        subjectCode: newExam.subjectCode,
+        roomName: newExam.roomName,
+        passingScore: Number(passingScore) || 5.0,
+        maxScore: newExam.maxScore,
+        allowRetake,
+        maxRetakeAttempts: 0,
+        maxBlurWarnings: Number(maxBlurWarnings) || 3,
+        isOpen: true,
+        questions: DEFAULT_SAMPLE_QUESTIONS,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
 
     const updated = [newExam, ...exams];
     saveExamsToStorage(updated);
@@ -1427,17 +1462,57 @@ export const ExamManagementView: React.FC = () => {
 
                           {actionMenuOpenId === exam.id && (
                             <div className="absolute right-0 top-8 z-30 bg-white rounded-2xl border border-slate-200 shadow-xl p-1.5 min-w-[200px] text-left text-xs animate-scale-up">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActionMenuOpenId(null);
-                                  setScoreGridExam(exam);
-                                }}
-                                className="w-full text-left px-3 py-2 rounded-xl hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 font-semibold"
-                              >
-                                <PenTool className="w-3.5 h-3.5 text-blue-600" />
-                                <span>กรอกคะแนนแบบ Inline Grid</span>
-                              </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActionMenuOpenId(null);
+                                    setPlayerExam(exam);
+                                  }}
+                                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-emerald-50 hover:text-emerald-700 flex items-center gap-2 font-semibold text-emerald-800"
+                                >
+                                  <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>📱 ทดสอบทำข้อสอบ (Student Player)</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nextOpen = !(exam.isOpen !== false);
+                                    onlineQuizService.toggleQuizStatus(exam.id, nextOpen);
+                                    setExams((prev) =>
+                                      prev.map((e) => (e.id === exam.id ? { ...e, isOpen: nextOpen } : e))
+                                    );
+                                    showToast(
+                                      nextOpen
+                                        ? `✓ เปิดรับการสอบ "${exam.title}" แล้ว`
+                                        : `✓ ปิดรับการสอบ "${exam.title}" แล้ว`
+                                    );
+                                    setActionMenuOpenId(null);
+                                  }}
+                                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-amber-50 hover:text-amber-700 flex items-center gap-2 font-semibold text-slate-700"
+                                >
+                                  {exam.isOpen !== false ? (
+                                    <>
+                                      <Lock className="w-3.5 h-3.5 text-amber-600" />
+                                      <span>ปิดรับการสอบ (Close Exam)</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Unlock className="w-3.5 h-3.5 text-emerald-600" />
+                                      <span>เปิดรับการสอบ (Open Exam)</span>
+                                    </>
+                                  )}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActionMenuOpenId(null);
+                                    setScoreGridExam(exam);
+                                  }}
+                                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 font-semibold"
+                                >
+                                  <PenTool className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>กรอกคะแนนแบบ Inline Grid</span>
+                                </button>
                               <button
                                 type="button"
                                 onClick={() => {
@@ -1687,6 +1762,70 @@ export const ExamManagementView: React.FC = () => {
                     <option value="UPCOMING">เร็วๆ นี้</option>
                   </select>
                 </div>
+              </div>
+
+              {/* SECTION: ระบบสอบออนไลน์ & สอบซ่อม */}
+              <div className="p-3.5 rounded-2xl bg-blue-50/60 border border-blue-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="isOnlineQuizToggle"
+                      checked={isOnlineQuiz}
+                      onChange={(e) => setIsOnlineQuiz(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+                    />
+                    <label htmlFor="isOnlineQuizToggle" className="font-bold text-blue-900 cursor-pointer">
+                      📱 เปิดระบบสอบออนไลน์ (Online Quiz)
+                    </label>
+                  </div>
+                  <span className="text-[10px] font-bold text-blue-700 bg-white px-2 py-0.5 rounded-full border border-blue-200">
+                    Auto-Grading & Retake
+                  </span>
+                </div>
+
+                {isOnlineQuiz && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-1">
+                        เกณฑ์คะแนนผ่าน (Passing Score)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={newMaxScore}
+                        step={0.5}
+                        value={passingScore}
+                        onChange={(e) => setPassingScore(Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-1">
+                        เตือนสลับหน้าจอสูงสุด (ครั้ง)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={maxBlurWarnings}
+                        onChange={(e) => setMaxBlurWarnings(Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800"
+                      />
+                    </div>
+                    <div className="flex flex-col justify-center pt-2">
+                      <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={allowRetake}
+                          onChange={(e) => setAllowRetake(e.target.checked)}
+                          className="w-3.5 h-3.5 text-blue-600 rounded"
+                        />
+                        <span>🔄 สอบซ่อมได้เรื่อยๆ จนกว่าจะผ่าน</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
@@ -2202,6 +2341,25 @@ export const ExamManagementView: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* MODAL 4: นักเรียนทำข้อสอบออนไลน์ (Student Exam Player & Anti-Cheat) */}
+      {playerExam && (
+        <StudentExamPlayerModal
+          isOpen={!!playerExam}
+          onClose={() => setPlayerExam(null)}
+          examId={playerExam.id}
+          studentCode="45101"
+          studentName="ด.ช. กฤษณะ ศรีสมบูรณ์"
+          classroomId={playerExam.roomName || 'room-3-1'}
+          onGraded={(score, isPassed) => {
+            showToast(
+              isPassed
+                ? `✓ บันทึกคะแนนเรียบร้อย: นักเรียนสอบผ่านเกณฑ์ ได้ ${score} คะแนน`
+                : `⚠️ บันทึกคะแนนเรียบร้อย: นักเรียนได้ ${score} คะแนน (สามารถสอบซ่อมได้)`
+            );
+          }}
+        />
       )}
     </div>
   );

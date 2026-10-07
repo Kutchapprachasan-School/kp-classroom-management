@@ -11,6 +11,8 @@
  * Design System: Pastel Anime Education Dashboard (Prompt typography, #163A66, #1D75D8, #10B981)
  */
 
+import { cleanSlateService } from './cleanSlateService.ts';
+
 export type AttendanceStatusCode =
   | 'PRESENT'   // มาเรียน / มาแถวปกติ (ได้เวลาเรียน 100%)
   | 'LATE'      // มาสาย (ได้เวลาเรียน 100%)
@@ -544,8 +546,11 @@ export const attendanceCorrelationService = {
       return filtered;
     }
 
-    // If storage is completely empty, initialize default mock baseline
+    // If storage is completely empty, initialize default mock baseline unless clean slate is active
     if (list.length === 0) {
+      if (cleanSlateService.isCleanSlateActive()) {
+        return [];
+      }
       const initial = generateMockMorningRecords();
       writeStorage(STORAGE_KEYS.MORNING_ASSEMBLY, initial);
       return initial.filter(
@@ -770,6 +775,9 @@ export const attendanceCorrelationService = {
   getPeriodRecordsByDateAndRoom(classroomId: string, date: string): PeriodAttendanceRecord[] {
     let list = readStorage<PeriodAttendanceRecord[]>(STORAGE_KEYS.PERIOD_ATTENDANCE, []);
     if (list.length === 0) {
+      if (cleanSlateService.isCleanSlateActive()) {
+        return [];
+      }
       list = generateMockPeriodRecords();
       writeStorage(STORAGE_KEYS.PERIOD_ATTENDANCE, list);
     }

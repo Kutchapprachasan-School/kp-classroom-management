@@ -13,6 +13,9 @@ export interface StudentRecord {
   gender?: 'MALE' | 'FEMALE';
   classroomId?: string;
   studentCode?: string;
+  passwordHash?: string | null;
+  isPasswordChanged?: boolean;
+  lastLoginAt?: string;
 }
 
 const STORAGE_PREFIX = 'cls_students_';
@@ -234,6 +237,36 @@ export const studentService = {
       }
     }
     return null;
+  },
+
+  // อัปเดตรหัสผ่านนักเรียน (บันทึกลง local storage ประจำห้องเรียน)
+  updateStudentPassword(code: string, passwordHash: string): boolean {
+    const found = this.findStudentByCode(code);
+    if (!found) return false;
+    const { student, classroomId } = found;
+    const list = getLocalStudents(classroomId);
+    const updated = list.map((s) =>
+      s.code === student.code || s.id === student.id
+        ? { ...s, passwordHash, isPasswordChanged: true, lastLoginAt: new Date().toISOString() }
+        : s
+    );
+    saveLocalStudents(classroomId, updated);
+    return true;
+  },
+
+  // รีเซ็ตรหัสผ่านนักเรียนกลับเป็นค่าเริ่มต้น (5 หลัก) โดยครูที่ปรึกษา / แอดมิน
+  resetStudentPassword(code: string): boolean {
+    const found = this.findStudentByCode(code);
+    if (!found) return false;
+    const { student, classroomId } = found;
+    const list = getLocalStudents(classroomId);
+    const updated = list.map((s) =>
+      s.code === student.code || s.id === student.id
+        ? { ...s, passwordHash: null, isPasswordChanged: false }
+        : s
+    );
+    saveLocalStudents(classroomId, updated);
+    return true;
   },
 
   // READ: List students in classroom

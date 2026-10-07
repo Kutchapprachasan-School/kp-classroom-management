@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase';
 import { ScoreUpdateSchema, type ScoreUpdateInput } from './types';
+import { cleanSlateService } from './cleanSlateService';
 
 export interface ScoreRecord {
   id: string;
@@ -49,6 +50,9 @@ const getLocalScores = (): ScoreRecord[] => {
     } catch {
       // fallback
     }
+  }
+  if (cleanSlateService.isCleanSlateActive()) {
+    return [];
   }
   return defaultScores;
 };

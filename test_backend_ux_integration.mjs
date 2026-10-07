@@ -86,6 +86,10 @@ const {
   DEFAULT_BANNER_COMPRESSION_OPTIONS,
 } = await import('./src/utils/imageCompressor.ts');
 const { FEEDBACK_STICKERS_BY_STRAND } = await import('./src/config/feedbackStickersCatalog.ts');
+const { cleanSlateService } = await import('./src/services/cleanSlateService.ts');
+const { authService, hashPassword } = await import('./src/services/authService.ts');
+const { classroomService } = await import('./src/services/classroomService.ts');
+const { onlineQuizService, DEFAULT_SAMPLE_QUESTIONS } = await import('./src/services/onlineQuizService.ts');
 
 // Test Execution Statistics Tracker
 let totalTestsExecuted = 0;
@@ -1119,13 +1123,218 @@ await runTestCaseAsync('T4.1: Full Academic Term End-to-End Lifecycle Simulation
 });
 
 // ==============================================================================
+// 🔹 TIER 5: PRODUCTION MVP, STUDENT AUTH, ADVISOR SETTINGS & ONLINE QUIZ ENGINE
+// ==============================================================================
+console.log('\n==============================================================================');
+console.log('🔹 TIER 5: PRODUCTION MVP, STUDENT AUTH, ADVISOR SETTINGS & ONLINE QUIZ');
+console.log('==============================================================================');
+
+runTestCase('T5.1.1: Clean Slate Selective Transactional Purge', () => {
+  // Ensure foundation exists
+  localStorage.setItem('cls_classrooms_data', JSON.stringify([{ id: 'room-3-1', name: 'ม.3/1' }]));
+  localStorage.setItem('cls_scores_data', JSON.stringify([{ id: 'sc-dummy', score: 10 }]));
+  localStorage.setItem('kp_morning_assembly_records', JSON.stringify([{ id: 'att-dummy' }]));
+
+  const result = cleanSlateService.purgeTransactionalMockData();
+  assert.strictEqual(result.success, true);
+  assert.strictEqual(cleanSlateService.isCleanSlateActive(), true);
+
+  // Transactional keys must be cleared
+  assert.strictEqual(localStorage.getItem('cls_scores_data'), null);
+  assert.strictEqual(localStorage.getItem('kp_morning_assembly_records'), null);
+
+  // Preserved infrastructure must remain intact
+  assert.ok(localStorage.getItem('cls_classrooms_data'), 'Classrooms must be preserved');
+});
+
+runTestCase('T5.1.2: Clean Slate Invariant Preservation (Leave Settings & Auth Intact)', () => {
+  localStorage.setItem('kp_school_leave_settings', JSON.stringify({ quota: 15 }));
+  localStorage.setItem('cls_current_auth_user', JSON.stringify({ id: 'usr-teacher-1', role: 'TEACHER' }));
+
+  cleanSlateService.purgeTransactionalMockData();
+
+  assert.ok(localStorage.getItem('kp_school_leave_settings'), 'School leave settings must NEVER be touched');
+  assert.ok(localStorage.getItem('cls_current_auth_user'), 'Teacher auth session must be preserved');
+
+  // Deactivate clean slate for remaining tests
+  cleanSlateService.deactivateCleanSlate();
+});
+
+runTestCase('T5.2.1: Student Authentication Initial Login with 5-digit Code', async () => {
+  const studentUser = await authService.loginStudent('45101', '45101');
+  assert.strictEqual(studentUser.role, 'STUDENT');
+  assert.strictEqual(studentUser.studentCode, '45101');
+  assert.ok(studentUser.name, 'Student must have name');
+});
+
+runTestCase('T5.2.2: Student Self-Contained Password Change & Validation', async () => {
+  const success = await authService.studentChangePassword('45101', '45101', 'SecureP@ss2026');
+  assert.strictEqual(success, true, 'Student password change must succeed');
+
+  // New password login must succeed
+  const loggedIn = await authService.loginStudentWithHashedPassword('45101', 'SecureP@ss2026');
+  assert.strictEqual(loggedIn.studentCode, '45101');
+});
+
+runTestCase('T5.2.3: Rejection of Old Password Post-Change', async () => {
+  await assert.rejects(
+    async () => {
+      await authService.loginStudentWithHashedPassword('45101', '45101');
+    },
+    /รหัสผ่านไม่ถูกต้อง/,
+    'Login with old default password must be rejected after password change'
+  );
+});
+
+runTestCase('T5.2.4: Homeroom Advisor 1-Click Password Reset', async () => {
+  const resetSuccess = await authService.resetStudentPasswordByAdvisor('45101', 'ครูภาสภูมิ');
+  assert.strictEqual(resetSuccess, true, 'Advisor reset must succeed');
+
+  // Must be able to login with 5-digit code again
+  const loggedIn = await authService.loginStudentWithHashedPassword('45101', '45101');
+  assert.strictEqual(loggedIn.studentCode, '45101', 'Student must login with default 5-digit code after advisor reset');
+});
+
+runTestCase('T5.3.1: Homeroom Advisor and Co-Advisor Assignment & Persistence', async () => {
+  const updated = await classroomService.updateAdvisers(
+    'room-3-1',
+    'ครูสมคิด สุวรรณโชติ',
+    'ครูวิภาดา สมบูรณ์'
+  );
+  assert.strictEqual(updated.adviser, 'ครูสมคิด สุวรรณโชติ');
+  assert.strictEqual(updated.coAdviser, 'ครูวิภาดา สมบูรณ์');
+
+  const reloaded = await classroomService.getById('room-3-1');
+  assert.strictEqual(reloaded?.adviser, 'ครูสมคิด สุวรรณโชติ');
+  assert.strictEqual(reloaded?.coAdviser, 'ครูวิภาดา สมบูรณ์');
+});
+
+runTestCase('T5.4.1: Online Quiz Creation with Passing Score, Retake Policy & Focus Guard', () => {
+  const quiz = onlineQuizService.saveQuiz({
+    id: 'quiz-unit-1',
+    examId: 'ex-online-1',
+    title: 'แบบทดสอบย่อยบทที่ 1 ภาษาญี่ปุ่น',
+    subjectCode: 'ญ31201',
+    roomName: 'ม.3/1',
+    passingScore: 6.0,
+    maxScore: 10.0,
+    allowRetake: true,
+    maxRetakeAttempts: 0, // unlimited
+    maxBlurWarnings: 3,
+    isOpen: true,
+    questions: DEFAULT_SAMPLE_QUESTIONS,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+
+  assert.strictEqual(quiz.passingScore, 6.0);
+  assert.strictEqual(quiz.allowRetake, true);
+  assert.strictEqual(quiz.maxBlurWarnings, 3);
+  assert.strictEqual(quiz.questions.length, 4);
+});
+
+runTestCase('T5.4.2: Online Quiz Auto-Grading & Score Ledger Sync', async () => {
+  // All correct answers: Q1: A (2.5), Q2: B (2.5), Q3: B (2.5), Q4: B (2.5) -> Total = 10.0
+  const result = await onlineQuizService.submitQuizAttempt({
+    examId: 'ex-online-1',
+    studentCode: '45102',
+    studentName: 'ด.ช. จิรายุ เดชปันคำ',
+    classroomId: 'room-3-1',
+    answers: {
+      'q-1': 'A',
+      'q-2': 'B',
+      'q-3': 'B',
+      'q-4': 'B',
+    },
+    violationCount: 0,
+    isAutoSubmitted: false,
+  });
+
+  assert.strictEqual(result.score, 10.0, 'All correct answers must earn 10.0 score');
+  assert.strictEqual(result.isPassed, true, 'Score >= passingScore (6.0) must be PASSED');
+  assert.strictEqual(result.attempt.attemptNo, 1);
+
+  // Score must be synced into scoreService
+  const scores = scoreService.getScores('room-3-1');
+  const studentScore = scores.find((s) => s.enrollmentId === 'stu-45102');
+  assert.ok(studentScore, 'Score must be automatically written to scoreService');
+});
+
+runTestCase('T5.4.3: Remedial Retake Eligibility Determination', async () => {
+  // Failing answers: only Q1 is correct (2.5 / 10 < passing 6.0)
+  const failResult = await onlineQuizService.submitQuizAttempt({
+    examId: 'ex-online-1',
+    studentCode: '45107',
+    studentName: 'ด.ช. ภูรินท์ บัณฑิต',
+    classroomId: 'room-3-1',
+    answers: {
+      'q-1': 'A', // 2.5
+      'q-2': 'D', // wrong
+      'q-3': 'A', // wrong
+      'q-4': 'A', // wrong
+    },
+    violationCount: 1,
+    isAutoSubmitted: false,
+  });
+
+  assert.strictEqual(failResult.score, 2.5);
+  assert.strictEqual(failResult.isPassed, false, 'Score 2.5 < passingScore 6.0 must FAIL');
+  assert.strictEqual(failResult.canRetake, true, 'Remedial retake must be permitted');
+
+  // Remedial retake attempt 2: earns passing score
+  const retakeResult = await onlineQuizService.submitQuizAttempt({
+    examId: 'ex-online-1',
+    studentCode: '45107',
+    studentName: 'ด.ช. ภูรินท์ บัณฑิต',
+    classroomId: 'room-3-1',
+    answers: {
+      'q-1': 'A',
+      'q-2': 'B',
+      'q-3': 'B',
+      'q-4': 'A', // 7.5
+    },
+  });
+
+  assert.strictEqual(retakeResult.attempt.attemptNo, 2);
+  assert.strictEqual(retakeResult.score, 7.5);
+  assert.strictEqual(retakeResult.isPassed, true, 'Retake score 7.5 >= 6.0 must PASS');
+});
+
+runTestCase('T5.4.4: Anti-Cheat Focus Guard Violation Tracking & Auto-Submit Flag', async () => {
+  const violationResult = await onlineQuizService.submitQuizAttempt({
+    examId: 'ex-online-1',
+    studentCode: '45110',
+    studentName: 'ด.ช. อัศวิน วนเกษตรกุล',
+    classroomId: 'room-3-1',
+    answers: { 'q-1': 'A' },
+    violationCount: 3,
+    isAutoSubmitted: true,
+  });
+
+  assert.strictEqual(violationResult.attempt.isAutoSubmitted, true, 'Auto-submitted flag must be recorded');
+  assert.strictEqual(violationResult.attempt.violationCount, 3, 'Violation count must be tracked');
+});
+
+runTestCase('T5.4.5: Teacher Instant Open/Close Quiz Toggle', () => {
+  const closed = onlineQuizService.toggleQuizStatus('ex-online-1', false);
+  assert.strictEqual(closed, false, 'Quiz status must toggle to CLOSED');
+
+  const reloaded = onlineQuizService.getQuizByExamId('ex-online-1');
+  assert.strictEqual(reloaded.isOpen, false);
+
+  const opened = onlineQuizService.toggleQuizStatus('ex-online-1', true);
+  assert.strictEqual(opened, true, 'Quiz status must toggle back to OPEN');
+});
+
+// ==============================================================================
 // Verification Summary & Final Assertion
 // ==============================================================================
 console.log('\n==============================================================================');
-console.log(`🎉 ALL ${totalTestsPassed} / ${totalTestsExecuted} TESTS ACROSS TIERS 1-4 PASSED PERFECTLY!`);
+console.log(`🎉 ALL ${totalTestsPassed} / ${totalTestsExecuted} TESTS ACROSS TIERS 1-5 PASSED PERFECTLY!`);
 console.log('   Tier 1: Feature Coverage (R1 - R5)      -> PASS');
 console.log('   Tier 2: Boundary & Corner Cases        -> PASS');
 console.log('   Tier 3: Cross-Feature Combinations     -> PASS');
 console.log('   Tier 4: Real-World Scenarios (Full E2E)-> PASS');
+console.log('   Tier 5: Production MVP, Auth, Quizzes  -> PASS');
 console.log('==============================================================================\n');
 process.exit(0);
