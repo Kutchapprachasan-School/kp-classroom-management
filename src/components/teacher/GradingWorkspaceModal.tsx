@@ -1,0 +1,425 @@
+import React, { useState, useEffect } from 'react';
+import {
+  X,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ZoomIn,
+  ZoomOut,
+  ExternalLink,
+  FileText,
+  Sparkles,
+  MessageSquare,
+} from 'lucide-react';
+import type { GradingQueueItem } from '../../services/teacherCourseAssignmentService';
+
+interface GradingWorkspaceModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  currentItem: GradingQueueItem | null;
+  allItems: GradingQueueItem[];
+  onSaveGrade: (itemId: string, score: number, feedback: string) => void;
+  onSelectQueueItem: (item: GradingQueueItem) => void;
+}
+
+const FEEDBACK_STAMPS = [
+  '🌟 ยอดเยี่ยมมาก ลายเส้นคมชัด',
+  '🎨 ระบายสีแสงเงาถูกต้องสวยงาม',
+  '✨ สัดส่วนองค์ประกอบสมบูรณ์',
+  '📝 ปรับปรุงการตัดเส้นเล็กน้อย',
+  '⏰ ส่งงานตรงเวลา มีความรับผิดชอบ',
+  '👍 ตอบคำถามครบถ้วนตามเกณฑ์',
+];
+
+export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
+  isOpen,
+  onClose,
+  currentItem,
+  allItems,
+  onSaveGrade,
+  onSelectQueueItem,
+}) => {
+  const [scoreInput, setScoreInput] = useState<string>('');
+  const [feedbackInput, setFeedbackInput] = useState<string>('');
+  const [zoomLevel, setZoomLevel] = useState<number>(100);
+  const [imgError, setImgError] = useState<boolean>(false);
+
+  // Sync inputs when item changes
+  useEffect(() => {
+    if (currentItem) {
+      if (currentItem.status === 'GRADED' && currentItem.score !== undefined && currentItem.score !== null) {
+        setScoreInput(String(currentItem.score));
+      } else {
+        setScoreInput(String(currentItem.maxScore)); // default to full score
+      }
+      setFeedbackInput(currentItem.teacherFeedback || '');
+      setZoomLevel(100);
+      setImgError(false);
+    }
+  }, [currentItem]);
+
+  if (!isOpen || !currentItem) return null;
+
+  const currentIndex = allItems.findIndex((i) => i.id === currentItem.id);
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex < allItems.length - 1;
+
+  const handlePrev = () => {
+    if (hasPrev) {
+      onSelectQueueItem(allItems[currentIndex - 1]);
+    }
+  };
+
+  const handleNext = () => {
+    if (hasNext) {
+      onSelectQueueItem(allItems[currentIndex + 1]);
+    }
+  };
+
+  const handleSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const num = parseFloat(scoreInput);
+    if (isNaN(num) || num < 0) return;
+    onSaveGrade(currentItem.id, num, feedbackInput);
+  };
+
+  const isImage = currentItem.submissionChannel === 'IMAGE_UPLOAD' || (currentItem.fileName || '').match(/\.(jpg|jpeg|png|webp)$/i);
+  const isPdf = currentItem.submissionChannel === 'PDF_UPLOAD' || (currentItem.fileName || '').endsWith('.pdf');
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 animate-fade-in font-sans">
+      <div className="bg-white rounded-3xl max-w-6xl w-full h-[94vh] flex flex-col overflow-hidden shadow-2xl border border-slate-200">
+        {/* Header */}
+        <div className="px-5 py-3.5 bg-gradient-to-r from-blue-50/90 via-white to-sky-50/70 border-b border-slate-200 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <span className="px-3 py-1 rounded-xl bg-blue-600 text-white font-extrabold text-xs shadow-xs">
+              คิวที่ #{currentItem.queueNo} (FIFO)
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                  {currentItem.studentName}
+                </h2>
+                <span className="text-xs text-slate-500 font-semibold">
+                  เลขที่ {currentItem.seatNo} • ห้อง {currentItem.classroom}
+                </span>
+                {currentItem.status === 'GRADED' ? (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    ✓ ตรวจแล้ว ({currentItem.score}/{currentItem.maxScore})
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                    ⏳ รอตรวจ
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500">
+                วิชา {currentItem.subjectCode} {currentItem.subjectName} • ส่งเมื่อ {currentItem.submittedAtText}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Prev / Next queue navigation */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={handlePrev}
+                disabled={!hasPrev}
+                className="p-1.5 rounded-lg hover:bg-white text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                title="นักเรียนคนก่อนหน้า"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-[11px] font-bold text-slate-600 px-1.5 tabular-nums">
+                {currentIndex + 1} / {allItems.length}
+              </span>
+              <button
+                type="button"
+                onClick={handleNext}
+                disabled={!hasNext}
+                className="p-1.5 rounded-lg hover:bg-white text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                title="นักเรียนคนถัดไป"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+              title="ปิดหน้าต่างตรวจงาน"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Dual-Pane Content Body */}
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden bg-slate-100/50">
+          {/* Left Pane (7/12 on desktop): Work Viewer */}
+          <div className="lg:col-span-7 p-4 sm:p-5 flex flex-col overflow-y-auto border-r border-slate-200 bg-white">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-700">ไฟล์ผลงาน:</span>
+                <span className="text-xs font-bold text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 truncate max-w-xs">
+                  {currentItem.fileName || 'ผลงานนักเรียน'}
+                </span>
+              </div>
+
+              {isImage && (
+                <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                  <button
+                    type="button"
+                    onClick={() => setZoomLevel((z) => Math.max(50, z - 25))}
+                    className="p-1 rounded bg-slate-100 hover:bg-slate-200 cursor-pointer"
+                    title="ย่อขนาด"
+                  >
+                    <ZoomOut className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="font-mono text-[11px] font-bold w-10 text-center">{zoomLevel}%</span>
+                  <button
+                    type="button"
+                    onClick={() => setZoomLevel((z) => Math.min(200, z + 25))}
+                    className="p-1 rounded bg-slate-100 hover:bg-slate-200 cursor-pointer"
+                    title="ขยายขนาด"
+                  >
+                    <ZoomIn className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Viewer Display */}
+            <div className="flex-1 mt-3 rounded-2xl border border-slate-200 bg-slate-900/5 flex items-center justify-center overflow-auto p-2 min-h-[280px]">
+              {isImage ? (
+                !imgError && currentItem.filePreviewUrl ? (
+                  <img
+                    src={currentItem.filePreviewUrl}
+                    alt={currentItem.assignmentTitle}
+                    onError={() => setImgError(true)}
+                    style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'center' }}
+                    className="max-h-[55vh] w-auto object-contain rounded-xl transition-transform duration-150 shadow-md"
+                  />
+                ) : (
+                  <div className="p-8 text-center space-y-3 bg-blue-50/50 rounded-2xl w-full">
+                    <span className="text-4xl">🎨</span>
+                    <h4 className="text-sm font-bold text-slate-800">
+                      {currentItem.fileName}
+                    </h4>
+                    <p className="text-xs text-slate-500">
+                      ภาพวาด/ผลงานทัศนศิลป์ของ {currentItem.studentName}
+                    </p>
+                  </div>
+                )
+              ) : isPdf ? (
+                <div className="p-6 text-center space-y-4 bg-rose-50/40 border border-rose-200 rounded-2xl w-full max-w-md">
+                  <FileText className="w-12 h-12 text-rose-500 mx-auto" />
+                  <div>
+                    <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white font-black text-[10px]">
+                      PDF PORTFOLIO
+                    </span>
+                    <h4 className="text-sm font-bold text-slate-900 mt-2">
+                      {currentItem.fileName}
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-1">
+                      แฟ้มสะสมงานทัศนศิลป์ (Art Portfolio 3 หน้า)
+                    </p>
+                  </div>
+                  {currentItem.filePreviewUrl && (
+                    <a
+                      href={currentItem.filePreviewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-teal-400" />
+                      <span>เปิดดูเอกสาร PDF เต็มหน้าต่าง ↗</span>
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <div className="p-6 text-center space-y-4 bg-indigo-50/60 border border-indigo-200 rounded-2xl w-full max-w-md">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mx-auto shadow-sm">
+                    <Sparkles className="w-6 h-6 text-cyan-300" />
+                  </div>
+                  <div>
+                    <span className="px-2 py-0.5 rounded-md bg-gradient-to-r from-[#00C4CC] to-indigo-600 text-white font-black text-[11px]">
+                      {currentItem.externalPlatform || 'CANVA'}
+                    </span>
+                    <h4 className="text-sm font-bold text-slate-900 mt-2">
+                      {currentItem.fileName || 'งานออกแบบออนไลน์'}
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-1">
+                      คลิกปุ่มด้านล่างเพื่อเปิดดูผลงานบน {currentItem.externalPlatform || 'Canva'}
+                    </p>
+                  </div>
+                  {currentItem.externalLinkUrl && (
+                    <a
+                      href={currentItem.externalLinkUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-extrabold shadow-sm transition-colors cursor-pointer"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>เปิดดูผลงาน {currentItem.externalPlatform || 'Canva'} ↗</span>
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right Pane (5/12 on desktop): Grading & Feedback Form */}
+          <div className="lg:col-span-5 p-4 sm:p-5 flex flex-col justify-between bg-white overflow-y-auto">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Assignment Meta */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                <span className="text-[11px] font-bold text-blue-600 block">
+                  {currentItem.sgsUnit}
+                </span>
+                <h3 className="text-sm font-extrabold text-slate-900">
+                  {currentItem.assignmentTitle}
+                </h3>
+                <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
+                  <span>เกณฑ์คะแนนเต็ม:</span>
+                  <span className="font-extrabold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
+                    {currentItem.maxScore} คะแนน
+                  </span>
+                </div>
+              </div>
+
+              {/* Score Input & Quick Buttons */}
+              <div className="p-4 rounded-2xl bg-blue-50/50 border border-blue-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="modal-score-input" className="text-xs font-bold text-slate-900">
+                    ให้คะแนน (Score):
+                  </label>
+                  <span className="text-xs text-slate-500">
+                    เต็ม {currentItem.maxScore} คะแนน
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = parseFloat(scoreInput) || 0;
+                      setScoreInput(String(Math.max(0, cur - 0.5)));
+                    }}
+                    className="w-10 h-10 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-lg flex items-center justify-center hover:bg-slate-100 cursor-pointer shadow-2xs"
+                  >
+                    -
+                  </button>
+
+                  <input
+                    id="modal-score-input"
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max={currentItem.maxScore}
+                    value={scoreInput}
+                    onChange={(e) => setScoreInput(e.target.value)}
+                    className="flex-1 h-10 text-center font-extrabold text-xl rounded-xl border-2 border-blue-500 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-2xs"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = parseFloat(scoreInput) || 0;
+                      setScoreInput(String(Math.min(currentItem.maxScore, cur + 0.5)));
+                    }}
+                    className="w-10 h-10 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-lg flex items-center justify-center hover:bg-slate-100 cursor-pointer shadow-2xs"
+                  >
+                    +
+                  </button>
+                </div>
+
+                {/* Quick Score Preset Buttons */}
+                <div className="grid grid-cols-4 gap-1.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setScoreInput(String(currentItem.maxScore))}
+                    className="py-1.5 px-2 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-xs font-bold transition-colors cursor-pointer text-center"
+                  >
+                    เต็ม ({currentItem.maxScore})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScoreInput(String(Math.max(0, currentItem.maxScore - 1)))}
+                    className="py-1.5 px-2 rounded-xl bg-blue-100 hover:bg-blue-200 text-blue-900 text-xs font-bold transition-colors cursor-pointer text-center"
+                  >
+                    {Math.max(0, currentItem.maxScore - 1)}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScoreInput(String(Math.round(currentItem.maxScore * 0.8)))}
+                    className="py-1.5 px-2 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-bold transition-colors cursor-pointer text-center"
+                  >
+                    80% ({Math.round(currentItem.maxScore * 0.8)})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScoreInput(String(Math.round(currentItem.maxScore * 0.7)))}
+                    className="py-1.5 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors cursor-pointer text-center"
+                  >
+                    70% ({Math.round(currentItem.maxScore * 0.7)})
+                  </button>
+                </div>
+              </div>
+
+              {/* Feedback Input & Stickers */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
+                  <span>คำแนะนำ & ข้อเสนอแนะถึงนักเรียน:</span>
+                </label>
+
+                <textarea
+                  rows={2}
+                  value={feedbackInput}
+                  onChange={(e) => setFeedbackInput(e.target.value)}
+                  placeholder="พิมพ์ข้อเสนอแนะ หรือคลิกเลือกสติกเกอร์สำเร็จรูปด้านล่าง..."
+                  className="w-full p-2.5 rounded-xl border border-slate-200 bg-white text-xs focus:outline-none focus:border-blue-500"
+                />
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {FEEDBACK_STAMPS.map((stamp) => (
+                    <button
+                      key={stamp}
+                      type="button"
+                      onClick={() => setFeedbackInput(stamp)}
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium transition-colors cursor-pointer"
+                    >
+                      + {stamp}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2 flex flex-col gap-2">
+                <button
+                  type="submit"
+                  className="w-full py-3.5 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                >
+                  <Check className="w-5 h-5" />
+                  <span>บันทึกคะแนน & ตรวจคนถัดไป ➔</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  ปิดหน้าต่าง
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
