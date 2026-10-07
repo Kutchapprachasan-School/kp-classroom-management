@@ -1,87 +1,79 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   BookOpen,
-  FileText,
   Plus,
-  Folder,
-  FolderOpen,
-  Calendar,
-  Clock,
-  Zap,
-  CloudDownload,
-  Users,
-  CheckCircle2,
+  Search,
   ChevronDown,
   ChevronRight,
-  Download,
-  Play,
-  ExternalLink,
-  MoreVertical,
-  X,
-  FileCheck,
-  Sparkles,
-  UploadCloud,
-  Share2,
-  Printer,
-  Check,
-  AlertCircle,
-  Eye,
   Edit3,
-  ArrowRight,
-  Camera,
+  Users,
+  CheckCircle2,
+  AlertTriangle,
+  FileText,
+  FileSpreadsheet,
+  Video,
+  Eye,
+  Copy,
+  Printer,
+  Sparkles,
+  X,
+  Download,
+  Layers,
+  FolderOpen,
+  ClipboardList,
+  Check,
+  HelpCircle,
+  FileCheck,
 } from 'lucide-react';
-import {
-  TeacherSubjectBannerModal,
-  getSubjectBannerUrl,
-} from '../components/teacher/TeacherSubjectBannerModal';
 
-// Data Types
-export interface LessonFile {
+// ==========================================
+// DATA TYPES
+// ==========================================
+export type UnitStatus = 'DONE' | 'IN_PROGRESS' | 'NOT_STARTED';
+
+export interface EvaluationItem {
   id: string;
-  name: string;
-  type: 'PDF' | 'PPTX' | 'DOCX' | 'MP4' | 'LINK';
-  size: string;
-  updatedAt: string;
-  downloadUrl?: string;
-  isOnlineView?: boolean;
-}
-
-export interface ExtraStudentFile {
-  id: string;
-  name: string;
-  type: 'PDF' | 'YOUTUBE' | 'LINK';
-  sizeOrSource: string;
-  actionLabel: string;
-  url?: string;
-}
-
-export interface ActivityMaterial {
-  id: string;
-  name: string;
-  category: 'ใบงาน' | 'เกมการเรียนรู้' | 'คลิปเสียง' | 'แบบทดสอบ';
-  size: string;
-  format: string;
-}
-
-export interface WeekPlanData {
-  week: number;
-  unitNumber: number;
   title: string;
-  description: string;
-  status: 'DONE' | 'IN_PROGRESS' | 'PLANNING';
-  statusLabel: string;
-  teachingDates: string;
-  dateShort: string;
+  weightPercent: number;
+  criteria: string;
+}
+
+export interface UnitPlanItem {
+  id: string;
+  unitNumber: number;
+  titleJa: string;
+  titleTh: string;
+  displayTitle: string;
   periods: number;
+  periodDurationText: string;
+  weekNumber: number;
+  dateRange: string;
+  status: UnitStatus;
+  statusLabel: string;
+  statusBadgeClass: string;
+  circleColorClass: string;
+  indicatorsSummary: string;
+  courseCode: string;
+  courseName: string;
+  classroom: string;
   objectives: string[];
-  evaluations: {
-    label: string;
-    percentage: number;
-    iconType: 'assignment' | 'activity' | 'exam';
+  evaluations: EvaluationItem[];
+  files: {
+    id: string;
+    name: string;
+    type: 'PDF' | 'PPTX' | 'DOCX' | 'MP4' | 'LINK';
+    size: string;
+    updatedAt: string;
+    url?: string;
   }[];
-  files: LessonFile[];
-  studentExtraFiles: ExtraStudentFile[];
-  activityMaterials: ActivityMaterial[];
+  worksheets: {
+    id: string;
+    name: string;
+    fullScore: number;
+    submittedCount: number;
+    totalCount: number;
+    dueDate: string;
+  }[];
   reflection: {
     conductedDate: string;
     summary: string;
@@ -91,320 +83,232 @@ export interface WeekPlanData {
   };
 }
 
-export interface CourseOption {
+export interface CourseFilterOption {
   code: string;
   name: string;
   classroom: string;
   semester: string;
-  totalWeeks: number;
-  hoursPerWeek: number;
 }
 
-const COURSES: CourseOption[] = [
+// ==========================================
+// INITIAL MOCK DATA (Matching Mockup 100%)
+// ==========================================
+const INITIAL_COURSES: CourseFilterOption[] = [
+  {
+    code: 'ญ23101',
+    name: 'ภาษาญี่ปุ่น ม.3/1',
+    classroom: 'ม.3/1',
+    semester: 'ภาคเรียนที่ 1/2569',
+  },
   {
     code: 'ญ32101',
-    name: 'ภาษาญี่ปุ่น',
-    classroom: 'ม.3/1',
-    semester: 'ภาคเรียนที่ 1/2569',
-    totalWeeks: 16,
-    hoursPerWeek: 1.0,
-  },
-  {
-    code: 'ญ32102',
-    name: 'ภาษาญี่ปุ่น 2',
-    classroom: 'ม.3/2',
-    semester: 'ภาคเรียนที่ 1/2569',
-    totalWeeks: 16,
-    hoursPerWeek: 1.0,
-  },
-  {
-    code: 'ญ31101',
-    name: 'ภาษาญี่ปุ่นพื้นฐาน',
+    name: 'ภาษาญี่ปุ่น ม.4/1',
     classroom: 'ม.4/1',
     semester: 'ภาคเรียนที่ 1/2569',
-    totalWeeks: 16,
-    hoursPerWeek: 2.0,
   },
   {
-    code: 'ศ23101',
-    name: 'ศิลปะและดนตรี',
-    classroom: 'ม.3/1',
+    code: 'ญ33101',
+    name: 'ภาษาญี่ปุ่น ม.5/1',
+    classroom: 'ม.5/1',
     semester: 'ภาคเรียนที่ 1/2569',
-    totalWeeks: 16,
-    hoursPerWeek: 1.5,
   },
 ];
 
-const WEEK_PLANS: WeekPlanData[] = [
+const INITIAL_UNITS: UnitPlanItem[] = [
   {
-    week: 1,
+    id: 'unit-1',
     unitNumber: 1,
-    title: 'บทที่ 1 : ปฐมนิเทศ และรู้จักภาษาญี่ปุ่น',
-    description: 'แนะนำรายวิชา ความสำคัญของภาษาญี่ปุ่น และหลักการออกเสียงเบื้องต้น',
+    titleJa: '日常のあいさつ',
+    titleTh: 'การทักทายประจำวัน',
+    displayTitle: '日常のあいさつ (การทักทายประจำวัน)',
+    periods: 4,
+    periodDurationText: '4 คาบ (50 นาที/คาบ)',
+    weekNumber: 1,
+    dateRange: 'สัปดาห์ที่ 1 (2 – 6 ต.ค. 2569)',
     status: 'DONE',
-    statusLabel: 'ดำเนินการแล้ว',
-    teachingDates: '13 พ.ค. 2569 – 17 พ.ค. 2569',
-    dateShort: '13-17 พ.ค. 69',
-    periods: 5,
+    statusLabel: 'เสร็จสิ้น',
+    statusBadgeClass: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+    circleColorClass: 'bg-blue-500',
+    indicatorsSummary: '1.1 ตัวชี้วัด',
+    courseCode: 'ญ23101',
+    courseName: 'ภาษาญี่ปุ่น',
+    classroom: 'ม.3/1',
     objectives: [
-      'นักเรียนสามารถทักทายและแนะนำตนเองเป็นภาษาญี่ปุ่นได้',
-      'นักเรียนสามารถอ่านและเขียนอักษรฮิรางานะได้',
-      'นักเรียนมีความสนใจในการเรียนภาษาญี่ปุ่น',
+      '1. อธิบายและใช้คำทักทายพื้นฐานในชีวิตประจำวันได้ (ต 1.1 ม.3/1)',
+      '2. ฟังและพูดโต้ตอบในการทักทายได้อย่างเหมาะสม (ต 2.1 ม.3/1)',
     ],
     evaluations: [
-      { label: 'แบบฝึกหัด / ใบงาน', percentage: 40, iconType: 'assignment' },
-      { label: 'กิจกรรมในห้องเรียน', percentage: 30, iconType: 'activity' },
-      { label: 'สอบปลายหน่วย', percentage: 30, iconType: 'exam' },
+      { id: 'ev1', title: 'การมีส่วนร่วม', weightPercent: 20, criteria: 'สังเกตพฤติกรรม' },
+      { id: 'ev2', title: 'งาน/ใบงาน', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
+      { id: 'ev3', title: 'สอบย่อย', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
+      { id: 'ev4', title: 'สอบปลายหน่วย', weightPercent: 20, criteria: 'ผ่านเกณฑ์ 70%' },
     ],
     files: [
       {
         id: 'f1',
-        name: 'แผนการสอน_บทที่1_ปฐมนิเทศ.pdf',
+        name: 'แผนการสอน_หน่วยที่1_การทักทายประจำวัน.pdf',
         type: 'PDF',
-        size: '1.2 MB',
-        updatedAt: '12 พ.ค. 2569',
+        size: '1.4 MB',
+        updatedAt: '2 ต.ค. 2569',
       },
       {
         id: 'f2',
-        name: 'สไลด์ประกอบการสอน_บทที่1.pptx',
+        name: 'สไลด์ประกอบการสอน_คำทักทายและวัฒนธรรม.pptx',
         type: 'PPTX',
-        size: '8.6 MB',
-        updatedAt: '12 พ.ค. 2569',
-      },
-      {
-        id: 'f3',
-        name: 'ใบความรู้_การออกเสียงภาษาญี่ปุ่น.docx',
-        type: 'DOCX',
-        size: '1.8 MB',
-        updatedAt: '11 พ.ค. 2569',
-      },
-      {
-        id: 'f4',
-        name: 'วิดีโอสอน_การทักทายภาษาญี่ปุ่น.mp4',
-        type: 'MP4',
-        size: '45.3 MB',
-        updatedAt: '11 พ.ค. 2569',
-        isOnlineView: true,
+        size: '6.8 MB',
+        updatedAt: '2 ต.ค. 2569',
       },
     ],
-    studentExtraFiles: [
+    worksheets: [
       {
-        id: 'ef1',
-        name: 'แบบฝึกหัดเพิ่มเติม (PDF)',
-        type: 'PDF',
-        sizeOrSource: '1.1 MB',
-        actionLabel: 'ดาวน์โหลด',
+        id: 'ws1',
+        name: 'ใบงานที่ 1.1: ฝึกเขียนบทสนทนาทักทายยามเช้าและเย็น',
+        fullScore: 10,
+        submittedCount: 32,
+        totalCount: 32,
+        dueDate: '4 ต.ค. 2569',
       },
       {
-        id: 'ef2',
-        name: 'คำศัพท์ภาษาญี่ปุ่น (PDF)',
-        type: 'PDF',
-        sizeOrSource: '2.4 MB',
-        actionLabel: 'ดาวน์โหลด',
-      },
-      {
-        id: 'ef3',
-        name: 'ลิงก์วิดีโอการออกเสียง',
-        type: 'YOUTUBE',
-        sizeOrSource: 'YouTube',
-        actionLabel: 'เปิดลิงก์',
-        url: 'https://youtube.com',
-      },
-    ],
-    activityMaterials: [
-      {
-        id: 'act1',
-        name: 'ใบงานที่ 1.1_ฝึกคัดอักษรฮิรางานะ 46 ตัว',
-        category: 'ใบงาน',
-        size: '2.1 MB',
-        format: 'PDF',
-      },
-      {
-        id: 'act2',
-        name: 'เกมจับคู่คำศัพท์และเสียงอ่าน_Unit1',
-        category: 'เกมการเรียนรู้',
-        size: '3.4 MB',
-        format: 'Interactive HTML',
-      },
-      {
-        id: 'act3',
-        name: 'คลิปเสียงบทสนทนาทักทายในชีวิตประจำวัน',
-        category: 'คลิปเสียง',
-        size: '8.5 MB',
-        format: 'MP3 Audio',
-      },
-      {
-        id: 'act4',
-        name: 'แบบทดสอบสั้นท้ายคาบปฐมนิเทศ (Quiz)',
-        category: 'แบบทดสอบ',
-        size: '850 KB',
-        format: 'PDF',
+        id: 'ws2',
+        name: 'ใบงานที่ 1.2: คัดคำศัพท์ฮิรางานะหมวดการทักทาย',
+        fullScore: 10,
+        submittedCount: 31,
+        totalCount: 32,
+        dueDate: '6 ต.ค. 2569',
       },
     ],
     reflection: {
-      conductedDate: '17 พ.ค. 2569',
+      conductedDate: '6 ต.ค. 2569',
       summary:
-        'นักเรียนระดับชั้น ม.3/1 จำนวน 38 คน ให้ความสนใจในการฝึกออกเสียงคำทักทายภาษาญี่ปุ่นเป็นอย่างดี มีส่วนร่วมในการทำกิจกรรมแนะนำตนเอง สามารถจำและออกเสียงคำว่า "Konnichiwa", "Arigatou gozaimasu" ได้ถูกต้อง 92% ของห้อง',
-      problem:
-        'นักเรียนบางคนยังสับสนการลากเส้นตัวอักษร "あ" (A) กับ "お" (O) ในสมุดคัดลายมือ และเวลาฝึกพูดรายคนท้ายคาบค่อนข้างจำกัด',
-      solution:
-        'จัดทำคลิปสั้นแสดงลำดับการตวัดเส้น (Stroke Order) พร้อมภาพเคลื่อนไหวส่งให้นักเรียนใน Google Classroom/Line และเปิดให้ฝึกทบทวน 10 นาทีแรกของคาบถัดไป',
+        'นักเรียนระดับชั้น ม.3/1 จำนวน 32 คน มีความกระตือรือร้นในการฝึกออกเสียงคำทักทาย สามารถใช้คำว่า "Konnichiwa" และ "Arigatou gozaimasu" ได้ถูกต้องตามสถานการณ์คิดเป็น 93% ของผู้เรียน',
+      problem: 'นักเรียนบางคนยังสับสนระหว่างคำทักทายทางการกับคำทักทายเพื่อนสนิท',
+      solution: 'จัดกิจกรรมบทบาทสมมติ (Role-play) โดยแบ่งสถานการณ์ระหว่างครูกับนักเรียน และเพื่อนกับเพื่อน',
       recordedBy: 'นายปัญจพล เกษรัตน์ (ครูผู้สอน)',
     },
   },
   {
-    week: 2,
+    id: 'unit-2',
     unitNumber: 2,
-    title: 'บทที่ 2 : อักษรฮิรางานะ หมวดอะ-คะ-สะ',
-    description: 'ฝึกจดจำรูปอักษร ลำดับเส้น และการประสมเสียงพื้นฐาน 15 ตัวแรก',
+    titleJa: '家族と友達',
+    titleTh: 'ครอบครัวและเพื่อน',
+    displayTitle: '家族と友達 (ครอบครัวและเพื่อน)',
+    periods: 4,
+    periodDurationText: '4 คาบ (50 นาที/คาบ)',
+    weekNumber: 2,
+    dateRange: 'สัปดาห์ที่ 2 (9 – 13 ต.ค. 2569)',
     status: 'IN_PROGRESS',
     statusLabel: 'กำลังดำเนินการ',
-    teachingDates: '20 พ.ค. 2569 – 24 พ.ค. 2569',
-    dateShort: '20-24 พ.ค. 69',
-    periods: 5,
+    statusBadgeClass: 'bg-blue-50 text-blue-600 border-blue-200',
+    circleColorClass: 'bg-purple-500',
+    indicatorsSummary: '1.1 ตัวชี้วัด',
+    courseCode: 'ญ23101',
+    courseName: 'ภาษาญี่ปุ่น',
+    classroom: 'ม.3/1',
     objectives: [
-      'นักเรียนสามารถเขียนอักษรฮิรางานะ หมวด อะ คะ สะ ได้ถูกต้องตามลำดับเส้น',
-      'นักเรียนสามารถอ่านออกเสียงคำศัพท์พื้นฐานจากหมวด อะ คะ สะ ได้',
-      'นักเรียนส่งสมุดคัดลายมือตามกำหนดเวลา',
+      '1. แนะนำสมาชิกในครอบครัวและเพื่อนสนิทเป็นภาษาญี่ปุ่นได้ (ต 1.1 ม.3/1)',
+      '2. ใช้คำสรรพนามและคำแสดงความเป็นเจ้าของได้อย่างถูกต้อง (ต 2.1 ม.3/1)',
     ],
     evaluations: [
-      { label: 'สมุดคัดลายมือฮิรางานะ', percentage: 50, iconType: 'assignment' },
-      { label: 'การอ่านออกเสียงรายบุคคล', percentage: 30, iconType: 'activity' },
-      { label: 'การร่วมกิจกรรมบัตรคำ', percentage: 20, iconType: 'exam' },
+      { id: 'ev2-1', title: 'การมีส่วนร่วม', weightPercent: 20, criteria: 'สังเกตพฤติกรรม' },
+      { id: 'ev2-2', title: 'งาน/ใบงาน', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
+      { id: 'ev2-3', title: 'สอบย่อย', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
+      { id: 'ev2-4', title: 'สอบปลายหน่วย', weightPercent: 20, criteria: 'ผ่านเกณฑ์ 70%' },
     ],
     files: [
       {
         id: 'f2-1',
-        name: 'แผนการสอน_บทที่2_ฮิรางานะตอนที่1.pdf',
+        name: 'แผนการสอน_หน่วยที่2_ครอบครัวและเพื่อน.pdf',
         type: 'PDF',
-        size: '1.4 MB',
-        updatedAt: '18 พ.ค. 2569',
-      },
-      {
-        id: 'f2-2',
-        name: 'สไลด์ประกอบการสอน_ลำดับเส้นฮิรางานะ.pptx',
-        type: 'PPTX',
-        size: '12.4 MB',
-        updatedAt: '19 พ.ค. 2569',
-      },
-      {
-        id: 'f2-3',
-        name: 'ตารางคัดตัวอักษร_อะ_คะ_สะ.docx',
-        type: 'DOCX',
-        size: '950 KB',
-        updatedAt: '19 พ.ค. 2569',
-      },
-    ],
-    studentExtraFiles: [
-      {
-        id: 'ef2-1',
-        name: 'สมุดคัดลายมือฉบับพิมพ์เอง (PDF)',
-        type: 'PDF',
-        sizeOrSource: '2.0 MB',
-        actionLabel: 'ดาวน์โหลด',
-      },
-      {
-        id: 'ef2-2',
-        name: 'เพลงช่วยจำฮิรางานะ',
-        type: 'YOUTUBE',
-        sizeOrSource: 'YouTube',
-        actionLabel: 'เปิดลิงก์',
-        url: 'https://youtube.com',
-      },
-    ],
-    activityMaterials: [
-      {
-        id: 'act2-1',
-        name: 'เกมหมุนวงล้อสุ่มทายตัวอักษร',
-        category: 'เกมการเรียนรู้',
         size: '1.2 MB',
-        format: 'Web App',
+        updatedAt: '8 ต.ค. 2569',
+      },
+    ],
+    worksheets: [
+      {
+        id: 'ws2-1',
+        name: 'ใบงานผังครอบครัว (Kazoku)',
+        fullScore: 10,
+        submittedCount: 28,
+        totalCount: 32,
+        dueDate: '12 ต.ค. 2569',
       },
     ],
     reflection: {
-      conductedDate: '24 พ.ค. 2569',
-      summary:
-        'นักเรียน 88% สามารถจำตัวอักษร 15 ตัวแรกได้แม่นยำขึ้นหลังทำกิจกรรมจับคู่บัตรคำ',
-      problem: 'การเขียนตัว "さ" ยังมีนักเรียนลากเส้นติดกันแทนที่จะยกมือ',
-      solution: 'แจกชีทลำดับเส้นที่มีลูกศรทิศทางกำกับชัดเจน',
-      recordedBy: 'นายปัญจพล เกษรัตน์ (ครูผู้สอน)',
+      conductedDate: 'กำลังดำเนินการสอน',
+      summary: 'กำลังจัดการเรียนรู้ในหัวข้อคำเรียกบุคคลในครอบครัวของตนเองและผู้อื่น',
+      problem: 'ยังไม่พบปัญหาที่เด่นชัด',
+      solution: 'เน้นย้ำความแตกต่างระหว่าง ちち (พ่อฉัน) กับ おとうさん (พ่อคนอื่น)',
+      recordedBy: 'นายปัญจพล เกษรัตน์',
     },
   },
   {
-    week: 3,
+    id: 'unit-3',
     unitNumber: 3,
-    title: 'บทที่ 3 : อักษรฮิรางานะ หมวดทะ-นะ-ฮะ',
-    description: 'ฝึกประสมคำศัพท์ และสนทนาการกล่าวขอบคุณ-ขอโทษ',
-    status: 'PLANNING',
-    statusLabel: 'วางแผนแล้ว',
-    teachingDates: '27 พ.ค. 2569 – 31 พ.ค. 2569',
-    dateShort: '27-31 พ.ค. 69',
-    periods: 5,
+    titleJa: '学校生活',
+    titleTh: 'ชีวิตในโรงเรียน',
+    displayTitle: '学校生活 (ชีวิตในโรงเรียน)',
+    periods: 4,
+    periodDurationText: '4 คาบ (50 นาที/คาบ)',
+    weekNumber: 3,
+    dateRange: 'สัปดาห์ที่ 3 (16 – 20 ต.ค. 2569)',
+    status: 'NOT_STARTED',
+    statusLabel: 'ยังไม่เริ่ม',
+    statusBadgeClass: 'bg-slate-100 text-slate-500 border-slate-200',
+    circleColorClass: 'bg-emerald-500',
+    indicatorsSummary: '1.2 ตัวชี้วัด',
+    courseCode: 'ญ23101',
+    courseName: 'ภาษาญี่ปุ่น',
+    classroom: 'ม.3/1',
     objectives: [
-      'นักเรียนสามารถอ่านและเขียนอักษรหมวด ทะ นะ ฮะ ได้',
-      'นักเรียนใช้สำนวน Sumimasen และ Arigatou ได้ถูกต้องตามบริบท',
+      '1. บอกชื่อวิชา สถานที่ และอุปกรณ์ในโรงเรียนได้ (ต 1.2 ม.3/1)',
+      '2. ถามและบอกตารางเรียนประจำวันได้ (ต 2.1 ม.3/2)',
     ],
     evaluations: [
-      { label: 'ใบงานคำศัพท์', percentage: 40, iconType: 'assignment' },
-      { label: 'บทสนทนาคู่', percentage: 40, iconType: 'activity' },
-      { label: 'แบบทดสอบเขียนตามคำบอก', percentage: 20, iconType: 'exam' },
+      { id: 'ev3-1', title: 'การมีส่วนร่วม', weightPercent: 20, criteria: 'สังเกตพฤติกรรม' },
+      { id: 'ev3-2', title: 'งาน/ใบงาน', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
+      { id: 'ev3-3', title: 'สอบย่อย', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
+      { id: 'ev3-4', title: 'สอบปลายหน่วย', weightPercent: 20, criteria: 'ผ่านเกณฑ์ 70%' },
     ],
-    files: [
-      {
-        id: 'f3-1',
-        name: 'แผนการสอน_บทที่3.pdf',
-        type: 'PDF',
-        size: '1.1 MB',
-        updatedAt: '25 พ.ค. 2569',
-      },
-    ],
-    studentExtraFiles: [
-      {
-        id: 'ef3-1',
-        name: 'ชีทคำศัพท์หมวดทะนะฮะ (PDF)',
-        type: 'PDF',
-        sizeOrSource: '1.5 MB',
-        actionLabel: 'ดาวน์โหลด',
-      },
-    ],
-    activityMaterials: [],
+    files: [],
+    worksheets: [],
     reflection: {
       conductedDate: '-',
-      summary: 'ยังไม่ได้ดำเนินการสอน (กำหนดสอนสัปดาห์หน้า)',
+      summary: 'ยังไม่ได้ดำเนินการสอน (กำหนดสัปดาห์ที่ 3)',
       problem: '-',
       solution: '-',
-      recordedBy: 'นายปัญจพล เกษรัตน์ (ครูผู้สอน)',
+      recordedBy: 'นายปัญจพล เกษรัตน์',
     },
   },
   {
-    week: 4,
+    id: 'unit-4',
     unitNumber: 4,
-    title: 'บทที่ 4 : อักษรฮิรางานะ หมวดมะ-ยะ-ระ-วะ และตัวสะกด ん',
-    description: 'เรียนรู้อักษรจนครบ 46 ตัว พร้อมฝึกอ่านบทความสั้น',
-    status: 'PLANNING',
-    statusLabel: 'วางแผนแล้ว',
-    teachingDates: '3 มิ.ย. 2569 – 7 มิ.ย. 2569',
-    dateShort: '3-7 มิ.ย. 69',
-    periods: 5,
+    titleJa: '食べ物と飲み物',
+    titleTh: 'อาหารและเครื่องดื่ม',
+    displayTitle: '食べ物と飲み物 (อาหารและเครื่องดื่ม)',
+    periods: 4,
+    periodDurationText: '4 คาบ (50 นาที/คาบ)',
+    weekNumber: 4,
+    dateRange: 'สัปดาห์ที่ 4 (23 – 27 ต.ค. 2569)',
+    status: 'NOT_STARTED',
+    statusLabel: 'ยังไม่เริ่ม',
+    statusBadgeClass: 'bg-slate-100 text-slate-500 border-slate-200',
+    circleColorClass: 'bg-amber-500',
+    indicatorsSummary: '1.1 ตัวชี้วัด',
+    courseCode: 'ญ23101',
+    courseName: 'ภาษาญี่ปุ่น',
+    classroom: 'ม.3/1',
     objectives: [
-      'นักเรียนจดจำอักษรฮิรางานะครบทั้ง 46 ตัว',
-      'นักเรียนสามารถอ่านคำศัพท์ที่มีตัวสะกด ん ได้ถูกต้อง',
+      '1. สั่งอาหารและเครื่องดื่มในร้านอาหารญี่ปุ่นได้ (ต 1.1 ม.3/1)',
+      '2. บอกความชอบและรสชาติของอาหารได้ (ต 1.3 ม.3/1)',
     ],
     evaluations: [
-      { label: 'แบบทดสอบฮิรางานะ 46 ตัว', percentage: 60, iconType: 'exam' },
-      { label: 'กิจกรรม Speed Reading', percentage: 40, iconType: 'activity' },
+      { id: 'ev4-1', title: 'การมีส่วนร่วม', weightPercent: 20, criteria: 'สังเกตพฤติกรรม' },
+      { id: 'ev4-2', title: 'งาน/ใบงาน', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
+      { id: 'ev4-3', title: 'สอบย่อย', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
+      { id: 'ev4-4', title: 'สอบปลายหน่วย', weightPercent: 20, criteria: 'ผ่านเกณฑ์ 70%' },
     ],
-    files: [
-      {
-        id: 'f4-1',
-        name: 'แผนการสอน_บทที่4.pdf',
-        type: 'PDF',
-        size: '1.3 MB',
-        updatedAt: '25 พ.ค. 2569',
-      },
-    ],
-    studentExtraFiles: [],
-    activityMaterials: [],
+    files: [],
+    worksheets: [],
     reflection: {
       conductedDate: '-',
       summary: 'ยังไม่ได้ดำเนินการสอน',
@@ -414,34 +318,35 @@ const WEEK_PLANS: WeekPlanData[] = [
     },
   },
   {
-    week: 5,
+    id: 'unit-5',
     unitNumber: 5,
-    title: 'บทที่ 5 : เสียงขุ่น (Dakuon) และเสียงกึ่งขุ่น (Handakuon)',
-    description: 'หลักการเติม Tenten ( ゛) และ Maru ( ゜)',
-    status: 'PLANNING',
-    statusLabel: 'วางแผนแล้ว',
-    teachingDates: '10 มิ.ย. 2569 – 14 มิ.ย. 2569',
-    dateShort: '10-14 มิ.ย. 69',
-    periods: 5,
+    titleJa: '旅行',
+    titleTh: 'การท่องเที่ยว',
+    displayTitle: '旅行 (การท่องเที่ยว)',
+    periods: 4,
+    periodDurationText: '4 คาบ (50 นาที/คาบ)',
+    weekNumber: 5,
+    dateRange: 'สัปดาห์ที่ 5 (30 ต.ค. – 3 พ.ย. 2569)',
+    status: 'NOT_STARTED',
+    statusLabel: 'ยังไม่เริ่ม',
+    statusBadgeClass: 'bg-slate-100 text-slate-500 border-slate-200',
+    circleColorClass: 'bg-rose-500',
+    indicatorsSummary: '1.1 ตัวชี้วัด',
+    courseCode: 'ญ23101',
+    courseName: 'ภาษาญี่ปุ่น',
+    classroom: 'ม.3/1',
     objectives: [
-      'นักเรียนเข้าใจการเปลี่ยนเสียงเมื่อเติม Tenten และ Maru',
-      'สามารถอ่านออกเสียงเสียงขุ่น กะ สะ ดะ บะ ปะ ได้ถูกต้อง',
+      '1. ถามทางและบอกทิศทางสถานที่ท่องเที่ยวในญี่ปุ่นได้ (ต 1.1 ม.3/1)',
+      '2. ซื้อตั๋วรถไฟและสอบถามข้อมูลยานพาหนะได้ (ต 2.1 ม.3/1)',
     ],
     evaluations: [
-      { label: 'แบบฝึกหัดเสียงขุ่น', percentage: 50, iconType: 'assignment' },
-      { label: 'การฟังและเขียนตามคำบอก', percentage: 50, iconType: 'exam' },
+      { id: 'ev5-1', title: 'การมีส่วนร่วม', weightPercent: 20, criteria: 'สังเกตพฤติกรรม' },
+      { id: 'ev5-2', title: 'งาน/ใบงาน', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
+      { id: 'ev5-3', title: 'สอบย่อย', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
+      { id: 'ev5-4', title: 'สอบปลายหน่วย', weightPercent: 20, criteria: 'ผ่านเกณฑ์ 70%' },
     ],
-    files: [
-      {
-        id: 'f5-1',
-        name: 'แผนการสอน_บทที่5.pdf',
-        type: 'PDF',
-        size: '1.2 MB',
-        updatedAt: '25 พ.ค. 2569',
-      },
-    ],
-    studentExtraFiles: [],
-    activityMaterials: [],
+    files: [],
+    worksheets: [],
     reflection: {
       conductedDate: '-',
       summary: 'ยังไม่ได้ดำเนินการสอน',
@@ -451,33 +356,35 @@ const WEEK_PLANS: WeekPlanData[] = [
     },
   },
   {
-    week: 6,
+    id: 'unit-6',
     unitNumber: 6,
-    title: 'บทที่ 6 : เสียงควบ (Yoon) และเสียงกัก (Sokuon)',
-    description: 'การผสมอักษรตัวเล็ก ゃ ゅ ょ และ っ ในคำศัพท์ภาษาญี่ปุ่น',
-    status: 'PLANNING',
-    statusLabel: 'วางแผนแล้ว',
-    teachingDates: '17 มิ.ย. 2569 – 21 มิ.ย. 2569',
-    dateShort: '17-21 มิ.ย. 69',
-    periods: 5,
+    titleJa: '文化と行事',
+    titleTh: 'วัฒนธรรมและเทศกาล',
+    displayTitle: '文化と行事 (วัฒนธรรมและเทศกาล)',
+    periods: 4,
+    periodDurationText: '4 คาบ (50 นาที/คาบ)',
+    weekNumber: 6,
+    dateRange: 'สัปดาห์ที่ 6 (6 – 10 พ.ย. 2569)',
+    status: 'NOT_STARTED',
+    statusLabel: 'ยังไม่เริ่ม',
+    statusBadgeClass: 'bg-slate-100 text-slate-500 border-slate-200',
+    circleColorClass: 'bg-teal-500',
+    indicatorsSummary: '1.1 ตัวชี้วัด',
+    courseCode: 'ญ23101',
+    courseName: 'ภาษาญี่ปุ่น',
+    classroom: 'ม.3/1',
     objectives: [
-      'นักเรียนสามารถอ่านคำศัพท์ที่มีเสียงควบและเสียงกักได้',
+      '1. อธิบายประเพณีและเทศกาลสำคัญของญี่ปุ่นได้ (ต 2.1 ม.3/1)',
+      '2. เปรียบเทียบวัฒนธรรมไทยกับวัฒนธรรมญี่ปุ่นได้อย่างถูกต้อง (ต 2.2 ม.3/1)',
     ],
     evaluations: [
-      { label: 'แบบฝึกหัดเสียงควบ', percentage: 50, iconType: 'assignment' },
-      { label: 'สอบย่อยกลางภาค', percentage: 50, iconType: 'exam' },
+      { id: 'ev6-1', title: 'การมีส่วนร่วม', weightPercent: 20, criteria: 'สังเกตพฤติกรรม' },
+      { id: 'ev6-2', title: 'งาน/ใบงาน', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
+      { id: 'ev6-3', title: 'สอบย่อย', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
+      { id: 'ev6-4', title: 'สอบปลายหน่วย', weightPercent: 20, criteria: 'ผ่านเกณฑ์ 70%' },
     ],
-    files: [
-      {
-        id: 'f6-1',
-        name: 'แผนการสอน_บทที่6.pdf',
-        type: 'PDF',
-        size: '1.2 MB',
-        updatedAt: '25 พ.ค. 2569',
-      },
-    ],
-    studentExtraFiles: [],
-    activityMaterials: [],
+    files: [],
+    worksheets: [],
     reflection: {
       conductedDate: '-',
       summary: 'ยังไม่ได้ดำเนินการสอน',
@@ -488,1498 +395,1506 @@ const WEEK_PLANS: WeekPlanData[] = [
   },
 ];
 
-// Generate remainder weeks 7-16
-for (let w = 7; w <= 16; w++) {
-  WEEK_PLANS.push({
-    week: w,
-    unitNumber: w,
-    title: `บทที่ ${w} : การสื่อสารภาษาญี่ปุ่นและวัฒนธรรม หน่วยที่ ${w}`,
-    description: `เนื้อหาและกิจกรรมการเรียนรู้ประจำสัปดาห์ที่ ${w}`,
-    status: 'PLANNING',
-    statusLabel: 'วางแผนแล้ว',
-    teachingDates: `กำหนดสอนสัปดาห์ที่ ${w}`,
-    dateShort: `สัปดาห์ ${w}`,
-    periods: 5,
-    objectives: [
-      `นักเรียนเข้าใจจุดประสงค์การเรียนรู้ประจำสัปดาห์ที่ ${w}`,
-      'นักเรียนมีส่วนร่วมในการทำกิจกรรมกลุ่มและฝึกพูด',
-    ],
-    evaluations: [
-      { label: 'ภาระงาน / ใบงาน', percentage: 50, iconType: 'assignment' },
-      { label: 'กิจกรรมการเรียนรู้', percentage: 50, iconType: 'activity' },
-    ],
-    files: [
-      {
-        id: `f${w}-1`,
-        name: `แผนการสอน_สัปดาห์ที่${w}.pdf`,
-        type: 'PDF',
-        size: '1.2 MB',
-        updatedAt: '25 พ.ค. 2569',
-      },
-    ],
-    studentExtraFiles: [],
-    activityMaterials: [],
-    reflection: {
-      conductedDate: '-',
-      summary: 'ยังไม่ได้ดำเนินการสอน',
-      problem: '-',
-      solution: '-',
-      recordedBy: 'นายปัญจพล เกษรัตน์',
-    },
-  });
-}
-
+// ==========================================
+// COMPONENT
+// ==========================================
 export const LessonPlansView: React.FC = () => {
+  // Navigation & Selection States
+  const [courses] = useState<CourseFilterOption[]>(INITIAL_COURSES);
   const [selectedCourseIndex, setSelectedCourseIndex] = useState(0);
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
-  const [activeWeek, setActiveWeek] = useState(2);
-  const [activeTab, setActiveTab] = useState<'files' | 'activities' | 'reflection'>('files');
-  const [fileFilter, setFileFilter] = useState<'ALL' | 'PDF' | 'PPTX' | 'DOCX' | 'MP4'>('ALL');
-  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+  const [selectedClassroom, setSelectedClassroom] = useState('ม.3/1');
+  const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
+  const [selectedSemester, setSelectedSemester] = useState('ภาคเรียนที่ 1/2569');
+  const [isSemesterDropdownOpen, setIsSemesterDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Modals state
-  const [isCreatePlanModalOpen, setIsCreatePlanModalOpen] = useState(false);
-  const [isManageFilesModalOpen, setIsManageFilesModalOpen] = useState(false);
-  const [isUnitDetailModalOpen, setIsUnitDetailModalOpen] = useState(false);
-  const [isAllWeeksModalOpen, setIsAllWeeksModalOpen] = useState(false);
-  const [previewFile, setPreviewFile] = useState<LessonFile | null>(null);
+  // Units list state
+  const [units, setUnits] = useState<UnitPlanItem[]>(INITIAL_UNITS);
+  const [selectedUnitId, setSelectedUnitId] = useState<string>('unit-1');
+  const [activeSubTab, setActiveSubTab] = useState<'info' | 'media' | 'worksheets' | 'reflection'>('info');
 
-  // New Lesson Plan Form State
-  const [newPlanUnit, setNewPlanUnit] = useState('บทที่ 2 : อักษรฮิรางานะ หมวดอะ คะ สะ');
-  const [newPlanDesc, setNewPlanDesc] = useState('');
-  const [newPlanPeriods, setNewPlanPeriods] = useState(5);
-  const [newPlanWeek, setNewPlanWeek] = useState(2);
+  // Mobile View Switcher Tab (units | detail | widgets)
+  const [mobileTab, setMobileTab] = useState<'units' | 'detail' | 'widgets'>('detail');
 
-  // Active Menu Dropdown for file rows
-  const [activeFileMenuId, setActiveFileMenuId] = useState<string | null>(null);
+  // Interactive Modals State
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditBasicInfoModalOpen, setIsEditBasicInfoModalOpen] = useState(false);
+  const [isEditObjectivesModalOpen, setIsEditObjectivesModalOpen] = useState(false);
+  const [isEditEvaluationsModalOpen, setIsEditEvaluationsModalOpen] = useState(false);
+  const [isViewAllModalOpen, setIsViewAllModalOpen] = useState(false);
+  const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [isClassStatsModalOpen, setIsClassStatsModalOpen] = useState(false);
+  const [isRelatedFilesModalOpen, setIsRelatedFilesModalOpen] = useState(false);
 
-  // Teacher Custom Subject Banner State
-  const [isBannerModalOpen, setIsBannerModalOpen] = useState(false);
-  const [customBannerUrl, setCustomBannerUrl] = useState<string | null>(() =>
-    getSubjectBannerUrl(COURSES[0].code)
-  );
+  // Forms State for Create Modal
+  const [newUnitNumber, setNewUnitNumber] = useState(7);
+  const [newTitleJa, setNewTitleJa] = useState('');
+  const [newTitleTh, setNewTitleTh] = useState('');
+  const [newPeriods, setNewPeriods] = useState(4);
+  const [newDateRange, setNewDateRange] = useState('สัปดาห์ที่ 7 (13 – 17 พ.ย. 2569)');
 
-  useEffect(() => {
-    const course = COURSES[selectedCourseIndex];
-    if (course) {
-      setCustomBannerUrl(getSubjectBannerUrl(course.code));
-    }
-  }, [selectedCourseIndex]);
+  // Form State for Edit Basic Info
+  const currentUnit = units.find((u) => u.id === selectedUnitId) || units[0];
+  const [editDisplayTitle, setEditDisplayTitle] = useState(currentUnit.displayTitle);
+  const [editPeriods, setEditPeriods] = useState(currentUnit.periods);
+  const [editDateRange, setEditDateRange] = useState(currentUnit.dateRange);
 
-  useEffect(() => {
-    const handleBannerUpdate = (e: Event) => {
-      const customEvent = e as CustomEvent<{ courseCode: string; bannerUrl: string | null }>;
-      const currentCode = COURSES[selectedCourseIndex]?.code;
-      if (customEvent.detail && customEvent.detail.courseCode.toLowerCase() === currentCode?.toLowerCase()) {
-        setCustomBannerUrl(customEvent.detail.bannerUrl);
-      }
-    };
-    window.addEventListener('kps-subject-banner-updated', handleBannerUpdate);
-    return () => {
-      window.removeEventListener('kps-subject-banner-updated', handleBannerUpdate);
-    };
-  }, [selectedCourseIndex]);
+  // Form State for Edit Objectives
+  const [editObjectives, setEditObjectives] = useState<string[]>(currentUnit.objectives);
 
-  // Toast feedback
+  // Form State for Edit Evaluations
+  const [editEvaluations, setEditEvaluations] = useState<EvaluationItem[]>(currentUnit.evaluations);
+
+  // Toast feedback state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3500);
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const currentCourse = COURSES[selectedCourseIndex];
-  const currentWeekPlan = WEEK_PLANS.find((p) => p.week === activeWeek) || WEEK_PLANS[0];
+  const currentCourse = courses[selectedCourseIndex] || courses[0];
 
-  const filteredFiles = currentWeekPlan.files.filter((file) => {
-    if (fileFilter === 'ALL') return true;
-    return file.type === fileFilter;
+  // Filtered units based on search
+  const filteredUnits = units.filter((u) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      u.displayTitle.toLowerCase().includes(q) ||
+      u.titleJa.toLowerCase().includes(q) ||
+      u.titleTh.toLowerCase().includes(q) ||
+      `หน่วยที่ ${u.unitNumber}`.includes(q)
+    );
   });
 
-  // Solid colorful squircle badges matching the reference mockup
-  const getFileBadge = (type: LessonFile['type']) => {
-    switch (type) {
-      case 'PDF':
-        return (
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-rose-500 text-white font-extrabold text-[11px] sm:text-xs flex items-center justify-center shrink-0 shadow-2xs">
-            PDF
-          </div>
-        );
-      case 'PPTX':
-        return (
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-600 text-white font-extrabold text-[11px] sm:text-xs flex items-center justify-center shrink-0 shadow-2xs">
-            PPT
-          </div>
-        );
-      case 'DOCX':
-        return (
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-600 text-white font-extrabold text-[11px] sm:text-xs flex items-center justify-center shrink-0 shadow-2xs">
-            DOC
-          </div>
-        );
-      case 'MP4':
-        return (
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-purple-600 text-white font-extrabold text-[11px] sm:text-xs flex items-center justify-center shrink-0 shadow-2xs">
-            <Play className="w-4 h-4 fill-white text-white" />
-          </div>
-        );
-      default:
-        return (
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-600 text-white font-extrabold text-[11px] sm:text-xs flex items-center justify-center shrink-0 shadow-2xs">
-            FILE
-          </div>
-        );
+  // Calculate total evaluation weight
+  const totalWeight = currentUnit.evaluations.reduce((sum, item) => sum + item.weightPercent, 0);
+
+  // Synchronize edit form when currentUnit changes
+  const handleSelectUnit = (unitId: string) => {
+    setSelectedUnitId(unitId);
+    const target = units.find((u) => u.id === unitId);
+    if (target) {
+      setEditDisplayTitle(target.displayTitle);
+      setEditPeriods(target.periods);
+      setEditDateRange(target.dateRange);
+      setEditObjectives([...target.objectives]);
+      setEditEvaluations([...target.evaluations]);
+      // On mobile, switch to detail tab
+      setMobileTab('detail');
     }
   };
 
-  const handleDownloadAll = () => {
-    showToast(`กำลังจัดเตรียมไฟล์แผนการสอนทั้งหมด 16 สัปดาห์ (${currentCourse.code}) เป็นไฟล์ ZIP สำเร็จแล้ว!`);
+  // Save Basic Info changes
+  const handleSaveBasicInfo = () => {
+    setUnits((prev) =>
+      prev.map((u) =>
+        u.id === currentUnit.id
+          ? {
+              ...u,
+              displayTitle: editDisplayTitle,
+              periods: editPeriods,
+              periodDurationText: `${editPeriods} คาบ (50 นาที/คาบ)`,
+              dateRange: editDateRange,
+            }
+          : u
+      )
+    );
+    setIsEditBasicInfoModalOpen(false);
+    showToast('✓ บันทึกข้อมูลพื้นฐานหน่วยการเรียนรู้เรียบร้อยแล้ว');
   };
 
-  const handleDownloadFile = (fileName: string, size: string) => {
-    showToast(`เริ่มดาวน์โหลด ${fileName} (${size}) เรียบร้อยแล้ว`);
+  // Save Objectives changes
+  const handleSaveObjectives = () => {
+    setUnits((prev) =>
+      prev.map((u) => (u.id === currentUnit.id ? { ...u, objectives: editObjectives } : u))
+    );
+    setIsEditObjectivesModalOpen(false);
+    showToast('✓ อัปเดตตัวชี้วัด / ผลการเรียนรู้เรียบร้อยแล้ว');
+  };
+
+  // Save Evaluations changes
+  const handleSaveEvaluations = () => {
+    setUnits((prev) =>
+      prev.map((u) => (u.id === currentUnit.id ? { ...u, evaluations: editEvaluations } : u))
+    );
+    setIsEditEvaluationsModalOpen(false);
+    showToast('✓ อัปเดตโครงสร้างการประเมินผลเรียบร้อยแล้ว');
+  };
+
+  // Create New Unit
+  const handleCreateNewUnit = () => {
+    if (!newTitleTh.trim()) {
+      alert('กรุณากรอกชื่อหน่วยการเรียนรู้ (ภาษาไทย)');
+      return;
+    }
+    const newDisplayTitle = newTitleJa.trim()
+      ? `${newTitleJa.trim()} (${newTitleTh.trim()})`
+      : newTitleTh.trim();
+
+    const newUnit: UnitPlanItem = {
+      id: `unit-${Date.now()}`,
+      unitNumber: newUnitNumber,
+      titleJa: newTitleJa,
+      titleTh: newTitleTh,
+      displayTitle: newDisplayTitle,
+      periods: newPeriods,
+      periodDurationText: `${newPeriods} คาบ (50 นาที/คาบ)`,
+      weekNumber: newUnitNumber,
+      dateRange: newDateRange,
+      status: 'NOT_STARTED',
+      statusLabel: 'ยังไม่เริ่ม',
+      statusBadgeClass: 'bg-slate-100 text-slate-500 border-slate-200',
+      circleColorClass: 'bg-indigo-500',
+      indicatorsSummary: '1.1 ตัวชี้วัด',
+      courseCode: currentCourse.code,
+      courseName: currentCourse.name,
+      classroom: selectedClassroom,
+      objectives: [
+        `1. เข้าใจเนื้อหาและคำศัพท์ประจำหน่วยที่ ${newUnitNumber} ได้อย่างถูกต้อง`,
+        '2. สามารถนำไปประยุกต์ใช้ในการสื่อสารได้',
+      ],
+      evaluations: [
+        { id: `ev-${Date.now()}-1`, title: 'การมีส่วนร่วม', weightPercent: 20, criteria: 'สังเกตพฤติกรรม' },
+        { id: `ev-${Date.now()}-2`, title: 'งาน/ใบงาน', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
+        { id: `ev-${Date.now()}-3`, title: 'สอบย่อย', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
+        { id: `ev-${Date.now()}-4`, title: 'สอบปลายหน่วย', weightPercent: 20, criteria: 'ผ่านเกณฑ์ 70%' },
+      ],
+      files: [],
+      worksheets: [],
+      reflection: {
+        conductedDate: '-',
+        summary: 'ยังไม่ได้ดำเนินการสอน',
+        problem: '-',
+        solution: '-',
+        recordedBy: 'นายปัญจพล เกษรัตน์',
+      },
+    };
+
+    setUnits((prev) => [...prev, newUnit]);
+    setSelectedUnitId(newUnit.id);
+    setIsCreateModalOpen(false);
+    setNewTitleJa('');
+    setNewTitleTh('');
+    setNewUnitNumber((prev) => prev + 1);
+    showToast(`✓ สร้างแผนการสอนหน่วยที่ ${newUnitNumber} สำเร็จ`);
+  };
+
+  // Copy unit handler
+  const handleCopyUnit = () => {
+    const clonedTitle = `${currentUnit.displayTitle} (สำเนา)`;
+    const clonedUnit: UnitPlanItem = {
+      ...currentUnit,
+      id: `unit-copy-${Date.now()}`,
+      unitNumber: units.length + 1,
+      displayTitle: clonedTitle,
+      status: 'NOT_STARTED',
+      statusLabel: 'ยังไม่เริ่ม',
+      statusBadgeClass: 'bg-slate-100 text-slate-500 border-slate-200',
+    };
+    setUnits((prev) => [...prev, clonedUnit]);
+    setIsCopyModalOpen(false);
+    showToast(`✓ คัดลอกหน่วยการเรียนรู้ไปยังหน่วยที่ ${clonedUnit.unitNumber} เรียบร้อยแล้ว`);
   };
 
   return (
-    <div className="space-y-4 sm:space-y-5 max-w-[1440px] mx-auto pb-16 font-sans select-none animate-fade-in">
+    <div className="w-full max-w-[1520px] mx-auto pb-16 font-sans text-slate-800">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-5 right-5 z-50 bg-slate-900/95 backdrop-blur-md text-white text-xs sm:text-sm font-medium px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 border border-slate-700 animate-slide-up">
-          <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-            <Check className="w-4 h-4" />
-          </div>
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900/95 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 border border-slate-700 animate-slide-up text-sm font-medium">
+          <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
-          <button
-            onClick={() => setToastMessage(null)}
-            className="text-slate-400 hover:text-white ml-2 p-1 cursor-pointer"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
         </div>
       )}
 
-      {/* ========================================================
-          1. TOP HERO BANNER (Full width spanning across top)
-          ======================================================== */}
-      <div className="bg-white rounded-2xl sm:rounded-3xl border border-blue-100/80 shadow-xs p-4 sm:p-5 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all">
-        {/* Left Side: Icon & Title & Subtitle */}
-        <div className="flex items-center gap-3.5 sm:gap-4 z-10 min-w-0">
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/25">
-            <BookOpen className="w-6 h-6 sm:w-7 sm:h-7" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-base sm:text-lg lg:text-xl font-extrabold text-slate-900 tracking-tight leading-tight">
-              แผนการสอนและบันทึกหลังสอน (Lesson Plans)
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 font-normal mt-0.5 leading-relaxed truncate sm:whitespace-normal">
-              จัดการแผนการสอนรายวิชา และไฟล์ประกอบการสอน เพื่อให้นักเรียนสามารถศึกษาเพิ่มเติมได้
-            </p>
-          </div>
-        </div>
-
-        {/* Center/Right Illustration: Anime teacher in classroom with bookshelves */}
-        <div className="hidden md:flex items-center justify-end absolute right-52 lg:right-64 top-0 bottom-0 pointer-events-none select-none z-0 overflow-hidden">
-          <img
-            src="/images/teacher/lesson_hero_teacher.png"
-            alt="Anime Teacher in Classroom"
-            className="h-full object-cover object-left opacity-95"
-            style={{
-              maskImage: 'linear-gradient(to right, transparent 0%, black 20%)',
-              WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 20%)',
-            }}
-          />
-        </div>
-
-        {/* Right Side: Action Buttons in Frosted Capsule */}
-        <div className="flex items-center gap-2.5 z-10 shrink-0 self-start md:self-center bg-white/80 md:bg-white/90 backdrop-blur-xs p-1 md:p-1.5 rounded-2xl">
-          <button
-            type="button"
-            onClick={() => setIsCreatePlanModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
-          >
-            <Plus className="w-4 h-4" />
-            <span>+ สร้างแผนการสอน</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsManageFilesModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5 bg-white hover:bg-slate-50 active:scale-95 border border-slate-200/90 text-slate-700 rounded-xl text-xs sm:text-sm font-bold shadow-2xs hover:shadow-xs transition-all cursor-pointer whitespace-nowrap"
-          >
-            <Folder className="w-4 h-4 text-blue-600" />
-            <span>จัดการไฟล์</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ========================================================
-          2. TWO-COLUMN LAYOUT (lg:grid-cols-12)
-          Starting directly below Hero Banner to mirror the mockup!
-          ======================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 items-start">
-        {/* --------------------------------------------------------
-            LEFT COLUMN (lg:col-span-8) - Course Header, Week Carousel,
-            Unit Details, Document Table, and Bottom Quote Banner
-            -------------------------------------------------------- */}
-        <div className="lg:col-span-8 space-y-4 sm:space-y-5 min-w-0">
-          {/* Card 1: Course Header & Week Selector */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-card p-4 sm:p-5 space-y-4">
-            {/* Course Info & Controls Row */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
-              {/* Left: Course Title & Meta Chips */}
-              <div className="space-y-2 min-w-0">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                    <BookOpen className="w-4 h-4" />
-                  </div>
-                  <h2 className="text-sm sm:text-base lg:text-lg font-extrabold text-slate-900 tracking-tight truncate">
-                    แผนการสอนรายวิชา {currentCourse.code} {currentCourse.name} {currentCourse.classroom}
-                  </h2>
-                </div>
-
-                {/* Meta Chips */}
-                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 pl-0.5">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/70 font-medium">
-                    <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                    <span>{currentCourse.semester}</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/70 font-medium">
-                    <Zap className="w-3.5 h-3.5 text-amber-500" />
-                    <span>{currentCourse.totalWeeks} สัปดาห์</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/70 font-medium">
-                    <Clock className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>เวลาเรียน {currentCourse.hoursPerWeek.toFixed(1)} ชม./สัปดาห์</span>
-                  </span>
-                </div>
-              </div>
-
-              {/* Right: Course Selector & Download All */}
-              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0 self-start sm:self-center">
-                {/* Course Selector Dropdown */}
-                <div className="relative">
-                  <div className="text-[10px] text-blue-600 font-bold mb-0.5 pl-1 hidden sm:block">
-                    เลือกวิชาที่ต้องการ:
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsCourseDropdownOpen((prev) => !prev)}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-50/70 hover:bg-blue-100/70 border border-blue-200/90 text-slate-800 rounded-xl text-xs font-bold shadow-2xs transition-colors cursor-pointer"
-                  >
-                    <div className="text-left">
-                      <div className="text-[9px] text-slate-400 font-normal leading-none mb-0.5">
-                        รหัสวิชา
-                      </div>
-                      <div className="leading-tight">
-                        {currentCourse.code} : {currentCourse.name} {currentCourse.classroom}
-                      </div>
-                    </div>
-                    <ChevronDown
-                      className={`w-3.5 h-3.5 text-slate-500 transition-transform ${
-                        isCourseDropdownOpen ? 'rotate-180' : ''
-                      }`}
-                    />
-                  </button>
-
-                  {isCourseDropdownOpen && (
-                    <div className="absolute right-0 mt-1.5 w-72 bg-white rounded-2xl border border-slate-200 shadow-xl p-2 z-40 space-y-1 animate-slide-up">
-                      <div className="px-2.5 py-1 text-[11px] font-bold text-slate-400">
-                        เลือกรายวิชาสอน
-                      </div>
-                      {COURSES.map((course, idx) => (
-                        <button
-                          key={course.code + course.classroom}
-                          type="button"
-                          onClick={() => {
-                            setSelectedCourseIndex(idx);
-                            setIsCourseDropdownOpen(false);
-                            showToast(`สลับไปวิชา ${course.code} ${course.name} เรียบร้อยแล้ว`);
-                          }}
-                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer ${
-                            selectedCourseIndex === idx
-                              ? 'bg-blue-600 text-white'
-                              : 'hover:bg-slate-50 text-slate-700'
-                          }`}
-                        >
-                          <div className="min-w-0">
-                            <div className="truncate">
-                              {course.code} : {course.name}
-                            </div>
-                            <div
-                              className={`text-[10px] truncate ${
-                                selectedCourseIndex === idx ? 'text-blue-100' : 'text-slate-400'
-                              }`}
-                            >
-                              ห้อง {course.classroom} • {course.semester}
-                            </div>
-                          </div>
-                          {selectedCourseIndex === idx && <Check className="w-4 h-4 shrink-0" />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Change Subject Banner Button */}
-                <button
-                  type="button"
-                  onClick={() => setIsBannerModalOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer whitespace-nowrap self-end"
-                  title="อัปโหลดและปรับแต่งแบนเนอร์รายวิชา"
-                >
-                  <Camera className="w-4 h-4 text-blue-600" />
-                  <span>เปลี่ยนแบนเนอร์วิชา</span>
-                </button>
-
-                {/* Download All Plan Button */}
-                <button
-                  type="button"
-                  onClick={handleDownloadAll}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-blue-50/80 hover:bg-blue-100 text-blue-600 border border-blue-200/90 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer whitespace-nowrap self-end"
-                >
-                  <CloudDownload className="w-4 h-4" />
-                  <span>ดาวน์โหลดแผนการสอนทั้งหมด</span>
-                </button>
-              </div>
+      {/* ======================================================== */}
+      {/* 1. TOP HERO BANNER (Pastel Anime Education Parity)      */}
+      {/* ======================================================== */}
+      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-blue-100/80 shadow-xs mb-5 bg-gradient-to-r from-blue-100/90 via-sky-50/80 to-purple-50/60 p-5 sm:p-7 md:p-8">
+        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          {/* Left Title & Icon */}
+          <div className="flex items-start sm:items-center gap-4 sm:gap-5 max-w-2xl">
+            <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
+              <BookOpen className="w-7 h-7 sm:w-8 sm:h-8" />
             </div>
-
-            {/* Panoramic Subject Banner (Always visible with hero_banner.png as default) */}
-            <div className="relative w-full h-36 sm:h-44 md:h-48 rounded-2xl overflow-hidden border border-slate-200/90 shadow-2xs group">
-              <img
-                src={customBannerUrl || '/images/teacher/hero_banner.png'}
-                alt={`Banner for ${currentCourse.name}`}
-                className="w-full h-full object-cover object-center group-hover:scale-[1.01] transition-transform duration-500"
-              />
-              <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent flex items-end justify-between p-3.5 sm:p-4">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/90 backdrop-blur-md border border-white/80 text-[11px] font-bold text-blue-900 shadow-xs">
-                  <span className="text-blue-600">🏷️</span>
-                  <span>แผนการสอนประจำรายวิชา ({currentCourse.code})</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsBannerModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 hover:bg-white backdrop-blur-md text-slate-800 text-[11px] font-bold border border-white/80 shadow-xs hover:shadow-sm cursor-pointer transition-all"
-                >
-                  <Camera className="w-3.5 h-3.5 text-blue-600" />
-                  <span>เปลี่ยนภาพ</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Week Timeline Carousel / Cards Row */}
-            <div className="pt-2 border-t border-slate-100">
-              <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-thin scrollbar-thumb-slate-200">
-                {WEEK_PLANS.slice(0, 6).map((plan) => {
-                  const isActive = activeWeek === plan.week;
-                  return (
-                    <button
-                      key={plan.week}
-                      type="button"
-                      onClick={() => setActiveWeek(plan.week)}
-                      className={`min-w-[115px] sm:min-w-[125px] p-2.5 rounded-2xl text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
-                        isActive
-                          ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 scale-[1.02]'
-                          : 'bg-white hover:bg-slate-50 border border-slate-200/80 text-slate-700 shadow-2xs hover:border-blue-200'
-                      }`}
-                    >
-                      <div className="flex items-center justify-center">
-                        {plan.week === 1 ? (
-                          <Calendar className={`w-4 h-4 ${isActive ? 'text-white' : 'text-blue-600'}`} />
-                        ) : (
-                          <Users className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                        )}
-                      </div>
-                      <div className="text-xs font-extrabold leading-tight">
-                        สัปดาห์ที่ {plan.week}
-                      </div>
-                      <div
-                        className={`text-[10px] font-medium leading-tight ${
-                          isActive ? 'text-blue-100' : 'text-slate-400'
-                        }`}
-                      >
-                        {plan.week === 1 ? 'ปัจจุบัน' : plan.dateShort}
-                      </div>
-                    </button>
-                  );
-                })}
-
-                {/* 16 Weeks Modal Opener Button */}
-                <button
-                  type="button"
-                  onClick={() => setIsAllWeeksModalOpen(true)}
-                  className="min-w-[70px] p-2 rounded-2xl bg-white hover:bg-blue-50 border border-slate-200/80 hover:border-blue-300 text-slate-600 hover:text-blue-600 transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 text-center shadow-2xs shrink-0"
-                  title="ดูแผนการสอนทั้งหมด 16 สัปดาห์"
-                >
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="text-[11px] font-bold text-blue-600 leading-tight">16 สัปดาห์</span>
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: Unit Detail Card (Week 1 / Selected Week) */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-card p-4 sm:p-5 space-y-3.5 transition-all">
-            {/* Top row: Badge + Title + Status */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2.5 min-w-0">
-                <span className="px-3 py-1 bg-blue-600 text-white rounded-full text-xs font-bold shadow-2xs">
-                  สัปดาห์ที่ {currentWeekPlan.week}
-                </span>
-                <h3 className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight truncate">
-                  {currentWeekPlan.title}
-                </h3>
-              </div>
-
-              {/* Status Pill */}
-              <button
-                type="button"
-                onClick={() => setIsUnitDetailModalOpen(true)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer shadow-2xs ${
-                  currentWeekPlan.status === 'DONE'
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                    : currentWeekPlan.status === 'IN_PROGRESS'
-                    ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
-                    : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
-                }`}
-              >
-                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                <span>{currentWeekPlan.statusLabel} &gt;</span>
-              </button>
-            </div>
-
-            {/* Description */}
-            <p className="text-xs sm:text-sm text-slate-500 font-normal leading-relaxed">
-              {currentWeekPlan.description}
-            </p>
-
-            {/* Chips & Detail Action */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50/70 border border-blue-100 text-blue-700 text-xs font-medium">
-                  <Calendar className="w-3.5 h-3.5" />
-                  <span>วันที่สอน {currentWeekPlan.teachingDates}</span>
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50/70 border border-blue-100 text-blue-700 text-xs font-medium">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>{currentWeekPlan.periods} คาบ</span>
+            <div>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-xl sm:text-2xl md:text-[26px] font-extrabold text-[#163A66] tracking-tight">
+                  แผนการสอน / จัดการแผนการสอน
+                </h1>
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-white/90 text-blue-700 border border-blue-200/80 shadow-2xs">
+                  หลักสูตรสถานศึกษา 2569
                 </span>
               </div>
-
-              <button
-                type="button"
-                onClick={() => setIsUnitDetailModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-blue-200 text-xs font-bold text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer shadow-2xs"
-              >
-                <span>ดูรายละเอียด</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Card 3: Unit Tabs & File Table Section */}
-          <div className="space-y-3">
-            {/* Tabs Header */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-              <button
-                type="button"
-                onClick={() => setActiveTab('files')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  activeTab === 'files'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-white hover:bg-slate-50 border border-slate-200/80 text-slate-600'
-                }`}
-              >
-                <FileText className="w-4 h-4" />
-                <span>ไฟล์ประกอบการสอน</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('activities')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  activeTab === 'activities'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-white hover:bg-slate-50 border border-slate-200/80 text-slate-600'
-                }`}
-              >
-                <Play className="w-3.5 h-3.5 fill-current" />
-                <span>สื่อกิจกรรม / ใบงาน</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('reflection')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  activeTab === 'reflection'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-white hover:bg-slate-50 border border-slate-200/80 text-slate-600'
-                }`}
-              >
-                <FileCheck className="w-4 h-4" />
-                <span>บันทึกหลังสอน</span>
-              </button>
-            </div>
-
-            {/* TAB 1: ไฟล์ประกอบการสอน (Tabular table matching mockup) */}
-            {activeTab === 'files' && (
-              <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-card p-4 sm:p-5 space-y-2 transition-all">
-                {/* Table Header Row */}
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <h4 className="text-xs sm:text-sm font-extrabold text-slate-900">
-                    ไฟล์เอกสารและสื่อการสอน
-                  </h4>
-
-                  {/* Filter Dropdown */}
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setIsFilterDropdownOpen((prev) => !prev)}
-                      className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 cursor-pointer"
-                    >
-                      <span>
-                        {fileFilter === 'ALL'
-                          ? 'ดูทั้งหมด'
-                          : fileFilter === 'PDF'
-                          ? 'เฉพาะ PDF'
-                          : fileFilter === 'PPTX'
-                          ? 'เฉพาะ PPTX'
-                          : fileFilter === 'DOCX'
-                          ? 'เฉพาะ DOCX'
-                          : 'เฉพาะ MP4'}
-                      </span>
-                      <ChevronDown className="w-3.5 h-3.5" />
-                    </button>
-
-                    {isFilterDropdownOpen && (
-                      <div className="absolute right-0 mt-1 w-36 bg-white rounded-xl border border-slate-200 shadow-lg p-1.5 z-30 space-y-0.5 text-xs">
-                        {(['ALL', 'PDF', 'PPTX', 'DOCX', 'MP4'] as const).map((ft) => (
-                          <button
-                            key={ft}
-                            type="button"
-                            onClick={() => {
-                              setFileFilter(ft);
-                              setIsFilterDropdownOpen(false);
-                            }}
-                            className={`w-full text-left px-2.5 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
-                              fileFilter === ft
-                                ? 'bg-blue-600 text-white font-bold'
-                                : 'text-slate-700 hover:bg-slate-100'
-                            }`}
-                          >
-                            {ft === 'ALL' ? 'ดูทั้งหมด' : ft}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* File Table Rows */}
-                <div className="divide-y divide-slate-100">
-                  {filteredFiles.map((file) => (
-                    <div
-                      key={file.id}
-                      className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-3 px-2 rounded-xl hover:bg-blue-50/20 transition-all"
-                    >
-                      {/* Left: Badge + File Name */}
-                      <div className="flex items-center gap-3 min-w-0 sm:flex-1">
-                        {getFileBadge(file.type)}
-                        <button
-                          type="button"
-                          onClick={() => setPreviewFile(file)}
-                          className="font-bold text-slate-800 text-xs sm:text-sm text-left truncate block hover:text-blue-600 transition-colors cursor-pointer"
-                          title={file.name}
-                        >
-                          {file.name}
-                        </button>
-                      </div>
-
-                      {/* Desktop Middle Columns: Type, Size, Date */}
-                      <div className="hidden md:flex items-center gap-6 text-xs text-slate-500 font-medium shrink-0">
-                        <span className="w-12 text-slate-500 font-semibold">{file.type}</span>
-                        <span className="w-16 text-slate-500">{file.size}</span>
-                        <span className="w-24 text-slate-500">{file.updatedAt}</span>
-                      </div>
-
-                      {/* Mobile Meta (if sm/md hidden) */}
-                      <div className="flex md:hidden items-center gap-2 text-[10px] text-slate-400 pl-12 -mt-2">
-                        <span className="font-semibold text-slate-500">{file.type}</span>
-                        <span>•</span>
-                        <span>{file.size}</span>
-                        <span>•</span>
-                        <span>{file.updatedAt}</span>
-                      </div>
-
-                      {/* Right: Action Button & More Menu */}
-                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                        {file.isOnlineView ? (
-                          <button
-                            type="button"
-                            onClick={() => setPreviewFile(file)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50/80 hover:bg-blue-100 text-blue-600 border border-blue-200/80 text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            <span>ดูออนไลน์</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleDownloadFile(file.name, file.size)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50/80 hover:bg-blue-100 text-blue-600 border border-blue-200/80 text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            <span>ดาวน์โหลด</span>
-                          </button>
-                        )}
-
-                        {/* More Menu Dropdown */}
-                        <div className="relative">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setActiveFileMenuId((prev) => (prev === file.id ? null : file.id))
-                            }
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-                            title="ตัวเลือกเพิ่มเติม"
-                          >
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
-
-                          {activeFileMenuId === file.id && (
-                            <div className="absolute right-0 mt-1 w-44 bg-white rounded-xl border border-slate-200 shadow-xl p-1.5 z-30 space-y-0.5 text-xs animate-slide-up">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setPreviewFile(file);
-                                  setActiveFileMenuId(null);
-                                }}
-                                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-slate-50 text-slate-700 font-medium cursor-pointer"
-                              >
-                                <Eye className="w-3.5 h-3.5 text-slate-400" />
-                                <span>ดูตัวอย่างไฟล์</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  handleDownloadFile(file.name, file.size);
-                                  setActiveFileMenuId(null);
-                                }}
-                                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-slate-50 text-slate-700 font-medium cursor-pointer"
-                              >
-                                <Download className="w-3.5 h-3.5 text-slate-400" />
-                                <span>ดาวน์โหลดไฟล์</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  showToast('คัดลอกลิงก์แชร์ให้นักเรียนเรียบร้อยแล้ว');
-                                  setActiveFileMenuId(null);
-                                }}
-                                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-slate-50 text-slate-700 font-medium cursor-pointer"
-                              >
-                                <Share2 className="w-3.5 h-3.5 text-slate-400" />
-                                <span>คัดลอกลิงก์แชร์</span>
-                              </button>
-                              <div className="my-1 border-t border-slate-100" />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  showToast('เปิดแบบฟอร์มแก้ไขชื่อไฟล์');
-                                  setActiveFileMenuId(null);
-                                }}
-                                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-slate-50 text-slate-700 font-medium cursor-pointer"
-                              >
-                                <Edit3 className="w-3.5 h-3.5 text-slate-400" />
-                                <span>แก้ไขชื่อไฟล์</span>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  {filteredFiles.length === 0 && (
-                    <div className="py-8 text-center text-slate-400 text-xs">
-                      ไม่พบไฟล์ในหมวดหมู่นี้
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* TAB 2: สื่อกิจกรรม / ใบงาน */}
-            {activeTab === 'activities' && (
-              <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-card p-4 sm:p-5 space-y-3 transition-all">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <h4 className="text-xs sm:text-sm font-extrabold text-slate-900">
-                    สื่อการเรียนรู้เชิงกิจกรรมและแบบฝึกปฏิบัติ
-                  </h4>
-                  <button
-                    type="button"
-                    onClick={() => setIsManageFilesModalOpen(true)}
-                    className="text-xs font-bold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>เพิ่มสื่อกิจกรรม</span>
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {currentWeekPlan.activityMaterials.map((act) => (
-                    <div
-                      key={act.id}
-                      className="p-3.5 rounded-2xl border border-slate-100 hover:border-blue-200 bg-slate-50/50 hover:bg-blue-50/30 transition-all flex flex-col justify-between space-y-2.5"
-                    >
-                      <div className="space-y-1">
-                        <span className="inline-block px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 font-bold text-[10px]">
-                          {act.category}
-                        </span>
-                        <h5 className="font-bold text-slate-800 text-xs leading-snug">
-                          {act.name}
-                        </h5>
-                        <p className="text-[11px] text-slate-400">
-                          {act.format} • {act.size}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => handleDownloadFile(act.name, act.size)}
-                          className="flex-1 py-1.5 px-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                        >
-                          <Download className="w-3.5 h-3.5 text-blue-600" />
-                          <span>ดาวน์โหลด</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-
-                  {currentWeekPlan.activityMaterials.length === 0 && (
-                    <div className="col-span-full py-8 text-center text-slate-400 text-xs">
-                      ยังไม่มีสื่อกิจกรรมในสัปดาห์นี้
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* TAB 3: บันทึกหลังสอน */}
-            {activeTab === 'reflection' && (
-              <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-card p-4 sm:p-5 space-y-4 transition-all">
-                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
-                  <div>
-                    <h4 className="text-sm sm:text-base font-extrabold text-slate-900">
-                      บันทึกผลการจัดการเรียนรู้ (บันทึกหลังสอน)
-                    </h4>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      วันที่บันทึก: {currentWeekPlan.reflection.conductedDate}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => window.print()}
-                      className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                      <span>พิมพ์</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => showToast('เปิดฟอร์มแก้ไขบันทึกหลังสอน')}
-                      className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                      <span>แก้ไขบันทึก</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-3.5 text-xs sm:text-sm">
-                  {/* Results */}
-                  <div className="p-3.5 rounded-2xl bg-emerald-50/60 border border-emerald-100 space-y-1.5">
-                    <div className="font-bold text-emerald-800 flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      <span>ผลการจัดกิจกรรมการเรียนรู้</span>
-                    </div>
-                    <p className="text-slate-700 leading-relaxed pl-6">
-                      {currentWeekPlan.reflection.summary}
-                    </p>
-                  </div>
-
-                  {/* Problems & Solutions */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="p-3.5 rounded-2xl bg-rose-50/60 border border-rose-100 space-y-1.5">
-                      <div className="font-bold text-rose-800 flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 text-rose-600" />
-                        <span>ปัญหา / อุปสรรค</span>
-                      </div>
-                      <p className="text-slate-700 leading-relaxed pl-6">
-                        {currentWeekPlan.reflection.problem}
-                      </p>
-                    </div>
-
-                    <div className="p-3.5 rounded-2xl bg-blue-50/60 border border-blue-100 space-y-1.5">
-                      <div className="font-bold text-blue-800 flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-blue-600" />
-                        <span>ข้อเสนอแนะ / แนวทางแก้ไข</span>
-                      </div>
-                      <p className="text-slate-700 leading-relaxed pl-6">
-                        {currentWeekPlan.reflection.solution}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Sign off */}
-                  <div className="pt-1 text-right text-xs text-slate-500 font-medium">
-                    ลงชื่อ: <span className="font-bold text-slate-700">{currentWeekPlan.reflection.recordedBy}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Card 4: Bottom Quote Banner (Inside Left Column below document table) */}
-          <div className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-blue-100 shadow-2xs select-none">
-            <img
-              src="/images/teacher/lesson_bottom_quote_banner.png"
-              alt="Japanese quote: ภาษาญี่ปุ่น... ไม่ใช่แค่ภาษา แต่คือกุญแจสู่โลกกว้าง"
-              className="w-full h-auto object-cover block"
-            />
-          </div>
-        </div>
-
-        {/* --------------------------------------------------------
-            RIGHT COLUMN (lg:col-span-4) - Widgets:
-            1. สรุปเนื้อหาบทเรียน (Learning Objectives & Evaluations)
-            2. ไฟล์เพิ่มเติมสำหรับนักเรียน (Extra Student Resources)
-            -------------------------------------------------------- */}
-        <div className="lg:col-span-4 space-y-4 sm:space-y-5 min-w-0">
-          {/* Widget 1: สรุปเนื้อหาบทเรียน */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-card p-4 sm:p-5 space-y-4">
-            {/* Header */}
-            <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100">
-              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                <BookOpen className="w-4 h-4" />
-              </div>
-              <h4 className="text-sm font-extrabold text-slate-900">
-                สรุปเนื้อหาบทเรียน
-              </h4>
-            </div>
-
-            {/* Sub-section: จุดประสงค์การเรียนรู้ */}
-            <div className="space-y-2.5">
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-                <div className="w-4 h-4 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px]">
-                  🎯
-                </div>
-                <span>จุดประสงค์การเรียนรู้</span>
-              </div>
-
-              <div className="space-y-2">
-                {currentWeekPlan.objectives.map((obj, i) => (
-                  <div key={i} className="flex items-start gap-2.5 text-xs text-slate-700 leading-snug">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                    <span>{obj}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Sub-section: การวัดและประเมินผล */}
-            <div className="pt-2 border-t border-slate-100 space-y-2.5">
-              <div className="flex items-center gap-2 text-xs font-bold text-rose-600">
-                <div className="w-4 h-4 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-[10px]">
-                  📋
-                </div>
-                <span>การวัดและประเมินผล</span>
-              </div>
-
-              <div className="space-y-2 text-xs">
-                {currentWeekPlan.evaluations.map((ev, i) => (
-                  <div key={i} className="flex items-center justify-between py-1 text-slate-700">
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-600">
-                        {ev.iconType === 'assignment' ? (
-                          <FileText className="w-3.5 h-3.5 text-slate-600" />
-                        ) : ev.iconType === 'activity' ? (
-                          <Users className="w-3.5 h-3.5 text-slate-600" />
-                        ) : (
-                          <Calendar className="w-3.5 h-3.5 text-slate-600" />
-                        )}
-                      </span>
-                      <span className="font-medium text-slate-800">{ev.label}</span>
-                    </div>
-                    <span className="font-extrabold text-slate-900">{ev.percentage}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Widget 2: ไฟล์เพิ่มเติมสำหรับนักเรียน */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-card p-4 sm:p-5 space-y-3.5">
-            {/* Header */}
-            <div className="space-y-0.5 pb-2 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                  <FolderOpen className="w-4 h-4" />
-                </div>
-                <h4 className="text-sm font-extrabold text-slate-900">
-                  ไฟล์เพิ่มเติมสำหรับนักเรียน
-                </h4>
-              </div>
-              <p className="text-[11px] text-slate-400 font-medium pl-10.5">
-                ให้นักเรียนศึกษาเพิ่มเติมหลังเรียน
+              <p className="text-xs sm:text-sm text-[#6B7C93] font-medium mt-1 leading-relaxed">
+                สร้างและจัดการแผนการสอนรายวิชา แบบหน่วยการเรียนรู้ พร้อมสื่อการสอนและประเมินผล
               </p>
             </div>
+          </div>
 
-            {/* Items List */}
-            <div className="space-y-2.5">
-              {currentWeekPlan.studentExtraFiles.map((file) => (
-                <div
-                  key={file.id}
-                  className="p-2.5 rounded-2xl border border-slate-100 hover:border-blue-200 bg-white hover:bg-blue-50/20 transition-all flex items-center justify-between gap-2.5 shadow-2xs"
-                >
-                  {/* Left: Icon + Text */}
-                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    {file.type === 'PDF' ? (
-                      <div className="w-8 h-8 rounded-full bg-rose-500 text-white font-extrabold text-[10px] flex items-center justify-center shrink-0 shadow-2xs">
-                        PDF
-                      </div>
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                        <Play className="w-3.5 h-3.5 fill-white text-white" />
-                      </div>
-                    )}
+          {/* Right: Anime Mascot & Speech Bubble */}
+          <div className="flex items-center gap-4 self-end md:self-center shrink-0">
+            {/* Cute Speech Bubble */}
+            <div className="hidden lg:flex items-center gap-2 bg-white/95 backdrop-blur-xs px-4 py-2.5 rounded-2xl shadow-xs border border-blue-100 text-xs font-semibold text-slate-700 relative">
+              <span>"การสอนที่ดี คือการเปิดโลกแห่งโอกาส ให้กับนักเรียน" ♡</span>
+              <div className="absolute -right-2 top-1/2 -translate-y-1/2 w-0 h-0 border-y-6 border-y-transparent border-l-8 border-l-white/95" />
+            </div>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="font-bold text-slate-800 text-xs truncate">
-                        {file.name}
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-medium">
-                        {file.sizeOrSource}
-                      </div>
-                    </div>
-                  </div>
+            {/* Character Graphic */}
+            <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 border-2 border-white shadow-sm bg-blue-100/50">
+              <img
+                src="/images/teacher/hero_banner.png"
+                alt="Anime Teacher Character"
+                className="w-full h-full object-cover object-top scale-110"
+                onError={(e) => {
+                  // Fallback if image path differs
+                  e.currentTarget.src = '/images/teacher/teacher_avatar.png';
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
 
-                  {/* Right: Action Button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (file.url) {
-                        window.open(file.url, '_blank');
-                      } else {
-                        handleDownloadFile(file.name, file.sizeOrSource);
-                      }
-                    }}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-50/80 hover:bg-blue-100 text-blue-600 border border-blue-200/80 text-[11px] font-bold shadow-2xs transition-colors shrink-0 cursor-pointer"
-                  >
-                    {file.type === 'YOUTUBE' ? (
-                      <ExternalLink className="w-3 h-3" />
-                    ) : (
-                      <Download className="w-3 h-3" />
-                    )}
-                    <span>{file.actionLabel}</span>
-                  </button>
+      {/* ======================================================== */}
+      {/* 2. TOP FILTER & ACTION BAR                              */}
+      {/* ======================================================== */}
+      <section className="bg-white rounded-2xl border border-slate-200/80 p-3 sm:p-4 shadow-2xs mb-6">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 sm:gap-4">
+          {/* Action Button & Selectors */}
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+            {/* + สร้างแผนการสอนใหม่ */}
+            <button
+              type="button"
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>สร้างแผนการสอนใหม่</span>
+            </button>
+
+            {/* Dropdown 1: รหัสวิชา */}
+            <div className="relative">
+              <div className="text-[10px] text-slate-400 font-semibold px-1 mb-0.5">รหัสวิชา</div>
+              <button
+                type="button"
+                onClick={() => setIsCourseDropdownOpen((prev) => !prev)}
+                className="flex items-center justify-between gap-2.5 px-3 py-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 min-w-[200px] transition-all cursor-pointer"
+              >
+                <span className="truncate">
+                  {currentCourse.code} - {currentCourse.name}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              </button>
+
+              {isCourseDropdownOpen && (
+                <div className="absolute top-full left-0 mt-1.5 w-64 bg-white border border-slate-200 rounded-xl shadow-lg z-30 py-1.5 animate-fade-in">
+                  {courses.map((c, idx) => (
+                    <button
+                      key={c.code}
+                      type="button"
+                      onClick={() => {
+                        setSelectedCourseIndex(idx);
+                        setIsCourseDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3.5 py-2 text-xs font-semibold flex items-center justify-between hover:bg-blue-50 transition-colors ${
+                        idx === selectedCourseIndex ? 'text-blue-600 bg-blue-50/60 font-bold' : 'text-slate-700'
+                      }`}
+                    >
+                      <span>
+                        {c.code} - {c.name}
+                      </span>
+                      {idx === selectedCourseIndex && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                    </button>
+                  ))}
                 </div>
-              ))}
+              )}
+            </div>
 
-              {currentWeekPlan.studentExtraFiles.length === 0 && (
-                <div className="py-4 text-center text-slate-400 text-xs">
-                  ไม่มีไฟล์เพิ่มเติมในสัปดาห์นี้
+            {/* Dropdown 2: ห้องเรียน */}
+            <div className="relative">
+              <div className="text-[10px] text-slate-400 font-semibold px-1 mb-0.5">ห้องเรียน</div>
+              <button
+                type="button"
+                onClick={() => setIsClassDropdownOpen((prev) => !prev)}
+                className="flex items-center justify-between gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 min-w-[95px] transition-all cursor-pointer"
+              >
+                <span>{selectedClassroom}</span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+              </button>
+
+              {isClassDropdownOpen && (
+                <div className="absolute top-full left-0 mt-1.5 w-36 bg-white border border-slate-200 rounded-xl shadow-lg z-30 py-1.5 animate-fade-in">
+                  {['ม.3/1', 'ม.3/2', 'ม.4/1'].map((rm) => (
+                    <button
+                      key={rm}
+                      type="button"
+                      onClick={() => {
+                        setSelectedClassroom(rm);
+                        setIsClassDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3.5 py-2 text-xs font-semibold hover:bg-blue-50 ${
+                        selectedClassroom === rm ? 'text-blue-600 bg-blue-50/60 font-bold' : 'text-slate-700'
+                      }`}
+                    >
+                      {rm}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Dropdown 3: ภาคเรียน */}
+            <div className="relative">
+              <div className="text-[10px] text-slate-400 font-semibold px-1 mb-0.5">ภาคเรียน</div>
+              <button
+                type="button"
+                onClick={() => setIsSemesterDropdownOpen((prev) => !prev)}
+                className="flex items-center justify-between gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 min-w-[130px] transition-all cursor-pointer"
+              >
+                <span>{selectedSemester}</span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+              </button>
+
+              {isSemesterDropdownOpen && (
+                <div className="absolute top-full left-0 mt-1.5 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-30 py-1.5 animate-fade-in">
+                  {['ภาคเรียนที่ 1/2569', 'ภาคเรียนที่ 2/2568'].map((sem) => (
+                    <button
+                      key={sem}
+                      type="button"
+                      onClick={() => {
+                        setSelectedSemester(sem);
+                        setIsSemesterDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3.5 py-2 text-xs font-semibold hover:bg-blue-50 ${
+                        selectedSemester === sem ? 'text-blue-600 bg-blue-50/60 font-bold' : 'text-slate-700'
+                      }`}
+                    >
+                      {sem}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
           </div>
+
+          {/* Search Box on Right */}
+          <div className="relative w-full lg:w-72">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="ค้นหาแผนการสอน / หน่วย..."
+              className="w-full pl-9 pr-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
+      </section>
+
+      {/* ======================================================== */}
+      {/* MOBILE COLUMN SWITCHER TABS (Clean Ergonomics)           */}
+      {/* ======================================================== */}
+      <div className="flex lg:hidden items-center justify-between gap-1 bg-white p-1 rounded-xl border border-slate-200 mb-4 shadow-2xs">
+        <button
+          type="button"
+          onClick={() => setMobileTab('units')}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+            mobileTab === 'units'
+              ? 'bg-blue-600 text-white shadow-2xs'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          📚 หน่วยการเรียนรู้ ({units.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileTab('detail')}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+            mobileTab === 'detail'
+              ? 'bg-blue-600 text-white shadow-2xs'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          📑 รายละเอียดหน่วย
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileTab('widgets')}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+            mobileTab === 'widgets'
+              ? 'bg-blue-600 text-white shadow-2xs'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          📊 ข้อมูลห้อง & สื่อ
+        </button>
       </div>
 
-      {/* ========================================================
-          3. INTERACTIVE MODALS
-          ======================================================== */}
+      {/* ======================================================== */}
+      {/* 3. MAIN THREE-COLUMN LAYOUT                              */}
+      {/* ======================================================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        {/* ====================================================== */}
+        {/* COLUMN 1: หน่วยการเรียนรู้ (6 หน่วย)                   */}
+        {/* ====================================================== */}
+        <div
+          className={`lg:col-span-3 space-y-3 ${
+            mobileTab === 'units' ? 'block' : 'hidden lg:block'
+          }`}
+        >
+          {/* Column Header */}
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+              <span>หน่วยการเรียนรู้</span>
+              <span className="text-xs font-semibold text-slate-500">({units.length} หน่วย)</span>
+            </h2>
+          </div>
 
-      {/* MODAL 1: สร้างแผนการสอนใหม่ */}
-      {isCreatePlanModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-xl w-full p-5 sm:p-6 space-y-4 my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
-                  <Plus className="w-5 h-5" />
+          {/* 6 Unit Cards */}
+          <div className="space-y-2.5">
+            {filteredUnits.map((unit) => {
+              const isSelected = unit.id === selectedUnitId;
+              return (
+                <div
+                  key={unit.id}
+                  onClick={() => handleSelectUnit(unit.id)}
+                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer relative ${
+                    isSelected
+                      ? 'bg-blue-50/50 border-blue-400 ring-2 ring-blue-100/80 shadow-xs'
+                      : 'bg-white border-slate-200/90 hover:border-slate-300 hover:shadow-2xs'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Colored Circle Number */}
+                    <div
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full ${unit.circleColorClass} text-white font-extrabold text-xs sm:text-sm flex items-center justify-center shrink-0 shadow-2xs`}
+                    >
+                      {unit.unitNumber}
+                    </div>
+
+                    {/* Unit Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[11px] font-bold text-slate-500">
+                        หน่วยที่ {unit.unitNumber}
+                      </div>
+                      <h3 className="text-xs sm:text-sm font-bold text-slate-900 truncate mt-0.5">
+                        {unit.displayTitle}
+                      </h3>
+
+                      {/* Meta & Status Badge */}
+                      <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-100">
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          {unit.periods} คาบ • {unit.indicatorsSummary}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${unit.statusBadgeClass}`}
+                        >
+                          {unit.statusLabel}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Chevron Indicator */}
+                    <div className="shrink-0 self-center text-slate-400">
+                      <ChevronRight className="w-4 h-4" />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-extrabold text-slate-800 text-base sm:text-lg">
-                    สร้างแผนการสอนรายวิชาใหม่
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    {currentCourse.code} : {currentCourse.name} ({currentCourse.classroom})
-                  </p>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ====================================================== */}
+        {/* COLUMN 2: CENTER UNIT DETAILS (ข้อมูลหน่วย & แท็บย่อย) */}
+        {/* ====================================================== */}
+        <div
+          className={`lg:col-span-6 bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-2xs ${
+            mobileTab === 'detail' ? 'block' : 'hidden lg:block'
+          }`}
+        >
+          {/* Unit Top Header */}
+          <div className="flex items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <h2 className="text-base sm:text-lg font-extrabold text-[#163A66] truncate">
+                หน่วยที่ {currentUnit.unitNumber} : {currentUnit.displayTitle}
+              </h2>
+            </div>
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-bold border shrink-0 ${currentUnit.statusBadgeClass}`}
+            >
+              🌱 {currentUnit.statusLabel}
+            </span>
+          </div>
+
+          {/* 4 Sub-Tabs */}
+          <div className="flex items-center gap-2 sm:gap-4 border-b border-slate-200/80 pt-2 pb-0 overflow-x-auto no-scrollbar">
+            {[
+              { key: 'info', label: 'ข้อมูลหน่วย', icon: BookOpen },
+              { key: 'media', label: 'สื่อการสอน / ไฟล์', icon: FolderOpen },
+              { key: 'worksheets', label: 'ใบงาน', icon: FileSpreadsheet },
+              { key: 'reflection', label: 'บันทึกหลังสอน', icon: FileCheck },
+            ].map((tab) => {
+              const TabIcon = tab.icon;
+              const isActive = activeSubTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveSubTab(tab.key as any)}
+                  className={`flex items-center gap-1.5 py-2.5 px-2 text-xs sm:text-sm font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+                    isActive
+                      ? 'text-blue-600 border-blue-600'
+                      : 'text-slate-500 border-transparent hover:text-slate-800'
+                  }`}
+                >
+                  <TabIcon className="w-4 h-4" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* TAB 1: ข้อมูลหน่วย (Matching Mockup Column 2 100%) */}
+          {activeSubTab === 'info' && (
+            <div className="mt-4 space-y-4">
+              {/* Section 1: ข้อมูลพื้นฐาน */}
+              <div className="bg-slate-50/70 rounded-2xl border border-slate-200/80 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800">
+                    <HelpCircle className="w-4 h-4 text-blue-600" />
+                    <span>ข้อมูลพื้นฐาน</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditDisplayTitle(currentUnit.displayTitle);
+                      setEditPeriods(currentUnit.periods);
+                      setEditDateRange(currentUnit.dateRange);
+                      setIsEditBasicInfoModalOpen(true);
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:text-blue-600 hover:border-blue-200 text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>แก้ไข</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                  <div>
+                    <span className="text-slate-400 font-medium">รหัสวิชา:</span>
+                    <div className="font-bold text-slate-800 mt-0.5">{currentUnit.courseCode}</div>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-medium">รายวิชา:</span>
+                    <div className="font-bold text-slate-800 mt-0.5">{currentUnit.courseName}</div>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-medium">ห้องเรียน:</span>
+                    <div className="font-bold text-slate-800 mt-0.5">{currentUnit.classroom}</div>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-medium">หน่วยที่:</span>
+                    <div className="font-bold text-slate-800 mt-0.5">{currentUnit.unitNumber}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-slate-400 font-medium">ชื่อหน่วย:</span>
+                    <div className="font-bold text-slate-900 mt-0.5">{currentUnit.displayTitle}</div>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-medium">เวลาเรียน:</span>
+                    <div className="font-bold text-slate-800 mt-0.5">{currentUnit.periodDurationText}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-slate-400 font-medium">ช่วงเวลา:</span>
+                    <div className="font-bold text-slate-800 mt-0.5">{currentUnit.dateRange}</div>
+                  </div>
                 </div>
               </div>
 
+              {/* Section 2: ตัวชี้วัด / ผลการเรียนรู้ */}
+              <div className="bg-slate-50/70 rounded-2xl border border-slate-200/80 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800">
+                    <BookOpen className="w-4 h-4 text-emerald-600" />
+                    <span>ตัวชี้วัด / ผลการเรียนรู้</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditObjectives([...currentUnit.objectives]);
+                      setIsEditObjectivesModalOpen(true);
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:text-blue-600 hover:border-blue-200 text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>แก้ไข</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {currentUnit.objectives.map((obj, i) => (
+                    <div key={i} className="text-xs text-slate-700 font-medium leading-relaxed">
+                      {obj}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Section 3: การประเมินผล */}
+              <div className="bg-slate-50/70 rounded-2xl border border-slate-200/80 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800">
+                    <Layers className="w-4 h-4 text-blue-600" />
+                    <span>การประเมินผล</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditEvaluations([...currentUnit.evaluations]);
+                      setIsEditEvaluationsModalOpen(true);
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:text-blue-600 hover:border-blue-200 text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>แก้ไข</span>
+                  </button>
+                </div>
+
+                {/* Table */}
+                <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-100/70 text-slate-600 font-bold border-b border-slate-200">
+                      <tr>
+                        <th className="py-2.5 px-3">รายการ</th>
+                        <th className="py-2.5 px-3">น้ำหนักคะแนน</th>
+                        <th className="py-2.5 px-3">เกณฑ์การประเมิน</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
+                      {currentUnit.evaluations.map((ev) => (
+                        <tr key={ev.id} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-2.5 px-3 font-semibold text-slate-900">{ev.title}</td>
+                          <td className="py-2.5 px-3 font-bold text-blue-600">{ev.weightPercent}%</td>
+                          <td className="py-2.5 px-3 text-slate-600">{ev.criteria}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Summary Score Bar */}
+                <div className="mt-3 py-2 px-4 rounded-xl bg-blue-50/80 border border-blue-100 flex items-center justify-center gap-2 text-xs font-extrabold text-blue-700">
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                  <span>คะแนนรวม {totalWeight}%</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: สื่อการสอน / ไฟล์ */}
+          {activeSubTab === 'media' && (
+            <div className="mt-4 space-y-3 animate-fade-in">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700">
+                  ไฟล์เอกสารและสื่อของหน่วยนี้ ({currentUnit.files.length} รายการ)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => showToast('เปิดแบบฟอร์มอัปโหลดสื่อการสอน')}
+                  className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>เพิ่มไฟล์สื่อ</span>
+                </button>
+              </div>
+
+              {currentUnit.files.length === 0 ? (
+                <div className="py-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  <FolderOpen className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="text-xs text-slate-500 font-medium">ยังไม่มีไฟล์สื่อในหน่วยนี้</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {currentUnit.files.map((file) => (
+                    <div
+                      key={file.id}
+                      className="p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200 flex items-center justify-between gap-3 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <FileText className="w-5 h-5 text-blue-600 shrink-0" />
+                        <div className="truncate">
+                          <div className="text-xs font-bold text-slate-800 truncate">{file.name}</div>
+                          <div className="text-[10px] text-slate-400">
+                            {file.type} • {file.size} • อัปเดต {file.updatedAt}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => showToast(`กำลังดาวน์โหลด ${file.name}`)}
+                        className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-blue-600 hover:bg-blue-50 text-xs font-bold shadow-2xs flex items-center gap-1 cursor-pointer shrink-0"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>ดาวน์โหลด</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: ใบงาน */}
+          {activeSubTab === 'worksheets' && (
+            <div className="mt-4 space-y-3 animate-fade-in">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700">
+                  รายการใบงานและภาระงาน ({currentUnit.worksheets.length} งาน)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => showToast('สร้างใบงานใหม่สำหรับหน่วยนี้')}
+                  className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>สร้างใบงาน</span>
+                </button>
+              </div>
+
+              {currentUnit.worksheets.length === 0 ? (
+                <div className="py-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  <FileSpreadsheet className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="text-xs text-slate-500 font-medium">ยังไม่มีใบงานในหน่วยนี้</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {currentUnit.worksheets.map((ws) => (
+                    <div
+                      key={ws.id}
+                      className="p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200 flex items-center justify-between gap-3 transition-colors"
+                    >
+                      <div>
+                        <div className="text-xs font-bold text-slate-800">{ws.name}</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          คะแนนเต็ม {ws.fullScore} • ส่งแล้ว {ws.submittedCount}/{ws.totalCount} คน • ครบกำหนด {ws.dueDate}
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 shrink-0">
+                        ตรวจแล้ว {ws.submittedCount} คน
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 4: บันทึกหลังสอน */}
+          {activeSubTab === 'reflection' && (
+            <div className="mt-4 space-y-3 animate-fade-in text-xs">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div>
+                  <span className="text-slate-400 font-bold">วันที่ดำเนินการสอน:</span>
+                  <p className="font-semibold text-slate-800 mt-0.5">{currentUnit.reflection.conductedDate}</p>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-bold">ผลการจัดการเรียนรู้:</span>
+                  <p className="font-medium text-slate-700 mt-0.5 leading-relaxed">{currentUnit.reflection.summary}</p>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-bold">ปัญหาและอุปสรรค:</span>
+                  <p className="font-medium text-slate-700 mt-0.5 leading-relaxed">{currentUnit.reflection.problem}</p>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-bold">แนวทางแก้ไขและข้อเสนอแนะ:</span>
+                  <p className="font-medium text-slate-700 mt-0.5 leading-relaxed">{currentUnit.reflection.solution}</p>
+                </div>
+                <div className="pt-2 border-t border-slate-200 text-right text-slate-500 font-semibold">
+                  ลงชื่อ: {currentUnit.reflection.recordedBy}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => showToast('เปิดหน้าต่างแก้ไขบันทึกหลังสอน')}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-bold cursor-pointer"
+                >
+                  แก้ไขบันทึก
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPrintModalOpen(true)}
+                  className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>พิมพ์บันทึกหลังสอน</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ====================================================== */}
+        {/* COLUMN 3: RIGHT SIDE WIDGETS (ห้องเรียน, สื่อ, Quick)  */}
+        {/* ====================================================== */}
+        <div
+          className={`lg:col-span-3 space-y-4 ${
+            mobileTab === 'widgets' ? 'block' : 'hidden lg:block'
+          }`}
+        >
+          {/* Widget 1: จัดการห้องเรียน (Matching Mockup 100%) */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs">
+            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-900">จัดการห้องเรียน</h3>
               <button
                 type="button"
-                onClick={() => setIsCreatePlanModalOpen(false)}
-                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                onClick={() => setIsClassStatsModalOpen(true)}
+                className="text-[11px] font-semibold text-blue-600 hover:underline cursor-pointer"
+              >
+                ดูข้อมูลห้องทั้งหมด &gt;
+              </button>
+            </div>
+
+            {/* Room Selector Dropdown */}
+            <div className="mt-2.5 mb-3">
+              <button
+                type="button"
+                onClick={() => setIsClassDropdownOpen((prev) => !prev)}
+                className="w-full flex items-center justify-between px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 cursor-pointer"
+              >
+                <span>{selectedClassroom}</span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+              </button>
+            </div>
+
+            {/* ข้อมูลรวมห้อง */}
+            <div className="text-xs">
+              <div className="text-[11px] font-bold text-slate-500 mb-2">ข้อมูลรวมห้อง</div>
+              <div className="space-y-2 font-medium">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <Users className="w-4 h-4 text-blue-500" />
+                    <span>นักเรียนทั้งหมด</span>
+                  </div>
+                  <span className="font-extrabold text-slate-900">32 คน</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <span>เข้าเรียนเฉลี่ย</span>
+                  </div>
+                  <span className="font-extrabold text-emerald-600">93%</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <AlertTriangle className="w-4 h-4 text-amber-500" />
+                    <span>ขาดเรียน</span>
+                  </div>
+                  <span className="font-extrabold text-amber-600">2 คน</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <FileText className="w-4 h-4 text-rose-500" />
+                    <span>ลากิจ/ลาป่วย</span>
+                  </div>
+                  <span className="font-extrabold text-rose-600">1 คน</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Action: ดูสถิติรายชั้น */}
+            <button
+              type="button"
+              onClick={() => setIsClassStatsModalOpen(true)}
+              className="mt-4 w-full py-2.5 rounded-xl bg-blue-50/80 hover:bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center gap-2 border border-blue-200/80 transition-all cursor-pointer"
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>ดูสถิติรายชั้น</span>
+            </button>
+          </div>
+
+          {/* Widget 2: ไฟล์และสื่อที่เกี่ยวข้อง (Matching Mockup 100%) */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs">
+            <h3 className="text-xs sm:text-sm font-bold text-slate-900 mb-3">
+              ไฟล์และสื่อที่เกี่ยวข้อง
+            </h3>
+
+            <div className="space-y-2.5 text-xs">
+              {/* Row 1: สื่อการสอน (PDF) */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                    <FileText className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-slate-800">สื่อการสอน (PDF)</div>
+                    <div className="text-[10px] text-slate-400">2 ไฟล์</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsRelatedFilesModalOpen(true)}
+                  className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 text-[11px] font-bold cursor-pointer"
+                >
+                  ดูทั้งหมด
+                </button>
+              </div>
+
+              {/* Row 2: ใบงาน (Word/PDF) */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                    <FileSpreadsheet className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-slate-800">ใบงาน (Word/PDF)</div>
+                    <div className="text-[10px] text-slate-400">3 ไฟล์</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsRelatedFilesModalOpen(true)}
+                  className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 text-[11px] font-bold cursor-pointer"
+                >
+                  ดูทั้งหมด
+                </button>
+              </div>
+
+              {/* Row 3: สื่อวิดีโอ (YouTube) */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                    <Video className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-slate-800">สื่อวิดีโอ (YouTube)</div>
+                    <div className="text-[10px] text-slate-400">1 ลิงก์</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsRelatedFilesModalOpen(true)}
+                  className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 text-[11px] font-bold cursor-pointer"
+                >
+                  ดูทั้งหมด
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Widget 3: Quick Actions (Matching Mockup 100%) */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs">
+            <h3 className="text-xs sm:text-sm font-bold text-slate-900 mb-3 flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-blue-600" />
+              <span>Quick Actions</span>
+            </h3>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => setIsViewAllModalOpen(true)}
+                className="w-full py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-blue-50/70 border border-slate-200/80 text-slate-800 hover:text-blue-700 text-xs font-bold flex items-center gap-2.5 transition-all cursor-pointer"
+              >
+                <Eye className="w-4 h-4 text-blue-600" />
+                <span>ดูแผนการสอนทั้งหมด</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsCopyModalOpen(true)}
+                className="w-full py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-blue-50/70 border border-slate-200/80 text-slate-800 hover:text-blue-700 text-xs font-bold flex items-center gap-2.5 transition-all cursor-pointer"
+              >
+                <Copy className="w-4 h-4 text-purple-600" />
+                <span>คัดลอกหน่วยการเรียนรู้</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsPrintModalOpen(true)}
+                className="w-full py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-blue-50/70 border border-slate-200/80 text-slate-800 hover:text-blue-700 text-xs font-bold flex items-center gap-2.5 transition-all cursor-pointer"
+              >
+                <Printer className="w-4 h-4 text-slate-600" />
+                <span>พิมพ์แผนการสอน</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ======================================================== */}
+      {/* 4. BOTTOM STEPPER FLOW (รายการหน่วยการเรียนรู้ 6 หน่วย)   */}
+      {/* ======================================================== */}
+      <section className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-2xs mt-5">
+        <div className="flex items-center justify-between mb-3.5">
+          <h3 className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-2">
+            <ClipboardList className="w-4 h-4 text-blue-600" />
+            <span>รายการหน่วยการเรียนรู้ ({units.length} หน่วย)</span>
+          </h3>
+        </div>
+
+        {/* Horizontal Flow Stepper */}
+        <div className="overflow-x-auto pb-1 no-scrollbar">
+          <div className="flex items-center gap-2 min-w-[760px]">
+            {units.slice(0, 6).map((unit, idx) => {
+              const isSelected = unit.id === selectedUnitId;
+              return (
+                <React.Fragment key={unit.id}>
+                  <div
+                    onClick={() => handleSelectUnit(unit.id)}
+                    className={`flex-1 min-w-[110px] p-2.5 rounded-xl border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-blue-50/70 border-blue-400 shadow-2xs'
+                        : 'bg-slate-50/60 border-slate-200 hover:bg-slate-100/70'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`w-6 h-6 rounded-full ${unit.circleColorClass} text-white font-extrabold text-xs flex items-center justify-center shrink-0`}
+                      >
+                        {unit.unitNumber}
+                      </div>
+                      <div className="truncate">
+                        <div className="text-[11px] font-bold text-slate-800 truncate">
+                          หน่วยที่ {unit.unitNumber}
+                        </div>
+                        <div
+                          className={`text-[10px] font-bold ${
+                            unit.status === 'DONE'
+                              ? 'text-emerald-600'
+                              : unit.status === 'IN_PROGRESS'
+                              ? 'text-blue-600'
+                              : 'text-slate-400'
+                          }`}
+                        >
+                          {unit.statusLabel}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-1 text-[10px] text-slate-400 font-medium pl-8">
+                      {unit.periods} คาบ
+                    </div>
+                  </div>
+
+                  {idx < 5 && (
+                    <ChevronRight className="w-4 h-4 text-slate-300 shrink-0 mx-0.5" />
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ======================================================== */}
+      {/* 5. INTERACTIVE MODALS                                    */}
+      {/* ======================================================== */}
+
+      {/* MODAL 1: สร้างแผนการสอนใหม่ */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-2xs p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Plus className="w-5 h-5 text-blue-600" />
+                <span>สร้างแผนการสอน / หน่วยการเรียนรู้ใหม่</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setIsCreatePlanModalOpen(false);
-                showToast(`บันทึกแผนการสอนสัปดาห์ที่ ${newPlanWeek} เรียบร้อยแล้ว!`);
-              }}
-              className="space-y-3.5 text-xs sm:text-sm"
-            >
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="mt-4 space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    สัปดาห์ที่สอน
-                  </label>
-                  <select
-                    value={newPlanWeek}
-                    onChange={(e) => setNewPlanWeek(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-medium focus:outline-hidden focus:border-blue-600 transition-colors"
-                  >
-                    {[...Array(16)].map((_, i) => (
-                      <option key={i + 1} value={i + 1}>
-                        สัปดาห์ที่ {i + 1}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    จำนวนคาบ
-                  </label>
+                  <label className="block text-slate-600 font-bold mb-1">หน่วยที่</label>
                   <input
                     type="number"
-                    min="1"
-                    max="10"
-                    value={newPlanPeriods}
-                    onChange={(e) => setNewPlanPeriods(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-medium focus:outline-hidden focus:border-blue-600 transition-colors"
+                    min={1}
+                    value={newUnitNumber}
+                    onChange={(e) => setNewUnitNumber(parseInt(e.target.value) || 1)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1">จำนวนคาบเรียน</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={newPeriods}
+                    onChange={(e) => setNewPeriods(parseInt(e.target.value) || 4)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  ชื่อหน่วยการเรียนรู้ / บทเรียน
-                </label>
+                <label className="block text-slate-600 font-bold mb-1">ชื่อหน่วย (ภาษาญี่ปุ่น หรือคำอ่าน)</label>
                 <input
                   type="text"
-                  required
-                  value={newPlanUnit}
-                  onChange={(e) => setNewPlanUnit(e.target.value)}
-                  placeholder="เช่น บทที่ 2 : อักษรฮิรางานะ หมวดอะ คะ สะ"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 font-medium focus:outline-hidden focus:border-blue-600 transition-colors"
+                  placeholder="เช่น 日常のあいさつ"
+                  value={newTitleJa}
+                  onChange={(e) => setNewTitleJa(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  คำอธิบาย / สาระสำคัญของบทเรียน
-                </label>
-                <textarea
-                  rows={3}
-                  value={newPlanDesc}
-                  onChange={(e) => setNewPlanDesc(e.target.value)}
-                  placeholder="ระบุภาพรวมและทักษะที่นักเรียนจะได้รับ..."
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 font-medium focus:outline-hidden focus:border-blue-600 transition-colors resize-none"
+                <label className="block text-slate-600 font-bold mb-1">ชื่อหน่วย (ภาษาไทย) *</label>
+                <input
+                  type="text"
+                  placeholder="เช่น การทักทายประจำวัน"
+                  value={newTitleTh}
+                  onChange={(e) => setNewTitleTh(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
                 />
               </div>
 
-              {/* Upload Drop Zone */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  แนบไฟล์เอกสารประกอบการสอน (PDF, PPTX, DOCX, MP4)
-                </label>
-                <div className="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-2xl p-4 text-center cursor-pointer transition-colors bg-slate-50/50">
-                  <UploadCloud className="w-8 h-8 text-blue-500 mx-auto mb-1" />
-                  <p className="text-xs font-bold text-slate-700">
-                    ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์
-                  </p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    รองรับไฟล์ขนาดสูงสุด 100 MB ต่อไฟล์
-                  </p>
-                </div>
+                <label className="block text-slate-600 font-bold mb-1">ช่วงเวลาที่สอน</label>
+                <input
+                  type="text"
+                  value={newDateRange}
+                  onChange={(e) => setNewDateRange(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                />
               </div>
+            </div>
 
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsCreatePlanModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 transition-colors cursor-pointer"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-xs hover:shadow-md transition-all cursor-pointer"
-                >
-                  บันทึกแผนการสอน
-                </button>
-              </div>
-            </form>
+            <div className="mt-6 flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-bold"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateNewUnit}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
+              >
+                บันทึกสร้างหน่วย
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* MODAL 2: จัดการไฟล์ */}
-      {isManageFilesModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-2xl w-full p-5 sm:p-6 space-y-4 my-8">
+      {/* MODAL 2: แก้ไขข้อมูลพื้นฐาน */}
+      {isEditBasicInfoModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-2xs p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-scale-up">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
-                  <Folder className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-slate-800 text-base sm:text-lg">
-                    จัดการคลังไฟล์และสื่อการสอน
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    พื้นที่จัดเก็บ R2 Cloud Storage (ใช้ไป 56.9 MB / 10 GB)
-                  </p>
-                </div>
-              </div>
-
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Edit3 className="w-4 h-4 text-blue-600" />
+                <span>แก้ไขข้อมูลพื้นฐาน (หน่วยที่ {currentUnit.unitNumber})</span>
+              </h3>
               <button
                 type="button"
-                onClick={() => setIsManageFilesModalOpen(false)}
-                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                onClick={() => setIsEditBasicInfoModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Storage Meter */}
-            <div className="p-3 bg-blue-50/60 rounded-2xl border border-blue-100 space-y-1.5 text-xs">
-              <div className="flex items-center justify-between font-bold text-slate-700">
-                <span>พื้นที่ R2 Cloud Storage ของวิชา {currentCourse.code}</span>
-                <span className="text-blue-600">0.57%</span>
+            <div className="mt-4 space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">ชื่อหน่วย</label>
+                <input
+                  type="text"
+                  value={editDisplayTitle}
+                  onChange={(e) => setEditDisplayTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold"
+                />
               </div>
-              <div className="w-full h-2 bg-blue-200/50 rounded-full overflow-hidden">
-                <div className="w-[1%] h-full bg-blue-600 rounded-full" />
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">เวลาเรียน (คาบ)</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={editPeriods}
+                  onChange={(e) => setEditPeriods(parseInt(e.target.value) || 1)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">ช่วงเวลา</label>
+                <input
+                  type="text"
+                  value={editDateRange}
+                  onChange={(e) => setEditDateRange(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                />
               </div>
             </div>
 
-            {/* Quick Upload */}
-            <div className="border-2 border-dashed border-blue-300 bg-blue-50/30 rounded-2xl p-4 text-center cursor-pointer hover:bg-blue-50/60 transition-colors">
-              <UploadCloud className="w-7 h-7 text-blue-600 mx-auto mb-1" />
-              <div className="text-xs font-bold text-slate-800">
-                อัปโหลดไฟล์สื่อการสอนใหม่
-              </div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
-                ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเบราว์เซอร์ไฟล์จากเครื่อง
-              </div>
+            <div className="mt-5 flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsEditBasicInfoModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-bold"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveBasicInfo}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold"
+              >
+                บันทึกการเปลี่ยนแปลง
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: แก้ไขตัวชี้วัด / ผลการเรียนรู้ */}
+      {isEditObjectivesModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-2xs p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-emerald-600" />
+                <span>แก้ไขตัวชี้วัด / ผลการเรียนรู้</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsEditObjectivesModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            {/* Current Files List */}
-            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-              {currentWeekPlan.files.map((f) => (
-                <div
-                  key={f.id}
-                  className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 hover:border-slate-200 bg-white text-xs"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    {getFileBadge(f.type)}
-                    <div className="truncate">
-                      <div className="font-bold text-slate-800 truncate">{f.name}</div>
-                      <div className="text-[10px] text-slate-400">
-                        {f.type} • {f.size} • {f.updatedAt}
-                      </div>
+            <div className="mt-4 space-y-3 text-xs max-h-[60vh] overflow-y-auto pr-1">
+              {editObjectives.map((obj, idx) => (
+                <div key={idx} className="flex items-start gap-2">
+                  <textarea
+                    rows={2}
+                    value={obj}
+                    onChange={(e) => {
+                      const updated = [...editObjectives];
+                      updated[idx] = e.target.value;
+                      setEditObjectives(updated);
+                    }}
+                    className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs leading-relaxed"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditObjectives(editObjectives.filter((_, i) => i !== idx));
+                    }}
+                    className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEditObjectives([...editObjectives, `${editObjectives.length + 1}. ตัวชี้วัดใหม่ (ต 1.1 ม.3/1)`]);
+                }}
+                className="w-full py-2 rounded-xl border border-dashed border-slate-300 text-blue-600 hover:bg-blue-50 font-bold flex items-center justify-center gap-1"
+              >
+                <Plus className="w-4 h-4" />
+                <span>เพิ่มตัวชี้วัด</span>
+              </button>
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsEditObjectivesModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-bold"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveObjectives}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold"
+              >
+                บันทึกตัวชี้วัด
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: แก้ไขการประเมินผล */}
+      {isEditEvaluationsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-2xs p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Layers className="w-4 h-4 text-blue-600" />
+                <span>แก้ไขโครงสร้างการประเมินผล</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsEditEvaluationsModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2.5 text-xs max-h-[60vh] overflow-y-auto pr-1">
+              {editEvaluations.map((ev, idx) => (
+                <div key={ev.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="col-span-2">
+                      <label className="text-[10px] text-slate-500 font-bold">รายการ</label>
+                      <input
+                        type="text"
+                        value={ev.title}
+                        onChange={(e) => {
+                          const updated = [...editEvaluations];
+                          updated[idx].title = e.target.value;
+                          setEditEvaluations(updated);
+                        }}
+                        className="w-full px-2 py-1 bg-white border border-slate-200 rounded-lg font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 font-bold">น้ำหนัก (%)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={ev.weightPercent}
+                        onChange={(e) => {
+                          const updated = [...editEvaluations];
+                          updated[idx].weightPercent = parseInt(e.target.value) || 0;
+                          setEditEvaluations(updated);
+                        }}
+                        className="w-full px-2 py-1 bg-white border border-slate-200 rounded-lg font-bold text-blue-600"
+                      />
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadFile(f.name, f.size)}
-                      className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
-                      title="ดาวน์โหลด"
-                    >
-                      <Download className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => showToast(`ลบไฟล์ ${f.name} เรียบร้อยแล้ว`)}
-                      className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
-                      title="ลบไฟล์"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-bold">เกณฑ์การประเมิน</label>
+                    <input
+                      type="text"
+                      value={ev.criteria}
+                      onChange={(e) => {
+                        const updated = [...editEvaluations];
+                        updated[idx].criteria = e.target.value;
+                        setEditEvaluations(updated);
+                      }}
+                      className="w-full px-2 py-1 bg-white border border-slate-200 rounded-lg"
+                    />
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="flex justify-end pt-2 border-t border-slate-100">
+            <div className="mt-4 p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-center text-xs font-bold text-blue-700">
+              คะแนนรวมทั้งหมด:{' '}
+              {editEvaluations.reduce((acc, curr) => acc + curr.weightPercent, 0)}%
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
               <button
                 type="button"
-                onClick={() => setIsManageFilesModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+                onClick={() => setIsEditEvaluationsModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-bold"
               >
-                ปิดหน้าต่าง
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEvaluations}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold"
+              >
+                บันทึกการประเมิน
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL 3: ดูตัวอย่างไฟล์ (Preview Simulator) */}
-      {previewFile && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-2xl w-full p-5 sm:p-6 space-y-4 my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5 min-w-0">
-                {getFileBadge(previewFile.type)}
-                <div className="min-w-0">
-                  <h3 className="font-extrabold text-slate-800 text-base sm:text-lg truncate">
-                    {previewFile.name}
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    {previewFile.type} • {previewFile.size} • อัปเดตเมื่อ {previewFile.updatedAt}
-                  </p>
-                </div>
+      {/* MODAL 5: ดูแผนการสอนทั้งหมด */}
+      {isViewAllModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-2xs p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-3xl w-full p-6 shadow-2xl border border-slate-100 animate-scale-up max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Eye className="w-5 h-5 text-blue-600" />
+                  <span>ภาพรวมแผนการสอนรายวิชา {currentCourse.code} ({units.length} หน่วย)</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  ห้อง {selectedClassroom} • {selectedSemester}
+                </p>
               </div>
-
               <button
                 type="button"
-                onClick={() => setPreviewFile(null)}
-                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                onClick={() => setIsViewAllModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Simulated Viewer */}
-            <div className="rounded-2xl border border-slate-200 bg-slate-900 text-white min-h-[220px] flex flex-col items-center justify-center p-6 text-center space-y-3">
-              {previewFile.type === 'MP4' ? (
-                <div className="space-y-2">
-                  <div className="w-16 h-16 rounded-full bg-blue-600/30 text-blue-400 border border-blue-500/30 flex items-center justify-center mx-auto cursor-pointer hover:scale-105 transition-transform">
-                    <Play className="w-8 h-8 fill-current translate-x-0.5" />
-                  </div>
-                  <div className="font-bold text-sm">วิดีโอสอนการทักทายภาษาญี่ปุ่น</div>
-                  <div className="text-xs text-slate-400">ความยาว: 14 นาที 20 วินาที • ความละเอียด 1080p Full HD</div>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <FileText className="w-12 h-12 text-slate-400 mx-auto" />
-                  <div className="font-bold text-sm">ตัวอย่างเอกสาร {previewFile.name}</div>
-                  <div className="text-xs text-slate-400">
-                    เอกสารประกอบการจัดการเรียนการสอน กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => showToast('คัดลอกลิงก์แชร์เรียบร้อยแล้ว')}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs cursor-pointer"
-              >
-                <Share2 className="w-3.5 h-3.5" />
-                <span>คัดลอกลิงก์</span>
-              </button>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPreviewFile(null)}
-                  className="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs cursor-pointer"
+            <div className="mt-4 overflow-y-auto space-y-3 pr-1 flex-1">
+              {units.map((unit) => (
+                <div
+                  key={unit.id}
+                  className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200 flex items-center justify-between gap-4"
                 >
-                  ปิด
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleDownloadFile(previewFile.name, previewFile.size);
-                    setPreviewFile(null);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>ดาวน์โหลดไฟล์</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 4: ดูรายละเอียดโครงสร้างแผนการสอน */}
-      {isUnitDetailModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-2xl w-full p-5 sm:p-6 space-y-4 my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
-                  <FileText className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-slate-800 text-base sm:text-lg">
-                    รายละเอียดโครงสร้างแผนการสอน
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    {currentCourse.code} • สัปดาห์ที่ {currentWeekPlan.week}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setIsUnitDetailModalOpen(false)}
-                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3.5 text-xs sm:text-sm">
-              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80">
-                <span className="font-bold text-slate-800 block text-xs mb-1">
-                  ชื่อหน่วยและสาระการเรียนรู้
-                </span>
-                <p className="text-slate-600 font-medium">{currentWeekPlan.title}</p>
-                <p className="text-slate-500 text-xs mt-1">{currentWeekPlan.description}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="p-3 rounded-xl bg-blue-50/50 border border-blue-100">
-                  <span className="text-slate-500 font-medium">ช่วงเวลาจัดการเรียนรู้</span>
-                  <div className="font-bold text-blue-900 mt-0.5">
-                    {currentWeekPlan.teachingDates}
-                  </div>
-                </div>
-                <div className="p-3 rounded-xl bg-blue-50/50 border border-blue-100">
-                  <span className="text-slate-500 font-medium">ระยะเวลาสอน</span>
-                  <div className="font-bold text-blue-900 mt-0.5">
-                    {currentWeekPlan.periods} คาบเรียน
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <span className="font-bold text-slate-800 block text-xs">
-                  จุดประสงค์การเรียนรู้ (K, P, A)
-                </span>
-                <div className="space-y-1.5">
-                  {currentWeekPlan.objectives.map((obj, i) => (
-                    <div key={i} className="flex items-start gap-2 text-xs text-slate-700">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                      <span>{obj}</span>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-8 h-8 rounded-full ${unit.circleColorClass} text-white font-extrabold text-xs flex items-center justify-center shrink-0`}
+                    >
+                      {unit.unitNumber}
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setIsUnitDetailModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs cursor-pointer shadow-xs"
-              >
-                ปิดหน้าต่าง
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 5: ตาราง 16 สัปดาห์ทั้งหมด */}
-      {isAllWeeksModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-3xl w-full p-5 sm:p-6 space-y-4 my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
-                  <Calendar className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-slate-800 text-base sm:text-lg">
-                    โครงสร้างแผนการสอนตลอดภาคเรียน (16 สัปดาห์)
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    วิชา {currentCourse.code} {currentCourse.name} • {currentCourse.semester}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setIsAllWeeksModalOpen(false)}
-                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-[60vh] overflow-y-auto p-1">
-              {WEEK_PLANS.map((plan) => {
-                const isSelected = activeWeek === plan.week;
-                return (
-                  <button
-                    key={plan.week}
-                    type="button"
-                    onClick={() => {
-                      setActiveWeek(plan.week);
-                      setIsAllWeeksModalOpen(false);
-                    }}
-                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between space-y-1.5 ${
-                      isSelected
-                        ? 'border-blue-600 bg-blue-50/80 shadow-xs'
-                        : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
-                    }`}
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-bold text-slate-900">
+                        {unit.displayTitle}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {unit.periods} คาบ • {unit.dateRange} • {unit.objectives.length} ตัวชี้วัด
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    className={`px-2.5 py-1 rounded-full text-xs font-bold border shrink-0 ${unit.statusBadgeClass}`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-extrabold text-xs text-blue-600">
-                        สัปดาห์ที่ {plan.week}
-                      </span>
-                      <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                          plan.status === 'DONE'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : plan.status === 'IN_PROGRESS'
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-slate-100 text-slate-500'
-                        }`}
-                      >
-                        {plan.statusLabel}
-                      </span>
-                    </div>
-
-                    <div className="font-bold text-slate-800 text-xs line-clamp-1">
-                      {plan.title}
-                    </div>
-
-                    <div className="text-[10px] text-slate-400">
-                      {plan.periods} คาบ • {plan.files.length} ไฟล์
-                    </div>
-                  </button>
-                );
-              })}
+                    {unit.statusLabel}
+                  </span>
+                </div>
+              ))}
             </div>
 
-            <div className="flex justify-end pt-3 border-t border-slate-100">
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end shrink-0">
               <button
                 type="button"
-                onClick={() => setIsAllWeeksModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+                onClick={() => setIsViewAllModalOpen(false)}
+                className="px-5 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold"
               >
                 ปิดหน้าต่าง
               </button>
@@ -1988,22 +1903,237 @@ export const LessonPlansView: React.FC = () => {
         </div>
       )}
 
-      {/* Teacher Subject Banner Modal */}
-      <TeacherSubjectBannerModal
-        isOpen={isBannerModalOpen}
-        onClose={() => setIsBannerModalOpen(false)}
-        courseCode={currentCourse.code}
-        courseName={currentCourse.name}
-        currentBannerUrl={customBannerUrl}
-        onBannerSaved={(newUrl) => {
-          setCustomBannerUrl(newUrl);
-          showToast(
-            newUrl
-              ? `บันทึกแบนเนอร์วิชา ${currentCourse.code} เรียบร้อยแล้ว (ขนาดไม่เกิน 150 KB)`
-              : `คืนค่าแบนเนอร์วิชา ${currentCourse.code} เป็นค่าเริ่มต้นเรียบร้อย`
-          );
-        }}
-      />
+      {/* MODAL 6: คัดลอกหน่วยการเรียนรู้ */}
+      {isCopyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-2xs p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Copy className="w-5 h-5 text-purple-600" />
+                <span>คัดลอกหน่วยการเรียนรู้</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsCopyModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 text-xs space-y-3">
+              <p className="text-slate-600">
+                คุณกำลังจะคัดลอกโครงสร้างแผนการสอนของ:
+              </p>
+              <div className="p-3 bg-purple-50 rounded-xl border border-purple-200 font-bold text-purple-900">
+                หน่วยที่ {currentUnit.unitNumber} : {currentUnit.displayTitle}
+              </div>
+              <p className="text-slate-500 leading-relaxed">
+                ระบบจะสร้างหน่วยการเรียนรู้ใหม่ลำดับถัดไปพร้อมตัวชี้วัดและโครงสร้างประเมินผลให้ทันที
+              </p>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsCopyModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-bold"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleCopyUnit}
+                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold"
+              >
+                ยืนยันการคัดลอก
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 7: พิมพ์แผนการสอน */}
+      {isPrintModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-2xs p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Printer className="w-5 h-5 text-slate-700" />
+                <span>พิมพ์แผนการจัดการเรียนรู้</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsPrintModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 p-5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-3 leading-relaxed">
+              <div className="text-center font-bold text-sm text-slate-900 border-b border-slate-200 pb-2">
+                แผนการจัดการเรียนรู้รายวิชา {currentCourse.name} ({currentCourse.code})<br />
+                ระดับชั้นมัธยมศึกษาปีที่ 3 • {selectedSemester}
+              </div>
+              <div>
+                <strong>หน่วยการเรียนรู้ที่ {currentUnit.unitNumber}:</strong> {currentUnit.displayTitle}
+              </div>
+              <div>
+                <strong>เวลาเรียน:</strong> {currentUnit.periodDurationText} • {currentUnit.dateRange}
+              </div>
+              <div>
+                <strong>ตัวชี้วัด / ผลการเรียนรู้:</strong>
+                <ul className="list-disc pl-5 mt-1 space-y-1">
+                  {currentUnit.objectives.map((o, idx) => (
+                    <li key={idx}>{o}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <strong>การวัดและประเมินผล:</strong>
+                <ul className="list-disc pl-5 mt-1 space-y-1">
+                  {currentUnit.evaluations.map((e) => (
+                    <li key={e.id}>
+                      {e.title} ({e.weightPercent}%) - {e.criteria}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsPrintModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-bold"
+              >
+                ปิด
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  window.print();
+                  setIsPrintModalOpen(false);
+                }}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"
+              >
+                <Printer className="w-4 h-4" />
+                <span>สั่งพิมพ์ (Print)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 8: ดูสถิติรายชั้น */}
+      {isClassStatsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-2xs p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Users className="w-5 h-5 text-blue-600" />
+                <span>สถิติชั้นเรียน ห้อง {selectedClassroom}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsClassStatsModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+              <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-xl">
+                <span className="text-slate-500 font-medium">นักเรียนทั้งหมด</span>
+                <div className="text-lg font-extrabold text-blue-700 mt-1">32 คน</div>
+              </div>
+              <div className="p-3 bg-emerald-50/70 border border-emerald-100 rounded-xl">
+                <span className="text-slate-500 font-medium">เข้าเรียนเฉลี่ย</span>
+                <div className="text-lg font-extrabold text-emerald-700 mt-1">93.2%</div>
+              </div>
+              <div className="p-3 bg-amber-50/70 border border-amber-100 rounded-xl">
+                <span className="text-slate-500 font-medium">ขาดเรียนสะสม</span>
+                <div className="text-lg font-extrabold text-amber-700 mt-1">2 คน</div>
+              </div>
+              <div className="p-3 bg-rose-50/70 border border-rose-100 rounded-xl">
+                <span className="text-slate-500 font-medium">การส่งใบงานเฉลี่ย</span>
+                <div className="text-lg font-extrabold text-rose-700 mt-1">96.8%</div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsClassStatsModalOpen(false)}
+                className="px-5 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold"
+              >
+                ปิด
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 9: ดูไฟล์และสื่อทั้งหมด */}
+      {isRelatedFilesModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-2xs p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <FolderOpen className="w-5 h-5 text-blue-600" />
+                <span>คลังไฟล์และสื่อการสอนทั้งหมด</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsRelatedFilesModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2 text-xs max-h-[60vh] overflow-y-auto pr-1">
+              {[
+                { name: 'แผนการสอน_หน่วยที่1_ทักทาย.pdf', type: 'PDF', size: '1.4 MB' },
+                { name: 'สไลด์_คำทักทายประจำวัน.pptx', type: 'PPTX', size: '6.8 MB' },
+                { name: 'ใบงานที่1.1_บทสนทนา.docx', type: 'DOCX', size: '820 KB' },
+                { name: 'วิดีโอ_การทักทายภาษาญี่ปุ่น_YouTube', type: 'VIDEO', size: 'ลิงก์ภายนอก' },
+              ].map((f, i) => (
+                <div
+                  key={i}
+                  className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-3"
+                >
+                  <div className="truncate">
+                    <div className="font-bold text-slate-800 truncate">{f.name}</div>
+                    <div className="text-[10px] text-slate-400">{f.type} • {f.size}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => showToast(`เปิด ${f.name}`)}
+                    className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold shrink-0"
+                  >
+                    เปิดดู
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 flex items-center justify-end pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsRelatedFilesModalOpen(false)}
+                className="px-5 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold"
+              >
+                ปิด
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
+export default LessonPlansView;

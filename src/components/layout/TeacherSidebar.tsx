@@ -161,26 +161,26 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       icon: BarChart2,
     },
     {
-      key: 'lessons',
+      key: 'courses',
       label: 'สื่อการสอน / ไฟล์',
       icon: Folder,
     },
     {
       key: 'exams',
-      label: 'จัดการสอบ / เก็บคะแนน',
+      label: 'ประเมิน / แบบฟอร์ม',
       icon: ClipboardList,
     },
     {
       key: 'academic-year',
       label: 'ปฏิทินกิจกรรม',
       icon: CalendarDays,
-    },
-    {
-      key: 'messages',
-      label: 'ข้อความ',
-      icon: MessageSquare,
       badge: '5',
       badgeStyle: 'bg-rose-500 text-white font-extrabold',
+    },
+    {
+      key: 'lessons',
+      label: 'แผนการสอน',
+      icon: MessageSquare,
     },
     ...(activeRole === 'STUDENT_AFFAIRS'
       ? [

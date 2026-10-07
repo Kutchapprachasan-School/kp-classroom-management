@@ -213,9 +213,9 @@ export const App: React.FC = () => {
       case 'student-council':
         return 'สภานักเรียน';
       case 'courses':
-        return 'รายวิชา';
+        return 'รายวิชา / สื่อการสอน';
       case 'lessons':
-        return 'สื่อการสอน / ไฟล์';
+        return 'แผนการสอน / จัดการแผนการสอน';
       case 'roster':
         return 'รายชื่อนักเรียน';
       case 'student':
