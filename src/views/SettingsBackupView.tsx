@@ -91,6 +91,7 @@ import { TEACHER_SUBJECTS_LIST } from '../services/teacherCourseAssignmentServic
 import { SettingsHeroBanner } from '../components/settings/SettingsHeroBanner';
 import { SettingsCategoryCard } from '../components/settings/SettingsCategoryCard';
 import { SettingsSubModal } from '../components/settings/SettingsSubModal';
+import { AdminTeacherBannerModal } from '../components/teacher/AdminTeacherBannerModal';
 
 export type SettingsKey =
   | 'school_info'
@@ -172,6 +173,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
   const [teacherBanners, setTeacherBanners] = useState<Record<TeacherBannerKey, TeacherBannerItem>>(() =>
     teacherBannerService.getBanners()
   );
+  const [adminBannerModalKey, setAdminBannerModalKey] = useState<TeacherBannerKey | null>(null);
 
   // Backups & Snapshots
   const [snapshots, setSnapshots] = useState<SgsSnapshotRecord[]>([]);
@@ -1612,7 +1614,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                 </div>
                 <button
                   type="button"
-                  onClick={() => showToast('เปิดตัวเลือกอัปโหลด Hero Banner')}
+                  onClick={() => setAdminBannerModalKey('hero')}
                   className="w-full py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
                 >
                   <Upload className="w-3.5 h-3.5" />
@@ -1629,7 +1631,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                 </div>
                 <button
                   type="button"
-                  onClick={() => showToast('เปิดตัวเลือกอัปโหลด Sidebar Mascot')}
+                  onClick={() => setAdminBannerModalKey('sidebar')}
                   className="w-full py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
                 >
                   <Upload className="w-3.5 h-3.5" />
@@ -1646,7 +1648,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                 </div>
                 <button
                   type="button"
-                  onClick={() => showToast('เปิดตัวเลือกอัปโหลด Bottom Quote')}
+                  onClick={() => setAdminBannerModalKey('bottom')}
                   className="w-full py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
                 >
                   <Upload className="w-3.5 h-3.5" />
@@ -1707,6 +1709,17 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
           </div>
         </div>
       </SettingsSubModal>
+
+      {/* Admin Teacher Banner Studio Modal */}
+      <AdminTeacherBannerModal
+        isOpen={adminBannerModalKey !== null}
+        onClose={() => {
+          setAdminBannerModalKey(null);
+          setTeacherBanners(teacherBannerService.getBanners());
+        }}
+        activeRole={activeRole}
+        initialBannerKey={adminBannerModalKey || 'hero'}
+      />
     </div>
   );
 };

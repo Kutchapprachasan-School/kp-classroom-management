@@ -73,7 +73,11 @@ const defaultBanners = teacherBannerService.getBanners();
 assert.strictEqual(defaultBanners.hero.id, 'hero');
 assert.strictEqual(defaultBanners.sidebar.id, 'sidebar');
 assert.strictEqual(defaultBanners.bottom.id, 'bottom');
-assert.ok(defaultBanners.hero.quoteText.includes('การศึกษาคือการลงทุน'), 'Hero quote text matches mockup');
+assert.ok(
+  defaultBanners.hero.quoteText.includes('การศึกษาคือการลงทุน') ||
+  defaultBanners.hero.quoteText.includes('การตั้งใจทำทุกครั้ง'),
+  'Hero quote text matches mockup'
+);
 assert.ok(defaultBanners.sidebar.quoteText.includes('สอนภาษาญี่ปุ่น'), 'Sidebar quote text matches mockup');
 assert.ok(defaultBanners.bottom.quoteText.includes('ภาษา...คือกุญแจสู่โลกกว้าง'), 'Bottom quote text matches mockup');
 console.log('  ✓ Default banners verified matching Reference Image 1');

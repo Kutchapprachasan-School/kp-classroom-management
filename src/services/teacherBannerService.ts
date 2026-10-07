@@ -16,6 +16,11 @@ export interface TeacherBannerItem {
   quoteText?: string;
   subText?: string;
   targetLink?: string;
+  opacity?: number;        // ความโปร่งแสง 20-100% (ค่าเริ่มต้น 100)
+  positionX?: number;      // เลื่อนตำแหน่งแนวนอน -50 ถึง +50% (ค่าเริ่มต้น 0)
+  positionY?: number;      // เลื่อนตำแหน่งแนวตั้ง -50 ถึง +50% (ค่าเริ่มต้น 0)
+  scale?: number;          // ย่อ/ขยายสัดส่วน 80 ถึง 150% (ค่าเริ่มต้น 100)
+  showQuote?: boolean;     // แสดงบอลลูนคำพูดคำคม (ค่าเริ่มต้น true)
   updatedAt?: string;
   updatedBy?: string;
 }
@@ -33,6 +38,11 @@ export const DEFAULT_TEACHER_BANNERS: Record<TeacherBannerKey, TeacherBannerItem
     customUrl: null,
     quoteText: 'สอนภาษาญี่ปุ่น',
     subText: 'เรียนรู้ เข้าใจ ใช้ได้จริง',
+    opacity: 100,
+    positionX: 0,
+    positionY: 0,
+    scale: 100,
+    showQuote: true,
     updatedAt: '2 ต.ค. 2569 • ค่าเริ่มต้นจากระบบ',
     updatedBy: 'ผู้ดูแลระบบฝ่ายวิชาการ',
   },
@@ -40,11 +50,16 @@ export const DEFAULT_TEACHER_BANNERS: Record<TeacherBannerKey, TeacherBannerItem
     id: 'hero',
     name: 'แบนเนอร์หลักด้านบน (Hero Banner)',
     locationLabel: 'ส่วนบนกึ่งกลางหน้าแดชบอร์ดของครู (Main Hero)',
-    dimensionGuide: 'แนะนำขนาด 1100 × 260 px หรือ 1200 × 300 px (สัดส่วน ~4.2:1)',
-    defaultUrl: '/images/teacher/hero_banner.png',
+    dimensionGuide: 'ขนาดมาตรฐานที่แนะนำ: 1200 × 260 px (สัดส่วน ~4.6:1)',
+    defaultUrl: '/images/teacher/hero_banner_anime.png',
     customUrl: null,
-    quoteText: '“ การศึกษาคือการลงทุน ที่คุ้มค่าที่สุดในชีวิต ”',
+    quoteText: '“การตั้งใจทำทุกครั้ง ช่วยให้เราก้าวหน้าได้ขึ้น นะคะ ♡”',
     subText: 'ร่วมสร้างอนาคตที่ดีกว่าไปด้วยกัน',
+    opacity: 100,
+    positionX: 0,
+    positionY: 0,
+    scale: 100,
+    showQuote: true,
     updatedAt: '2 ต.ค. 2569 • ค่าเริ่มต้นจากระบบ',
     updatedBy: 'ผู้ดูแลระบบฝ่ายวิชาการ',
   },
@@ -57,6 +72,11 @@ export const DEFAULT_TEACHER_BANNERS: Record<TeacherBannerKey, TeacherBannerItem
     customUrl: null,
     quoteText: '“ ภาษา...คือกุญแจสู่โลกกว้าง ”',
     subText: 'สอนวันนี้ เพื่ออนาคตที่ดีกว่าของพวกเขา',
+    opacity: 100,
+    positionX: 0,
+    positionY: 0,
+    scale: 100,
+    showQuote: true,
     updatedAt: '2 ต.ค. 2569 • ค่าเริ่มต้นจากระบบ',
     updatedBy: 'ผู้ดูแลระบบฝ่ายวิชาการ',
   },
