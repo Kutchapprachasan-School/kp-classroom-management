@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { gachaService } from '../services/gachaService';
 import { ChibiBuddyAvatar } from '../components/student/ChibiBuddyAvatar';
+import { cleanSlateService } from '../services/cleanSlateService';
+import type { AuthUser } from '../services/authService';
 
 export interface TrophyBadgeItem {
   id: string;
@@ -77,11 +79,13 @@ const BADGES_SCREEN_2: TrophyBadgeItem[] = [
 interface StudentTrophyViewProps {
   onNavigateToGacha?: () => void;
   onNavigateToMissions?: () => void;
+  currentUser?: AuthUser | null;
 }
 
 export const StudentTrophyView: React.FC<StudentTrophyViewProps> = ({
   onNavigateToGacha,
   onNavigateToMissions,
+  currentUser: _currentUser,
 }) => {
   const currentBuddy = gachaService.getActiveBuddy();
   const [buddyCustomName, setBuddyCustomName] = useState(currentBuddy.name);
@@ -117,7 +121,11 @@ export const StudentTrophyView: React.FC<StudentTrophyViewProps> = ({
     setTimeout(() => setToastMsg(null), 3000);
   };
 
-  const unlockedCount = BADGES_SCREEN_2.filter((b) => b.isUnlocked).length;
+  const isClean = cleanSlateService.isCleanSlateActive();
+  const badgesList = isClean
+    ? BADGES_SCREEN_2.map((b) => ({ ...b, isUnlocked: false, unlockedAt: undefined }))
+    : BADGES_SCREEN_2;
+  const unlockedCount = badgesList.filter((b) => b.isUnlocked).length;
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-12 animate-fade-in font-sans text-slate-800 select-none">
@@ -299,7 +307,7 @@ export const StudentTrophyView: React.FC<StudentTrophyViewProps> = ({
 
         {/* 6 Badges Grid (3 columns on desktop, 2 on tablet, 1 on mobile) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {BADGES_SCREEN_2.map((badge) => {
+          {badgesList.map((badge) => {
             const getIcon = () => {
               switch (badge.iconName) {
                 case 'work':

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Zap,
   Flame,
@@ -11,6 +11,9 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import type { QuizQuestion, StudentLeaderboardEntry } from '../types/viewModels';
+import { cleanSlateService } from '../services/cleanSlateService';
+import { gamificationService } from '../services/gamificationService';
+import { authService, type AuthUser } from '../services/authService';
 
 const arenaQuestions: QuizQuestion[] = [
   {
@@ -36,18 +39,45 @@ const arenaQuestions: QuizQuestion[] = [
   },
 ];
 
-const mockLeaderboard: StudentLeaderboardEntry[] = [
-  { rank: 1, name: 'ด.ญ. ปรียาภรณ์ ชัยแก้ว', classroom: 'ม.3/8', xp: 1240, streakDays: 12, avatarText: 'ป' },
-  { rank: 2, name: 'ด.ช. กฤษณะ ศรีสมบูรณ์', classroom: 'ม.3/8', xp: 1120, streakDays: 9, avatarText: 'ก' },
-  { rank: 3, name: 'ด.ช. ชัยมงคล วงศ์บุตร', classroom: 'ม.3/8', xp: 980, streakDays: 7, avatarText: 'ช' },
-  { rank: 4, name: 'ด.ช. ทัตธน คำฝั้น', classroom: 'ม.3/8', xp: 850, streakDays: 5, avatarText: 'ท' },
-  { rank: 5, name: 'ด.ญ. อคิราห์ วิรากร', classroom: 'ม.3/8', xp: 720, streakDays: 3, avatarText: 'อ' },
-  { rank: 6, name: 'ด.ช. อัศวิน วนเกษตรกุล', classroom: 'ม.3/8', xp: 690, streakDays: 2, avatarText: 'อ' },
-  { rank: 7, name: 'ด.ช. ภูรินท์ บัณฑิต', classroom: 'ม.3/8', xp: 670, streakDays: 4, avatarText: 'ภ' },
-  { rank: 8, name: 'ด.ช. จิรายุ เดชปันคำ (คุณ)', classroom: 'ม.3/8', xp: 650, streakDays: 4, avatarText: 'จ', isCurrentUser: true },
-];
+interface StudentArenaViewProps {
+  currentUser?: AuthUser | null;
+}
 
-export const StudentArenaView: React.FC = () => {
+export const StudentArenaView: React.FC<StudentArenaViewProps> = ({ currentUser }) => {
+  const effectiveUser = currentUser || authService.getCurrentUser();
+  const studentName = effectiveUser?.name || 'นักเรียน';
+  const studentRoom = effectiveUser?.classroomId || 'ม.3/1';
+  const isClean = cleanSlateService.isCleanSlateActive();
+  const [streakDays, setStreakDays] = useState<number>(() =>
+    isClean ? 0 : gamificationService.getStreak(effectiveUser?.id || 'stu-2')
+  );
+
+  useEffect(() => {
+    if (isClean) {
+      setStreakDays(0);
+    } else {
+      setStreakDays(gamificationService.getStreak(effectiveUser?.id || 'stu-2'));
+    }
+  }, [isClean, effectiveUser?.id]);
+
+  const leaderboard: StudentLeaderboardEntry[] = isClean
+    ? [
+        {
+          rank: 1,
+          name: `${studentName} (คุณ)`,
+          classroom: studentRoom,
+          xp: 0,
+          streakDays: streakDays,
+          avatarText: studentName.charAt(0) || 'น',
+          isCurrentUser: true,
+        },
+      ]
+    : [
+        { rank: 1, name: 'ด.ญ. ปรียาภรณ์ ชัยแก้ว', classroom: studentRoom, xp: 1240, streakDays: 12, avatarText: 'ป' },
+        { rank: 2, name: 'ด.ช. กฤษณะ ศรีสมบูรณ์', classroom: studentRoom, xp: 1120, streakDays: 9, avatarText: 'ก' },
+        { rank: 3, name: 'ด.ช. ชัยมงคล วงศ์บุตร', classroom: studentRoom, xp: 980, streakDays: 7, avatarText: 'ช' },
+        { rank: 4, name: `${studentName} (คุณ)`, classroom: studentRoom, xp: 650, streakDays: streakDays || 4, avatarText: studentName.charAt(0) || 'น', isCurrentUser: true },
+      ];
   const [quizState, setQuizState] = useState<'IDLE' | 'PLAYING' | 'RESULT'>('IDLE');
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
@@ -120,7 +150,7 @@ export const StudentArenaView: React.FC = () => {
             <div className="bg-white/15 backdrop-blur-md border border-white/20 rounded-2xl px-4 py-3 text-center min-w-[90px]">
               <div className="flex items-center justify-center gap-1 text-yellow-300">
                 <Flame className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                <span className="text-lg font-black">4</span>
+                <span className="text-lg font-black">{streakDays}</span>
               </div>
               <div className="text-[11px] text-white/80 font-medium">สตรีก (วัน)</div>
             </div>
@@ -152,7 +182,7 @@ export const StudentArenaView: React.FC = () => {
                     พร้อมประลองความรู้ประจำสัปดาห์หรือยัง?
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
-                    มีคำถาม 3 ข้อ ข้อละ 50 XP พร้อมโบนัสสตรีก 4 วันต่อเนื่องอีก 50 XP รวมสูงสุด <span className="font-semibold text-amber-600">200 XP</span>!
+                    มีคำถาม 3 ข้อ ข้อละ 50 XP พร้อมโบนัสสตรีกต่อเนื่องอีก 50 XP รวมสูงสุด <span className="font-semibold text-amber-600">200 XP</span>!
                   </p>
                 </div>
 
@@ -306,7 +336,7 @@ export const StudentArenaView: React.FC = () => {
                   <div className="h-8 w-px bg-amber-200" />
                   <div className="text-center">
                     <div className="text-xs text-amber-700 font-medium">สตรีกต่อเนื่อง</div>
-                    <div className="text-2xl font-black text-orange-600">5 วัน 🔥</div>
+                    <div className="text-2xl font-black text-orange-600">{Math.max(1, streakDays + 1)} วัน 🔥</div>
                   </div>
                 </div>
 
@@ -352,16 +382,16 @@ export const StudentArenaView: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-amber-500" />
                 <h3 className="font-bold text-slate-800 text-sm">
-                  อันดับสนามประลอง ม.3/8
+                  อันดับสนามประลอง {studentRoom}
                 </h3>
               </div>
               <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
-                สัปดาห์ที่ 8
+                สัปดาห์นี้
               </span>
             </div>
 
             <div className="divide-y divide-slate-100 mt-2">
-              {mockLeaderboard.map((item) => (
+              {leaderboard.map((item) => (
                 <div
                   key={item.rank}
                   className={`py-3 px-2 flex items-center justify-between rounded-xl transition-colors ${

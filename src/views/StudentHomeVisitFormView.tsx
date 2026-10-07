@@ -15,34 +15,54 @@ import {
   type HomeVisitRecord,
   type SdqLevel,
 } from '../services/homeVisitService';
+import { cleanSlateService } from '../services/cleanSlateService';
+import { authService, type AuthUser } from '../services/authService';
+import { type SchoolSettingsConfig } from '../config/schoolSettings';
 
 interface StudentHomeVisitFormViewProps {
   onAwardXp?: (xp: number) => void;
+  currentUser?: AuthUser | null;
+  schoolSettings?: SchoolSettingsConfig;
 }
 
 export const StudentHomeVisitFormView: React.FC<StudentHomeVisitFormViewProps> = ({
   onAwardXp,
+  currentUser,
+  schoolSettings,
 }) => {
-  const existing = homeVisitService.getByStudentCode('45102');
+  const effectiveUser = currentUser || authService.getCurrentUser();
+  const studentCode = effectiveUser?.studentCode || '45102';
+  const isClean = cleanSlateService.isCleanSlateActive();
+  const existing = homeVisitService.getByStudentCode(studentCode);
 
   // Stepper State (1, 2, 3)
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
 
   // Step 1: ข้อมูลผู้ปกครองและที่อยู่
   const [guardianName, setGuardianName] = useState(
-    existing?.guardianName || 'นางสมพร คำฝั้น'
+    existing?.guardianName || (isClean ? '' : 'นางสมพร คำฝั้น')
   );
   const [guardianRelation, setGuardianRelation] = useState(
     existing?.guardianRelation || 'มารดา'
   );
   const [guardianPhone, setGuardianPhone] = useState(
-    existing?.guardianPhone || '081-452-9918'
+    existing?.guardianPhone || (isClean ? '' : '081-452-9918')
   );
-  const [addressLine, setAddressLine] = useState('142/8 หมู่ 4');
-  const [province, setProvince] = useState('เชียงใหม่');
-  const [district, setDistrict] = useState('เมืองเชียงใหม่');
-  const [subdistrict, setSubdistrict] = useState('หนองบัว');
-  const [postalCode, setPostalCode] = useState('50200');
+  const [addressLine, setAddressLine] = useState(
+    existing?.address || (isClean ? '' : '142/8 หมู่ 4')
+  );
+  const [province, setProvince] = useState(
+    schoolSettings?.districtProvince?.includes('จ.')
+      ? schoolSettings.districtProvince.split('จ.')[1].trim()
+      : isClean ? 'อุดรธานี' : 'เชียงใหม่'
+  );
+  const [district, setDistrict] = useState(
+    schoolSettings?.districtProvince?.includes('อ.')
+      ? schoolSettings.districtProvince.split('อ.')[1].split(' ')[0]
+      : isClean ? 'กุดจับ' : 'เมืองเชียงใหม่'
+  );
+  const [subdistrict, setSubdistrict] = useState(isClean ? 'เมืองเพีย' : 'หนองบัว');
+  const [postalCode, setPostalCode] = useState(isClean ? '41250' : '50200');
 
   // Step 2: สภาพครอบครัวและการเรียน
   const [familyMembersCount, setFamilyMembersCount] = useState('4 คน');
@@ -50,20 +70,20 @@ export const StudentHomeVisitFormView: React.FC<StudentHomeVisitFormViewProps> =
     '10,001 - 20,000 บาท'
   );
   const [guardianOccupation, setGuardianOccupation] = useState(
-    'รับจ้างทั่วไป / ค้าขาย'
+    isClean ? '' : 'รับจ้างทั่วไป / ค้าขาย'
   );
   const [housingType, setHousingType] = useState('บ้านของตนเอง');
   const travelMethod = 'รถโดยสารประจำทาง/รับจ้าง';
   const [familyNotes, setFamilyNotes] = useState(
-    'ช่วงเย็นช่วยผู้ปกครองขายของที่ตลาด บางวันทำการบ้านเสร็จดึก ต้องการคำแนะนำเรื่องตารางอ่านหนังสือ'
+    existing?.sdqEmotionalNote || (isClean ? '' : 'ช่วงเย็นช่วยผู้ปกครองขายของที่ตลาด บางวันทำการบ้านเสร็จดึก ต้องการคำแนะนำเรื่องตารางอ่านหนังสือ')
   );
 
   // Step 3: สรุปผลการเยี่ยมบ้าน & GPS
-  const [gpsLat, setGpsLat] = useState<number>(existing?.gpsLat || 18.7883);
-  const [gpsLng, setGpsLng] = useState<number>(existing?.gpsLng || 98.9542);
+  const [gpsLat, setGpsLat] = useState<number>(existing?.gpsLat || 17.4167);
+  const [gpsLng, setGpsLng] = useState<number>(existing?.gpsLng || 102.5833);
   const [isLocating, setIsLocating] = useState(false);
   const [teacherSummary, setTeacherSummary] = useState(
-    'นักเรียนมีความกตัญญูและตั้งใจเรียน สภาพแวดล้อมครอบครัวอบอุ่นแต่มีภาระงานช่วยครอบครัว ครูประจำชั้นจะช่วยติดตามและให้คำปรึกษาอย่างใกล้ชิด'
+    existing?.teacherSummaryNote || (isClean ? 'อยู่ระหว่างรอการลงพื้นที่เยี่ยมบ้านโดยครูที่ปรึกษา' : 'นักเรียนมีความกตัญญูและตั้งใจเรียน สภาพแวดล้อมครอบครัวอบอุ่นแต่มีภาระงานช่วยครอบครัว ครูประจำชั้นจะช่วยติดตามและให้คำปรึกษาอย่างใกล้ชิด')
   );
 
   // SDQ Self Assessment (5 dimensions, 0-8 each = 0-40)
@@ -110,7 +130,7 @@ export const StudentHomeVisitFormView: React.FC<StudentHomeVisitFormViewProps> =
 
   const handleSaveFinal = () => {
     const fullAddress = `${addressLine} ต.${subdistrict} อ.${district} จ.${province} ${postalCode}`;
-    homeVisitService.submitStudentHomeInfo('45102', {
+    homeVisitService.submitStudentHomeInfo(studentCode, {
       address: fullAddress,
       landmarkNote: 'ข้างวัดป่าแดง บ้านรั้วไม้สีน้ำตาล',
       gpsLat,

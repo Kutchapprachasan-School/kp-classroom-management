@@ -204,6 +204,10 @@ class BellScheduleService {
     return generateBellScheduleTimeline(this.getConfig());
   }
 
+  public getPeriodsTimeline(): BellScheduleTimelineItem[] {
+    return this.getTimeline();
+  }
+
   public generateBellScheduleTimeline(config: SchoolBellScheduleConfig): BellScheduleTimelineItem[] {
     return generateBellScheduleTimeline(config);
   }

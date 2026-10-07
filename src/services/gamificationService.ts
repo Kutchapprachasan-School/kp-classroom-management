@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase'
 import { studentAdventureQuests } from '../data/mockData';
 import type { StudentQuestItem, StudentLeaderboardEntry, BadgeItem } from '../types/viewModels';
 import { behaviorService } from './behaviorService';
+import { cleanSlateService } from './cleanSlateService';
 
 const STORAGE_KEY_QUESTS = 'cls_student_quests';
 const STORAGE_KEY_STREAK = 'cls_student_streak';
@@ -61,6 +62,9 @@ const getLocalQuests = (): StudentQuestItem[] => {
     } catch {
       // fallback
     }
+  }
+  if (cleanSlateService.isCleanSlateActive()) {
+    return [];
   }
   return studentAdventureQuests;
 };
@@ -127,11 +131,22 @@ export const gamificationService = {
 
   // READ: Get leaderboard
   async getLeaderboard(): Promise<StudentLeaderboardEntry[]> {
+    if (cleanSlateService.isCleanSlateActive()) {
+      return [];
+    }
     return defaultLeaderboard;
   },
 
   // READ: Get badges / trophies
   async getTrophies(): Promise<BadgeItem[]> {
+    if (cleanSlateService.isCleanSlateActive()) {
+      return defaultBadges.map((b) => ({
+        ...b,
+        isUnlocked: false,
+        unlockedAt: undefined,
+        progressPercent: 0,
+      }));
+    }
     return defaultBadges;
   },
 
@@ -139,7 +154,8 @@ export const gamificationService = {
   async claimDailyCheckin(studentId = 'stu-2'): Promise<{ streak: number; xpAwarded: number; isFirstToday: boolean }> {
     const today = new Date().toISOString().split('T')[0];
     const lastCheckin = localStorage.getItem(`${STORAGE_KEY_STREAK}_${studentId}_date`);
-    const currentStreak = parseInt(localStorage.getItem(`${STORAGE_KEY_STREAK}_${studentId}_count`) || '12', 10);
+    const defaultInitialStreak = cleanSlateService.isCleanSlateActive() ? '0' : '12';
+    const currentStreak = parseInt(localStorage.getItem(`${STORAGE_KEY_STREAK}_${studentId}_count`) || defaultInitialStreak, 10);
 
     if (lastCheckin === today) {
       return { streak: currentStreak, xpAwarded: 0, isFirstToday: false };
@@ -154,5 +170,10 @@ export const gamificationService = {
     await behaviorService.awardXp(studentId, xp, `เช็คชื่อประจำวันต่อเนื่อง (${newStreak} วัน)`, idempotencyKey);
 
     return { streak: newStreak, xpAwarded: xp, isFirstToday: true };
+  },
+
+  getStreak(studentId = 'stu-2'): number {
+    const defaultInitialStreak = cleanSlateService.isCleanSlateActive() ? '0' : '12';
+    return parseInt(localStorage.getItem(`${STORAGE_KEY_STREAK}_${studentId}_count`) || defaultInitialStreak, 10);
   },
 };

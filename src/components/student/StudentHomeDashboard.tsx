@@ -23,23 +23,42 @@ import {
   studentBannerService,
   STUDENT_BANNERS_EVENT,
 } from '../../services/studentBannerService';
+import { gamificationService } from '../../services/gamificationService';
+import { cleanSlateService } from '../../services/cleanSlateService';
+import { bellScheduleService } from '../../services/bellScheduleService';
+import { TEACHER_SUBJECTS_LIST } from '../../services/teacherCourseAssignmentService';
 import type { StudentTabKey } from './StudentSidebar';
+import type { AuthUser } from '../../services/authService';
+import type { SchoolSettingsConfig } from '../../config/schoolSettings';
+import type { StudentQuestItem } from '../../types/viewModels';
 
 interface StudentHomeDashboardProps {
   onNavigate: (tab: StudentTabKey) => void;
   onOpenAssignment?: (assignmentId: string) => void;
+  currentUser?: AuthUser | null;
+  schoolSettings?: SchoolSettingsConfig;
 }
 
 export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
   onNavigate,
   onOpenAssignment,
+  currentUser,
 }) => {
+  const isClean = cleanSlateService.isCleanSlateActive();
+  const studentRoom = currentUser?.classroomId || 'ม.3/1';
+  const bellConfig = bellScheduleService.getConfig();
+
+  const [quests, setQuests] = useState<StudentQuestItem[]>([]);
   const [heroBannerUrl, setHeroBannerUrl] = useState<string>(() =>
     studentBannerService.getEffectiveBannerUrl('hero')
   );
   const [bottomBannerUrl, setBottomBannerUrl] = useState<string>(() =>
     studentBannerService.getEffectiveBannerUrl('bottom')
   );
+
+  useEffect(() => {
+    gamificationService.getQuests().then(setQuests);
+  }, []);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -49,6 +68,11 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
     window.addEventListener(STUDENT_BANNERS_EVENT, handleUpdate);
     return () => window.removeEventListener(STUDENT_BANNERS_EVENT, handleUpdate);
   }, []);
+
+  const pendingQuests = quests.filter((q) => q.status === 'PENDING');
+  const enrolledSubjects = TEACHER_SUBJECTS_LIST.filter((s) =>
+    s.classrooms.some((c) => c === studentRoom || c.includes(studentRoom))
+  );
 
   return (
     <div className="font-['Prompt',sans-serif] space-y-5 animate-fade-in text-slate-800 select-none pb-8">
@@ -99,9 +123,11 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
               onClick={() => onNavigate('missions')}
               className="bg-white rounded-2xl p-3.5 border border-sky-100/80 shadow-2xs hover:shadow-xs hover:border-sky-300 transition-all cursor-pointer flex flex-col justify-between relative group"
             >
-              <span className="absolute top-3.5 right-3.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-red-500 text-white shadow-2xs">
-                3
-              </span>
+              {pendingQuests.length > 0 && (
+                <span className="absolute top-3.5 right-3.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-red-500 text-white shadow-2xs">
+                  {pendingQuests.length}
+                </span>
+              )}
               <div>
                 <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center border border-sky-100 shadow-2xs group-hover:scale-105 transition-transform">
                   <ClipboardCheck className="w-5 h-5" />
@@ -112,7 +138,7 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
                 </div>
               </div>
               <p className="text-[11px] text-slate-400 mt-1 truncate">
-                มี 3 งานที่ต้องทำ
+                {pendingQuests.length > 0 ? `มี ${pendingQuests.length} งานที่ต้องทำ` : 'ไม่มีงานค้าง ✨'}
               </p>
             </div>
 
@@ -131,7 +157,7 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
                 </div>
               </div>
               <p className="text-[11px] text-slate-400 mt-1 truncate">
-                วันนี้มี 4 คาบ
+                วันนี้มี {bellConfig.totalPeriodsPerDay} คาบ
               </p>
             </div>
 
@@ -179,116 +205,57 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
 
             {/* Assignment Cards List */}
             <div className="space-y-3">
-              {/* Item 1: ใบงานที่ 1 การใช้ AI ในชีวิตประจำวัน */}
-              <div className="rounded-2xl border border-slate-200/80 hover:border-purple-300 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all hover:shadow-2xs bg-white">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 border border-purple-100 flex items-center justify-center shrink-0 shadow-2xs">
-                    <FileText className="w-5 h-5" />
+              {pendingQuests.length === 0 ? (
+                <div className="text-center py-8 px-4 bg-slate-50/60 rounded-2xl border border-dashed border-slate-200">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3 border border-emerald-100">
+                    <ClipboardCheck className="w-6 h-6" />
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-[11px] text-slate-400 font-medium">
-                      วิชา ญ31201 · ม.4/1
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                      <span className="font-bold text-slate-900 text-xs sm:text-sm">
-                        ใบงานที่ 1 การใช้ AI ในชีวิตประจำวัน
-                      </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-500 border border-red-200">
-                        ครบกำหนดวันนี้
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-1">
-                      ส่งภายใน 1 ต.ค. 2569 เวลา 23:59 น.
-                    </div>
-                  </div>
+                  <h4 className="text-sm font-bold text-slate-800 mb-1">
+                    ไม่มีงานค้างในขณะนี้
+                  </h4>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+                    คุณส่งงานครบถ้วนหรือยังไม่มีงานใหม่ที่ได้รับมอบหมาย ยอดเยี่ยมมาก! ✨
+                  </p>
                 </div>
+              ) : (
+                pendingQuests.slice(0, 3).map((quest) => (
+                  <div
+                    key={quest.id}
+                    className="rounded-2xl border border-slate-200/80 hover:border-blue-300 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all hover:shadow-2xs bg-white"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0 shadow-2xs">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[11px] text-slate-400 font-medium">
+                          {quest.subjectTitle}
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                          <span className="font-bold text-slate-900 text-xs sm:text-sm">
+                            {quest.title}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-1">
+                          กำหนดส่ง: {quest.dueDateText} · เต็ม {quest.maxScore} คะแนน
+                        </div>
+                      </div>
+                    </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenAssignment?.('assign-1');
-                    onNavigate('missions');
-                  }}
-                  className="self-end sm:self-center px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer hover:scale-102"
-                >
-                  <span>ทำงาน</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Item 2: แบบฝึกหัด Unit 1 วัฒนธรรมอาหารญี่ปุ่นยุคใหม่ */}
-              <div className="rounded-2xl border border-slate-200/80 hover:border-emerald-300 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all hover:shadow-2xs bg-white">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0 shadow-2xs">
-                    <FileText className="w-5 h-5" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onOpenAssignment?.(quest.id);
+                        onNavigate('missions');
+                      }}
+                      className="self-end sm:self-center px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer hover:scale-102"
+                    >
+                      <span>ทำงาน</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-[11px] text-slate-400 font-medium">
-                      วิชา ญ33201 · ม.4/1
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                      <span className="font-bold text-slate-900 text-xs sm:text-sm">
-                        แบบฝึกหัด Unit 1 วัฒนธรรมอาหารญี่ปุ่นยุคใหม่
-                      </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">
-                        ครบกำหนดใน 3 วัน
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-1">
-                      ส่งภายใน 3 ต.ค. 2569 เวลา 23:59 น.
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenAssignment?.('assign-2');
-                    onNavigate('missions');
-                  }}
-                  className="self-end sm:self-center px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer hover:scale-102"
-                >
-                  <span>ทำงาน</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Item 3: ใบงานที่ 2 คำศัพท์เรื่องเลข 0-100 */}
-              <div className="rounded-2xl border border-slate-200/80 hover:border-sky-300 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all hover:shadow-2xs bg-white">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-11 h-11 rounded-xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center shrink-0 shadow-2xs">
-                    <FileText className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[11px] text-slate-400 font-medium">
-                      วิชา ญ21202 · ม.1/1
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                      <span className="font-bold text-slate-900 text-xs sm:text-sm">
-                        ใบงานที่ 2 คำศัพท์เรื่องเลข 0-100
-                      </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-600 border border-sky-200">
-                        ครบกำหนดใน 5 วัน
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-1">
-                      ส่งภายใน 5 ต.ค. 2569 เวลา 23:59 น.
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenAssignment?.('assign-3');
-                    onNavigate('missions');
-                  }}
-                  className="self-end sm:self-center px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer hover:scale-102"
-                >
-                  <span>ทำงาน</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -305,7 +272,7 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
                 ระดับของฉัน
               </h3>
               <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                Lv.2
+                {isClean ? 'Lv.1' : 'Lv.2'}
               </span>
             </div>
 
@@ -331,7 +298,7 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
                   <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
                 </div>
                 <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                  วิ่งออกไป! เติบโตไปด้วยกัน!
+                  {isClean ? 'เริ่มต้นการเรียนรู้และเติบโตไปด้วยกัน!' : 'วิ่งออกไป! เติบโตไปด้วยกัน!'}
                 </p>
               </div>
             </div>
@@ -339,17 +306,17 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
             {/* Progress */}
             <div className="space-y-1.5 pt-1">
               <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
-                <span>เลเวล 2</span>
-                <span className="text-slate-500">650 / 1000 XP</span>
+                <span>{isClean ? 'เลเวล 1' : 'เลเวล 2'}</span>
+                <span className="text-slate-500">{isClean ? '0 / 100 XP' : '650 / 1000 XP'}</span>
               </div>
               <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
                 <div
                   className="bg-blue-600 h-full rounded-full transition-all duration-500"
-                  style={{ width: '65%' }}
+                  style={{ width: isClean ? '0%' : '65%' }}
                 />
               </div>
               <div className="text-[11px] text-slate-400 text-center">
-                อีก 350 XP จะถึงเลเวล 3
+                {isClean ? 'อีก 100 XP จะถึงเลเวล 2' : 'อีก 350 XP จะถึงเลเวล 3'}
               </div>
             </div>
 
@@ -396,7 +363,7 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
                     วิชาที่เรียน
                   </div>
                   <div className="text-xs sm:text-sm font-bold text-blue-600 mt-0.5">
-                    6 วิชา
+                    {enrolledSubjects.length} วิชา
                   </div>
                 </div>
               </div>
@@ -411,7 +378,7 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
                     งานที่ต้องทำ
                   </div>
                   <div className="text-xs sm:text-sm font-bold text-blue-600 mt-0.5">
-                    3 งาน
+                    {pendingQuests.length} งาน
                   </div>
                 </div>
               </div>
@@ -426,7 +393,7 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
                     คะแนนรวม
                   </div>
                   <div className="text-xs sm:text-sm font-bold text-slate-800 mt-0.5">
-                    88.5%
+                    {isClean ? 'รอประเมิน' : '88.5%'}
                   </div>
                 </div>
               </div>
@@ -441,7 +408,7 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
                     XP ทั้งหมด
                   </div>
                   <div className="text-xs sm:text-sm font-bold text-slate-800 mt-0.5">
-                    670
+                    {isClean ? '0' : '670'}
                   </div>
                 </div>
               </div>

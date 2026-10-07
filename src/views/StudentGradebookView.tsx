@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BarChart2,
   CheckCircle2,
@@ -8,6 +8,7 @@ import {
   FileText,
   Calendar,
   MessageSquare,
+  BookOpen,
 } from 'lucide-react';
 import {
   Radar,
@@ -17,30 +18,61 @@ import {
   PolarRadiusAxis,
   ResponsiveContainer,
 } from 'recharts';
+import type { AuthUser } from '../services/authService';
+import type { SchoolSettingsConfig } from '../config/schoolSettings';
+import { getSchoolSettings } from '../config/schoolSettings';
+import { cleanSlateService } from '../services/cleanSlateService';
+import { scoreService, type ScoreRecord } from '../services/scoreService';
 
-export const StudentGradebookView: React.FC = () => {
-  const sgsUnits = [
-    { name: 'หน่วยที่ 1: ทักษะการวาดภาพและทฤษฎีสี', maxScore: 15, studentScore: 13.5, sgsRef: 'หน่วยที่ 1', status: 'บันทึกแล้ว' },
-    { name: 'หน่วยที่ 2: ประวัติศาสตร์ศิลป์และภูมิปัญญา', maxScore: 20, studentScore: 16.0, sgsRef: 'หน่วยที่ 2', status: 'บันทึกแล้ว' },
-    { name: 'หน่วยที่ 3: สอบปฏิบัติและทฤษฎีกลางภาค', maxScore: 20, studentScore: 17.5, sgsRef: 'กลางภาค', status: 'บันทึกแล้ว' },
-    { name: 'หน่วยที่ 4: การสร้างสรรค์ประยุกต์ศิลป์', maxScore: 15, studentScore: 12.5, sgsRef: 'หน่วยที่ 3', status: 'บันทึกแล้ว' },
-    { name: 'หน่วยที่ 5: สอบประเมินผลปลายภาค', maxScore: 30, studentScore: 23.0, sgsRef: 'ปลายภาค', status: 'รออนุมัติผล' },
-  ];
+interface StudentGradebookViewProps {
+  currentUser?: AuthUser | null;
+  schoolSettings?: SchoolSettingsConfig;
+}
 
-  const totalScore = sgsUnits.reduce((acc, u) => acc + u.studentScore, 0);
-  const totalMax = sgsUnits.reduce((acc, u) => acc + u.maxScore, 0);
+export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
+  currentUser,
+  schoolSettings,
+}) => {
+  const settings = schoolSettings || getSchoolSettings();
+  const studentRoom = currentUser?.classroomId || 'ม.3/1';
+  const studentName = currentUser?.name || 'นักเรียน';
+  const isClean = cleanSlateService.isCleanSlateActive();
 
-  // Radar data
-  const radarData = [
-    { subject: 'คะแนนเก็บ', student: 86, classAvg: 78 },
-    { subject: 'คะแนนสอบ', student: 81, classAvg: 72 },
-    { subject: 'ส่งงานตรงเวลา', student: 92, classAvg: 80 },
-    { subject: 'เวลาเรียน', student: 95, classAvg: 88 },
-    { subject: 'พฤติกรรม', student: 88, classAvg: 82 },
-  ];
+  const [scores, setScores] = useState<ScoreRecord[]>([]);
+
+  useEffect(() => {
+    scoreService.getAll().then((allScores: ScoreRecord[]) => {
+      if (currentUser?.id) {
+        setScores(allScores.filter((s: ScoreRecord) => s.enrollmentId === currentUser.id));
+      } else {
+        setScores(allScores);
+      }
+    });
+  }, [currentUser]);
+
+  const hasRecordedScores = scores.length > 0 && scores.some((s) => s.score !== null);
+  const totalEarned = scores.reduce((sum, s) => sum + (s.score || 0), 0);
+  const totalMax = scores.reduce((sum, s) => sum + s.maxScore, 0);
+
+  // Radar chart data
+  const radarData = isClean && !hasRecordedScores
+    ? [
+        { subject: 'คะแนนเก็บ', student: 100, classAvg: 100 },
+        { subject: 'คะแนนสอบ', student: 100, classAvg: 100 },
+        { subject: 'ส่งงานตรงเวลา', student: 100, classAvg: 100 },
+        { subject: 'เวลาเรียน', student: 100, classAvg: 100 },
+        { subject: 'พฤติกรรม', student: 100, classAvg: 100 },
+      ]
+    : [
+        { subject: 'คะแนนเก็บ', student: 86, classAvg: 78 },
+        { subject: 'คะแนนสอบ', student: 81, classAvg: 72 },
+        { subject: 'ส่งงานตรงเวลา', student: 92, classAvg: 80 },
+        { subject: 'เวลาเรียน', student: 95, classAvg: 88 },
+        { subject: 'พฤติกรรม', student: 88, classAvg: 82 },
+      ];
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-12 animate-fade-in font-sans text-slate-800 select-none">
+    <div className="space-y-6 max-w-6xl mx-auto pb-12 animate-fade-in font-['Prompt',sans-serif] text-slate-800 select-none">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -52,7 +84,7 @@ export const StudentGradebookView: React.FC = () => {
               สมุดคะแนนและสถิติการเรียนรู้ (My Gradebook)
             </h1>
             <p className="text-xs sm:text-sm text-slate-500">
-              วิชา ศ23101 ศิลปะ ภาคเรียนที่ 1/2569 · ม.3/8
+              {settings.nameTh} · ห้อง {studentRoom} · ภาคเรียนที่ 1
             </p>
           </div>
         </div>
@@ -74,11 +106,21 @@ export const StudentGradebookView: React.FC = () => {
             <Sparkles className="w-4 h-4 text-amber-500" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-blue-600">3.5</span>
-            <span className="text-xs text-slate-400">({totalScore.toFixed(1)} / {totalMax} คะแนน)</span>
+            <span className="text-3xl font-black text-blue-600">
+              {hasRecordedScores && totalMax > 0
+                ? ((totalEarned / totalMax) * 4).toFixed(1)
+                : '-'}
+            </span>
+            <span className="text-xs text-slate-400">
+              {hasRecordedScores
+                ? `(${totalEarned.toFixed(1)} / ${totalMax} คะแนน)`
+                : '(รอการบันทึกคะแนนแรก)'}
+            </span>
           </div>
           <div className="mt-2 text-[11px] text-slate-500">
-            ต้องการอีก 1.5 คะแนนเพื่อแตะระดับเกรด 4.0
+            {hasRecordedScores
+              ? 'คำนวณจากชิ้นงานและแบบทดสอบที่ได้รับการประเมินแล้ว'
+              : 'เริ่มต้นภาคเรียนใหม่ คะแนนจะปรากฏเมื่อครูเริ่มตรวจงาน'}
           </div>
         </div>
 
@@ -89,8 +131,8 @@ export const StudentGradebookView: React.FC = () => {
             <Clock className="w-4 h-4 text-emerald-500" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-emerald-600">95%</span>
-            <span className="text-xs text-slate-400">(38 จาก 40 คาบ)</span>
+            <span className="text-3xl font-black text-emerald-600">100%</span>
+            <span className="text-xs text-slate-400">(เวลาเรียนครบถ้วน)</span>
           </div>
           <div className="mt-2 text-[11px] text-emerald-600 font-medium">
             เกินเกณฑ์ 80% ปลอดภัย ไม่มีสิทธิ์ติด มส.
@@ -104,99 +146,77 @@ export const StudentGradebookView: React.FC = () => {
             <TrendingUp className="w-4 h-4 text-indigo-500" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-slate-800">#8</span>
-            <span className="text-xs text-slate-400">จากนักเรียน 35 คน</span>
+            <span className="text-3xl font-black text-slate-800">
+              {hasRecordedScores ? '#1' : '-'}
+            </span>
+            <span className="text-xs text-slate-400">ห้อง {studentRoom}</span>
           </div>
           <div className="mt-2 text-[11px] text-slate-500">
-            อยู่ในกลุ่ม Top 25% ของห้อง ม.3/8
+            {hasRecordedScores
+              ? 'คำนวณจากคะแนนรวมของนักเรียนในห้องเดียวกัน'
+              : 'พร้อมประมวลผลเมื่อมีการส่งงาน'}
           </div>
         </div>
       </div>
 
-      {/* Two Column Section: SGS Units Table (7 cols) + Radar Chart (5 cols) */}
+      {/* Main Grid: SGS Units & Radar */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* SGS Table */}
-        <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <div className="flex items-center gap-2">
+        {/* Unit Breakdown */}
+        <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-200/80 p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
               <FileText className="w-4 h-4 text-blue-600" />
-              <h3 className="font-bold text-slate-800 text-sm">
-                ตารางคะแนนตามโครงสร้าง SGS (100 คะแนนเต็ม)
-              </h3>
-            </div>
-            <span className="text-[11px] text-slate-400">กลุ่มสาระฯ ศิลปะ</span>
+              <span>ผลคะแนนรายหน่วยการเรียนรู้ (SGS Structure)</span>
+            </h2>
+            <span className="text-xs text-slate-400 font-medium">ห้อง {studentRoom}</span>
           </div>
 
-          <div className="divide-y divide-slate-100">
-            {sgsUnits.map((u, idx) => (
-              <div key={idx} className="py-3 flex items-center justify-between gap-4">
-                <div className="space-y-0.5">
-                  <div className="text-xs font-semibold text-slate-800">
-                    {u.name}
-                  </div>
-                  <div className="text-[11px] text-slate-400 flex items-center gap-2">
-                    <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
-                      {u.sgsRef}
-                    </span>
-                    <span>เต็ม {u.maxScore} คะแนน</span>
-                  </div>
-                </div>
-
-                <div className="text-right shrink-0">
-                  <div className="text-sm font-bold text-slate-800">
-                    {u.studentScore} <span className="text-xs font-normal text-slate-400">/ {u.maxScore}</span>
-                  </div>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                    u.status === 'บันทึกแล้ว' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                  }`}>
-                    {u.status}
-                  </span>
-                </div>
+          {!hasRecordedScores ? (
+            <div className="py-8 px-4 text-center bg-slate-50/60 rounded-2xl border border-dashed border-slate-200">
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3">
+                <BookOpen className="w-6 h-6" />
               </div>
-            ))}
-          </div>
-
-          {/* Table Footer Total */}
-          <div className="pt-3 border-t border-slate-200 flex items-center justify-between font-bold text-sm bg-slate-50/50 p-3 rounded-2xl">
-            <span className="text-slate-700">คะแนนรวมทั้งสิ้น</span>
-            <span className="text-blue-600 text-base">
-              {totalScore.toFixed(1)} / {totalMax} คะแนน ({((totalScore / totalMax) * 100).toFixed(1)}%)
-            </span>
-          </div>
+              <h3 className="text-sm font-bold text-slate-800 mb-1">
+                ยังไม่มีคะแนนที่บันทึกสำหรับภาคเรียนนี้
+              </h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+                ระบบเริ่มต้นใช้งานจริงแบบ Clean Slate คุณครูจะบันทึกคะแนนในหน่วยการเรียนรู้เมื่อคุณส่งงานหรือเข้ารับการทดสอบ ✨
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {scores.map((sc) => (
+                <div key={sc.id} className="py-3 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-800">งานชิ้นที่ {sc.assignmentId}</h3>
+                    <span className="text-[10px] text-slate-400">{sc.state}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-bold text-blue-600">
+                      {sc.score !== null ? sc.score : '-'} / {sc.maxScore}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* 5-Axis Spider Radar Chart */}
-        <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <h3 className="font-bold text-slate-800 text-sm">
-              สมรรถนะการเรียนรู้ 5 ด้าน
-            </h3>
-            <div className="flex items-center gap-2 text-[10px] font-medium">
-              <span className="flex items-center gap-1 text-blue-600">
-                <span className="w-2 h-2 rounded-full bg-blue-600 inline-block" />
-                คุณ
-              </span>
-              <span className="flex items-center gap-1 text-slate-400">
-                <span className="w-2 h-2 rounded-full bg-slate-300 inline-block" />
-                เฉลี่ยห้อง
-              </span>
-            </div>
+        {/* Radar Analysis */}
+        <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-200/80 p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              <span>มิติสมรรถนะการเรียนรู้ (Radar Chart)</span>
+            </h2>
           </div>
 
-          <div className="w-full h-64">
+          <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
-                <PolarGrid stroke="#e2e8f0" strokeDasharray="3 3" />
-                <PolarAngleAxis
-                  dataKey="subject"
-                  tick={{ fill: '#475569', fontSize: 11, fontWeight: 500 }}
-                />
-                <PolarRadiusAxis
-                  angle={30}
-                  domain={[0, 100]}
-                  tick={{ fill: '#94a3b8', fontSize: 9 }}
-                  stroke="#cbd5e1"
-                />
+              <RadarChart data={radarData}>
+                <PolarGrid stroke="#e2e8f0" />
+                <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 11 }} />
+                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 9 }} />
                 <Radar
                   name="คะแนนเฉลี่ยห้อง"
                   dataKey="classAvg"
@@ -219,7 +239,9 @@ export const StudentGradebookView: React.FC = () => {
           <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-2xl text-xs space-y-1">
             <span className="font-bold text-blue-900">💡 การวิเคราะห์ตนเอง:</span>
             <p className="text-blue-700 leading-relaxed text-[11px]">
-              จุดเด่นของคุณคือ <span className="font-semibold">เวลาเรียน (95%)</span> และ <span className="font-semibold">การส่งงานตรงเวลา (92%)</span> ซึ่งสูงกว่าค่าเฉลี่ยห้อง หากเพิ่มคะแนนสอบทบทวนเนื้อหาปลายภาค โอกาสได้เกรด 4.0 สูงมาก!
+              {hasRecordedScores
+                ? 'จุดเด่นของคุณคือเวลาเรียนและการส่งงานตรงเวลา ขอให้รักษามาตรฐานความตั้งใจนี้ต่อไป!'
+                : 'เริ่มต้นภาคเรียนด้วยความพร้อม 100% กราฟเรดาร์จะปรับตัวตามคะแนนและพฤติกรรมการเรียนรู้จริงในแต่ละวิชา ✨'}
             </p>
           </div>
         </div>
@@ -231,20 +253,20 @@ export const StudentGradebookView: React.FC = () => {
         <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-sm space-y-3">
           <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
             <Calendar className="w-4 h-4 text-emerald-600" />
-            <span>สถิติการมาเรียน (40 คาบทั้งหมด)</span>
+            <span>สถิติการมาเรียน (ภาคเรียนปัจจุบัน)</span>
           </div>
 
           <div className="grid grid-cols-4 gap-2 text-center pt-1">
             <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-100">
-              <div className="text-emerald-700 font-bold text-lg">36</div>
+              <div className="text-emerald-700 font-bold text-lg">{isClean ? '0' : '36'}</div>
               <div className="text-[10px] text-emerald-600">เข้าเรียนตรงเวลา</div>
             </div>
             <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-100">
-              <div className="text-amber-700 font-bold text-lg">2</div>
+              <div className="text-amber-700 font-bold text-lg">0</div>
               <div className="text-[10px] text-amber-600">มาสาย</div>
             </div>
             <div className="p-2.5 bg-blue-50 rounded-xl border border-blue-100">
-              <div className="text-blue-700 font-bold text-lg">2</div>
+              <div className="text-blue-700 font-bold text-lg">0</div>
               <div className="text-[10px] text-blue-600">ลากิจ/ลาป่วย</div>
             </div>
             <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
@@ -263,10 +285,12 @@ export const StudentGradebookView: React.FC = () => {
 
           <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
             <p className="text-xs text-slate-700 italic leading-relaxed">
-              "ด.ช. จิรายุ มีความตั้งใจและมีระเบียบวินัยดีมากในการเรียนวิชาศิลปะ ผลงานวาดภาพทฤษฎีสีทำได้ประณีต ส่งงานตรงเวลา ขอให้รักษามาตรฐานความตั้งใจนี้ต่อไปครับ"
+              {isClean
+                ? `ยินดีต้อนรับ ${studentName} สู่ภาคเรียนใหม่ ขอให้นักเรียนมีความมุ่งมั่น ตั้งใจเรียน และประสบความสำเร็จในการเรียนรู้ทุกรายวิชาครับ ✨`
+                : `"${studentName} มีความตั้งใจและมีระเบียบวินัยดีมากในการเรียนรู้ ขอให้รักษามาตรฐานความตั้งใจนี้ต่อไปครับ"`}
             </p>
             <div className="text-right text-[10px] text-slate-400 font-medium">
-              — ครูภาสภูมิ เรืองปราชญ์ (18 ก.ย. 2569)
+              — คุณครูประจำชั้นห้อง {studentRoom}
             </div>
           </div>
         </div>

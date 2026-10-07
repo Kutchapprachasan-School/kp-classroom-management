@@ -4,6 +4,8 @@
 // Common: 40.0%, Uncommon: 35.0%, Rare: 18.0%, Epic: 5.0%, Legendary: 1.8%, Mythic: 0.2%
 // ระบบการันตี Pity System: สุ่มครบ 80 ครั้ง การันตี Epic หรือ Legendary แน่นอน
 
+import { cleanSlateService } from './cleanSlateService';
+
 export type GachaRarity =
   | 'COMMON'
   | 'UNCOMMON'
@@ -444,16 +446,28 @@ export const gachaService = {
         // fallback
       }
     }
-    const initial: GachaState = {
-      tickets: 12, // Initial 12 tickets as in mockup
-      pityCount: 32, // Initial 32 / 80 as in mockup
-      pityMax: 80,
-      totalPulls: 32,
-      unlockedBuddyIds: ['buddy-c1', 'buddy-c2', 'buddy-u1'],
-      activeBuddyId: 'buddy-u1',
-      starShards: 150,
-      pullHistory: [],
-    };
+    const isClean = cleanSlateService.isCleanSlateActive();
+    const initial: GachaState = isClean
+      ? {
+          tickets: 3, // Starter 3 tickets for real student
+          pityCount: 0,
+          pityMax: 80,
+          totalPulls: 0,
+          unlockedBuddyIds: ['buddy-c1'], // single starter buddy
+          activeBuddyId: 'buddy-c1',
+          starShards: 0,
+          pullHistory: [],
+        }
+      : {
+          tickets: 12, // Initial 12 tickets as in mockup
+          pityCount: 32, // Initial 32 / 80 as in mockup
+          pityMax: 80,
+          totalPulls: 32,
+          unlockedBuddyIds: ['buddy-c1', 'buddy-c2', 'buddy-u1'],
+          activeBuddyId: 'buddy-u1',
+          starShards: 150,
+          pullHistory: [],
+        };
     this.saveState(initial);
     return initial;
   },

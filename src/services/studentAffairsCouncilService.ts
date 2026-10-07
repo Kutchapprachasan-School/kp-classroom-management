@@ -4,6 +4,8 @@
 // เชื่อมข้อมูล 2 ฝั่ง: ครูบริหารจัดการ <-> นักเรียนเข้าโหวต E-Voting / ยื่นใบลา / ส่งข้อเสนอแนะ
 // ============================================================================
 
+import { cleanSlateService } from './cleanSlateService';
+
 export interface AssemblyExceptionRecord {
   studentCode: string;
   studentName: string;
@@ -403,6 +405,14 @@ export const studentAffairsCouncilService = {
 
   // 2. วินัยและคะแนนพฤติกรรม
   getDisciplineLogs(): DisciplineRecord[] {
+    if (cleanSlateService.isCleanSlateActive()) {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_DISCIPLINE);
+        return raw ? JSON.parse(raw) : [];
+      } catch {
+        return [];
+      }
+    }
     try {
       const raw = localStorage.getItem(STORAGE_KEY_DISCIPLINE);
       return raw ? JSON.parse(raw) : INITIAL_DISCIPLINE;
@@ -427,6 +437,14 @@ export const studentAffairsCouncilService = {
 
   // 3. ใบลานักเรียน (แยกจาก E-Leave ครู)
   getStudentLeaves(): StudentLeaveRequest[] {
+    if (cleanSlateService.isCleanSlateActive()) {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_LEAVES);
+        return raw ? JSON.parse(raw) : [];
+      } catch {
+        return [];
+      }
+    }
     try {
       const raw = localStorage.getItem(STORAGE_KEY_LEAVES);
       return raw ? JSON.parse(raw) : INITIAL_LEAVES;
@@ -600,6 +618,14 @@ export const studentAffairsCouncilService = {
   },
 
   getSuggestions(): StudentSuggestion[] {
+    if (cleanSlateService.isCleanSlateActive()) {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_SUGGESTIONS);
+        return raw ? JSON.parse(raw) : [];
+      } catch {
+        return [];
+      }
+    }
     try {
       const raw = localStorage.getItem(STORAGE_KEY_SUGGESTIONS);
       return raw ? JSON.parse(raw) : INITIAL_SUGGESTIONS;

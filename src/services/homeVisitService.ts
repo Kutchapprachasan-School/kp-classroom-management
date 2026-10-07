@@ -3,6 +3,8 @@
 // รองรับการเก็บข้อมูลครบ 10 หมวด (5 หน้า) + รูปถ่าย 2 มุม + ลายเซ็น 4 ฝ่าย + โอนข้อมูลขึ้น cct.eef.or.th
 // ============================================================================
 
+import { cleanSlateService } from './cleanSlateService';
+
 export type VisitStatus = 'VISITED' | 'SCHEDULED' | 'PENDING';
 export type SdqLevel = 'NORMAL' | 'RISK' | 'PROBLEM' | 'PENDING';
 export type CctSyncStatus = 'SYNCED' | 'READY_TO_SYNC' | 'INCOMPLETE';
@@ -482,6 +484,14 @@ const INITIAL_RECORDS: HomeVisitRecord[] = [
 
 export const homeVisitService = {
   getAll(): HomeVisitRecord[] {
+    if (cleanSlateService.isCleanSlateActive()) {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? (JSON.parse(raw) as HomeVisitRecord[]) : [];
+      } catch {
+        return [];
+      }
+    }
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) {

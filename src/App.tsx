@@ -469,6 +469,8 @@ export const App: React.FC = () => {
             activeRole === 'STUDENT_COUNCIL' ? 'STUDENT_COUNCIL' : 'STUDENT_GENERAL'
           }
           activeRole={activeRole}
+          currentUser={currentAuthUser}
+          schoolSettings={schoolSettings}
           onChangeStudentRole={(stuRole) => setActiveRole(stuRole)}
           onSwitchToTeacherRole={(tRole) => handleChangeRole(tRole)}
           onExit={handleLogout}

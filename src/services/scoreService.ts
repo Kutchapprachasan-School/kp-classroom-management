@@ -99,6 +99,11 @@ export const scoreService = {
     return all;
   },
 
+  // READ: Get all scores
+  async getAll(): Promise<ScoreRecord[]> {
+    return getLocalScores();
+  },
+
   // READ: Get all scores for an assignment
   async getByAssignment(assignmentId: string): Promise<ScoreRecord[]> {
     if (isSupabaseConfigured) {

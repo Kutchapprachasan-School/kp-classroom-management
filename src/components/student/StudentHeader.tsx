@@ -10,13 +10,17 @@ import SparklesRegular from '@mingcute/react/core-regular/sparkles';
 import Settings3Regular from '@mingcute/react/core-regular/settings-3';
 import { studentBannerService } from '../../services/studentBannerService';
 import type { SchoolUserRole } from '../../config/schoolRoles';
+import type { AuthUser } from '../../services/authService';
+import { cleanSlateService } from '../../services/cleanSlateService';
 
 interface StudentHeaderProps {
   onExit: () => void;
   totalXp?: number;
   studentName?: string;
+  classroomName?: string;
   studentRole?: 'STUDENT_GENERAL' | 'STUDENT_COUNCIL';
   activeRole?: SchoolUserRole;
+  currentUser?: AuthUser | null;
   onOpenMobileMenu?: () => void;
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
@@ -25,8 +29,10 @@ interface StudentHeaderProps {
 
 export const StudentHeader: React.FC<StudentHeaderProps> = ({
   onExit,
-  totalXp = 670,
-  studentName = 'ด.ช. ทัศธน คำปั้น',
+  totalXp = cleanSlateService.isCleanSlateActive() ? 0 : 670,
+  studentName = 'นักเรียน',
+  classroomName,
+  currentUser,
   activeRole,
   onOpenMobileMenu,
   onToggleSidebar: _onToggleSidebar,
@@ -54,13 +60,13 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
         <div className="relative shrink-0">
           <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full border-2 border-sky-100 overflow-hidden shadow-2xs bg-sky-50 flex items-center justify-center">
             <img
-              src="/images/banners/student-avatar.png"
+              src={currentUser?.avatarUrl || "/images/banners/student-avatar.png"}
               alt={studentName}
               className="w-full h-full object-cover"
               onError={(e) => {
                 (e.target as HTMLElement).setAttribute(
                   'src',
-                  'https://api.dicebear.com/7.x/bottts/svg?seed=student'
+                  'https://api.dicebear.com/7.x/bottts/svg?seed=' + encodeURIComponent(studentName)
                 );
               }}
             />
@@ -73,6 +79,11 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
             <h2 className="text-sm sm:text-base font-bold text-slate-800 leading-tight truncate">
               สวัสดีครับ {studentName} 👋
             </h2>
+            {classroomName && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                {classroomName}
+              </span>
+            )}
           </div>
           <p className="text-[11px] sm:text-xs text-slate-400 font-medium truncate mt-0.5">
             ตั้งใจเรียน พัฒนาตัวเอง สู่อนาคตที่ดีกว่า ✨

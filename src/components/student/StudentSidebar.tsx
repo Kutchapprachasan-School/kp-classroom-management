@@ -21,6 +21,8 @@ import {
   KUTCHAP_SCHOOL_INFO,
   type SchoolUserRole,
 } from '../../config/schoolRoles';
+import { getSchoolSettings } from '../../config/schoolSettings';
+import { cleanSlateService } from '../../services/cleanSlateService';
 import {
   studentBannerService,
   STUDENT_BANNERS_EVENT,
@@ -96,7 +98,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
       key: 'missions' as StudentTabKey,
       label: 'งานที่ได้รับมอบหมาย',
       icon: ClipboardRegular,
-      badge: 3,
+      badge: cleanSlateService.isCleanSlateActive() ? null : 3,
     },
     { key: 'gradebook' as StudentTabKey, label: 'ผลการเรียน', icon: ChartBarRegular, badge: null },
     { key: 'timetable' as StudentTabKey, label: 'ตารางเรียน', icon: Calendar2Regular, badge: null },
@@ -104,6 +106,8 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
     { key: 'profile' as StudentTabKey, label: 'ข้อมูลส่วนตัว', icon: User3Regular, badge: null },
     { key: 'contact' as StudentTabKey, label: 'ติดต่อครู', icon: Chat2Regular, badge: null },
   ];
+
+  const schoolSettings = getSchoolSettings();
 
   const sidebarContent = (
     <div className="h-full flex flex-col justify-between font-['Prompt',sans-serif] bg-white border-r border-slate-200/90 text-slate-700">
@@ -113,19 +117,19 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
           <div className="flex items-center gap-2.5 min-w-0">
             <img
               src="/images/banners/school-logo.png"
-              alt="ตราโรงเรียนคำยางพิทยา"
+              alt={schoolSettings.nameTh}
               className="w-10 h-10 object-contain shrink-0"
               onError={(e) => {
                 // fallback to svg logo
-                (e.target as HTMLElement).setAttribute('src', KUTCHAP_SCHOOL_INFO.logoUrl);
+                (e.target as HTMLElement).setAttribute('src', schoolSettings.logoUrl || KUTCHAP_SCHOOL_INFO.logoUrl);
               }}
             />
             <div className="min-w-0">
               <h1 className="font-bold text-slate-900 text-xs sm:text-sm tracking-tight truncate leading-tight">
-                {KUTCHAP_SCHOOL_INFO.nameTh}
+                {schoolSettings.nameTh}
               </h1>
               <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium truncate mt-0.5">
-                {KUTCHAP_SCHOOL_INFO.districtProvince}
+                {schoolSettings.districtProvince}
               </p>
             </div>
           </div>

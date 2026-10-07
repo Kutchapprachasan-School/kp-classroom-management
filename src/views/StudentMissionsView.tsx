@@ -14,26 +14,18 @@ import {
 } from 'lucide-react';
 import { gamificationService } from '../services/gamificationService';
 import { sgsRosterAndSubmissionService } from '../services/sgsRosterAndSubmissionService';
-import type { StudentQuestItem } from '../types/viewModels';
+import { cleanSlateService } from '../services/cleanSlateService';
+import type { StudentQuestItem, StudentLeaderboardEntry } from '../types/viewModels';
+import type { AuthUser } from '../services/authService';
 
-interface LeaderboardUser {
-  rank: number;
-  name: string;
-  avatar: string;
-  xp: number;
-  badge?: string;
+interface StudentMissionsViewProps {
+  currentUser?: AuthUser | null;
 }
 
-const LEADERBOARD_DATA: LeaderboardUser[] = [
-  { rank: 1, name: 'ด.ญ. สุภาวดี ใจดี', avatar: '👧', xp: 1420, badge: '🥇' },
-  { rank: 2, name: 'ด.ช. กิตติศักดิ์ แสงทอง', avatar: '👦', xp: 1280, badge: '🥈' },
-  { rank: 3, name: 'ด.ญ. พิมพ์ชนก วงศ์ศรี', avatar: '👧', xp: 980, badge: '🥉' },
-  { rank: 4, name: 'ด.ช. นที ธรรมชาติ', avatar: '👦', xp: 850 },
-  { rank: 5, name: 'ด.ญ. อรวรรณ ศรีสุข', avatar: '👧', xp: 720 },
-];
-
-export const StudentMissionsView: React.FC = () => {
+export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ currentUser }) => {
+  const isClean = cleanSlateService.isCleanSlateActive();
   const [quests, setQuests] = useState<StudentQuestItem[]>([]);
+  const [leaderboard, setLeaderboard] = useState<StudentLeaderboardEntry[]>([]);
   const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'SUBMITTED'>('ALL');
   const [selectedQuest, setSelectedQuest] = useState<StudentQuestItem | null>(null);
   const [submitLink, setSubmitLink] = useState('');
@@ -50,6 +42,8 @@ export const StudentMissionsView: React.FC = () => {
   const loadQuests = async () => {
     const data = await gamificationService.getQuests();
     setQuests(data);
+    const lb = await gamificationService.getLeaderboard();
+    setLeaderboard(lb);
   };
 
   useEffect(() => {
@@ -226,59 +220,73 @@ export const StudentMissionsView: React.FC = () => {
           </div>
 
           <div className="space-y-3">
-            {filteredQuests.map((quest) => (
-              <div
-                key={quest.id}
-                className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs hover:border-orange-200 hover:shadow-sm transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="w-11 h-11 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 mt-0.5">
-                    <FileText className="w-5 h-5" />
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-[11px] font-bold text-orange-600 uppercase tracking-wide">
-                      {quest.subjectTitle}
-                    </span>
-                    <h4 className="font-bold text-slate-800 text-sm">
-                      {quest.title}
-                    </h4>
-                    <div className="flex items-center gap-2 text-xs text-slate-400">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-slate-400" />
-                        {quest.dueDateText}
+            {filteredQuests.length === 0 ? (
+              <div className="bg-white rounded-3xl border border-dashed border-slate-200 p-8 sm:p-12 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3 border border-emerald-100">
+                  <CheckCircle2 className="w-7 h-7" />
+                </div>
+                <h4 className="font-bold text-slate-800 text-sm sm:text-base">
+                  ไม่มีภารกิจหรือการบ้านที่ต้องส่งในขณะนี้
+                </h4>
+                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                  คุณไม่มีงานค้าง ยอดเยี่ยมมาก! เมื่อคุณครูมอบหมายงานใหม่ ภารกิจจะปรากฏที่นี่ทันที ✨
+                </p>
+              </div>
+            ) : (
+              filteredQuests.map((quest) => (
+                <div
+                  key={quest.id}
+                  className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs hover:border-orange-200 hover:shadow-sm transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-11 h-11 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 mt-0.5">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[11px] font-bold text-orange-600 uppercase tracking-wide">
+                        {quest.subjectTitle}
                       </span>
-                      <span>•</span>
-                      <span>เต็ม {quest.maxScore} คะแนน</span>
+                      <h4 className="font-bold text-slate-800 text-sm">
+                        {quest.title}
+                      </h4>
+                      <div className="flex items-center gap-2 text-xs text-slate-400">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          {quest.dueDateText}
+                        </span>
+                        <span>•</span>
+                        <span>เต็ม {quest.maxScore} คะแนน</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:items-end w-full sm:w-auto gap-2">
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                      <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold">
+                        {quest.statusLabel}
+                      </span>
+
+                      <button
+                        onClick={() => setSelectedQuest(quest)}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0C6D5B] hover:bg-[#095748] text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
+                      >
+                        <span>{quest.status === 'PENDING' ? 'ส่งงาน' : 'รายละเอียด'}</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-500 fill-emerald-400" />
+                      <span>+{quest.xpReward} XP เมื่อตรวจผ่าน</span>
                     </div>
                   </div>
                 </div>
-
-                <div className="flex flex-col sm:items-end w-full sm:w-auto gap-2">
-                  <div className="flex items-center gap-2 self-start sm:self-auto">
-                    <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold">
-                      {quest.statusLabel}
-                    </span>
-
-                    <button
-                      onClick={() => setSelectedQuest(quest)}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0C6D5B] hover:bg-[#095748] text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
-                    >
-                      <span>{quest.status === 'PENDING' ? 'ส่งงาน' : 'รายละเอียด'}</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  <div className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-500 fill-emerald-400" />
-                    <span>+{quest.xpReward} XP เมื่อตรวจผ่าน</span>
-                  </div>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
-        {/* Right Column: Leaderboard Top 5 (ตาม Mockup 1) */}
+        {/* Right Column: Leaderboard Top 5 */}
         <div className="lg:col-span-4 space-y-4">
           <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -294,54 +302,72 @@ export const StudentMissionsView: React.FC = () => {
             </div>
 
             <div className="space-y-2.5">
-              {LEADERBOARD_DATA.map((user) => (
-                <div
-                  key={user.rank}
-                  className={`flex items-center justify-between p-2.5 rounded-2xl transition-colors ${
-                    user.rank === 1
-                      ? 'bg-amber-50/70 border border-amber-200/60'
-                      : user.rank === 2
-                      ? 'bg-slate-50 border border-slate-200/60'
-                      : 'hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 text-center text-xs font-black text-slate-500">
-                      {user.badge || `#${user.rank}`}
-                    </span>
-                    <span className="text-xl">{user.avatar}</span>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-slate-900 truncate">
-                        {user.name}
-                      </p>
-                      <p className="text-[11px] text-slate-400">
-                        ชั้น ม.3/1
-                      </p>
+              {leaderboard.length === 0 ? (
+                <div className="p-6 text-center bg-slate-50/70 rounded-2xl border border-dashed border-slate-200">
+                  <Trophy className="w-8 h-8 text-amber-500 mx-auto mb-2 opacity-80" />
+                  <p className="text-xs font-bold text-slate-700">เริ่มต้นการเก็บคะแนนสัปดาห์นี้</p>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    ส่งงานเป็นคนแรกเพื่อขึ้นแท่นอันดับ 1 ของห้องเรียน! ✨
+                  </p>
+                </div>
+              ) : (
+                leaderboard.map((user) => (
+                  <div
+                    key={user.rank}
+                    className={`flex items-center justify-between p-2.5 rounded-2xl transition-colors ${
+                      user.rank === 1
+                        ? 'bg-amber-50/70 border border-amber-200/60'
+                        : user.rank === 2
+                        ? 'bg-slate-50 border border-slate-200/60'
+                        : 'hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 text-center text-xs font-black text-slate-500">
+                        {`#${user.rank}`}
+                      </span>
+                      <span className="text-xl">{user.avatarText || '👤'}</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-900 truncate">
+                          {user.name}
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          {user.classroom || 'ม.3/1'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-xs font-black text-orange-600 tabular-nums">
+                        {user.xp.toLocaleString()}
+                      </span>
+                      <span className="text-[10px] text-slate-400 ml-0.5">XP</span>
                     </div>
                   </div>
-
-                  <div className="text-right">
-                    <span className="text-xs font-black text-orange-600 tabular-nums">
-                      {user.xp.toLocaleString()}
-                    </span>
-                    <span className="text-[10px] text-slate-400 ml-0.5">XP</span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
             {/* My Rank Card */}
             <div className="mt-3 pt-3 border-t border-slate-100 bg-slate-50/80 rounded-2xl p-3 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span className="w-6 text-center text-xs font-black text-slate-600">#8</span>
+                <span className="w-6 text-center text-xs font-black text-slate-600">
+                  {isClean ? '-' : '#8'}
+                </span>
                 <span className="text-lg">🦊</span>
                 <div>
-                  <p className="text-xs font-bold text-slate-900">คุณ (ทัตธน คำฝั้น)</p>
-                  <p className="text-[10px] text-slate-400">อีก 70 XP เพื่อเลื่อนอันดับ</p>
+                  <p className="text-xs font-bold text-slate-900">
+                    คุณ ({currentUser?.name || 'นักเรียน'})
+                  </p>
+                  <p className="text-[10px] text-slate-400">
+                    {isClean ? 'เริ่มต้นสะสมแต้ม XP' : 'อีก 70 XP เพื่อเลื่อนอันดับ'}
+                  </p>
                 </div>
               </div>
               <div className="text-right">
-                <span className="text-xs font-black text-slate-700">650</span>
+                <span className="text-xs font-black text-slate-700">
+                  {isClean ? '0' : '650'}
+                </span>
                 <span className="text-[10px] text-slate-400 ml-0.5">XP</span>
               </div>
             </div>

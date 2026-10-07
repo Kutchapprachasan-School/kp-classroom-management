@@ -22,6 +22,14 @@ export const TRANSACTIONAL_STORAGE_KEYS = [
   'kp_student_quiz_attempts',
   'kp_assignment_submissions_v1',
   'cls_score_audit_logs',
+  'cls_student_quests',
+  'cls_student_streak',
+  'kp_home_visit_records_v2',
+  'cms_affairs_student_leaves_v2',
+  'cms_affairs_discipline_v1',
+  'cms_council_suggestions_v1',
+  'cms_council_voted_students_v1',
+  'cls_buddy_gacha_v1',
 ];
 
 // รายการ Key โครงสร้างพื้นฐานของโรงเรียนที่ต้องเก็บรักษาไว้ (Preserved Infrastructure)
@@ -64,6 +72,19 @@ class CleanSlateService {
           localStorage.removeItem(key);
           purgedKeys.push(key);
         }
+      });
+
+      // ล้าง keys นักเรียนแบบ dynamic (เช่น cls_student_streak_*, kp_student_quiz_*)
+      const dynamicKeysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('cls_student_streak_') || k.startsWith('kp_student_quiz_'))) {
+          dynamicKeysToRemove.push(k);
+        }
+      }
+      dynamicKeysToRemove.forEach((k) => {
+        localStorage.removeItem(k);
+        purgedKeys.push(k);
       });
 
       // ตั้งค่าสถานะ Clean Slate Active

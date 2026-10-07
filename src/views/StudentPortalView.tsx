@@ -1,7 +1,6 @@
 // src/views/StudentPortalView.tsx
-// พอร์ทัลนักเรียน โรงเรียนคำยางพิทยา
-// ออกแบบตรงตามภาพอ้างอิง media_1791203662191.png 100% พร้อมฟอนต์ Prompt
-// รองรับการปรับแต่งแบนเนอร์ทั้ง 3 ส่วนโดย Admin เท่านั้น
+// พอร์ทัลนักเรียน โรงเรียน เชื่อมต่อระบบผู้ใช้จริงและ Clean Slate พร้อมฟอนต์ Prompt
+// รองรับการปรับแต่งแบนเนอร์ทั้ง 3 ส่วนโดย Admin
 
 import React, { useState, useEffect } from 'react';
 import { StudentSidebar, type StudentTabKey } from '../components/student/StudentSidebar';
@@ -27,12 +26,17 @@ import { StudentAffairsCouncilView } from './StudentAffairsCouncilView';
 
 import { gamificationService } from '../services/gamificationService';
 import { studentBannerService } from '../services/studentBannerService';
+import { authService, type AuthUser } from '../services/authService';
+import { getSchoolSettings, type SchoolSettingsConfig } from '../config/schoolSettings';
+import { cleanSlateService } from '../services/cleanSlateService';
 import { type SchoolUserRole } from '../config/schoolRoles';
 
 interface StudentPortalViewProps {
   onExit: () => void;
   studentRole?: 'STUDENT_GENERAL' | 'STUDENT_COUNCIL';
   activeRole?: SchoolUserRole;
+  currentUser?: AuthUser | null;
+  schoolSettings?: SchoolSettingsConfig;
   onChangeStudentRole?: (role: 'STUDENT_GENERAL' | 'STUDENT_COUNCIL') => void;
   onSwitchToTeacherRole?: (role: SchoolUserRole) => void;
 }
@@ -41,11 +45,20 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
   onExit,
   studentRole = 'STUDENT_GENERAL',
   activeRole,
+  currentUser,
+  schoolSettings,
   onChangeStudentRole,
   onSwitchToTeacherRole,
 }) => {
+  const effectiveUser = currentUser || authService.getCurrentUser();
+  const effectiveSettings = schoolSettings || getSchoolSettings();
+  const studentName = effectiveUser?.name || 'นักเรียน';
+  const studentClassroom = effectiveUser?.classroomId || 'ม.3/1';
+
   const [activeTab, setActiveTab] = useState<StudentTabKey>('home');
-  const [currentXp, setCurrentXp] = useState(670);
+  const [currentXp, setCurrentXp] = useState<number>(() =>
+    cleanSlateService.isCleanSlateActive() ? 0 : 670
+  );
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const saved = window.localStorage.getItem('kp_student_sidebar_open');
@@ -88,12 +101,13 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
   }, [handleToggleSidebar]);
 
   useEffect(() => {
-    gamificationService.claimDailyCheckin('stu-2').then((res) => {
+    const studentId = effectiveUser?.id || 'stu-2';
+    gamificationService.claimDailyCheckin(studentId).then((res) => {
       if (res.isFirstToday) {
         setCurrentXp((prev) => prev + res.xpAwarded);
       }
     });
-  }, []);
+  }, [effectiveUser?.id]);
 
   return (
     <div
@@ -119,7 +133,9 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
         <StudentHeader
           onExit={onExit}
           totalXp={currentXp}
-          studentName="ด.ช. ทัศธน คำปั้น"
+          studentName={studentName}
+          classroomName={studentClassroom}
+          currentUser={effectiveUser}
           studentRole={studentRole}
           activeRole={activeRole}
           onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
@@ -130,9 +146,11 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
         <main className="flex-1 p-3.5 sm:p-5 md:p-6 overflow-y-auto overflow-x-hidden">
           <div className="max-w-[1360px] mx-auto">
-            {/* 1. หน้าแรก (Home) - ตรงตามภาพอ้างอิง media_1791203662191.png 100% */}
+            {/* 1. หน้าแรก (Home) */}
             {activeTab === 'home' && (
               <StudentHomeDashboard
+                currentUser={effectiveUser}
+                schoolSettings={effectiveSettings}
                 onNavigate={(tab) => setActiveTab(tab)}
                 onOpenAssignment={(_id) => setActiveTab('missions')}
               />
@@ -141,6 +159,8 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
             {/* 2. รายวิชาของฉัน */}
             {activeTab === 'courses' && (
               <StudentCoursesView
+                currentUser={effectiveUser}
+                schoolSettings={effectiveSettings}
                 onBack={() => setActiveTab('home')}
                 onSelectCourse={(_code) => setActiveTab('missions')}
               />
@@ -148,7 +168,11 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
             {/* 3. ตารางเรียน */}
             {activeTab === 'timetable' && (
-              <StudentTimetableView onBack={() => setActiveTab('home')} />
+              <StudentTimetableView
+                currentUser={effectiveUser}
+                schoolSettings={effectiveSettings}
+                onBack={() => setActiveTab('home')}
+              />
             )}
 
             {/* 4. กิจกรรม / ประกาศ */}
@@ -158,19 +182,34 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
             {/* 5. ข้อมูลส่วนตัว */}
             {activeTab === 'profile' && (
-              <StudentProfileView onBack={() => setActiveTab('home')} />
+              <StudentProfileView
+                currentUser={effectiveUser}
+                schoolSettings={effectiveSettings}
+                onBack={() => setActiveTab('home')}
+              />
             )}
 
             {/* 6. ติดต่อครู */}
             {activeTab === 'contact' && (
-              <StudentContactTeacherView onBack={() => setActiveTab('home')} />
+              <StudentContactTeacherView
+                currentUser={effectiveUser}
+                schoolSettings={effectiveSettings}
+                onBack={() => setActiveTab('home')}
+              />
             )}
 
             {/* 7. งานที่ได้รับมอบหมาย */}
-            {activeTab === 'missions' && <StudentMissionsView />}
+            {activeTab === 'missions' && (
+              <StudentMissionsView currentUser={effectiveUser} />
+            )}
 
             {/* 8. ผลการเรียน */}
-            {activeTab === 'gradebook' && <StudentGradebookView />}
+            {activeTab === 'gradebook' && (
+              <StudentGradebookView
+                currentUser={effectiveUser}
+                schoolSettings={effectiveSettings}
+              />
+            )}
 
             {/* 9. สุ่มคู่หู (Gacha) */}
             {activeTab === 'gacha' && (
@@ -183,12 +222,13 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
             {/* 10. ตู้รางวัล */}
             {activeTab === 'trophy' && (
               <StudentTrophyView
+                currentUser={effectiveUser}
                 onNavigateToGacha={() => setActiveTab('gacha')}
                 onNavigateToMissions={() => setActiveTab('missions')}
               />
             )}
 
-            {/* 11. ดูแลนักเรียน (คำยาง 9 หน้า) */}
+            {/* 11. ดูแลนักเรียน */}
             {activeTab === 'mobile-care' && (
               <StudentMobileCareView onExit={() => setActiveTab('home')} />
             )}
@@ -199,18 +239,23 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
             )}
 
             {/* 13. สนามประลอง Arena */}
-            {activeTab === 'arena' && <StudentArenaView />}
+            {activeTab === 'arena' && <StudentArenaView currentUser={effectiveUser} />}
 
             {/* 14. เยี่ยมบ้าน */}
             {activeTab === 'home-visit' && (
               <StudentHomeVisitFormView
+                currentUser={effectiveUser}
+                schoolSettings={effectiveSettings}
                 onAwardXp={(xp) => setCurrentXp((prev) => prev + xp)}
               />
             )}
 
             {/* 15. เลือกตั้งสภานักเรียน */}
             {activeTab === 'student-council' && (
-              <StudentCouncilAffairsPortalView section="COUNCIL" />
+              <StudentCouncilAffairsPortalView
+                section="COUNCIL"
+                currentUser={effectiveUser}
+              />
             )}
 
             {/* 16. ปฏิบัติงานสภานักเรียน */}

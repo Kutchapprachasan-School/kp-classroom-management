@@ -3,26 +3,28 @@
 
 import React from 'react';
 import { Megaphone, Calendar } from 'lucide-react';
+import { getSchoolSettings } from '../../config/schoolSettings';
 
 interface StudentAnnouncementsViewProps {
   onBack: () => void;
 }
 
 export const StudentAnnouncementsView: React.FC<StudentAnnouncementsViewProps> = ({ onBack }) => {
+  const settings = getSchoolSettings();
   const announcements = [
     {
       id: 'ann-1',
-      title: 'กำหนดการสอบกลางภาค ภาคเรียนที่ 1 ปีการศึกษา 2569',
-      date: '1 ต.ค. 2569',
+      title: 'กำหนดการสอบกลางภาค ภาคเรียนที่ 1',
+      date: '1 ต.ค.',
       category: 'วิชาการ',
       categoryColor: 'bg-blue-100 text-blue-700',
       summary:
-        'งานวัดและประเมินผลแจ้งตารางสอบกลางภาคเรียนที่ 1/2569 เริ่มวันที่ 14-16 ตุลาคม 2569 ขอให้นักเรียนเตรียมตัวทบทวนบทเรียนและตรวจสอบคะแนนเก็บ',
+        'งานวัดและประเมินผลแจ้งตารางสอบกลางภาคเรียน ขอให้นักเรียนเตรียมตัวทบทวนบทเรียนและตรวจสอบคะแนนเก็บ',
     },
     {
       id: 'ann-2',
-      title: 'กิจกรรมสัปดาห์วิทยาศาสตร์และนวัตกรรม AI โรงเรียนคำยางพิทยา',
-      date: '28 ก.ย. 2569',
+      title: `กิจกรรมสัปดาห์วิทยาศาสตร์และนวัตกรรม AI ${settings.nameTh}`,
+      date: '28 ก.ย.',
       category: 'กิจกรรม',
       categoryColor: 'bg-emerald-100 text-emerald-700',
       summary:

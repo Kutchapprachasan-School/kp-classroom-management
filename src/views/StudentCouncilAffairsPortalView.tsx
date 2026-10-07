@@ -15,17 +15,22 @@ import {
   type StudentSuggestion,
 } from '../services/studentAffairsCouncilService';
 
+import type { AuthUser } from '../services/authService';
+import { authService } from '../services/authService';
+
 interface StudentCouncilAffairsPortalViewProps {
   section?: 'LEAVE' | 'COUNCIL';
   onAwardXp?: (xp: number) => void;
+  currentUser?: AuthUser | null;
 }
 
 export const StudentCouncilAffairsPortalView: React.FC<
   StudentCouncilAffairsPortalViewProps
-> = ({ section = 'LEAVE', onAwardXp }) => {
-  const studentCode = '45102';
-  const studentName = 'ด.ช. ทัตธน คำฝั้น';
-  const classroom = 'ม.3/1';
+> = ({ section = 'LEAVE', onAwardXp, currentUser }) => {
+  const effectiveUser = currentUser || authService.getCurrentUser();
+  const studentCode = effectiveUser?.studentCode || 'STD-001';
+  const studentName = effectiveUser?.name || 'นักเรียน';
+  const classroom = effectiveUser?.classroomId || 'ม.3/1';
 
   const [parties, setParties] = useState<CouncilCandidateParty[]>(() =>
     studentAffairsCouncilService.getCandidateParties()
