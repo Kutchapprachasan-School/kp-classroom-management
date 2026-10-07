@@ -347,7 +347,12 @@ const academicTermsCode = fs.readFileSync('src/views/AcademicTermsView.tsx', 'ut
 assert.ok(academicTermsCode.includes('ปฏิทินกิจกรรมโรงเรียน (School Activities & Events)'), 'AcademicTermsView focuses purely on activities/events');
 assert.ok(academicTermsCode.includes('การตั้งค่าปีการศึกษา, ภาคเรียน (เปิดเทอม-ปิดเทอม)'), 'AcademicTermsView includes migration notice linking to settings');
 assert.ok(academicTermsCode.includes('ไปที่ตั้งค่าปีการศึกษา'), 'AcademicTermsView links to settings');
-console.log('  ✓ AcademicTermsView refactored purely for Activities & Events timeline');
+assert.ok(academicTermsCode.includes('kp_school_calendar_events_v2'), 'AcademicTermsView includes localStorage persistence for calendar events');
+assert.ok(academicTermsCode.includes('พฤหัสบดี'), 'AcademicTermsView contains Thursday column');
+assert.ok(academicTermsCode.includes('w-6 h-6 rounded-full bg-blue-600 text-white font-black text-xs'), 'AcademicTermsView contains blue circle badge for today (Day 2)');
+assert.ok(academicTermsCode.includes('+ เพิ่มกิจกรรม'), 'AcademicTermsView includes + เพิ่มกิจกรรม action button');
+assert.ok(academicTermsCode.includes('ประชุม / อบรม'), 'AcademicTermsView includes 5 category legend badges');
+console.log('  ✓ AcademicTermsView refactored purely for Activities & Events timeline matching media_1791415925768_dac3bff6.png');
 
 const settingsCode = fs.readFileSync('src/views/SettingsBackupView.tsx', 'utf8');
 assert.ok(settingsCode.includes("'CALENDAR'"), 'SettingsBackupView has CALENDAR tab');

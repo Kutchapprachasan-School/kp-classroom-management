@@ -1,9 +1,9 @@
 // src/views/AcademicTermsView.tsx
 // ปฏิทินกิจกรรมโรงเรียน (School Activity & Event Calendar)
-// ปรับปรุง UI ให้ตรงตามภาพต้นแบบ Reference Image 1 (media_1791271263121.png) อย่างแม่นยำ
+// ปรับปรุง UI ให้ตรงตามภาพต้นแบบ Reference Image (media_1791415925768_dac3bff6.png) อย่างแม่นยำ 100%
 // ผสานปฏิทินแบบ Interactive Monthly Grid (ตุลาคม 2569) + การ์ดกิจกรรมครู & นักเรียน + ปรับแต่งตามหมวดหมู่ 5 สี
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CalendarDays,
   Calendar,
@@ -20,6 +20,15 @@ import {
   Bus,
   GraduationCap,
   FileText,
+  CalendarCheck,
+  Award,
+  FileCheck,
+  BookOpen,
+  Target,
+  Landmark,
+  PlusCircle,
+  Hexagon,
+  Shield,
 } from 'lucide-react';
 
 export type ActivityCategory = 'ALL' | 'ACADEMIC' | 'DEVELOPMENT' | 'SPORTS' | 'AFFAIRS' | 'EXAM';
@@ -45,7 +54,9 @@ interface AcademicTermsViewProps {
   onNavigateToExams?: () => void;
 }
 
-// ข้อมูลกิจกรรมเดือนตุลาคม 2569 ตรงตามภาพต้นแบบ Mockup Image 1 ครบทุกรายการ
+const CALENDAR_EVENTS_STORAGE_KEY = 'kp_school_calendar_events_v2';
+
+// ข้อมูลกิจกรรมเดือนตุลาคม 2569 ตรงตามภาพต้นแบบ Mockup Image ครบทุกรายการ
 const INITIAL_OCTOBER_EVENTS: CalendarEventItem[] = [
   // 1 ต.ค.
   {
@@ -103,7 +114,7 @@ const INITIAL_OCTOBER_EVENTS: CalendarEventItem[] = [
     month: 10,
     year: 2569,
     time: '15:00',
-    title: 'ส่งคะแนนผลกลางภาค',
+    title: 'ส่งคะแนนกลางภาค',
     category: 'ACADEMIC',
     colorType: 'GREEN',
     targetRole: 'TEACHER',
@@ -127,7 +138,7 @@ const INITIAL_OCTOBER_EVENTS: CalendarEventItem[] = [
     day: 4,
     month: 10,
     year: 2569,
-    title: 'การแข่งขันกีฬา (นักเรียน)',
+    title: 'การแข่งขันกีฬาสี (นักเรียน)',
     category: 'STUDENT',
     colorType: 'BLUE',
     targetRole: 'STUDENT',
@@ -319,7 +330,7 @@ const INITIAL_OCTOBER_EVENTS: CalendarEventItem[] = [
     day: 30,
     month: 10,
     year: 2569,
-    title: 'กิจกรรมกีฬาสีภายใน (นักเรียน)',
+    title: 'กิจกรรมกีฬาภายใน (นักเรียน)',
     category: 'STUDENT',
     colorType: 'RED',
     targetRole: 'STUDENT',
@@ -347,7 +358,22 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
   const [roleFilter, setRoleFilter] = useState<'TEACHER' | 'STUDENT'>('TEACHER');
   const [viewMode, setViewMode] = useState<'MONTH' | 'WEEK' | 'DAY'>('MONTH');
   const [selectedMonthOffset, setSelectedMonthOffset] = useState<number>(0); // -1 = ก.ย., 0 = ต.ค., 1 = พ.ย.
-  const [events, setEvents] = useState<CalendarEventItem[]>(INITIAL_OCTOBER_EVENTS);
+  const [events, setEvents] = useState<CalendarEventItem[]>(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const saved = localStorage.getItem(CALENDAR_EVENTS_STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+      } catch {
+        // fallback to initial
+      }
+    }
+    return INITIAL_OCTOBER_EVENTS;
+  });
   const [selectedEvent, setSelectedEvent] = useState<CalendarEventItem | null>(null);
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
 
@@ -359,34 +385,76 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
   const [newEventTargetRole, setNewEventTargetRole] = useState<'TEACHER' | 'STUDENT' | 'ALL'>('TEACHER');
   const [newEventLocation, setNewEventLocation] = useState('ห้องประชุมโรงเรียน');
 
-  // Helper for pill badge color mapping
+  // Sync to local storage
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        localStorage.setItem(CALENDAR_EVENTS_STORAGE_KEY, JSON.stringify(events));
+      } catch {
+        // ignore
+      }
+    }
+  }, [events]);
+
+  // Pill badge color mapping according to Reference Image media_1791415925768_dac3bff6.png
   const getPillStyle = (colorType: CalendarLegendColor) => {
     switch (colorType) {
       case 'BLUE':
-        return 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100';
+        return 'bg-[#EBF5FF] text-[#1D64D8] hover:bg-[#DDEEFF]';
       case 'ORANGE':
-        return 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100';
+        return 'bg-[#FFF6E5] text-[#B45309] hover:bg-[#FEEFD0]';
       case 'GREEN':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100';
+        return 'bg-[#EAFBF1] text-[#047857] hover:bg-[#D6F7E3]';
       case 'RED':
-        return 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100';
+        return 'bg-[#FDEBF1] text-[#BE185D] hover:bg-[#FBD9E4]';
       case 'PURPLE':
-        return 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100';
+        return 'bg-[#F5EEFD] text-[#7E22CE] hover:bg-[#ECDDFA]';
     }
   };
 
-  const getPillDotColor = (colorType: CalendarLegendColor) => {
+  const getPillIconColor = (colorType: CalendarLegendColor) => {
     switch (colorType) {
       case 'BLUE':
-        return 'bg-blue-500';
+        return 'text-[#1D64D8]';
       case 'ORANGE':
-        return 'bg-amber-500';
+        return 'text-[#B45309]';
       case 'GREEN':
-        return 'bg-emerald-500';
+        return 'text-[#047857]';
       case 'RED':
-        return 'bg-rose-500';
+        return 'text-[#BE185D]';
       case 'PURPLE':
-        return 'bg-purple-500';
+        return 'text-[#7E22CE]';
+    }
+  };
+
+  // Specific Icon resolution matching Reference Image
+  const getEventIcon = (ev: CalendarEventItem) => {
+    const t = ev.title;
+    if (t.includes('ประชุมครู')) return Calendar;
+    if (t.includes('รายงานผลการสอน')) return FileText;
+    if (t.includes('ประชุมฝ่ายวิชาการ')) return CalendarCheck;
+    if (t.includes('กิจกรรมวันครู')) return Award;
+    if (t.includes('ส่งคะแนนผลกลางภาค') || t.includes('ส่งคะแนนกลางภาค')) return FileCheck;
+    if (t.includes('ค่ายภาษา') || t.includes('จิตอาสา') || t.includes('สัปดาห์ห้องสมุด') || t.includes('กีฬาภายใน')) return GraduationCap;
+    if (t.includes('การแข่งขันกีฬาสี') || t.includes('รับสมัครนักเรียน') || t.includes('งานวิจัย') || t.includes('ภาษาต่างประเทศ')) return BookOpen;
+    if (t.includes('ส่งข้อสอบกลางภาค')) return Target;
+    if (t.includes('อบรมการใช้สื่อดิจิทัล')) return Sparkles;
+    if (t.includes('คณะกรรมการสถานศึกษา') || t.includes('ประชุมผู้ปกครอง')) return Users;
+    if (t.includes('วันหยุด')) return Landmark;
+    if (t.includes('ทัศนศึกษา')) return PlusCircle;
+    if (t.includes('ประเมินผล') || t.includes('สรุปผลการเรียน')) return FileText;
+    if (t.includes('ลอยกระทง')) return Sparkles;
+    if (t.includes('ส่งแผนการจัดการเรียนรู้')) return Shield;
+    if (t.includes('กำหนดส่งคะแนนปลายภาค')) return Clock;
+
+    // Fallback by color
+    switch (ev.colorType) {
+      case 'BLUE': return CalendarDays;
+      case 'ORANGE': return FileText;
+      case 'GREEN': return FileCheck;
+      case 'RED': return GraduationCap;
+      case 'PURPLE': return Hexagon;
+      default: return Calendar;
     }
   };
 
@@ -436,19 +504,19 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
       date: '2 ต.ค.',
       title: 'ประชุมฝ่ายวิชาการ',
       meta: 'เวลา 08:30 น. | ห้องประชุมโรงเรียน',
-      icon: Calendar,
+      icon: CalendarCheck,
     },
     {
       date: '2 ต.ค.',
       title: 'ส่งคะแนนกลางภาค',
       meta: 'เวลา 15:00 น. | ระบบออนไลน์',
-      icon: FileText,
+      icon: FileCheck,
     },
     {
       date: '6 ต.ค.',
       title: 'ส่งข้อสอบกลางภาค',
       meta: 'เวลา 09:00 น. | กลุ่มสาระฯ',
-      icon: FileText,
+      icon: Target,
     },
     {
       date: '8 ต.ค.',
@@ -460,7 +528,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
       date: '15 ต.ค.',
       title: 'ประชุมกลุ่มสาระฯ (ภาษาต่างประเทศ)',
       meta: 'เวลา 14:00 น. | ห้องกลุ่มสาระฯ',
-      icon: Users,
+      icon: BookOpen,
     },
   ];
 
@@ -504,7 +572,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
 
   return (
     <div
-      className="space-y-5 max-w-7xl mx-auto pb-10 animate-fade-in font-sans select-none text-slate-800"
+      className="space-y-6 max-w-7xl mx-auto pb-10 animate-fade-in font-sans select-none text-slate-800"
       style={{ fontFamily: "'Prompt', -apple-system, BlinkMacSystemFont, sans-serif" }}
     >
       {/* Test assertion compatibility hidden banner & links */}
@@ -519,9 +587,8 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
         {categoryFilter === 'EXAM' && <span>Exam Filter Active</span>}
       </div>
 
-      {/* 1. Hero Banner matching Reference Image 1 */}
+      {/* 1. Hero Banner matching Reference Image */}
       <div className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-blue-100 shadow-xs bg-sky-100">
-        {/* Background Artwork matching Reference Image 1 */}
         <div className="absolute inset-0 z-0">
           <img
             src="/images/teacher/hero_banner.png"
@@ -576,7 +643,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
             </div>
           </div>
 
-          {/* Right Quote matching Image 1 */}
+          {/* Right Quote */}
           <div className="hidden md:flex flex-col items-end text-right pr-6 lg:pr-14">
             <p className="text-sm font-bold text-slate-800 drop-shadow-xs">
               “ ร่วมสร้างโอกาส
@@ -588,50 +655,53 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
         </div>
       </div>
 
-      {/* 2. Main 2-Column Grid: Left Calendar Grid (~70%) & Right 2-Cards (~30%) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left Column: Interactive Monthly Calendar Grid (8 Cols out of 12) */}
-        <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-xs space-y-4">
-          {/* Header Row: Month Navigation & View Toggles */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedMonthOffset((prev) => Math.max(-1, prev - 1))}
-                className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
-                title="เดือนก่อนหน้า"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 border border-slate-200 rounded-xl">
-                <CalendarDays className="w-4 h-4 text-blue-600" />
-                <span className="text-sm font-extrabold text-slate-900">
-                  {selectedMonthOffset === -1
-                    ? 'กันยายน 2569'
-                    : selectedMonthOffset === 1
-                    ? 'พฤศจิกายน 2569'
-                    : 'ตุลาคม 2569'}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedMonthOffset((prev) => Math.min(1, prev + 1))}
-                className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
-                title="เดือนถัดไป"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
+      {/* 2. Interactive Monthly Calendar Grid Card (Matching media_1791415925768_dac3bff6.png exactly) */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 md:p-6 shadow-xs space-y-4">
+        {/* Header Row: Month Navigation & View Toggles */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Left: Previous, Month Title, Next */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={() => setSelectedMonthOffset((prev) => Math.max(-1, prev - 1))}
+              className="w-9 h-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-blue-600 flex items-center justify-center transition-colors cursor-pointer shadow-2xs"
+              title="เดือนก่อนหน้า"
+            >
+              <ChevronLeft className="w-5 h-5 text-blue-600" />
+            </button>
+
+            <div className="flex items-center gap-2.5">
+              <CalendarDays className="w-6 h-6 text-blue-600 shrink-0" />
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                {selectedMonthOffset === -1
+                  ? 'กันยายน 2569'
+                  : selectedMonthOffset === 1
+                  ? 'พฤศจิกายน 2569'
+                  : 'ตุลาคม 2569'}
+              </h2>
             </div>
 
-            {/* View Mode Toggles on Right */}
-            <div className="flex items-center gap-1.5 text-xs">
+            <button
+              type="button"
+              onClick={() => setSelectedMonthOffset((prev) => Math.min(1, prev + 1))}
+              className="w-9 h-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-blue-600 flex items-center justify-center transition-colors cursor-pointer shadow-2xs"
+              title="เดือนถัดไป"
+            >
+              <ChevronRight className="w-5 h-5 text-blue-600" />
+            </button>
+          </div>
+
+          {/* Right: View Toggles & วันนี้ Button */}
+          <div className="flex items-center gap-2.5">
+            {/* View Mode Segmented Control */}
+            <div className="inline-flex items-center bg-slate-50/90 p-1 rounded-xl border border-slate-200/80">
               <button
                 type="button"
                 onClick={() => setViewMode('MONTH')}
-                className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   viewMode === 'MONTH'
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 font-medium'
                 }`}
               >
                 เดือน
@@ -639,10 +709,10 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
               <button
                 type="button"
                 onClick={() => setViewMode('WEEK')}
-                className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                   viewMode === 'WEEK'
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 สัปดาห์
@@ -650,247 +720,258 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
               <button
                 type="button"
                 onClick={() => setViewMode('DAY')}
-                className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                   viewMode === 'DAY'
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 วัน
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedMonthOffset(0);
-                  setViewMode('MONTH');
-                  const todayItem = events.find((e) => e.day === 2);
-                  if (todayItem) setSelectedEvent(todayItem);
-                }}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold transition-colors cursor-pointer"
-              >
-                <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                <span>วันนี้</span>
-              </button>
-            </div>
-          </div>
-
-          {/* 7-Column Day Header (อาทิตย์ - เสาร์) */}
-          <div className="grid grid-cols-7 gap-1 text-center font-bold text-xs text-slate-500 py-1 bg-slate-50/80 rounded-xl border border-slate-100">
-            <div>อาทิตย์</div>
-            <div>จันทร์</div>
-            <div>อังคาร</div>
-            <div>พุธ</div>
-            <div>พฤหัสบดี</div>
-            <div>ศุกร์</div>
-            <div>เสาร์</div>
-          </div>
-
-          {/* 35 Calendar Cells Grid (5 Rows x 7 Cols) */}
-          <div className="grid grid-cols-7 gap-1">
-            {calendarCells.map((cell, idx) => {
-              const dayEvents = cell.isCurrentMonth
-                ? events.filter((e) => e.day === cell.day)
-                : [];
-              const isToday = cell.isCurrentMonth && cell.day === 2;
-              const isHolidayCell = cell.isCurrentMonth && cell.day === 9;
-
-              return (
-                <div
-                  key={`${cell.day}-${idx}`}
-                  className={`min-h-[92px] sm:min-h-[105px] p-1.5 rounded-xl border transition-all flex flex-col justify-between ${
-                    cell.isCurrentMonth
-                      ? isHolidayCell
-                        ? 'bg-amber-50/30 border-amber-200/70 hover:border-amber-300'
-                        : isToday
-                        ? 'bg-blue-50/20 border-blue-300 shadow-2xs'
-                        : 'bg-white border-slate-100 hover:border-slate-200'
-                      : 'bg-slate-50/40 border-slate-100/60 opacity-40'
-                  }`}
-                >
-                  {/* Date Number Badge */}
-                  <div className="flex items-center justify-between mb-1">
-                    {isToday ? (
-                      <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-extrabold text-xs flex items-center justify-center shadow-xs">
-                        {cell.day}
-                      </span>
-                    ) : (
-                      <span
-                        className={`text-xs font-bold pl-1 ${
-                          cell.isCurrentMonth ? 'text-slate-700' : 'text-slate-400'
-                        }`}
-                      >
-                        {cell.day}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Day Events Pills */}
-                  <div className="space-y-1 flex-1 overflow-y-auto max-h-[72px]">
-                    {dayEvents.map((ev) => (
-                      <button
-                        key={ev.id}
-                        type="button"
-                        onClick={() => setSelectedEvent(ev)}
-                        className={`w-full text-left p-1 rounded-md text-[10px] sm:text-[11px] font-bold border truncate transition-all cursor-pointer flex items-center gap-1 ${getPillStyle(
-                          ev.colorType
-                        )}`}
-                        title={`${ev.time ? ev.time + ' ' : ''}${ev.title}`}
-                      >
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full shrink-0 ${getPillDotColor(
-                            ev.colorType
-                          )}`}
-                        />
-                        <span className="truncate">
-                          {ev.time && <span className="font-mono mr-1">{ev.time}</span>}
-                          {ev.day === 9 && !ev.title.includes('🔥') ? `🔥 ${ev.title}` : ev.title}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Bottom Legend Bar & Add Activity Button */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 text-xs">
-            {/* 5 Category Color Badges */}
-            <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold text-slate-600">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                <span>ประชุม / อบรม</span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                <span>กำหนดส่งงาน / เอกสาร</span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                <span>งานวิชาการ / ภาระงานครู</span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                <span>กิจกรรมนักเรียน</span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-purple-500" />
-                <span>อื่นๆ</span>
-              </span>
             </div>
 
-            {/* [+ เพิ่มกิจกรรม] Blue Action Button */}
+            {/* [📅 วันนี้] Button */}
             <button
               type="button"
-              onClick={() => setIsAddEventModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+              onClick={() => {
+                setSelectedMonthOffset(0);
+                setViewMode('MONTH');
+                const todayItem = events.find((e) => e.day === 2);
+                if (todayItem) setSelectedEvent(todayItem);
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-blue-200 bg-white hover:bg-blue-50/50 text-blue-600 font-bold text-xs shadow-2xs transition-colors cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>+ เพิ่มกิจกรรม</span>
+              <Calendar className="w-4 h-4 text-blue-600" />
+              <span>วันนี้</span>
             </button>
           </div>
         </div>
 
-        {/* Right Column: 2 Cards (4 Cols out of 12) */}
-        <div className="lg:col-span-4 space-y-4">
-          {/* CARD 1: กิจกรรมสำหรับครู */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-xs space-y-3.5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
-                  👤
+        {/* Calendar Grid Container (Seamless Matrix Table) */}
+        <div className="border border-slate-200/90 rounded-2xl overflow-hidden bg-white">
+          <div className="overflow-x-auto">
+            <div className="min-w-[700px] lg:min-w-0">
+              {/* 7 Columns Header Row */}
+              <div className="grid grid-cols-7 border-b border-slate-200 divide-x divide-slate-100 text-center font-bold text-xs sm:text-sm">
+                <div className="py-2.5 text-slate-700 bg-slate-50/40">อาทิตย์</div>
+                <div className="py-2.5 text-slate-700 bg-slate-50/40">จันทร์</div>
+                <div className="py-2.5 text-slate-700 bg-slate-50/40">อังคาร</div>
+                <div className="py-2.5 text-slate-700 bg-slate-50/40">พุธ</div>
+                <div className="py-2.5 text-blue-700 bg-blue-50/60 font-extrabold border-x border-blue-100/70">
+                  พฤหัสบดี
                 </div>
-                <h3 className="font-extrabold text-sm text-slate-900">
-                  กิจกรรมสำหรับครู
-                </h3>
+                <div className="py-2.5 text-slate-700 bg-slate-50/40">ศุกร์</div>
+                <div className="py-2.5 text-slate-700 bg-slate-50/40">เสาร์</div>
               </div>
-              <button
-                type="button"
-                onClick={() => setRoleFilter('TEACHER')}
-                className="text-xs text-blue-600 hover:text-blue-800 font-bold transition-colors cursor-pointer"
-              >
-                ดูทั้งหมด →
-              </button>
-            </div>
 
-            <div className="space-y-2.5">
-              {teacherSpecificActivities.map((act, index) => {
-                const IconComp = act.icon;
-                return (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="w-11 h-11 rounded-xl bg-blue-50 text-blue-700 font-extrabold text-xs flex flex-col items-center justify-center shrink-0 border border-blue-100">
-                        <span>{act.date.split(' ')[0]}</span>
-                        <span className="text-[10px] font-normal">{act.date.split(' ')[1]}</span>
-                      </span>
-                      <div className="min-w-0">
-                        <h4 className="font-bold text-xs text-slate-800 truncate">
-                          {act.title}
-                        </h4>
-                        <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                          {act.meta}
-                        </p>
+              {/* 35 Calendar Cells Grid (5 Rows x 7 Columns) */}
+              <div className="grid grid-cols-7 divide-x divide-slate-100">
+                {calendarCells.map((cell, idx) => {
+                  const isCurrentMonth = cell.isCurrentMonth;
+                  const dayNumber = cell.day;
+                  const colIndex = idx % 7;
+                  const isThursday = colIndex === 4;
+                  const isToday = isCurrentMonth && dayNumber === 2;
+                  const isLastRow = idx >= 28;
+                  const dayEvents = isCurrentMonth ? events.filter((e) => e.day === dayNumber) : [];
+
+                  return (
+                    <div
+                      key={`${dayNumber}-${idx}`}
+                      className={`min-h-[115px] sm:min-h-[125px] p-2 flex flex-col justify-start transition-colors ${
+                        !isLastRow ? 'border-b border-slate-100' : ''
+                      } ${
+                        isThursday
+                          ? 'bg-blue-50/20'
+                          : 'bg-white'
+                      }`}
+                    >
+                      {/* Top row: Day Number */}
+                      <div className="flex items-center justify-between mb-1.5 h-6">
+                        {isToday ? (
+                          <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                            {dayNumber}
+                          </span>
+                        ) : (
+                          <span
+                            className={`text-xs sm:text-sm font-semibold pl-1 ${
+                              isCurrentMonth ? 'text-slate-700' : 'text-slate-300 font-medium'
+                            }`}
+                          >
+                            {dayNumber}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Event Pills */}
+                      <div className="space-y-1.5 w-full">
+                        {dayEvents.map((ev) => {
+                          const IconComp = getEventIcon(ev);
+                          const pillStyle = getPillStyle(ev.colorType);
+                          const iconColor = getPillIconColor(ev.colorType);
+
+                          return (
+                            <button
+                              key={ev.id}
+                              type="button"
+                              onClick={() => setSelectedEvent(ev)}
+                              className={`w-full text-left px-2 py-1 rounded-md text-[10px] sm:text-[11px] font-medium transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${pillStyle}`}
+                              title={`${ev.time ? ev.time + ' ' : ''}${ev.title}`}
+                            >
+                              <IconComp className={`w-3.5 h-3.5 shrink-0 ${iconColor}`} />
+                              <span className="truncate">
+                                {ev.time && <span className="font-mono mr-1">{ev.time}</span>}
+                                {ev.title}
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
 
-                    <IconComp className="w-4 h-4 text-blue-500 shrink-0" />
-                  </div>
-                );
-              })}
+        {/* Bottom Legend Bar & Add Activity Button */}
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-slate-100">
+          {/* 5 Category Color Badges */}
+          <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-slate-600">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#2563EB]" />
+              <span>ประชุม / อบรม</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B]" />
+              <span>กำหนดส่งงาน / เอกสาร</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#10B981]" />
+              <span>งานวิชาการ / ภาระงานครู</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#F43F5E]" />
+              <span>กิจกรรมนักเรียน</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#8B5CF6]" />
+              <span>อื่นๆ</span>
             </div>
           </div>
 
-          {/* CARD 2: กิจกรรมสำหรับนักเรียน */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-xs space-y-3.5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs">
-                  👥
-                </div>
-                <h3 className="font-extrabold text-sm text-slate-900">
-                  กิจกรรมสำหรับนักเรียน
-                </h3>
+          {/* [+ เพิ่มกิจกรรม] Action Button */}
+          <button
+            type="button"
+            onClick={() => setIsAddEventModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm shadow-xs transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ เพิ่มกิจกรรม</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 3. Secondary Activities Section (กิจกรรมสำหรับครู & กิจกรรมสำหรับนักเรียน) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1">
+        {/* CARD 1: กิจกรรมสำหรับครู */}
+        <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-xs space-y-3.5">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
+                👤
               </div>
-              <button
-                type="button"
-                onClick={() => setRoleFilter('STUDENT')}
-                className="text-xs text-emerald-600 hover:text-emerald-800 font-bold transition-colors cursor-pointer"
-              >
-                ดูทั้งหมด →
-              </button>
+              <h3 className="font-extrabold text-sm text-slate-900">
+                กิจกรรมสำหรับครู
+              </h3>
             </div>
+            <button
+              type="button"
+              onClick={() => setRoleFilter('TEACHER')}
+              className="text-xs text-blue-600 hover:text-blue-800 font-bold transition-colors cursor-pointer"
+            >
+              ดูทั้งหมด →
+            </button>
+          </div>
 
-            <div className="space-y-2.5">
-              {studentSpecificActivities.map((act, index) => {
-                const IconComp = act.icon;
-                return (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 font-extrabold text-xs flex flex-col items-center justify-center shrink-0 border border-emerald-100">
-                        <span>{act.date.split(' ')[0]}</span>
-                        <span className="text-[10px] font-normal">{act.date.split(' ')[1]}</span>
-                      </span>
-                      <div className="min-w-0">
-                        <h4 className="font-bold text-xs text-slate-800 truncate">
-                          {act.title}
-                        </h4>
-                        <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                          {act.meta}
-                        </p>
-                      </div>
+          <div className="space-y-2.5">
+            {teacherSpecificActivities.map((actItem, index) => {
+              const IconComp = actItem.icon;
+              return (
+                <div
+                  key={index}
+                  className="flex items-center justify-between gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="w-11 h-11 rounded-xl bg-blue-50 text-blue-700 font-extrabold text-xs flex flex-col items-center justify-center shrink-0 border border-blue-100">
+                      <span>{actItem.date.split(' ')[0]}</span>
+                      <span className="text-[10px] font-normal">{actItem.date.split(' ')[1]}</span>
+                    </span>
+                    <div className="min-w-0">
+                      <h4 className="font-bold text-xs text-slate-800 truncate">
+                        {actItem.title}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                        {actItem.meta}
+                      </p>
                     </div>
-
-                    <IconComp className="w-4 h-4 text-emerald-500 shrink-0" />
                   </div>
-                );
-              })}
+
+                  <IconComp className="w-4 h-4 text-blue-500 shrink-0" />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* CARD 2: กิจกรรมสำหรับนักเรียน */}
+        <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-xs space-y-3.5">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs">
+                👥
+              </div>
+              <h3 className="font-extrabold text-sm text-slate-900">
+                กิจกรรมสำหรับนักเรียน
+              </h3>
             </div>
+            <button
+              type="button"
+              onClick={() => setRoleFilter('STUDENT')}
+              className="text-xs text-emerald-600 hover:text-emerald-800 font-bold transition-colors cursor-pointer"
+            >
+              ดูทั้งหมด →
+            </button>
+          </div>
+
+          <div className="space-y-2.5">
+            {studentSpecificActivities.map((actItem, index) => {
+              const IconComp = actItem.icon;
+              return (
+                <div
+                  key={index}
+                  className="flex items-center justify-between gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 font-extrabold text-xs flex flex-col items-center justify-center shrink-0 border border-emerald-100">
+                      <span>{actItem.date.split(' ')[0]}</span>
+                      <span className="text-[10px] font-normal">{actItem.date.split(' ')[1]}</span>
+                    </span>
+                    <div className="min-w-0">
+                      <h4 className="font-bold text-xs text-slate-800 truncate">
+                        {actItem.title}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                        {actItem.meta}
+                      </p>
+                    </div>
+                  </div>
+
+                  <IconComp className="w-4 h-4 text-emerald-500 shrink-0" />
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -909,7 +990,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsAddEventModalOpen(false)}
-                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg"
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -926,7 +1007,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                   placeholder="เช่น ประชุมครู, กิจกรรมค่ายวิชาการ"
                   value={newEventTitle}
                   onChange={(e) => setNewEventTitle(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 font-semibold"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
@@ -941,7 +1022,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                     max={31}
                     value={newEventDay}
                     onChange={(e) => setNewEventDay(Number(e.target.value) || 1)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
@@ -953,7 +1034,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                     placeholder="08:30"
                     value={newEventTime}
                     onChange={(e) => setNewEventTime(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -966,7 +1047,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                   <select
                     value={newEventColor}
                     onChange={(e) => setNewEventColor(e.target.value as CalendarLegendColor)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="BLUE">🔵 ประชุม / อบรม</option>
                     <option value="ORANGE">🟠 กำหนดส่งงาน / เอกสาร</option>
@@ -982,7 +1063,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                   <select
                     value={newEventTargetRole}
                     onChange={(e) => setNewEventTargetRole(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="TEACHER">สำหรับครู</option>
                     <option value="STUDENT">สำหรับนักเรียน</option>
@@ -1000,7 +1081,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                   placeholder="เช่น ห้องประชุมโรงเรียน, สนามกีฬา"
                   value={newEventLocation}
                   onChange={(e) => setNewEventLocation(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
@@ -1008,13 +1089,13 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsAddEventModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-600 font-semibold"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-600 font-semibold hover:bg-slate-50 cursor-pointer"
                 >
                   ยกเลิก
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold"
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold cursor-pointer"
                 >
                   บันทึกกิจกรรม
                 </button>
@@ -1040,7 +1121,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
               <button
                 type="button"
                 onClick={() => setSelectedEvent(null)}
-                className="text-slate-400 hover:text-slate-700 p-1"
+                className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1080,7 +1161,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                     setSelectedEvent(null);
                     onNavigateToExams();
                   }}
-                  className="px-3 py-1.5 rounded-xl bg-blue-600 text-white font-bold text-xs"
+                  className="px-3 py-1.5 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 cursor-pointer"
                 >
                   ไปที่หน้าจัดการสอบ
                 </button>
@@ -1088,7 +1169,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
               <button
                 type="button"
                 onClick={() => setSelectedEvent(null)}
-                className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50"
+                className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 cursor-pointer"
               >
                 ปิด
               </button>
