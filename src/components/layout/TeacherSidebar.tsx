@@ -173,7 +173,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     },
     {
       key: 'roster',
-      label: 'นักเรียน',
+      label: 'ห้องเรียน / รายชื่อนักเรียน',
       icon: Users,
     },
     {

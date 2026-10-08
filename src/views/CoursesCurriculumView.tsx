@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   BookMarked,
   Plus,
@@ -14,6 +14,8 @@ import {
   FileSpreadsheet,
   Folder,
   UploadCloud,
+  ChevronDown,
+  Calendar,
 } from 'lucide-react';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 import {
@@ -96,11 +98,52 @@ export const CoursesCurriculumView: React.FC = () => {
     isPublishedToStudents: true,
   });
 
+  // Collapsible accordion state for units
+  const [collapsedUnitIds, setCollapsedUnitIds] = useState<Record<string, boolean>>({});
+
+  const toggleCollapseUnit = (unitId: string) => {
+    setCollapsedUnitIds((prev) => ({
+      ...prev,
+      [unitId]: !prev[unitId],
+    }));
+  };
+
+  const handleExpandAllUnits = () => {
+    setCollapsedUnitIds({});
+  };
+
+  const handleCollapseAllUnits = () => {
+    if (!selectedCourse) return;
+    const allCollapsed: Record<string, boolean> = {};
+    selectedCourse.units.forEach((u) => {
+      allCollapsed[u.id] = true;
+    });
+    setCollapsedUnitIds(allCollapsed);
+  };
+
+  // Term / Academic Year Filter for courses
+  const [termFilter, setTermFilter] = useState<string>('ALL');
+
+  const availableTerms = useMemo(() => {
+    const set = new Set<string>();
+    courses.forEach((c) => {
+      set.add(`${c.term}/${c.academicYear}`);
+    });
+    return Array.from(set).sort();
+  }, [courses]);
+
+  const filteredCourses = useMemo(() => {
+    if (termFilter === 'ALL') return courses;
+    return courses.filter((c) => `${c.term}/${c.academicYear}` === termFilter);
+  }, [courses, termFilter]);
+
   // Copy Academic Year Form State
   const [copyYearForm, setCopyYearForm] = useState({
+    copyScope: 'CURRENT_COURSE' as 'CURRENT_COURSE' | 'ALL_COURSES',
+    fromTerm: '1',
     fromYear: '2569',
+    toTerm: '1',
     toYear: '2570',
-    targetTerm: '1',
   });
 
   // Handlers for Course CRUD
@@ -281,20 +324,33 @@ export const CoursesCurriculumView: React.FC = () => {
     showToast(`✓ ลบสื่อการสอนเรียบร้อยแล้ว`);
   };
 
-  // Handler for Copy Curriculum Across Years
+  // Handler for Copy Curriculum Across Years / Terms
   const handleExecuteCopyYear = (e: React.FormEvent) => {
     e.preventDefault();
-    const result = coursesCurriculumService.copyCurriculumToAcademicYear(
-      copyYearForm.fromYear,
-      copyYearForm.toYear,
-      copyYearForm.targetTerm
-    );
-
-    setIsCopyYearModalOpen(false);
-    refreshCourses();
-    showToast(
-      `✓ คัดลอกแผนการสอนสำเร็จ! นำเข้า ${result.copiedCount} รายวิชาไปยังปีการศึกษา ${copyYearForm.toYear}`
-    );
+    if (copyYearForm.copyScope === 'CURRENT_COURSE' && selectedCourse) {
+      const cloned = coursesCurriculumService.copyCourseToNewTerm(
+        selectedCourse.id,
+        copyYearForm.toYear,
+        copyYearForm.toTerm
+      );
+      setIsCopyYearModalOpen(false);
+      refreshCourses();
+      setSelectedCourseId(cloned.id);
+      showToast(
+        `✓ คัดลอกแผนการสอน ${cloned.code} ไปยังภาคเรียนที่ ${copyYearForm.toTerm}/${copyYearForm.toYear} เรียบร้อยแล้ว (แผนเดิม 100% ยังคงปลอดภัย)`
+      );
+    } else {
+      const result = coursesCurriculumService.copyCurriculumToAcademicYear(
+        copyYearForm.fromYear,
+        copyYearForm.toYear,
+        copyYearForm.toTerm
+      );
+      setIsCopyYearModalOpen(false);
+      refreshCourses();
+      showToast(
+        `✓ คัดลอกแผนการสอนสำเร็จ! นำเข้า ${result.copiedCount} รายวิชาไปยังปีการศึกษา ${copyYearForm.toYear} (แผนเดิมยังคงอยู่ครบ 100%)`
+      );
+    }
   };
 
   return (
@@ -342,51 +398,76 @@ export const CoursesCurriculumView: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Course Cards List (4 cols) */}
         <div className="lg:col-span-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-1.5 shrink-0">
               <Folder className="w-4 h-4 text-blue-600" />
-              <span>รายวิชาที่รับผิดชอบ ({courses.length})</span>
+              <span>รายวิชาที่สอน ({filteredCourses.length})</span>
             </h2>
-            <span className="text-[11px] text-slate-400 font-medium">ปี 2569</span>
+            <div className="flex items-center gap-1">
+              <Calendar className="w-3 h-3 text-slate-400" />
+              <select
+                value={termFilter}
+                onChange={(e) => setTermFilter(e.target.value)}
+                className="text-[11px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg px-2 py-0.5 focus:outline-none focus:border-blue-500"
+              >
+                <option value="ALL">ทุกเทอม</option>
+                {availableTerms.map((term) => (
+                  <option key={term} value={term}>
+                    เทอม {term}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="space-y-2.5">
-            {courses.map((course) => {
-              const isSelected = selectedCourse?.id === course.id;
-              return (
-                <div
-                  key={course.id}
-                  onClick={() => setSelectedCourseId(course.id)}
-                  className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-blue-50/80 border-blue-300 shadow-sm ring-1 ring-blue-300/60'
-                      : 'bg-white border-slate-200/90 shadow-2xs hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-extrabold text-xs text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-md">
-                      {course.code}
-                    </span>
-                    <span className="text-[11px] text-slate-500 font-semibold">
-                      {course.credits} หน่วยกิต • {course.periodsPerWeek} คาบ/สัปดาห์
-                    </span>
-                  </div>
+            {filteredCourses.length === 0 ? (
+              <div className="p-6 text-center bg-white rounded-2xl border border-slate-200/90 text-xs text-slate-400">
+                ไม่พบรายวิชาในภาคเรียนที่เลือก
+              </div>
+            ) : (
+              filteredCourses.map((course) => {
+                const isSelected = selectedCourse?.id === course.id;
+                return (
+                  <div
+                    key={course.id}
+                    onClick={() => setSelectedCourseId(course.id)}
+                    className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-blue-50/80 border-blue-300 shadow-sm ring-1 ring-blue-300/60'
+                        : 'bg-white border-slate-200/90 shadow-2xs hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-extrabold text-xs text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-md">
+                          {course.code}
+                        </span>
+                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded">
+                          {course.term}/{course.academicYear}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-slate-500 font-semibold">
+                        {course.credits} นก. • {course.periodsPerWeek} คาบ
+                      </span>
+                    </div>
 
-                  <h3 className="font-bold text-slate-900 text-sm leading-snug mt-1">
-                    {course.name}
-                  </h3>
+                    <h3 className="font-bold text-slate-900 text-sm leading-snug mt-1">
+                      {course.name}
+                    </h3>
 
-                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100/80 text-[11px] text-slate-500">
-                    <span className="truncate max-w-[170px]">
-                      {course.strand}
-                    </span>
-                    <span className="font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full">
-                      {course.assignedClassrooms.join(', ')}
-                    </span>
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100/80 text-[11px] text-slate-500">
+                      <span className="truncate max-w-[170px]">
+                        {course.strand}
+                      </span>
+                      <span className="font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full">
+                        {course.assignedClassrooms.join(', ')}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
 
@@ -442,9 +523,29 @@ export const CoursesCurriculumView: React.FC = () => {
 
             {/* Units & Media Accordion Cards */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                <span>หน่วยการเรียนรู้และสื่อประกอบการสอน ({selectedCourse.units.length} หน่วย)</span>
-                <span className="text-slate-400 font-medium">สัดส่วนคะแนนรวม ปพ.5 / SGS</span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold text-slate-700">
+                <div className="flex items-center gap-2">
+                  <span>หน่วยการเรียนรู้และสื่อประกอบการสอน ({selectedCourse.units.length} หน่วย)</span>
+                  <span className="text-slate-400 font-medium hidden sm:inline">• สัดส่วนคะแนนรวม ปพ.5 / SGS</span>
+                </div>
+                {selectedCourse.units.length > 0 && (
+                  <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={handleExpandAllUnits}
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-bold transition-colors cursor-pointer"
+                    >
+                      ขยายทั้งหมด
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCollapseAllUnits}
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-bold transition-colors cursor-pointer"
+                    >
+                      พับเก็บทั้งหมด
+                    </button>
+                  </div>
+                )}
               </div>
 
               {selectedCourse.units.length === 0 ? (
@@ -456,147 +557,175 @@ export const CoursesCurriculumView: React.FC = () => {
                   </p>
                 </div>
               ) : (
-                selectedCourse.units.map((unit) => (
-                  <div
-                    key={unit.id}
-                    className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 space-y-3.5 hover:border-slate-300 transition-all"
-                  >
-                    {/* Unit Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/70 pb-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 text-[10px] font-extrabold">
-                            สัปดาห์ที่ {unit.weekStart || 1} - {unit.weekEnd || 4}
-                          </span>
-                          <span className="text-xs font-bold text-slate-800">
-                            {unit.title}
-                          </span>
-                        </div>
-                        {unit.description && (
-                          <p className="text-xs text-slate-500 mt-0.5 leading-snug">
-                            {unit.description}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <span className="text-xs font-extrabold text-blue-700 block">
-                            {unit.maxScore} คะแนน
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            {unit.sgsRef}
-                          </span>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleOpenAddMedia(unit.id)}
-                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-blue-50 text-blue-700 border border-slate-200 hover:border-blue-300 text-[11px] font-bold shadow-2xs transition-colors cursor-pointer"
-                          title="เพิ่มสื่อ ใบงาน หรือแบบทดสอบ"
+                selectedCourse.units.map((unit) => {
+                  const isCollapsed = Boolean(collapsedUnitIds[unit.id]);
+                  return (
+                    <div
+                      key={unit.id}
+                      className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 space-y-3 hover:border-slate-300 transition-all"
+                    >
+                      {/* Unit Header with Toggle Button */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/70 pb-3">
+                        <div
+                          className="flex-1 cursor-pointer select-none"
+                          onClick={() => toggleCollapseUnit(unit.id)}
                         >
-                          <Plus className="w-3 h-3 text-blue-600" />
-                          <span>+ สื่อ/ใบงาน</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteUnit(unit.id, unit.title)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                          title="ลบหน่วยนี้"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Unit Media Items List */}
-                    <div className="space-y-2">
-                      <div className="text-[11px] font-bold text-slate-500 flex items-center justify-between">
-                        <span>สื่อการสอน ใบงาน และการสอบเก็บคะแนน ({unit.mediaItems.length} รายการ)</span>
-                        <span className="text-[10px] text-emerald-600 font-semibold">
-                          • เปิดให้นักเรียนเข้าถึง
-                        </span>
-                      </div>
-
-                      {unit.mediaItems.length === 0 ? (
-                        <p className="text-[11px] text-slate-400 italic bg-white p-2.5 rounded-xl border border-slate-100">
-                          ยังไม่มีไฟล์หรือสื่อในหน่วยนี้ คลิก "+ สื่อ/ใบงาน" เพื่อเพิ่มเอกสารการสอน
-                        </p>
-                      ) : (
-                        <div className="grid grid-cols-1 gap-2">
-                          {unit.mediaItems.map((media) => (
-                            <div
-                              key={media.id}
-                              className="bg-white rounded-xl border border-slate-200 p-2.5 flex items-center justify-between gap-3 shadow-2xs hover:shadow-xs transition-shadow"
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleCollapseUnit(unit.id);
+                              }}
+                              className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 text-slate-600 hover:text-blue-600 transition-colors"
+                              title={isCollapsed ? 'คลิกเพื่อขยาย' : 'คลิกเพื่อพับเก็บ'}
                             >
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <div
-                                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                                    media.mediaType === 'EXAM_QUIZ'
-                                      ? 'bg-purple-100 text-purple-700'
-                                      : media.mediaType === 'WORKSHEET'
-                                      ? 'bg-amber-100 text-amber-700'
-                                      : 'bg-blue-100 text-blue-700'
-                                  }`}
-                                >
-                                  {media.mediaType === 'EXAM_QUIZ' ? (
-                                    <Sparkles className="w-3.5 h-3.5" />
-                                  ) : media.mediaType === 'WORKSHEET' ? (
-                                    <FileSpreadsheet className="w-3.5 h-3.5" />
-                                  ) : (
-                                    <FileText className="w-3.5 h-3.5" />
-                                  )}
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-xs font-bold text-slate-800 truncate">
-                                      {media.title}
-                                    </span>
-                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-slate-100 text-slate-600 uppercase">
-                                      {media.fileType || media.mediaType}
-                                    </span>
-                                  </div>
-                                  <div className="text-[10px] text-slate-400">
-                                    {media.fileSize && <span>{media.fileSize} • </span>}
-                                    <span>สร้างเมื่อ {media.createdAt}</span>
-                                    {media.linkedExamId && (
-                                      <span className="text-purple-600 font-semibold ml-1">
-                                        • ลิงก์ระบบสอบออนไลน์
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
+                              <ChevronDown
+                                className={`w-4 h-4 transition-transform duration-200 ${
+                                  isCollapsed ? '-rotate-90 text-slate-400' : 'text-blue-600'
+                                }`}
+                              />
+                            </button>
+                            <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 text-[10px] font-extrabold">
+                              สัปดาห์ที่ {unit.weekStart || 1} - {unit.weekEnd || 4}
+                            </span>
+                            <span className="text-xs font-bold text-slate-800 hover:text-blue-600 transition-colors">
+                              {unit.title}
+                            </span>
+                            {isCollapsed && (
+                              <span className="px-2 py-0.5 rounded-full bg-slate-200/80 text-slate-600 text-[10px] font-semibold">
+                                📁 {unit.mediaItems.length} ไฟล์/สื่อ
+                              </span>
+                            )}
+                          </div>
+                          {unit.description && (
+                            <p className="text-xs text-slate-500 mt-1 ml-7 leading-snug">
+                              {unit.description}
+                            </p>
+                          )}
+                        </div>
 
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                {media.fileUrl && (
-                                  <a
-                                    href={media.fileUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                                    title="เปิดดูไฟล์"
-                                  >
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                  </a>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteMedia(unit.id, media.id)}
-                                  className="p-1 rounded text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                                  title="ลบสื่อนี้"
+                        <div className="flex items-center gap-2 sm:gap-3 shrink-0 self-end sm:self-auto">
+                          <div className="text-right">
+                            <span className="text-xs font-extrabold text-blue-700 block">
+                              {unit.maxScore} คะแนน
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {unit.sgsRef}
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenAddMedia(unit.id)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-blue-50 text-blue-700 border border-slate-200 hover:border-blue-300 text-[11px] font-bold shadow-2xs transition-colors cursor-pointer"
+                            title="เพิ่มสื่อ ใบงาน หรือแบบทดสอบ"
+                          >
+                            <Plus className="w-3 h-3 text-blue-600" />
+                            <span>+ สื่อ/ใบงาน</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUnit(unit.id, unit.title)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="ลบหน่วยนี้"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Unit Media Items List (Collapsible Accordion Content) */}
+                      {!isCollapsed && (
+                        <div className="space-y-2 pt-1 animate-in fade-in duration-150">
+                          <div className="text-[11px] font-bold text-slate-500 flex items-center justify-between">
+                            <span>สื่อการสอน ใบงาน และการสอบเก็บคะแนน ({unit.mediaItems.length} รายการ)</span>
+                            <span className="text-[10px] text-emerald-600 font-semibold">
+                              • เปิดให้นักเรียนเข้าถึง
+                            </span>
+                          </div>
+
+                          {unit.mediaItems.length === 0 ? (
+                            <p className="text-[11px] text-slate-400 italic bg-white p-2.5 rounded-xl border border-slate-100">
+                              ยังไม่มีไฟล์หรือสื่อในหน่วยนี้ คลิก "+ สื่อ/ใบงาน" เพื่อเพิ่มเอกสารการสอน
+                            </p>
+                          ) : (
+                            <div className="grid grid-cols-1 gap-2">
+                              {unit.mediaItems.map((media) => (
+                                <div
+                                  key={media.id}
+                                  className="bg-white rounded-xl border border-slate-200 p-2.5 flex items-center justify-between gap-3 shadow-2xs hover:shadow-xs transition-shadow"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div
+                                      className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                                        media.mediaType === 'EXAM_QUIZ'
+                                          ? 'bg-purple-100 text-purple-700'
+                                          : media.mediaType === 'WORKSHEET'
+                                          ? 'bg-amber-100 text-amber-700'
+                                          : 'bg-blue-100 text-blue-700'
+                                      }`}
+                                    >
+                                      {media.mediaType === 'EXAM_QUIZ' ? (
+                                        <Sparkles className="w-3.5 h-3.5" />
+                                      ) : media.mediaType === 'WORKSHEET' ? (
+                                        <FileSpreadsheet className="w-3.5 h-3.5" />
+                                      ) : (
+                                        <FileText className="w-3.5 h-3.5" />
+                                      )}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-xs font-bold text-slate-800 truncate">
+                                          {media.title}
+                                        </span>
+                                        <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-slate-100 text-slate-600 uppercase">
+                                          {media.fileType || media.mediaType}
+                                        </span>
+                                      </div>
+                                      <div className="text-[10px] text-slate-400">
+                                        {media.fileSize && <span>{media.fileSize} • </span>}
+                                        <span>สร้างเมื่อ {media.createdAt}</span>
+                                        {media.linkedExamId && (
+                                          <span className="text-purple-600 font-semibold ml-1">
+                                            • ลิงก์ระบบสอบออนไลน์
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {media.fileUrl && (
+                                      <a
+                                        href={media.fileUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                        title="เปิดดูไฟล์"
+                                      >
+                                        <ExternalLink className="w-3.5 h-3.5" />
+                                      </a>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteMedia(unit.id, media.id)}
+                                      className="p-1 rounded text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                      title="ลบสื่อนี้"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
-                          ))}
+                          )}
                         </div>
                       )}
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -1045,7 +1174,7 @@ export const CoursesCurriculumView: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Copy className="w-5 h-5 text-indigo-600" />
                 <h3 className="text-base font-extrabold text-slate-900">
-                  คัดลอกแผนการสอนข้ามปีการศึกษา
+                  คัดลอกแผนการสอนข้ามภาคเรียน / ปีการศึกษา
                 </h3>
               </div>
               <button
@@ -1059,50 +1188,117 @@ export const CoursesCurriculumView: React.FC = () => {
 
             <div className="p-3.5 bg-indigo-50/70 border border-indigo-200 rounded-2xl text-xs text-indigo-900 space-y-1">
               <span className="font-bold flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-indigo-600" />
-                <span>สะดวก รวดเร็ว ไม่ต้องพิมพ์ใหม่ทุกปี</span>
+                <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+                <span>สะดวก รวดเร็ว ปรับแก้เพียงเล็กน้อยได้ทันที</span>
               </span>
               <p className="text-[11px] text-indigo-700 leading-relaxed">
-                ระบบจะคัดลอกโครงสร้างรายวิชา หน่วยการเรียนรู้ สัดส่วนคะแนนเต็ม และสื่อการสอนทั้งหมดไปยังปีการศึกษาใหม่ให้โดยอัตโนมัติ
+                คัดลอกจากเทอมเดิม (เช่น 1/2569) ไปเป็นเทอมใหม่ (เช่น 1/2570) โดยที่แผนเก่าและงานของนักเรียนรุ่นเดิมยังคงถูกเก็บรักษาไว้ 100% เพื่อให้นักเรียนกลับมาดู แก้งาน หรือส่งงานย้อนหลังได้ตลอดเวลา
               </p>
             </div>
 
-            <form onSubmit={handleExecuteCopyYear} className="space-y-3.5 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">คัดลอกจากปีการศึกษาเดิม:</label>
-                  <select
-                    value={copyYearForm.fromYear}
-                    onChange={(e) => setCopyYearForm({ ...copyYearForm, fromYear: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold focus:border-blue-500 focus:outline-none"
+            <form onSubmit={handleExecuteCopyYear} className="space-y-4 text-xs">
+              {/* Scope Selection */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1.5">ขอบเขตที่ต้องการคัดลอก:</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <label
+                    className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-colors ${
+                      copyYearForm.copyScope === 'CURRENT_COURSE'
+                        ? 'border-indigo-500 bg-indigo-50/60 text-indigo-900 font-bold'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
                   >
-                    <option value="2569">ปีการศึกษา 2569</option>
-                    <option value="2568">ปีการศึกษา 2568</option>
+                    <input
+                      type="radio"
+                      name="copyScope"
+                      checked={copyYearForm.copyScope === 'CURRENT_COURSE'}
+                      onChange={() => setCopyYearForm({ ...copyYearForm, copyScope: 'CURRENT_COURSE' })}
+                      className="text-indigo-600"
+                    />
+                    <span className="truncate">
+                      เฉพาะวิชา: {selectedCourse ? selectedCourse.code : 'วิชาที่เลือก'}
+                    </span>
+                  </label>
+
+                  <label
+                    className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-colors ${
+                      copyYearForm.copyScope === 'ALL_COURSES'
+                        ? 'border-indigo-500 bg-indigo-50/60 text-indigo-900 font-bold'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="copyScope"
+                      checked={copyYearForm.copyScope === 'ALL_COURSES'}
+                      onChange={() => setCopyYearForm({ ...copyYearForm, copyScope: 'ALL_COURSES' })}
+                      className="text-indigo-600"
+                    />
+                    <span>ทุกรายวิชาที่สอน</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Source Term / Year */}
+              <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">คัดลอกจากภาคเรียนเดิม:</label>
+                  <select
+                    value={copyYearForm.fromTerm}
+                    onChange={(e) => setCopyYearForm({ ...copyYearForm, fromTerm: e.target.value })}
+                    className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white font-bold focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="1">ภาคเรียนที่ 1</option>
+                    <option value="2">ภาคเรียนที่ 2</option>
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">ไปยังปีการศึกษาใหม่:</label>
+                  <label className="font-bold text-slate-700 block mb-1">ปีการศึกษาเดิม:</label>
+                  <select
+                    value={copyYearForm.fromYear}
+                    onChange={(e) => setCopyYearForm({ ...copyYearForm, fromYear: e.target.value })}
+                    className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white font-bold focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="2569">2569</option>
+                    <option value="2568">2568</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Target Term / Year */}
+              <div className="grid grid-cols-2 gap-3 p-3 bg-blue-50/50 rounded-2xl border border-blue-200">
+                <div>
+                  <label className="font-bold text-blue-900 block mb-1">ไปยังภาคเรียนเป้าหมาย:</label>
+                  <select
+                    value={copyYearForm.toTerm}
+                    onChange={(e) => setCopyYearForm({ ...copyYearForm, toTerm: e.target.value })}
+                    className="w-full px-2.5 py-1.5 rounded-xl border border-blue-200 bg-white font-bold text-blue-900 focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="1">ภาคเรียนที่ 1</option>
+                    <option value="2">ภาคเรียนที่ 2</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-bold text-blue-900 block mb-1">ปีการศึกษาเป้าหมาย:</label>
                   <input
                     type="text"
                     required
                     placeholder="เช่น 2570"
                     value={copyYearForm.toYear}
                     onChange={(e) => setCopyYearForm({ ...copyYearForm, toYear: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold text-indigo-700 focus:border-indigo-500 focus:outline-none"
+                    className="w-full px-2.5 py-1.5 rounded-xl border border-blue-200 bg-white font-bold text-blue-900 focus:border-blue-500 focus:outline-none"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">ภาคเรียนเป้าหมาย:</label>
-                <select
-                  value={copyYearForm.targetTerm}
-                  onChange={(e) => setCopyYearForm({ ...copyYearForm, targetTerm: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 font-semibold focus:border-blue-500 focus:outline-none"
-                >
-                  <option value="1">ภาคเรียนที่ 1</option>
-                  <option value="2">ภาคเรียนที่ 2</option>
-                </select>
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-[11px] text-emerald-800 space-y-1">
+                <div className="font-bold flex items-center gap-1.5 text-emerald-900">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>การันตีความปลอดภัยของข้อมูลประวัติ (Data Retention)</span>
+                </div>
+                <p>
+                  แผนการสอนเดิมของเทอม {copyYearForm.fromTerm}/{copyYearForm.fromYear} จะไม่ถูกลบหรือเขียนทับ นักเรียนรุ่นที่เคยเรียนยังคงสามารถเข้าถึงสื่อการสอนและส่งงานย้อนหลังได้ตามปกติ
+                </p>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">

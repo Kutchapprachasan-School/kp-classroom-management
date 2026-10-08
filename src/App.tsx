@@ -76,7 +76,6 @@ export const App: React.FC = () => {
     const user = authService.getCurrentUser();
     if (user) {
       if (user.role === 'STUDENT') return 'student-portal';
-      if (user.role === 'ADMIN') return 'admin-dashboard';
       return 'home';
     }
     return 'school-login';
@@ -172,7 +171,9 @@ export const App: React.FC = () => {
     }
 
     if (nextRole === 'ACADEMIC_ADMIN') {
-      setCurrentView('admin-dashboard');
+      if (currentView === 'student-portal' || currentView === 'school-login') {
+        setCurrentView('home');
+      }
       return;
     }
 
@@ -249,7 +250,7 @@ export const App: React.FC = () => {
       case 'lessons':
         return 'หลักสูตร/แผนการสอน';
       case 'roster':
-        return 'รายชื่อนักเรียน';
+        return 'ห้องเรียน / รายชื่อนักเรียน';
       case 'student':
         return 'ข้อมูลนักเรียน';
       case 'timetable':
@@ -280,9 +281,7 @@ export const App: React.FC = () => {
   };
 
   const handleBack = () => {
-    if (activeRole === 'ACADEMIC_ADMIN') {
-      setCurrentView('admin-dashboard');
-    } else if (currentView !== 'home') {
+    if (currentView !== 'home') {
       setCurrentView('home');
     }
   };
@@ -458,11 +457,7 @@ export const App: React.FC = () => {
               setActiveRole(role);
             }
             setCurrentAuthUser(authService.getCurrentUser());
-            if (role === 'ACADEMIC_ADMIN') {
-              setCurrentView('admin-dashboard');
-            } else {
-              setCurrentView((target as TeacherViewKey) || 'home');
-            }
+            setCurrentView((target as TeacherViewKey) || 'home');
           }}
           onEnterStudentPortal={(stuRole) => {
             setActiveRole(stuRole || 'STUDENT_GENERAL');
@@ -482,16 +477,12 @@ export const App: React.FC = () => {
           onSwitchToTeacherRole={(tRole) => handleChangeRole(tRole)}
           onExit={handleLogout}
         />
-      ) : currentView === 'admin-dashboard' || (activeRole === 'ACADEMIC_ADMIN' && currentView === 'home') ? (
+      ) : currentView === 'admin-dashboard' ? (
         <AdminExecutiveDashboardView
           activeRole={activeRole}
           onChangeRole={handleChangeRole}
           onNavigateToView={(viewKey) => {
-            if (viewKey === 'home' || viewKey === 'admin-dashboard') {
-              setCurrentView('admin-dashboard');
-            } else {
-              setCurrentView(viewKey as TeacherViewKey);
-            }
+            setCurrentView(viewKey as TeacherViewKey);
           }}
           onLogout={handleLogout}
           currentUser={currentAuthUser}

@@ -410,6 +410,39 @@ class CoursesCurriculumService {
     }
     return { copiedCount };
   }
+
+  /**
+   * คัดลอกรายวิชาและแผนการสอนเฉพาะวิชาไปยังภาคเรียน/ปีการศึกษาใหม่
+   * รักษาแผนเก่าไว้ 100% เพื่อให้นักเรียนรุ่นเดิมกลับมาดู ส่งงาน แก้งานย้อนหลังได้
+   */
+  public copyCourseToNewTerm(
+    courseId: string,
+    targetYear: string,
+    targetTerm: string
+  ): CourseCurriculumRecord {
+    const all = this.load();
+    const src = all.find((c) => c.id === courseId);
+    if (!src) throw new Error('Course not found');
+
+    const cloned: CourseCurriculumRecord = {
+      ...src,
+      id: `course-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      academicYear: targetYear,
+      term: targetTerm,
+      units: src.units.map((u, uIdx) => ({
+        ...u,
+        id: `unit-${Date.now()}-${uIdx}-${Math.random().toString(36).slice(2, 6)}`,
+        mediaItems: u.mediaItems.map((m, mIdx) => ({
+          ...m,
+          id: `media-${Date.now()}-${uIdx}-${mIdx}-${Math.random().toString(36).slice(2, 6)}`,
+        })),
+      })),
+    };
+
+    all.unshift(cloned);
+    this.save();
+    return cloned;
+  }
 }
 
 export const coursesCurriculumService = new CoursesCurriculumService();

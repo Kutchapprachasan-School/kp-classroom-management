@@ -7,7 +7,7 @@ export const ClassroomCreateSchema = z.object({
   subjectCode: z.string().min(1, 'ต้องระบุรหัสวิชา เช่น ศ23101'),
   subjectName: z.string().min(1, 'ต้องระบุชื่อวิชา เช่น ศิลปะ'),
   adviser: z.string().optional(),
-  termId: z.string().default('term-1-2569'),
+  termId: z.string().optional().default('term-1-2569'),
 });
 export type ClassroomCreateInput = z.infer<typeof ClassroomCreateSchema>;
 
