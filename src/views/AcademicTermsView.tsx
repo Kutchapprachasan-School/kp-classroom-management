@@ -8,7 +8,7 @@
 // 3. ปฏิทินจิ๋ว (Mini Calendar Grid Date Picker) ในโมดอล ทั้งเลือกวันเดียวและช่วงวันที่
 // 4. คีย์เวิร์ดตรวจจับไอคอนตามบริบท เช่น "อบรม", "ประชุม", "ส่งงาน", "คะแนน", "สอบ", "ค่าย", "จิตอาสา", "กีฬา", ฯลฯ
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Presentation1Regular from '@mingcute/react/core-regular/presentation-1';
 import GroupRegular from '@mingcute/react/core-regular/group';
 import FileCheckRegular from '@mingcute/react/core-regular/file-check';
@@ -35,6 +35,12 @@ import Delete2Regular from '@mingcute/react/core-regular/delete-2';
 import CloseRegular from '@mingcute/react/core-regular/close';
 import TimeRegular from '@mingcute/react/core-regular/time';
 import LocationRegular from '@mingcute/react/core-regular/location';
+
+import {
+  academicCalendarService,
+  ACADEMIC_CALENDAR_EVENT,
+  type SpecialHolidayRecord,
+} from '../services/academicCalendarService';
 
 export type ActivityCategory = 'ALL' | 'ACADEMIC' | 'DEVELOPMENT' | 'SPORTS' | 'AFFAIRS' | 'EXAM';
 
@@ -65,6 +71,51 @@ interface AcademicTermsViewProps {
 }
 
 const CALENDAR_EVENTS_STORAGE_KEY = 'kp_school_calendar_events_v2';
+
+// Helper แยกวัน เดือน ปี จากสตริงวันที่ของระบบวันหยุด เช่น '13 ต.ค. 2569' หรือ '23 ต.ค. 2569'
+export const parseHolidayDate = (dateStr: string): { day: number; month: number; year: number } => {
+  const monthMap: Record<string, number> = {
+    'ม.ค.': 1, 'มกราคม': 1,
+    'ก.พ.': 2, 'กุมภาพันธ์': 2,
+    'มี.ค.': 3, 'มีนาคม': 3,
+    'เม.ย.': 4, 'เมษายน': 4,
+    'พ.ค.': 5, 'พฤษภาคม': 5,
+    'มิ.ย.': 6, 'มิถุนายน': 6,
+    'ก.ค.': 7, 'กรกฎาคม': 7,
+    'ส.ค.': 8, 'สิงหาคม': 8,
+    'ก.ย.': 9, 'กันยายน': 9,
+    'ต.ค.': 10, 'ตุลาคม': 10,
+    'พ.ย.': 11, 'พฤศจิกายน': 11,
+    'ธ.ค.': 12, 'ธันวาคม': 12,
+  };
+  const parts = dateStr.trim().split(/\s+/);
+  if (parts.length >= 3) {
+    const day = parseInt(parts[0], 10) || 1;
+    const month = monthMap[parts[1]] || 10;
+    const year = parseInt(parts[2], 10) || 2569;
+    return { day, month, year };
+  }
+  return { day: 1, month: 10, year: 2569 };
+};
+
+// แปลง SpecialHolidayRecord จาก academicCalendarService (Single Source of Truth) เป็น CalendarEventItem
+export const convertHolidayToCalendarEvent = (holiday: SpecialHolidayRecord): CalendarEventItem => {
+  const { day, month, year } = parseHolidayDate(holiday.date);
+  return {
+    id: `holiday-${holiday.id}`,
+    day,
+    month,
+    year,
+    fullDateLabel: formatThaiFullDate(day, month, year),
+    title: holiday.name.startsWith('วัน') ? holiday.name : `วันหยุด: ${holiday.name}`,
+    category: 'OTHER',
+    colorType: holiday.type === 'GOVERNMENT' ? 'PURPLE' : 'ORANGE',
+    targetRole: 'ALL',
+    isAllDay: true,
+    location: holiday.typeLabel || 'วันหยุดราชการ / โรงเรียน',
+    description: holiday.note || 'วันหยุดตามปฏิทินการศึกษา ซิงค์กับระบบการลา',
+  };
+};
 
 // Helper คำนวณชื่อวันในสัปดาห์ (ตุลาคม 2569: วันที่ 1 คือวันพุธ, วันที่ 2 คือวันพฤหัสบดี)
 export const getThaiDayOfWeekName = (day: number): string => {
@@ -563,6 +614,38 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
     return INITIAL_OCTOBER_EVENTS;
   });
 
+  // Synced Holidays from academicCalendarService (Single Source of Truth)
+  const [holidaysList, setHolidaysList] = useState<SpecialHolidayRecord[]>(() => {
+    try {
+      return academicCalendarService.getHolidays().filter((h) => h.isActive);
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    const handleCalendarChange = () => {
+      try {
+        setHolidaysList(academicCalendarService.getHolidays().filter((h) => h.isActive));
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener(ACADEMIC_CALENDAR_EVENT, handleCalendarChange);
+    return () => window.removeEventListener(ACADEMIC_CALENDAR_EVENT, handleCalendarChange);
+  }, []);
+
+  const holidayEvents: CalendarEventItem[] = useMemo(() => {
+    return holidaysList.map(convertHolidayToCalendarEvent);
+  }, [holidaysList]);
+
+  // Combined events: User-defined events + Synced Holidays
+  const allEvents: CalendarEventItem[] = useMemo(() => {
+    const holidayIds = new Set(holidayEvents.map((h) => h.id));
+    const userEvents = events.filter((e) => !holidayIds.has(e.id));
+    return [...holidayEvents, ...userEvents];
+  }, [events, holidayEvents]);
+
   const [selectedEvent, setSelectedEvent] = useState<CalendarEventItem | null>(null);
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -1020,7 +1103,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
               onClick={() => {
                 setSelectedMonthOffset(0);
                 setViewMode('MONTH');
-                const todayItem = events.find((e) => e.day === 2);
+                const todayItem = allEvents.find((e) => e.day === 2);
                 if (todayItem) setSelectedEvent(todayItem);
               }}
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-blue-200 bg-white hover:bg-blue-50/50 text-blue-600 font-bold text-xs shadow-2xs transition-colors cursor-pointer"
@@ -1058,7 +1141,9 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                   const isToday = isCurrentMonth && dayNumber === 2;
                   const isLastRow = idx >= 28;
                   const dayEvents = isCurrentMonth
-                    ? events.filter((e) => {
+                    ? allEvents.filter((e) => {
+                        if (roleFilter === 'TEACHER' && e.targetRole === 'STUDENT') return false;
+                        if (roleFilter === 'STUDENT' && e.targetRole === 'TEACHER') return false;
                         if (e.endDay && e.endDay >= e.day) {
                           return dayNumber >= e.day && dayNumber <= e.endDay;
                         }
@@ -1708,49 +1793,78 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
             </div>
 
             {/* ปุ่ม Actions: แก้ไข, ลบ, ปิด */}
-            <div className="flex items-center justify-between pt-1">
-              <button
-                type="button"
-                onClick={() => handleDeleteEvent(selectedEvent.id)}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-rose-200 text-rose-600 font-bold text-xs hover:bg-rose-50 cursor-pointer"
-                title="ลบกิจกรรมนี้"
-              >
-                <Delete2Regular className="w-3.5 h-3.5 text-rose-600" />
-                <span>ลบ</span>
-              </button>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleStartEditEvent(selectedEvent)}
-                  className="flex items-center gap-1 px-3.5 py-1.5 rounded-xl bg-blue-50 text-blue-700 font-bold text-xs hover:bg-blue-100 border border-blue-200 cursor-pointer"
-                >
-                  <Edit2Regular className="w-3.5 h-3.5 text-blue-600" />
-                  <span>แก้ไข</span>
-                </button>
-
-                {selectedEvent.category === 'EXAM' && onNavigateToExams && (
+            {selectedEvent.id.startsWith('holiday-') ? (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1 w-full">
+                <span className="text-[11px] text-purple-700 font-bold bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-200">
+                  วันหยุดทางการ ซิงค์กับระบบการลา & ปฏิทินการศึกษา
+                </span>
+                <div className="flex items-center gap-2">
+                  {onNavigateToSettings && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedEvent(null);
+                        onNavigateToSettings();
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 cursor-pointer"
+                    >
+                      จัดการวันหยุดในการตั้งค่า
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => {
-                      setSelectedEvent(null);
-                      onNavigateToExams();
-                    }}
-                    className="px-3 py-1.5 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 cursor-pointer"
+                    onClick={() => setSelectedEvent(null)}
+                    className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 cursor-pointer"
                   >
-                    จัดการสอบ
+                    ปิด
                   </button>
-                )}
-
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between pt-1">
                 <button
                   type="button"
-                  onClick={() => setSelectedEvent(null)}
-                  className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 cursor-pointer"
+                  onClick={() => handleDeleteEvent(selectedEvent.id)}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-rose-200 text-rose-600 font-bold text-xs hover:bg-rose-50 cursor-pointer"
+                  title="ลบกิจกรรมนี้"
                 >
-                  ปิด
+                  <Delete2Regular className="w-3.5 h-3.5 text-rose-600" />
+                  <span>ลบ</span>
                 </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleStartEditEvent(selectedEvent)}
+                    className="flex items-center gap-1 px-3.5 py-1.5 rounded-xl bg-blue-50 text-blue-700 font-bold text-xs hover:bg-blue-100 border border-blue-200 cursor-pointer"
+                  >
+                    <Edit2Regular className="w-3.5 h-3.5 text-blue-600" />
+                    <span>แก้ไข</span>
+                  </button>
+
+                  {selectedEvent.category === 'EXAM' && onNavigateToExams && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedEvent(null);
+                        onNavigateToExams();
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 cursor-pointer"
+                    >
+                      จัดการสอบ
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedEvent(null)}
+                    className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 cursor-pointer"
+                  >
+                    ปิด
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}

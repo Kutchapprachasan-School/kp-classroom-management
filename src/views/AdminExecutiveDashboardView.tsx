@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   getSchoolSettings,
   type SchoolBrandingSettings,
@@ -46,7 +46,16 @@ export const AdminExecutiveDashboardView: React.FC<
   currentUser,
   schoolSettings,
 }) => {
-  const branding = schoolSettings || getSchoolSettings();
+  const [branding, setBranding] = useState(() => schoolSettings || getSchoolSettings());
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setBranding(getSchoolSettings());
+    };
+    window.addEventListener('kps-school-settings-updated', handleUpdate);
+    return () => window.removeEventListener('kps-school-settings-updated', handleUpdate);
+  }, [schoolSettings]);
+
   const [currentMenu, setCurrentMenu] = useState<AdminMenuKey>('home');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -191,7 +200,7 @@ export const AdminExecutiveDashboardView: React.FC<
               {/* 1. Hero Greeting Banner */}
               <AdminHeroBanner
                 schoolName={branding.nameTh}
-                quote="การศึกษา คือ รากฐาน ของอนาคตที่มั่นคง"
+                quote={branding.motto || branding.philosophy || "การศึกษา คือ รากฐาน ของอนาคตที่มั่นคง"}
               />
 
               {/* 2. 4 Stat KPI Cards */}

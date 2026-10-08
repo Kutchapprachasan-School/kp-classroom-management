@@ -112,7 +112,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         {/* Brand Header */}
         <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <AdminSchoolLogo size={38} />
+            <AdminSchoolLogo size={38} logoUrl={branding.logoUrl} />
             {!isCollapsed && (
               <div className="min-w-0">
                 <div className="font-extrabold text-slate-900 text-sm leading-tight truncate">

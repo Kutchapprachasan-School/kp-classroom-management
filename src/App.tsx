@@ -157,8 +157,8 @@ export const App: React.FC = () => {
     useState<QuickFilterMode>('ALL');
   const [deepLinkBanner, setDeepLinkBanner] = useState<string | null>(null);
   const [settingsInitialTab, setSettingsInitialTab] = useState<
-    'CALENDAR' | 'BRANDING' | 'STORAGE' | 'BANNERS'
-  >('CALENDAR');
+    'OVERVIEW' | 'CALENDAR' | 'BRANDING' | 'STORAGE' | 'BANNERS' | undefined
+  >(undefined);
 
   const handleChangeRole = (nextRole: SchoolUserRole) => {
     setActiveRole(nextRole);
@@ -208,6 +208,9 @@ export const App: React.FC = () => {
       setDeepLinkAssignmentFilter(payload.assignmentQuickFilter);
     }
     setDeepLinkBanner(payload.highlightBanner || null);
+    if (payload.view === 'settings') {
+      setSettingsInitialTab(payload.settingsTab as any || undefined);
+    }
     setCurrentView(payload.view as TeacherViewKey);
   };
 
@@ -503,6 +506,9 @@ export const App: React.FC = () => {
               if (view === 'school-login') {
                 handleLogout();
               } else {
+                if (view === 'settings') {
+                  setSettingsInitialTab(undefined);
+                }
                 setCurrentView(view);
               }
             }}

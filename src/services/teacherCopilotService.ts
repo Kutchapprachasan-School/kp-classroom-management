@@ -37,6 +37,7 @@ export interface CrossViewNavigationPayload {
   assignmentQuickFilter?: 'ALL' | 'MISSING_OR_R' | 'PENDING_REVIEW';
   gradesQuickFilter?: 'ALL' | 'AT_RISK';
   highlightBanner?: string;
+  settingsTab?: string;
 }
 
 export interface UrgentTriageItem {

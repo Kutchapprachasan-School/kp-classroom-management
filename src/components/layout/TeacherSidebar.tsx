@@ -21,7 +21,12 @@ import {
   UserCheck,
   ClipboardCheck,
 } from 'lucide-react';
-import { getSchoolSettings, type SchoolUserRole } from '../../config/schoolRoles';
+import {
+  getSchoolSettings,
+  DEFAULT_KUTCHAP_LOGO_SVG,
+  type SchoolUserRole,
+  type SchoolBrandingSettings,
+} from '../../config/schoolRoles';
 import {
   teacherBannerService,
   TEACHER_BANNERS_EVENT,
@@ -108,7 +113,17 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
   };
 
   const isAdmin = teacherBannerService.canManageBanners(activeRole);
-  const schoolSettings = getSchoolSettings();
+  const [schoolSettings, setSchoolSettings] = useState<SchoolBrandingSettings>(() =>
+    getSchoolSettings()
+  );
+
+  useEffect(() => {
+    const handleSettingsUpdate = () => {
+      setSchoolSettings(getSchoolSettings());
+    };
+    window.addEventListener('kps-school-settings-updated', handleSettingsUpdate);
+    return () => window.removeEventListener('kps-school-settings-updated', handleSettingsUpdate);
+  }, []);
 
   // เมนูหลักของครูตามแบบ Pastel Anime Education Dashboard
   const menuItems: NavMenuItem[] = [
@@ -203,13 +218,13 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       {/* 1. Header: School Logo & Title matching Image 1 */}
       <div className="p-3.5 sm:p-4 border-b border-slate-100 flex items-center justify-between gap-2.5 shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 flex items-center justify-center shadow-2xs">
+          <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 flex items-center justify-center shadow-2xs bg-white border border-slate-100 p-0.5">
             <img
-              src="/images/teacher/school_logo.png"
+              src={schoolSettings.logoUrl || '/images/teacher/school_logo.png'}
               alt={schoolSettings.nameTh}
               className="w-full h-full object-contain"
               onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src = schoolSettings.logoUrl;
+                (e.currentTarget as HTMLImageElement).src = DEFAULT_KUTCHAP_LOGO_SVG;
               }}
             />
           </div>
@@ -218,7 +233,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
               {schoolSettings.nameTh}
             </h1>
             <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate mt-0.5">
-              {schoolSettings.districtProvince || 'ต.นาสูง อ.วังสามหมอ จ.อุดรธานี'}
+              {schoolSettings.districtProvince || `${schoolSettings.district ? 'อ.' + schoolSettings.district : ''} ${schoolSettings.province ? 'จ.' + schoolSettings.province : ''}`.trim() || 'อ.กุดจับ จ.อุดรธานี'}
             </p>
           </div>
         </div>

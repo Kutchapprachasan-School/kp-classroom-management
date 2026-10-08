@@ -9,7 +9,7 @@ interface AdminHeroBannerProps {
 
 export const AdminHeroBanner: React.FC<AdminHeroBannerProps> = ({
   schoolName = getSchoolSettings().nameTh,
-  quote = 'การศึกษา คือ รากฐาน ของอนาคตที่มั่นคง',
+  quote = getSchoolSettings().motto || getSchoolSettings().philosophy || 'การศึกษา คือ รากฐาน ของอนาคตที่มั่นคง',
 }) => {
   return (
     <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#EEF4FF] via-[#F8FAFF] to-[#E8F2FE] border border-blue-100 shadow-[0_2px_12px_rgba(37,99,235,0.04)] select-none">

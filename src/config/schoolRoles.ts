@@ -47,10 +47,18 @@ export interface SchoolBrandingSettings {
   baseFontSizePx: number;
   morningToClassSyncMode: MorningToClassSyncMode;
   motto?: string;
+  philosophy?: string;
   vision?: string;
   mission?: string;
+  addressLine?: string;
+  subdistrict?: string;
+  district?: string;
+  province?: string;
   postalCode?: string;
   phoneNumber?: string;
+  email?: string;
+  websiteUrl?: string;
+  schoolColors?: string;
 }
 
 export interface SmsUserAccount {
@@ -67,7 +75,7 @@ export interface SmsUserAccount {
   smsSynced: boolean;
 }
 
-// โลโก้ตราประจำโรงเรียนกุดจับประชาสรรค์ (ตรงตามหน้า School Management System: คบเพลิงเปลวไฟสีแดง รัศมีสีทอง อักษรย่อ กป และริบบิ้นสีฟ้า)
+// โลโก้ตราประจำโรงเรียนกุดจับประชาสรรค์ (คบเพลิงเปลวไฟสีแดง รัศมีสีทอง อักษรย่อ กป และริบบิ้นสีฟ้า)
 export const DEFAULT_KUTCHAP_LOGO_SVG = `data:image/svg+xml;utf8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" fill="none">
   <defs>
@@ -97,36 +105,44 @@ export const DEFAULT_KUTCHAP_LOGO_SVG = `data:image/svg+xml;utf8,${encodeURIComp
   <circle cx="80" cy="96" r="24" fill="#FEFCE8" stroke="url(#rayGold)" stroke-width="4.5"/>
   <circle cx="80" cy="96" r="19" fill="#FFFFFF" stroke="#FDE047" stroke-width="1.2"/>
   <!-- อักษร กป สีน้ำเงินเข้ม -->
-  <text x="80" y="103" text-anchor="middle" fill="#1E293B" font-family="sans-serif" font-weight="900" font-size="18" letter-spacing="-0.5">คยพ</text>
+  <text x="80" y="103" text-anchor="middle" fill="#1E293B" font-family="sans-serif" font-weight="900" font-size="18" letter-spacing="-0.5">กป</text>
   <!-- ริบบิ้นสีฟ้าด้านล่าง -->
   <path d="M26 118 L44 112 L48 126 L32 132 Z" fill="#0EA5E9"/>
   <path d="M134 118 L116 112 L112 126 L128 132 Z" fill="#0EA5E9"/>
   <path d="M38 116 C58 126 102 126 122 116 L126 130 C102 140 58 140 34 130 Z" fill="url(#ribbonBlue)" stroke="#FFFFFF" stroke-width="1.5"/>
-  <text x="80" y="130" text-anchor="middle" fill="#FFFFFF" font-family="sans-serif" font-weight="700" font-size="8.5">โรงเรียนคำยางพิทยา</text>
+  <text x="80" y="130" text-anchor="middle" fill="#FFFFFF" font-family="sans-serif" font-weight="700" font-size="8.5">โรงเรียนกุดจับประชาสรรค์</text>
 </svg>
 `)}`;
 
 export const KUTCHAP_SCHOOL_INFO: SchoolBrandingSettings = {
   classroomSystemTitle: 'ระบบจัดการชั้นเรียน',
-  nameTh: 'โรงเรียนคำยางพิทยา',
-  nameEn: 'Khamyang Pittaya School',
-  shortCode: 'ค.ย.พ. • สพม.อุดรธานี',
-  districtProvince: 'ต.นาสูง อ.วังสามหมอ จ.อุดรธานี',
-  affiliation: 'School Management System',
-  domain: 'khamyang.ac.th',
+  nameTh: 'โรงเรียนกุดจับประชาสรรค์',
+  nameEn: 'Kutchapprachasan School',
+  shortCode: 'ก.ป. • สพม.อุดรธานี',
+  districtProvince: 'อ.กุดจับ จ.อุดรธานี',
+  affiliation: 'สำนักงานเขตพื้นที่การศึกษามัธยมศึกษาอุดรธานี',
+  domain: 'kutchap.ac.th',
   academicTerm: 'ภาคเรียนที่ 1/2569',
   logoUrl: DEFAULT_KUTCHAP_LOGO_SVG,
   smsSystemName: 'School Management System',
-  smsApiUrl: 'https://sms.khamyang.ac.th/api/v1/auth-sync',
+  smsApiUrl: 'https://sms.kutchap.ac.th/api/v1/auth-sync',
   smsLastSyncedAt: '30 ก.ย. 2569 • 11:05 น.',
   fontFamily: 'Prompt',
   baseFontSizePx: 15,
   morningToClassSyncMode: 'AUTO_PREFILL',
-  motto: 'ร่วมสร้างโอกาส พัฒนาผู้เรียน สู่อนาคตที่ดีกว่า',
-  vision: 'มุ่งมั่นพัฒนาผู้เรียนให้มีความรู้ คู่คุณธรรม ก้าวทันเทคโนโลยี มีทักษะในศตวรรษที่ 21',
-  mission: 'ส่งเสริมการจัดการเรียนรู้เชิงรุก (Active Learning) พัฒนาระบบดิจิทัลเพื่อการศึกษา และสร้างเสริมสุขภาวะที่ดีของผู้เรียน',
-  postalCode: '41280',
-  phoneNumber: '042-298-123',
+  motto: 'การศึกษา คือ รากฐาน ของอนาคตที่มั่นคง',
+  philosophy: 'ประพฤติดี มีวิชา กีฬาเด่น เน้นคุณธรรม',
+  vision: 'มุ่งมั่นพัฒนาผู้เรียนสู่มาตรฐานสากล บนพื้นฐานความเป็นไทยและหลักปรัชญาของเศรษฐกิจพอเพียง',
+  mission: '1. จัดการศึกษาขั้นพื้นฐานอย่างมีคุณภาพและเสมอภาค\n2. ส่งเสริมการใช้เทคโนโลยีดิจิทัลเพื่อการเรียนรู้\n3. พัฒนาทักษะและศักยภาพผู้เรียนในศตวรรษที่ 21',
+  addressLine: 'เลขที่ 199 หมู่ 1 ถนนกุดจับ-เชียงพิณ',
+  subdistrict: 'เมืองเพีย',
+  district: 'กุดจับ',
+  province: 'อุดรธานี',
+  postalCode: '41250',
+  phoneNumber: '042-261-023',
+  email: 'info@kutchap.ac.th',
+  websiteUrl: 'https://kutchap.ac.th',
+  schoolColors: 'น้ำเงิน - ขาว',
 };
 
 const SCHOOL_SETTINGS_STORAGE_KEY = 'kps_school_branding_settings_v1';
