@@ -1,35 +1,40 @@
 // src/views/AcademicTermsView.tsx
 // ปฏิทินกิจกรรมโรงเรียน (School Activity & Event Calendar)
-// ปรับปรุง UI ให้ตรงตามภาพต้นแบบ Reference Image (media_1791415925768_dac3bff6.png) อย่างแม่นยำ 100%
-// เพิ่มระบบระบุและแสดง "วันที่จัดกิจกรรม" (Activity Date) ทั้งแบบวันเดียวและหลายวัน พร้อมพรีวิววันที่ภาษาไทย
+// ปรับปรุง UI สไตล์ Pastel Anime Education Dashboard (KP Classroom Management)
+// ใช้ MingCute Icons (@mingcute/react) ทันสมัย พร้อมระบบตรวจจับคีย์เวิร์ดอัจฉริยะ (อบรม -> Presentation, ประชุม -> Group, ฯลฯ)
+// รองรับ:
+// 1. กิจกรรมตลอดทั้งวัน ไม่แสดงคำว่า "ตลอดทั้งวัน" ในช่องปฏิทิน
+// 2. ระบบแก้ไขกิจกรรม (Edit) และลบกิจกรรม (Delete) ซิงค์ LocalStorage ทันที
+// 3. ปฏิทินจิ๋ว (Mini Calendar Grid Date Picker) ในโมดอล ทั้งเลือกวันเดียวและช่วงวันที่
+// 4. คีย์เวิร์ดตรวจจับไอคอนตามบริบท เช่น "อบรม", "ประชุม", "ส่งงาน", "คะแนน", "สอบ", "ค่าย", "จิตอาสา", "กีฬา", ฯลฯ
 
 import React, { useState, useEffect } from 'react';
-import {
-  CalendarDays,
-  Calendar,
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  Clock,
-  Sparkles,
-  Trophy,
-  Users,
-  MapPin,
-  X,
-  Heart,
-  Bus,
-  GraduationCap,
-  FileText,
-  CalendarCheck,
-  Award,
-  FileCheck,
-  BookOpen,
-  Target,
-  Landmark,
-  PlusCircle,
-  Hexagon,
-  Shield,
-} from 'lucide-react';
+import Presentation1Regular from '@mingcute/react/core-regular/presentation-1';
+import GroupRegular from '@mingcute/react/core-regular/group';
+import FileCheckRegular from '@mingcute/react/core-regular/file-check';
+import Document2Regular from '@mingcute/react/core-regular/document-2';
+import TargetRegular from '@mingcute/react/core-regular/target';
+import AwardRegular from '@mingcute/react/core-regular/award';
+import TentRegular from '@mingcute/react/core-regular/tent';
+import HeartRegular from '@mingcute/react/core-regular/heart';
+import TrophyRegular from '@mingcute/react/core-regular/trophy';
+import UserAddRegular from '@mingcute/react/core-regular/user-add';
+import UmbrellaRegular from '@mingcute/react/core-regular/umbrella';
+import Book2Regular from '@mingcute/react/core-regular/book-2';
+import MortarboardRegular from '@mingcute/react/core-regular/mortarboard';
+import BusRegular from '@mingcute/react/core-regular/bus';
+import SparklesRegular from '@mingcute/react/core-regular/sparkles';
+import ShieldRegular from '@mingcute/react/core-regular/shield';
+import Calendar2Regular from '@mingcute/react/core-regular/calendar-2';
+import CalendarDayRegular from '@mingcute/react/core-regular/calendar-day';
+import LeftSmallRegular from '@mingcute/react/core-regular/left-small';
+import RightSmallRegular from '@mingcute/react/core-regular/right-small';
+import AddRegular from '@mingcute/react/core-regular/add';
+import Edit2Regular from '@mingcute/react/core-regular/edit-2';
+import Delete2Regular from '@mingcute/react/core-regular/delete-2';
+import CloseRegular from '@mingcute/react/core-regular/close';
+import TimeRegular from '@mingcute/react/core-regular/time';
+import LocationRegular from '@mingcute/react/core-regular/location';
 
 export type ActivityCategory = 'ALL' | 'ACADEMIC' | 'DEVELOPMENT' | 'SPORTS' | 'AFFAIRS' | 'EXAM';
 
@@ -102,7 +107,117 @@ export const formatThaiFullDate = (
   return `วัน${dayOfWeek}ที่ ${day} ${monthName} ${year}`;
 };
 
-// ข้อมูลกิจกรรมเดือนตุลาคม 2569 ตรงตามภาพต้นแบบ Mockup Image ครบทุกรายการ
+// ตรวจจับไอคอน MingCute Icons อัจฉริยะตามคำสำคัญ (Keyword Matcher)
+export const getMingCuteEventIcon = (ev: {
+  title: string;
+  category?: string;
+  colorType?: CalendarLegendColor;
+}) => {
+  const t = ev.title.toLowerCase();
+
+  // 1. ผู้ใช้ระบุเจาะจง: "อบรม" ให้ใส่ไอคอนอบรม (Presentation), "ประชุม" ให้ใส่ไอคอนประชุม (Group)
+  if (t.includes('อบรม')) return Presentation1Regular;
+  if (t.includes('ประชุม')) return GroupRegular;
+
+  // 2. งานส่งเอกสาร / รายงาน / บันทึก
+  if (
+    t.includes('ส่งงาน') ||
+    t.includes('รายงาน') ||
+    t.includes('เอกสาร') ||
+    t.includes('ประเมินผล') ||
+    t.includes('สรุปผลการเรียน')
+  ) {
+    return Document2Regular;
+  }
+
+  // 3. คะแนน / ข้อสอบ / การสอบ / วัดผล
+  if (
+    t.includes('คะแนน') ||
+    t.includes('สอบ') ||
+    t.includes('ข้อสอบ') ||
+    t.includes('ผลการสอบ') ||
+    t.includes('วัดผล')
+  ) {
+    return TargetRegular;
+  }
+
+  // 4. ค่ายกิจกรรม
+  if (t.includes('ค่าย')) return TentRegular;
+
+  // 5. จิตอาสา / บำเพ็ญประโยชน์
+  if (t.includes('จิตอาสา') || t.includes('คุณธรรม') || t.includes('บริจาค')) {
+    return HeartRegular;
+  }
+
+  // 6. กีฬา / แข่งขัน
+  if (t.includes('กีฬา') || t.includes('แข่งขัน') || t.includes('กรีฑา')) {
+    return TrophyRegular;
+  }
+
+  // 7. รับสมัครนักเรียน / ผู้เข้าอบรม
+  if (t.includes('รับสมัคร')) return UserAddRegular;
+
+  // 8. วันหยุดราชการ / หยุดประจำภาค
+  if (t.includes('วันหยุด') || t.includes('หยุด')) return UmbrellaRegular;
+
+  // 9. งานวิจัย / ห้องสมุด / หนังสือ
+  if (t.includes('วิจัย') || t.includes('ห้องสมุด') || t.includes('หนังสือ')) {
+    return Book2Regular;
+  }
+
+  // 10. วันครู / พิธีการ / ปฐมนิเทศ / จบการศึกษา
+  if (
+    t.includes('วันครู') ||
+    t.includes('พิธี') ||
+    t.includes('ปฐมนิเทศ') ||
+    t.includes('ปัจฉิมนิเทศ') ||
+    t.includes('ไหว้ครู')
+  ) {
+    return MortarboardRegular;
+  }
+
+  // 11. ทัศนศึกษา / การเดินทาง
+  if (t.includes('ทัศนศึกษา') || t.includes('ดูงาน')) return BusRegular;
+
+  // 12. ลอยกระทง / ปีใหม่ / เทศกาลสร้างสรรค์
+  if (
+    t.includes('ลอยกระทง') ||
+    t.includes('ปีใหม่') ||
+    t.includes('เทศกาล') ||
+    t.includes('สร้างสรรค์')
+  ) {
+    return SparklesRegular;
+  }
+
+  // 13. ผู้ปกครอง
+  if (t.includes('ผู้ปกครอง')) return GroupRegular;
+
+  // 14. แผนงาน / มาตรฐาน
+  if (t.includes('แผน') || t.includes('นโยบาย') || t.includes('sar')) {
+    return ShieldRegular;
+  }
+
+  // 15. เกียรติบัตร / รางวัล
+  if (t.includes('รางวัล') || t.includes('เกียรติบัตร')) return AwardRegular;
+
+  // Fallback ตามโทนสีหมวดหมู่
+  switch (ev.colorType) {
+    case 'BLUE':
+      return Presentation1Regular;
+    case 'ORANGE':
+      return Document2Regular;
+    case 'GREEN':
+      return FileCheckRegular;
+    case 'RED':
+      return MortarboardRegular;
+    case 'PURPLE':
+      return SparklesRegular;
+    default:
+      return Calendar2Regular;
+  }
+};
+
+// ข้อมูลกิจกรรมเดือนตุลาคม 2569 ตรงตามภาพต้นแบบ Mockup ครบทุกรายการ
 const INITIAL_OCTOBER_EVENTS: CalendarEventItem[] = [
   // 1 ต.ค.
   {
@@ -261,6 +376,7 @@ const INITIAL_OCTOBER_EVENTS: CalendarEventItem[] = [
     colorType: 'ORANGE',
     targetRole: 'ALL',
     location: 'วันหยุดราชการ',
+    isAllDay: true,
   },
   // 10 ต.ค.
   {
@@ -360,6 +476,7 @@ const INITIAL_OCTOBER_EVENTS: CalendarEventItem[] = [
     month: 10,
     year: 2569,
     fullDateLabel: 'วันพฤหัสบดีที่ 23 ตุลาคม 2569',
+    time: '13:00',
     title: 'ประชุมผู้ปกครอง (เวลา 13.00 น.)',
     category: 'OTHER',
     colorType: 'PURPLE',
@@ -428,6 +545,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
   const [roleFilter, setRoleFilter] = useState<'TEACHER' | 'STUDENT'>('TEACHER');
   const [viewMode, setViewMode] = useState<'MONTH' | 'WEEK' | 'DAY'>('MONTH');
   const [selectedMonthOffset, setSelectedMonthOffset] = useState<number>(0); // -1 = ก.ย., 0 = ต.ค., 1 = พ.ย.
+
   const [events, setEvents] = useState<CalendarEventItem[]>(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
@@ -444,10 +562,12 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
     }
     return INITIAL_OCTOBER_EVENTS;
   });
+
   const [selectedEvent, setSelectedEvent] = useState<CalendarEventItem | null>(null);
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
 
-  // Form state for new activity event (รองรับวันที่จัดกิจกรรมเต็มรูปแบบ)
+  // Form state for new / edit activity event (รองรับวันที่จัดกิจกรรมเต็มรูปแบบ)
   const [isMultiDay, setIsMultiDay] = useState(false);
   const [newEventTitle, setNewEventTitle] = useState('');
   const [newEventDay, setNewEventDay] = useState<number>(2);
@@ -462,12 +582,70 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
   const [newEventLocation, setNewEventLocation] = useState('ห้องประชุมโรงเรียน');
   const [newEventDescription, setNewEventDescription] = useState('');
 
-  // ฟังก์ชันเปิดโมดอลเพิ่มกิจกรรมสำหรับวันที่เจาะจง
-  const openAddEventForDay = (day: number) => {
+  // ฟังก์ชันเปิดโมดอลสร้างกิจกรรมใหม่
+  const handleOpenCreateModal = (day = 2) => {
+    setEditingEventId(null);
+    setNewEventTitle('');
     setNewEventDay(day);
     setNewEventEndDay(day);
     setIsMultiDay(false);
+    setNewEventMonth(10);
+    setNewEventYear(2569);
+    setNewEventIsAllDay(false);
+    setNewEventTime('08:30');
+    setNewEventEndTime('16:30');
+    setNewEventColor('BLUE');
+    setNewEventTargetRole('TEACHER');
+    setNewEventLocation('ห้องประชุมโรงเรียน');
+    setNewEventDescription('');
     setIsAddEventModalOpen(true);
+  };
+
+  // ฟังก์ชันเปิดโมดอลแก้ไขกิจกรรมที่มีอยู่แล้ว
+  const handleStartEditEvent = (item: CalendarEventItem) => {
+    setEditingEventId(item.id);
+    setNewEventTitle(item.title);
+    setNewEventDay(item.day);
+    setNewEventEndDay(item.endDay || item.day);
+    setIsMultiDay(!!item.endDay && item.endDay > item.day);
+    setNewEventMonth(item.month || 10);
+    setNewEventYear(item.year || 2569);
+
+    const isAllDayVal = item.isAllDay === true || item.time === 'ตลอดทั้งวัน';
+    setNewEventIsAllDay(isAllDayVal);
+
+    if (item.time && item.time !== 'ตลอดทั้งวัน') {
+      if (item.time.includes('-')) {
+        const parts = item.time.split('-').map((s) => s.trim());
+        setNewEventTime(parts[0] || '08:30');
+        setNewEventEndTime(parts[1] || '16:30');
+      } else {
+        setNewEventTime(item.time.trim());
+        setNewEventEndTime(item.time.trim());
+      }
+    } else {
+      setNewEventTime('08:30');
+      setNewEventEndTime('16:30');
+    }
+
+    setNewEventColor(item.colorType || 'BLUE');
+    setNewEventTargetRole(item.targetRole || 'TEACHER');
+    setNewEventLocation(item.location || '');
+    setNewEventDescription(item.description || '');
+
+    setSelectedEvent(null);
+    setIsAddEventModalOpen(true);
+  };
+
+  // ฟังก์ชันลบกิจกรรม
+  const handleDeleteEvent = (eventId: string) => {
+    setEvents((prev) => prev.filter((ev) => ev.id !== eventId));
+    setSelectedEvent(null);
+  };
+
+  // ฟังก์ชันเปิดโมดอลเพิ่มกิจกรรมสำหรับวันที่เจาะจง
+  const openAddEventForDay = (day: number) => {
+    handleOpenCreateModal(day);
   };
 
   // Sync to local storage
@@ -512,37 +690,6 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
     }
   };
 
-  // Specific Icon resolution matching Reference Image
-  const getEventIcon = (ev: CalendarEventItem) => {
-    const t = ev.title;
-    if (t.includes('ประชุมครู')) return Calendar;
-    if (t.includes('รายงานผลการสอน')) return FileText;
-    if (t.includes('ประชุมฝ่ายวิชาการ')) return CalendarCheck;
-    if (t.includes('กิจกรรมวันครู')) return Award;
-    if (t.includes('ส่งคะแนนผลกลางภาค') || t.includes('ส่งคะแนนกลางภาค')) return FileCheck;
-    if (t.includes('ค่ายภาษา') || t.includes('จิตอาสา') || t.includes('สัปดาห์ห้องสมุด') || t.includes('กีฬาภายใน')) return GraduationCap;
-    if (t.includes('การแข่งขันกีฬาสี') || t.includes('รับสมัครนักเรียน') || t.includes('งานวิจัย') || t.includes('ภาษาต่างประเทศ')) return BookOpen;
-    if (t.includes('ส่งข้อสอบกลางภาค')) return Target;
-    if (t.includes('อบรมการใช้สื่อดิจิทัล')) return Sparkles;
-    if (t.includes('คณะกรรมการสถานศึกษา') || t.includes('ประชุมผู้ปกครอง')) return Users;
-    if (t.includes('วันหยุด')) return Landmark;
-    if (t.includes('ทัศนศึกษา')) return PlusCircle;
-    if (t.includes('ประเมินผล') || t.includes('สรุปผลการเรียน')) return FileText;
-    if (t.includes('ลอยกระทง')) return Sparkles;
-    if (t.includes('ส่งแผนการจัดการเรียนรู้')) return Shield;
-    if (t.includes('กำหนดส่งคะแนนปลายภาค')) return Clock;
-
-    // Fallback by color
-    switch (ev.colorType) {
-      case 'BLUE': return CalendarDays;
-      case 'ORANGE': return FileText;
-      case 'GREEN': return FileCheck;
-      case 'RED': return GraduationCap;
-      case 'PURPLE': return Hexagon;
-      default: return Calendar;
-    }
-  };
-
   // Calendar Days Setup (ตุลาคม 2569: เริ่มต้นวันพุธที่ 1 ต.ค., 31 วัน)
   // Grid 5 แถว x 7 วัน = 35 ช่อง (28-30 ก.ย. และ 1 พ.ย.)
   const calendarCells = [
@@ -580,27 +727,57 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
         : newEventTime
       : undefined;
 
-    const newItem: CalendarEventItem = {
-      id: `act-${Date.now()}`,
-      day: newEventDay,
-      month: newEventMonth,
-      year: newEventYear,
-      endDay: isMultiDay ? newEventEndDay : undefined,
-      endMonth: isMultiDay ? newEventMonth : undefined,
-      endYear: isMultiDay ? newEventYear : undefined,
-      fullDateLabel: formattedFullDate,
-      time: formattedTimeRange,
-      isAllDay: newEventIsAllDay,
-      title: newEventTitle.trim(),
-      category: colorToCategoryMap[newEventColor] || 'OTHER',
-      colorType: newEventColor,
-      targetRole: newEventTargetRole,
-      location: newEventLocation.trim() || undefined,
-      description: newEventDescription.trim() || undefined,
-    };
+    if (editingEventId) {
+      // โหมดแก้ไขกิจกรรมเดิม
+      setEvents((prev) =>
+        prev.map((ev) =>
+          ev.id === editingEventId
+            ? {
+                ...ev,
+                day: newEventDay,
+                month: newEventMonth,
+                year: newEventYear,
+                endDay: isMultiDay ? newEventEndDay : undefined,
+                endMonth: isMultiDay ? newEventMonth : undefined,
+                endYear: isMultiDay ? newEventYear : undefined,
+                fullDateLabel: formattedFullDate,
+                time: formattedTimeRange,
+                isAllDay: newEventIsAllDay,
+                title: newEventTitle.trim(),
+                category: colorToCategoryMap[newEventColor] || 'OTHER',
+                colorType: newEventColor,
+                targetRole: newEventTargetRole,
+                location: newEventLocation.trim() || undefined,
+                description: newEventDescription.trim() || undefined,
+              }
+            : ev
+        )
+      );
+    } else {
+      // โหมดสร้างกิจกรรมใหม่
+      const newItem: CalendarEventItem = {
+        id: `act-${Date.now()}`,
+        day: newEventDay,
+        month: newEventMonth,
+        year: newEventYear,
+        endDay: isMultiDay ? newEventEndDay : undefined,
+        endMonth: isMultiDay ? newEventMonth : undefined,
+        endYear: isMultiDay ? newEventYear : undefined,
+        fullDateLabel: formattedFullDate,
+        time: formattedTimeRange,
+        isAllDay: newEventIsAllDay,
+        title: newEventTitle.trim(),
+        category: colorToCategoryMap[newEventColor] || 'OTHER',
+        colorType: newEventColor,
+        targetRole: newEventTargetRole,
+        location: newEventLocation.trim() || undefined,
+        description: newEventDescription.trim() || undefined,
+      };
+      setEvents((prev) => [...prev, newItem]);
+    }
 
-    setEvents((prev) => [...prev, newItem]);
     setIsAddEventModalOpen(false);
+    setEditingEventId(null);
     setNewEventTitle('');
     setNewEventDescription('');
   };
@@ -611,31 +788,31 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
       date: '2 ต.ค.',
       title: 'ประชุมฝ่ายวิชาการ',
       meta: 'เวลา 08:30 น. | ห้องประชุมโรงเรียน',
-      icon: CalendarCheck,
+      icon: GroupRegular,
     },
     {
       date: '2 ต.ค.',
       title: 'ส่งคะแนนกลางภาค',
       meta: 'เวลา 15:00 น. | ระบบออนไลน์',
-      icon: FileCheck,
+      icon: TargetRegular,
     },
     {
       date: '6 ต.ค.',
       title: 'ส่งข้อสอบกลางภาค',
       meta: 'เวลา 09:00 น. | กลุ่มสาระฯ',
-      icon: Target,
+      icon: TargetRegular,
     },
     {
       date: '8 ต.ค.',
       title: 'ประชุมคณะกรรมการสถานศึกษา',
       meta: 'เวลา 10:00 น. | ห้องประชุมใหญ่',
-      icon: Users,
+      icon: GroupRegular,
     },
     {
       date: '15 ต.ค.',
       title: 'ประชุมกลุ่มสาระฯ (ภาษาต่างประเทศ)',
       meta: 'เวลา 14:00 น. | ห้องกลุ่มสาระฯ',
-      icon: BookOpen,
+      icon: GroupRegular,
     },
   ];
 
@@ -645,31 +822,31 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
       date: '3 ต.ค.',
       title: 'ค่ายภาษา (ม.1-ม.3)',
       meta: 'เวลา 08:00 น. | สนามกีฬา',
-      icon: GraduationCap,
+      icon: TentRegular,
     },
     {
       date: '4 ต.ค.',
       title: 'การแข่งขันกีฬา',
       meta: 'เวลา 08:00 น. | สนามกีฬา',
-      icon: Trophy,
+      icon: TrophyRegular,
     },
     {
       date: '10 ต.ค.',
       title: 'จิตอาสา',
       meta: 'เวลา 09:00 น. | บริเวณโรงเรียน',
-      icon: Heart,
+      icon: HeartRegular,
     },
     {
       date: '19 ต.ค.',
       title: 'ทัศนศึกษา (ม.4-ม.6)',
       meta: 'เวลา 07:00 น. | จังหวัดใกล้เคียง',
-      icon: Bus,
+      icon: BusRegular,
     },
     {
       date: '24 ต.ค.',
       title: 'กิจกรรมวันลอยกระทง',
       meta: 'เวลา 17:00 น. | ลานกิจกรรม',
-      icon: Sparkles,
+      icon: SparklesRegular,
     },
   ];
 
@@ -709,7 +886,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
           <div className="space-y-3 max-w-xl">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md">
-                <Calendar className="w-5 h-5" />
+                <Calendar2Regular className="w-5 h-5" />
               </div>
               <div>
                 <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">
@@ -774,11 +951,11 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
               className="w-9 h-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-blue-600 flex items-center justify-center transition-colors cursor-pointer shadow-2xs"
               title="เดือนก่อนหน้า"
             >
-              <ChevronLeft className="w-5 h-5 text-blue-600" />
+              <LeftSmallRegular className="w-5 h-5 text-blue-600" />
             </button>
 
             <div className="flex items-center gap-2.5">
-              <CalendarDays className="w-6 h-6 text-blue-600 shrink-0" />
+              <CalendarDayRegular className="w-6 h-6 text-blue-600 shrink-0" />
               <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
                 {selectedMonthOffset === -1
                   ? 'กันยายน 2569'
@@ -794,7 +971,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
               className="w-9 h-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-blue-600 flex items-center justify-center transition-colors cursor-pointer shadow-2xs"
               title="เดือนถัดไป"
             >
-              <ChevronRight className="w-5 h-5 text-blue-600" />
+              <RightSmallRegular className="w-5 h-5 text-blue-600" />
             </button>
           </div>
 
@@ -848,7 +1025,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
               }}
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-blue-200 bg-white hover:bg-blue-50/50 text-blue-600 font-bold text-xs shadow-2xs transition-colors cursor-pointer"
             >
-              <Calendar className="w-4 h-4 text-blue-600" />
+              <Calendar2Regular className="w-4 h-4 text-blue-600" />
               <span>วันนี้</span>
             </button>
           </div>
@@ -894,9 +1071,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                       key={`${dayNumber}-${idx}`}
                       className={`group relative min-h-[115px] sm:min-h-[125px] p-2 flex flex-col justify-start transition-colors ${
                         !isLastRow ? 'border-b border-slate-100' : ''
-                      } ${
-                        isThursday ? 'bg-blue-50/20' : 'bg-white'
-                      }`}
+                      } ${isThursday ? 'bg-blue-50/20' : 'bg-white'}`}
                     >
                       {/* Top row: Day Number & Quick Add Button */}
                       <div className="flex items-center justify-between mb-1.5 h-6">
@@ -925,7 +1100,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                             className="opacity-0 group-hover:opacity-100 p-1 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-600 transition-all cursor-pointer"
                             title={`เพิ่มกิจกรรมวันที่ ${dayNumber} ต.ค. 2569`}
                           >
-                            <Plus className="w-3.5 h-3.5" />
+                            <AddRegular className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </div>
@@ -933,9 +1108,17 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                       {/* Event Pills */}
                       <div className="space-y-1.5 w-full">
                         {dayEvents.map((ev) => {
-                          const IconComp = getEventIcon(ev);
+                          const IconComp = getMingCuteEventIcon(ev);
                           const pillStyle = getPillStyle(ev.colorType);
                           const iconColor = getPillIconColor(ev.colorType);
+
+                          // กฎ: ถ้าเป็นกิจกรรมตลอดทั้งวัน (isAllDay หรือ time === 'ตลอดทั้งวัน') ไม่ต้องใส่คำว่าตลอดทั้งวันในช่องปฏิทิน
+                          const isAllDayEvent = ev.isAllDay === true || ev.time === 'ตลอดทั้งวัน';
+                          const showTimeInPill =
+                            !isAllDayEvent &&
+                            ev.time &&
+                            ev.time.trim() !== '' &&
+                            ev.time !== 'ตลอดทั้งวัน';
 
                           return (
                             <button
@@ -943,11 +1126,13 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                               type="button"
                               onClick={() => setSelectedEvent(ev)}
                               className={`w-full text-left px-2 py-1 rounded-md text-[10px] sm:text-[11px] font-medium transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${pillStyle}`}
-                              title={`${ev.time ? ev.time + ' ' : ''}${ev.title}`}
+                              title={`${showTimeInPill ? ev.time + ' ' : ''}${ev.title}`}
                             >
                               <IconComp className={`w-3.5 h-3.5 shrink-0 ${iconColor}`} />
                               <span className="truncate">
-                                {ev.time && <span className="font-mono mr-1">{ev.time}</span>}
+                                {showTimeInPill && (
+                                  <span className="font-mono mr-1">{ev.time}</span>
+                                )}
                                 {ev.title}
                               </span>
                             </button>
@@ -991,15 +1176,10 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
           {/* [+ เพิ่มกิจกรรม] Action Button */}
           <button
             type="button"
-            onClick={() => {
-              setNewEventDay(2);
-              setNewEventEndDay(2);
-              setIsMultiDay(false);
-              setIsAddEventModalOpen(true);
-            }}
+            onClick={() => handleOpenCreateModal(2)}
             className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm shadow-xs transition-colors cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
+            <AddRegular className="w-4 h-4" />
             <span>+ เพิ่มกิจกรรม</span>
           </button>
         </div>
@@ -1108,18 +1288,22 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
         </div>
       </div>
 
-      {/* MODAL 1: เพิ่มกิจกรรมใหม่ (พร้อมระบบระบุวันที่จัดกิจกรรม) */}
+      {/* MODAL 1: เพิ่ม / แก้ไขกิจกรรม (พร้อมปฏิทินจิ๋วเลือกวันที่ และตรวจจับไอคอน MingCute อัจฉริยะ) */}
       {isAddEventModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-scale-up space-y-4 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <Calendar className="w-5 h-5 text-blue-600" />
+                  {editingEventId ? (
+                    <Edit2Regular className="w-5 h-5 text-blue-600" />
+                  ) : (
+                    <Calendar2Regular className="w-5 h-5 text-blue-600" />
+                  )}
                 </div>
                 <div>
                   <h3 className="text-base font-extrabold text-slate-900">
-                    เพิ่มกิจกรรม / กำหนดการโรงเรียน
+                    {editingEventId ? 'แก้ไขกิจกรรม / กำหนดการ' : 'เพิ่มกิจกรรม / กำหนดการโรงเรียน'}
                   </h3>
                   <p className="text-[11px] text-slate-500 font-medium">
                     กำหนดวันที่ เวลา และกลุ่มเป้าหมายสำหรับปฏิทิน
@@ -1128,35 +1312,53 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => setIsAddEventModalOpen(false)}
+                onClick={() => {
+                  setIsAddEventModalOpen(false);
+                  setEditingEventId(null);
+                }}
                 className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <CloseRegular className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleAddEventSubmit} className="space-y-4 text-xs">
               {/* ชื่อกิจกรรม */}
               <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  ชื่อกิจกรรม / ภาระงาน <span className="text-rose-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-slate-700">
+                    ชื่อกิจกรรม / ภาระงาน <span className="text-rose-500">*</span>
+                  </label>
+                  {/* Smart Icon Live Preview Indicator */}
+                  {newEventTitle.trim() && (
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-bold">
+                      {React.createElement(
+                        getMingCuteEventIcon({
+                          title: newEventTitle,
+                          colorType: newEventColor,
+                        }),
+                        { className: 'w-3.5 h-3.5 text-blue-600' }
+                      )}
+                      <span>ไอคอนตรวจจับอัตโนมัติ</span>
+                    </div>
+                  )}
+                </div>
                 <input
                   type="text"
                   required
-                  placeholder="เช่น ประชุมกลุ่มสาระวิชาการ, กิจกรรมค่ายวิทยาศาสตร์"
+                  placeholder="เช่น ประชุมกลุ่มสาระวิชาการ, อบรมการใช้ AI, กิจกรรมค่ายวิทยาศาสตร์"
                   value={newEventTitle}
                   onChange={(e) => setNewEventTitle(e.target.value)}
                   className="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
-              {/* ส่วนระบุวันที่จัดกิจกรรม (Activity Date Section) */}
+              {/* ส่วนระบุวันที่จัดกิจกรรม พร้อมปฏิทินจิ๋ว (Interactive Mini Calendar) */}
               <div className="p-3.5 bg-slate-50/90 rounded-2xl border border-slate-200 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <label className="font-extrabold text-slate-800 text-xs flex items-center gap-1.5">
-                    <CalendarDays className="w-4 h-4 text-blue-600" />
-                    <span>วันที่จัดกิจกรรม (Activity Date)</span>
+                    <CalendarDayRegular className="w-4 h-4 text-blue-600" />
+                    <span>เลือกวันที่จัดกิจกรรม (Mini Calendar Picker)</span>
                   </label>
 
                   {/* Mode Toggle: วันเดียว vs หลายวัน */}
@@ -1179,7 +1381,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                       type="button"
                       onClick={() => {
                         setIsMultiDay(true);
-                        if (newEventEndDay < newEventDay) {
+                        if (newEventEndDay <= newEventDay) {
                           setNewEventEndDay(Math.min(31, newEventDay + 1));
                         }
                       }}
@@ -1194,115 +1396,79 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                   </div>
                 </div>
 
-                {/* วันที่แบบวันเดียว */}
-                {!isMultiDay ? (
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                        วันที่
-                      </label>
-                      <select
-                        value={newEventDay}
-                        onChange={(e) => setNewEventDay(Number(e.target.value))}
-                        className="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white font-bold text-xs focus:ring-2 focus:ring-blue-500"
-                      >
-                        {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                          <option key={d} value={d}>
-                            วันที่ {d} ({getThaiDayOfWeekName(d)})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                        เดือน
-                      </label>
-                      <select
-                        value={newEventMonth}
-                        onChange={(e) => setNewEventMonth(Number(e.target.value))}
-                        className="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white font-bold text-xs focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value={10}>ตุลาคม</option>
-                        <option value={11}>พฤศจิกายน</option>
-                        <option value={12}>ธันวาคม</option>
-                        <option value={1}>มกราคม</option>
-                        <option value={2}>กุมภาพันธ์</option>
-                        <option value={3}>มีนาคม</option>
-                        <option value={4}>เมษายน</option>
-                        <option value={5}>พฤษภาคม</option>
-                        <option value={6}>มิถุนายน</option>
-                        <option value={7}>กรกฎาคม</option>
-                        <option value={8}>สิงหาคม</option>
-                        <option value={9}>กันยายน</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                        ปี พ.ศ.
-                      </label>
-                      <select
-                        value={newEventYear}
-                        onChange={(e) => setNewEventYear(Number(e.target.value))}
-                        className="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white font-bold text-xs focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value={2569}>2569</option>
-                        <option value={2570}>2570</option>
-                        <option value={2568}>2568</option>
-                      </select>
-                    </div>
+                {/* ปฏิทินจิ๋วแบบกดเลือกได้ทันที (Interactive Mini Calendar Grid) */}
+                <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-800 pb-1 border-b border-slate-100">
+                    <span className="flex items-center gap-1.5 text-blue-700">
+                      <Calendar2Regular className="w-4 h-4 text-blue-600" />
+                      <span>ตุลาคม 2569</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      {isMultiDay ? 'คลิกเลือกวันเริ่ม แล้วคลิกวันสิ้นสุด' : 'คลิกเลือกวันที่ต้องการ'}
+                    </span>
                   </div>
-                ) : (
-                  /* วันที่แบบหลายวัน (ช่วงวันที่) */
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                          วันที่เริ่มต้น (Start Date)
-                        </label>
-                        <select
-                          value={newEventDay}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
-                            setNewEventDay(val);
-                            if (newEventEndDay < val) setNewEventEndDay(val);
+
+                  {/* วันในสัปดาห์ 7 ช่อง */}
+                  <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-slate-500 py-1">
+                    <div className="text-rose-500">อา</div>
+                    <div>จ</div>
+                    <div>อ</div>
+                    <div>พ</div>
+                    <div className="text-blue-600">พฤ</div>
+                    <div>ศ</div>
+                    <div>ส</div>
+                  </div>
+
+                  {/* ตารางวันที่ 1 - 31 ของเดือนตุลาคม (วันที่ 1 ตรงกับวันพุธ -> ว่าง 3 ช่องแรก) */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {/* วันที่ว่างก่อนวันที่ 1 */}
+                    <div className="h-7" />
+                    <div className="h-7" />
+                    <div className="h-7" />
+
+                    {/* วันที่ 1 - 31 */}
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => {
+                      const isStart = d === newEventDay;
+                      const isEnd = isMultiDay && d === newEventEndDay;
+                      const isInRange = isMultiDay && d > newEventDay && d < newEventEndDay;
+                      const isSingleSelected = !isMultiDay && isStart;
+
+                      let btnClass = 'text-slate-700 hover:bg-blue-50';
+                      if (isSingleSelected || isStart || isEnd) {
+                        btnClass = 'bg-blue-600 text-white font-black shadow-xs';
+                      } else if (isInRange) {
+                        btnClass = 'bg-blue-100 text-blue-800 font-bold';
+                      }
+
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => {
+                            if (!isMultiDay) {
+                              setNewEventDay(d);
+                              setNewEventEndDay(d);
+                            } else {
+                              if (d < newEventDay) {
+                                setNewEventDay(d);
+                                setNewEventEndDay(d);
+                              } else {
+                                setNewEventEndDay(d);
+                              }
+                            }
                           }}
-                          className="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white font-bold text-xs focus:ring-2 focus:ring-blue-500"
+                          className={`h-7 w-full rounded-lg text-xs flex items-center justify-center transition-all cursor-pointer ${btnClass}`}
                         >
-                          {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                            <option key={d} value={d}>
-                              วันที่ {d} ต.ค. ({getThaiDayOfWeekName(d)})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                          ถึงวันที่ (End Date)
-                        </label>
-                        <select
-                          value={newEventEndDay}
-                          onChange={(e) => setNewEventEndDay(Number(e.target.value))}
-                          className="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white font-bold text-xs focus:ring-2 focus:ring-blue-500"
-                        >
-                          {Array.from({ length: 31 }, (_, i) => i + 1)
-                            .filter((d) => d >= newEventDay)
-                            .map((d) => (
-                              <option key={d} value={d}>
-                                วันที่ {d} ต.ค. ({getThaiDayOfWeekName(d)})
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-                    </div>
+                          {d}
+                        </button>
+                      );
+                    })}
                   </div>
-                )}
+                </div>
 
-                {/* พรีวิววันที่ภาษาไทยแบบเต็ม */}
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-900 text-xs font-bold shadow-2xs">
-                  <CalendarCheck className="w-4 h-4 text-blue-600 shrink-0" />
+                {/* พรีวิวข้อความวันที่ภาษาไทยแบบเต็ม */}
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-50/90 border border-blue-200 text-blue-900 text-xs font-bold shadow-2xs">
+                  <CalendarDayRegular className="w-4 h-4 text-blue-600 shrink-0" />
                   <span className="truncate">
                     {formatThaiFullDate(
                       newEventDay,
@@ -1357,8 +1523,9 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <div className="px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 text-xs font-semibold">
-                    ☀️ กิจกรรมดำเนินตลอดทั้งวัน
+                  <div className="px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 text-xs font-semibold flex items-center gap-2">
+                    <TimeRegular className="w-4 h-4 text-amber-500" />
+                    <span>☀️ กิจกรรมดำเนินตลอดทั้งวัน (ไม่แสดงเวลาตัวเลขในช่องปฏิทิน)</span>
                   </div>
                 )}
               </div>
@@ -1429,7 +1596,10 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
               <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsAddEventModalOpen(false)}
+                  onClick={() => {
+                    setIsAddEventModalOpen(false);
+                    setEditingEventId(null);
+                  }}
                   className="px-4 py-2 rounded-xl border border-slate-300 text-slate-600 font-semibold hover:bg-slate-50 cursor-pointer"
                 >
                   ยกเลิก
@@ -1438,7 +1608,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold cursor-pointer shadow-xs"
                 >
-                  บันทึกกิจกรรมลงปฏิทิน
+                  {editingEventId ? 'บันทึกการแก้ไข' : 'บันทึกกิจกรรมลงปฏิทิน'}
                 </button>
               </div>
             </form>
@@ -1446,7 +1616,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
         </div>
       )}
 
-      {/* MODAL 2: รายละเอียดกิจกรรมที่เลือก (พร้อมแสดงวันที่จัดกิจกรรมเต็มรูปแบบ) */}
+      {/* MODAL 2: รายละเอียดกิจกรรมที่เลือก (พร้อมปุ่มแก้ไขและลบกิจกรรม) */}
       {selectedEvent && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-200 animate-scale-up space-y-4">
@@ -1459,23 +1629,28 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                 >
                   {selectedEvent.fullDateLabel || `${selectedEvent.day} ตุลาคม 2569`}
                 </span>
-                <h3 className="font-extrabold text-base text-slate-900 mt-1.5 leading-snug">
-                  {selectedEvent.title}
-                </h3>
+                <div className="flex items-center gap-2 mt-2">
+                  {React.createElement(getMingCuteEventIcon(selectedEvent), {
+                    className: `w-5 h-5 shrink-0 ${getPillIconColor(selectedEvent.colorType)}`,
+                  })}
+                  <h3 className="font-extrabold text-base text-slate-900 leading-snug">
+                    {selectedEvent.title}
+                  </h3>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedEvent(null)}
                 className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <CloseRegular className="w-4 h-4" />
               </button>
             </div>
 
             <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 text-xs space-y-2.5 text-slate-600">
               {/* วันที่จัดกิจกรรม */}
               <div className="flex items-center gap-2">
-                <CalendarDays className="w-4 h-4 text-blue-600 shrink-0" />
+                <CalendarDayRegular className="w-4 h-4 text-blue-600 shrink-0" />
                 <span className="font-bold text-slate-800">
                   วันที่:{' '}
                   {selectedEvent.fullDateLabel ||
@@ -1489,24 +1664,31 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
               </div>
 
               {/* เวลา */}
-              {selectedEvent.time && (
+              {selectedEvent.isAllDay || selectedEvent.time === 'ตลอดทั้งวัน' ? (
                 <div className="flex items-center gap-2">
-                  <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <TimeRegular className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span className="font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/80">
+                    กิจกรรมตลอดทั้งวัน (All Day)
+                  </span>
+                </div>
+              ) : selectedEvent.time ? (
+                <div className="flex items-center gap-2">
+                  <TimeRegular className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                   <span>เวลา: {selectedEvent.time} น.</span>
                 </div>
-              )}
+              ) : null}
 
               {/* สถานที่ */}
               {selectedEvent.location && (
                 <div className="flex items-center gap-2">
-                  <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                  <LocationRegular className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                   <span>สถานที่: {selectedEvent.location}</span>
                 </div>
               )}
 
               {/* กลุ่มเป้าหมาย */}
               <div className="flex items-center gap-2">
-                <Users className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                <GroupRegular className="w-3.5 h-3.5 text-purple-600 shrink-0" />
                 <span>
                   เป้าหมาย:{' '}
                   {selectedEvent.targetRole === 'TEACHER'
@@ -1525,26 +1707,49 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
               )}
             </div>
 
-            <div className="flex justify-end gap-2 pt-1">
-              {selectedEvent.category === 'EXAM' && onNavigateToExams && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedEvent(null);
-                    onNavigateToExams();
-                  }}
-                  className="px-3.5 py-1.5 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 cursor-pointer"
-                >
-                  ไปที่หน้าจัดการสอบ
-                </button>
-              )}
+            {/* ปุ่ม Actions: แก้ไข, ลบ, ปิด */}
+            <div className="flex items-center justify-between pt-1">
               <button
                 type="button"
-                onClick={() => setSelectedEvent(null)}
-                className="px-4 py-1.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 cursor-pointer"
+                onClick={() => handleDeleteEvent(selectedEvent.id)}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-rose-200 text-rose-600 font-bold text-xs hover:bg-rose-50 cursor-pointer"
+                title="ลบกิจกรรมนี้"
               >
-                ปิด
+                <Delete2Regular className="w-3.5 h-3.5 text-rose-600" />
+                <span>ลบ</span>
               </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleStartEditEvent(selectedEvent)}
+                  className="flex items-center gap-1 px-3.5 py-1.5 rounded-xl bg-blue-50 text-blue-700 font-bold text-xs hover:bg-blue-100 border border-blue-200 cursor-pointer"
+                >
+                  <Edit2Regular className="w-3.5 h-3.5 text-blue-600" />
+                  <span>แก้ไข</span>
+                </button>
+
+                {selectedEvent.category === 'EXAM' && onNavigateToExams && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedEvent(null);
+                      onNavigateToExams();
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 cursor-pointer"
+                  >
+                    จัดการสอบ
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedEvent(null)}
+                  className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 cursor-pointer"
+                >
+                  ปิด
+                </button>
+              </div>
             </div>
           </div>
         </div>
