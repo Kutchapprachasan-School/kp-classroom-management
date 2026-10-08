@@ -1,15 +1,20 @@
 // src/components/dashboard/TeacherWeeklyTasksWidget.tsx
-// วิดเจ็ตงานที่ต้องทำ (สัปดาห์นี้) 3 รายการ ตามภาพต้นแบบ Mockup Image 1
+// วิดเจ็ตงานที่ต้องทำ (สัปดาห์นี้) ดึงข้อมูลอ้างอิงจากปฏิทินกิจกรรมโรงเรียน
+// รองรับการซิงค์แบบเรียลไทม์ และแสดงสถานะด่วน/ปกติชัดเจน
 
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   CheckSquare,
   FileText,
   ChevronRight,
 } from 'lucide-react';
 import type { CrossViewNavigationPayload } from '../../services/teacherCopilotService';
+import type { CalendarEventItem } from '../../views/AcademicTermsView';
+import { authService } from '../../services/authService';
 
-interface TaskItem {
+const CALENDAR_EVENTS_STORAGE_KEY = 'kp_school_calendar_events_v2';
+
+export interface TaskItem {
   id: string;
   title: string;
   dueDate: string;
@@ -19,15 +24,15 @@ interface TaskItem {
   iconColor: string;
 }
 
-const WEEKLY_TASKS_MOCK: TaskItem[] = [
+const DEFAULT_FALLBACK_TASKS: TaskItem[] = [
   {
     id: 't-1',
     title: 'จัดทำแผนการจัดการเรียนรู้ (ม.3/1)',
     dueDate: 'ส่งภายใน 3 ต.ค. 2569',
     priority: 'URGENT',
     priorityLabel: 'ด่วน',
-    iconBgColor: 'bg-pink-100',
-    iconColor: 'text-pink-600',
+    iconBgColor: 'bg-rose-100',
+    iconColor: 'text-rose-600',
   },
   {
     id: 't-2',
@@ -44,8 +49,8 @@ const WEEKLY_TASKS_MOCK: TaskItem[] = [
     dueDate: 'ส่งภายใน 10 ต.ค. 2569',
     priority: 'NORMAL',
     priorityLabel: 'ปกติ',
-    iconBgColor: 'bg-purple-100',
-    iconColor: 'text-purple-600',
+    iconBgColor: 'bg-sky-100',
+    iconColor: 'text-sky-600',
   },
 ];
 
@@ -60,6 +65,98 @@ export const TeacherWeeklyTasksWidget: React.FC<TeacherWeeklyTasksWidgetProps> =
   onSelectTask,
   onDeepNavigate,
 }) => {
+  // โหลดรายการกิจกรรมจาก LocalStorage
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEventItem[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem(CALENDAR_EVENTS_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    const handleEventsUpdate = () => {
+      try {
+        const raw = localStorage.getItem(CALENDAR_EVENTS_STORAGE_KEY);
+        if (raw) setCalendarEvents(JSON.parse(raw));
+      } catch {}
+    };
+    window.addEventListener('kps-academic-calendar-updated', handleEventsUpdate);
+    window.addEventListener('storage', handleEventsUpdate);
+    return () => {
+      window.removeEventListener('kps-academic-calendar-updated', handleEventsUpdate);
+      window.removeEventListener('storage', handleEventsUpdate);
+    };
+  }, []);
+
+  // แปลงปฏิทินกิจกรรมเป็นงานที่ต้องทำในสัปดาห์นี้
+  const displayTasks = useMemo(() => {
+    const user = authService.getCurrentUser();
+    const currentUserId = user?.id || 'u-1';
+
+    // กรองกิจกรรมเฉพาะที่ครูมีสิทธิ์เห็น และเป็นงานที่เกี่ยวข้อง (ส่งงาน, ประชุม, ภาระงาน)
+    const filtered = calendarEvents.filter((ev) => {
+      const target = (ev as any).targetRole || (ev as any).targetAudience || 'ALL';
+      if (target === 'STUDENT') return false;
+      if (target === 'PERSONAL') {
+        return (ev as any).createdBy === currentUserId || (ev as any).assignedUsers?.includes(currentUserId);
+      }
+      if (target === 'CUSTOM') {
+        return (ev as any).assignedUsers?.includes(currentUserId);
+      }
+      return true;
+    });
+
+    // เรียงตามความเร่งด่วน หรือวันที่ใกล้เคียง
+    const mapped: TaskItem[] = filtered.slice(0, 3).map((ev) => {
+      const isUrgent =
+        ev.colorType === 'ORANGE' ||
+        ev.category === 'SUBMISSION' ||
+        ev.title.includes('ส่ง') ||
+        ev.title.includes('ด่วน');
+
+      return {
+        id: ev.id,
+        title: ev.title,
+        dueDate: ev.fullDateLabel || `วันที่ ${ev.day} ต.ค. 2569`,
+        priority: isUrgent ? 'URGENT' : 'NORMAL',
+        priorityLabel: isUrgent ? 'ด่วน' : 'ปกติ',
+        iconBgColor:
+          ev.colorType === 'ORANGE'
+            ? 'bg-amber-100'
+            : ev.colorType === 'GREEN'
+            ? 'bg-emerald-100'
+            : ev.colorType === 'RED'
+            ? 'bg-rose-100'
+            : 'bg-blue-100',
+        iconColor:
+          ev.colorType === 'ORANGE'
+            ? 'text-amber-700'
+            : ev.colorType === 'GREEN'
+            ? 'text-emerald-700'
+            : ev.colorType === 'RED'
+            ? 'text-rose-700'
+            : 'text-blue-700',
+      };
+    });
+
+    if (mapped.length >= 3) {
+      return mapped.slice(0, 3);
+    }
+
+    // ถ้ามีน้อยกว่า 3 รายการ ให้นำ fallback tasks มาเติมให้ครบ 3 เพื่อความสมบูรณ์ของ UI
+    const combined = [...mapped];
+    for (const fb of DEFAULT_FALLBACK_TASKS) {
+      if (combined.length >= 3) break;
+      if (!combined.some((item) => item.title === fb.title)) {
+        combined.push(fb);
+      }
+    }
+    return combined.slice(0, 3);
+  }, [calendarEvents]);
+
   const handleViewAll = () => {
     if (onNavigateToTasks) {
       onNavigateToTasks();
@@ -78,7 +175,7 @@ export const TeacherWeeklyTasksWidget: React.FC<TeacherWeeklyTasksWidgetProps> =
       return;
     }
     onDeepNavigate?.({
-      view: 'assignments',
+      view: 'academic-year',
       highlightBanner: item.title,
     });
   };
@@ -90,7 +187,7 @@ export const TeacherWeeklyTasksWidget: React.FC<TeacherWeeklyTasksWidgetProps> =
         <div className="flex items-center gap-2">
           <CheckSquare className="w-4 h-4 text-blue-600" />
           <h2 className="font-extrabold text-slate-800 text-sm sm:text-base leading-tight">
-            งานที่ต้องทำ (สัปดาห์นี้)
+            งานที่ต้องทำ (อ้างอิงจากปฏิทิน)
           </h2>
         </div>
         <button
@@ -105,7 +202,7 @@ export const TeacherWeeklyTasksWidget: React.FC<TeacherWeeklyTasksWidgetProps> =
 
       {/* Task List */}
       <div className="p-2 sm:p-3 space-y-2">
-        {WEEKLY_TASKS_MOCK.map((item) => (
+        {displayTasks.map((item) => (
           <div
             key={item.id}
             onClick={() => handleTaskClick(item)}

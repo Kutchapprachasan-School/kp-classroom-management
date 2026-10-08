@@ -145,7 +145,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       : []),
     {
       key: 'timetable',
-      label: 'ตารางสอน/วันนี้',
+      label: 'ตารางสอน',
       icon: Calendar,
     },
     {
@@ -193,9 +193,16 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       badgeStyle: 'bg-rose-500 text-white font-extrabold',
     },
     {
+      key: 'messages',
+      label: 'ข้อความ & แชท',
+      icon: MessageSquare,
+      badge: '5',
+      badgeStyle: 'bg-blue-500 text-white font-extrabold',
+    },
+    {
       key: 'lessons',
       label: 'แผนการสอน',
-      icon: MessageSquare,
+      icon: Folder,
     },
     ...(activeRole === 'STUDENT_AFFAIRS'
       ? [

@@ -249,14 +249,24 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
     </div>
   );
 
+  const isFemaleTeacher =
+    Boolean((currentUser as any)?.gender === 'FEMALE') ||
+    Boolean(currentUser?.name?.includes('นาง') || currentUser?.name?.includes('น.ส.'));
+
+  const defaultTeacherAvatar = isFemaleTeacher
+    ? '/images/banners/student-avatar-girl.png'
+    : '/images/teacher/teacher_avatar.png';
+
+  const effectiveAvatar = currentUser?.avatarUrl || defaultTeacherAvatar;
+
   // Profile Dropdown Content
   const profileDropdownContent = isProfileOpen && (
     <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl border border-slate-200 shadow-2xl p-3 z-50 space-y-2.5 text-xs text-slate-700">
       <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
         <div className="w-11 h-11 rounded-full overflow-hidden border border-blue-200 shrink-0 bg-blue-50">
           <img
-            src="/images/teacher/teacher_avatar.png"
-            alt="นายปัญจพล เกษรัตน์"
+            src={effectiveAvatar}
+            alt={currentUser?.name || "ครูผู้สอน"}
             className="w-full h-full object-cover"
           />
         </div>
@@ -476,8 +486,8 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden shrink-0 border-2 border-blue-100 shadow-2xs bg-blue-50 flex items-center justify-center">
               <img
-                src={currentUser?.avatarUrl || "/images/teacher/teacher_avatar.png"}
-                alt={currentUser?.name || "นายปัญจพล เกษรัตน์"}
+                src={effectiveAvatar}
+                alt={currentUser?.name || "ครูผู้สอน"}
                 className="w-full h-full object-cover"
                 onError={(e) => {
                   (e.currentTarget as HTMLImageElement).src =
@@ -660,8 +670,8 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
             >
               <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 border border-slate-200 shadow-2xs">
                 <img
-                  src="/images/teacher/teacher_avatar.png"
-                  alt="ครูปัญจพล"
+                  src={effectiveAvatar}
+                  alt={currentUser?.name || "ครูผู้สอน"}
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     (e.currentTarget as HTMLImageElement).src =

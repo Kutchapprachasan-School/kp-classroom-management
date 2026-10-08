@@ -215,6 +215,8 @@ export function getSchoolSettings(): SchoolBrandingSettings {
   }
 }
 
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
+
 export function saveSchoolSettings(next: Partial<SchoolBrandingSettings>): SchoolBrandingSettings {
   const merged: SchoolBrandingSettings = {
     ...getSchoolSettings(),
@@ -229,7 +231,63 @@ export function saveSchoolSettings(next: Partial<SchoolBrandingSettings>): Schoo
     applySchoolBrandingAndTypography(merged);
     window.dispatchEvent(new Event('kps-school-settings-updated'));
   }
+
+  // ซิงค์ตรงกับฐานข้อมูล Supabase ตาราง SystemSettings เพื่อให้เครื่องอื่นเห็นตรงกันทันที
+  if (isSupabaseConfigured) {
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('SystemSettings')
+          .update({
+            schoolName: merged.nameTh,
+            affiliation: merged.affiliation,
+            logoUrl: merged.logoUrl,
+            updatedAt: new Date().toISOString(),
+          })
+          .eq('id', 'default');
+        if (error) {
+          console.warn('[Supabase Sync] Failed to update SystemSettings:', error.message);
+        } else {
+          console.log('[Supabase Sync] SystemSettings updated successfully with logo and school info');
+        }
+      } catch (err) {
+        console.warn('[Supabase Sync] Error updating SystemSettings:', err);
+      }
+    })();
+  }
+
   return merged;
+}
+
+export async function fetchAndSyncSchoolSettingsFromSupabase(): Promise<SchoolBrandingSettings | null> {
+  if (!isSupabaseConfigured) return null;
+  try {
+    const { data, error } = await supabase
+      .from('SystemSettings')
+      .select('*')
+      .eq('id', 'default')
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    const current = getSchoolSettings();
+    const updated: SchoolBrandingSettings = {
+      ...current,
+      nameTh: data.schoolName || current.nameTh,
+      affiliation: data.affiliation || current.affiliation,
+      logoUrl: data.logoUrl || current.logoUrl,
+    };
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(SCHOOL_SETTINGS_STORAGE_KEY, JSON.stringify(updated));
+      applySchoolBrandingAndTypography(updated);
+      window.dispatchEvent(new Event('kps-school-settings-updated'));
+    }
+    return updated;
+  } catch (err) {
+    console.warn('[Supabase Sync] Error fetching SystemSettings:', err);
+    return null;
+  }
 }
 
 export function resetSchoolSettingsToDefault(): SchoolBrandingSettings {

@@ -63,6 +63,7 @@ import type { QuickFilterMode } from './views/AssignmentManagementView';
 import {
   getSchoolSettings,
   applySchoolBrandingAndTypography,
+  fetchAndSyncSchoolSettingsFromSupabase,
   SCHOOL_ROLE_PROFILES,
   type SchoolUserRole,
 } from './config/schoolRoles';
@@ -137,6 +138,9 @@ export const App: React.FC = () => {
 
   React.useEffect(() => {
     applySchoolBrandingAndTypography(schoolSettings);
+    // ซิงค์ข้อมูลโรงเรียนและโลโก้ล่าสุดจาก Supabase เพื่อให้ตรงกันทุกเครื่อง
+    fetchAndSyncSchoolSettingsFromSupabase().catch(() => {});
+
     const handleSettingsChange = () => {
       const next = getSchoolSettings();
       setSchoolSettings(next);
@@ -249,7 +253,7 @@ export const App: React.FC = () => {
       case 'student':
         return 'ข้อมูลนักเรียน';
       case 'timetable':
-        return 'ตารางสอน / ภาระงานวันนี้';
+        return 'ตารางสอน';
       case 'academic-year':
         return 'ปฏิทินกิจกรรมโรงเรียน';
       case 'messages':

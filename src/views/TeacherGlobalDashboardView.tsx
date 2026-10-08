@@ -11,7 +11,6 @@ import { TeacherQuickShortcuts } from '../components/dashboard/TeacherQuickShort
 import { TeacherCalendarActivityWidget } from '../components/dashboard/TeacherCalendarActivityWidget';
 import { TeacherWeeklyTasksWidget } from '../components/dashboard/TeacherWeeklyTasksWidget';
 import { TeacherAnnouncementsWidget } from '../components/dashboard/TeacherAnnouncementsWidget';
-import { TeacherMobileHomeHero } from '../components/dashboard/TeacherMobileHomeHero';
 import { AdminTeacherBannerModal } from '../components/teacher/AdminTeacherBannerModal';
 import type { TeacherBannerKey } from '../services/teacherBannerService';
 
@@ -51,19 +50,7 @@ export const TeacherGlobalDashboardView: React.FC<
 
   return (
     <div className="max-w-[1440px] mx-auto space-y-4 sm:space-y-5 pb-20 select-none font-sans">
-      {/* 1. Mobile Greeting Hero (เฉพาะบนหน้าจอมือถือ < 768px ตามภาพต้นแบบ Screen 1 Mobile First) */}
-      <div className="md:hidden">
-        <TeacherMobileHomeHero
-          teacherName={currentUser?.name || 'นายปัญจพล เกษรัตน์'}
-          department={
-            currentUser?.subjectGroup ||
-            (currentUser?.position ? `กลุ่มสาระฯ (${currentUser.position})` : 'กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ (ภาษาญี่ปุ่น)')
-          }
-          avatarUrl={currentUser?.avatarUrl || '/images/teacher/teacher_avatar.png'}
-        />
-      </div>
-
-      {/* 2. สองคอลัมน์หลักซ้าย-ขวา ตามภาพต้นแบบ Mockup Image 1 (Desktop Dashboard) */}
+      {/* สองคอลัมน์หลักซ้าย-ขวา ตามภาพต้นแบบ Mockup Image 1 (Desktop Dashboard) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 items-start">
         {/* ฝั่งซ้าย (Main Stream Column ~65-68% / lg:col-span-8) */}
         <div className="lg:col-span-8 space-y-4 sm:space-y-5 min-w-0">

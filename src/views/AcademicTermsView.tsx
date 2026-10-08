@@ -42,6 +42,7 @@ import {
   type SpecialHolidayRecord,
 } from '../services/academicCalendarService';
 import { cleanSlateService } from '../services/cleanSlateService';
+import { authService } from '../services/authService';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 
 export type ActivityCategory = 'ALL' | 'ACADEMIC' | 'DEVELOPMENT' | 'SPORTS' | 'AFFAIRS' | 'EXAM';
@@ -62,7 +63,9 @@ export interface CalendarEventItem {
   title: string;
   category: 'MEETING' | 'SUBMISSION' | 'ACADEMIC' | 'STUDENT' | 'OTHER' | 'EXAM';
   colorType: CalendarLegendColor;
-  targetRole: 'TEACHER' | 'STUDENT' | 'ALL';
+  targetRole: 'TEACHER' | 'STUDENT' | 'ALL' | 'PERSONAL' | 'CUSTOM';
+  createdBy?: string;
+  assignedNames?: string;
   location?: string;
   description?: string;
 }
@@ -663,7 +666,8 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
   const [newEventTime, setNewEventTime] = useState('08:30');
   const [newEventEndTime, setNewEventEndTime] = useState('16:30');
   const [newEventColor, setNewEventColor] = useState<CalendarLegendColor>('BLUE');
-  const [newEventTargetRole, setNewEventTargetRole] = useState<'TEACHER' | 'STUDENT' | 'ALL'>('TEACHER');
+  const [newEventTargetRole, setNewEventTargetRole] = useState<'TEACHER' | 'STUDENT' | 'ALL' | 'PERSONAL' | 'CUSTOM'>('TEACHER');
+  const [newEventCustomAssignees, setNewEventCustomAssignees] = useState('');
   const [newEventLocation, setNewEventLocation] = useState('ห้องประชุมโรงเรียน');
   const [newEventDescription, setNewEventDescription] = useState('');
 
@@ -832,6 +836,8 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                 category: colorToCategoryMap[newEventColor] || 'OTHER',
                 colorType: newEventColor,
                 targetRole: newEventTargetRole,
+                createdBy: ev.createdBy || (authService.getCurrentUser()?.id || 'u-1'),
+                assignedNames: newEventTargetRole === 'CUSTOM' ? newEventCustomAssignees.trim() : undefined,
                 location: newEventLocation.trim() || undefined,
                 description: newEventDescription.trim() || undefined,
               }
@@ -855,6 +861,8 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
         category: colorToCategoryMap[newEventColor] || 'OTHER',
         colorType: newEventColor,
         targetRole: newEventTargetRole,
+        createdBy: authService.getCurrentUser()?.id || 'u-1',
+        assignedNames: newEventTargetRole === 'CUSTOM' ? newEventCustomAssignees.trim() : undefined,
         location: newEventLocation.trim() || undefined,
         description: newEventDescription.trim() || undefined,
       };
@@ -1614,9 +1622,26 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                     <option value="TEACHER">👤 สำหรับครูและบุคลากร</option>
                     <option value="STUDENT">👥 สำหรับนักเรียน</option>
                     <option value="ALL">🌐 ทุกคนในโรงเรียน</option>
+                    <option value="PERSONAL">🔒 เฉพาะตัวเอง (ครูส่วนบุคคล)</option>
+                    <option value="CUSTOM">🎯 เฉพาะคนที่กำหนด</option>
                   </select>
                 </div>
               </div>
+
+              {newEventTargetRole === 'CUSTOM' && (
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1 text-xs">
+                    ระบุชื่อครู/นักเรียนที่กำหนด (เช่น นายปัญจพล, หัวหน้ากลุ่มสาระ, ม.3/1)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="ระบุชื่อหรือตำแหน่งคนที่กำหนด..."
+                    value={newEventCustomAssignees}
+                    onChange={(e) => setNewEventCustomAssignees(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                  />
+                </div>
+              )}
 
               {/* สถานที่ */}
               <div>

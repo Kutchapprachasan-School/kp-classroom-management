@@ -293,11 +293,12 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
     reader.onload = () => {
       const dataUrl = reader.result as string;
       if (dataUrl) {
-        setSchoolSettings((prev) => ({
-          ...prev,
-          logoUrl: dataUrl,
-        }));
-        showToast('📷 อัปโหลดตราโรงเรียนเรียบร้อย (กดบันทึกเพื่อนำไปใช้งาน)');
+        setSchoolSettings((prev) => {
+          const updated = { ...prev, logoUrl: dataUrl };
+          saveSchoolSettings(updated);
+          return updated;
+        });
+        showToast('✓ อัปโหลดตราโรงเรียนและบันทึกลงฐานข้อมูล Supabase เรียบร้อยแล้ว');
       }
     };
     reader.onerror = () => {
@@ -307,11 +308,12 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
   };
 
   const handleResetLogoToDefault = () => {
-    setSchoolSettings((prev) => ({
-      ...prev,
-      logoUrl: DEFAULT_KUTCHAP_LOGO_SVG,
-    }));
-    showToast('🔄 คืนค่าตราโรงเรียนมาตรฐานเรียบร้อย (กดบันทึกเพื่อยืนยัน)');
+    setSchoolSettings((prev) => {
+      const updated = { ...prev, logoUrl: DEFAULT_KUTCHAP_LOGO_SVG };
+      saveSchoolSettings(updated);
+      return updated;
+    });
+    showToast('🔄 คืนค่าตราโรงเรียนมาตรฐานและบันทึกเรียบร้อย');
   };
 
   const handleSaveSchoolInfo = () => {

@@ -144,6 +144,7 @@ export interface MorningAssemblyStats {
   leaveCount: number;
   activityCount: number;
   attendanceRate: number;
+  isCompleted?: boolean;
 }
 
 export interface StudentCumulativeStats {
@@ -181,6 +182,7 @@ export interface AssemblyCalendarDayInfo {
   lateCount: number;
   absentCount: number;
   leaveCount: number;
+  recordsCount?: number;
 }
 
 // ----------------------------------------------------
@@ -546,16 +548,9 @@ export const attendanceCorrelationService = {
       return filtered;
     }
 
-    // If storage is completely empty, initialize default mock baseline unless clean slate is active
+    // If storage is completely empty, return empty list (no auto mock seeding)
     if (list.length === 0) {
-      if (cleanSlateService.isCleanSlateActive()) {
-        return [];
-      }
-      const initial = generateMockMorningRecords();
-      writeStorage(STORAGE_KEYS.MORNING_ASSEMBLY, initial);
-      return initial.filter(
-        (r) => r.date === date && normalizeClassroomId(r.classroomId) === targetRoom
-      );
+      return [];
     }
 
     return [];
@@ -758,18 +753,7 @@ export const attendanceCorrelationService = {
     }
 
     if (list.length === 0) {
-      if (cleanSlateService.isCleanSlateActive()) {
-        return [];
-      }
-      const initial = generateMockPeriodRecords();
-      writeStorage(STORAGE_KEYS.PERIOD_ATTENDANCE, initial);
-      return initial.filter(
-        (r) =>
-          r.date === date &&
-          r.periodNo === periodNo &&
-          normalizeClassroomId(r.classroomId) === targetRoom &&
-          normalizeCourseCode(r.courseCode) === targetCourse
-      );
+      return [];
     }
 
     return [];

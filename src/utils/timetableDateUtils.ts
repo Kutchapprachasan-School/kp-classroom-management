@@ -13,17 +13,18 @@ export type TimetableColorTheme =
 export interface TimetableMatrixSlot {
   id: string;
   day: 'จันทร์' | 'อังคาร' | 'พุธ' | 'พฤหัสบดี' | 'ศุกร์';
-  dayDate: string;
+  dayDate?: string;
   period: number;
-  timeRange: string;
+  timeRange?: string;
   subjectCode: string;
   room: string;
   subjectName: string;
-  isConducted: boolean;
+  isConducted?: boolean;
   isFreePeriod?: boolean;
+  isLunchSlot?: boolean;
   status?: 'CHECKED' | 'UNCHECKED' | 'TEACHING' | 'LUNCH';
-  colorTheme: TimetableColorTheme;
-  category: 'subject' | 'activity' | 'meeting' | 'free';
+  colorTheme?: TimetableColorTheme;
+  category?: 'subject' | 'activity' | 'meeting' | 'free';
 }
 
 export interface TaskWidgetItem {

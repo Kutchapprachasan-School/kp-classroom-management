@@ -183,16 +183,10 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
       }
     }
   }
-  // เมื่ออยู่ในโหมด Clean Slate (เริ่มต้นใช้งานจริง) ให้คืนค่ารายการว่าง [] เสมอ
-  // เพื่อให้คุณครูเห็น Empty State และสามารถเพิ่มหรือนำเข้ารายชื่อจริงได้
+  // คืนค่ารายการว่าง [] เสมอ หากยังไม่มีการเพิ่มหรือนำเข้ารายชื่อจริง
+  // เพื่อความสะอาดของระบบจริง (Zero Mock Data)
   if (cleanSlateService.isCleanSlateActive()) {
     return [];
-  }
-  if (mockStudentsByRoom[classroomId]) {
-    return mockStudentsByRoom[classroomId];
-  }
-  if (classroomId === 'room-3-1' || classroomId === 'ม.3/1') {
-    return defaultStudents;
   }
   return [];
 };
@@ -210,6 +204,10 @@ export const studentService = {
 
   // ดึงรายชื่อนักเรียนในห้อง
   getStudents(classroomId: string): StudentRecord[] {
+    return getLocalStudents(classroomId);
+  },
+
+  getStudentsByClassroom(classroomId: string): StudentRecord[] {
     return getLocalStudents(classroomId);
   },
 

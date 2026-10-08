@@ -45,19 +45,19 @@ export const TeacherHeroBanner: React.FC<TeacherHeroBannerProps> = ({
           className="w-full h-full object-cover object-center"
         />
 
-        {/* If the image is a custom upload without embedded text, overlay title & subtitle */}
-        {banner.customUrl && (
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-900/60 via-slate-900/30 to-transparent flex flex-col justify-center px-4 sm:px-8 text-white">
-            <h2 className="text-base sm:text-xl md:text-2xl font-black drop-shadow-md tracking-tight leading-snug">
-              {banner.quoteText || '“การศึกษาคือการลงทุน ที่คุ้มค่าที่สุดในชีวิต”'}
-            </h2>
-            {banner.subText && (
-              <p className="text-xs sm:text-sm md:text-base text-blue-100 font-medium drop-shadow-sm mt-1">
-                {banner.subText}
-              </p>
-            )}
+        {/* Hero Quote and Subtitle Typography Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/65 via-slate-900/35 to-transparent flex flex-col justify-center px-4 sm:px-8 text-white">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-500/30 backdrop-blur-xs text-blue-200 border border-blue-300/30 text-[10px] sm:text-xs font-bold w-fit mb-1.5">
+            <Sparkles className="w-3 h-3 text-yellow-300" />
+            <span>คำคมสร้างแรงบันดาลใจ</span>
           </div>
-        )}
+          <h2 className="text-sm sm:text-lg md:text-xl font-black drop-shadow-md tracking-tight leading-snug">
+            {banner.quoteText || '“การศึกษาคือการลงทุน ที่คุ้มค่าที่สุดในชีวิต”'}
+          </h2>
+          <p className="text-[11px] sm:text-xs md:text-sm text-blue-100 font-medium drop-shadow-sm mt-0.5 max-w-xl line-clamp-1 sm:line-clamp-none">
+            {banner.subText || 'ร่วมสร้างโอกาส พัฒนาผู้เรียน สู่อนาคตที่มั่นคงและยั่งยืน'}
+          </p>
+        </div>
       </div>
 
       {/* Admin Quick Customization Badge (Visible ONLY to ACADEMIC_ADMIN) */}
