@@ -739,11 +739,13 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
     handleOpenCreateModal(day);
   };
 
-  // Sync to local storage
+  // Sync to local storage and dispatch real-time update
   useEffect(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
         localStorage.setItem(CALENDAR_EVENTS_STORAGE_KEY, JSON.stringify(events));
+        window.dispatchEvent(new CustomEvent('kps-academic-calendar-updated', { detail: events }));
+        window.dispatchEvent(new Event('storage'));
       } catch {
         // ignore
       }

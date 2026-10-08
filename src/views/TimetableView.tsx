@@ -154,6 +154,33 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
     };
   }, []);
 
+  // ซิงค์การเปลี่ยนแปลงคาบสอนจากหน้าอื่น (เช่น การเช็คชื่อจากหน้าหลัก) แบบเรียลไทม์
+  useEffect(() => {
+    const handleSlotsSync = (e: Event) => {
+      const custom = e as CustomEvent<TimetableMatrixSlot[]>;
+      if (custom.detail && Array.isArray(custom.detail)) {
+        setMatrixSlots(custom.detail);
+      } else {
+        setMatrixSlots(loadSavedMatrixSlots());
+      }
+    };
+    window.addEventListener('kp_matrix_slots_updated', handleSlotsSync);
+    window.addEventListener('storage', handleSlotsSync);
+    return () => {
+      window.removeEventListener('kp_matrix_slots_updated', handleSlotsSync);
+      window.removeEventListener('storage', handleSlotsSync);
+    };
+  }, []);
+
+  const saveMatrixSlotsWithDispatch = (updated: TimetableMatrixSlot[]) => {
+    setMatrixSlots(updated);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(MATRIX_STORAGE_KEY, JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('kp_matrix_slots_updated', { detail: updated }));
+      window.dispatchEvent(new Event('storage'));
+    }
+  };
+
   const activePeriods = useMemo(() => {
     const timeline = bellScheduleService.getTimeline();
     const teachingList = timeline
@@ -343,10 +370,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
           }
         }
 
-        setMatrixSlots(newMatrix);
-        if (typeof window !== 'undefined' && window.localStorage) {
-          window.localStorage.setItem(MATRIX_STORAGE_KEY, JSON.stringify(newMatrix));
-        }
+        saveMatrixSlotsWithDispatch(newMatrix);
         showToast(`นำเข้าคาบสอนจากไฟล์เรียบร้อย (${importedCount} คาบ)`);
       } catch (err) {
         showToast('เกิดข้อผิดพลาดในการอ่านไฟล์ กรุณาตรวจสอบรูปแบบไฟล์ CSV');
@@ -380,35 +404,25 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
   };
 
   const handleSaveSlot = (slotToSave: TimetableMatrixSlot) => {
-    setMatrixSlots((prev) => {
-      const existingIdx = prev.findIndex(
-        (s) => s.id === slotToSave.id || (s.day === slotToSave.day && s.period === slotToSave.period)
-      );
-      let updated: TimetableMatrixSlot[];
-      if (existingIdx >= 0) {
-        updated = [...prev];
-        updated[existingIdx] = slotToSave;
-      } else {
-        updated = [...prev, slotToSave];
-      }
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(MATRIX_STORAGE_KEY, JSON.stringify(updated));
-      }
-      return updated;
-    });
+    const existingIdx = matrixSlots.findIndex(
+      (s) => s.id === slotToSave.id || (s.day === slotToSave.day && s.period === slotToSave.period)
+    );
+    let updated: TimetableMatrixSlot[];
+    if (existingIdx >= 0) {
+      updated = [...matrixSlots];
+      updated[existingIdx] = slotToSave;
+    } else {
+      updated = [...matrixSlots, slotToSave];
+    }
+    saveMatrixSlotsWithDispatch(updated);
     showToast(`บันทึกรายวิชา ${slotToSave.subjectCode} (${slotToSave.day} คาบที่ ${slotToSave.period}) สำเร็จ`);
   };
 
   const handleDeleteSlot = (slotId: string) => {
-    setMatrixSlots((prev) => {
-      const updated = prev.map((s) =>
-        s.id === slotId ? { ...s, isFreePeriod: true, category: 'free' as const, subjectCode: '', subjectName: '' } : s
-      );
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(MATRIX_STORAGE_KEY, JSON.stringify(updated));
-      }
-      return updated;
-    });
+    const updated = matrixSlots.map((s) =>
+      s.id === slotId ? { ...s, isFreePeriod: true, category: 'free' as const, subjectCode: '', subjectName: '' } : s
+    );
+    saveMatrixSlotsWithDispatch(updated);
     showToast('ลบรายวิชาออกจากตารางสอนเรียบร้อย');
   };
 
@@ -422,17 +436,12 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
       return updated;
     });
 
-    setMatrixSlots((prev) => {
-      const updated = prev.map((s) =>
-        s.id === slot.id
-          ? { ...s, isFreePeriod: true, category: 'free' as const, subjectCode: '', subjectName: '' }
-          : s
-      );
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(MATRIX_STORAGE_KEY, JSON.stringify(updated));
-      }
-      return updated;
-    });
+    const updated = matrixSlots.map((s) =>
+      s.id === slot.id
+        ? { ...s, isFreePeriod: true, category: 'free' as const, subjectCode: '', subjectName: '' }
+        : s
+    );
+    saveMatrixSlotsWithDispatch(updated);
 
     setSelectedSlot(null);
     showToast(`นำคาบ ${slot.subjectCode} ออกไปพักไว้ที่ "คาบรอลงตาราง" เรียบร้อย`);
@@ -449,40 +458,35 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
       (s) => s.day === targetMoveDay && s.period === targetMovePeriod
     );
 
-    setMatrixSlots((prev) => {
-      const updated = prev.map((s) => {
-        if (s.day === sourceDay && s.period === sourcePeriod) {
-          // แทนที่ตำแหน่งเดิมด้วย target slot หรือกลายเป็น free
-          if (targetExisting && !targetExisting.isFreePeriod && targetExisting.subjectCode) {
-            return {
-              ...targetExisting,
-              day: sourceDay,
-              period: sourcePeriod,
-            };
-          }
+    const updated = matrixSlots.map((s) => {
+      if (s.day === sourceDay && s.period === sourcePeriod) {
+        // แทนที่ตำแหน่งเดิมด้วย target slot หรือกลายเป็น free
+        if (targetExisting && !targetExisting.isFreePeriod && targetExisting.subjectCode) {
           return {
-            ...s,
-            isFreePeriod: true,
-            category: 'free' as const,
-            subjectCode: '',
-            subjectName: '',
+            ...targetExisting,
+            day: sourceDay,
+            period: sourcePeriod,
           };
         }
-        if (s.day === targetMoveDay && s.period === targetMovePeriod) {
-          return {
-            ...moveSlotTarget,
-            day: targetMoveDay as any,
-            period: targetMovePeriod,
-          };
-        }
-        return s;
-      });
-
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(MATRIX_STORAGE_KEY, JSON.stringify(updated));
+        return {
+          ...s,
+          isFreePeriod: true,
+          category: 'free' as const,
+          subjectCode: '',
+          subjectName: '',
+        };
       }
-      return updated;
+      if (s.day === targetMoveDay && s.period === targetMovePeriod) {
+        return {
+          ...moveSlotTarget,
+          day: targetMoveDay as any,
+          period: targetMovePeriod,
+        };
+      }
+      return s;
     });
+
+    saveMatrixSlotsWithDispatch(updated);
 
     showToast(
       `ย้ายคาบ ${moveSlotTarget.subjectCode} จากวัน${sourceDay} คาบที่ ${sourcePeriod} ไปวัน${targetMoveDay} คาบที่ ${targetMovePeriod} สำเร็จ`
@@ -526,10 +530,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
     const updatedSlots = matrixSlots.map((s) =>
       s.id === selectedSlot.id ? { ...s, status: 'CHECKED' as const, isConducted: true } : s
     );
-    setMatrixSlots(updatedSlots);
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem(MATRIX_STORAGE_KEY, JSON.stringify(updatedSlots));
-    }
+    saveMatrixSlotsWithDispatch(updatedSlots);
     showToast(`บันทึกการเช็คชื่อวิชา ${selectedSlot.subjectCode} (${selectedSlot.room}) เรียบร้อย`);
     setSelectedSlot(null);
   };

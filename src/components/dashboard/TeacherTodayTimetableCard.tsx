@@ -20,6 +20,12 @@ import {
   type SchoolBellScheduleConfig,
 } from '../../services/bellScheduleService';
 import type { AuthUser } from '../../services/authService';
+import {
+  calendarEventStorageService,
+  MATRIX_SLOTS_UPDATED_EVENT,
+} from '../../services/calendarEventStorageService';
+import { getSubjectIcon } from '../../config/subjectIcons';
+import type { TimetableMatrixSlot } from '../../utils/timetableDateUtils';
 
 export interface TodayPeriodItem {
   periodNumber: number;
@@ -130,6 +136,11 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
     bellScheduleService.getConfig()
   );
 
+  // เชื่อมโยงข้อมูลตารางสอนจริงจากหน้าตารางสอน (TimetableView)
+  const [matrixSlots, setMatrixSlots] = useState<TimetableMatrixSlot[]>(() =>
+    calendarEventStorageService.loadMatrixSlots()
+  );
+
   useEffect(() => {
     const handleBellUpdate = (e: Event) => {
       const custom = e as CustomEvent<SchoolBellScheduleConfig>;
@@ -143,41 +154,119 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
     };
   }, []);
 
-  const periodsList = useMemo(() => {
-    return TODAY_PERIODS_MOCK.map((item) => {
-      let subjectTitle = item.subjectTitle;
-      let courseCode = item.courseCode;
+  // ติดตามการเปลี่ยนแปลงคาบสอนจากหน้าตารางสอนแบบ Real-time
+  useEffect(() => {
+    const handleSlotsUpdate = (e: Event) => {
+      const custom = e as CustomEvent<TimetableMatrixSlot[]>;
+      if (custom.detail && Array.isArray(custom.detail)) {
+        setMatrixSlots(custom.detail);
+      } else {
+        setMatrixSlots(calendarEventStorageService.loadMatrixSlots());
+      }
+    };
+    window.addEventListener(MATRIX_SLOTS_UPDATED_EVENT, handleSlotsUpdate);
+    window.addEventListener('storage', handleSlotsUpdate);
+    return () => {
+      window.removeEventListener(MATRIX_SLOTS_UPDATED_EVENT, handleSlotsUpdate);
+      window.removeEventListener('storage', handleSlotsUpdate);
+    };
+  }, []);
 
-      // If a real teacher is logged in with a defined subject group (e.g. Science, Thai, etc.)
-      if (currentUser?.subjectGroup && !currentUser.subjectGroup.includes('ญี่ปุ่น')) {
-        if (item.periodNumber === 0) {
-          subjectTitle = `เช็คแถวเช้า & โฮมรูม (${currentUser.classroomId || 'ม.3/1'})`;
-        } else if (item.periodNumber === 5) {
-          subjectTitle = 'กิจกรรมพัฒนาผู้เรียน';
-        } else {
-          subjectTitle = `${currentUser.subjectGroup} (${currentUser.classroomId || `ม.3/${item.periodNumber}`})`;
-          courseCode = currentUser.subjectGroup.slice(0, 6);
-        }
+  const todayDayKey = useMemo(() => calendarEventStorageService.getTodayDayKey(), []);
+
+  // ติดตามคาบที่ดำเนินการเช็คชื่อเรียบร้อยแล้ว
+  const [completedPeriods, setCompletedPeriods] = useState<number[]>([0]);
+
+  // ซิงค์สถานะ checked จาก matrixSlots เข้า completedPeriods
+  useEffect(() => {
+    const checkedFromMatrix = matrixSlots
+      .filter((s) => s.day === todayDayKey && (s.status === 'CHECKED' || s.isConducted))
+      .map((s) => s.period);
+    if (checkedFromMatrix.length > 0) {
+      setCompletedPeriods((prev) => Array.from(new Set([...prev, ...checkedFromMatrix])));
+    }
+  }, [matrixSlots, todayDayKey]);
+
+  // คำนวณรายการคาบสอนวันนี้จาก matrixSlots จริง ไม่ใช้ mock data
+  const periodsList = useMemo<TodayPeriodItem[]>(() => {
+    // คาบที่ 0: กิจกรรมเข้าแถวเคารพธงชาติ & โฮมรูม
+    const period0: TodayPeriodItem = {
+      periodNumber: 0,
+      timeRange: `${bellConfig.morningAssemblyStart} - ${bellConfig.morningAssemblyEnd}`,
+      iconType: 'morning',
+      iconBgColor: 'bg-sky-500',
+      subjectTitle: `เช็คแถวเช้า & โฮมรูม (${currentUser?.classroomId || 'ม.3/1'})`,
+      courseCode: 'โฮมรูม',
+      classroom: `ห้อง ${currentUser?.classroomId || 'ม.3/1'} (ห้องประจำชั้น)`,
+      isMorningAssembly: true,
+      hasGradingButton: false,
+      isCompleted: completedPeriods.includes(0),
+    };
+
+    // คาบการสอนจริงจาก matrixSlots ในวันปัจจุบัน
+    const dayTeachingSlots = matrixSlots
+      .filter(
+        (s) =>
+          s.day === todayDayKey &&
+          !s.isFreePeriod &&
+          s.category !== 'free' &&
+          !!s.subjectCode &&
+          s.status !== 'LUNCH' &&
+          !s.isLunchSlot
+      )
+      .sort((a, b) => a.period - b.period);
+
+    // หากยังไม่มีคาบสอนจริงถูกบันทึกในตาราง ให้ fallback ไปที่คาบมาตรฐาน
+    if (dayTeachingSlots.length === 0) {
+      return [period0];
+    }
+
+    const teachingItems: TodayPeriodItem[] = dayTeachingSlots.map((s) => {
+      const iconConfig = getSubjectIcon(s.subjectCode, s.subjectName);
+
+      let iconType: TodayPeriodItem['iconType'] = 'nihon';
+      if (s.subjectCode.startsWith('ญ') || s.subjectName.includes('ญี่ปุ่น')) {
+        iconType = s.period % 2 === 0 ? 'hiragana' : 'nihon';
+      } else if (
+        s.category === 'activity' ||
+        s.subjectCode.startsWith('ก') ||
+        s.subjectName.includes('แนะแนว') ||
+        s.subjectName.includes('กิจกรรม')
+      ) {
+        iconType = 'activity';
+      } else {
+        iconType = 'hiragana';
       }
 
-      if (item.periodNumber === 0) {
-        return {
-          ...item,
-          subjectTitle,
-          courseCode,
-          timeRange: `${bellConfig.morningAssemblyStart} - ${bellConfig.morningAssemblyEnd}`,
-        };
-      }
+      const isCompleted = s.status === 'CHECKED' || s.isConducted === true || completedPeriods.includes(s.period);
+
       return {
-        ...item,
-        subjectTitle,
-        courseCode,
+        periodNumber: s.period,
+        timeRange: s.timeRange || `คาบที่ ${s.period}`,
+        iconType,
+        iconBgColor: iconConfig.bgClass.startsWith('bg-[')
+          ? iconConfig.bgClass
+          : iconConfig.id === 'japanese'
+          ? 'bg-[#EF4444]'
+          : iconConfig.bgClass,
+        subjectTitle: s.subjectName || s.subjectCode,
+        courseCode: s.subjectCode,
+        credits: s.credits || '1.0 หน่วยกิต',
+        totalPeriods: s.totalPeriods || '40 คาบ',
+        subType: s.category === 'activity' ? 'กิจกรรมพัฒนาผู้เรียน' : undefined,
+        classroom: s.room
+          ? s.room.startsWith('ม.') || s.room.startsWith('ห้อง')
+            ? s.room
+            : `ห้อง ${s.room}`
+          : 'ห้องเรียน',
+        isMorningAssembly: false,
+        hasGradingButton: s.category !== 'activity',
+        isCompleted,
       };
     });
-  }, [bellConfig, currentUser]);
 
-  // ติดตามคาบที่ดำเนินการเช็คชื่อเรียบร้อยแล้ว (mock ค่าเริ่มต้น: คาบ 0 เช็คแถวเช้าเสร็จแล้ว)
-  const [completedPeriods, setCompletedPeriods] = useState<number[]>([0]);
+    return [period0, ...teachingItems];
+  }, [matrixSlots, todayDayKey, bellConfig, currentUser, completedPeriods]);
 
   // ตั้งค่าเริ่มต้น: ซ่อนคาบที่เสร็จแล้วเป็นค่าเริ่มต้น และบันทึกสถานะลง localStorage
   const [hideCompleted, setHideCompleted] = useState<boolean>(() => {
@@ -206,17 +295,27 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
   )?.periodNumber ?? null;
 
   const toggleComplete = (periodNumber: number) => {
+    const isNowCompleted = !completedPeriods.includes(periodNumber);
     setCompletedPeriods((prev) =>
       prev.includes(periodNumber)
         ? prev.filter((p) => p !== periodNumber)
         : [...prev, periodNumber]
     );
+
+    if (periodNumber > 0 && isNowCompleted) {
+      calendarEventStorageService.markMatrixSlotChecked(todayDayKey, periodNumber);
+    }
   };
 
   const handleCheckIn = (period: TodayPeriodItem) => {
     // บันทึกสถานะว่าเช็คชื่อแล้ว
     if (!completedPeriods.includes(period.periodNumber)) {
       setCompletedPeriods((prev) => [...prev, period.periodNumber]);
+    }
+
+    // ซิงค์สถานะเข้าสู่ Matrix Slots ของตารางสอนจริง
+    if (period.periodNumber > 0) {
+      calendarEventStorageService.markMatrixSlotChecked(todayDayKey, period.periodNumber);
     }
 
     if (onCheckAttendance) {
@@ -285,11 +384,11 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
                 ตารางสอนวันนี้
               </h2>
               <h2 className="font-extrabold text-slate-800 text-sm leading-tight sm:hidden">
-                วันนี้ - 2 ตุลาคม 2569
+                วัน{todayDayKey} - 2 ต.ค. 2569
               </h2>
             </div>
             <p className="text-xs text-slate-500 font-medium hidden sm:block">
-              พฤหัสบดีที่ 2 ตุลาคม 2569
+              วัน{todayDayKey}ที่ 2 ตุลาคม 2569 ({Math.max(0, periodsList.length - 1)} คาบสอน)
             </p>
           </div>
         </div>
@@ -349,7 +448,7 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
               className="mt-3 px-3.5 py-1.5 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5"
             >
               <Eye className="w-3.5 h-3.5" />
-              <span>👁️ แสดงทุกคาบ ({TODAY_PERIODS_MOCK.length} คาบ)</span>
+              <span>👁️ แสดงทุกคาบ ({periodsList.length} คาบ)</span>
             </button>
           </div>
         ) : (

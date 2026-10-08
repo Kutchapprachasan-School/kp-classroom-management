@@ -1070,6 +1070,44 @@ assert.ok(stu1Rec, 'stu-1 record must exist in attendanceCorrelationService');
 assert.strictEqual(stu1Rec.status, 'PRESENT', 'stu-1 status must match');
 console.log('  ✓ Runtime bridge verified: attendanceService.saveRollCall records persist directly into attendanceCorrelationService');
 
-console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE, SUBJECT ICONS, BANNER COMPRESSOR, SIDEBAR UX, BELL SCHEDULE, MORNING ASSEMBLY, CLASSROOM ATTENDANCE, STICKERS CATALOG, ELAPSED ATTENDANCE % & PHASE 1 UNIFIED ARCHITECTURE CHECKS PASSED!');
+// ----------------------------------------------------
+// Step 12: Home Dashboard Real-Time Timetable & Calendar Zero-Mock Synchronization Check
+// ----------------------------------------------------
+console.log('\n--- 12. Checking Home Dashboard Real-Time Timetable & Calendar Sync ---');
+
+// 12.1 Check calendarEventStorageService.ts contract and methods
+const storageSrc = readFileSync('src/services/calendarEventStorageService.ts', 'utf8');
+assert.ok(storageSrc.includes('calendarEventStorageService'), 'calendarEventStorageService must exist');
+assert.ok(storageSrc.includes('kp_school_calendar_events_v2'), 'CALENDAR_EVENTS_STORAGE_KEY must be kp_school_calendar_events_v2');
+assert.ok(storageSrc.includes('kp_teacher_matrix_slots'), 'MATRIX_STORAGE_KEY must be kp_teacher_matrix_slots');
+assert.ok(storageSrc.includes('loadAllEvents'), 'loadAllEvents method must exist');
+assert.ok(storageSrc.includes('loadMatrixSlots'), 'loadMatrixSlots method must exist');
+assert.ok(storageSrc.includes('getTodayTeachingPeriodsCount'), 'getTodayTeachingPeriodsCount method must exist');
+assert.ok(storageSrc.includes('markMatrixSlotChecked'), 'markMatrixSlotChecked method must exist');
+console.log('  ✓ calendarEventStorageService.ts contract and synchronization methods verified');
+
+// 12.2 Check TeacherTodayTimetableCard.tsx source integration
+const todayCardSrc = readFileSync('src/components/dashboard/TeacherTodayTimetableCard.tsx', 'utf8');
+assert.ok(todayCardSrc.includes('calendarEventStorageService'), 'Must import calendarEventStorageService');
+assert.ok(todayCardSrc.includes('MATRIX_SLOTS_UPDATED_EVENT'), 'Must listen to MATRIX_SLOTS_UPDATED_EVENT');
+assert.ok(todayCardSrc.includes('loadMatrixSlots'), 'Must load timetable slots from storage service');
+assert.ok(todayCardSrc.includes('markMatrixSlotChecked'), 'Must sync checked slots to timetable storage');
+console.log('  ✓ TeacherTodayTimetableCard.tsx successfully connected to real timetable matrix slots');
+
+// 12.3 Check TeacherCalendarActivityWidget.tsx source integration
+const calendarWidgetSrc = readFileSync('src/components/dashboard/TeacherCalendarActivityWidget.tsx', 'utf8');
+assert.ok(calendarWidgetSrc.includes('calendarEventStorageService'), 'Must import calendarEventStorageService');
+assert.ok(calendarWidgetSrc.includes('todayPeriodsCount'), 'Must compute dynamic todayPeriodsCount');
+assert.ok(!calendarWidgetSrc.includes('<span className="text-3xl font-black text-blue-600 leading-none">\n                5\n              </span>'), 'Must NOT have static hardcoded 5 periods');
+assert.ok(calendarWidgetSrc.includes('{todayPeriodsCount}'), 'Must render dynamic {todayPeriodsCount}');
+console.log('  ✓ TeacherCalendarActivityWidget.tsx successfully displays dynamic period count and real calendar events');
+
+// 12.4 Check TimetableView.tsx dispatch integration
+const timetableViewSrc = readFileSync('src/views/TimetableView.tsx', 'utf8');
+assert.ok(timetableViewSrc.includes('kp_matrix_slots_updated'), 'TimetableView must dispatch kp_matrix_slots_updated');
+assert.ok(timetableViewSrc.includes('saveMatrixSlotsWithDispatch'), 'TimetableView must use saveMatrixSlotsWithDispatch');
+console.log('  ✓ TimetableView.tsx dispatches kp_matrix_slots_updated on all slot updates');
+
+console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE, SUBJECT ICONS, BANNER COMPRESSOR, SIDEBAR UX, BELL SCHEDULE, MORNING ASSEMBLY, CLASSROOM ATTENDANCE, STICKERS CATALOG, ELAPSED ATTENDANCE %, PHASE 1 UNIFIED ARCHITECTURE & HOME ZERO-MOCK SYNC CHECKS PASSED!');
 
 

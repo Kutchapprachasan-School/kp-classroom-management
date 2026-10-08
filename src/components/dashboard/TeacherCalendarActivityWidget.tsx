@@ -14,10 +14,13 @@ import {
   X,
 } from 'lucide-react';
 import type { CrossViewNavigationPayload } from '../../services/teacherCopilotService';
-import type { CalendarEventItem } from '../../views/AcademicTermsView';
 import { authService } from '../../services/authService';
-
-const CALENDAR_EVENTS_STORAGE_KEY = 'kp_school_calendar_events_v2';
+import {
+  calendarEventStorageService,
+  MATRIX_SLOTS_UPDATED_EVENT,
+  type CalendarEventItem,
+} from '../../services/calendarEventStorageService';
+import { ACADEMIC_CALENDAR_EVENT } from '../../services/academicCalendarService';
 
 const THAI_MONTHS_NAMES = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
@@ -47,29 +50,40 @@ export const TeacherCalendarActivityWidget: React.FC<
     events: CalendarEventItem[];
   } | null>(null);
 
-  // โหลดรายการกิจกรรมทั้งหมดจาก LocalStorage
-  const [calendarEvents, setCalendarEvents] = useState<CalendarEventItem[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const raw = localStorage.getItem(CALENDAR_EVENTS_STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
-  });
+  // โหลดรายการกิจกรรมทั้งหมดจาก Single Source of Truth จริง
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEventItem[]>(() =>
+    calendarEventStorageService.loadAllEvents()
+  );
+
+  // จำนวนคาบสอนจริงของวันนี้จากตารางสอน (เชื่อมโยงอัตโนมัติ ไม่ใช่ mock data)
+  const [todayPeriodsCount, setTodayPeriodsCount] = useState<number>(() =>
+    calendarEventStorageService.getTodayTeachingPeriodsCount()
+  );
 
   useEffect(() => {
     const handleEventsUpdate = () => {
-      try {
-        const raw = localStorage.getItem(CALENDAR_EVENTS_STORAGE_KEY);
-        if (raw) setCalendarEvents(JSON.parse(raw));
-      } catch {}
+      setCalendarEvents(calendarEventStorageService.loadAllEvents());
     };
     window.addEventListener('kps-academic-calendar-updated', handleEventsUpdate);
+    window.addEventListener(ACADEMIC_CALENDAR_EVENT, handleEventsUpdate);
     window.addEventListener('storage', handleEventsUpdate);
     return () => {
       window.removeEventListener('kps-academic-calendar-updated', handleEventsUpdate);
+      window.removeEventListener(ACADEMIC_CALENDAR_EVENT, handleEventsUpdate);
       window.removeEventListener('storage', handleEventsUpdate);
+    };
+  }, []);
+
+  // ซิงค์จำนวนคาบสอนของวันนี้แบบเรียลไทม์เมื่อมีการเปลี่ยนแปลงในตารางสอน
+  useEffect(() => {
+    const handleTimetableUpdate = () => {
+      setTodayPeriodsCount(calendarEventStorageService.getTodayTeachingPeriodsCount());
+    };
+    window.addEventListener(MATRIX_SLOTS_UPDATED_EVENT, handleTimetableUpdate);
+    window.addEventListener('storage', handleTimetableUpdate);
+    return () => {
+      window.removeEventListener(MATRIX_SLOTS_UPDATED_EVENT, handleTimetableUpdate);
+      window.removeEventListener('storage', handleTimetableUpdate);
     };
   }, []);
 
@@ -165,10 +179,17 @@ export const TeacherCalendarActivityWidget: React.FC<
     return cells;
   }, [currentYear, currentMonth, visibleEvents]);
 
-  // สรุปจำนวนกิจกรรมวันนี้ (2 ต.ค. 2569)
-  const todayEvents = useMemo(() => {
-    return visibleEvents.filter((ev) => ev.day === 2 && (ev.month || 10) === 10);
-  }, [visibleEvents]);
+  // สรุปจำนวนกิจกรรมตามวันที่เลือก (ค่าเริ่มต้น: วันนี้ 2 ต.ค. 2569)
+  const selectedDayEvents = useMemo(() => {
+    const targetDay = selectedDay || 2;
+    return visibleEvents.filter((ev) => {
+      const evMonth = ev.month || 10;
+      const evYear = ev.year > 2500 ? ev.year - 543 : ev.year;
+      const matchesSingle = ev.day === targetDay && evMonth === currentMonth && evYear === currentYear;
+      const isRange = ev.endDay && targetDay >= ev.day && targetDay <= ev.endDay && evMonth === currentMonth;
+      return matchesSingle || isRange;
+    });
+  }, [visibleEvents, selectedDay, currentMonth, currentYear]);
 
   const handlePrevMonth = () => {
     if (currentMonth === 1) {
@@ -329,13 +350,17 @@ export const TeacherCalendarActivityWidget: React.FC<
         <div className="sm:col-span-4 border-t sm:border-t-0 sm:border-l border-slate-100 pt-3 sm:pt-0 sm:pl-3 flex flex-col justify-center space-y-2">
           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
             <Clock className="w-3.5 h-3.5 text-blue-600" />
-            <span>วันนี้</span>
+            <span>
+              {selectedDay === 2 && currentMonth === 10 && currentYear === 2026
+                ? 'วันนี้'
+                : `วันที่ ${selectedDay} ${THAI_MONTHS_NAMES[currentMonth - 1]}`}
+            </span>
           </div>
 
           <div>
             <div className="flex items-baseline gap-1">
               <span className="text-3xl font-black text-blue-600 leading-none">
-                5
+                {todayPeriodsCount}
               </span>
               <span className="text-xs font-bold text-slate-700">คาบเรียน</span>
             </div>
@@ -344,15 +369,15 @@ export const TeacherCalendarActivityWidget: React.FC<
           <div className="space-y-1 text-xs font-semibold">
             <div className="flex items-center gap-1.5 text-slate-600">
               <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
-              <span>{todayEvents.filter((e) => e.category === 'MEETING').length} งานประชุม</span>
+              <span>{selectedDayEvents.filter((e) => e.category === 'MEETING').length} งานประชุม</span>
             </div>
             <div className="flex items-center gap-1.5 text-slate-600">
               <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-              <span>{todayEvents.filter((e) => e.category === 'SUBMISSION' || e.category === 'ACADEMIC').length} งานส่ง/วิชาการ</span>
+              <span>{selectedDayEvents.filter((e) => e.category === 'SUBMISSION' || e.category === 'ACADEMIC').length} งานส่ง/วิชาการ</span>
             </div>
             <div className="flex items-center gap-1.5 text-slate-600">
               <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
-              <span>{todayEvents.filter((e) => e.category === 'STUDENT' || e.category === 'OTHER').length} กิจกรรมนักเรียน</span>
+              <span>{selectedDayEvents.filter((e) => e.category === 'STUDENT' || e.category === 'OTHER').length} กิจกรรมนักเรียน</span>
             </div>
           </div>
         </div>

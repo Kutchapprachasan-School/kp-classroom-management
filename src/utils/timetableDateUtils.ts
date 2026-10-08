@@ -25,6 +25,9 @@ export interface TimetableMatrixSlot {
   status?: 'CHECKED' | 'UNCHECKED' | 'TEACHING' | 'LUNCH';
   colorTheme?: TimetableColorTheme;
   category?: 'subject' | 'activity' | 'meeting' | 'free';
+  credits?: string;
+  totalPeriods?: string;
+  subType?: string;
 }
 
 export interface TaskWidgetItem {

@@ -9,10 +9,12 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import type { CrossViewNavigationPayload } from '../../services/teacherCopilotService';
-import type { CalendarEventItem } from '../../views/AcademicTermsView';
 import { authService } from '../../services/authService';
-
-const CALENDAR_EVENTS_STORAGE_KEY = 'kp_school_calendar_events_v2';
+import {
+  calendarEventStorageService,
+  type CalendarEventItem,
+} from '../../services/calendarEventStorageService';
+import { ACADEMIC_CALENDAR_EVENT } from '../../services/academicCalendarService';
 
 export interface TaskItem {
   id: string;
@@ -65,28 +67,21 @@ export const TeacherWeeklyTasksWidget: React.FC<TeacherWeeklyTasksWidgetProps> =
   onSelectTask,
   onDeepNavigate,
 }) => {
-  // โหลดรายการกิจกรรมจาก LocalStorage
-  const [calendarEvents, setCalendarEvents] = useState<CalendarEventItem[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const raw = localStorage.getItem(CALENDAR_EVENTS_STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
-  });
+  // โหลดรายการกิจกรรมจาก Single Source of Truth จริง
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEventItem[]>(() =>
+    calendarEventStorageService.loadAllEvents()
+  );
 
   useEffect(() => {
     const handleEventsUpdate = () => {
-      try {
-        const raw = localStorage.getItem(CALENDAR_EVENTS_STORAGE_KEY);
-        if (raw) setCalendarEvents(JSON.parse(raw));
-      } catch {}
+      setCalendarEvents(calendarEventStorageService.loadAllEvents());
     };
     window.addEventListener('kps-academic-calendar-updated', handleEventsUpdate);
+    window.addEventListener(ACADEMIC_CALENDAR_EVENT, handleEventsUpdate);
     window.addEventListener('storage', handleEventsUpdate);
     return () => {
       window.removeEventListener('kps-academic-calendar-updated', handleEventsUpdate);
+      window.removeEventListener(ACADEMIC_CALENDAR_EVENT, handleEventsUpdate);
       window.removeEventListener('storage', handleEventsUpdate);
     };
   }, []);
