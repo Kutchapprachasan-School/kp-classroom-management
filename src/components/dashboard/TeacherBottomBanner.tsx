@@ -37,25 +37,24 @@ export const TeacherBottomBanner: React.FC<TeacherBottomBannerProps> = ({
 
   return (
     <div className="relative w-full rounded-2xl overflow-hidden shadow-xs border border-blue-100 group select-none transition-all">
-      <div className="relative w-full aspect-[8/1] min-h-[50px] sm:min-h-[64px] max-h-[96px] bg-gradient-to-r from-sky-50 via-blue-50 to-pink-50">
+      <div className="relative w-full aspect-[6/1] sm:aspect-[7.5/1] min-h-[75px] sm:min-h-[90px] max-h-[140px] bg-gradient-to-r from-sky-50 via-blue-50 to-pink-50">
         <img
           src={imageUrl}
           alt={banner.name}
           className="w-full h-full object-cover object-center"
         />
 
-        {banner.customUrl && (
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-900/60 via-slate-900/20 to-transparent flex flex-col justify-center px-4 sm:px-6 text-white">
-            <h3 className="text-xs sm:text-sm md:text-base font-bold drop-shadow-sm leading-tight">
-              {banner.quoteText || '“ภาษา...คือกุญแจสู่โลกกว้าง”'}
+        {/* Clean Rounded White Card with 2-line Quote */}
+        <div className="absolute inset-0 flex items-center px-4 sm:px-6">
+          <div className="bg-white/88 backdrop-blur-md rounded-2xl border border-white/90 px-3.5 sm:px-4 py-2 sm:py-2.5 shadow-2xs max-w-md">
+            <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 leading-tight">
+              {banner.quoteText || '“การเรียนรู้ไม่มีที่สิ้นสุด ร่วมสร้างอนาคตที่ดีกว่า”'}
             </h3>
-            {banner.subText && (
-              <p className="text-[10px] sm:text-xs text-blue-100 font-medium drop-shadow-2xs mt-0.5">
-                {banner.subText}
-              </p>
-            )}
+            <p className="text-[10px] sm:text-xs text-blue-700 font-medium mt-0.5 leading-snug">
+              {banner.subText || 'โรงเรียนกุดจับประชาสรรค์ • เพื่อการศึกษาที่เท่าเทียม'}
+            </p>
           </div>
-        )}
+        </div>
       </div>
 
       {isAdmin && onOpenAdminModal && (

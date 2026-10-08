@@ -205,93 +205,14 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       )}
 
       {/* ==================================================================== */}
-      {/* 1. TOP HEADER & SECONDARY ACTIONS (SMALL ICONS ONLY) */}
-      {/* ==================================================================== */}
-      <div className="bg-white rounded-3xl border border-slate-200/90 p-4 sm:p-5 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          {/* Title & Badge */}
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
-              <Edit3 className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg sm:text-xl font-extrabold text-slate-900">
-                  ตรวจงาน & ให้คะแนน (Assignment Grading)
-                </h1>
-                <span className="hidden sm:inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                  ⚡ FIFO คิวตรวจงาน
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 font-medium">
-                ศูนย์รวมผลงานที่นักเรียนส่งเข้ามา ตรวจงานและบันทึกคะแนนสะดวกรวดเร็วตามลำดับเวลา
-              </p>
-            </div>
-          </div>
-
-          {/* Secondary Actions as SMALL ICONS ONLY (ตามคำสั่ง: เอาเป็นไอคอนเล็กๆก็พอ) */}
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            {/* 1. ดูคะแนนรายชั้น Modal Trigger */}
-            <button
-              type="button"
-              onClick={() => setIsSgsMatrixOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 text-slate-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
-              title="ดูคะแนนรายชั้น และสมุด ปพ.5"
-            >
-              <FileSpreadsheet className="w-4 h-4 text-blue-600" />
-              <span className="hidden md:inline">ดูคะแนนรายชั้น</span>
-            </button>
-
-            {/* 2. ตารางการส่งงาน 3 สี Modal Trigger */}
-            <button
-              type="button"
-              onClick={() => setIs3ColorMatrixOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 hover:bg-teal-50 hover:border-teal-200 hover:text-teal-700 text-slate-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
-              title="ตารางเช็คส่งงาน 3 สี เขียว-ส้ม-แดง"
-            >
-              <CheckSquare className="w-4 h-4 text-teal-600" />
-              <span className="hidden md:inline">ตารางส่งงาน 3 สี</span>
-            </button>
-
-            {/* 3. งานรวมเฉลี่ยคะแนน Modal Trigger */}
-            <button
-              type="button"
-              onClick={() => setIsBundlesModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700 text-slate-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
-              title="ตั้งค่าหมวดหมู่งานรวมและปัดเศษทศนิยม 0.5"
-            >
-              <Layers className="w-4 h-4 text-indigo-600" />
-              <span className="hidden md:inline">งานรวมเฉลี่ย</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ==================================================================== */}
-      {/* 2. HERO BANNER: Master PageHeroBanner Design                        */}
+      {/* 1. HERO BANNER: Master PageHeroBanner Design (2-Line Strictly)       */}
       {/* ==================================================================== */}
       <PageHeroBanner
-        title="คิวตรวจงานนักเรียนรวม (FIFO)"
-        subtitle="ตรวจงานและให้คะแนนสะดวกรวดเร็ว ไม่พลาดทุกความพยายามของนักเรียน"
+        title="ตรวจงาน & ให้คะแนน (Assignment Grading)"
+        subtitle="ศูนย์รวมผลงานที่นักเรียนส่งเข้ามา ตรวจงานและบันทึกคะแนนสะดวกรวดเร็วตามลำดับเวลา"
         icon={<BookOpen className="w-6 h-6 text-white" />}
         iconBgClass="bg-blue-600 text-white"
         badgeText="FIFO Queue"
-        tagText="📝 งานทั้งหมด • รอตรวจ • ตรวจแล้ว • ส่งล่าช้า • ระบบคะแนน SGS"
-        quoteLines={[
-          'ตรวจงานตรงเวลา',
-          'สะท้อนผลการเรียนรู้',
-          'สู่การพัฒนาที่ยั่งยืน',
-        ]}
-        actions={
-          <button
-            type="button"
-            onClick={handleStartFirstPending}
-            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs sm:text-sm shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95 whitespace-nowrap"
-          >
-            <Play className="w-4 h-4 fill-white" />
-            <span>เริ่มตรวจคิวแรกทันที ({stats.pending} งานรอตรวจ)</span>
-          </button>
-        }
       />
 
       {/* ==================================================================== */}
@@ -465,6 +386,59 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
               <span>ล้างตัวกรอง</span>
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* ==================================================================== */}
+      {/* 4.5 FIFO START GRADING & SECONDARY SHORTCUTS (BEFORE TABLE)          */}
+      {/* ==================================================================== */}
+      <div className="bg-white rounded-2xl border border-blue-100 p-3 sm:p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <button
+            type="button"
+            onClick={handleStartFirstPending}
+            disabled={stats.pending === 0}
+            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-extrabold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 whitespace-nowrap"
+          >
+            <Play className="w-4 h-4 fill-white" />
+            <span>เริ่มตรวจงานทันที ({stats.pending} งานรอตรวจ)</span>
+          </button>
+          <span className="text-xs text-slate-500 font-medium">
+            เปิดตรวจผลงานแรกที่รอตรวจตามลำดับเวลา (FIFO) ให้อัตโนมัติ
+          </span>
+        </div>
+
+        {/* Secondary Actions */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setIsSgsMatrixOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 text-slate-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+            title="ดูคะแนนรายชั้น และสมุด ปพ.5"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-blue-600" />
+            <span>ดูคะแนนรายชั้น</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIs3ColorMatrixOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 hover:bg-teal-50 hover:border-teal-200 hover:text-teal-700 text-slate-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+            title="ตารางเช็คส่งงาน 3 สี เขียว-ส้ม-แดง"
+          >
+            <CheckSquare className="w-4 h-4 text-teal-600" />
+            <span>ตารางส่งงาน 3 สี</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsBundlesModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700 text-slate-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+            title="ตั้งค่าหมวดหมู่งานรวมและปัดเศษทศนิยม 0.5"
+          >
+            <Layers className="w-4 h-4 text-indigo-600" />
+            <span>งานรวมเฉลี่ย</span>
+          </button>
         </div>
       </div>
 

@@ -508,36 +508,21 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in font-sans text-slate-800 select-none">
-      {/* 1. Master PageHeroBanner */}
+      {/* 1. Master PageHeroBanner (2-Line Strictly) */}
       <PageHeroBanner
         title="ห้องเรียน / บัญชีรายชื่อนักเรียน"
         subtitle="จัดการข้อมูลนักเรียนในรายวิชาของคุณได้อย่างง่ายดาย"
         icon={<Users className="w-6 h-6 text-white" />}
         iconBgClass="bg-blue-600 text-white"
         badgeText={selectedClass?.roomNumber || 'ม.3/1'}
-        tagText="🎓 บัญชีรายชื่อนักเรียน • ตรวจสอบสถิติสะสม • Radar Chart 5 มิติ"
-        quoteLines={[
-          'ใส่ใจนักเรียนทุกคน',
-          'พัฒนาศักยภาพรอบด้าน',
-          'เติบโตอย่างมีคุณภาพ',
-        ]}
         actions={
-          <>
-            <button
-              onClick={() => setIsAddStudentOpen(true)}
-              className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-blue-900/20 transition-all cursor-pointer active:scale-95 whitespace-nowrap"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>+ เพิ่มนักเรียน</span>
-            </button>
-            <button
-              onClick={() => setIsImportModalOpen(true)}
-              className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-white hover:bg-blue-50 text-slate-800 rounded-xl text-xs sm:text-sm font-bold border border-slate-200 shadow-2xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
-            >
-              <Upload className="w-4 h-4 text-blue-600" />
-              <span>นำเข้ารายชื่อ Excel/SGS</span>
-            </button>
-          </>
+          <button
+            onClick={() => setIsAddStudentOpen(true)}
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-blue-900/20 transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>+ เพิ่มนักเรียน</span>
+          </button>
         }
       />
 

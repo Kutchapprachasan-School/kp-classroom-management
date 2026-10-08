@@ -313,8 +313,32 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
             </div>
           ) : isPdf ? (
             /* ============================================================== */
-            /* 2. MULTI-PAGE PDF DOCUMENT PREVIEW */
+            /* 2. REAL PDF EMBED OR MULTI-PAGE DOCUMENT PREVIEW             */
             /* ============================================================== */
+            url && !imgLoadError ? (
+              <div
+                className="transition-transform duration-200 origin-center max-w-4xl w-full flex items-center justify-center"
+                style={{
+                  transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
+                }}
+              >
+                {url.toLowerCase().includes('.pdf') ? (
+                  <iframe
+                    src={`${url}#toolbar=0`}
+                    title={title}
+                    onError={() => setImgLoadError(true)}
+                    className="w-full h-[74vh] rounded-2xl border border-slate-700 bg-white shadow-2xl"
+                  />
+                ) : (
+                  <img
+                    src={url}
+                    alt={fileName || 'เอกสารผลงาน PDF'}
+                    onError={() => setImgLoadError(true)}
+                    className="max-w-full max-h-[72vh] object-contain rounded-2xl shadow-2xl border border-slate-700/60 bg-slate-900"
+                  />
+                )}
+              </div>
+            ) : (
             <div
               className="transition-transform duration-200 origin-center max-w-2xl w-full"
               style={{
@@ -470,6 +494,7 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                 )}
               </div>
             </div>
+            )
           ) : (
             /* ============================================================== */
             /* 3. IMAGE PREVIEW (JPG, PNG, WEBP) */

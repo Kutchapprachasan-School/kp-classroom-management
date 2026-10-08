@@ -225,19 +225,19 @@ export const App: React.FC = () => {
       case 'admin-dashboard':
         return `แดชบอร์ดผู้บริหาร • ${schoolSettings.nameTh}`;
       case 'class-overview':
-        return 'ศ23101 ศิลปะ';
+        return 'คะแนนนักเรียน (ปพ.5)';
       case 'morning-assembly':
         return 'เช็คแถวเช้า (Morning Assembly)';
       case 'classroom-attendance':
         return 'เช็คชื่อเข้าเรียน (Classroom Attendance)';
       case 'exams':
-        return 'จัดการการสอบ (Exam Management)';
+        return 'จัดการสอบ/เก็บคะแนน';
       case 'assignments':
-        return 'สั่งงาน / R2';
+        return 'ตรวจงาน';
       case 'readiness':
         return 'ส่งเกรด SGS';
       case 'sar':
-        return 'รายงาน SAR';
+        return 'สรุปผลการเรียน';
       case 'home-visit':
         return 'เยี่ยมบ้าน นร.01';
       case 'student-affairs':
@@ -245,9 +245,9 @@ export const App: React.FC = () => {
       case 'student-council':
         return 'สภานักเรียน';
       case 'courses':
-        return 'รายวิชา / สื่อการสอน';
+        return 'หลักสูตร/แผนการสอน';
       case 'lessons':
-        return 'แผนการสอน / จัดการแผนการสอน';
+        return 'หลักสูตร/แผนการสอน';
       case 'roster':
         return 'รายชื่อนักเรียน';
       case 'student':
@@ -409,7 +409,7 @@ export const App: React.FC = () => {
                 { key: 'school-login', label: 'หน้า Login', icon: LogIn },
                 { key: 'admin-dashboard', label: '★ Dashboard ผู้บริหาร', icon: LayoutDashboard },
                 { key: 'home', label: '1. หน้าหลักครู', icon: Home },
-                { key: 'class-overview', label: '2. ชั้นเรียนของฉัน', icon: Users },
+                { key: 'class-overview', label: '2. คะแนนนักเรียน (ปพ.5)', icon: Users },
                 { key: 'home-visit', label: '3. เยี่ยมบ้าน นร.01 (CCT)', icon: HeartHandshake },
                 { key: 'student-affairs', label: '4. กิจการนักเรียน & ใบลา', icon: ShieldAlert },
                 { key: 'student-council', label: '5. สภานักเรียน E-Voting', icon: Vote },
@@ -417,8 +417,8 @@ export const App: React.FC = () => {
                 { key: 'student', label: '7. วิเคราะห์รายคน', icon: UserCheck },
                 { key: 'sar', label: '8. เทียบผลข้ามห้อง (SAR)', icon: FileSpreadsheet },
                 { key: 'timetable', label: '9. ตารางสอน/วันนี้', icon: CalendarDays },
-                { key: 'lessons', label: 'แผนการสอน/สื่อ', icon: Folder },
-                { key: 'exams', label: '10. สอบ/งาน', icon: PenTool },
+                { key: 'courses', label: 'หลักสูตร/แผนการสอน', icon: Folder },
+                { key: 'exams', label: '10. จัดการสอบ/เก็บคะแนน', icon: PenTool },
                 { key: 'student-portal', label: '11. พอร์ทัลนักเรียน', icon: GraduationCap },
               ].map((item) => {
                 const IconComp = item.icon;
@@ -640,7 +640,10 @@ export const App: React.FC = () => {
               )}
 
               {currentView === 'student' && (
-                <StudentDetailView onOpenHomeVisit={() => setCurrentView('home-visit')} />
+                <StudentDetailView
+                  onOpenHomeVisit={() => setCurrentView('home-visit')}
+                  onBack={() => setCurrentView('roster')}
+                />
               )}
 
               {currentView === 'timetable' && (

@@ -355,17 +355,17 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
   const isSelectedDateToday = selectedDate === DEFAULT_TODAY;
 
   return (
-    <div className="space-y-4 max-w-7xl mx-auto pb-24 font-sans select-none animate-fade-in text-slate-800">
+    <div className="space-y-4 max-w-7xl mx-auto pb-28 lg:pb-12 font-sans select-none animate-fade-in text-slate-800">
       {/* Toast Alert */}
       {toastMessage && (
-        <div className="fixed bottom-20 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 text-xs font-bold animate-bounce border border-slate-700">
+        <div className="fixed bottom-24 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 text-xs font-bold animate-bounce border border-slate-700">
           <Sparkles className="w-4 h-4 text-emerald-400" />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* ========================================================
-          1. TOP HERO BANNER (ขนาดกะทัดรัด ไม่ยาวเกินไป)
+          1. TOP HERO BANNER (2 บรรทัด กระชับ ชัดเจน)
           ======================================================== */}
       <PageHeroBanner
         title="เช็คแถวเช้า (Morning Assembly)"
@@ -373,7 +373,6 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
         icon={<UserCheck className="w-6 h-6 text-white" />}
         iconBgClass="bg-blue-600 text-white"
         badgeText="โฮมรูม"
-        tagText="☀️ หน้าเสาธง 07:45 - 08:15 • ห้อง ม.3/1"
       />
 
       {/* ========================================================
@@ -569,6 +568,7 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
             <option value="LATE">สาย</option>
             <option value="ABSENT">ขาด</option>
             <option value="LEAVE">ลา</option>
+            <option value="ACTIVITY">กิจกรรม</option>
           </select>
         </div>
       </div>
@@ -820,15 +820,15 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
                           </button>
                         </td>
 
-                        {/* Status Buttons: มา, สาย, ขาด, ลา */}
+                        {/* Status Buttons: มา, สาย, ขาด, ลา, กิจกรรม */}
                         <td className="py-3 px-4 text-center">
                           <div className="inline-flex items-center gap-1 font-bold">
-                            {(['PRESENT', 'LATE', 'ABSENT', 'LEAVE'] as const).map((st) => (
+                            {(['PRESENT', 'LATE', 'ABSENT', 'LEAVE', 'ACTIVITY'] as const).map((st) => (
                               <button
                                 key={st}
                                 type="button"
                                 onClick={() => handleStatusChange(record.studentCode, st)}
-                                className={`px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer font-bold ${
+                                className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer font-bold ${
                                   record.status === st
                                     ? st === 'PRESENT'
                                       ? 'bg-emerald-600 text-white shadow-xs scale-102'
@@ -836,11 +836,13 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
                                       ? 'bg-amber-500 text-white shadow-xs scale-102'
                                       : st === 'ABSENT'
                                       ? 'bg-rose-600 text-white shadow-xs scale-102'
-                                      : 'bg-purple-600 text-white shadow-xs scale-102'
+                                      : st === 'LEAVE'
+                                      ? 'bg-purple-600 text-white shadow-xs scale-102'
+                                      : 'bg-indigo-600 text-white shadow-xs scale-102'
                                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                 }`}
                               >
-                                {st === 'PRESENT' ? 'มา' : st === 'LATE' ? 'สาย' : st === 'ABSENT' ? 'ขาด' : 'ลา'}
+                                {st === 'PRESENT' ? 'มา' : st === 'LATE' ? 'สาย' : st === 'ABSENT' ? 'ขาด' : st === 'LEAVE' ? 'ลา' : 'กิจกรรม'}
                               </button>
                             ))}
                           </div>
@@ -887,8 +889,8 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-1.5 pt-2 text-xs font-bold">
-                    {(['PRESENT', 'LATE', 'ABSENT', 'LEAVE'] as const).map((st) => (
+                  <div className="grid grid-cols-5 gap-1 pt-2 text-[11px] font-bold">
+                    {(['PRESENT', 'LATE', 'ABSENT', 'LEAVE', 'ACTIVITY'] as const).map((st) => (
                       <button
                         key={st}
                         type="button"
@@ -901,11 +903,13 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
                               ? 'bg-amber-500 text-white shadow-xs'
                               : st === 'ABSENT'
                               ? 'bg-rose-600 text-white shadow-xs'
-                              : 'bg-purple-600 text-white shadow-xs'
+                              : st === 'LEAVE'
+                              ? 'bg-purple-600 text-white shadow-xs'
+                              : 'bg-indigo-600 text-white shadow-xs'
                             : 'bg-slate-100 text-slate-600'
                         }`}
                       >
-                        {st === 'PRESENT' ? 'มา' : st === 'LATE' ? 'สาย' : st === 'ABSENT' ? 'ขาด' : 'ลา'}
+                        {st === 'PRESENT' ? 'มา' : st === 'LATE' ? 'สาย' : st === 'ABSENT' ? 'ขาด' : st === 'LEAVE' ? 'ลา' : 'กิจกรรม'}
                       </button>
                     ))}
                   </div>
@@ -913,8 +917,8 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
               ))}
             </div>
 
-            {/* Bottom Sticky Action Bar: บันทึกผลการเช็คแถว */}
-            <div className="sticky bottom-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 p-3.5 sm:p-4 flex items-center justify-between shadow-lg">
+            {/* Bottom Sticky Action Bar: บันทึกผลการเช็คแถว (Elevated above mobile nav bar) */}
+            <div className="sticky bottom-[60px] lg:bottom-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 p-3.5 sm:p-4 flex items-center justify-between shadow-lg">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                 <span>

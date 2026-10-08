@@ -20,6 +20,7 @@ import {
   Sparkles,
   UserCheck,
   ClipboardCheck,
+  Award,
 } from 'lucide-react';
 import {
   getSchoolSettings,
@@ -160,10 +161,15 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     },
     {
       key: 'assignments',
-      label: 'ภาระงาน / สอน',
+      label: 'ตรวจงาน',
       icon: BookOpen,
       badge: '3',
       badgeStyle: 'bg-rose-500 text-white font-extrabold',
+    },
+    {
+      key: 'class-overview',
+      label: 'คะแนนนักเรียน (ปพ.5)',
+      icon: Award,
     },
     {
       key: 'roster',
@@ -177,12 +183,12 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     },
     {
       key: 'courses',
-      label: 'สื่อการสอน / ไฟล์',
+      label: 'หลักสูตร/แผนการสอน',
       icon: Folder,
     },
     {
       key: 'exams',
-      label: 'ประเมิน / แบบฟอร์ม',
+      label: 'จัดการสอบ/เก็บคะแนน',
       icon: ClipboardList,
     },
     {
@@ -198,11 +204,6 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       icon: MessageSquare,
       badge: '5',
       badgeStyle: 'bg-blue-500 text-white font-extrabold',
-    },
-    {
-      key: 'lessons',
-      label: 'แผนการสอน',
-      icon: Folder,
     },
     ...(activeRole === 'STUDENT_AFFAIRS'
       ? [

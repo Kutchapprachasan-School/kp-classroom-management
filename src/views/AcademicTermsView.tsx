@@ -601,6 +601,8 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
   const [roleFilter, setRoleFilter] = useState<'TEACHER' | 'STUDENT'>('TEACHER');
   const [viewMode, setViewMode] = useState<'MONTH' | 'WEEK' | 'DAY'>('MONTH');
   const [selectedMonthOffset, setSelectedMonthOffset] = useState<number>(0); // -1 = ก.ย., 0 = ต.ค., 1 = พ.ย.
+  const [selectedDayNumber, setSelectedDayNumber] = useState<number>(2); // Default 2 ต.ค. (วันนี้)
+  const [selectedWeekIndex, setSelectedWeekIndex] = useState<number>(0); // Default week 0 (contains 2 ต.ค.)
 
   const [events, setEvents] = useState<CalendarEventItem[]>(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -781,13 +783,53 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
 
   // Calendar Days Setup (ตุลาคม 2569: เริ่มต้นวันพุธที่ 1 ต.ค., 31 วัน)
   // Grid 5 แถว x 7 วัน = 35 ช่อง (28-30 ก.ย. และ 1 พ.ย.)
-  const calendarCells = [
-    { day: 28, isCurrentMonth: false },
-    { day: 29, isCurrentMonth: false },
-    { day: 30, isCurrentMonth: false },
-    ...Array.from({ length: 31 }, (_, i) => ({ day: i + 1, isCurrentMonth: true })),
-    { day: 1, isCurrentMonth: false },
-  ];
+  const calendarCells = useMemo(
+    () => [
+      { day: 28, isCurrentMonth: false },
+      { day: 29, isCurrentMonth: false },
+      { day: 30, isCurrentMonth: false },
+      ...Array.from({ length: 31 }, (_, i) => ({ day: i + 1, isCurrentMonth: true })),
+      { day: 1, isCurrentMonth: false },
+    ],
+    []
+  );
+
+  // Week days for Week View
+  const weekDays = useMemo(() => {
+    const startIdx = selectedWeekIndex * 7;
+    return calendarCells.slice(startIdx, startIdx + 7);
+  }, [selectedWeekIndex, calendarCells]);
+
+  const weekRangeLabel = useMemo(() => {
+    if (weekDays.length < 7) return '';
+    const first = weekDays[0];
+    const last = weekDays[6];
+    const m1 = first.isCurrentMonth ? 'ต.ค.' : selectedWeekIndex === 0 ? 'ก.ย.' : 'ต.ค.';
+    const m2 = last.isCurrentMonth ? 'ต.ค.' : selectedWeekIndex === 4 ? 'พ.ย.' : 'ต.ค.';
+    return `${first.day} ${m1} – ${last.day} ${m2} 2569`;
+  }, [weekDays, selectedWeekIndex]);
+
+  // Day events for Day View
+  const currentDayEvents = useMemo(() => {
+    return allEvents.filter((ev) => {
+      if (roleFilter === 'TEACHER' && ev.targetRole === 'STUDENT') return false;
+      if (roleFilter === 'STUDENT' && ev.targetRole === 'TEACHER') return false;
+      if (ev.endDay && ev.endDay >= ev.day) {
+        return selectedDayNumber >= ev.day && selectedDayNumber <= ev.endDay;
+      }
+      return ev.day === selectedDayNumber;
+    });
+  }, [allEvents, selectedDayNumber, roleFilter]);
+
+  const currentDayHoliday = useMemo(() => {
+    return currentDayEvents.find(
+      (e) =>
+        e.id.startsWith('holiday-') ||
+        e.title.includes('วันหยุด') ||
+        e.location?.includes('วันหยุด') ||
+        (e.category === 'OTHER' && e.title.includes('วันหยุด'))
+    );
+  }, [currentDayEvents]);
 
   const handleAddEventSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1059,123 +1101,530 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
           </div>
         </div>
 
-        {/* Calendar Grid Container (Seamless Matrix Table) */}
-        <div className="border border-slate-200/90 rounded-2xl overflow-hidden bg-white">
-          <div className="overflow-x-auto">
-            <div className="min-w-[700px] lg:min-w-0">
-              {/* 7 Columns Header Row */}
-              <div className="grid grid-cols-7 border-b border-slate-200 divide-x divide-slate-100 text-center font-bold text-xs sm:text-sm">
-                <div className="py-2.5 text-slate-700 bg-slate-50/40">อาทิตย์</div>
-                <div className="py-2.5 text-slate-700 bg-slate-50/40">จันทร์</div>
-                <div className="py-2.5 text-slate-700 bg-slate-50/40">อังคาร</div>
-                <div className="py-2.5 text-slate-700 bg-slate-50/40">พุธ</div>
-                <div className="py-2.5 text-blue-700 bg-blue-50/60 font-extrabold border-x border-blue-100/70">
-                  พฤหัสบดี
+        {/* Calendar View Modes: MONTH vs WEEK vs DAY */}
+        {viewMode === 'MONTH' && (
+          <div className="border border-slate-200/90 rounded-2xl overflow-hidden bg-white">
+            <div className="overflow-x-auto">
+              <div className="min-w-[700px] lg:min-w-0">
+                {/* 7 Columns Header Row */}
+                <div className="grid grid-cols-7 border-b border-slate-200 divide-x divide-slate-100 text-center font-bold text-xs sm:text-sm">
+                  <div className="py-2.5 text-rose-700 bg-rose-50/50">อาทิตย์</div>
+                  <div className="py-2.5 text-slate-700 bg-slate-50/40">จันทร์</div>
+                  <div className="py-2.5 text-slate-700 bg-slate-50/40">อังคาร</div>
+                  <div className="py-2.5 text-slate-700 bg-slate-50/40">พุธ</div>
+                  <div className="py-2.5 text-blue-700 bg-blue-50/60 font-extrabold border-x border-blue-100/70">
+                    พฤหัสบดี
+                  </div>
+                  <div className="py-2.5 text-slate-700 bg-slate-50/40">ศุกร์</div>
+                  <div className="py-2.5 text-rose-700 bg-rose-50/50">เสาร์</div>
                 </div>
-                <div className="py-2.5 text-slate-700 bg-slate-50/40">ศุกร์</div>
-                <div className="py-2.5 text-slate-700 bg-slate-50/40">เสาร์</div>
-              </div>
 
-              {/* 35 Calendar Cells Grid (5 Rows x 7 Columns) */}
-              <div className="grid grid-cols-7 divide-x divide-slate-100">
-                {calendarCells.map((cell, idx) => {
-                  const isCurrentMonth = cell.isCurrentMonth;
-                  const dayNumber = cell.day;
-                  const colIndex = idx % 7;
-                  const isThursday = colIndex === 4;
-                  const isToday = isCurrentMonth && dayNumber === 2;
-                  const isLastRow = idx >= 28;
-                  const dayEvents = isCurrentMonth
-                    ? allEvents.filter((e) => {
-                        if (roleFilter === 'TEACHER' && e.targetRole === 'STUDENT') return false;
-                        if (roleFilter === 'STUDENT' && e.targetRole === 'TEACHER') return false;
-                        if (e.endDay && e.endDay >= e.day) {
-                          return dayNumber >= e.day && dayNumber <= e.endDay;
-                        }
-                        return e.day === dayNumber;
-                      })
-                    : [];
+                {/* 35 Calendar Cells Grid (5 Rows x 7 Columns) */}
+                <div className="grid grid-cols-7 divide-x divide-slate-100">
+                  {calendarCells.map((cell, idx) => {
+                    const isCurrentMonth = cell.isCurrentMonth;
+                    const dayNumber = cell.day;
+                    const colIndex = idx % 7;
+                    const isThursday = colIndex === 4;
+                    const isToday = isCurrentMonth && dayNumber === 2;
+                    const isLastRow = idx >= 28;
+                    const dayEvents = isCurrentMonth
+                      ? allEvents.filter((e) => {
+                          if (roleFilter === 'TEACHER' && e.targetRole === 'STUDENT') return false;
+                          if (roleFilter === 'STUDENT' && e.targetRole === 'TEACHER') return false;
+                          if (e.endDay && e.endDay >= e.day) {
+                            return dayNumber >= e.day && dayNumber <= e.endDay;
+                          }
+                          return e.day === dayNumber;
+                        })
+                      : [];
 
-                  return (
-                    <div
-                      key={`${dayNumber}-${idx}`}
-                      className={`group relative min-h-[115px] sm:min-h-[125px] p-2 flex flex-col justify-start transition-colors ${
-                        !isLastRow ? 'border-b border-slate-100' : ''
-                      } ${isThursday ? 'bg-blue-50/20' : 'bg-white'}`}
-                    >
-                      {/* Top row: Day Number & Quick Add Button */}
-                      <div className="flex items-center justify-between mb-1.5 h-6">
-                        {isToday ? (
-                          <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
-                            {dayNumber}
-                          </span>
-                        ) : (
-                          <span
-                            className={`text-xs sm:text-sm font-semibold pl-1 ${
-                              isCurrentMonth ? 'text-slate-700' : 'text-slate-300 font-medium'
-                            }`}
-                          >
-                            {dayNumber}
-                          </span>
-                        )}
+                    const isWeekend = colIndex === 0 || colIndex === 6;
+                    const hasHolidayEvent = dayEvents.some(
+                      (e) =>
+                        e.id.startsWith('holiday-') ||
+                        e.title.includes('วันหยุด') ||
+                        e.location?.includes('วันหยุด') ||
+                        (e.category === 'OTHER' && e.title.includes('วันหยุด'))
+                    );
 
-                        {/* Quick Add '+' Button on hover */}
-                        {isCurrentMonth && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openAddEventForDay(dayNumber);
-                            }}
-                            className="opacity-0 group-hover:opacity-100 p-1 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-600 transition-all cursor-pointer"
-                            title={`เพิ่มกิจกรรมวันที่ ${dayNumber} ต.ค. 2569`}
-                          >
-                            <AddRegular className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
+                    // Holiday Tinting: ถ้าเป็นวันหยุดให้ทำเป็นสีแดงทั้งช่องเลย จะได้ดูง่าย
+                    const cellBgClass = hasHolidayEvent
+                      ? 'bg-rose-50/90 border border-rose-200/90 hover:bg-rose-100/70'
+                      : isWeekend
+                      ? 'bg-rose-50/30 hover:bg-rose-50/60'
+                      : isThursday
+                      ? 'bg-blue-50/20 hover:bg-blue-50/40'
+                      : 'bg-white hover:bg-slate-50/60';
 
-                      {/* Event Pills */}
-                      <div className="space-y-1.5 w-full">
-                        {dayEvents.map((ev) => {
-                          const IconComp = getMingCuteEventIcon(ev);
-                          const pillStyle = getPillStyle(ev.colorType);
-                          const iconColor = getPillIconColor(ev.colorType);
-
-                          // กฎ: ถ้าเป็นกิจกรรมตลอดทั้งวัน (isAllDay หรือ time === 'ตลอดทั้งวัน') ไม่ต้องใส่คำว่าตลอดทั้งวันในช่องปฏิทิน
-                          const isAllDayEvent = ev.isAllDay === true || ev.time === 'ตลอดทั้งวัน';
-                          const showTimeInPill =
-                            !isAllDayEvent &&
-                            ev.time &&
-                            ev.time.trim() !== '' &&
-                            ev.time !== 'ตลอดทั้งวัน';
-
-                          return (
-                            <button
-                              key={ev.id}
-                              type="button"
-                              onClick={() => setSelectedEvent(ev)}
-                              className={`w-full text-left px-2 py-1 rounded-md text-[10px] sm:text-[11px] font-medium transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${pillStyle}`}
-                              title={`${showTimeInPill ? ev.time + ' ' : ''}${ev.title}`}
-                            >
-                              <IconComp className={`w-3.5 h-3.5 shrink-0 ${iconColor}`} />
-                              <span className="truncate">
-                                {showTimeInPill && (
-                                  <span className="font-mono mr-1">{ev.time}</span>
-                                )}
-                                {ev.title}
+                    return (
+                      <div
+                        key={`${dayNumber}-${idx}`}
+                        onClick={() => {
+                          if (isCurrentMonth) {
+                            setSelectedDayNumber(dayNumber);
+                            setSelectedWeekIndex(Math.floor(idx / 7));
+                          }
+                        }}
+                        className={`group relative min-h-[115px] sm:min-h-[125px] p-2 flex flex-col justify-start transition-colors cursor-pointer ${
+                          !isLastRow ? 'border-b border-slate-100' : ''
+                        } ${cellBgClass}`}
+                      >
+                        {/* Top row: Day Number & Quick Add Button */}
+                        <div className="flex items-center justify-between mb-1.5 h-6">
+                          {isToday ? (
+                            <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                              {dayNumber}
+                            </span>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <span
+                                className={`text-xs sm:text-sm font-semibold pl-1 ${
+                                  hasHolidayEvent
+                                    ? 'text-rose-700 font-extrabold'
+                                    : isWeekend
+                                    ? 'text-rose-600/80 font-bold'
+                                    : isCurrentMonth
+                                    ? 'text-slate-700'
+                                    : 'text-slate-300 font-medium'
+                                }`}
+                              >
+                                {dayNumber}
                               </span>
+                              {hasHolidayEvent && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500 text-white shadow-2xs">
+                                  วันหยุด
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Quick Add '+' Button on hover */}
+                          {isCurrentMonth && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openAddEventForDay(dayNumber);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 p-1 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-600 transition-all cursor-pointer"
+                              title={`เพิ่มกิจกรรมวันที่ ${dayNumber} ต.ค. 2569`}
+                            >
+                              <AddRegular className="w-3.5 h-3.5" />
                             </button>
-                          );
-                        })}
+                          )}
+                        </div>
+
+                        {/* Event Pills */}
+                        <div className="space-y-1.5 w-full">
+                          {dayEvents.map((ev) => {
+                            const IconComp = getMingCuteEventIcon(ev);
+                            const pillStyle = getPillStyle(ev.colorType);
+                            const iconColor = getPillIconColor(ev.colorType);
+
+                            // กฎ: ถ้าเป็นกิจกรรมตลอดทั้งวัน (isAllDay หรือ time === 'ตลอดทั้งวัน') ไม่ต้องใส่คำว่าตลอดทั้งวันในช่องปฏิทิน
+                            const isAllDayEvent = ev.isAllDay === true || ev.time === 'ตลอดทั้งวัน';
+                            const showTimeInPill =
+                              !isAllDayEvent &&
+                              ev.time &&
+                              ev.time.trim() !== '' &&
+                              ev.time !== 'ตลอดทั้งวัน';
+
+                            return (
+                              <button
+                                key={ev.id}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedEvent(ev);
+                                }}
+                                className={`w-full text-left px-2 py-1 rounded-md text-[10px] sm:text-[11px] font-medium transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${pillStyle}`}
+                                title={`${showTimeInPill ? ev.time + ' ' : ''}${ev.title}`}
+                              >
+                                <IconComp className={`w-3.5 h-3.5 shrink-0 ${iconColor}`} />
+                                <span className="truncate">
+                                  {showTimeInPill && (
+                                    <span className="font-mono mr-1">{ev.time}</span>
+                                  )}
+                                  {ev.title}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* WEEK VIEW: 7 Day Columns */}
+        {viewMode === 'WEEK' && (
+          <div className="border border-slate-200/90 rounded-2xl overflow-hidden bg-white p-4 sm:p-5 space-y-4">
+            {/* Week Navigation Header */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={selectedWeekIndex <= 0}
+                  onClick={() => setSelectedWeekIndex((prev) => Math.max(0, prev - 1))}
+                  className="w-8 h-8 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-blue-600 transition-colors cursor-pointer"
+                  title="สัปดาห์ก่อนหน้า"
+                >
+                  <LeftSmallRegular className="w-4 h-4 text-blue-600" />
+                </button>
+                <span className="font-black text-sm sm:text-base text-slate-800">
+                  สัปดาห์ที่ {selectedWeekIndex + 1} ({weekRangeLabel})
+                </span>
+                <button
+                  type="button"
+                  disabled={selectedWeekIndex >= 4}
+                  onClick={() => setSelectedWeekIndex((prev) => Math.min(4, prev + 1))}
+                  className="w-8 h-8 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-blue-600 transition-colors cursor-pointer"
+                  title="สัปดาห์ถัดไป"
+                >
+                  <RightSmallRegular className="w-4 h-4 text-blue-600" />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500 font-medium">มุมมองสัปดาห์</span>
+                <button
+                  type="button"
+                  onClick={() => handleOpenCreateModal(2)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  <AddRegular className="w-3.5 h-3.5" />
+                  <span>เพิ่มกิจกรรม</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 7 Columns Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+              {weekDays.map((cell, colIdx) => {
+                const dayNumber = cell.day;
+                const isCurrentMonth = cell.isCurrentMonth;
+                const isToday = isCurrentMonth && dayNumber === 2;
+                const dayName = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'][colIdx];
+
+                const dayEvents = isCurrentMonth
+                  ? allEvents.filter((e) => {
+                      if (roleFilter === 'TEACHER' && e.targetRole === 'STUDENT') return false;
+                      if (roleFilter === 'STUDENT' && e.targetRole === 'TEACHER') return false;
+                      if (e.endDay && e.endDay >= e.day) {
+                        return dayNumber >= e.day && dayNumber <= e.endDay;
+                      }
+                      return e.day === dayNumber;
+                    })
+                  : [];
+
+                const isWeekend = colIdx === 0 || colIdx === 6;
+                const hasHolidayEvent = dayEvents.some(
+                  (e) =>
+                    e.id.startsWith('holiday-') ||
+                    e.title.includes('วันหยุด') ||
+                    e.location?.includes('วันหยุด') ||
+                    (e.category === 'OTHER' && e.title.includes('วันหยุด'))
+                );
+
+                return (
+                  <div
+                    key={`week-${dayNumber}-${colIdx}`}
+                    className={`rounded-xl border p-2.5 flex flex-col justify-between min-h-[220px] transition-all ${
+                      hasHolidayEvent
+                        ? 'bg-rose-50/90 border-rose-200'
+                        : isWeekend
+                        ? 'bg-rose-50/30 border-rose-100'
+                        : isToday
+                        ? 'bg-blue-50/30 border-blue-200 ring-2 ring-blue-400/40'
+                        : 'bg-slate-50/50 border-slate-200'
+                    }`}
+                  >
+                    {/* Header */}
+                    <div>
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-200/80 mb-2">
+                        <div className="flex items-center gap-1.5">
+                          {isToday ? (
+                            <span className="w-5 h-5 rounded-full bg-blue-600 text-white font-bold text-[11px] flex items-center justify-center">
+                              {dayNumber}
+                            </span>
+                          ) : (
+                            <span
+                              className={`text-xs font-bold ${
+                                hasHolidayEvent || isWeekend ? 'text-rose-700' : 'text-slate-800'
+                              }`}
+                            >
+                              {dayNumber}
+                            </span>
+                          )}
+                          <span className="text-[11px] text-slate-500 font-medium">{dayName}</span>
+                        </div>
+                        {hasHolidayEvent && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500 text-white">
+                            วันหยุด
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Events List */}
+                      <div className="space-y-1.5">
+                        {dayEvents.length === 0 ? (
+                          <div className="text-center py-6 text-[11px] text-slate-400">
+                            ไม่มีกิจกรรม
+                          </div>
+                        ) : (
+                          dayEvents.map((ev) => {
+                            const IconComp = getMingCuteEventIcon(ev);
+                            const pillStyle = getPillStyle(ev.colorType);
+                            const iconColor = getPillIconColor(ev.colorType);
+
+                            return (
+                              <button
+                                key={ev.id}
+                                type="button"
+                                onClick={() => setSelectedEvent(ev)}
+                                className={`w-full text-left p-2 rounded-lg text-xs font-medium transition-all cursor-pointer flex flex-col gap-1 shadow-2xs ${pillStyle}`}
+                              >
+                                <div className="flex items-center gap-1.5 font-bold">
+                                  <IconComp className={`w-3.5 h-3.5 shrink-0 ${iconColor}`} />
+                                  <span className="truncate">{ev.title}</span>
+                                </div>
+                                {ev.time && ev.time !== 'ตลอดทั้งวัน' && (
+                                  <span className="text-[10px] text-slate-500">
+                                    ⏰ {ev.time} น.
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Bottom Add Action */}
+                    {isCurrentMonth && (
+                      <button
+                        type="button"
+                        onClick={() => openAddEventForDay(dayNumber)}
+                        className="mt-2 w-full py-1 text-center rounded-md border border-dashed border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-[11px] font-bold text-slate-500 hover:text-blue-600 transition-colors cursor-pointer"
+                      >
+                        + เพิ่มกิจกรรม
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* DAY VIEW: Daily Agenda Timeline */}
+        {viewMode === 'DAY' && (
+          <div className="border border-slate-200/90 rounded-2xl overflow-hidden bg-white p-4 sm:p-5 space-y-5">
+            {/* Day Navigation Header */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={selectedDayNumber <= 1}
+                  onClick={() => setSelectedDayNumber((prev) => Math.max(1, prev - 1))}
+                  className="w-8 h-8 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-blue-600 transition-colors cursor-pointer"
+                  title="วันก่อนหน้า"
+                >
+                  <LeftSmallRegular className="w-4 h-4 text-blue-600" />
+                </button>
+                <div className="flex items-center gap-2">
+                  <span className="font-black text-base sm:text-lg text-slate-900">
+                    วัน{getThaiDayOfWeekName(selectedDayNumber)}ที่ {selectedDayNumber} ตุลาคม 2569
+                  </span>
+                  {selectedDayNumber === 2 && (
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-blue-600 text-white shadow-2xs">
+                      วันนี้
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  disabled={selectedDayNumber >= 31}
+                  onClick={() => setSelectedDayNumber((prev) => Math.min(31, prev + 1))}
+                  className="w-8 h-8 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-blue-600 transition-colors cursor-pointer"
+                  title="วันถัดไป"
+                >
+                  <RightSmallRegular className="w-4 h-4 text-blue-600" />
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleOpenCreateModal(selectedDayNumber)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-2xs transition-colors cursor-pointer"
+              >
+                <AddRegular className="w-4 h-4" />
+                <span>+ เพิ่มกิจกรรมวันนี้</span>
+              </button>
+            </div>
+
+            {/* Holiday Alert Banner (if holiday) */}
+            {currentDayHoliday && (
+              <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-center gap-3 text-rose-900">
+                <div className="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center text-rose-600 shrink-0">
+                  <UmbrellaRegular className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="font-extrabold text-sm text-rose-900">
+                    {currentDayHoliday.title}
+                  </div>
+                  <div className="text-xs text-rose-700">
+                    {currentDayHoliday.location || 'วันหยุดตามปฏิทินโรงเรียน • ไม่มีการเรียนการสอนในวันนี้'}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Daily Schedule & Events Timeline */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              {/* Left Column: Events for Today (7 cols) */}
+              <div className="lg:col-span-7 space-y-3">
+                <h4 className="font-extrabold text-sm text-slate-800 flex items-center gap-2">
+                  <SparklesRegular className="w-4 h-4 text-blue-600" />
+                  <span>กิจกรรมและกำหนดการ ({currentDayEvents.length} รายการ)</span>
+                </h4>
+
+                {currentDayEvents.length === 0 ? (
+                  <div className="text-center py-10 px-4 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                    <CalendarDayRegular className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                    <p className="text-xs font-semibold text-slate-600">ไม่มีกิจกรรมพิเศษสำหรับวันนี้</p>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenCreateModal(selectedDayNumber)}
+                      className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800"
+                    >
+                      <AddRegular className="w-4 h-4" />
+                      <span>สร้างกิจกรรมใหม่</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {currentDayEvents.map((ev) => {
+                      const IconComp = getMingCuteEventIcon(ev);
+                      const pillStyle = getPillStyle(ev.colorType);
+                      const iconColor = getPillIconColor(ev.colorType);
+
+                      return (
+                        <div
+                          key={ev.id}
+                          className={`p-3.5 rounded-xl border transition-all ${pillStyle}`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-2.5">
+                              <div className="p-2 rounded-lg bg-white/80 shadow-2xs">
+                                <IconComp className={`w-5 h-5 ${iconColor}`} />
+                              </div>
+                              <div>
+                                <h5 className="font-extrabold text-sm text-slate-900">
+                                  {ev.title}
+                                </h5>
+                                <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-600">
+                                  {ev.time && (
+                                    <span className="flex items-center gap-1">
+                                      <TimeRegular className="w-3.5 h-3.5 text-slate-400" />
+                                      <span>{ev.time} น.</span>
+                                    </span>
+                                  )}
+                                  {ev.location && (
+                                    <span className="flex items-center gap-1">
+                                      <LocationRegular className="w-3.5 h-3.5 text-slate-400" />
+                                      <span>{ev.location}</span>
+                                    </span>
+                                  )}
+                                </div>
+                                {ev.description && (
+                                  <p className="text-xs text-slate-600 mt-1.5">
+                                    {ev.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleStartEditEvent(ev)}
+                                className="p-1.5 rounded-lg hover:bg-white/80 text-slate-600 hover:text-blue-600 transition-colors cursor-pointer"
+                                title="แก้ไข"
+                              >
+                                <Edit2Regular className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteEvent(ev.id)}
+                                className="p-1.5 rounded-lg hover:bg-white/80 text-slate-600 hover:text-rose-600 transition-colors cursor-pointer"
+                                title="ลบ"
+                              >
+                                <Delete2Regular className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Right Column: Standard Bell Schedule Overview (5 cols) */}
+              <div className="lg:col-span-5 bg-slate-50/70 rounded-xl p-4 border border-slate-200/80 space-y-3">
+                <h4 className="font-extrabold text-xs text-slate-700 flex items-center gap-1.5">
+                  <TimeRegular className="w-4 h-4 text-blue-600" />
+                  <span>โครงสร้างเวลาเรียนประจำวัน</span>
+                </h4>
+
+                <div className="space-y-1.5 text-xs text-slate-600 font-sans">
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-100">
+                    <span className="font-semibold text-blue-700">07:45 - 08:15</span>
+                    <span className="font-bold text-slate-800">เช็คแถวหน้าเสาธง & โฮมรูม</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-100">
+                    <span className="font-semibold text-slate-500">08:30 - 09:20</span>
+                    <span className="text-slate-700">คาบเรียนที่ 1</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-100">
+                    <span className="font-semibold text-slate-500">09:20 - 10:10</span>
+                    <span className="text-slate-700">คาบเรียนที่ 2</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-100">
+                    <span className="font-semibold text-slate-500">10:20 - 11:10</span>
+                    <span className="text-slate-700">คาบเรียนที่ 3</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-100">
+                    <span className="font-semibold text-slate-500">11:10 - 12:00</span>
+                    <span className="text-slate-700">คาบเรียนที่ 4</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-amber-50/70 border border-amber-100 text-amber-800 font-bold">
+                    <span>12:00 - 13:00</span>
+                    <span>พักรับประทานอาหารกลางวัน</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-100">
+                    <span className="font-semibold text-slate-500">13:00 - 13:50</span>
+                    <span className="text-slate-700">คาบเรียนที่ 5</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-100">
+                    <span className="font-semibold text-slate-500">13:50 - 14:40</span>
+                    <span className="text-slate-700">คาบเรียนที่ 6</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-100">
+                    <span className="font-semibold text-slate-500">14:50 - 15:40</span>
+                    <span className="text-slate-700">คาบเรียนที่ 7</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Bottom Legend Bar & Add Activity Button */}
         <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-slate-100">

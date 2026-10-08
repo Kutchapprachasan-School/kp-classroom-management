@@ -9,7 +9,7 @@ import {
   TEACHER_BANNERS_EVENT,
   type TeacherBannerItem,
 } from '../../services/teacherBannerService';
-import type { SchoolUserRole } from '../../config/schoolRoles';
+import { getSchoolSettings, type SchoolUserRole } from '../../config/schoolRoles';
 
 interface TeacherHeroBannerProps {
   activeRole?: SchoolUserRole;
@@ -35,6 +35,8 @@ export const TeacherHeroBanner: React.FC<TeacherHeroBannerProps> = ({
   const isAdmin = teacherBannerService.canManageBanners(activeRole);
   const imageUrl = banner.customUrl || banner.defaultUrl;
 
+  const [schoolSettings] = useState(() => getSchoolSettings());
+
   return (
     <div className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden shadow-xs border border-blue-100 group select-none transition-all">
       {/* Background Graphic / Banner Image */}
@@ -45,18 +47,16 @@ export const TeacherHeroBanner: React.FC<TeacherHeroBannerProps> = ({
           className="w-full h-full object-cover object-center"
         />
 
-        {/* Hero Quote and Subtitle Typography Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/65 via-slate-900/35 to-transparent flex flex-col justify-center px-4 sm:px-8 text-white">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-500/30 backdrop-blur-xs text-blue-200 border border-blue-300/30 text-[10px] sm:text-xs font-bold w-fit mb-1.5">
-            <Sparkles className="w-3 h-3 text-yellow-300" />
-            <span>คำคมสร้างแรงบันดาลใจ</span>
+        {/* School Welcome Card inside Rounded White Box */}
+        <div className="absolute inset-0 flex items-center px-4 sm:px-8">
+          <div className="bg-white/92 backdrop-blur-md rounded-2xl border border-white/90 p-3 sm:p-4 shadow-xs max-w-lg">
+            <h2 className="text-sm sm:text-base md:text-lg font-black text-slate-900 tracking-tight leading-tight">
+              ยินดีต้อนรับสู่ระบบบริหารจัดการชั้นเรียน
+            </h2>
+            <p className="text-xs sm:text-sm text-blue-700 font-bold mt-1 leading-snug">
+              {schoolSettings.nameTh || 'โรงเรียนกุดจับประชาสรรค์'}
+            </p>
           </div>
-          <h2 className="text-sm sm:text-lg md:text-xl font-black drop-shadow-md tracking-tight leading-snug">
-            {banner.quoteText || '“การศึกษาคือการลงทุน ที่คุ้มค่าที่สุดในชีวิต”'}
-          </h2>
-          <p className="text-[11px] sm:text-xs md:text-sm text-blue-100 font-medium drop-shadow-sm mt-0.5 max-w-xl line-clamp-1 sm:line-clamp-none">
-            {banner.subText || 'ร่วมสร้างโอกาส พัฒนาผู้เรียน สู่อนาคตที่มั่นคงและยั่งยืน'}
-          </p>
         </div>
       </div>
 

@@ -545,19 +545,18 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
       )}
 
       {/* ========================================================
-          1. TOP HERO BANNER (แบนเนอร์กลาง ปลดปุ่มแก้ไขส่วนตัวออก)
+          1. TOP HERO BANNER (2 บรรทัด กระชับ ชัดเจน)
           ======================================================== */}
       <PageHeroBanner
-        title="ตารางสอน"
-        subtitle="จัดสรรเวลาและคาบสอน เพื่อให้นักเรียนทุกคนพัฒนาได้อย่างเต็มที่"
+        title="ตารางสอน (Teacher Timetable)"
+        subtitle="ตรวจสอบรายวิชาที่สอนในแต่ละวัน และจัดการคาบเรียนอย่างเป็นระบบ"
         icon={<Calendar className="w-6 h-6 text-white" />}
         iconBgClass="bg-blue-600 text-white"
         badgeText="ม.3/1"
-        tagText="⏱️ คาบ 1 - คาบ 8 • วันจันทร์ - ศุกร์ • ภาคเรียนที่ 1/2569"
         quoteLines={[
-          'การตั้งใจทำทุกครั้ง',
-          'ช่วยให้เราก้าวหน้าขึ้น',
-          'เยาวชนพร้อมสู่อนาคต',
+          'การจัดสรรเวลาอย่างมีคุณค่า',
+          'เพื่อการเรียนรู้ที่มีประสิทธิภาพ',
+          'สู่อนาคตที่มั่นคงของผู้เรียน',
         ]}
       />
 
@@ -1086,28 +1085,52 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
               </div>
             ))}
 
-            {/* October 2026 Sample Day Cells */}
+            {/* October 2026 Sample Day Cells based on Teacher's Actual Timetable */}
             {Array.from({ length: 35 }).map((_, i) => {
               const dayNum = i - 3; // 1 Oct is Thursday (index 4)
               const isValid = dayNum >= 1 && dayNum <= 31;
-              const isSchoolDay = i % 7 >= 1 && i % 7 <= 5 && isValid;
+              const colIndex = i % 7;
+              const isSchoolDay = colIndex >= 1 && colIndex <= 5 && isValid;
               const isToday = dayNum === 2;
               const isPast = dayNum < 2 && isValid;
+              const isFuture = dayNum > 2 && isValid;
 
               if (!isValid) {
-                return <div key={i} className="h-20 bg-slate-50/30 rounded-xl" />;
+                return <div key={i} className="h-22 bg-slate-50/30 rounded-2xl border border-slate-100/50" />;
+              }
+
+              // Determine Day of Week Name
+              const WEEKDAY_KEYS = ['', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', ''];
+              const dayKey = isSchoolDay ? WEEKDAY_KEYS[colIndex] : '';
+              const scheduledSlots = dayKey
+                ? matrixSlots.filter((s) => s.day === dayKey && !s.isFreePeriod)
+                : [];
+              const classCount = scheduledSlots.length;
+              const hasClasses = classCount > 0;
+              const isAllChecked = hasClasses && scheduledSlots.every((s) => s.status === 'CHECKED');
+
+              // Visual styling logic: Green = checked, Red = unchecked past/today, Gray = waiting (ONLY on days with classes)
+              let cellBorderBg = 'border-slate-100 bg-slate-50/60 opacity-60';
+              if (isToday) {
+                cellBorderBg = 'border-blue-500 bg-blue-50/50 shadow-xs ring-1 ring-blue-300';
+              } else if (isSchoolDay) {
+                if (hasClasses) {
+                  if (isPast) {
+                    cellBorderBg = isAllChecked
+                      ? 'border-emerald-300 bg-emerald-50/40 hover:bg-emerald-50'
+                      : 'border-rose-300 bg-rose-50/40 hover:bg-rose-50';
+                  } else if (isFuture) {
+                    cellBorderBg = 'border-slate-200 bg-slate-50/60 hover:bg-slate-100/60';
+                  }
+                } else {
+                  cellBorderBg = 'border-slate-100 bg-white hover:bg-slate-50/50';
+                }
               }
 
               return (
                 <div
                   key={i}
-                  className={`h-22 p-2 rounded-2xl border text-left flex flex-col justify-between transition-all ${
-                    isToday
-                      ? 'border-blue-500 bg-blue-50/50 shadow-xs'
-                      : isSchoolDay
-                      ? 'border-slate-200 bg-white hover:border-blue-300'
-                      : 'border-slate-100 bg-slate-50/60 opacity-60'
-                  }`}
+                  className={`h-22 p-2 rounded-2xl border text-left flex flex-col justify-between transition-all ${cellBorderBg}`}
                 >
                   <div className="flex items-center justify-between">
                     <span
@@ -1125,22 +1148,42 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                   </div>
 
                   {isSchoolDay ? (
-                    <div className="space-y-1">
-                      <div className="text-[10px] font-bold text-slate-700">สอน 6 คาบ</div>
-                      {isPast ? (
-                        <span className="inline-block text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded-md">
-                          ✓ เช็คครบ
-                        </span>
-                      ) : isToday ? (
-                        <span className="inline-block text-[9px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.2 rounded-md">
-                          กำลังสอน (3/6)
-                        </span>
-                      ) : (
-                        <span className="inline-block text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded-md">
-                          รอสอน
-                        </span>
-                      )}
-                    </div>
+                    hasClasses ? (
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-bold text-slate-700">
+                          สอน {classCount} คาบ
+                        </div>
+                        {isPast ? (
+                          isAllChecked ? (
+                            <span className="inline-block text-[9px] font-extrabold text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-1.5 py-0.2 rounded-md">
+                              ✓ เช็คแล้ว
+                            </span>
+                          ) : (
+                            <span className="inline-block text-[9px] font-extrabold text-rose-800 bg-rose-100/90 border border-rose-300 px-1.5 py-0.2 rounded-md">
+                              ⚠️ ยังไม่เช็ค
+                            </span>
+                          )
+                        ) : isToday ? (
+                          isAllChecked ? (
+                            <span className="inline-block text-[9px] font-extrabold text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.2 rounded-md">
+                              ✓ เช็คแล้ว
+                            </span>
+                          ) : (
+                            <span className="inline-block text-[9px] font-extrabold text-rose-800 bg-rose-100 border border-rose-300 px-1.5 py-0.2 rounded-md">
+                              ⚠️ ยังไม่เช็ค
+                            </span>
+                          )
+                        ) : (
+                          <span className="inline-block text-[9px] font-bold text-slate-600 bg-slate-200/80 border border-slate-300 px-1.5 py-0.2 rounded-md">
+                            รอสอน
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 font-medium">
+                        ไม่มีคาบสอน
+                      </span>
+                    )
                   ) : (
                     <span className="text-[10px] text-slate-400">วันหยุด</span>
                   )}

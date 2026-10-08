@@ -393,7 +393,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
   };
 
   return (
-    <div className="space-y-5 animate-fade-in pb-20">
+    <div className="space-y-5 animate-fade-in pb-32 lg:pb-16">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-5 right-5 z-50 bg-slate-900/90 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 text-xs font-bold border border-slate-700 animate-slide-in">
@@ -406,10 +406,10 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
       {/* HERO BANNER: สไตล์ Pastel Anime Education Dashboard                       */}
       {/* ========================================================================= */}
       <PageHeroBanner
-        badgeText="ระบบเช็คชื่อเข้าชั้นเรียน (Classroom Attendance)"
+        badgeText={`คาบที่ ${selectedPeriod}`}
         badgeClass="bg-emerald-600 text-white"
-        title="เช็คชื่อนักเรียนรายวิชา"
-        subtitle={`บันทึกการเข้าเรียนรายคาบ วิชา ${currentCourse.name} • รองรับ 6 สถานะพร้อมระบบความสอดคล้องการเข้าแถว`}
+        title="เช็คชื่อเข้าเรียน (Classroom Attendance)"
+        subtitle={`บันทึกการเข้าเรียนรายคาบ วิชา ${currentCourse.name} ห้อง ${currentCourse.roomLabel}`}
         actions={
           <div className="flex items-center gap-2">
             <span className="hidden sm:inline-flex px-3 py-1 rounded-full text-xs font-bold bg-white/10 text-white border border-white/20">
@@ -1168,7 +1168,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
       {/* ========================================================================= */}
       {/* STICKY BOTTOM SAVE ACTION BAR                                             */}
       {/* ========================================================================= */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 p-3 sm:p-4 shadow-2xl">
+      <div className="fixed bottom-[60px] lg:bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 p-3 sm:p-4 shadow-2xl">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 px-2 sm:px-4">
           <div className="flex items-center gap-2.5 text-xs text-slate-700">
             {hasUnsavedChanges ? (

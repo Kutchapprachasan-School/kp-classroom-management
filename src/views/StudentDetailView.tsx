@@ -18,14 +18,16 @@ import {
   Navigation,
   ShieldAlert,
   ArrowRightLeft,
+  ArrowLeft,
   X,
 } from 'lucide-react';
 
 interface StudentDetailViewProps {
   onOpenHomeVisit?: () => void;
+  onBack?: () => void;
 }
 
-export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ onOpenHomeVisit }) => {
+export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ onOpenHomeVisit, onBack }) => {
   const [visitRecord, setVisitRecord] = useState<HomeVisitRecord | null>(null);
 
   const resolveCurrentRoom = (): ClassroomRosterItem => {
@@ -112,6 +114,20 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ onOpenHome
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in">
+      {/* Top Back Navigation Button */}
+      {onBack && (
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-200 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+          >
+            <ArrowLeft className="w-4 h-4 text-slate-500" />
+            <span>← กลับไปหน้ารายชื่อนักเรียน</span>
+          </button>
+        </div>
+      )}
+
       {/* Student Profile Quick Action Bar */}
       <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">

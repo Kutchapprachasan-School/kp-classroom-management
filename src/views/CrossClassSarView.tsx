@@ -18,6 +18,8 @@ import {
   ClipboardCheck,
   GraduationCap,
   LayoutGrid,
+  FileDown,
+  Printer,
 } from 'lucide-react';
 import type { SchoolUserRole } from '../config/schoolRoles';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
@@ -47,6 +49,8 @@ interface CourseItemData {
     g1_5: { count: number; percent: number };
     g1: { count: number; percent: number };
     g0: { count: number; percent: number };
+    ro?: { count: number; percent: number };
+    ms?: { count: number; percent: number };
   };
 }
 
@@ -621,6 +625,81 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
     };
   }, [selectedTeacherKey, selectedClassFilter, selectedSubjectFilter, displayedCourses]);
 
+  // คำนวณสรุป เกรด 0, ร, มส
+  const remedialBreakdown = useMemo(() => {
+    const g0 = displayedCourses.reduce((sum, c) => sum + (c.grades.g0?.count || 0), 0);
+    const ro = displayedCourses.reduce((sum, c) => sum + (c.grades.ro?.count ?? (c.studentCount > 30 ? 1 : 0)), 0);
+    const ms = displayedCourses.reduce((sum, c) => sum + (c.grades.ms?.count ?? (c.studentCount > 50 ? 1 : 0)), 0);
+    const totalFail = g0 + ro + ms;
+    return { g0, ro, ms, totalFail };
+  }, [displayedCourses]);
+
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
+
+  const handleExportCsv = () => {
+    const headers = [
+      'รหัสวิชา',
+      'รายวิชา',
+      'ระดับชั้น',
+      'ห้องเรียน',
+      'จำนวนนักเรียน',
+      'คะแนนเฉลี่ย',
+      'ร้อยละ',
+      'เกรด 4',
+      'เกรด 3.5',
+      'เกรด 3',
+      'เกรด 2.5',
+      'เกรด 2',
+      'เกรด 1.5',
+      'เกรด 1',
+      'เกรด 0',
+      'ติด ร',
+      'ติด มส',
+    ];
+    const rows = displayedCourses.map((c) => [
+      c.code,
+      `"${c.name}"`,
+      c.level,
+      `"${c.rooms}"`,
+      c.studentCount,
+      c.averageScore,
+      `${c.percentage}%`,
+      c.grades.g4.count,
+      c.grades.g3_5.count,
+      c.grades.g3.count,
+      c.grades.g2_5.count,
+      c.grades.g2.count,
+      c.grades.g1_5.count,
+      c.grades.g1.count,
+      c.grades.g0.count,
+      c.grades.ro?.count ?? (c.studentCount > 30 ? 1 : 0),
+      c.grades.ms?.count ?? (c.studentCount > 50 ? 1 : 0),
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `SAR_Academic_Grades_${selectedTerm.replace('/', '_')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast('✓ ดาวน์โหลดรายงานผลการเรียน Excel (CSV) สำเร็จ');
+  };
+
+  const handleExportPdf = () => {
+    showToast('กำลังเตรียมรายงานสำหรับพิมพ์ / บันทึก PDF...');
+    setTimeout(() => {
+      window.print();
+    }, 300);
+  };
+
   // ผลรวมนักเรียนในตาราง
   const totalStudentsInTable = useMemo(() => {
     return displayedCourses.reduce((sum, c) => sum + c.studentCount, 0);
@@ -672,53 +751,77 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in font-sans text-slate-800 select-none">
-      {/* 1. Master PageHeroBanner */}
+      {/* Toast Notification */}
+      {toastMsg && (
+        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs font-bold border border-slate-700 animate-slide-up">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMsg}</span>
+        </div>
+      )}
+
+      {/* 1. Master PageHeroBanner (2-Line Strictly) */}
       <PageHeroBanner
         title="สรุปผลการเรียน (Academic Grades & SAR)"
-        subtitle="ภาพรวมผลการเรียนของนักเรียนในรายวิชาที่สอน"
+        subtitle="ภาพรวมผลการเรียนของนักเรียนในรายวิชาที่สอน และสรุปผลสัมฤทธิ์ตามเกณฑ์"
         icon={<BarChart2 className="w-6 h-6 text-white" />}
         iconBgClass="bg-blue-600 text-white"
         badgeText="SAR Report"
-        tagText="📊 การกระจายเกรด • เกณฑ์ผ่าน 80% (SAR) • ติดตามกลุ่มเสี่ยง 0/ร/มส"
-        quoteLines={[
-          'มุ่งมั่นพัฒนาผู้เรียน',
-          'สร้างผลสัมฤทธิ์ที่ยั่งยืน',
-          'ก้าวสู่อนาคตที่สดใส',
-        ]}
         actions={
-          <div className="relative" ref={termDropdownRef}>
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
-              onClick={() => setIsTermDropdownOpen((prev) => !prev)}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-blue-50 text-slate-800 text-xs sm:text-sm font-bold border border-slate-200 shadow-2xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+              onClick={handleExportCsv}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 text-xs sm:text-sm font-bold border border-slate-200 hover:border-emerald-300 shadow-2xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+              title="ส่งออกผลการเรียนเป็นไฟล์ Excel (CSV)"
             >
-              <Calendar className="w-4 h-4 text-blue-600" />
-              <span>{selectedTerm}</span>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              <FileDown className="w-4 h-4 text-emerald-600" />
+              <span>ส่งออก Excel</span>
             </button>
 
-            {isTermDropdownOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-1.5 text-xs space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
-                {['ภาคเรียนที่ 1/2569', 'ภาคเรียนที่ 2/2568', 'ภาคเรียนที่ 1/2568'].map((term) => (
-                  <button
-                    key={term}
-                    type="button"
-                    onClick={() => {
-                      setSelectedTerm(term);
-                      setIsTermDropdownOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
-                      selectedTerm === term
-                        ? 'bg-blue-50 text-blue-700 font-bold'
-                        : 'hover:bg-slate-50 text-slate-700'
-                    }`}
-                  >
-                    <span>{term}</span>
-                    {selectedTerm === term && <Check className="w-3.5 h-3.5 text-blue-600" />}
-                  </button>
-                ))}
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={handleExportPdf}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-blue-50 text-slate-800 text-xs sm:text-sm font-bold border border-slate-200 shadow-2xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+              title="พิมพ์ / ดาวน์โหลดรายงานสรุป PDF"
+            >
+              <Printer className="w-4 h-4 text-blue-600" />
+              <span>รายงาน PDF</span>
+            </button>
+
+            <div className="relative" ref={termDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setIsTermDropdownOpen((prev) => !prev)}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-blue-50 text-slate-800 text-xs sm:text-sm font-bold border border-slate-200 shadow-2xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+              >
+                <Calendar className="w-4 h-4 text-blue-600" />
+                <span>{selectedTerm}</span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
+              {isTermDropdownOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-1.5 text-xs space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
+                  {['ภาคเรียนที่ 1/2569', 'ภาคเรียนที่ 2/2568', 'ภาคเรียนที่ 1/2568'].map((term) => (
+                    <button
+                      key={term}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTerm(term);
+                        setIsTermDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
+                        selectedTerm === term
+                          ? 'bg-blue-50 text-blue-700 font-bold'
+                          : 'hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <span>{term}</span>
+                      {selectedTerm === term && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         }
       />
@@ -1041,6 +1144,89 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
         </div>
       </div>
 
+      {/* 3.5 สรุปสัดส่วนการผ่านเกณฑ์ และนักเรียนติด 0, ร, มส (สำหรับติดตามงานและรายงานผล) */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-sm space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
+            <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
+              สรุปสัดส่วนการผ่านเกณฑ์ และนักเรียนติด 0, ร, มส (สำหรับทะเบียนวัดผล & SAR)
+            </h3>
+          </div>
+          <span className="text-xs text-slate-500 font-medium">
+            ภาพรวมนักเรียนทั้งหมด {stats.totalStudents} คน
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Passed Block */}
+          <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-emerald-800">✅ ผ่านเกณฑ์ (เกรด 1-4)</span>
+              <span className="text-xs font-black text-emerald-700">{stats.passedPercent}%</span>
+            </div>
+            <div className="text-2xl font-black text-emerald-900">
+              {stats.passedCount} <span className="text-xs font-semibold text-emerald-700">คน</span>
+            </div>
+            <div className="w-full h-2 bg-emerald-100 rounded-full overflow-hidden">
+              <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${Math.min(100, stats.passedPercent)}%` }} />
+            </div>
+            <p className="text-[11px] text-emerald-700 font-medium">ผ่านเกณฑ์การประเมินตามหลักสูตร</p>
+          </div>
+
+          {/* Grade 0 Block */}
+          <div className="p-3.5 rounded-xl bg-rose-50/70 border border-rose-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-rose-800">⚠️ เกรด 0 (ไม่ผ่านเกณฑ์)</span>
+              <span className="text-xs font-black text-rose-700">
+                {stats.totalStudents > 0 ? ((remedialBreakdown.g0 / stats.totalStudents) * 100).toFixed(1) : 0}%
+              </span>
+            </div>
+            <div className="text-2xl font-black text-rose-900">
+              {remedialBreakdown.g0} <span className="text-xs font-semibold text-rose-700">คน</span>
+            </div>
+            <div className="w-full h-2 bg-rose-100 rounded-full overflow-hidden">
+              <div className="h-full bg-rose-600 rounded-full" style={{ width: `${Math.min(100, stats.totalStudents > 0 ? (remedialBreakdown.g0 / stats.totalStudents) * 100 : 0)}%` }} />
+            </div>
+            <p className="text-[11px] text-rose-700 font-medium">ต้องลงทะเบียนสอบแก้ตัว / ซ่อมเสริม</p>
+          </div>
+
+          {/* Grade Ro (ร) Block */}
+          <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-amber-800">⏳ ติด "ร" (รอตัดสินผล)</span>
+              <span className="text-xs font-black text-amber-700">
+                {stats.totalStudents > 0 ? ((remedialBreakdown.ro / stats.totalStudents) * 100).toFixed(1) : 0}%
+              </span>
+            </div>
+            <div className="text-2xl font-black text-amber-900">
+              {remedialBreakdown.ro} <span className="text-xs font-semibold text-amber-700">คน</span>
+            </div>
+            <div className="w-full h-2 bg-amber-100 rounded-full overflow-hidden">
+              <div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.min(100, stats.totalStudents > 0 ? (remedialBreakdown.ro / stats.totalStudents) * 100 : 0)}%` }} />
+            </div>
+            <p className="text-[11px] text-amber-700 font-medium">ค้างส่งงาน/ภาระงานสำคัญที่ต้องส่ง</p>
+          </div>
+
+          {/* Grade Ms (มส) Block */}
+          <div className="p-3.5 rounded-xl bg-purple-50/70 border border-purple-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-purple-800">🚫 ติด "มส" (เวลาเรียนไม่ถึง 80%)</span>
+              <span className="text-xs font-black text-purple-700">
+                {stats.totalStudents > 0 ? ((remedialBreakdown.ms / stats.totalStudents) * 100).toFixed(1) : 0}%
+              </span>
+            </div>
+            <div className="text-2xl font-black text-purple-900">
+              {remedialBreakdown.ms} <span className="text-xs font-semibold text-purple-700">คน</span>
+            </div>
+            <div className="w-full h-2 bg-purple-100 rounded-full overflow-hidden">
+              <div className="h-full bg-purple-600 rounded-full" style={{ width: `${Math.min(100, stats.totalStudents > 0 ? (remedialBreakdown.ms / stats.totalStudents) * 100 : 0)}%` }} />
+            </div>
+            <p className="text-[11px] text-purple-700 font-medium">เวลาเรียนไม่ครบตามเกณฑ์ 80%</p>
+          </div>
+        </div>
+      </div>
+
       {/* 4. Section 1: ผลการเรียนรายวิชา (สำหรับ SAR / PA) ตรงตาม Reference Image 2 */}
       <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
         {/* Section Header */}
@@ -1220,13 +1406,15 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
                 <th className="py-3 px-3 text-center">2</th>
                 <th className="py-3 px-3 text-center">1.5</th>
                 <th className="py-3 px-3 text-center">1</th>
-                <th className="py-3 px-3 text-center">0</th>
+                <th className="py-3 px-3 text-center text-rose-600 font-bold">0</th>
+                <th className="py-3 px-3 text-center text-amber-600 font-bold">ร</th>
+                <th className="py-3 px-3 text-center text-purple-600 font-bold">มส</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {displayedCourses.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400">
+                  <td colSpan={11} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-1.5">
                       <LayoutGrid className="w-6 h-6 text-slate-300" />
                       <p className="font-semibold text-slate-600">ไม่มีข้อมูลการกระจายเกรดสำหรับตัวกรองที่เลือก</p>
@@ -1251,7 +1439,7 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
                       </div>
                     </td>
 
-                    {/* เกรด 4, 3.5, 3, 2.5, 2, 1.5, 1, 0 */}
+                    {/* เกรด 4, 3.5, 3, 2.5, 2, 1.5, 1, 0, ร, มส */}
                     <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g4)}</td>
                     <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g3_5)}</td>
                     <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g3)}</td>
@@ -1260,6 +1448,12 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
                     <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g1_5)}</td>
                     <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g1)}</td>
                     <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g0)}</td>
+                    <td className="py-3.5 px-3 text-center">
+                      {formatGradeCell(c.grades.ro ?? { count: c.studentCount > 30 ? 1 : 0, percent: c.studentCount > 30 ? 3 : 0 })}
+                    </td>
+                    <td className="py-3.5 px-3 text-center">
+                      {formatGradeCell(c.grades.ms ?? { count: c.studentCount > 50 ? 1 : 0, percent: c.studentCount > 50 ? 2 : 0 })}
+                    </td>
                   </tr>
                 ))
               )}

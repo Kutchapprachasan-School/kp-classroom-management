@@ -54,9 +54,6 @@ export const PageHeroBanner: React.FC<PageHeroBannerProps> = ({
   iconBgClass = 'bg-blue-600 text-white',
   badgeText,
   badgeClass = 'bg-blue-100 text-blue-800 border-blue-200',
-  tagText,
-  tags,
-  tagIcon = '⏱',
   quoteLines,
   quoteText,
   actions,
@@ -81,9 +78,6 @@ export const PageHeroBanner: React.FC<PageHeroBannerProps> = ({
   const posX = heroBanner.positionX ?? 0;
   const posY = heroBanner.positionY ?? 0;
   const scale = (heroBanner.scale ?? 100) / 100;
-
-  // จัดการข้อความแท็ก Bullets
-  const combinedTagText = tagText || (tags && tags.length > 0 ? tags.join(' • ') : null);
 
   // จัดการคำคม (Quote)
   let activeQuoteLines: string[] = [];
@@ -126,64 +120,56 @@ export const PageHeroBanner: React.FC<PageHeroBannerProps> = ({
             }
           }}
         />
-        {/* Soft Left Gradient Overlay รับประกันว่าข้อความและปุ่มอ่านง่าย ชัดเจน 100% */}
-        <div className="absolute inset-0 bg-gradient-to-r from-white/95 via-sky-50/80 sm:via-sky-50/70 to-transparent" />
+        {/* Subtle glass reflection edge */}
+        <div className="absolute inset-0 bg-white/10 pointer-events-none" />
       </div>
 
       {/* ------------------------------------------------------------- */}
       {/* 2. Banner Foreground Content                                  */}
       {/* ------------------------------------------------------------- */}
-      <div className="relative min-h-[110px] sm:min-h-[130px] flex flex-col md:flex-row md:items-center justify-between px-5 sm:px-8 py-4 sm:py-5 z-10 gap-4">
-        {/* Left Section: Icon + Title & Subtitle + Tags */}
-        <div className="space-y-2 max-w-2xl">
-          <div className="flex items-center gap-3 sm:gap-3.5">
+      <div className="relative min-h-[100px] sm:min-h-[120px] flex flex-col md:flex-row md:items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 z-10 gap-3.5">
+        {/* Left Section: White Rounded Card strictly containing Line 1 (Title) and Line 2 (Subtitle) */}
+        <div className="bg-white/92 backdrop-blur-md rounded-2xl border border-white/90 p-3 sm:p-3.5 shadow-xs max-w-xl">
+          <div className="flex items-center gap-3">
             {icon && (
               <div
-                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl ${iconBgClass} flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20 border border-white/60`}
+                className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl ${iconBgClass} flex items-center justify-center shrink-0 shadow-xs border border-white/80`}
               >
                 {icon}
               </div>
             )}
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">
+                <h1 className="text-base sm:text-lg md:text-xl font-black text-slate-900 tracking-tight leading-tight truncate">
                   {title}
                 </h1>
                 {badgeText && (
                   <span
-                    className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-extrabold border ${badgeClass}`}
+                    className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-extrabold border ${badgeClass}`}
                   >
                     {badgeText}
                   </span>
                 )}
               </div>
-              <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5 leading-snug">
+              <p className="text-xs sm:text-[13px] text-slate-600 font-medium mt-0.5 leading-snug line-clamp-1">
                 {subtitle}
               </p>
             </div>
           </div>
-
-          {/* Bullets / Feature Tags Row under Subtitle */}
-          {combinedTagText && (
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 pl-14 flex-wrap">
-              <span className="text-slate-400 shrink-0">{tagIcon}</span>
-              <span className="leading-snug">{combinedTagText}</span>
-            </div>
-          )}
         </div>
 
         {/* Right Section: Stylized Thai Quote & Action Buttons */}
         <div className="flex items-center gap-4 self-end md:self-center shrink-0">
-          {/* Stylized Thai Quote (ตรงตามภาพ media_1791433581154_fc64a813.png) */}
+          {/* Stylized Thai Quote */}
           {activeQuoteLines.length > 0 && (
-            <div className="hidden md:flex flex-col items-end text-right pr-2 lg:pr-10 select-none">
+            <div className="hidden md:flex flex-col items-end text-right px-3 py-1.5 rounded-2xl bg-white/75 backdrop-blur-xs border border-white/70 shadow-2xs select-none">
               {activeQuoteLines.map((line, idx) => {
                 const isFirst = idx === 0;
                 const isLast = idx === activeQuoteLines.length - 1;
                 return (
                   <p
                     key={idx}
-                    className="text-xs sm:text-sm font-bold text-slate-800 drop-shadow-xs flex items-center gap-1.5 justify-end leading-relaxed"
+                    className="text-xs sm:text-[13px] font-bold text-slate-800 flex items-center gap-1.5 justify-end leading-snug"
                   >
                     {isFirst && <span className="text-blue-900 font-black">“ </span>}
                     <span>{line}</span>

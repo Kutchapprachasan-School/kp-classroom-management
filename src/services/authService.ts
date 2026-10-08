@@ -159,9 +159,70 @@ export const authService = {
     }
 
     // 1. ค้นหานักเรียนใน studentService
-    const found = studentService.findStudentByCode(trimmedCode);
-    const student = found?.student;
-    const classroomId = found?.classroomId || 'room-3-1';
+    let found = studentService.findStudentByCode(trimmedCode);
+    let student = found?.student;
+    let classroomId = found?.classroomId || 'room-3-1';
+
+    // 2. หากไม่พบใน LocalStorage ให้ตรวจสอบใน Supabase students / Student ทันที
+    if (!student && isSupabaseConfigured) {
+      logDbOperation(`SELECT * FROM students/Student WHERE studentCode = ${trimmedCode}`);
+      try {
+        const { data: stuRows } = await supabase
+          .from('students')
+          .select('*')
+          .or(`studentCode.eq.${trimmedCode},code.eq.${trimmedCode},id.eq.stu-${trimmedCode}`)
+          .limit(1);
+
+        let row = stuRows && stuRows[0];
+        if (!row) {
+          const { data: rawRows } = await supabase
+            .from('Student')
+            .select('*')
+            .or(`studentCode.eq.${trimmedCode},id.eq.stu-${trimmedCode}`)
+            .limit(1);
+          if (rawRows && rawRows[0]) {
+            const raw = rawRows[0];
+            row = {
+              id: raw.id,
+              studentCode: raw.studentCode,
+              code: raw.studentCode,
+              name: `${raw.title || ''} ${raw.firstName || ''} ${raw.lastName || ''}`.trim(),
+              gender: raw.gender,
+              status: raw.status,
+              classroom_id: 'room-3-1',
+              seat_no: 1,
+            };
+          }
+        }
+
+        if (row) {
+          classroomId = row.classroom_id || 'room-3-1';
+          const syncedStudent = {
+            id: row.id,
+            no: row.seat_no || 1,
+            code: row.studentCode || row.code || trimmedCode,
+            name: row.name || `นักเรียน ${trimmedCode}`,
+            attendance: '8/8',
+            score: 85,
+            status: (row.status === 'AT_RISK' ? 'AT_RISK' : 'NORMAL') as 'NORMAL' | 'AT_RISK',
+            gender: (row.gender === 'FEMALE' ? 'FEMALE' : 'MALE') as 'MALE' | 'FEMALE',
+            avatarUrl:
+              row.gender === 'FEMALE'
+                ? '/images/banners/student-avatar-girl.png'
+                : '/images/banners/student-avatar.png',
+            classroomId,
+          };
+          // แคชลง LocalStorage เพื่อให้ studentService และมุมมองอื่นๆ ทราบข้อมูล
+          const localList = studentService.getLocalStudents(classroomId);
+          if (!localList.some((s) => s.code === syncedStudent.code || s.id === syncedStudent.id)) {
+            studentService.saveLocalStudents(classroomId, [...localList, syncedStudent]);
+          }
+          student = syncedStudent;
+        }
+      } catch (err) {
+        console.warn('Supabase student login lookup error:', err);
+      }
+    }
 
     if (student) {
       // หากนักเรียนยังไม่เคยเปลี่ยนรหัสผ่าน -> รหัสผ่านเริ่มต้นคือ รหัสนักเรียน 5 หลัก (หรือ PIN 4 หลัก)
@@ -205,18 +266,22 @@ export const authService = {
       '45123': 'ด.ญ. ปริยาภรณ์ ชัยแก้ว',
     };
 
-    const studentName = nameMap[trimmedCode] || `นักเรียนรหัส ${trimmedCode}`;
-    const user: AuthUser = {
-      id: `stu-${trimmedCode}`,
-      name: studentName,
-      studentCode: trimmedCode,
-      role: 'STUDENT',
-      classroomId: 'room-3-1',
-    };
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(user));
+    if (nameMap[trimmedCode]) {
+      const studentName = nameMap[trimmedCode];
+      const user: AuthUser = {
+        id: `stu-${trimmedCode}`,
+        name: studentName,
+        studentCode: trimmedCode,
+        role: 'STUDENT',
+        classroomId: 'room-3-1',
+      };
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(user));
+      }
+      return user;
     }
-    return user;
+
+    throw new Error(`ไม่พบข้อมูลนักเรียนรหัส ${trimmedCode} ในระบบ กรุณาตรวจสอบรหัสประจำตัว หรือติดต่อคุณครูผู้สอน`);
   },
 
   // STUDENT CHANGE PASSWORD: นักเรียนเปลี่ยนรหัสผ่านด้วยตนเอง

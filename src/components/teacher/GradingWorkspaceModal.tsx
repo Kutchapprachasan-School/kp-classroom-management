@@ -249,31 +249,50 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
                   </div>
                 )
               ) : isPdf ? (
-                <div className="p-6 text-center space-y-4 bg-rose-50/40 border border-rose-200 rounded-2xl w-full max-w-md">
-                  <FileText className="w-12 h-12 text-rose-500 mx-auto" />
-                  <div>
-                    <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white font-black text-[10px]">
-                      PDF PORTFOLIO
-                    </span>
-                    <h4 className="text-sm font-bold text-slate-900 mt-2">
-                      {currentItem.fileName}
-                    </h4>
-                    <p className="text-xs text-slate-500 mt-1">
-                      แฟ้มสะสมงานทัศนศิลป์ (Art Portfolio 3 หน้า)
-                    </p>
+                !imgError && currentItem.filePreviewUrl ? (
+                  currentItem.filePreviewUrl.toLowerCase().includes('.pdf') ? (
+                    <iframe
+                      src={`${currentItem.filePreviewUrl}#toolbar=0`}
+                      title={currentItem.fileName}
+                      onError={() => setImgError(true)}
+                      className="w-full h-[52vh] rounded-xl border border-slate-200 bg-white shadow-sm"
+                    />
+                  ) : (
+                    <img
+                      src={currentItem.filePreviewUrl}
+                      alt={currentItem.assignmentTitle}
+                      onError={() => setImgError(true)}
+                      style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'center' }}
+                      className="max-h-[55vh] w-auto object-contain rounded-xl transition-transform duration-150 shadow-md"
+                    />
+                  )
+                ) : (
+                  <div className="p-6 text-center space-y-4 bg-rose-50/40 border border-rose-200 rounded-2xl w-full max-w-md">
+                    <FileText className="w-12 h-12 text-rose-500 mx-auto" />
+                    <div>
+                      <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white font-black text-[10px]">
+                        PDF PORTFOLIO
+                      </span>
+                      <h4 className="text-sm font-bold text-slate-900 mt-2">
+                        {currentItem.fileName}
+                      </h4>
+                      <p className="text-xs text-slate-500 mt-1">
+                        แฟ้มสะสมงานทัศนศิลป์ (Art Portfolio 3 หน้า)
+                      </p>
+                    </div>
+                    {currentItem.filePreviewUrl && (
+                      <a
+                        href={currentItem.filePreviewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors cursor-pointer"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-teal-400" />
+                        <span>เปิดดูเอกสาร PDF เต็มหน้าต่าง ↗</span>
+                      </a>
+                    )}
                   </div>
-                  {currentItem.filePreviewUrl && (
-                    <a
-                      href={currentItem.filePreviewUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors cursor-pointer"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5 text-teal-400" />
-                      <span>เปิดดูเอกสาร PDF เต็มหน้าต่าง ↗</span>
-                    </a>
-                  )}
-                </div>
+                )
               ) : (
                 <div className="p-6 text-center space-y-4 bg-indigo-50/60 border border-indigo-200 rounded-2xl w-full max-w-md">
                   <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mx-auto shadow-sm">
