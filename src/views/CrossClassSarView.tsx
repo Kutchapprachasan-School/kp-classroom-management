@@ -20,6 +20,8 @@ import {
   LayoutGrid,
   FileDown,
   Printer,
+  BarChart3,
+  School,
 } from 'lucide-react';
 import type { SchoolUserRole } from '../config/schoolRoles';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
@@ -380,21 +382,27 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
     (activeRole as string) === 'ADMIN' ||
     (activeRole as string) === 'DIRECTOR';
 
-  // State สำหรับ Filters ต่างๆ
+  // State สำหรับ Filters ต่างๆ (รองรับดูรายห้อง รายชั้น รายวิชา และรายผู้สอน)
   const [selectedTerm, setSelectedTerm] = useState('ภาคเรียนที่ 1/2569');
   const [selectedTeacherKey, setSelectedTeacherKey] = useState<string>('passapoom');
-  const [selectedClassFilter, setSelectedClassFilter] = useState<string>('ALL');
+  const [selectedGradeLevelFilter, setSelectedGradeLevelFilter] = useState<string>('ALL');
+  const [selectedRoomFilter, setSelectedRoomFilter] = useState<string>('ALL');
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('ALL');
+
+  // โหมดการแสดงผลการกระจายเกรด: 'both' (แสดงทั้งคู่), 'histogram' (กราฟ Histogram), 'table' (ตารางแจกแจง)
+  const [distributionViewMode, setDistributionViewMode] = useState<'both' | 'histogram' | 'table'>('both');
 
   // Dropdowns Open State
   const [isTermDropdownOpen, setIsTermDropdownOpen] = useState(false);
   const [isTeacherDropdownOpen, setIsTeacherDropdownOpen] = useState(false);
-  const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
+  const [isGradeLevelDropdownOpen, setIsGradeLevelDropdownOpen] = useState(false);
+  const [isRoomDropdownOpen, setIsRoomDropdownOpen] = useState(false);
   const [isSubjectDropdownOpen, setIsSubjectDropdownOpen] = useState(false);
 
   const termDropdownRef = useRef<HTMLDivElement>(null);
   const teacherDropdownRef = useRef<HTMLDivElement>(null);
-  const classDropdownRef = useRef<HTMLDivElement>(null);
+  const gradeLevelDropdownRef = useRef<HTMLDivElement>(null);
+  const roomDropdownRef = useRef<HTMLDivElement>(null);
   const subjectDropdownRef = useRef<HTMLDivElement>(null);
 
   // ปิด dropdown เมื่อคลิกข้างนอก
@@ -406,8 +414,11 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
       if (teacherDropdownRef.current && !teacherDropdownRef.current.contains(e.target as Node)) {
         setIsTeacherDropdownOpen(false);
       }
-      if (classDropdownRef.current && !classDropdownRef.current.contains(e.target as Node)) {
-        setIsClassDropdownOpen(false);
+      if (gradeLevelDropdownRef.current && !gradeLevelDropdownRef.current.contains(e.target as Node)) {
+        setIsGradeLevelDropdownOpen(false);
+      }
+      if (roomDropdownRef.current && !roomDropdownRef.current.contains(e.target as Node)) {
+        setIsRoomDropdownOpen(false);
       }
       if (subjectDropdownRef.current && !subjectDropdownRef.current.contains(e.target as Node)) {
         setIsSubjectDropdownOpen(false);
@@ -481,52 +492,83 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
     return ALL_TEACHERS_DATA[selectedTeacherKey] || ALL_TEACHERS_DATA['passapoom'];
   }, [isExecutiveOrAdmin, selectedTeacherKey, allSchoolCourses]);
 
-  // ตัวเลือกห้องเรียนที่สามารถเลือกได้:
-  // - ครูทั่วไป: เฉพาะห้องที่ปรึกษา (ม.3/1) และห้องที่สอน (ม.1/8, ม.2/8, ม.3/1, ม.3/2, ม.3/5, ม.3/6, ม.3/7, ม.3/8)
-  // - ผอ./Admin: ทุกห้องในโรงเรียน (ม.1 - ม.6)
-  const availableClassroomOptions = useMemo(() => {
+  // 1. ตัวเลือกระดับชั้น (Grade Levels)
+  const availableGradeLevelOptions = useMemo(() => {
     if (!isExecutiveOrAdmin) {
+      const levels = Array.from(new Set(currentTeacherProfile.courses.map((c) => c.level)));
       return [
-        { key: 'ALL', label: 'ทุกห้องที่สอน/รับผิดชอบ (ห้องที่ปรึกษา & ที่สอน)', badge: 'ครบทุกห้อง' },
-        { key: 'ม.3/1', label: 'ม.3/1', badge: 'ห้องที่ปรึกษา' },
-        { key: 'ม.1/8', label: 'ม.1/8', badge: 'วิชาที่สอน' },
-        { key: 'ม.2/8', label: 'ม.2/8', badge: 'วิชาที่สอน' },
-        { key: 'ม.3/2', label: 'ม.3/2', badge: 'วิชาที่สอน' },
-        { key: 'ม.3/5', label: 'ม.3/5', badge: 'วิชาที่สอน' },
-        { key: 'ม.3/6', label: 'ม.3/6', badge: 'วิชาที่สอน' },
-        { key: 'ม.3/7', label: 'ม.3/7', badge: 'วิชาที่สอน' },
-        { key: 'ม.3/8', label: 'ม.3/8', badge: 'วิชาที่สอน' },
+        { key: 'ALL', label: 'ทุกระดับชั้นที่สอน', badge: 'ทั้งหมด' },
+        ...levels.map((lvl) => ({ key: lvl, label: `ระดับชั้น ${lvl}`, badge: lvl })),
       ];
     }
+    return [
+      { key: 'ALL', label: 'ทุกระดับชั้น (ม.1 - ม.6)', badge: 'ทั้งโรงเรียน' },
+      { key: 'ม.1', label: 'ระดับชั้น ม.1', badge: 'ม.1' },
+      { key: 'ม.2', label: 'ระดับชั้น ม.2', badge: 'ม.2' },
+      { key: 'ม.3', label: 'ระดับชั้น ม.3', badge: 'ม.3' },
+      { key: 'ม.4', label: 'ระดับชั้น ม.4', badge: 'ม.4' },
+      { key: 'ม.5', label: 'ระดับชั้น ม.5', badge: 'ม.5' },
+      { key: 'ม.6', label: 'ระดับชั้น ม.6', badge: 'ม.6' },
+    ];
+  }, [isExecutiveOrAdmin, currentTeacherProfile]);
+
+  // 2. ตัวเลือกห้องเรียน (Rooms - กรองตามระดับชั้นที่เลือก)
+  const availableRoomOptions = useMemo(() => {
+    let courses = currentTeacherProfile.courses;
+    if (selectedGradeLevelFilter !== 'ALL') {
+      courses = courses.filter((c) => c.level === selectedGradeLevelFilter);
+    }
+
+    const roomSet = new Set<string>();
+    courses.forEach((c) => {
+      c.rooms.split(',').forEach((r) => {
+        const trimmed = r.trim();
+        if (trimmed) roomSet.add(trimmed);
+      });
+    });
+
+    if (!isExecutiveOrAdmin) {
+      if (selectedGradeLevelFilter === 'ALL' || selectedGradeLevelFilter === 'ม.3') {
+        roomSet.add('ม.3/1');
+      }
+    }
+
+    const sortedRooms = Array.from(roomSet).sort((a, b) => a.localeCompare(b, 'th'));
 
     return [
-      { key: 'ALL', label: 'ทุกห้องเรียนในโรงเรียน (ม.1 - ม.6)', badge: 'ทั้งโรงเรียน' },
-      { key: 'ม.1', label: 'ระดับชั้น ม.1 ทั้งหมด (ม.1/1 - ม.1/8)', badge: 'ม.1' },
-      { key: 'ม.1/1', label: 'ม.1/1', badge: 'ห้องเรียน' },
-      { key: 'ม.1/8', label: 'ม.1/8', badge: 'ห้องเรียน' },
-      { key: 'ม.2', label: 'ระดับชั้น ม.2 ทั้งหมด (ม.2/1 - ม.2/8)', badge: 'ม.2' },
-      { key: 'ม.2/1', label: 'ม.2/1', badge: 'ห้องเรียน' },
-      { key: 'ม.2/8', label: 'ม.2/8', badge: 'ห้องเรียน' },
-      { key: 'ม.3', label: 'ระดับชั้น ม.3 ทั้งหมด (ม.3/1 - ม.3/8)', badge: 'ม.3' },
-      { key: 'ม.3/1', label: 'ม.3/1', badge: 'ห้องเรียน' },
-      { key: 'ม.3/2', label: 'ม.3/2', badge: 'ห้องเรียน' },
-      { key: 'ม.3/5', label: 'ม.3/5', badge: 'ห้องเรียน' },
-      { key: 'ม.3/6', label: 'ม.3/6', badge: 'ห้องเรียน' },
-      { key: 'ม.3/7', label: 'ม.3/7', badge: 'ห้องเรียน' },
-      { key: 'ม.3/8', label: 'ม.3/8', badge: 'ห้องเรียน' },
-      { key: 'ม.4', label: 'ระดับชั้น ม.4 ทั้งหมด (ม.4/1)', badge: 'ม.ปลาย' },
-      { key: 'ม.5', label: 'ระดับชั้น ม.5 ทั้งหมด (ม.5/1)', badge: 'ม.ปลาย' },
-      { key: 'ม.6', label: 'ระดับชั้น ม.6 ทั้งหมด (ม.6/1)', badge: 'ม.ปลาย' },
+      {
+        key: 'ALL',
+        label:
+          selectedGradeLevelFilter === 'ALL'
+            ? 'ทุกห้องเรียน'
+            : `ทุกห้องในระดับ ${selectedGradeLevelFilter}`,
+        badge: 'ทั้งหมด',
+      },
+      ...sortedRooms.map((rm) => ({
+        key: rm,
+        label: `ห้อง ${rm}`,
+        badge: !isExecutiveOrAdmin && rm === 'ม.3/1' ? 'ห้องที่ปรึกษา' : 'ห้องเรียน',
+      })),
     ];
-  }, [isExecutiveOrAdmin]);
+  }, [isExecutiveOrAdmin, currentTeacherProfile, selectedGradeLevelFilter]);
 
-  // ตัวเลือกรายวิชา:
+  // 3. ตัวเลือกรายวิชา:
   const availableSubjectOptions = useMemo(() => {
-    const list = currentTeacherProfile.courses;
+    let courses = currentTeacherProfile.courses;
+    if (selectedGradeLevelFilter !== 'ALL') {
+      courses = courses.filter((c) => c.level === selectedGradeLevelFilter);
+    }
+    if (selectedRoomFilter !== 'ALL') {
+      courses = courses.filter((c) => {
+        const roomArray = c.rooms.split(',').map((r) => r.trim());
+        return roomArray.includes(selectedRoomFilter) || c.rooms.includes(selectedRoomFilter);
+      });
+    }
+
     const seen = new Set<string>();
     const options: { key: string; label: string }[] = [{ key: 'ALL', label: 'ทุกรายวิชา' }];
 
-    for (const c of list) {
+    for (const c of courses) {
       if (!seen.has(c.code)) {
         seen.add(c.code);
         options.push({
@@ -536,17 +578,20 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
       }
     }
     return options;
-  }, [currentTeacherProfile]);
+  }, [currentTeacherProfile, selectedGradeLevelFilter, selectedRoomFilter]);
 
-  // กรองรายวิชาตามห้องและวิชาที่เลือก
+  // 4. กรองรายวิชาตามระดับชั้น ห้อง และวิชาที่เลือก
   const displayedCourses = useMemo(() => {
     let list = currentTeacherProfile.courses;
 
-    if (selectedClassFilter !== 'ALL') {
+    if (selectedGradeLevelFilter !== 'ALL') {
+      list = list.filter((c) => c.level === selectedGradeLevelFilter);
+    }
+
+    if (selectedRoomFilter !== 'ALL') {
       list = list.filter((c) => {
-        if (c.level === selectedClassFilter) return true;
         const roomArray = c.rooms.split(',').map((r) => r.trim());
-        return roomArray.includes(selectedClassFilter) || c.rooms.includes(selectedClassFilter);
+        return roomArray.includes(selectedRoomFilter) || c.rooms.includes(selectedRoomFilter);
       });
     }
 
@@ -555,13 +600,14 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
     }
 
     return list;
-  }, [currentTeacherProfile, selectedClassFilter, selectedSubjectFilter]);
+  }, [currentTeacherProfile, selectedGradeLevelFilter, selectedRoomFilter, selectedSubjectFilter]);
 
   // สรุปสถิติ KPI (หากเป็นมุมมองเริ่มต้นของครูภาสภูมิ จะใช้ตัวเลขเป๊ะตาม Image 2 มิฉะนั้นคำนวณตามข้อมูลจริง)
   const stats = useMemo(() => {
     if (
       selectedTeacherKey === 'passapoom' &&
-      selectedClassFilter === 'ALL' &&
+      selectedGradeLevelFilter === 'ALL' &&
+      selectedRoomFilter === 'ALL' &&
       selectedSubjectFilter === 'ALL'
     ) {
       return ALL_TEACHERS_DATA.passapoom.kpiStats;
@@ -623,7 +669,7 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
       goodAboveCount,
       goodAbovePercent: baseCount > 0 ? Number(((goodAboveCount / baseCount) * 100).toFixed(1)) : 0,
     };
-  }, [selectedTeacherKey, selectedClassFilter, selectedSubjectFilter, displayedCourses]);
+  }, [selectedTeacherKey, selectedGradeLevelFilter, selectedRoomFilter, selectedSubjectFilter, displayedCourses]);
 
   // คำนวณสรุป เกรด 0, ร, มส
   const remedialBreakdown = useMemo(() => {
@@ -633,6 +679,60 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
     const totalFail = g0 + ro + ms;
     return { g0, ro, ms, totalFail };
   }, [displayedCourses]);
+
+  // คำนวณข้อมูลการแจกแจงเกรด Histogram สำหรับ 10 ระดับผลการเรียน (4 ถึง มส)
+  const histogramData = useMemo(() => {
+    const counts = {
+      g4: displayedCourses.reduce((sum, c) => sum + (c.grades.g4?.count || 0), 0),
+      g3_5: displayedCourses.reduce((sum, c) => sum + (c.grades.g3_5?.count || 0), 0),
+      g3: displayedCourses.reduce((sum, c) => sum + (c.grades.g3?.count || 0), 0),
+      g2_5: displayedCourses.reduce((sum, c) => sum + (c.grades.g2_5?.count || 0), 0),
+      g2: displayedCourses.reduce((sum, c) => sum + (c.grades.g2?.count || 0), 0),
+      g1_5: displayedCourses.reduce((sum, c) => sum + (c.grades.g1_5?.count || 0), 0),
+      g1: displayedCourses.reduce((sum, c) => sum + (c.grades.g1?.count || 0), 0),
+      g0: displayedCourses.reduce((sum, c) => sum + (c.grades.g0?.count || 0), 0),
+      ro: remedialBreakdown.ro,
+      ms: remedialBreakdown.ms,
+    };
+
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    const maxCount = Math.max(...Object.values(counts), 1);
+
+    const bars = [
+      { grade: '4', count: counts.g4, label: 'เกรด 4 (ดีเยี่ยม)', color: 'from-emerald-500 to-emerald-400', badgeColor: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+      { grade: '3.5', count: counts.g3_5, label: 'เกรด 3.5 (ดีมาก)', color: 'from-teal-500 to-teal-400', badgeColor: 'text-teal-700 bg-teal-50 border-teal-200' },
+      { grade: '3', count: counts.g3, label: 'เกรด 3 (ดี)', color: 'from-blue-500 to-blue-400', badgeColor: 'text-blue-700 bg-blue-50 border-blue-200' },
+      { grade: '2.5', count: counts.g2_5, label: 'เกรด 2.5 (ค่อนข้างดี)', color: 'from-sky-500 to-sky-400', badgeColor: 'text-sky-700 bg-sky-50 border-sky-200' },
+      { grade: '2', count: counts.g2, label: 'เกรด 2 (ปานกลาง)', color: 'from-indigo-500 to-indigo-400', badgeColor: 'text-indigo-700 bg-indigo-50 border-indigo-200' },
+      { grade: '1.5', count: counts.g1_5, label: 'เกรด 1.5 (พอใช้)', color: 'from-amber-500 to-amber-400', badgeColor: 'text-amber-700 bg-amber-50 border-amber-200' },
+      { grade: '1', count: counts.g1, label: 'เกรด 1 (ผ่านเกณฑ์)', color: 'from-orange-500 to-orange-400', badgeColor: 'text-orange-700 bg-orange-50 border-orange-200' },
+      { grade: '0', count: counts.g0, label: 'เกรด 0 (ไม่ผ่านเกณฑ์)', color: 'from-rose-500 to-rose-400', badgeColor: 'text-rose-700 bg-rose-50 border-rose-200' },
+      { grade: 'ร', count: counts.ro, label: 'ติด "ร" (รอตัดสินผล)', color: 'from-amber-600 to-amber-500', badgeColor: 'text-amber-800 bg-amber-50 border-amber-300' },
+      { grade: 'มส', count: counts.ms, label: 'ติด "มส" (เวลาเรียนไม่ถึง)', color: 'from-purple-600 to-purple-500', badgeColor: 'text-purple-800 bg-purple-50 border-purple-200' },
+    ].map((item) => ({
+      ...item,
+      percent: total > 0 ? Number(((item.count / total) * 100).toFixed(1)) : 0,
+      heightPercent: item.count > 0 ? Math.max(12, Math.round((item.count / maxCount) * 100)) : 6,
+    }));
+
+    const excellentCount = counts.g4 + counts.g3_5;
+    const goodCount = counts.g3 + counts.g2_5 + counts.g2;
+    const passingCount = counts.g1_5 + counts.g1;
+    const atRiskCount = counts.g0 + counts.ro + counts.ms;
+
+    return {
+      counts,
+      total,
+      maxCount,
+      bars,
+      groups: {
+        excellent: { count: excellentCount, percent: total > 0 ? ((excellentCount / total) * 100).toFixed(1) : '0' },
+        good: { count: goodCount, percent: total > 0 ? ((goodCount / total) * 100).toFixed(1) : '0' },
+        passing: { count: passingCount, percent: total > 0 ? ((passingCount / total) * 100).toFixed(1) : '0' },
+        atRisk: { count: atRiskCount, percent: total > 0 ? ((atRiskCount / total) * 100).toFixed(1) : '0' },
+      },
+    };
+  }, [displayedCourses, remedialBreakdown]);
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const showToast = (msg: string) => {
@@ -871,7 +971,8 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
                     type="button"
                     onClick={() => {
                       setSelectedTeacherKey('ALL');
-                      setSelectedClassFilter('ALL');
+                      setSelectedGradeLevelFilter('ALL');
+                      setSelectedRoomFilter('ALL');
                       setSelectedSubjectFilter('ALL');
                       setIsTeacherDropdownOpen(false);
                     }}
@@ -902,7 +1003,8 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
                         type="button"
                         onClick={() => {
                           setSelectedTeacherKey(t.id);
-                          setSelectedClassFilter('ALL');
+                          setSelectedGradeLevelFilter('ALL');
+                          setSelectedRoomFilter('ALL');
                           setSelectedSubjectFilter('ALL');
                           setIsTeacherDropdownOpen(false);
                         }}
@@ -927,39 +1029,38 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
             </div>
           )}
 
-          {/* 2.2 Dropdown เลือกชั้น/ห้อง (ฟีเจอร์หลักตามโจทย์) */}
-          <div className="relative" ref={classDropdownRef}>
+          {/* 2.2 Dropdown เลือกระดับชั้น (รายชั้น) */}
+          <div className="relative" ref={gradeLevelDropdownRef}>
             <button
               type="button"
-              onClick={() => setIsClassDropdownOpen((prev) => !prev)}
+              onClick={() => setIsGradeLevelDropdownOpen((prev) => !prev)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
             >
-              <Layers className="w-3.5 h-3.5 text-blue-600" />
+              <School className="w-3.5 h-3.5 text-blue-600" />
               <span>
-                {selectedClassFilter === 'ALL'
-                  ? 'เลือกชั้น/ห้อง: ทั้งหมด'
-                  : `ห้อง ${selectedClassFilter}`}
+                {selectedGradeLevelFilter === 'ALL'
+                  ? 'ระดับชั้น: ทั้งหมด'
+                  : `ชั้น ${selectedGradeLevelFilter}`}
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
             </button>
 
-            {isClassDropdownOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-64 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-2 text-xs space-y-1 animate-in fade-in zoom-in-95 duration-100 max-h-64 overflow-y-auto">
+            {isGradeLevelDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-2 text-xs space-y-1 animate-in fade-in zoom-in-95 duration-100 max-h-64 overflow-y-auto">
                 <div className="px-2 py-1 border-b border-slate-100 text-[11px] font-bold text-slate-400">
-                  {isExecutiveOrAdmin
-                    ? '👑 เลือกชั้น/ห้อง (ดูได้ทุกห้องทั้งโรงเรียน)'
-                    : '🔒 แสดงเฉพาะห้องครูที่ปรึกษา & ห้องที่สอน'}
+                  เลือกระดับชั้น (ม.1 - ม.6)
                 </div>
-                {availableClassroomOptions.map((opt) => (
+                {availableGradeLevelOptions.map((opt) => (
                   <button
                     key={opt.key}
                     type="button"
                     onClick={() => {
-                      setSelectedClassFilter(opt.key);
-                      setIsClassDropdownOpen(false);
+                      setSelectedGradeLevelFilter(opt.key);
+                      setSelectedRoomFilter('ALL');
+                      setIsGradeLevelDropdownOpen(false);
                     }}
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
-                      selectedClassFilter === opt.key
+                      selectedGradeLevelFilter === opt.key
                         ? 'bg-blue-50 text-blue-700 font-bold border border-blue-200'
                         : 'hover:bg-slate-50 text-slate-700'
                     }`}
@@ -974,7 +1075,54 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
             )}
           </div>
 
-          {/* 2.3 Dropdown เลือกรายวิชา */}
+          {/* 2.3 Dropdown เลือกห้องเรียน (รายห้อง) */}
+          <div className="relative" ref={roomDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsRoomDropdownOpen((prev) => !prev)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+            >
+              <Layers className="w-3.5 h-3.5 text-blue-600" />
+              <span>
+                {selectedRoomFilter === 'ALL'
+                  ? 'ห้องเรียน: ทั้งหมด'
+                  : `ห้อง ${selectedRoomFilter}`}
+              </span>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+
+            {isRoomDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-60 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-2 text-xs space-y-1 animate-in fade-in zoom-in-95 duration-100 max-h-64 overflow-y-auto">
+                <div className="px-2 py-1 border-b border-slate-100 text-[11px] font-bold text-slate-400">
+                  {isExecutiveOrAdmin
+                    ? 'เลือกห้องเรียน (ทั้งโรงเรียน)'
+                    : 'ห้องที่ปรึกษา & ห้องที่สอน'}
+                </div>
+                {availableRoomOptions.map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => {
+                      setSelectedRoomFilter(opt.key);
+                      setIsRoomDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
+                      selectedRoomFilter === opt.key
+                        ? 'bg-blue-50 text-blue-700 font-bold border border-blue-200'
+                        : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <span>{opt.label}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 font-medium">
+                      {opt.badge}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 2.4 Dropdown เลือกรายวิชา */}
           <div className="relative" ref={subjectDropdownRef}>
             <button
               type="button"
@@ -984,7 +1132,7 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
               <BookOpen className="w-3.5 h-3.5 text-blue-600" />
               <span>
                 {selectedSubjectFilter === 'ALL'
-                  ? 'เลือกรายวิชา: ทั้งหมด'
+                  ? 'รายวิชา: ทั้งหมด'
                   : selectedSubjectFilter}
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
@@ -1011,7 +1159,7 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
                   >
                     <span className="truncate">{opt.label}</span>
                     {selectedSubjectFilter === opt.key && (
-                      <Check className="w-3.5 h-3.5 text-blue-600" />
+                      <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                     )}
                   </button>
                 ))}
@@ -1020,12 +1168,17 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
           </div>
 
           {/* ปุ่มล้างตัวกรอง */}
-          {(selectedClassFilter !== 'ALL' || selectedSubjectFilter !== 'ALL') && (
+          {(selectedGradeLevelFilter !== 'ALL' ||
+            selectedRoomFilter !== 'ALL' ||
+            selectedSubjectFilter !== 'ALL' ||
+            (isExecutiveOrAdmin && selectedTeacherKey !== 'passapoom')) && (
             <button
               type="button"
               onClick={() => {
-                setSelectedClassFilter('ALL');
+                setSelectedGradeLevelFilter('ALL');
+                setSelectedRoomFilter('ALL');
                 setSelectedSubjectFilter('ALL');
+                setSelectedTeacherKey('passapoom');
               }}
               className="px-2.5 py-1.5 rounded-xl text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors flex items-center gap-1 cursor-pointer"
               title="ล้างตัวกรอง"
@@ -1140,89 +1293,6 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
           </div>
           <div className="text-[11px] text-pink-600 font-medium">
             ได้เกรด 3 หรือ 4
-          </div>
-        </div>
-      </div>
-
-      {/* 3.5 สรุปสัดส่วนการผ่านเกณฑ์ และนักเรียนติด 0, ร, มส (สำหรับติดตามงานและรายงานผล) */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-sm space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
-            <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
-              สรุปสัดส่วนการผ่านเกณฑ์ และนักเรียนติด 0, ร, มส (สำหรับทะเบียนวัดผล & SAR)
-            </h3>
-          </div>
-          <span className="text-xs text-slate-500 font-medium">
-            ภาพรวมนักเรียนทั้งหมด {stats.totalStudents} คน
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Passed Block */}
-          <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-emerald-800">✅ ผ่านเกณฑ์ (เกรด 1-4)</span>
-              <span className="text-xs font-black text-emerald-700">{stats.passedPercent}%</span>
-            </div>
-            <div className="text-2xl font-black text-emerald-900">
-              {stats.passedCount} <span className="text-xs font-semibold text-emerald-700">คน</span>
-            </div>
-            <div className="w-full h-2 bg-emerald-100 rounded-full overflow-hidden">
-              <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${Math.min(100, stats.passedPercent)}%` }} />
-            </div>
-            <p className="text-[11px] text-emerald-700 font-medium">ผ่านเกณฑ์การประเมินตามหลักสูตร</p>
-          </div>
-
-          {/* Grade 0 Block */}
-          <div className="p-3.5 rounded-xl bg-rose-50/70 border border-rose-200 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-rose-800">⚠️ เกรด 0 (ไม่ผ่านเกณฑ์)</span>
-              <span className="text-xs font-black text-rose-700">
-                {stats.totalStudents > 0 ? ((remedialBreakdown.g0 / stats.totalStudents) * 100).toFixed(1) : 0}%
-              </span>
-            </div>
-            <div className="text-2xl font-black text-rose-900">
-              {remedialBreakdown.g0} <span className="text-xs font-semibold text-rose-700">คน</span>
-            </div>
-            <div className="w-full h-2 bg-rose-100 rounded-full overflow-hidden">
-              <div className="h-full bg-rose-600 rounded-full" style={{ width: `${Math.min(100, stats.totalStudents > 0 ? (remedialBreakdown.g0 / stats.totalStudents) * 100 : 0)}%` }} />
-            </div>
-            <p className="text-[11px] text-rose-700 font-medium">ต้องลงทะเบียนสอบแก้ตัว / ซ่อมเสริม</p>
-          </div>
-
-          {/* Grade Ro (ร) Block */}
-          <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-amber-800">⏳ ติด "ร" (รอตัดสินผล)</span>
-              <span className="text-xs font-black text-amber-700">
-                {stats.totalStudents > 0 ? ((remedialBreakdown.ro / stats.totalStudents) * 100).toFixed(1) : 0}%
-              </span>
-            </div>
-            <div className="text-2xl font-black text-amber-900">
-              {remedialBreakdown.ro} <span className="text-xs font-semibold text-amber-700">คน</span>
-            </div>
-            <div className="w-full h-2 bg-amber-100 rounded-full overflow-hidden">
-              <div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.min(100, stats.totalStudents > 0 ? (remedialBreakdown.ro / stats.totalStudents) * 100 : 0)}%` }} />
-            </div>
-            <p className="text-[11px] text-amber-700 font-medium">ค้างส่งงาน/ภาระงานสำคัญที่ต้องส่ง</p>
-          </div>
-
-          {/* Grade Ms (มส) Block */}
-          <div className="p-3.5 rounded-xl bg-purple-50/70 border border-purple-200 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-purple-800">🚫 ติด "มส" (เวลาเรียนไม่ถึง 80%)</span>
-              <span className="text-xs font-black text-purple-700">
-                {stats.totalStudents > 0 ? ((remedialBreakdown.ms / stats.totalStudents) * 100).toFixed(1) : 0}%
-              </span>
-            </div>
-            <div className="text-2xl font-black text-purple-900">
-              {remedialBreakdown.ms} <span className="text-xs font-semibold text-purple-700">คน</span>
-            </div>
-            <div className="w-full h-2 bg-purple-100 rounded-full overflow-hidden">
-              <div className="h-full bg-purple-600 rounded-full" style={{ width: `${Math.min(100, stats.totalStudents > 0 ? (remedialBreakdown.ms / stats.totalStudents) * 100 : 0)}%` }} />
-            </div>
-            <p className="text-[11px] text-purple-700 font-medium">เวลาเรียนไม่ครบตามเกณฑ์ 80%</p>
           </div>
         </div>
       </div>
@@ -1372,93 +1442,321 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
         </div>
       </div>
 
-      {/* 5. Section 2: การกระจายเกรดโดยประมาณ ตรงตาม Reference Image 2 */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
-        {/* Section Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between gap-3">
+      {/* 5. Section 2: การกระจายเกรดโดยประมาณ และกราฟ Histogram */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden space-y-0">
+        {/* Section Header พร้อมปุ่มสลับ Histogram / ตาราง */}
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-              <LayoutGrid className="w-4 h-4" />
+              <BarChart3 className="w-4 h-4" />
             </div>
-            <h2 className="font-bold text-slate-800 text-sm sm:text-base">
-              การกระจายเกรดโดยประมาณ
-            </h2>
+            <div>
+              <h2 className="font-bold text-slate-800 text-sm sm:text-base">
+                การกระจายเกรดโดยประมาณ (Grade Distribution & Histogram)
+              </h2>
+              <p className="text-xs text-slate-400 font-medium">
+                แจกแจงความถี่ระดับผลการเรียน 10 ระดับ (เกรด 4 ถึง มส) สอดคล้องกับตัวกรองที่เลือก
+              </p>
+            </div>
           </div>
-          <button
-            type="button"
-            className="text-blue-600 hover:text-blue-800 font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
-          >
-            <span>ดูรายละเอียด</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            {/* สลับโหมดการดู: กราฟ Histogram / ตารางแจกแจง / แสดงทั้งคู่ */}
+            <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setDistributionViewMode('both')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  distributionViewMode === 'both'
+                    ? 'bg-white text-blue-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="แสดงทั้งกราฟและตาราง"
+              >
+                👁️ ทั้งหมด
+              </button>
+              <button
+                type="button"
+                onClick={() => setDistributionViewMode('histogram')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  distributionViewMode === 'histogram'
+                    ? 'bg-white text-blue-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="ดูกราฟ Histogram เท่านั้น"
+              >
+                📊 กราฟ Histogram
+              </button>
+              <button
+                type="button"
+                onClick={() => setDistributionViewMode('table')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  distributionViewMode === 'table'
+                    ? 'bg-white text-blue-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="ดูตารางแจกแจงเท่านั้น"
+              >
+                📋 ตารางแจกแจง
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Table Content */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-slate-100 text-slate-400 font-semibold bg-slate-50/40">
-                <th className="py-3 px-4 min-w-[200px]">รายวิชา / ระดับ</th>
-                <th className="py-3 px-3 text-center">4</th>
-                <th className="py-3 px-3 text-center">3.5</th>
-                <th className="py-3 px-3 text-center">3</th>
-                <th className="py-3 px-3 text-center">2.5</th>
-                <th className="py-3 px-3 text-center">2</th>
-                <th className="py-3 px-3 text-center">1.5</th>
-                <th className="py-3 px-3 text-center">1</th>
-                <th className="py-3 px-3 text-center text-rose-600 font-bold">0</th>
-                <th className="py-3 px-3 text-center text-amber-600 font-bold">ร</th>
-                <th className="py-3 px-3 text-center text-purple-600 font-bold">มส</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {displayedCourses.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-400">
-                    <div className="flex flex-col items-center justify-center gap-1.5">
-                      <LayoutGrid className="w-6 h-6 text-slate-300" />
-                      <p className="font-semibold text-slate-600">ไม่มีข้อมูลการกระจายเกรดสำหรับตัวกรองที่เลือก</p>
+        {/* 5.1 Interactive Histogram Bar Chart */}
+        {(distributionViewMode === 'both' || distributionViewMode === 'histogram') && (
+          <div className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/40 space-y-4">
+            {/* 4 Performance Group Summary Chips */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+              <div className="p-2.5 sm:p-3 rounded-xl bg-emerald-50/80 border border-emerald-200 flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-emerald-800 block">🌟 กลุ่มดีเยี่ยม (3.5 - 4.0)</span>
+                  <span className="text-xs text-emerald-600 font-medium">{histogramData.groups.excellent.percent}% ของทั้งหมด</span>
+                </div>
+                <span className="text-lg font-black text-emerald-900">{histogramData.groups.excellent.count} <span className="text-xs font-semibold">คน</span></span>
+              </div>
+
+              <div className="p-2.5 sm:p-3 rounded-xl bg-blue-50/80 border border-blue-200 flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-blue-800 block">📘 กลุ่มปานกลาง-ดี (2.0 - 3.0)</span>
+                  <span className="text-xs text-blue-600 font-medium">{histogramData.groups.good.percent}% ของทั้งหมด</span>
+                </div>
+                <span className="text-lg font-black text-blue-900">{histogramData.groups.good.count} <span className="text-xs font-semibold">คน</span></span>
+              </div>
+
+              <div className="p-2.5 sm:p-3 rounded-xl bg-amber-50/80 border border-amber-200 flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-amber-800 block">📙 กลุ่มผ่านเกณฑ์ (1.0 - 1.5)</span>
+                  <span className="text-xs text-amber-600 font-medium">{histogramData.groups.passing.percent}% ของทั้งหมด</span>
+                </div>
+                <span className="text-lg font-black text-amber-900">{histogramData.groups.passing.count} <span className="text-xs font-semibold">คน</span></span>
+              </div>
+
+              <div className="p-2.5 sm:p-3 rounded-xl bg-rose-50/80 border border-rose-200 flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-rose-800 block">🚨 กลุ่มซ่อมเสริม (0, ร, มส)</span>
+                  <span className="text-xs text-rose-600 font-medium">{histogramData.groups.atRisk.percent}% ของทั้งหมด</span>
+                </div>
+                <span className="text-lg font-black text-rose-900">{histogramData.groups.atRisk.count} <span className="text-xs font-semibold">คน</span></span>
+              </div>
+            </div>
+
+            {/* Histogram Bar Chart Graphic Container */}
+            <div className="p-4 sm:p-6 bg-white rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-blue-600" />
+                  กราฟแท่งความถี่ระดับผลการเรียน (Grade Distribution Histogram)
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  รวม {histogramData.total} ที่นั่งสอบ
+                </span>
+              </div>
+
+              {/* 10 Vertical Bars */}
+              <div className="pt-6 pb-2">
+                <div className="h-52 flex items-end justify-between gap-1.5 sm:gap-3 px-1 border-b border-dashed border-slate-200 relative">
+                  {/* Subtle Y-Axis Grid Lines */}
+                  <div className="absolute inset-0 pointer-events-none flex flex-col justify-between opacity-30 text-[10px] text-slate-400">
+                    <div className="border-b border-dashed border-slate-200 w-full" />
+                    <div className="border-b border-dashed border-slate-200 w-full" />
+                    <div className="border-b border-dashed border-slate-200 w-full" />
+                    <div className="border-b border-dashed border-slate-200 w-full" />
+                  </div>
+
+                  {histogramData.bars.map((bar) => (
+                    <div
+                      key={`hist-${bar.grade}`}
+                      className="flex-1 flex flex-col items-center justify-end h-full relative group cursor-pointer"
+                      title={`${bar.label}: ${bar.count} คน (${bar.percent}%)`}
+                    >
+                      {/* Top Count Badge */}
+                      <span
+                        className={`text-[10px] sm:text-xs font-black px-1.5 py-0.5 rounded-full border mb-1.5 transition-transform group-hover:scale-110 shadow-2xs ${bar.badgeColor}`}
+                      >
+                        {bar.count}
+                      </span>
+
+                      {/* Bar Track & Fill */}
+                      <div className="w-full max-w-[42px] sm:max-w-[48px] h-full flex items-end">
+                        <div
+                          className={`w-full rounded-t-xl bg-gradient-to-t ${bar.color} transition-all duration-300 group-hover:brightness-110 group-hover:shadow-md shadow-2xs`}
+                          style={{ height: `${bar.heightPercent}%` }}
+                        />
+                      </div>
                     </div>
-                  </td>
+                  ))}
+                </div>
+
+                {/* X-Axis Labels (Grades & Percentages) */}
+                <div className="flex items-start justify-between gap-1.5 sm:gap-3 px-1 pt-2">
+                  {histogramData.bars.map((bar) => (
+                    <div key={`hist-label-${bar.grade}`} className="flex-1 text-center">
+                      <span className="block font-black text-xs sm:text-sm text-slate-800">
+                        {bar.grade}
+                      </span>
+                      <span className="block text-[10px] text-slate-400 font-medium">
+                        {bar.percent}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 5.2 Table Content */}
+        {(distributionViewMode === 'both' || distributionViewMode === 'table') && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-100 text-slate-400 font-semibold bg-slate-50/40">
+                  <th className="py-3 px-4 min-w-[200px]">รายวิชา / ระดับ</th>
+                  <th className="py-3 px-3 text-center">4</th>
+                  <th className="py-3 px-3 text-center">3.5</th>
+                  <th className="py-3 px-3 text-center">3</th>
+                  <th className="py-3 px-3 text-center">2.5</th>
+                  <th className="py-3 px-3 text-center">2</th>
+                  <th className="py-3 px-3 text-center">1.5</th>
+                  <th className="py-3 px-3 text-center">1</th>
+                  <th className="py-3 px-3 text-center text-rose-600 font-bold">0</th>
+                  <th className="py-3 px-3 text-center text-amber-600 font-bold">ร</th>
+                  <th className="py-3 px-3 text-center text-purple-600 font-bold">มส</th>
                 </tr>
-              ) : (
-                displayedCourses.map((c) => (
-                  <tr key={`matrix-${c.id}`} className="hover:bg-slate-50/80 transition-colors">
-                    {/* รายวิชา / ระดับ พร้อมป้ายสี */}
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`w-5 h-5 rounded-md flex items-center justify-center text-white text-[10px] font-bold shrink-0 shadow-2xs ${renderDotColor(
-                            c.codeColor
-                          )}`}
-                        >
-                          <BookOpen className="w-3 h-3 text-white" />
-                        </span>
-                        <span className="font-bold text-slate-800 text-xs">{c.code}</span>
-                        <span className="font-semibold text-slate-500 text-xs">{c.level}</span>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {displayedCourses.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} className="py-12 text-center text-slate-400">
+                      <div className="flex flex-col items-center justify-center gap-1.5">
+                        <LayoutGrid className="w-6 h-6 text-slate-300" />
+                        <p className="font-semibold text-slate-600">ไม่มีข้อมูลการกระจายเกรดสำหรับตัวกรองที่เลือก</p>
                       </div>
                     </td>
-
-                    {/* เกรด 4, 3.5, 3, 2.5, 2, 1.5, 1, 0, ร, มส */}
-                    <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g4)}</td>
-                    <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g3_5)}</td>
-                    <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g3)}</td>
-                    <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g2_5)}</td>
-                    <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g2)}</td>
-                    <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g1_5)}</td>
-                    <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g1)}</td>
-                    <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g0)}</td>
-                    <td className="py-3.5 px-3 text-center">
-                      {formatGradeCell(c.grades.ro ?? { count: c.studentCount > 30 ? 1 : 0, percent: c.studentCount > 30 ? 3 : 0 })}
-                    </td>
-                    <td className="py-3.5 px-3 text-center">
-                      {formatGradeCell(c.grades.ms ?? { count: c.studentCount > 50 ? 1 : 0, percent: c.studentCount > 50 ? 2 : 0 })}
-                    </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  displayedCourses.map((c) => (
+                    <tr key={`matrix-${c.id}`} className="hover:bg-slate-50/80 transition-colors">
+                      {/* รายวิชา / ระดับ พร้อมป้ายสี */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`w-5 h-5 rounded-md flex items-center justify-center text-white text-[10px] font-bold shrink-0 shadow-2xs ${renderDotColor(
+                              c.codeColor
+                            )}`}
+                          >
+                            <BookOpen className="w-3 h-3 text-white" />
+                          </span>
+                          <span className="font-bold text-slate-800 text-xs">{c.code}</span>
+                          <span className="font-semibold text-slate-500 text-xs">{c.level}</span>
+                        </div>
+                      </td>
+
+                      {/* เกรด 4, 3.5, 3, 2.5, 2, 1.5, 1, 0, ร, มส */}
+                      <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g4)}</td>
+                      <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g3_5)}</td>
+                      <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g3)}</td>
+                      <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g2_5)}</td>
+                      <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g2)}</td>
+                      <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g1_5)}</td>
+                      <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g1)}</td>
+                      <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g0)}</td>
+                      <td className="py-3.5 px-3 text-center">
+                        {formatGradeCell(c.grades.ro ?? { count: c.studentCount > 30 ? 1 : 0, percent: c.studentCount > 30 ? 3 : 0 })}
+                      </td>
+                      <td className="py-3.5 px-3 text-center">
+                        {formatGradeCell(c.grades.ms ?? { count: c.studentCount > 50 ? 1 : 0, percent: c.studentCount > 50 ? 2 : 0 })}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* 5.5 สรุปสัดส่วนการผ่านเกณฑ์ และนักเรียนติด 0, ร, มส (ย้ายมาไว้ข้างล่างการกระจายเกรดตามสั่ง) */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-sm space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
+            <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
+              สรุปสัดส่วนการผ่านเกณฑ์ และนักเรียนติด 0, ร, มส (สำหรับทะเบียนวัดผล & SAR)
+            </h3>
+          </div>
+          <span className="text-xs text-slate-500 font-medium">
+            ภาพรวมนักเรียนทั้งหมด {stats.totalStudents} คน
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Passed Block */}
+          <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-emerald-800">✅ ผ่านเกณฑ์ (เกรด 1-4)</span>
+              <span className="text-xs font-black text-emerald-700">{stats.passedPercent}%</span>
+            </div>
+            <div className="text-2xl font-black text-emerald-900">
+              {stats.passedCount} <span className="text-xs font-semibold text-emerald-700">คน</span>
+            </div>
+            <div className="w-full h-2 bg-emerald-100 rounded-full overflow-hidden">
+              <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${Math.min(100, stats.passedPercent)}%` }} />
+            </div>
+            <p className="text-[11px] text-emerald-700 font-medium">ผ่านเกณฑ์การประเมินตามหลักสูตร</p>
+          </div>
+
+          {/* Grade 0 Block */}
+          <div className="p-3.5 rounded-xl bg-rose-50/70 border border-rose-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-rose-800">⚠️ เกรด 0 (ไม่ผ่านเกณฑ์)</span>
+              <span className="text-xs font-black text-rose-700">
+                {stats.totalStudents > 0 ? ((remedialBreakdown.g0 / stats.totalStudents) * 100).toFixed(1) : 0}%
+              </span>
+            </div>
+            <div className="text-2xl font-black text-rose-900">
+              {remedialBreakdown.g0} <span className="text-xs font-semibold text-rose-700">คน</span>
+            </div>
+            <div className="w-full h-2 bg-rose-100 rounded-full overflow-hidden">
+              <div className="h-full bg-rose-600 rounded-full" style={{ width: `${Math.min(100, stats.totalStudents > 0 ? (remedialBreakdown.g0 / stats.totalStudents) * 100 : 0)}%` }} />
+            </div>
+            <p className="text-[11px] text-rose-700 font-medium">ต้องลงทะเบียนสอบแก้ตัว / ซ่อมเสริม</p>
+          </div>
+
+          {/* Grade Ro (ร) Block */}
+          <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-amber-800">⏳ ติด "ร" (รอตัดสินผล)</span>
+              <span className="text-xs font-black text-amber-700">
+                {stats.totalStudents > 0 ? ((remedialBreakdown.ro / stats.totalStudents) * 100).toFixed(1) : 0}%
+              </span>
+            </div>
+            <div className="text-2xl font-black text-amber-900">
+              {remedialBreakdown.ro} <span className="text-xs font-semibold text-amber-700">คน</span>
+            </div>
+            <div className="w-full h-2 bg-amber-100 rounded-full overflow-hidden">
+              <div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.min(100, stats.totalStudents > 0 ? (remedialBreakdown.ro / stats.totalStudents) * 100 : 0)}%` }} />
+            </div>
+            <p className="text-[11px] text-amber-700 font-medium">ค้างส่งงาน/ภาระงานสำคัญที่ต้องส่ง</p>
+          </div>
+
+          {/* Grade Ms (มส) Block */}
+          <div className="p-3.5 rounded-xl bg-purple-50/70 border border-purple-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-purple-800">🚫 ติด "มส" (เวลาเรียนไม่ถึง 80%)</span>
+              <span className="text-xs font-black text-purple-700">
+                {stats.totalStudents > 0 ? ((remedialBreakdown.ms / stats.totalStudents) * 100).toFixed(1) : 0}%
+              </span>
+            </div>
+            <div className="text-2xl font-black text-purple-900">
+              {remedialBreakdown.ms} <span className="text-xs font-semibold text-purple-700">คน</span>
+            </div>
+            <div className="w-full h-2 bg-purple-100 rounded-full overflow-hidden">
+              <div className="h-full bg-purple-600 rounded-full" style={{ width: `${Math.min(100, stats.totalStudents > 0 ? (remedialBreakdown.ms / stats.totalStudents) * 100 : 0)}%` }} />
+            </div>
+            <p className="text-[11px] text-purple-700 font-medium">เวลาเรียนไม่ครบตามเกณฑ์ 80%</p>
+          </div>
         </div>
       </div>
 

@@ -23,6 +23,11 @@ import {
   type SubjectIconConfig,
 } from '../../config/subjectIcons';
 import { SubjectIconPickerModal } from './SubjectIconPickerModal';
+import {
+  coursesCurriculumService,
+  calculatePeriodsPerWeek,
+  type CourseCurriculumRecord,
+} from '../../services/coursesCurriculumService';
 
 export interface AddEditTimetableSlotModalProps {
   isOpen: boolean;
@@ -56,6 +61,12 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
 }) => {
   const isEditing = Boolean(initialSlot?.id && !initialSlot?.isFreePeriod);
 
+  // Curriculum Master Catalog State
+  const [catalogCourses, setCatalogCourses] = useState<CourseCurriculumRecord[]>(() =>
+    coursesCurriculumService.getCourses()
+  );
+  const [selectedCatalogCourseId, setSelectedCatalogCourseId] = useState<string>('');
+
   // Form State
   const [day, setDay] = useState<TimetableMatrixSlot['day']>('จันทร์');
   const [period, setPeriod] = useState<number>(1);
@@ -72,20 +83,30 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
 
   // Synchronize when initialSlot changes
   useEffect(() => {
+    const list = coursesCurriculumService.getCourses();
+    setCatalogCourses(list);
+
     if (initialSlot) {
       setDay(initialSlot.day || 'จันทร์');
       setPeriod(initialSlot.period || 1);
       setSubjectCode(initialSlot.subjectCode || '');
       setSubjectName(initialSlot.subjectName || '');
-      setClassroom(initialSlot.room?.startsWith('ม.') ? initialSlot.room : 'ม.3/1');
+      setClassroom(initialSlot.room?.startsWith('ม.') ? initialSlot.room.split('•')[0].trim() : 'ม.3/1');
       setRoom(initialSlot.room?.includes('ห้อง') ? initialSlot.room.replace(/.*ห้อง\s*/, '') : '324');
       setColorTheme(initialSlot.colorTheme || 'blue');
 
       if (initialSlot.subjectCode) {
+        const match = list.find((c) => c.code === initialSlot.subjectCode);
+        if (match) {
+          setSelectedCatalogCourseId(match.id);
+        } else {
+          setSelectedCatalogCourseId('');
+        }
         const detected = getSubjectIcon(initialSlot.subjectCode, initialSlot.subjectName);
         setSelectedIcon(detected);
         setIsManualIconSet(false);
       } else {
+        setSelectedCatalogCourseId('');
         setSelectedIcon(null);
         setIsManualIconSet(false);
       }
@@ -97,6 +118,7 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
       setClassroom('ม.3/1');
       setRoom('324');
       setColorTheme('blue');
+      setSelectedCatalogCourseId('');
       setSelectedIcon(null);
       setIsManualIconSet(false);
     }
@@ -113,6 +135,30 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
   if (!isOpen) return null;
 
   const currentIcon = selectedIcon || getSubjectIcon(subjectCode, subjectName);
+
+  const selectedCourseFromCatalog = catalogCourses.find(
+    (c) => c.id === selectedCatalogCourseId || c.code === subjectCode
+  );
+
+  const handleSelectCatalogCourse = (courseId: string) => {
+    setSelectedCatalogCourseId(courseId);
+    if (!courseId) return;
+    const course = catalogCourses.find((c) => c.id === courseId);
+    if (!course) return;
+
+    setSubjectCode(course.code);
+    setSubjectName(course.name);
+
+    if (course.assignedClassrooms && course.assignedClassrooms.length > 0) {
+      if (!course.assignedClassrooms.includes(classroom)) {
+        setClassroom(course.assignedClassrooms[0]);
+      }
+    }
+
+    const detected = getSubjectIcon(course.code, course.name);
+    setSelectedIcon(detected);
+    setIsManualIconSet(false);
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -226,8 +272,50 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
               </div>
             </div>
 
+            {/* 1. Pick Subject from Catalog (Primary Flow) */}
+            <div className="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-200/80 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black text-blue-950 flex items-center gap-1.5">
+                  <BookOpen className="w-4 h-4 text-blue-600" />
+                  <span>เลือกวิชาจากหลักสูตร (Master Catalog) <span className="text-rose-500">*</span></span>
+                </label>
+                {selectedCourseFromCatalog && (
+                  <span className="text-[10px] font-extrabold text-blue-700 bg-white px-2 py-0.5 rounded-full border border-blue-200 shadow-2xs">
+                    {selectedCourseFromCatalog.credits} หน่วยกิต ({calculatePeriodsPerWeek(selectedCourseFromCatalog.credits).periodsPerRoom} คาบ/ห้อง)
+                  </span>
+                )}
+              </div>
+
+              <div className="relative">
+                <select
+                  value={selectedCatalogCourseId}
+                  onChange={(e) => handleSelectCatalogCourse(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-blue-200 rounded-xl text-xs sm:text-sm text-slate-800 font-extrabold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 appearance-none cursor-pointer"
+                >
+                  <option value="">-- เลือกรหัสวิชาที่สอนจากหลักสูตร --</option>
+                  {catalogCourses.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.code} : {c.name} ({c.credits} นก. • {c.assignedClassrooms.join(', ')})
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-blue-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-slate-500 font-medium">
+                  {catalogCourses.length > 0
+                    ? `มี ${catalogCourses.length} รายวิชาในหลักสูตรที่ลงทะเบียนไว้`
+                    : 'ยังไม่มีรายวิชาในหลักสูตร'}
+                </span>
+                <span className="text-blue-600 font-bold">
+                  (สร้างรายวิชาได้ที่หน้าหลักสูตร/แผนการสอน)
+                </span>
+              </div>
+            </div>
+
             {/* Subject Code & Name */}
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   รหัสวิชา <span className="text-rose-500">*</span>
@@ -235,7 +323,7 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
                 <input
                   type="text"
                   required
-                  placeholder="เช่น ญ31201, ว30221, ค21101, ท21101"
+                  placeholder="เช่น ญ31201, ว30221"
                   value={subjectCode}
                   onChange={(e) => setSubjectCode(e.target.value)}
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 font-extrabold focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
@@ -248,7 +336,7 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
                 </label>
                 <input
                   type="text"
-                  placeholder="เช่น ภาษาญี่ปุ่น 1, เคมี 1, ฟิสิกส์ 2, ดนตรีปฏิบัติ"
+                  placeholder="เช่น ภาษาญี่ปุ่น 1"
                   value={subjectName}
                   onChange={(e) => setSubjectName(e.target.value)}
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
@@ -256,19 +344,41 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
               </div>
             </div>
 
-            {/* Classroom & Room */}
+            {/* Classroom & Room (Constrained to Course's Assigned Classrooms) */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  ชั้น / ห้องเรียน
+                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                  <span>ชั้น / ห้องเรียน</span>
+                  {selectedCourseFromCatalog && selectedCourseFromCatalog.assignedClassrooms.length > 0 && (
+                    <span className="text-[10px] text-blue-600 font-bold">
+                      (เฉพาะห้องที่เปิดสอน)
+                    </span>
+                  )}
                 </label>
-                <input
-                  type="text"
-                  placeholder="เช่น ม.3/1"
-                  value={classroom}
-                  onChange={(e) => setClassroom(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                />
+                {selectedCourseFromCatalog && selectedCourseFromCatalog.assignedClassrooms.length > 0 ? (
+                  <div className="relative">
+                    <select
+                      value={classroom}
+                      onChange={(e) => setClassroom(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 font-extrabold focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 appearance-none cursor-pointer"
+                    >
+                      {selectedCourseFromCatalog.assignedClassrooms.map((rm) => (
+                        <option key={rm} value={rm}>
+                          ห้อง {rm}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="เช่น ม.3/1"
+                    value={classroom}
+                    onChange={(e) => setClassroom(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
+                )}
               </div>
 
               <div>
@@ -285,6 +395,24 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
                 />
               </div>
             </div>
+
+            {/* Period Quota & Schedule Calculation Info */}
+            {selectedCourseFromCatalog && (
+              <div className="p-3 rounded-2xl bg-linear-to-r from-blue-50/70 to-indigo-50/70 border border-blue-200/80 text-xs text-slate-700 space-y-1">
+                <div className="flex items-center justify-between font-bold">
+                  <span className="flex items-center gap-1.5 text-blue-900">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                    <span>ภาระการสอนตามหลักสูตร:</span>
+                  </span>
+                  <span className="text-blue-700 font-black">
+                    {calculatePeriodsPerWeek(selectedCourseFromCatalog.credits).periodsPerRoom} คาบ / ห้อง ในห้อง {classroom}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  ห้องที่เปิดสอน: {selectedCourseFromCatalog.assignedClassrooms.join(', ')} • ภาระการสอนรวม {calculatePeriodsPerWeek(selectedCourseFromCatalog.credits, selectedCourseFromCatalog.assignedClassrooms.length).totalPeriodsPerWeek} คาบ/สัปดาห์
+                </p>
+              </div>
+            )}
 
             {/* Subject Icon Selector Card */}
             <div className="p-3.5 rounded-2xl border border-blue-100 bg-blue-50/50 space-y-2">

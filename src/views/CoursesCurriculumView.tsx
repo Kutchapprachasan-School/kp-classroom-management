@@ -16,13 +16,20 @@ import {
   UploadCloud,
   ChevronDown,
   Calendar,
+  RotateCcw,
+  Archive,
+  Check,
 } from 'lucide-react';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 import {
   coursesCurriculumService,
+  calculatePeriodsPerWeek,
   type CourseCurriculumRecord,
   type MediaType,
+  type TrashMediaItem,
 } from '../services/coursesCurriculumService';
+import { classroomService } from '../services/classroomService';
+import type { ClassroomRosterItem } from '../types/viewModels';
 
 export const CoursesCurriculumView: React.FC = () => {
   const [courses, setCourses] = useState<CourseCurriculumRecord[]>(() =>
@@ -33,6 +40,14 @@ export const CoursesCurriculumView: React.FC = () => {
   );
 
   const selectedCourse = courses.find((c) => c.id === selectedCourseId) || courses[0];
+
+  // Supabase real classrooms state
+  const [allClassrooms, setAllClassrooms] = useState<ClassroomRosterItem[]>([]);
+  useEffect(() => {
+    classroomService.getAll().then((rooms) => {
+      setAllClassrooms(rooms);
+    });
+  }, []);
 
   // Feedback toast
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -56,6 +71,27 @@ export const CoursesCurriculumView: React.FC = () => {
     return () => window.removeEventListener('kp-courses-curriculum-updated', handler);
   }, [selectedCourseId]);
 
+  // Trash Bin State & Sync
+  const [trashItems, setTrashItems] = useState<TrashMediaItem[]>(() =>
+    coursesCurriculumService.getTrashMediaItems()
+  );
+  const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
+  const [mediaToDelete, setMediaToDelete] = useState<{
+    unitId: string;
+    mediaId: string;
+    title: string;
+  } | null>(null);
+
+  const refreshTrash = () => {
+    setTrashItems(coursesCurriculumService.getTrashMediaItems());
+  };
+
+  useEffect(() => {
+    const handler = () => refreshTrash();
+    window.addEventListener('kp-curriculum-trash-updated', handler);
+    return () => window.removeEventListener('kp-curriculum-trash-updated', handler);
+  }, []);
+
   // Modal States
   const [isAddCourseModalOpen, setIsAddCourseModalOpen] = useState(false);
   const [isEditCourseModalOpen, setIsEditCourseModalOpen] = useState(false);
@@ -64,7 +100,7 @@ export const CoursesCurriculumView: React.FC = () => {
   const [isAddMediaModalOpen, setIsAddMediaModalOpen] = useState(false);
   const [targetUnitIdForMedia, setTargetUnitIdForMedia] = useState<string>('');
 
-  // Course Form State
+  // Course Form State (Interactive Room Chips, No Comma Text)
   const [courseForm, setCourseForm] = useState({
     code: '',
     name: '',
@@ -74,8 +110,9 @@ export const CoursesCurriculumView: React.FC = () => {
     periodsPerWeek: 3,
     academicYear: '2569',
     term: '1',
-    classroomsText: 'ม.3/1, ม.3/2',
+    assignedClassrooms: ['ม.3/1', 'ม.3/2'] as string[],
   });
+  const [roomFilterTab, setRoomFilterTab] = useState<string>('ALL');
 
   // Unit Form State
   const [unitForm, setUnitForm] = useState({
@@ -146,30 +183,77 @@ export const CoursesCurriculumView: React.FC = () => {
     toYear: '2570',
   });
 
+  // Handlers for Room Selection Chips
+  const toggleRoomSelection = (roomName: string) => {
+    setCourseForm((prev) => {
+      const exists = prev.assignedClassrooms.includes(roomName);
+      const nextRooms = exists
+        ? prev.assignedClassrooms.filter((r) => r !== roomName)
+        : [...prev.assignedClassrooms, roomName];
+      const { periodsPerRoom } = calculatePeriodsPerWeek(prev.credits, nextRooms.length);
+      return {
+        ...prev,
+        assignedClassrooms: nextRooms,
+        periodsPerWeek: periodsPerRoom,
+      };
+    });
+  };
+
+  const selectAllRoomsOfLevel = (levelPrefix: string) => {
+    const targetRooms = allClassrooms
+      .filter((c) => c.name.startsWith(levelPrefix) || c.level.startsWith(levelPrefix))
+      .map((c) => c.name);
+    if (targetRooms.length === 0) return;
+
+    setCourseForm((prev) => {
+      const allSelected = targetRooms.every((r) => prev.assignedClassrooms.includes(r));
+      const nextRooms = allSelected
+        ? prev.assignedClassrooms.filter((r) => !targetRooms.includes(r))
+        : Array.from(new Set([...prev.assignedClassrooms, ...targetRooms]));
+      const { periodsPerRoom } = calculatePeriodsPerWeek(prev.credits, nextRooms.length);
+      return {
+        ...prev,
+        assignedClassrooms: nextRooms,
+        periodsPerWeek: periodsPerRoom,
+      };
+    });
+  };
+
   // Handlers for Course CRUD
   const handleOpenAddCourse = () => {
+    const defaultLevel = 'ม.3';
+    const defaultRooms = allClassrooms
+      .filter((c) => c.name.startsWith('ม.3'))
+      .map((c) => c.name);
+    const initialRooms = defaultRooms.length > 0 ? defaultRooms.slice(0, 2) : ['ม.3/1', 'ม.3/2'];
+    const { periodsPerRoom } = calculatePeriodsPerWeek(1.5, initialRooms.length);
     setCourseForm({
       code: '',
       name: '',
       strand: 'กลุ่มสาระการเรียนรู้ศิลปะ',
-      level: 'ม.3',
+      level: defaultLevel,
       credits: 1.5,
-      periodsPerWeek: 3,
+      periodsPerWeek: periodsPerRoom,
       academicYear: '2569',
       term: '1',
-      classroomsText: 'ม.3/1, ม.3/2',
+      assignedClassrooms: initialRooms,
     });
+    setRoomFilterTab('ม.3');
     setIsAddCourseModalOpen(true);
   };
 
   const handleSaveAddCourse = (e: React.FormEvent) => {
     e.preventDefault();
     if (!courseForm.code || !courseForm.name) return;
+    if (courseForm.assignedClassrooms.length === 0) {
+      alert('กรุณาเลือกห้องเรียนที่สอนอย่างน้อย 1 ห้อง');
+      return;
+    }
 
-    const classrooms = courseForm.classroomsText
-      .split(',')
-      .map((r) => r.trim())
-      .filter(Boolean);
+    const { periodsPerRoom } = calculatePeriodsPerWeek(
+      courseForm.credits,
+      courseForm.assignedClassrooms.length
+    );
 
     const created = coursesCurriculumService.createCourse({
       code: courseForm.code.trim(),
@@ -177,17 +261,17 @@ export const CoursesCurriculumView: React.FC = () => {
       strand: courseForm.strand,
       level: courseForm.level,
       credits: Number(courseForm.credits),
-      periodsPerWeek: Number(courseForm.periodsPerWeek),
+      periodsPerWeek: periodsPerRoom,
       academicYear: courseForm.academicYear,
       term: courseForm.term,
-      assignedClassrooms: classrooms.length > 0 ? classrooms : ['ม.3/1'],
+      assignedClassrooms: courseForm.assignedClassrooms,
       units: [],
     });
 
     setIsAddCourseModalOpen(false);
     setSelectedCourseId(created.id);
     refreshCourses();
-    showToast(`✓ เพิ่มรายวิชา ${created.code} ${created.name} เรียบร้อยแล้ว`);
+    showToast(`✓ เพิ่มรายวิชา ${created.code} ${created.name} เรียบร้อยแล้ว (ลงตารางสอนได้ทันที)`);
   };
 
   const handleOpenEditCourse = () => {
@@ -201,19 +285,24 @@ export const CoursesCurriculumView: React.FC = () => {
       periodsPerWeek: selectedCourse.periodsPerWeek,
       academicYear: selectedCourse.academicYear,
       term: selectedCourse.term,
-      classroomsText: selectedCourse.assignedClassrooms.join(', '),
+      assignedClassrooms: [...selectedCourse.assignedClassrooms],
     });
+    setRoomFilterTab(selectedCourse.level || 'ALL');
     setIsEditCourseModalOpen(true);
   };
 
   const handleSaveEditCourse = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCourse) return;
+    if (courseForm.assignedClassrooms.length === 0) {
+      alert('กรุณาเลือกห้องเรียนที่สอนอย่างน้อย 1 ห้อง');
+      return;
+    }
 
-    const classrooms = courseForm.classroomsText
-      .split(',')
-      .map((r) => r.trim())
-      .filter(Boolean);
+    const { periodsPerRoom } = calculatePeriodsPerWeek(
+      courseForm.credits,
+      courseForm.assignedClassrooms.length
+    );
 
     coursesCurriculumService.updateCourse(selectedCourse.id, {
       code: courseForm.code.trim(),
@@ -221,10 +310,10 @@ export const CoursesCurriculumView: React.FC = () => {
       strand: courseForm.strand,
       level: courseForm.level,
       credits: Number(courseForm.credits),
-      periodsPerWeek: Number(courseForm.periodsPerWeek),
+      periodsPerWeek: periodsPerRoom,
       academicYear: courseForm.academicYear,
       term: courseForm.term,
-      assignedClassrooms: classrooms,
+      assignedClassrooms: courseForm.assignedClassrooms,
     });
 
     setIsEditCourseModalOpen(false);
@@ -317,11 +406,49 @@ export const CoursesCurriculumView: React.FC = () => {
     showToast(`✓ เพิ่มสื่อการสอน "${mediaForm.title}" ในหน่วยการเรียนรู้แล้ว`);
   };
 
-  const handleDeleteMedia = (unitId: string, mediaId: string) => {
-    if (!selectedCourse) return;
-    coursesCurriculumService.deleteMediaItem(selectedCourse.id, unitId, mediaId);
-    refreshCourses();
-    showToast(`✓ ลบสื่อการสอนเรียบร้อยแล้ว`);
+  // Trash and Soft-Delete Media Handlers
+  const handleRequestDeleteMedia = (unitId: string, mediaId: string, title: string) => {
+    setMediaToDelete({ unitId, mediaId, title });
+  };
+
+  const handleConfirmDeleteMedia = () => {
+    if (!selectedCourse || !mediaToDelete) return;
+    const ok = coursesCurriculumService.softDeleteMediaItem(
+      selectedCourse.id,
+      mediaToDelete.unitId,
+      mediaToDelete.mediaId
+    );
+    if (ok) {
+      refreshCourses();
+      refreshTrash();
+      showToast(`✓ ย้าย "${mediaToDelete.title}" ไปไว้ในถังขยะเรียบร้อยแล้ว (กู้คืนได้ทุกเวลา)`);
+    }
+    setMediaToDelete(null);
+  };
+
+  const handleRestoreMedia = (trashId: string, title: string) => {
+    const ok = coursesCurriculumService.restoreMediaItem(trashId);
+    if (ok) {
+      refreshCourses();
+      refreshTrash();
+      showToast(`✓ กู้คืนไฟล์ "${title}" กลับเข้าสู่หน่วยการเรียนรู้เดิมเรียบร้อยแล้ว`);
+    }
+  };
+
+  const handlePermanentDeleteMedia = (trashId: string, title: string) => {
+    if (confirm(`คุณต้องการลบถาวร "${title}" ใช่หรือไม่? (ไม่สามารถกู้คืนได้อีก)`)) {
+      coursesCurriculumService.permanentDeleteMediaItem(trashId);
+      refreshTrash();
+      showToast(`✓ ลบไฟล์ออกจากถังขยะถาวรเรียบร้อยแล้ว`);
+    }
+  };
+
+  const handleEmptyTrash = () => {
+    if (confirm('คุณต้องการล้างถังขยะทั้งหมดใช่หรือไม่? ไฟล์ทั้งหมดจะถูกลบถาวร')) {
+      coursesCurriculumService.emptyTrash();
+      refreshTrash();
+      showToast('✓ ล้างถังขยะเรียบร้อยแล้ว');
+    }
   };
 
   // Handler for Copy Curriculum Across Years / Terms
@@ -372,6 +499,21 @@ export const CoursesCurriculumView: React.FC = () => {
         badgeText="Curriculum"
         actions={
           <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setIsTrashModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-rose-50 text-rose-700 rounded-xl text-xs sm:text-sm font-bold border border-slate-200 hover:border-rose-300 shadow-2xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+              title="ดูสื่อการสอนที่ลบไปแล้ว และกู้คืนกลับมา"
+            >
+              <Trash2 className="w-4 h-4 text-rose-600" />
+              <span>ถังขยะสื่อ</span>
+              {trashItems.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-100 text-rose-700 font-extrabold">
+                  {trashItems.length}
+                </span>
+              )}
+            </button>
+
             <button
               type="button"
               onClick={() => setIsCopyYearModalOpen(true)}
@@ -710,9 +852,9 @@ export const CoursesCurriculumView: React.FC = () => {
                                     )}
                                     <button
                                       type="button"
-                                      onClick={() => handleDeleteMedia(unit.id, media.id)}
+                                      onClick={() => handleRequestDeleteMedia(unit.id, media.id, media.title)}
                                       className="p-1 rounded text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                                      title="ลบสื่อนี้"
+                                      title="ย้ายสื่อนี้ไปถังขยะ"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
@@ -812,44 +954,133 @@ export const CoursesCurriculumView: React.FC = () => {
                 </select>
               </div>
 
+              {/* Credits & Period Calculation */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">หน่วยกิต (Credits):</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0.5"
-                    max="4.0"
+                  <select
                     value={courseForm.credits}
-                    onChange={(e) => setCourseForm({ ...courseForm, credits: parseFloat(e.target.value) || 1.0 })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-semibold focus:border-blue-500 focus:outline-none"
-                  />
+                    onChange={(e) => {
+                      const newCredits = parseFloat(e.target.value) || 1.0;
+                      const { periodsPerRoom } = calculatePeriodsPerWeek(
+                        newCredits,
+                        courseForm.assignedClassrooms.length
+                      );
+                      setCourseForm({
+                        ...courseForm,
+                        credits: newCredits,
+                        periodsPerWeek: periodsPerRoom,
+                      });
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold text-slate-800 bg-white focus:border-blue-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="0.5">0.5 หน่วยกิต (1 คาบ/ห้อง)</option>
+                    <option value="1.0">1.0 หน่วยกิต (2 คาบ/ห้อง)</option>
+                    <option value="1.5">1.5 หน่วยกิต (3 คาบ/ห้อง)</option>
+                    <option value="2.0">2.0 หน่วยกิต (4 คาบ/ห้อง)</option>
+                    <option value="2.5">2.5 หน่วยกิต (5 คาบ/ห้อง)</option>
+                    <option value="3.0">3.0 หน่วยกิต (6 คาบ/ห้อง)</option>
+                  </select>
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">จำนวนคาบ/สัปดาห์:</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={courseForm.periodsPerWeek}
-                    onChange={(e) => setCourseForm({ ...courseForm, periodsPerWeek: parseInt(e.target.value, 10) || 2 })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-semibold focus:border-blue-500 focus:outline-none"
-                  />
+                  <label className="font-bold text-slate-700 block mb-1">คาบเรียนต่อสัปดาห์ / ห้อง:</label>
+                  <div className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-extrabold text-blue-700 flex items-center justify-between">
+                    <span>{calculatePeriodsPerWeek(courseForm.credits).periodsPerRoom} คาบ/สัปดาห์</span>
+                    <span className="text-[10px] text-slate-400 font-medium">คำนวณอัตโนมัติ</span>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">ห้องเรียนที่สอน (คั่นด้วยจุลภาค):</label>
-                <input
-                  type="text"
-                  placeholder="เช่น ม.3/1, ม.3/2, ม.3/8"
-                  value={courseForm.classroomsText}
-                  onChange={(e) => setCourseForm({ ...courseForm, classroomsText: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 font-semibold focus:border-blue-500 focus:outline-none"
-                />
-                <span className="text-[10px] text-slate-400 mt-0.5 block">
-                  กำหนดห้องเรียนเพื่อให้นักเรียนในห้องเหล่านี้เข้าถึงสื่อและส่งงานได้
-                </span>
+              {/* Real Room Selection from Supabase (Zero Comma Text) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-700 flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-blue-600" />
+                    <span>ห้องเรียนที่สอน (เลือกจากห้องที่เปิดจริงในระบบ):</span>
+                  </label>
+                  <span className="text-[11px] font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                    เลือกแล้ว {courseForm.assignedClassrooms.length} ห้อง
+                  </span>
+                </div>
+
+                {/* Level Filter Tabs */}
+                <div className="flex items-center gap-1 overflow-x-auto pb-1">
+                  {['ALL', 'ม.1', 'ม.2', 'ม.3', 'ม.4', 'ม.5', 'ม.6'].map((lvl) => (
+                    <button
+                      key={lvl}
+                      type="button"
+                      onClick={() => setRoomFilterTab(lvl)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                        roomFilterTab === lvl
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {lvl === 'ALL' ? 'ทุกระดับ' : lvl}
+                    </button>
+                  ))}
+                  {roomFilterTab !== 'ALL' && (
+                    <button
+                      type="button"
+                      onClick={() => selectAllRoomsOfLevel(roomFilterTab)}
+                      className="text-[10px] font-bold text-blue-600 hover:underline px-2 cursor-pointer ml-auto whitespace-nowrap"
+                    >
+                      เลือก/ยกเลิก ทั้ง {roomFilterTab}
+                    </button>
+                  )}
+                </div>
+
+                {/* Room Chips Grid */}
+                <div className="p-3 bg-slate-50/80 rounded-2xl border border-slate-200 max-h-40 overflow-y-auto">
+                  {allClassrooms.length === 0 ? (
+                    <div className="text-center py-4 text-slate-400 text-xs">
+                      กำลังโหลดรายชื่อห้องเรียนจากระบบ...
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {allClassrooms
+                        .filter(
+                          (c) => roomFilterTab === 'ALL' || c.name.startsWith(roomFilterTab) || c.level.startsWith(roomFilterTab)
+                        )
+                        .map((c) => {
+                          const isSelected = courseForm.assignedClassrooms.includes(c.name);
+                          return (
+                            <button
+                              key={c.id || c.name}
+                              type="button"
+                              onClick={() => toggleRoomSelection(c.name)}
+                              className={`p-2 rounded-xl text-xs font-bold border flex items-center justify-between transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-300/40'
+                                  : 'bg-white text-slate-700 border-slate-200/90 hover:bg-blue-50/50 hover:border-blue-300'
+                              }`}
+                            >
+                              <span>{c.name}</span>
+                              {isSelected ? (
+                                <Check className="w-3.5 h-3.5 text-white" />
+                              ) : (
+                                <span className="w-3.5 h-3.5 rounded-full border border-slate-300" />
+                              )}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Total Teaching Load Indicator */}
+                <div className="p-2.5 rounded-xl bg-linear-to-r from-blue-50 to-indigo-50 border border-blue-200/80 flex items-center justify-between text-xs font-bold text-blue-900">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-blue-600" />
+                    <span>ภาระการสอนรวมทั้งหมด:</span>
+                  </div>
+                  <div className="text-sm font-black text-blue-700">
+                    {calculatePeriodsPerWeek(courseForm.credits, courseForm.assignedClassrooms.length).totalPeriodsPerWeek} คาบ / สัปดาห์
+                    <span className="text-[10px] text-slate-500 font-normal ml-1">
+                      ({calculatePeriodsPerWeek(courseForm.credits).periodsPerRoom} คาบ × {Math.max(1, courseForm.assignedClassrooms.length)} ห้อง)
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
@@ -904,14 +1135,133 @@ export const CoursesCurriculumView: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">ห้องเรียนที่สอน (คั่นด้วยจุลภาค):</label>
-                <input
-                  type="text"
-                  value={courseForm.classroomsText}
-                  onChange={(e) => setCourseForm({ ...courseForm, classroomsText: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 font-semibold focus:border-blue-500 focus:outline-none"
-                />
+              {/* Credits & Period Calculation */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">หน่วยกิต (Credits):</label>
+                  <select
+                    value={courseForm.credits}
+                    onChange={(e) => {
+                      const newCredits = parseFloat(e.target.value) || 1.0;
+                      const { periodsPerRoom } = calculatePeriodsPerWeek(
+                        newCredits,
+                        courseForm.assignedClassrooms.length
+                      );
+                      setCourseForm({
+                        ...courseForm,
+                        credits: newCredits,
+                        periodsPerWeek: periodsPerRoom,
+                      });
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold text-slate-800 bg-white focus:border-blue-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="0.5">0.5 หน่วยกิต (1 คาบ/ห้อง)</option>
+                    <option value="1.0">1.0 หน่วยกิต (2 คาบ/ห้อง)</option>
+                    <option value="1.5">1.5 หน่วยกิต (3 คาบ/ห้อง)</option>
+                    <option value="2.0">2.0 หน่วยกิต (4 คาบ/ห้อง)</option>
+                    <option value="2.5">2.5 หน่วยกิต (5 คาบ/ห้อง)</option>
+                    <option value="3.0">3.0 หน่วยกิต (6 คาบ/ห้อง)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">คาบเรียนต่อสัปดาห์ / ห้อง:</label>
+                  <div className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-extrabold text-blue-700 flex items-center justify-between">
+                    <span>{calculatePeriodsPerWeek(courseForm.credits).periodsPerRoom} คาบ/สัปดาห์</span>
+                    <span className="text-[10px] text-slate-400 font-medium">คำนวณอัตโนมัติ</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Real Room Selection from Supabase (Zero Comma Text) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-700 flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-blue-600" />
+                    <span>ห้องเรียนที่สอน (เลือกจากห้องที่เปิดจริงในระบบ):</span>
+                  </label>
+                  <span className="text-[11px] font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                    เลือกแล้ว {courseForm.assignedClassrooms.length} ห้อง
+                  </span>
+                </div>
+
+                {/* Level Filter Tabs */}
+                <div className="flex items-center gap-1 overflow-x-auto pb-1">
+                  {['ALL', 'ม.1', 'ม.2', 'ม.3', 'ม.4', 'ม.5', 'ม.6'].map((lvl) => (
+                    <button
+                      key={lvl}
+                      type="button"
+                      onClick={() => setRoomFilterTab(lvl)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                        roomFilterTab === lvl
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {lvl === 'ALL' ? 'ทุกระดับ' : lvl}
+                    </button>
+                  ))}
+                  {roomFilterTab !== 'ALL' && (
+                    <button
+                      type="button"
+                      onClick={() => selectAllRoomsOfLevel(roomFilterTab)}
+                      className="text-[10px] font-bold text-blue-600 hover:underline px-2 cursor-pointer ml-auto whitespace-nowrap"
+                    >
+                      เลือก/ยกเลิก ทั้ง {roomFilterTab}
+                    </button>
+                  )}
+                </div>
+
+                {/* Room Chips Grid */}
+                <div className="p-3 bg-slate-50/80 rounded-2xl border border-slate-200 max-h-40 overflow-y-auto">
+                  {allClassrooms.length === 0 ? (
+                    <div className="text-center py-4 text-slate-400 text-xs">
+                      กำลังโหลดรายชื่อห้องเรียนจากระบบ...
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {allClassrooms
+                        .filter(
+                          (c) => roomFilterTab === 'ALL' || c.name.startsWith(roomFilterTab) || c.level.startsWith(roomFilterTab)
+                        )
+                        .map((c) => {
+                          const isSelected = courseForm.assignedClassrooms.includes(c.name);
+                          return (
+                            <button
+                              key={c.id || c.name}
+                              type="button"
+                              onClick={() => toggleRoomSelection(c.name)}
+                              className={`p-2 rounded-xl text-xs font-bold border flex items-center justify-between transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-300/40'
+                                  : 'bg-white text-slate-700 border-slate-200/90 hover:bg-blue-50/50 hover:border-blue-300'
+                              }`}
+                            >
+                              <span>{c.name}</span>
+                              {isSelected ? (
+                                <Check className="w-3.5 h-3.5 text-white" />
+                              ) : (
+                                <span className="w-3.5 h-3.5 rounded-full border border-slate-300" />
+                              )}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Total Teaching Load Indicator */}
+                <div className="p-2.5 rounded-xl bg-linear-to-r from-blue-50 to-indigo-50 border border-blue-200/80 flex items-center justify-between text-xs font-bold text-blue-900">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-blue-600" />
+                    <span>ภาระการสอนรวมทั้งหมด:</span>
+                  </div>
+                  <div className="text-sm font-black text-blue-700">
+                    {calculatePeriodsPerWeek(courseForm.credits, courseForm.assignedClassrooms.length).totalPeriodsPerWeek} คาบ / สัปดาห์
+                    <span className="text-[10px] text-slate-500 font-normal ml-1">
+                      ({calculatePeriodsPerWeek(courseForm.credits).periodsPerRoom} คาบ × {Math.max(1, courseForm.assignedClassrooms.length)} ห้อง)
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
@@ -1317,6 +1667,160 @@ export const CoursesCurriculumView: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================================== */}
+      {/* MODAL 6: ยืนยันการลบสื่อการสอน (ย้ายไปถังขยะ)                             */}
+      {/* ==================================================================== */}
+      {mediaToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in font-sans">
+          <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-slide-up space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200">
+                <Trash2 className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">ย้ายสื่อการสอนไปถังขยะ?</h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  ไฟล์จะไม่สูญหาย และสามารถกู้คืนกลับมาได้ตลอดเวลา
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1">
+              <span className="font-bold text-slate-700">ชื่อไฟล์ / สื่อ:</span>
+              <p className="font-extrabold text-slate-900 truncate">{mediaToDelete.title}</p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setMediaToDelete(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold transition-colors cursor-pointer text-xs"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteMedia}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold shadow-md transition-colors cursor-pointer text-xs flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>ย้ายไปถังขยะ</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================================== */}
+      {/* MODAL 7: ถังขยะสื่อการสอน (Trash / Recycle Bin Modal)                    */}
+      {/* ==================================================================== */}
+      {isTrashModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in font-sans">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-slide-up space-y-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200">
+                  <Archive className="w-5 h-5 text-rose-600" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">
+                    ถังขยะสื่อการสอน ({trashItems.length})
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    รายการไฟล์และสื่อที่ถูกลบ สามารถกดกู้คืนกลับไปยังรายวิชาเดิมได้
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTrashModalOpen(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* List */}
+            <div className="overflow-y-auto space-y-2.5 flex-1 pr-1">
+              {trashItems.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200/80 text-xs text-slate-400 space-y-2">
+                  <Archive className="w-8 h-8 text-slate-300 mx-auto" />
+                  <p className="font-bold text-slate-600">ถังขยะว่างเปล่า</p>
+                  <p>ไม่มีสื่อการสอนที่ถูกลบค้างไว้</p>
+                </div>
+              ) : (
+                trashItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-3 bg-white rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-extrabold text-slate-900 truncate">
+                          {item.title}
+                        </span>
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-slate-100 text-slate-600 uppercase">
+                          {item.fileType || item.mediaType}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        <span className="text-blue-600 font-semibold">{item.originalCourseCode}</span>
+                        <span> • {item.originalUnitTitle}</span>
+                        <span> • ลบเมื่อ {item.deletedAt ? new Date(item.deletedAt).toLocaleDateString('th-TH') : '-'}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleRestoreMedia(item.id, item.title)}
+                        className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold border border-emerald-200 transition-colors flex items-center gap-1 cursor-pointer"
+                        title="กู้คืนไฟล์นี้กลับสู่หน่วยเดิม"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>กู้คืน</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePermanentDeleteMedia(item.id, item.title)}
+                        className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 font-bold border border-slate-200 transition-colors cursor-pointer"
+                        title="ลบถาวร"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+              {trashItems.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={handleEmptyTrash}
+                  className="text-xs font-bold text-rose-600 hover:text-rose-800 transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>ล้างถังขยะทั้งหมด</span>
+                </button>
+              ) : (
+                <div />
+              )}
+
+              <button
+                type="button"
+                onClick={() => setIsTrashModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs transition-colors cursor-pointer"
+              >
+                ปิด
+              </button>
+            </div>
           </div>
         </div>
       )}

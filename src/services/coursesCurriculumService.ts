@@ -47,7 +47,39 @@ export interface CourseCurriculumRecord {
   units: CurriculumUnit[];
 }
 
+export interface TrashMediaItem extends UnitMediaItem {
+  deletedAt: string;
+  originalCourseId: string;
+  originalCourseCode: string;
+  originalCourseName: string;
+  originalUnitId: string;
+  originalUnitTitle: string;
+}
+
 const STORAGE_KEY = 'kp_courses_curriculum';
+const TRASH_STORAGE_KEY = 'kp_curriculum_trash';
+
+/**
+ * คำนวณจำนวนคาบต่อสัปดาห์ตามหน่วยกิตและจำนวนห้องเรียน
+ * 0.5 หน่วยกิต = 1 คาบ/ห้อง
+ * 1.0 หน่วยกิต = 2 คาบ/ห้อง
+ * 1.5 หน่วยกิต = 3 คาบ/ห้อง
+ * 2.0 หน่วยกิต = 4 คาบ/ห้อง
+ */
+export const calculatePeriodsPerWeek = (
+  credits: number,
+  roomCount: number = 1
+): {
+  periodsPerRoom: number;
+  totalPeriodsPerWeek: number;
+} => {
+  const periodsPerRoom = Math.max(1, Math.round((Number(credits) || 1) * 2));
+  const safeRooms = Math.max(1, roomCount);
+  return {
+    periodsPerRoom,
+    totalPeriodsPerWeek: periodsPerRoom * safeRooms,
+  };
+};
 
 // ข้อมูลเริ่มต้นสำหรับระบบ
 const INITIAL_COURSES: CourseCurriculumRecord[] = [
@@ -364,6 +396,120 @@ class CoursesCurriculumService {
       return true;
     }
     return false;
+  }
+
+  // -------------------------------------------------------------
+  // ถังขยะสื่อการสอน (Trash / Recycle Bin for Media Items)
+  // -------------------------------------------------------------
+  private trashCache: TrashMediaItem[] | null = null;
+
+  private loadTrash(): TrashMediaItem[] {
+    if (this.trashCache) return this.trashCache;
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem(TRASH_STORAGE_KEY);
+      if (raw) {
+        this.trashCache = JSON.parse(raw);
+        return this.trashCache!;
+      }
+    } catch {
+      // ignore
+    }
+    this.trashCache = [];
+    return this.trashCache;
+  }
+
+  private saveTrash(): void {
+    if (typeof window === 'undefined' || !this.trashCache) return;
+    try {
+      localStorage.setItem(TRASH_STORAGE_KEY, JSON.stringify(this.trashCache));
+      window.dispatchEvent(new CustomEvent('kp-curriculum-trash-updated'));
+    } catch {
+      // ignore
+    }
+  }
+
+  public getTrashMediaItems(): TrashMediaItem[] {
+    return this.loadTrash();
+  }
+
+  public softDeleteMediaItem(courseId: string, unitId: string, mediaId: string): boolean {
+    const course = this.getCourseById(courseId);
+    if (!course) return false;
+
+    const unit = course.units.find((u) => u.id === unitId);
+    if (!unit) return false;
+
+    const item = unit.mediaItems.find((m) => m.id === mediaId);
+    if (!item) return false;
+
+    // Remove from unit
+    unit.mediaItems = unit.mediaItems.filter((m) => m.id !== mediaId);
+    this.save();
+
+    // Add to trash
+    const trash = this.loadTrash();
+    const trashItem: TrashMediaItem = {
+      ...item,
+      deletedAt: new Date().toISOString(),
+      originalCourseId: course.id,
+      originalCourseCode: course.code,
+      originalCourseName: course.name,
+      originalUnitId: unit.id,
+      originalUnitTitle: unit.title,
+    };
+    trash.unshift(trashItem);
+    this.saveTrash();
+    return true;
+  }
+
+  public restoreMediaItem(trashMediaId: string): boolean {
+    const trash = this.loadTrash();
+    const itemIndex = trash.findIndex((t) => t.id === trashMediaId);
+    if (itemIndex === -1) return false;
+
+    const item = trash[itemIndex];
+    const course = this.getCourseById(item.originalCourseId);
+    if (!course) return false;
+
+    let unit = course.units.find((u) => u.id === item.originalUnitId);
+    if (!unit && course.units.length > 0) {
+      unit = course.units[0];
+    }
+    if (!unit) return false;
+
+    const {
+      deletedAt,
+      originalCourseId,
+      originalCourseCode,
+      originalCourseName,
+      originalUnitId,
+      originalUnitTitle,
+      ...restoredMedia
+    } = item;
+
+    unit.mediaItems.push(restoredMedia);
+    this.save();
+
+    trash.splice(itemIndex, 1);
+    this.saveTrash();
+    return true;
+  }
+
+  public permanentDeleteMediaItem(trashMediaId: string): boolean {
+    const trash = this.loadTrash();
+    const len = trash.length;
+    this.trashCache = trash.filter((t) => t.id !== trashMediaId);
+    if (this.trashCache.length !== len) {
+      this.saveTrash();
+      return true;
+    }
+    return false;
+  }
+
+  public emptyTrash(): void {
+    this.trashCache = [];
+    this.saveTrash();
   }
 
   /**
