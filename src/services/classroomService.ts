@@ -11,13 +11,13 @@ const getLocalClassrooms = (): ClassroomRosterItem[] => {
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch {
         // fallback
       }
     }
   }
-  return [];
+  return INITIAL_SEED_CLASSROOMS;
 };
 
 const saveLocalClassrooms = (items: ClassroomRosterItem[]) => {
@@ -35,6 +35,123 @@ export interface TeacherAccountItem {
   position?: string;
   subjectGroup?: string;
 }
+
+export const DEFAULT_TEACHER_ACCOUNTS: TeacherAccountItem[] = [
+  {
+    id: 'u-panjapol',
+    name: 'นายปัญจพล เกษรัตน์',
+    username: 'panjapol.k',
+    email: 'panjapol.k@kutchap.ac.th',
+    role: 'TEACHER',
+    position: 'ครูประจำวิชา & ที่ปรึกษา ม.3/1',
+    subjectGroup: 'กลุ่มสาระการเรียนรู้วิทยาศาสตร์และเทคโนโลยี (ภาษาญี่ปุ่น)',
+  },
+  {
+    id: 'u-1',
+    name: 'ครูภาสภูมิ เรืองปราชญ์',
+    username: 'passapoom.r',
+    email: 'passapoom.r@kutchap.ac.th',
+    role: 'TEACHER',
+    position: 'ครูชำนาญการ • ที่ปรึกษา ม.3/1',
+    subjectGroup: 'กลุ่มสาระการเรียนรู้ศิลปะ',
+  },
+  {
+    id: 'u-2',
+    name: 'ครูวิภาดา สมบูรณ์',
+    username: 'wiphada.s',
+    email: 'wiphada.s@kutchap.ac.th',
+    role: 'STUDENT_AFFAIRS',
+    position: 'หัวหน้างานกิจการนักเรียน • ที่ปรึกษา ม.2/1',
+    subjectGroup: 'กลุ่มบริหารงานกิจการนักเรียน',
+  },
+  {
+    id: 'u-3',
+    name: 'นายสมชาย ใจดี',
+    username: 'somchai.j',
+    email: 'somchai.j@kutchap.ac.th',
+    role: 'ADMIN',
+    position: 'ผู้อำนวยการโรงเรียน',
+    subjectGroup: 'ฝ่ายบริหารโรงเรียน',
+  },
+  {
+    id: 'u-4',
+    name: 'ครูชูเกียรติ มุ่งมั่น',
+    username: 'chookiat.m',
+    email: 'chookiat.m@kutchap.ac.th',
+    role: 'TEACHER',
+    position: 'ครูชำนาญการพิเศษ • ที่ปรึกษา ม.1/1',
+    subjectGroup: 'กลุ่มสาระการเรียนรู้คณิตศาสตร์',
+  },
+  {
+    id: 'u-5',
+    name: 'ครูศิริพร บุญรักษา',
+    username: 'siriporn.b',
+    email: 'siriporn.b@kutchap.ac.th',
+    role: 'TEACHER',
+    position: 'ครู • ที่ปรึกษา ม.1/2',
+    subjectGroup: 'กลุ่มสาระการเรียนรู้ภาษาไทย',
+  },
+  {
+    id: 'u-6',
+    name: 'ครูนภาพร ศรีสุข',
+    username: 'napaporn.s',
+    email: 'napaporn.s@kutchap.ac.th',
+    role: 'TEACHER',
+    position: 'ครู • ที่ปรึกษา ม.2/2',
+    subjectGroup: 'กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ',
+  },
+  {
+    id: 'u-7',
+    name: 'ครูสุรชัย วิจิตรศิลป์',
+    username: 'surachai.w',
+    email: 'surachai.w@kutchap.ac.th',
+    role: 'TEACHER',
+    position: 'ครู • ที่ปรึกษา ม.3/2',
+    subjectGroup: 'กลุ่มสาระการเรียนรู้สุขศึกษาและพลศึกษา',
+  },
+  {
+    id: 'u-8',
+    name: 'ครูจิราภรณ์ แสนดี',
+    username: 'jiraporn.s',
+    email: 'jiraporn.s@kutchap.ac.th',
+    role: 'TEACHER',
+    position: 'ครู • ที่ปรึกษา ม.4/1',
+    subjectGroup: 'กลุ่มสาระการเรียนรู้การงานอาชีพ',
+  },
+  {
+    id: 'u-9',
+    name: 'ครูธนกร เกียรติขจร',
+    username: 'thanakorn.k',
+    email: 'thanakorn.k@kutchap.ac.th',
+    role: 'TEACHER',
+    position: 'ครูชำนาญการ • ที่ปรึกษา ม.5/1',
+    subjectGroup: 'กลุ่มสาระการเรียนรู้วิทยาศาสตร์และเทคโนโลยี',
+  },
+  {
+    id: 'u-10',
+    name: 'ครูพิมพ์ใจ รักษ์ถิ่น',
+    username: 'pimjai.r',
+    email: 'pimjai.r@kutchap.ac.th',
+    role: 'TEACHER',
+    position: 'ครู • ที่ปรึกษา ม.6/1',
+    subjectGroup: 'กลุ่มสาระการเรียนรู้สังคมศึกษา ศาสนา และวัฒนธรรม',
+  },
+];
+
+export const INITIAL_SEED_CLASSROOMS: ClassroomRosterItem[] = [
+  { id: 'room-1-1', name: 'ม.1/1', level: 'ม.1', roomNumber: 'ม.1/1', adviser: 'ครูชูเกียรติ มุ่งมั่น', studentCount: 30 },
+  { id: 'room-1-2', name: 'ม.1/2', level: 'ม.1', roomNumber: 'ม.1/2', adviser: 'ครูศิริพร บุญรักษา', studentCount: 28 },
+  { id: 'room-1-8', name: 'ม.1/8', level: 'ม.1', roomNumber: 'ม.1/8', adviser: 'ครูเอกชัย มิ่งขวัญ', studentCount: 27 },
+  { id: 'room-2-1', name: 'ม.2/1', level: 'ม.2', roomNumber: 'ม.2/1', adviser: 'ครูวิภาดา สมบูรณ์', studentCount: 32 },
+  { id: 'room-2-2', name: 'ม.2/2', level: 'ม.2', roomNumber: 'ม.2/2', adviser: 'ครูนภาพร ศรีสุข', studentCount: 31 },
+  { id: 'room-2-8', name: 'ม.2/8', level: 'ม.2', roomNumber: 'ม.2/8', adviser: 'ครูชนิกา ทรัพย์สุข', studentCount: 35 },
+  { id: 'room-3-1', name: 'ม.3/1', level: 'ม.3', roomNumber: 'ม.3/1', adviser: 'ครูภาสภูมิ เรืองปราชญ์', studentCount: 32 },
+  { id: 'room-3-2', name: 'ม.3/2', level: 'ม.3', roomNumber: 'ม.3/2', adviser: 'ครูสุรชัย วิจิตรศิลป์', studentCount: 30 },
+  { id: 'room-3-8', name: 'ม.3/8', level: 'ม.3', roomNumber: 'ม.3/8', adviser: 'นายปัญจพล เกษรัตน์', studentCount: 32 },
+  { id: 'room-4-1', name: 'ม.4/1', level: 'ม.4', roomNumber: 'ม.4/1', adviser: 'ครูจิราภรณ์ แสนดี', studentCount: 35 },
+  { id: 'room-5-1', name: 'ม.5/1', level: 'ม.5', roomNumber: 'ม.5/1', adviser: 'ครูธนกร เกียรติขจร', studentCount: 33 },
+  { id: 'room-6-1', name: 'ม.6/1', level: 'ม.6', roomNumber: 'ม.6/1', adviser: 'ครูพิมพ์ใจ รักษ์ถิ่น', studentCount: 34 },
+];
 
 const TEACHERS_CACHE_KEY = 'kp_teacher_accounts_cache';
 
@@ -81,7 +198,7 @@ export const classroomService = {
       }
     }
 
-    return [];
+    return DEFAULT_TEACHER_ACCOUNTS;
   },
   // READ: List all classrooms directly from Supabase (Zero Mock Data)
   async getAll(): Promise<ClassroomRosterItem[]> {

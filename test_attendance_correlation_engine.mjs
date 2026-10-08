@@ -1108,6 +1108,57 @@ assert.ok(timetableViewSrc.includes('kp_matrix_slots_updated'), 'TimetableView m
 assert.ok(timetableViewSrc.includes('saveMatrixSlotsWithDispatch'), 'TimetableView must use saveMatrixSlotsWithDispatch');
 console.log('  ✓ TimetableView.tsx dispatches kp_matrix_slots_updated on all slot updates');
 
-console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE, SUBJECT ICONS, BANNER COMPRESSOR, SIDEBAR UX, BELL SCHEDULE, MORNING ASSEMBLY, CLASSROOM ATTENDANCE, STICKERS CATALOG, ELAPSED ATTENDANCE %, PHASE 1 UNIFIED ARCHITECTURE & HOME ZERO-MOCK SYNC CHECKS PASSED!');
+// ----------------------------------------------------
+// Step 13: Classroom Management, Student Roster View, Grade Themes & Teacher Accounts Check
+// ----------------------------------------------------
+console.log('\n--- 13. Checking Classroom Management, Student Roster View, Grade Themes & Teacher Accounts ---');
+
+// 13.1 Check Teacher Accounts in classroomService.ts
+const classroomServiceSrc = readFileSync('src/services/classroomService.ts', 'utf8');
+assert.ok(classroomServiceSrc.includes('DEFAULT_TEACHER_ACCOUNTS'), 'Must export DEFAULT_TEACHER_ACCOUNTS');
+assert.ok(classroomServiceSrc.includes('getTeacherAccounts'), 'Must have getTeacherAccounts method');
+assert.ok(classroomServiceSrc.includes('นายปัญจพล เกษรัตน์'), 'Must include real teacher นายปัญจพล เกษรัตน์');
+assert.ok(classroomServiceSrc.includes('ครูภาสภูมิ เรืองปราชญ์'), 'Must include real teacher ครูภาสภูมิ เรืองปราชญ์');
+console.log('  ✓ classroomService.ts teacher accounts and fallback verified');
+
+// 13.2 Check Grade Level Themes in gradeLevelTheme.ts
+const gradeThemeSrc = readFileSync('src/utils/gradeLevelTheme.ts', 'utf8');
+assert.ok(gradeThemeSrc.includes("GRADE_LEVEL_THEMES"), 'Must export GRADE_LEVEL_THEMES');
+assert.ok(gradeThemeSrc.includes("'ม.1':"), 'Must have ม.1 theme');
+assert.ok(gradeThemeSrc.includes("'ม.2':"), 'Must have ม.2 theme');
+assert.ok(gradeThemeSrc.includes("'ม.3':"), 'Must have ม.3 theme');
+assert.ok(gradeThemeSrc.includes("'ม.4':"), 'Must have ม.4 theme');
+assert.ok(gradeThemeSrc.includes("'ม.5':"), 'Must have ม.5 theme');
+assert.ok(gradeThemeSrc.includes("'ม.6':"), 'Must have ม.6 theme');
+assert.ok(gradeThemeSrc.includes('getGradeLevelTheme'), 'Must export getGradeLevelTheme');
+console.log('  ✓ gradeLevelTheme.ts themes for ม.1 - ม.6 verified');
+
+// 13.3 Check ClassroomManagementView.tsx
+const clsManagementSrc = readFileSync('src/views/ClassroomManagementView.tsx', 'utf8');
+assert.ok(clsManagementSrc.includes('getGradeLevelTheme'), 'Must use getGradeLevelTheme');
+assert.ok(clsManagementSrc.includes('onManageStudents'), 'Must handle onManageStudents');
+assert.ok(clsManagementSrc.includes('จัดการนักเรียน'), 'Must have จัดการนักเรียน button');
+assert.ok(clsManagementSrc.includes('md:hidden'), 'Must have mobile stacked cards view (no horizontal table on phones)');
+console.log('  ✓ ClassroomManagementView.tsx grade colors, manage student navigation, and mobile cards verified');
+
+// 13.4 Check StudentRosterView.tsx
+const stuRosterSrc = readFileSync('src/views/StudentRosterView.tsx', 'utf8');
+assert.ok(stuRosterSrc.includes('จัดการนักเรียน / นักเรียน'), 'Must match mockup title: จัดการนักเรียน / นักเรียน');
+assert.ok(stuRosterSrc.includes('มาเรียนปกติ'), 'Must have KPI: มาเรียนปกติ');
+assert.ok(stuRosterSrc.includes('ขาดเรียน'), 'Must have KPI: ขาดเรียน');
+assert.ok(stuRosterSrc.includes('ลาเรียน'), 'Must have KPI: ลาเรียน');
+assert.ok(stuRosterSrc.includes('โปรไฟล์'), 'Must have action: โปรไฟล์');
+assert.ok(stuRosterSrc.includes('ผลการเรียน'), 'Must have action: ผลการเรียน');
+assert.ok(stuRosterSrc.includes('md:hidden'), 'Must have mobile stacked cards view');
+assert.ok(stuRosterSrc.includes('onBackToClassrooms'), 'Must support back navigation to classrooms');
+console.log('  ✓ StudentRosterView.tsx mockup parity, 4 KPIs, actions, and mobile view verified');
+
+// 13.5 Check TeacherSidebar.tsx navigation items
+const sidebarSrc = readFileSync('src/components/layout/TeacherSidebar.tsx', 'utf8');
+assert.ok(sidebarSrc.includes("'classrooms'"), 'TeacherSidebar must have classrooms menu (หน้าห้องเรียน)');
+assert.ok(sidebarSrc.includes("'roster'"), 'TeacherSidebar must have roster menu (หน้ารายชื่อนักเรียน)');
+console.log('  ✓ TeacherSidebar.tsx includes both classrooms and roster menus');
+
+console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE, SUBJECT ICONS, BANNER COMPRESSOR, SIDEBAR UX, BELL SCHEDULE, MORNING ASSEMBLY, CLASSROOM ATTENDANCE, STICKERS CATALOG, ELAPSED ATTENDANCE %, PHASE 1 UNIFIED ARCHITECTURE, HOME ZERO-MOCK SYNC & CLASSROOMS/ROSTER CHECKS PASSED!');
 
 

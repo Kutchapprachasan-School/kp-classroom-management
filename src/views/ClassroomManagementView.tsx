@@ -386,8 +386,8 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
           </div>
         </div>
 
-        {/* Table Content */}
-        <div className="overflow-x-auto">
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-slate-50/80 text-slate-600 border-b border-slate-200/80 font-bold uppercase tracking-wider">
@@ -512,6 +512,91 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Stacked Cards View (No horizontal scrolling on phones) */}
+        <div className="md:hidden p-4 space-y-3 bg-slate-50/50">
+          {filteredClassrooms.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 bg-white rounded-2xl border border-slate-200">
+              {isLoading ? 'กำลังโหลดข้อมูลห้องเรียน...' : 'ไม่พบข้อมูลห้องเรียน'}
+            </div>
+          ) : (
+            filteredClassrooms.map((room) => {
+              const theme = getGradeLevelTheme(room.name || room.level);
+              return (
+                <div
+                  key={room.id}
+                  className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs space-y-3"
+                >
+                  {/* Card Header: Room Name + Level Tag + Student Count */}
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl border font-extrabold text-sm shadow-2xs ${theme.pillBg} ${theme.pillText} ${theme.pillBorder}`}
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full ${theme.dotColor}`} />
+                      <span>{room.name}</span>
+                    </span>
+
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${theme.chipBg} ${theme.chipText}`}
+                      >
+                        {theme.shortLabel}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-xs">
+                        {room.studentCount || 0} คน
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card Body: Adviser */}
+                  <div className="flex items-center gap-2 text-xs text-slate-600 bg-slate-50/80 p-2.5 rounded-xl border border-slate-100">
+                    <UserCheck className="w-4 h-4 text-blue-600 shrink-0" />
+                    <div className="flex-1 truncate">
+                      <span className="text-slate-400 text-[11px]">ครูที่ปรึกษา: </span>
+                      <span className="font-semibold text-slate-800">
+                        {room.adviser || 'ยังไม่ได้กำหนด'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card Actions: Primary Button (min-height 44px) + Admin Controls */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => onManageStudents(room)}
+                      className="flex-1 min-h-[44px] bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs"
+                      title={`จัดการรายชื่อนักเรียนห้อง ${room.name}`}
+                    >
+                      <Users className="w-4 h-4" />
+                      <span>จัดการนักเรียน</span>
+                    </button>
+
+                    {isFullAccess && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditModal(room)}
+                          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 rounded-xl transition-colors cursor-pointer"
+                          title="แก้ไขห้องเรียน"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDeleteModal(room)}
+                          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 rounded-xl transition-colors cursor-pointer"
+                          title="ลบห้องเรียน"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 

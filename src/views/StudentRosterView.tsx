@@ -34,6 +34,7 @@ import { studentService, type StudentRecord } from '../services/studentService';
 import { messagingService, STUDENT_TRANSFERRED_EVENT } from '../services/messagingService';
 import type { ClassroomRosterItem, AtRiskStudent } from '../types/viewModels';
 import type { SchoolUserRole } from '../config/schoolRoles';
+import { getGradeLevelTheme } from '../utils/gradeLevelTheme';
 
 interface StudentRosterViewProps {
   initialClassroomId?: string;
@@ -679,35 +680,58 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
                 onClick={() => setIsClassDropdownOpen((prev) => !prev)}
                 className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:border-slate-300 rounded-xl font-bold text-slate-700 shadow-2xs transition-colors cursor-pointer"
               >
-                <span>{selectedClass?.name || 'ม.3/1'}</span>
+                {selectedClass ? (
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg border font-extrabold text-xs ${
+                      getGradeLevelTheme(selectedClass.name).pillBg
+                    } ${getGradeLevelTheme(selectedClass.name).pillText} ${
+                      getGradeLevelTheme(selectedClass.name).pillBorder
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        getGradeLevelTheme(selectedClass.name).dotColor
+                      }`}
+                    />
+                    <span>{selectedClass.name}</span>
+                  </span>
+                ) : (
+                  <span>ม.3/1</span>
+                )}
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </button>
 
               {isClassDropdownOpen && (
-                <div className="absolute left-0 top-full mt-1.5 w-60 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-1.5 space-y-1 max-h-64 overflow-y-auto animate-scale-up">
+                <div className="absolute left-0 top-full mt-1.5 w-64 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-1.5 space-y-1 max-h-64 overflow-y-auto animate-scale-up">
                   <div className="px-2.5 py-1 text-[11px] font-bold text-slate-400">
                     เลือกห้องเรียน
                   </div>
-                  {allClassrooms.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedClass(c);
-                        setIsClassDropdownOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-left font-semibold transition-colors cursor-pointer ${
-                        selectedClass?.id === c.id
-                          ? 'bg-blue-50 text-blue-700 font-bold'
-                          : 'hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <span>{c.name}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {c.studentCount || 0} คน
-                      </span>
-                    </button>
-                  ))}
+                  {allClassrooms.map((c) => {
+                    const theme = getGradeLevelTheme(c.name);
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedClass(c);
+                          setIsClassDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-left font-semibold transition-colors cursor-pointer ${
+                          selectedClass?.id === c.id
+                            ? 'bg-blue-50 text-blue-700 font-bold'
+                            : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-full ${theme.dotColor}`} />
+                          <span className="font-bold">{c.name}</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {c.studentCount || 0} คน
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1144,7 +1168,24 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
 
                     {/* ชั้น/ห้อง */}
                     <td className="py-3 px-4 font-semibold text-slate-600">
-                      {selectedClass?.name || 'ม.3/1'}
+                      {selectedClass ? (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border font-bold text-xs ${
+                            getGradeLevelTheme(selectedClass.name).pillBg
+                          } ${getGradeLevelTheme(selectedClass.name).pillText} ${
+                            getGradeLevelTheme(selectedClass.name).pillBorder
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              getGradeLevelTheme(selectedClass.name).dotColor
+                            }`}
+                          />
+                          <span>{selectedClass.name}</span>
+                        </span>
+                      ) : (
+                        'ม.3/1'
+                      )}
                     </td>
 
                     {/* เลขที่ */}
