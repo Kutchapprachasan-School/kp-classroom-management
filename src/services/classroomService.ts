@@ -26,7 +26,63 @@ const saveLocalClassrooms = (items: ClassroomRosterItem[]) => {
   }
 };
 
+export interface TeacherAccountItem {
+  id: string;
+  name: string;
+  username?: string;
+  email?: string;
+  role?: string;
+  position?: string;
+  subjectGroup?: string;
+}
+
+const TEACHERS_CACHE_KEY = 'kp_teacher_accounts_cache';
+
 export const classroomService = {
+  // READ: List all real teacher accounts directly from Supabase User table
+  async getTeacherAccounts(): Promise<TeacherAccountItem[]> {
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('User')
+          .select('id, name, username, email, role, position, subjectGroup')
+          .order('name', { ascending: true });
+
+        if (!error && data && data.length > 0) {
+          const teachers: TeacherAccountItem[] = data.filter((u: any) =>
+            u.role === 'TEACHER' ||
+            u.role === 'ADMIN' ||
+            u.position?.includes('ครู') ||
+            u.position?.includes('ผู้อำนวยการ') ||
+            u.position?.includes('รองผู้') ||
+            u.subjectGroup
+          );
+          if (teachers.length > 0) {
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem(TEACHERS_CACHE_KEY, JSON.stringify(teachers));
+            }
+            return teachers;
+          }
+        }
+      } catch (err) {
+        console.warn('Error fetching teacher accounts from Supabase:', err);
+      }
+    }
+
+    if (typeof localStorage !== 'undefined') {
+      const cached = localStorage.getItem(TEACHERS_CACHE_KEY);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    return [];
+  },
   // READ: List all classrooms directly from Supabase (Zero Mock Data)
   async getAll(): Promise<ClassroomRosterItem[]> {
     if (isSupabaseConfigured) {

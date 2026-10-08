@@ -4,20 +4,21 @@ import { z } from 'zod';
 export const ClassroomCreateSchema = z.object({
   name: z.string().min(1, 'ต้องระบุชื่อชั้นเรียน เช่น ม.3/1'),
   level: z.string().min(1, 'ต้องระบุระดับชั้น เช่น ม.3'),
-  subjectCode: z.string().min(1, 'ต้องระบุรหัสวิชา เช่น ศ23101'),
-  subjectName: z.string().min(1, 'ต้องระบุชื่อวิชา เช่น ศิลปะ'),
+  subjectCode: z.string().optional().default('ศ23101'),
+  subjectName: z.string().optional().default('ศิลปะ'),
   adviser: z.string().optional(),
   termId: z.string().optional().default('term-1-2569'),
 });
-export type ClassroomCreateInput = z.infer<typeof ClassroomCreateSchema>;
+export type ClassroomCreateInput = z.input<typeof ClassroomCreateSchema>;
 
 export const StudentCreateSchema = z.object({
   studentNo: z.number().int().min(1, 'เลขที่ต้องมากกว่า 0'),
   studentCode: z.string().min(1, 'ต้องระบุรหัสนักเรียน'),
   name: z.string().min(1, 'ต้องระบุชื่อ-นามสกุล'),
+  gender: z.enum(['MALE', 'FEMALE']).optional().default('MALE'),
   status: z.enum(['NORMAL', 'AT_RISK']).default('NORMAL'),
 });
-export type StudentCreateInput = z.infer<typeof StudentCreateSchema>;
+export type StudentCreateInput = z.input<typeof StudentCreateSchema>;
 
 // ================= ASSIGNMENT & EXAM SCHEMAS =================
 export const AssignmentCreateSchema = z.object({

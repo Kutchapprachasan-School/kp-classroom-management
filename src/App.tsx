@@ -10,7 +10,8 @@ import { ExamManagementView } from './views/ExamManagementView';
 import { AssignmentManagementView } from './views/AssignmentManagementView';
 import { CoursesCurriculumView } from './views/CoursesCurriculumView';
 import { LessonPlansView } from './views/LessonPlansView';
-import { ClassroomsRosterView } from './views/ClassroomsRosterView';
+import { ClassroomManagementView } from './views/ClassroomManagementView';
+import { StudentRosterView } from './views/StudentRosterView';
 import { TimetableView } from './views/TimetableView';
 import { AcademicTermsView } from './views/AcademicTermsView';
 import { MessagesView } from './views/MessagesView';
@@ -105,6 +106,7 @@ export const App: React.FC = () => {
   const [isQuickBarOpen, setIsQuickBarOpen] = useState(false);
   const [isDevToolbarVisible, setIsDevToolbarVisible] = useState(false);
   const [selectedTaskForModal, setSelectedTaskForModal] = useState<DailyTodoItem | null>(null);
+  const [selectedClassroomIdForRoster, setSelectedClassroomIdForRoster] = useState<string | undefined>(undefined);
 
   // Toggle sidebar for both mobile drawer and desktop collapsible panel
   const handleToggleSidebar = React.useCallback(() => {
@@ -249,8 +251,10 @@ export const App: React.FC = () => {
         return 'หลักสูตร/แผนการสอน';
       case 'lessons':
         return 'หลักสูตร/แผนการสอน';
+      case 'classrooms':
+        return 'จัดการห้องเรียน (Classrooms)';
       case 'roster':
-        return 'ห้องเรียน / รายชื่อนักเรียน';
+        return 'จัดการนักเรียน / นักเรียน (Student Roster)';
       case 'student':
         return 'ข้อมูลนักเรียน';
       case 'timetable':
@@ -621,12 +625,22 @@ export const App: React.FC = () => {
 
               {currentView === 'lessons' && <LessonPlansView />}
 
-              {currentView === 'roster' && (
-                <ClassroomsRosterView
-                  onSelectStudent={handleSelectStudent}
-                  onSelectClassroom={() => setCurrentView('class-overview')}
+              {currentView === 'classrooms' && (
+                <ClassroomManagementView
                   activeRole={activeRole}
-                  onChangeRole={handleChangeRole}
+                  onManageStudents={(room) => {
+                    setSelectedClassroomIdForRoster(room.id);
+                    setCurrentView('roster');
+                  }}
+                />
+              )}
+
+              {currentView === 'roster' && (
+                <StudentRosterView
+                  initialClassroomId={selectedClassroomIdForRoster}
+                  activeRole={activeRole}
+                  onSelectStudent={handleSelectStudent}
+                  onBackToClassrooms={() => setCurrentView('classrooms')}
                 />
               )}
 

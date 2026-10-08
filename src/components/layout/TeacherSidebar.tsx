@@ -21,6 +21,7 @@ import {
   UserCheck,
   ClipboardCheck,
   Award,
+  Layers,
 } from 'lucide-react';
 import {
   getSchoolSettings,
@@ -51,6 +52,7 @@ export type TeacherViewKey =
   | 'student-council'
   | 'courses'
   | 'lessons'
+  | 'classrooms'
   | 'roster'
   | 'student'
   | 'timetable'
@@ -172,8 +174,13 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       icon: Award,
     },
     {
+      key: 'classrooms',
+      label: 'ห้องเรียน',
+      icon: Layers,
+    },
+    {
       key: 'roster',
-      label: 'ห้องเรียน / รายชื่อนักเรียน',
+      label: 'รายชื่อนักเรียน',
       icon: Users,
     },
     {
