@@ -1,7 +1,11 @@
 // src/components/layout/PageHeroBanner.tsx
-// แบนเนอร์หัวหน้าเว็บดีไซน์ Pastel Anime Education Dashboard (ตามภาพที่ 2 media_1791345472357.png)
-// ข้อความด้านซ้ายจะเปลี่ยนตามแต่ละหน้า ส่วนภาพพื้นหลัง/การจัดวางดึงจาก teacherBannerService
-// รองรับการปรับความโปร่งแสง, การขยับตำแหน่ง (Pan X/Y), ซูม, และแสดงผลแบบ Responsive ทั้ง PC และ Mobile
+// แบนเนอร์หัวหน้าเว็บมาตรฐานสำหรับทุกหน้า (Master Page Hero Banner)
+// ตามภาพต้นแบบ media_1791433581154_fc64a813.png
+// โครงสร้างมาตรฐานเดียวกันทุกหน้า:
+// 1. ซ้าย: ไอคอนประจำหน้าในกล่องมนสีฟ้า + ชื่อหน้าตัวหนาคมชัด + คำอธิบายรอง + แถบ Bullets/Tags ด้านล่าง
+// 2. ขวา-กลาง: คำคมหรือสโลแกนประจำหน้าแบบจัดวาง 3 บรรทัดพร้อมเครื่องบินกระดาษ ✈
+// 3. ขวา: ภาพประกอบโรงเรียนและนักเรียนอนิเมะ (hero_banner.png) พร้อมเลเยอร์ไล่เฉดสีฟ้าพาสเทลโปร่งสบายตา
+// 4. รองรับปุ่มการทำงานหลัก (Actions) และการปรับแต่งภาพแบนเนอร์ของแอดมิน
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -11,16 +15,35 @@ import {
 } from '../../services/teacherBannerService';
 
 export interface PageHeroBannerProps {
+  /** ชื่อหัวข้อหน้าเว็บหลัก */
   title: string;
+  /** คำอธิบายวัตถุประสงค์ของหน้านี้ (สั้น กระชับ 1 บรรทัด) */
   subtitle: string;
+  /** ไอคอนประจำหน้า (เช่น MingCute หรือ Lucide Icon) */
   icon?: React.ReactNode;
+  /** คลาสสีพื้นหลังของไอคอน (ค่าเริ่มต้น: bg-blue-600 text-white) */
   iconBgClass?: string;
-  iconColorClass?: string;
+  /** ป้ายกำกับเล็กข้างชื่อ เช่น 'ม.3/1', 'โฮมรูม', 'SAR' */
   badgeText?: string;
+  /** คลาสสีของป้ายกำกับ */
+  badgeClass?: string;
+  /** ข้อความแท็ก/Bullets ใต้คำอธิบาย เช่น 'สอบเก็บคะแนน • สอบกลางภาค • สอบปลายภาค' */
+  tagText?: string;
+  /** รายการแท็กแบบอาร์เรย์ (จะถูกเชื่อมด้วย ' • ' อัตโนมัติ) */
+  tags?: string[];
+  /** ไอคอนนำหน้าแท็ก (ค่าเริ่มต้น: ⏱) */
+  tagIcon?: string | React.ReactNode;
+  /** ข้อความคำคมหรือสโลแกนประจำหน้า (แสดง 2-3 บรรทัด) */
+  quoteLines?: string[];
+  /** ข้อความคำคมเดี่ยว (กรณีไม่ได้แยกบรรทัด) */
   quoteText?: string;
-  className?: string;
+  /** ปุ่มคำสั่ง Action หรือ Dropdown เพิ่มเติม */
   actions?: React.ReactNode;
+  /** คลาส Tailwind เพิ่มเติมสำหรับคอนเทนเนอร์หลัก */
+  className?: string;
+  /** ฟังก์ชันเปิดการตั้งค่าแบนเนอร์ (สำหรับ Admin) */
   onOpenBannerSettings?: () => void;
+  /** ระบุว่าผู้ใช้เป็นแอดมินหรือไม่ */
   isAdmin?: boolean;
 }
 
@@ -30,9 +53,14 @@ export const PageHeroBanner: React.FC<PageHeroBannerProps> = ({
   icon,
   iconBgClass = 'bg-blue-600 text-white',
   badgeText,
+  badgeClass = 'bg-blue-100 text-blue-800 border-blue-200',
+  tagText,
+  tags,
+  tagIcon = '⏱',
+  quoteLines,
   quoteText,
-  className = '',
   actions,
+  className = '',
   onOpenBannerSettings,
   isAdmin = false,
 }) => {
@@ -48,88 +76,145 @@ export const PageHeroBanner: React.FC<PageHeroBannerProps> = ({
     return () => window.removeEventListener(TEACHER_BANNERS_EVENT, handleUpdate);
   }, []);
 
-  const imageUrl = heroBanner.customUrl || heroBanner.defaultUrl;
+  const imageUrl = heroBanner.customUrl || heroBanner.defaultUrl || '/images/teacher/hero_banner.png';
   const opacity = (heroBanner.opacity ?? 100) / 100;
   const posX = heroBanner.positionX ?? 0;
   const posY = heroBanner.positionY ?? 0;
   const scale = (heroBanner.scale ?? 100) / 100;
-  const activeQuote = quoteText || heroBanner.quoteText || '“การตั้งใจทำทุกครั้ง ช่วยให้เราก้าวหน้าได้ขึ้น นะคะ ♡”';
-  const showQuote = heroBanner.showQuote !== false;
+
+  // จัดการข้อความแท็ก Bullets
+  const combinedTagText = tagText || (tags && tags.length > 0 ? tags.join(' • ') : null);
+
+  // จัดการคำคม (Quote)
+  let activeQuoteLines: string[] = [];
+  if (quoteLines && quoteLines.length > 0) {
+    activeQuoteLines = quoteLines;
+  } else if (quoteText) {
+    activeQuoteLines = quoteText
+      .replace(/^[“"']|[”"']$/g, '')
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  } else if (heroBanner.quoteText) {
+    activeQuoteLines = heroBanner.quoteText
+      .replace(/^[“"']|[”"']$/g, '')
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
 
   return (
     <div
-      className={`relative w-full rounded-2xl sm:rounded-3xl border border-[#E6EEF7] bg-white shadow-2xs overflow-hidden select-none transition-all ${className}`}
+      className={`relative w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-blue-100/90 shadow-xs bg-sky-100 select-none transition-all ${className}`}
     >
       {/* ------------------------------------------------------------- */}
-      {/* 1. Background Graphic with Adjustable Pan, Zoom & Opacity      */}
+      {/* 1. Background Artwork & Pastel Gradient Fader                 */}
       {/* ------------------------------------------------------------- */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <img
           src={imageUrl}
-          alt="School Hero Banner"
+          alt={title}
           style={{
             opacity,
             transform: `translate(${posX}%, ${posY}%) scale(${scale})`,
-            transformOrigin: 'center center',
+            transformOrigin: 'right center',
           }}
-          className="w-full h-full object-cover object-right md:object-center transition-all duration-300"
+          className="w-full h-full object-cover object-right transition-all duration-300"
+          onError={(e) => {
+            if (e.currentTarget.src !== '/images/teacher/hero_banner.png') {
+              e.currentTarget.src = '/images/teacher/hero_banner.png';
+            }
+          }}
         />
-
-        {/* Soft Left Gradient Overlay to guarantee text legibility */}
-        <div className="absolute inset-0 bg-gradient-to-r from-white via-white/85 to-transparent sm:to-white/10" />
+        {/* Soft Left Gradient Overlay รับประกันว่าข้อความและปุ่มอ่านง่าย ชัดเจน 100% */}
+        <div className="absolute inset-0 bg-gradient-to-r from-white/95 via-sky-50/80 sm:via-sky-50/70 to-transparent" />
       </div>
 
       {/* ------------------------------------------------------------- */}
       {/* 2. Banner Foreground Content                                  */}
       {/* ------------------------------------------------------------- */}
-      <div className="relative z-10 px-4 sm:px-6 md:px-8 py-5 sm:py-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 min-h-[110px] sm:min-h-[135px]">
-        {/* Left: Icon + Title & Subtitle */}
-        <div className="flex items-center gap-3.5 sm:gap-4 max-w-xl">
-          {icon && (
-            <div
-              className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl ${iconBgClass} flex items-center justify-center shrink-0 shadow-md shadow-blue-500/15 border border-white/60`}
-            >
-              {icon}
+      <div className="relative min-h-[110px] sm:min-h-[130px] flex flex-col md:flex-row md:items-center justify-between px-5 sm:px-8 py-4 sm:py-5 z-10 gap-4">
+        {/* Left Section: Icon + Title & Subtitle + Tags */}
+        <div className="space-y-2 max-w-2xl">
+          <div className="flex items-center gap-3 sm:gap-3.5">
+            {icon && (
+              <div
+                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl ${iconBgClass} flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20 border border-white/60`}
+              >
+                {icon}
+              </div>
+            )}
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">
+                  {title}
+                </h1>
+                {badgeText && (
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-extrabold border ${badgeClass}`}
+                  >
+                    {badgeText}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5 leading-snug">
+                {subtitle}
+              </p>
+            </div>
+          </div>
+
+          {/* Bullets / Feature Tags Row under Subtitle */}
+          {combinedTagText && (
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 pl-14 flex-wrap">
+              <span className="text-slate-400 shrink-0">{tagIcon}</span>
+              <span className="leading-snug">{combinedTagText}</span>
             </div>
           )}
-
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">
-                {title}
-              </h1>
-              {badgeText && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800 border border-blue-200">
-                  {badgeText}
-                </span>
-              )}
-            </div>
-            <p className="text-xs sm:text-sm text-slate-600 font-medium leading-snug">
-              {subtitle}
-            </p>
-          </div>
         </div>
 
-        {/* Right: Cute Anime Quote Bubble & Action Buttons */}
-        <div className="flex items-center gap-2 self-end md:self-center">
-          {showQuote && activeQuote && (
-            <div className="hidden lg:flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-white/85 backdrop-blur-xs border border-pink-100 shadow-2xs text-[#163A66] text-xs font-bold transition-transform hover:scale-102">
-              <span className="text-pink-500">🌸</span>
-              <span className="italic">{activeQuote}</span>
+        {/* Right Section: Stylized Thai Quote & Action Buttons */}
+        <div className="flex items-center gap-4 self-end md:self-center shrink-0">
+          {/* Stylized Thai Quote (ตรงตามภาพ media_1791433581154_fc64a813.png) */}
+          {activeQuoteLines.length > 0 && (
+            <div className="hidden md:flex flex-col items-end text-right pr-2 lg:pr-10 select-none">
+              {activeQuoteLines.map((line, idx) => {
+                const isFirst = idx === 0;
+                const isLast = idx === activeQuoteLines.length - 1;
+                return (
+                  <p
+                    key={idx}
+                    className="text-xs sm:text-sm font-bold text-slate-800 drop-shadow-xs flex items-center gap-1.5 justify-end leading-relaxed"
+                  >
+                    {isFirst && <span className="text-blue-900 font-black">“ </span>}
+                    <span>{line}</span>
+                    {isLast && (
+                      <>
+                        <span className="text-blue-900 font-black"> ”</span>
+                        <span className="text-blue-500 font-normal">✈</span>
+                      </>
+                    )}
+                  </p>
+                );
+              })}
             </div>
           )}
 
-          {actions}
+          {/* Actions (Buttons / Filters / Switchers) */}
+          {actions && (
+            <div className="flex flex-wrap items-center gap-2">
+              {actions}
+            </div>
+          )}
 
-          {/* Quick Admin Edit Button */}
+          {/* Admin Banner Settings Quick Trigger */}
           {isAdmin && onOpenBannerSettings && (
             <button
               type="button"
               onClick={onOpenBannerSettings}
-              className="px-2.5 py-1 rounded-xl bg-slate-900/70 hover:bg-slate-900 text-white text-[11px] font-bold shadow-xs backdrop-blur-xs transition-colors cursor-pointer"
+              className="px-2.5 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-900 text-white text-[11px] font-bold shadow-xs backdrop-blur-xs transition-colors cursor-pointer border border-white/20"
               title="ปรับแต่งภาพแบนเนอร์และตำแหน่ง (Admin)"
             >
-              ⚙️ ปรับแต่งภาพ
+              ⚙️ แบนเนอร์
             </button>
           )}
         </div>

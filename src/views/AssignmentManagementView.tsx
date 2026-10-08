@@ -4,7 +4,6 @@ import {
   Clock,
   Eye,
   Check,
-  Sparkles,
   Calculator,
   BookOpen,
   CheckSquare,
@@ -29,6 +28,7 @@ import { SgsClassroomMatrixModal } from '../components/teacher/SgsClassroomMatri
 import { Submission3ColorMatrixModal } from '../components/teacher/Submission3ColorMatrixModal';
 import { AssignmentBundlesModal } from '../components/teacher/AssignmentBundlesModal';
 import { GradingWorkspaceModal } from '../components/teacher/GradingWorkspaceModal';
+import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 
 export type QuickFilterMode = 'ALL' | 'MISSING_OR_R' | 'PENDING_REVIEW';
 
@@ -268,44 +268,31 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       </div>
 
       {/* ==================================================================== */}
-      {/* 2. HERO BANNER: Pastel Anime Education Aesthetic */}
+      {/* 2. HERO BANNER: Master PageHeroBanner Design                        */}
       {/* ==================================================================== */}
-      <div className="relative rounded-3xl overflow-hidden border border-blue-100 bg-gradient-to-r from-[#EBF4FF] via-[#F2F7FC] to-[#EFF6FF] p-5 sm:p-6 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
-          <div className="space-y-2 max-w-xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100/80 border border-blue-200 text-blue-800 text-xs font-bold">
-              <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-              <span>ตรวจงานและให้คะแนนสะดวกรวดเร็ว ไม่พลาดทุกความพยายามของนักเรียน</span>
-            </div>
-            <h2 className="text-lg sm:text-2xl font-extrabold text-[#163A66] leading-snug">
-              คิวตรวจงานนักเรียนรวมทั้งหมด (FIFO First-In First-Out)
-            </h2>
-            <p className="text-xs sm:text-sm text-[#6B7C93] leading-relaxed">
-              ใครส่งก่อนจะขึ้นมาอยู่บนสุด ครูสามารถคลิกตรวจงาน ดูผลงานขยายใหญ่ ให้คะแนน และกดบันทึกเพื่อเลื่อนไปคนถัดไปได้ต่อเนื่องทันที
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={handleStartFirstPending}
-              className="px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs sm:text-sm shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95"
-            >
-              <Play className="w-4 h-4 fill-white" />
-              <span>เริ่มตรวจคิวแรกทันที ({stats.pending} งานรอตรวจ)</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Mascot / Decoration Accent */}
-        <div className="absolute right-0 bottom-0 opacity-15 pointer-events-none hidden lg:block transform translate-x-4 translate-y-2">
-          <img
-            src="/images/banners/hero-banner.png"
-            alt="Anime Mascot"
-            className="w-48 h-auto object-contain"
-          />
-        </div>
-      </div>
+      <PageHeroBanner
+        title="คิวตรวจงานนักเรียนรวม (FIFO)"
+        subtitle="ตรวจงานและให้คะแนนสะดวกรวดเร็ว ไม่พลาดทุกความพยายามของนักเรียน"
+        icon={<BookOpen className="w-6 h-6 text-white" />}
+        iconBgClass="bg-blue-600 text-white"
+        badgeText="FIFO Queue"
+        tagText="📝 งานทั้งหมด • รอตรวจ • ตรวจแล้ว • ส่งล่าช้า • ระบบคะแนน SGS"
+        quoteLines={[
+          'ตรวจงานตรงเวลา',
+          'สะท้อนผลการเรียนรู้',
+          'สู่การพัฒนาที่ยั่งยืน',
+        ]}
+        actions={
+          <button
+            type="button"
+            onClick={handleStartFirstPending}
+            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs sm:text-sm shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95 whitespace-nowrap"
+          >
+            <Play className="w-4 h-4 fill-white" />
+            <span>เริ่มตรวจคิวแรกทันที ({stats.pending} งานรอตรวจ)</span>
+          </button>
+        }
+      />
 
       {/* ==================================================================== */}
       {/* 3. 5 KPI SUMMARY STAT CARDS (ตรงตามสไตล์ใน Mockup) */}
@@ -533,16 +520,41 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
-                  {filteredSubmissions.map((item) => {
-                    const isGraded = item.status === 'GRADED';
-                    const isPdf = item.submissionChannel === 'PDF_UPLOAD' || (item.fileName || '').endsWith('.pdf');
-                    const isLink = item.submissionChannel === 'LINK_URL' || item.externalLinkUrl;
+                  {filteredSubmissions.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-16 px-4 text-center">
+                        <div className="max-w-md mx-auto flex flex-col items-center justify-center text-center">
+                          <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
+                            <BookOpen className="w-8 h-8" />
+                          </div>
+                          <h3 className="text-base font-bold text-slate-800 mb-1">
+                            ยังไม่มีภาระงานหรือการบ้านในขณะนี้
+                          </h3>
+                          <p className="text-xs text-slate-500 mb-5 leading-relaxed">
+                            เริ่มต้นสร้างภาระงาน กำหนดคะแนน และมอบหมายให้นักเรียนส่งงานในรายวิชาของคุณ
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setIsBundlesModalOpen(true)}
+                            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                            <span>+ สร้างภาระงานใหม่</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredSubmissions.map((item) => {
+                      const isGraded = item.status === 'GRADED';
+                      const isPdf = item.submissionChannel === 'PDF_UPLOAD' || (item.fileName || '').endsWith('.pdf');
+                      const isLink = item.submissionChannel === 'LINK_URL' || item.externalLinkUrl;
 
-                    return (
-                      <tr
-                        key={item.id}
-                        className="hover:bg-blue-50/40 transition-colors group"
-                      >
+                      return (
+                        <tr
+                          key={item.id}
+                          className="hover:bg-blue-50/40 transition-colors group"
+                        >
                         {/* Queue No */}
                         <td className="py-3 px-4 text-center font-bold text-slate-500 tabular-nums">
                           <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center mx-auto text-[11px]">
@@ -682,8 +694,9 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                         </td>
                       </tr>
                     );
-                  })}
-                </tbody>
+                  })
+                )}
+              </tbody>
               </table>
             </div>
 
@@ -691,7 +704,28 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
             {/* 6. MOBILE FIRST RESPONSIVE VIEW (NO HORIZONTAL SCROLL) */}
             {/* ================================================================ */}
             <div className="block lg:hidden divide-y divide-slate-100 p-3 space-y-3">
-              {filteredSubmissions.map((item) => {
+              {filteredSubmissions.length === 0 ? (
+                <div className="bg-white rounded-2xl p-8 border border-slate-200/90 text-center flex flex-col items-center">
+                  <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
+                    <BookOpen className="w-7 h-7" />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-800 mb-1">
+                    ยังไม่มีภาระงานหรือการบ้านในขณะนี้
+                  </h3>
+                  <p className="text-xs text-slate-500 mb-4 leading-relaxed max-w-xs">
+                    เริ่มต้นสร้างภาระงาน กำหนดคะแนน และมอบหมายให้นักเรียนส่งงานในรายวิชาของคุณ
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsBundlesModalOpen(true)}
+                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center gap-2 cursor-pointer active:scale-95"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                    <span>+ สร้างภาระงานใหม่</span>
+                  </button>
+                </div>
+              ) : (
+                filteredSubmissions.map((item) => {
                 const isGraded = item.status === 'GRADED';
                 const isPdf = item.submissionChannel === 'PDF_UPLOAD' || (item.fileName || '').endsWith('.pdf');
                 const isLink = item.submissionChannel === 'LINK_URL' || item.externalLinkUrl;
@@ -792,7 +826,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                     </button>
                   </div>
                 );
-              })}
+              })
+            )}
             </div>
           </>
         )}

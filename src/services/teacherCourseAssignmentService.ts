@@ -8,6 +8,8 @@
 // 5. ระบบหมวดหมู่งานรวม สั่ง 20 งาน ส่ง 10 ได้ 5 คะแนน พร้อมสูตรเฉลี่ยและสวิตช์ปัดทศนิยม >= 0.5 อัตโนมัติ
 // ============================================================================
 
+import { cleanSlateService } from './cleanSlateService';
+
 export interface TeachingSubjectInfo {
   code: string;
   name: string;
@@ -466,6 +468,9 @@ export const teacherCourseAssignmentService = {
     } catch {
       // fallback
     }
+    if (cleanSlateService.isCleanSlateActive()) {
+      return [];
+    }
     return INITIAL_QUEUE_ITEMS.sort((a, b) => a.submittedTimestamp - b.submittedTimestamp);
   },
 
@@ -513,6 +518,20 @@ export const teacherCourseAssignmentService = {
       if (raw) return JSON.parse(raw);
     } catch {
       // fallback
+    }
+    if (cleanSlateService.isCleanSlateActive()) {
+      return {
+        id: 'bundle-clean-default',
+        subjectCode: 'ศ23101',
+        classroom: 'ม.3/1',
+        title: 'ชุดการบ้านและภาระงานสะสม',
+        description: 'ยังไม่มีชุดภาระงานสะสมในขณะนี้ สร้างภาระงานเพื่อเริ่มเก็บคะแนน',
+        targetSgsColumn: 'คะแนนเก็บระหว่างภาค',
+        maxScore: 10,
+        totalTasks: 10,
+        autoRoundUpHalf: true,
+        students: [],
+      };
     }
     return buildInitialBundle();
   },

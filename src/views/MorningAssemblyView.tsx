@@ -34,6 +34,7 @@ import {
   CalendarDays,
   Printer,
   ClipboardCheck,
+  QrCode,
 } from 'lucide-react';
 import {
   attendanceCorrelationService,
@@ -44,6 +45,10 @@ import {
   type AssemblyCalendarDayInfo,
 } from '../services/attendanceCorrelationService';
 import type { CrossViewNavigationPayload } from '../services/teacherCopilotService';
+import { DynamicQrAttendanceModal } from '../components/attendance/DynamicQrAttendanceModal';
+import { StudentQrScannerModal } from '../components/attendance/StudentQrScannerModal';
+import { StudentIdCardModal } from '../components/attendance/StudentIdCardModal';
+import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 
 export interface MorningAssemblyViewProps {
   onDeepNavigate?: (payload: CrossViewNavigationPayload) => void;
@@ -83,6 +88,11 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
   const [isStatsModalOpen, setIsStatsModalOpen] = useState<boolean>(false);
   const [classroomStats, setClassroomStats] = useState<ClassroomTermStatsSummary | null>(null);
   const [statsSearchQuery, setStatsSearchQuery] = useState<string>('');
+
+  // QR Code Attendance Modals State
+  const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
+  const [isStudentScannerOpen, setIsStudentScannerOpen] = useState<boolean>(false);
+  const [activeStudentForBadge, setActiveStudentForBadge] = useState<MorningAssemblyRecord | null>(null);
 
   // ----------------------------------------------------
   // Data Loading & Correlation
@@ -244,61 +254,67 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
       )}
 
       {/* ========================================================
-          1. HEADER PANEL matching Mockup
+          1. HEADER PANEL matching Master PageHeroBanner Design
           ======================================================== */}
-      <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-100 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 shadow-2xs">
-            <UserCheck className="w-6 h-6 stroke-[2.2]" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-              <span>เช็คแถวเช้า (Morning Assembly)</span>
-              <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-blue-600 text-white font-bold shadow-2xs">
-                โฮมรูม
-              </span>
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
-              บันทึกการเข้าแถวเคารพธงชาติและกิจกรรมยามเช้า เชื่อมโยงความสอดคล้องกับคาบเรียนอัตโนมัติ
-            </p>
-          </div>
-        </div>
-
-        {/* Quick Top Actions */}
-        <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
-          <button
-            type="button"
-            onClick={handleBatchMarkAllPresent}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold transition-all shadow-xs cursor-pointer whitespace-nowrap"
-            title="เช็คทุกคนในห้อง ม.3/1 เป็น มา"
-          >
-            <Check className="w-4 h-4 stroke-[3]" />
-            <span>✓ มาแถวครบทุกคน</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleRunCorrelation}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white hover:bg-blue-50 active:scale-95 text-blue-600 border border-blue-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap"
-            title="รันระบบตรวจสอบความสอดคล้องระหว่างแถวเช้าและคาบเรียน"
-          >
-            <Sparkles className="w-4 h-4 text-blue-600" />
-            <span>ตรวจความสอดคล้อง</span>
-          </button>
-
-          {onDeepNavigate && (
+      <PageHeroBanner
+        title="เช็คแถวเช้า (Morning Assembly)"
+        subtitle="บันทึกการเข้าแถวเคารพธงชาติและกิจกรรมโฮมรูม เชื่อมโยงความสอดคล้องกับคาบเรียนอัตโนมัติ"
+        icon={<UserCheck className="w-6 h-6 text-white stroke-[2.2]" />}
+        iconBgClass="bg-blue-600 text-white"
+        badgeText="โฮมรูม"
+        tagText="☀️ หน้าเสาธง 07:45 - 08:15 • โฮมรูม ม.3/1 • ล็อกห้องที่ปรึกษา"
+        quoteLines={[
+          'วินัยเริ่มต้นยามเช้า',
+          'สร้างความพร้อมสู่การเรียนรู้',
+          'เยาวชนคุณภาพของสังคม',
+        ]}
+        actions={
+          <>
+            {/* QR Code Dynamic Attendance */}
             <button
               type="button"
-              onClick={() => onDeepNavigate({ view: 'classroom-attendance' })}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-blue-50/90 hover:bg-blue-100 active:scale-95 text-blue-700 border border-blue-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap"
-              title="สลับไปยังหน้าเช็คชื่อเข้าเรียนรายคาบ"
+              onClick={() => setIsQrModalOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-xs cursor-pointer whitespace-nowrap"
+              title="เปิด QR Code ไดนามิกหมุนเวียน 15 วินาที หรือครูสแกนบัตรนักเรียน"
             >
-              <ClipboardCheck className="w-4 h-4 text-blue-600" />
-              <span>ไปเช็คชื่อเข้าเรียน →</span>
+              <QrCode className="w-4 h-4" />
+              <span>📱 QR Code เช็คชื่อ</span>
             </button>
-          )}
-        </div>
-      </div>
+
+            <button
+              type="button"
+              onClick={handleBatchMarkAllPresent}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold transition-all shadow-xs cursor-pointer whitespace-nowrap"
+              title="เช็คทุกคนในห้อง ม.3/1 เป็น มา"
+            >
+              <Check className="w-4 h-4 stroke-[3]" />
+              <span>✓ มาแถวครบทุกคน</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleRunCorrelation}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-blue-50 active:scale-95 text-blue-700 border border-blue-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap"
+              title="รันระบบตรวจสอบความสอดคล้องระหว่างแถวเช้าและคาบเรียน"
+            >
+              <Sparkles className="w-4 h-4 text-blue-600" />
+              <span>ตรวจความสอดคล้อง</span>
+            </button>
+
+            {onDeepNavigate && (
+              <button
+                type="button"
+                onClick={() => onDeepNavigate({ view: 'classroom-attendance' })}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-blue-50 active:scale-95 text-blue-700 border border-blue-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap"
+                title="สลับไปยังหน้าเช็คชื่อเข้าเรียนรายคาบ"
+              >
+                <ClipboardCheck className="w-4 h-4 text-blue-600" />
+                <span>ไปเช็คชื่อเข้าเรียน →</span>
+              </button>
+            )}
+          </>
+        }
+      />
 
       {/* ========================================================
           2. FILTERS & SELECTION CONTROLS BAR matching Mockup
@@ -686,6 +702,17 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
               </button>
             </div>
 
+            {/* Button: QR Code Attendance Trigger */}
+            <button
+              type="button"
+              onClick={() => setIsQrModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap"
+              title="เปิดระบบเช็คชื่อ QR Code ไดนามิก"
+            >
+              <QrCode className="w-3.5 h-3.5" />
+              <span>QR Code</span>
+            </button>
+
             {/* Button: ดูสถิติรวมทั้งห้อง (Cumulative Attendance Term Summary) */}
             <button
               type="button"
@@ -709,11 +736,37 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
           </div>
         </div>
 
-        {/* ------------------------------------------------------
-            5.1 DESKTOP TABLE VIEW (matching media_1791314921886.png)
-            Hidden on mobile when in 'CARDS' mode
-            ------------------------------------------------------ */}
-        <div className={`overflow-x-auto ${mobileMode === 'CARDS' ? 'hidden md:block' : 'block'}`}>
+        {records.length === 0 ? (
+          <div className="py-16 px-4 text-center">
+            <div className="max-w-md mx-auto space-y-3">
+              <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-500 mx-auto flex items-center justify-center shadow-2xs border border-blue-100">
+                <Users className="w-8 h-8" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-base font-bold text-slate-800">
+                  ยังไม่มีรายชื่อนักเรียนในห้องที่ปรึกษา {ADVISORY_LABEL}
+                </h4>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  กรุณาเพิ่มนักเรียนหรือนำเข้ารายชื่อจากระบบ SGS / Excel ในหน้าบัญชีรายชื่อนักเรียน เพื่อเริ่มต้นเช็คแถวหน้าเสาธงและโฮมรูม
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onDeepNavigate?.({ view: 'roster' })}
+                className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-2xs cursor-pointer transition-all"
+              >
+                <Users className="w-4 h-4" />
+                <span>ไปที่บัญชีรายชื่อนักเรียน</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* ------------------------------------------------------
+                5.1 DESKTOP TABLE VIEW (matching media_1791314921886.png)
+                Hidden on mobile when in 'CARDS' mode
+                ------------------------------------------------------ */}
+            <div className={`overflow-x-auto ${mobileMode === 'CARDS' ? 'hidden md:block' : 'block'}`}>
           <table className="w-full text-left text-xs text-slate-700 border-collapse">
             <thead className="bg-slate-50/80 text-slate-500 font-bold border-b border-slate-100">
               <tr>
@@ -935,8 +988,18 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
                     </div>
                   </div>
 
-                  {/* Status Pill Badge */}
-                  <div>
+                  {/* Status Pill Badge & ID Card QR Button */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setActiveStudentForBadge(record)}
+                      className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold flex items-center gap-1 cursor-pointer border border-blue-200"
+                      title="เปิด QR บัตรนักเรียนเพื่อสแกน"
+                    >
+                      <QrCode className="w-3 h-3 text-blue-600" />
+                      <span>บัตร</span>
+                    </button>
+
                     {record.status === 'PRESENT' && (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                         <CheckCircle2 className="w-3.5 h-3.5" />
@@ -1065,6 +1128,8 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
             </div>
           )}
         </div>
+        </>
+        )}
       </div>
 
       {/* ========================================================
@@ -1290,6 +1355,51 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
             </div>
           </div>
         </div>
+      )}
+      {/* ========================================================
+          QR CODE ATTENDANCE MODALS
+          ======================================================== */}
+      {/* 1. Dynamic Rotating QR Attendance Modal (Projector & Continuous Scanner) */}
+      <DynamicQrAttendanceModal
+        isOpen={isQrModalOpen}
+        onClose={() => setIsQrModalOpen(false)}
+        attendanceType="MORNING_ASSEMBLY"
+        classroomId={selectedClassroom}
+        classroomLabel={ADVISORY_LABEL}
+        date={selectedDate}
+        students={records.map((r) => ({
+          studentCode: r.studentCode,
+          studentName: r.studentName,
+          status: r.status,
+        }))}
+        onStudentCheckIn={(studentCode, studentName) => {
+          handleStatusChange(studentCode, studentName, 'PRESENT');
+          showToast(`✓ บันทึกเช็คชื่อ ${studentName} เรียบร้อยแล้ว`);
+        }}
+      />
+
+      {/* 2. Student Self QR Scanner Modal (Student scans Teacher QR) */}
+      <StudentQrScannerModal
+        isOpen={isStudentScannerOpen}
+        onClose={() => setIsStudentScannerOpen(false)}
+        expectedRoomId={selectedClassroom}
+        expectedType="MORNING_ASSEMBLY"
+        onSuccessCheckIn={(studentCode, studentName) => {
+          handleStatusChange(studentCode, studentName, 'PRESENT');
+          showToast(`✓ เช็คชื่อสำเร็จ: ${studentName}`);
+        }}
+      />
+
+      {/* 3. Individual Student ID Card Modal */}
+      {activeStudentForBadge && (
+        <StudentIdCardModal
+          isOpen={true}
+          onClose={() => setActiveStudentForBadge(null)}
+          studentCode={activeStudentForBadge.studentCode}
+          studentName={activeStudentForBadge.studentName}
+          classroomLabel={ADVISORY_LABEL}
+          classroomId={selectedClassroom}
+        />
       )}
     </div>
   );

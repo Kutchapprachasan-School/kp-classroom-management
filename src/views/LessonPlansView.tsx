@@ -25,6 +25,8 @@ import {
   HelpCircle,
   FileCheck,
 } from 'lucide-react';
+import { cleanSlateService } from '../services/cleanSlateService';
+import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 
 // ==========================================
 // DATA TYPES
@@ -410,7 +412,9 @@ export const LessonPlansView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Units list state
-  const [units, setUnits] = useState<UnitPlanItem[]>(INITIAL_UNITS);
+  const [units, setUnits] = useState<UnitPlanItem[]>(() => {
+    return cleanSlateService.isCleanSlateActive() ? [] : INITIAL_UNITS;
+  });
   const [selectedUnitId, setSelectedUnitId] = useState<string>('unit-1');
   const [activeSubTab, setActiveSubTab] = useState<'info' | 'media' | 'worksheets' | 'reflection'>('info');
 
@@ -429,23 +433,23 @@ export const LessonPlansView: React.FC = () => {
   const [isRelatedFilesModalOpen, setIsRelatedFilesModalOpen] = useState(false);
 
   // Forms State for Create Modal
-  const [newUnitNumber, setNewUnitNumber] = useState(7);
+  const [newUnitNumber, setNewUnitNumber] = useState(1);
   const [newTitleJa, setNewTitleJa] = useState('');
   const [newTitleTh, setNewTitleTh] = useState('');
   const [newPeriods, setNewPeriods] = useState(4);
-  const [newDateRange, setNewDateRange] = useState('สัปดาห์ที่ 7 (13 – 17 พ.ย. 2569)');
+  const [newDateRange, setNewDateRange] = useState('สัปดาห์ที่ 1');
 
   // Form State for Edit Basic Info
-  const currentUnit = units.find((u) => u.id === selectedUnitId) || units[0];
-  const [editDisplayTitle, setEditDisplayTitle] = useState(currentUnit.displayTitle);
-  const [editPeriods, setEditPeriods] = useState(currentUnit.periods);
-  const [editDateRange, setEditDateRange] = useState(currentUnit.dateRange);
+  const currentUnit = units.find((u) => u.id === selectedUnitId) || units[0] || null;
+  const [editDisplayTitle, setEditDisplayTitle] = useState(currentUnit?.displayTitle || '');
+  const [editPeriods, setEditPeriods] = useState(currentUnit?.periods || 4);
+  const [editDateRange, setEditDateRange] = useState(currentUnit?.dateRange || '');
 
   // Form State for Edit Objectives
-  const [editObjectives, setEditObjectives] = useState<string[]>(currentUnit.objectives);
+  const [editObjectives, setEditObjectives] = useState<string[]>(currentUnit?.objectives || []);
 
   // Form State for Edit Evaluations
-  const [editEvaluations, setEditEvaluations] = useState<EvaluationItem[]>(currentUnit.evaluations);
+  const [editEvaluations, setEditEvaluations] = useState<EvaluationItem[]>(currentUnit?.evaluations || []);
 
   // Toast feedback state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -584,6 +588,10 @@ export const LessonPlansView: React.FC = () => {
 
   // Copy unit handler
   const handleCopyUnit = () => {
+    if (!currentUnit) {
+      showToast('ยังไม่มีหน่วยการเรียนรู้ที่เลือก');
+      return;
+    }
     const clonedTitle = `${currentUnit.displayTitle} (สำเนา)`;
     const clonedUnit: UnitPlanItem = {
       ...currentUnit,
@@ -610,53 +618,21 @@ export const LessonPlansView: React.FC = () => {
       )}
 
       {/* ======================================================== */}
-      {/* 1. TOP HERO BANNER (Pastel Anime Education Parity)      */}
+      {/* 1. TOP HERO BANNER: Master PageHeroBanner Design       */}
       {/* ======================================================== */}
-      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-blue-100/80 shadow-xs mb-5 bg-gradient-to-r from-blue-100/90 via-sky-50/80 to-purple-50/60 p-5 sm:p-7 md:p-8">
-        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          {/* Left Title & Icon */}
-          <div className="flex items-start sm:items-center gap-4 sm:gap-5 max-w-2xl">
-            <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
-              <BookOpen className="w-7 h-7 sm:w-8 sm:h-8" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="text-xl sm:text-2xl md:text-[26px] font-extrabold text-[#163A66] tracking-tight">
-                  แผนการสอน / จัดการแผนการสอน
-                </h1>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-white/90 text-blue-700 border border-blue-200/80 shadow-2xs">
-                  หลักสูตรสถานศึกษา 2569
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm text-[#6B7C93] font-medium mt-1 leading-relaxed">
-                สร้างและจัดการแผนการสอนรายวิชา แบบหน่วยการเรียนรู้ พร้อมสื่อการสอนและประเมินผล
-              </p>
-            </div>
-          </div>
-
-          {/* Right: Anime Mascot & Speech Bubble */}
-          <div className="flex items-center gap-4 self-end md:self-center shrink-0">
-            {/* Cute Speech Bubble */}
-            <div className="hidden lg:flex items-center gap-2 bg-white/95 backdrop-blur-xs px-4 py-2.5 rounded-2xl shadow-xs border border-blue-100 text-xs font-semibold text-slate-700 relative">
-              <span>"การสอนที่ดี คือการเปิดโลกแห่งโอกาส ให้กับนักเรียน" ♡</span>
-              <div className="absolute -right-2 top-1/2 -translate-y-1/2 w-0 h-0 border-y-6 border-y-transparent border-l-8 border-l-white/95" />
-            </div>
-
-            {/* Character Graphic */}
-            <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 border-2 border-white shadow-sm bg-blue-100/50">
-              <img
-                src="/images/teacher/hero_banner.png"
-                alt="Anime Teacher Character"
-                className="w-full h-full object-cover object-top scale-110"
-                onError={(e) => {
-                  // Fallback if image path differs
-                  e.currentTarget.src = '/images/teacher/teacher_avatar.png';
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      </section>
+      <PageHeroBanner
+        title="แผนการสอนและบันทึกหลังสอน (Lesson Plans)"
+        subtitle="สร้างและจัดการแผนการสอนรายวิชา แบบหน่วยการเรียนรู้ พร้อมสื่อการสอนและประเมินผล"
+        icon={<BookOpen className="w-6 h-6 text-white" />}
+        iconBgClass="bg-blue-600 text-white"
+        badgeText="หลักสูตร 2569"
+        tagText="📚 16 สัปดาห์ • ไฟล์เอกสาร • สื่อกิจกรรม • บันทึกหลังสอน"
+        quoteLines={[
+          'การสอนที่ดี',
+          'คือการเปิดโลกแห่งโอกาส',
+          'ให้กับนักเรียนทุกคน',
+        ]}
+      />
 
       {/* ======================================================== */}
       {/* 2. TOP FILTER & ACTION BAR                              */}
@@ -864,7 +840,16 @@ export const LessonPlansView: React.FC = () => {
 
           {/* 6 Unit Cards */}
           <div className="space-y-2.5">
-            {filteredUnits.map((unit) => {
+            {filteredUnits.length === 0 ? (
+              <div className="p-6 text-center bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center mx-auto mb-2">
+                  <BookOpen className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-bold text-slate-700">ยังไม่มีหน่วยการเรียนรู้</p>
+                <p className="text-[11px] text-slate-400 mt-1">กดปุ่มสร้างแผนการสอนเพื่อเริ่มต้น</p>
+              </div>
+            ) : (
+              filteredUnits.map((unit) => {
               const isSelected = unit.id === selectedUnitId;
               return (
                 <div
@@ -913,7 +898,8 @@ export const LessonPlansView: React.FC = () => {
                   </div>
                 </div>
               );
-            })}
+            })
+          )}
           </div>
         </div>
 
@@ -925,19 +911,41 @@ export const LessonPlansView: React.FC = () => {
             mobileTab === 'detail' ? 'block' : 'hidden lg:block'
           }`}
         >
-          {/* Unit Top Header */}
-          <div className="flex items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <h2 className="text-base sm:text-lg font-extrabold text-[#163A66] truncate">
-                หน่วยที่ {currentUnit.unitNumber} : {currentUnit.displayTitle}
-              </h2>
+          {!currentUnit ? (
+            <div className="py-16 px-4 text-center flex flex-col items-center justify-center">
+              <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
+                <BookOpen className="w-8 h-8" />
+              </div>
+              <h3 className="text-base font-bold text-slate-800 mb-1">
+                ยังไม่มีแผนการสอนในรายวิชานี้
+              </h3>
+              <p className="text-xs text-slate-500 mb-5 leading-relaxed max-w-sm">
+                เริ่มต้นสร้างแผนการสอน กำหนดหน่วยการเรียนรู้ วัตถุประสงค์ และแนบสื่อการสอนสำหรับนักเรียน
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(true)}
+                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ สร้างแผนการสอน</span>
+              </button>
             </div>
-            <span
-              className={`px-3 py-1 rounded-full text-xs font-bold border shrink-0 ${currentUnit.statusBadgeClass}`}
-            >
-              🌱 {currentUnit.statusLabel}
-            </span>
-          </div>
+          ) : (
+            <>
+              {/* Unit Top Header */}
+              <div className="flex items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <h2 className="text-base sm:text-lg font-extrabold text-[#163A66] truncate">
+                    หน่วยที่ {currentUnit.unitNumber} : {currentUnit.displayTitle}
+                  </h2>
+                </div>
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-bold border shrink-0 ${currentUnit.statusBadgeClass}`}
+                >
+                  🌱 {currentUnit.statusLabel}
+                </span>
+              </div>
 
           {/* 4 Sub-Tabs */}
           <div className="flex items-center gap-2 sm:gap-4 border-b border-slate-200/80 pt-2 pb-0 overflow-x-auto no-scrollbar">
@@ -1246,6 +1254,8 @@ export const LessonPlansView: React.FC = () => {
               </div>
             </div>
           )}
+            </>
+          )}
         </div>
 
         {/* ====================================================== */}
@@ -1447,56 +1457,62 @@ export const LessonPlansView: React.FC = () => {
         </div>
 
         {/* Horizontal Flow Stepper */}
-        <div className="overflow-x-auto pb-1 no-scrollbar">
-          <div className="flex items-center gap-2 min-w-[760px]">
-            {units.slice(0, 6).map((unit, idx) => {
-              const isSelected = unit.id === selectedUnitId;
-              return (
-                <React.Fragment key={unit.id}>
-                  <div
-                    onClick={() => handleSelectUnit(unit.id)}
-                    className={`flex-1 min-w-[110px] p-2.5 rounded-xl border transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-blue-50/70 border-blue-400 shadow-2xs'
-                        : 'bg-slate-50/60 border-slate-200 hover:bg-slate-100/70'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`w-6 h-6 rounded-full ${unit.circleColorClass} text-white font-extrabold text-xs flex items-center justify-center shrink-0`}
-                      >
-                        {unit.unitNumber}
-                      </div>
-                      <div className="truncate">
-                        <div className="text-[11px] font-bold text-slate-800 truncate">
-                          หน่วยที่ {unit.unitNumber}
-                        </div>
-                        <div
-                          className={`text-[10px] font-bold ${
-                            unit.status === 'DONE'
-                              ? 'text-emerald-600'
-                              : unit.status === 'IN_PROGRESS'
-                              ? 'text-blue-600'
-                              : 'text-slate-400'
-                          }`}
-                        >
-                          {unit.statusLabel}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-1 text-[10px] text-slate-400 font-medium pl-8">
-                      {unit.periods} คาบ
-                    </div>
-                  </div>
-
-                  {idx < 5 && (
-                    <ChevronRight className="w-4 h-4 text-slate-300 shrink-0 mx-0.5" />
-                  )}
-                </React.Fragment>
-              );
-            })}
+        {units.length === 0 ? (
+          <div className="py-6 text-center text-xs text-slate-400 font-medium">
+            ยังไม่มีหน่วยการเรียนรู้ในระบบ
           </div>
-        </div>
+        ) : (
+          <div className="overflow-x-auto pb-1 no-scrollbar">
+            <div className="flex items-center gap-2 min-w-[760px]">
+              {units.slice(0, 6).map((unit, idx) => {
+                const isSelected = unit.id === selectedUnitId;
+                return (
+                  <React.Fragment key={unit.id}>
+                    <div
+                      onClick={() => handleSelectUnit(unit.id)}
+                      className={`flex-1 min-w-[110px] p-2.5 rounded-xl border transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-blue-50/70 border-blue-400 shadow-2xs'
+                          : 'bg-slate-50/60 border-slate-200 hover:bg-slate-100/70'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`w-6 h-6 rounded-full ${unit.circleColorClass} text-white font-extrabold text-xs flex items-center justify-center shrink-0`}
+                        >
+                          {unit.unitNumber}
+                        </div>
+                        <div className="truncate">
+                          <div className="text-[11px] font-bold text-slate-800 truncate">
+                            หน่วยที่ {unit.unitNumber}
+                          </div>
+                          <div
+                            className={`text-[10px] font-bold ${
+                              unit.status === 'DONE'
+                                ? 'text-emerald-600'
+                                : unit.status === 'IN_PROGRESS'
+                                ? 'text-blue-600'
+                                : 'text-slate-400'
+                            }`}
+                          >
+                            {unit.statusLabel}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-1 text-[10px] text-slate-400 font-medium pl-8">
+                        {unit.periods} คาบ
+                      </div>
+                    </div>
+
+                    {idx < 5 && (
+                      <ChevronRight className="w-4 h-4 text-slate-300 shrink-0 mx-0.5" />
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ======================================================== */}

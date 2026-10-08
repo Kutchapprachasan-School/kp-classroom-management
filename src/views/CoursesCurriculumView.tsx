@@ -3,38 +3,37 @@ import { BookMarked, Plus, Layers, Edit3, Trash2 } from 'lucide-react';
 import { coursesCurriculumData } from '../data/mockData';
 import type { CourseCurriculumItem } from '../types/viewModels';
 
+import { PageHeroBanner } from '../components/layout/PageHeroBanner';
+
 export const CoursesCurriculumView: React.FC = () => {
   const [courses] = useState<CourseCurriculumItem[]>(coursesCurriculumData);
   const [selectedCourse, setSelectedCourse] = useState<CourseCurriculumItem>(courses[0]);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in font-sans">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-              <BookMarked className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-800">
-                รายวิชา / หลักสูตร (Courses & Curriculum)
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500">
-                กำหนดโครงสร้างหน่วยการเรียนรู้ สัดส่วนคะแนน SGS และจำนวนหน่วยกิต
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <button
-          onClick={() => alert('เปิดฟอร์มเพิ่มรายวิชาใหม่ตามโครงสร้างหลักสูตรแกนกลาง')}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          <span>+ เพิ่มรายวิชาใหม่</span>
-        </button>
-      </div>
+      {/* Master PageHeroBanner */}
+      <PageHeroBanner
+        title="รายวิชา / หลักสูตร (Courses & Curriculum)"
+        subtitle="กำหนดโครงสร้างหน่วยการเรียนรู้ สัดส่วนคะแนน SGS และจำนวนหน่วยกิต"
+        icon={<BookMarked className="w-6 h-6 text-white" />}
+        iconBgClass="bg-blue-600 text-white"
+        badgeText="Curriculum"
+        tagText="📚 โครงสร้างหน่วยการเรียนรู้ • สัดส่วนคะแนน SGS • เกณฑ์การตัดสินผลการเรียน"
+        quoteLines={[
+          'หลักสูตรที่ได้มาตรฐาน',
+          'สู่การจัดการเรียนรู้ที่มีคุณภาพ',
+          'พัฒนาศักยภาพผู้เรียน',
+        ]}
+        actions={
+          <button
+            onClick={() => alert('เปิดฟอร์มเพิ่มรายวิชาใหม่ตามโครงสร้างหลักสูตรแกนกลาง')}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors whitespace-nowrap"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ เพิ่มรายวิชาใหม่</span>
+          </button>
+        }
+      />
 
       {/* Main Grid: Course selector (Left 4) + SGS Unit Structure (Right 8) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

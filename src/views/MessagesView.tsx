@@ -30,6 +30,7 @@ import {
   type StudentTransferResult,
 } from '../services/messagingService';
 import type { SchoolUserRole } from '../config/schoolRoles';
+import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 
 interface MessagesViewProps {
   activeRole?: SchoolUserRole;
@@ -397,54 +398,50 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
         </div>
       )}
 
-      {/* 1. Page Header Card matching media_1791273562793.png */}
-      <div className="bg-white rounded-2xl border border-[#E6EEF7] p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Left: Chat Icon, Title & Subtitle */}
-        <div className="flex items-center gap-3.5 min-w-0">
-          <div className="w-13 h-13 rounded-2xl bg-[#E8F2FF] text-[#1D75D8] flex items-center justify-center shrink-0 shadow-2xs">
-            <MessageSquare className="w-7 h-7 fill-[#1D75D8]/20" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-lg sm:text-xl font-bold text-[#163A66] tracking-tight truncate">
-              ระบบข้อความ & แชทกลุ่มห้องเรียนจัดในมัติ
-            </h1>
-            <p className="text-xs text-[#6B7C93] mt-0.5 leading-relaxed">
-              กลุ่มครูที่ปรึกษาและกลุ่มประจำวิชาจะตั้งนักเรียนเข้าอัตโนมัติ เมื่อมีการย้ายห้องเรียน จะสลับกลุ่มและโอนย้ายงาน/คะแนนเดิมติดตัวไปด้วย
-            </p>
-          </div>
-        </div>
-
-        {/* Right: Green Information Pill Badge */}
-        <div className="bg-[#EBFBF5] border border-[#C6F2DF] rounded-2xl px-4 py-2.5 flex items-center gap-3 shrink-0 shadow-2xs self-start md:self-auto">
-          <div className="w-7 h-7 rounded-full bg-[#10B981] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
-            <span className="text-xs">♪</span>
-          </div>
-          <div>
-            <div className="text-xs font-bold text-[#163A66] flex items-center gap-1">
-              <span>จัดกลุ่มการสื่อสารด้วยไอคอนชัดเจน</span>
-              <span>🌤️</span>
+      {/* 1. Master PageHeroBanner Design */}
+      <PageHeroBanner
+        title="ระบบข้อความ & แชทกลุ่มอัตโนมัติ"
+        subtitle="กลุ่มครูที่ปรึกษาและกลุ่มประจำวิชาดึงสมาชิกเข้าอัตโนมัติ ย้ายห้องเรียนระบบจะย้ายกลุ่มและโอนงาน/คะแนนเดิมติดตัวไปด้วย"
+        icon={<MessageSquare className="w-6 h-6 text-white" />}
+        iconBgClass="bg-blue-600 text-white"
+        badgeText="Auto Sync"
+        tagText="💬 กลุ่มที่ปรึกษา • กลุ่มประจำวิชา • ซิงค์สมาชิกอัตโนมัติ • โอนย้ายคะแนน 100%"
+        quoteLines={[
+          'สื่อสารสะดวกรวดเร็ว',
+          'เชื่อมโยงครูและนักเรียน',
+          'สร้างสรรค์ชุมชนการเรียนรู้',
+        ]}
+        actions={
+          <div className="bg-[#EBFBF5] border border-[#C6F2DF] rounded-2xl px-3.5 py-2 flex items-center gap-2.5 shrink-0 shadow-2xs">
+            <div className="w-6 h-6 rounded-full bg-[#10B981] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+              ♪
             </div>
-            <p className="text-[11px] text-[#6B7C93] mt-0.5">
-              เลือกดูได้ทั้ง{' '}
-              <button
-                type="button"
-                onClick={() => setSelectedGroupId('homeroom-3-1')}
-                className="text-[#1D75D8] font-bold hover:underline cursor-pointer"
-              >
-                กลุ่มครูที่ปรึกษา
-              </button>{' '}
-              และ{' '}
-              <button
-                type="button"
-                onClick={() => setSelectedGroupId('class-3-1')}
-                className="text-[#1D75D8] font-bold hover:underline cursor-pointer"
-              >
-                กลุ่มห้องเรียน
-              </button>
-            </p>
+            <div>
+              <div className="text-xs font-bold text-[#163A66] flex items-center gap-1">
+                <span>จัดกลุ่มการสื่อสารด้วยไอคอนชัดเจน 🌤️</span>
+              </div>
+              <p className="text-[11px] text-[#6B7C93]">
+                เลือกดู{' '}
+                <button
+                  type="button"
+                  onClick={() => setSelectedGroupId('homeroom-3-1')}
+                  className="text-blue-600 font-bold hover:underline cursor-pointer"
+                >
+                  กลุ่มที่ปรึกษา
+                </button>{' '}
+                / {' '}
+                <button
+                  type="button"
+                  onClick={() => setSelectedGroupId('class-3-1')}
+                  className="text-blue-600 font-bold hover:underline cursor-pointer"
+                >
+                  กลุ่มห้องเรียน
+                </button>
+              </p>
+            </div>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Transfer Alert Notification (if transfer performed) */}
       {lastTransferResult && (

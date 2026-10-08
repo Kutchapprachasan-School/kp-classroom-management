@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase';
 import { AssignmentCreateSchema, type AssignmentCreateInput } from './types';
+import { cleanSlateService } from './cleanSlateService';
 
 export interface AssignmentRecord {
   id: string;
@@ -90,6 +91,9 @@ const getLocalAssignments = (): AssignmentRecord[] => {
     } catch {
       // fallback
     }
+  }
+  if (cleanSlateService.isCleanSlateActive()) {
+    return [];
   }
   return defaultAssignments;
 };

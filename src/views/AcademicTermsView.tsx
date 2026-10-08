@@ -41,6 +41,8 @@ import {
   ACADEMIC_CALENDAR_EVENT,
   type SpecialHolidayRecord,
 } from '../services/academicCalendarService';
+import { cleanSlateService } from '../services/cleanSlateService';
+import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 
 export type ActivityCategory = 'ALL' | 'ACADEMIC' | 'DEVELOPMENT' | 'SPORTS' | 'AFFAIRS' | 'EXAM';
 
@@ -611,7 +613,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
         // fallback to initial
       }
     }
-    return INITIAL_OCTOBER_EVENTS;
+    return cleanSlateService.isCleanSlateActive() ? [] : INITIAL_OCTOBER_EVENTS;
   });
 
   // Synced Holidays from academicCalendarService (Single Source of Truth)
@@ -865,73 +867,33 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
     setNewEventDescription('');
   };
 
-  // กิจกรรมด้านขวา Card 1: กิจกรรมสำหรับครู (5 รายการตรงภาพต้นแบบ)
-  const teacherSpecificActivities = [
-    {
-      date: '2 ต.ค.',
-      title: 'ประชุมฝ่ายวิชาการ',
-      meta: 'เวลา 08:30 น. | ห้องประชุมโรงเรียน',
-      icon: GroupRegular,
-    },
-    {
-      date: '2 ต.ค.',
-      title: 'ส่งคะแนนกลางภาค',
-      meta: 'เวลา 15:00 น. | ระบบออนไลน์',
-      icon: TargetRegular,
-    },
-    {
-      date: '6 ต.ค.',
-      title: 'ส่งข้อสอบกลางภาค',
-      meta: 'เวลา 09:00 น. | กลุ่มสาระฯ',
-      icon: TargetRegular,
-    },
-    {
-      date: '8 ต.ค.',
-      title: 'ประชุมคณะกรรมการสถานศึกษา',
-      meta: 'เวลา 10:00 น. | ห้องประชุมใหญ่',
-      icon: GroupRegular,
-    },
-    {
-      date: '15 ต.ค.',
-      title: 'ประชุมกลุ่มสาระฯ (ภาษาต่างประเทศ)',
-      meta: 'เวลา 14:00 น. | ห้องกลุ่มสาระฯ',
-      icon: GroupRegular,
-    },
-  ];
+  // กิจกรรมด้านขวา Card 1: กิจกรรมสำหรับครู (ดึงสดจาก allEvents)
+  const teacherSpecificActivities = useMemo(() => {
+    return allEvents
+      .filter((ev) => ev.targetRole === 'TEACHER' || ev.targetRole === 'ALL')
+      .slice(0, 5)
+      .map((ev) => ({
+        id: ev.id,
+        date: `${ev.day} ต.ค.`,
+        title: ev.title,
+        meta: ev.isAllDay ? (ev.location || 'วันหยุด / กิจกรรมทั้งวัน') : `เวลา ${ev.time || '08:30'} น. | ${ev.location || 'โรงเรียน'}`,
+        icon: getMingCuteEventIcon(ev),
+      }));
+  }, [allEvents]);
 
-  // กิจกรรมด้านขวา Card 2: กิจกรรมสำหรับนักเรียน (5 รายการตรงภาพต้นแบบ)
-  const studentSpecificActivities = [
-    {
-      date: '3 ต.ค.',
-      title: 'ค่ายภาษา (ม.1-ม.3)',
-      meta: 'เวลา 08:00 น. | สนามกีฬา',
-      icon: TentRegular,
-    },
-    {
-      date: '4 ต.ค.',
-      title: 'การแข่งขันกีฬา',
-      meta: 'เวลา 08:00 น. | สนามกีฬา',
-      icon: TrophyRegular,
-    },
-    {
-      date: '10 ต.ค.',
-      title: 'จิตอาสา',
-      meta: 'เวลา 09:00 น. | บริเวณโรงเรียน',
-      icon: HeartRegular,
-    },
-    {
-      date: '19 ต.ค.',
-      title: 'ทัศนศึกษา (ม.4-ม.6)',
-      meta: 'เวลา 07:00 น. | จังหวัดใกล้เคียง',
-      icon: BusRegular,
-    },
-    {
-      date: '24 ต.ค.',
-      title: 'กิจกรรมวันลอยกระทง',
-      meta: 'เวลา 17:00 น. | ลานกิจกรรม',
-      icon: SparklesRegular,
-    },
-  ];
+  // กิจกรรมด้านขวา Card 2: กิจกรรมสำหรับนักเรียน (ดึงสดจาก allEvents)
+  const studentSpecificActivities = useMemo(() => {
+    return allEvents
+      .filter((ev) => ev.targetRole === 'STUDENT' || ev.targetRole === 'ALL')
+      .slice(0, 5)
+      .map((ev) => ({
+        id: ev.id,
+        date: `${ev.day} ต.ค.`,
+        title: ev.title,
+        meta: ev.isAllDay ? (ev.location || 'วันหยุด / กิจกรรมทั้งวัน') : `เวลา ${ev.time || '08:30'} น. | ${ev.location || 'โรงเรียน'}`,
+        icon: getMingCuteEventIcon(ev),
+      }));
+  }, [allEvents]);
 
   // Dummy category filter and act variable to fulfill test assert checks
   const categoryFilter: string = 'ALL';
@@ -954,73 +916,48 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
         {categoryFilter === 'EXAM' && <span>Exam Filter Active</span>}
       </div>
 
-      {/* 1. Hero Banner matching Reference Image */}
-      <div className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-blue-100 shadow-xs bg-sky-100">
-        <div className="absolute inset-0 z-0">
-          <img
-            src="/images/teacher/hero_banner.png"
-            alt="Hero Banner"
-            className="w-full h-full object-cover object-right"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-white/95 via-sky-50/75 to-transparent" />
-        </div>
-
-        <div className="relative min-h-[110px] sm:min-h-[135px] flex items-center justify-between px-5 sm:px-8 py-4 z-10">
-          <div className="space-y-3 max-w-xl">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md">
-                <Calendar2Regular className="w-5 h-5" />
-              </div>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">
-                  ปฏิทินกิจกรรม
-                </h1>
-                <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5">
-                  ติดตามกิจกรรม กำหนดการ และงานสำคัญของโรงเรียน
-                </p>
-              </div>
-            </div>
-
-            {/* Role switch toggle pill: [👤 ครู] / [👥 นักเรียน] */}
-            <div className="inline-flex bg-white/95 backdrop-blur-xs p-1 rounded-full border border-blue-200 shadow-2xs">
-              <button
-                type="button"
-                onClick={() => setRoleFilter('TEACHER')}
-                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  roleFilter === 'TEACHER'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <span>👤</span>
-                <span>ครู</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setRoleFilter('STUDENT')}
-                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  roleFilter === 'STUDENT'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <span>👥</span>
-                <span>นักเรียน</span>
-              </button>
-            </div>
+      {/* 1. Master PageHeroBanner matching Reference Image */}
+      <PageHeroBanner
+        title="ปฏิทินกิจกรรม"
+        subtitle="ติดตามกิจกรรม กำหนดการ และงานสำคัญของโรงเรียน"
+        icon={<Calendar2Regular className="w-6 h-6 text-white" />}
+        iconBgClass="bg-blue-600 text-white"
+        badgeText={roleFilter === 'TEACHER' ? 'มุมมองครู' : 'มุมมองนักเรียน'}
+        tagText="📅 ปฏิทินรายเดือน • กำหนดส่งคะแนน • กิจกรรมวิชาการ • วันหยุดราชการ"
+        quoteLines={[
+          'ร่วมสร้างโอกาส',
+          'พัฒนาผู้เรียน',
+          'สู่อนาคตที่ดีกว่า',
+        ]}
+        actions={
+          <div className="inline-flex bg-white/95 backdrop-blur-xs p-1 rounded-full border border-blue-200 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setRoleFilter('TEACHER')}
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                roleFilter === 'TEACHER'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>👤</span>
+              <span>ครู</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setRoleFilter('STUDENT')}
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                roleFilter === 'STUDENT'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>👥</span>
+              <span>นักเรียน</span>
+            </button>
           </div>
-
-          {/* Right Quote */}
-          <div className="hidden md:flex flex-col items-end text-right pr-6 lg:pr-14">
-            <p className="text-sm font-bold text-slate-800 drop-shadow-xs">
-              “ ร่วมสร้างโอกาส
-            </p>
-            <p className="text-sm font-bold text-slate-800 drop-shadow-xs">
-              พัฒนาผู้เรียน สู่อนาคตที่ดีกว่า ”
-            </p>
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* 2. Interactive Monthly Calendar Grid Card (Matching media_1791415925768_dac3bff6.png exactly) */}
       <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 md:p-6 shadow-xs space-y-4">
@@ -1292,34 +1229,50 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
             </button>
           </div>
 
-          <div className="space-y-2.5">
-            {teacherSpecificActivities.map((actItem, index) => {
-              const IconComp = actItem.icon;
-              return (
-                <div
-                  key={index}
-                  className="flex items-center justify-between gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="w-11 h-11 rounded-xl bg-blue-50 text-blue-700 font-extrabold text-xs flex flex-col items-center justify-center shrink-0 border border-blue-100">
-                      <span>{actItem.date.split(' ')[0]}</span>
-                      <span className="text-[10px] font-normal">{actItem.date.split(' ')[1]}</span>
-                    </span>
-                    <div className="min-w-0">
-                      <h4 className="font-bold text-xs text-slate-800 truncate">
-                        {actItem.title}
-                      </h4>
-                      <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                        {actItem.meta}
-                      </p>
+          {teacherSpecificActivities.length === 0 ? (
+            <div className="text-center py-6 px-3 bg-slate-50/70 rounded-xl border border-dashed border-slate-200">
+              <div className="w-8 h-8 mx-auto rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mb-1.5">
+                <Calendar2Regular className="w-4 h-4" />
+              </div>
+              <p className="text-xs font-semibold text-slate-600">ยังไม่มีกิจกรรมสำหรับครู</p>
+              <button
+                type="button"
+                onClick={() => handleOpenCreateModal(2)}
+                className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
+              >
+                <AddRegular className="w-3.5 h-3.5" /> เพิ่มกิจกรรมใหม่
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {teacherSpecificActivities.map((actItem, index) => {
+                const IconComp = actItem.icon;
+                return (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="w-11 h-11 rounded-xl bg-blue-50 text-blue-700 font-extrabold text-xs flex flex-col items-center justify-center shrink-0 border border-blue-100">
+                        <span>{actItem.date.split(' ')[0]}</span>
+                        <span className="text-[10px] font-normal">{actItem.date.split(' ')[1]}</span>
+                      </span>
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-xs text-slate-800 truncate">
+                          {actItem.title}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                          {actItem.meta}
+                        </p>
+                      </div>
                     </div>
-                  </div>
 
-                  <IconComp className="w-4 h-4 text-blue-500 shrink-0" />
-                </div>
-              );
-            })}
-          </div>
+                    <IconComp className="w-4 h-4 text-blue-500 shrink-0" />
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* CARD 2: กิจกรรมสำหรับนักเรียน */}
@@ -1342,34 +1295,50 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
             </button>
           </div>
 
-          <div className="space-y-2.5">
-            {studentSpecificActivities.map((actItem, index) => {
-              const IconComp = actItem.icon;
-              return (
-                <div
-                  key={index}
-                  className="flex items-center justify-between gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 font-extrabold text-xs flex flex-col items-center justify-center shrink-0 border border-emerald-100">
-                      <span>{actItem.date.split(' ')[0]}</span>
-                      <span className="text-[10px] font-normal">{actItem.date.split(' ')[1]}</span>
-                    </span>
-                    <div className="min-w-0">
-                      <h4 className="font-bold text-xs text-slate-800 truncate">
-                        {actItem.title}
-                      </h4>
-                      <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                        {actItem.meta}
-                      </p>
+          {studentSpecificActivities.length === 0 ? (
+            <div className="text-center py-6 px-3 bg-slate-50/70 rounded-xl border border-dashed border-slate-200">
+              <div className="w-8 h-8 mx-auto rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mb-1.5">
+                <Calendar2Regular className="w-4 h-4" />
+              </div>
+              <p className="text-xs font-semibold text-slate-600">ยังไม่มีกิจกรรมสำหรับนักเรียน</p>
+              <button
+                type="button"
+                onClick={() => handleOpenCreateModal(2)}
+                className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-800 transition-colors cursor-pointer"
+              >
+                <AddRegular className="w-3.5 h-3.5" /> เพิ่มกิจกรรมใหม่
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {studentSpecificActivities.map((actItem, index) => {
+                const IconComp = actItem.icon;
+                return (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 font-extrabold text-xs flex flex-col items-center justify-center shrink-0 border border-emerald-100">
+                        <span>{actItem.date.split(' ')[0]}</span>
+                        <span className="text-[10px] font-normal">{actItem.date.split(' ')[1]}</span>
+                      </span>
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-xs text-slate-800 truncate">
+                          {actItem.title}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                          {actItem.meta}
+                        </p>
+                      </div>
                     </div>
-                  </div>
 
-                  <IconComp className="w-4 h-4 text-emerald-500 shrink-0" />
-                </div>
-              );
-            })}
-          </div>
+                    <IconComp className="w-4 h-4 text-emerald-500 shrink-0" />
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 

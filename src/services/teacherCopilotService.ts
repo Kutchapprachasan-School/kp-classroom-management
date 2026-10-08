@@ -28,7 +28,11 @@ export type DeepLinkTargetView =
   | 'timetable'
   | 'settings'
   | 'morning-assembly'
-  | 'classroom-attendance';
+  | 'classroom-attendance'
+  | 'roster'
+  | 'lessons'
+  | 'academic-year'
+  | 'messages';
 
 export interface CrossViewNavigationPayload {
   view: DeepLinkTargetView;
@@ -38,6 +42,7 @@ export interface CrossViewNavigationPayload {
   gradesQuickFilter?: 'ALL' | 'AT_RISK';
   highlightBanner?: string;
   settingsTab?: string;
+  classroomId?: string;
 }
 
 export interface UrgentTriageItem {

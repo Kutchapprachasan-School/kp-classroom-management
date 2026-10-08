@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, ArrowRight } from 'lucide-react';
+import { AlertCircle, ArrowRight, CheckCircle2 } from 'lucide-react';
 import type { AtRiskStudent } from '../../types/viewModels';
 
 interface AtRiskCardProps {
@@ -48,7 +48,18 @@ export const AtRiskCard: React.FC<AtRiskCardProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100/70">
-            {students.map((student) => (
+            {students.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-8 text-center text-slate-400">
+                  <div className="flex flex-col items-center justify-center gap-1">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                    <span className="font-semibold text-slate-700">ไม่มีนักเรียนในกลุ่มที่ต้องเฝ้าระวังพิเศษ</span>
+                    <span className="text-[11px] text-slate-400">นักเรียนทุกคนมีเวลาเรียนและผลการประเมินอยู่ในเกณฑ์ปกติ</span>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              students.map((student) => (
               <tr
                 key={student.enrollmentId}
                 onClick={() => onSelectStudent(student)}
@@ -84,7 +95,7 @@ export const AtRiskCard: React.FC<AtRiskCardProps> = ({
                   {student.totalScore.toFixed(1)}
                 </td>
               </tr>
-            ))}
+            )))}
           </tbody>
         </table>
       </div>

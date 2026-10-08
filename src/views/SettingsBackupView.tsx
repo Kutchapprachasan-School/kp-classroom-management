@@ -30,6 +30,7 @@ import {
   Upload,
   RefreshCw,
   Sparkles,
+  Database,
 } from 'lucide-react';
 
 import {
@@ -39,6 +40,13 @@ import {
   type SchoolUserRole,
   type SchoolBrandingSettings,
 } from '../config/schoolRoles';
+
+import {
+  schoolPoliciesService,
+  type SchoolAttendancePolicyConfig,
+  type SchoolGradingPolicyConfig,
+  type SchoolNotificationConfig,
+} from '../services/schoolPoliciesService';
 
 import {
   type SchoolBellScheduleConfig,
@@ -208,6 +216,22 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
     setTimeout(() => setToastMsg(null), 3200);
   };
 
+  // Clean Slate status
+  const [isCleanSlate, setIsCleanSlate] = useState<boolean>(() =>
+    cleanSlateService.isCleanSlateActive()
+  );
+
+  // Policy States (Supabase Linked)
+  const [attendancePolicy, setAttendancePolicy] = useState<SchoolAttendancePolicyConfig>(() =>
+    schoolPoliciesService.getAttendancePolicy()
+  );
+  const [gradingPolicy, setGradingPolicy] = useState<SchoolGradingPolicyConfig>(() =>
+    schoolPoliciesService.getGradingPolicy()
+  );
+  const [notificationConfig, setNotificationConfig] = useState<SchoolNotificationConfig>(() =>
+    schoolPoliciesService.getNotificationConfig()
+  );
+
   // Sync with window events and fetch snapshots & classrooms
   useEffect(() => {
     sgsExportService.getSnapshots().then(setSnapshots).catch(() => {});
@@ -215,6 +239,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
 
     const handleClassroomChange = () => {
       classroomService.getAll().then(setClassrooms).catch(() => {});
+      setIsCleanSlate(cleanSlateService.isCleanSlateActive());
     };
     window.addEventListener('kps-data-sync-event', handleClassroomChange);
 
@@ -229,6 +254,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
     window.addEventListener(TEACHER_BANNERS_EVENT, onTeacherBannersChange);
 
     return () => {
+      window.removeEventListener('kps-data-sync-event', handleClassroomChange);
       window.removeEventListener(ACADEMIC_CALENDAR_EVENT, handleCalendarChange);
       window.removeEventListener(SCHOOL_LEAVE_SETTINGS_EVENT, onLeaveChange);
       window.removeEventListener(STUDENT_BANNERS_EVENT, onBannersChange);
@@ -305,6 +331,21 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
     showToast('🔄 คืนค่าเวลาเรียนเริ่มต้นเรียบร้อย');
   };
 
+  const handleSaveAttendancePolicy = () => {
+    schoolPoliciesService.saveAttendancePolicy(attendancePolicy);
+    showToast('✓ บันทึกเกณฑ์เวลาเรียน 80% และกฎการเช็คชื่อเรียบร้อย');
+  };
+
+  const handleSaveGradingPolicy = () => {
+    schoolPoliciesService.saveGradingPolicy(gradingPolicy);
+    showToast('✓ บันทึกเกณฑ์การตัดเกรดและสัดส่วนคะแนน SGS เรียบร้อย');
+  };
+
+  const handleSaveNotificationConfig = () => {
+    schoolPoliciesService.saveNotificationConfig(notificationConfig);
+    showToast('✓ บันทึกการตั้งค่าการแจ้งเตือน Line / SMS เรียบร้อย');
+  };
+
   return (
     <div className="space-y-6 font-sans text-slate-800 pb-20 select-none">
       {/* Toast Notification */}
@@ -316,9 +357,12 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
       )}
 
       {/* ==================================================================== */}
-      {/* 1. TOP HERO BANNER (ตรงตาม Mockup: การตั้งค่าที่ถูกต้อง ช่วยให้การทำงานง่ายขึ้นนะคะ ♡) */}
+      {/* RENDER MODE A: OVERVIEW DASHBOARD (NO POPUPS) */}
       {/* ==================================================================== */}
-      <SettingsHeroBanner schoolName={schoolSettings.nameTh} />
+      {activeModalKey === null && (
+        <>
+          {/* 1. TOP HERO BANNER (ตรงตาม Mockup: การตั้งค่าที่ถูกต้อง ช่วยให้การทำงานง่ายขึ้นนะคะ ♡) */}
+          <SettingsHeroBanner schoolName={schoolSettings.nameTh} />
 
       {/* ==================================================================== */}
       {/* CATEGORY 1: ข้อมูลพื้นฐาน (ข้อมูลทั่วไปของโรงเรียนและผู้ใช้งาน) */}
@@ -705,8 +749,145 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         </div>
       </section>
 
+          {/* ==================================================================== */}
+          {/* CATEGORY 6: ผังโครงสร้างตาราง Supabase สำหรับการตั้งค่า (12 หมวดหมู่) */}
+          {/* ==================================================================== */}
+          <section className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-card space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 shadow-2xs border border-indigo-100">
+                  <Database className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-extrabold text-[#163A66]">
+                      ผังโครงสร้างตาราง Supabase สำหรับการตั้งค่า (Settings Schema Directory)
+                    </h3>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800">
+                      12 Tables
+                    </span>
+                  </div>
+                  <p className="text-xs font-medium text-[#6B7C93]">
+                    รายงานการเชื่อมโยงระบบการตั้งค่าแต่ละจุดไปยังตารางจริงในฐานข้อมูล Supabase พร้อมความยืดหยุ่นระดับโรงเรียน
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Supabase Connected
+                </span>
+              </div>
+            </div>
+
+            {/* 12 Tables Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {[
+                {
+                  table: 'school_profiles',
+                  desc: 'ข้อมูลโรงเรียน, รหัส 10 หลัก, อัตลักษณ์, คำขวัญ, ผู้บริหาร, สีประจำ รร.',
+                  route: 'school_info' as SettingsKey,
+                  cols: 'name_th, code_10_digit, motto, director_name, logo_url',
+                },
+                {
+                  table: 'bell_schedules',
+                  desc: 'เวลาเข้าแถวเคารพธงชาติ, คาบเรียน 1-7, โหมดพักเที่ยงนับคาบ vs ข้ามคาบ',
+                  route: 'timetable' as SettingsKey,
+                  cols: 'morning_start, first_period, lunch_mode, slot, duration',
+                },
+                {
+                  table: 'academic_terms',
+                  desc: 'ปีการศึกษา (2569), ภาคเรียน 1/2, วันเปิด-ปิดเทอม, สัปดาห์สอบกลาง/ปลายภาค',
+                  route: 'timetable' as SettingsKey,
+                  cols: 'year, semester_no, start_date, end_date, total_weeks',
+                },
+                {
+                  table: 'school_special_holidays',
+                  desc: 'วันหยุดพิเศษเฉพาะโรงเรียน (วันสถาปนา, งานเทศกาล, ภัยพิบัติ)',
+                  route: 'timetable' as SettingsKey,
+                  cols: 'date, title, holiday_type, is_cancelled',
+                },
+                {
+                  table: 'school_weekend_makeup_days',
+                  desc: 'วันมาเรียนชดเชย เสาร์-อาทิตย์ พร้อมเลือกระดับชั้นเป้าหมาย (ม.1-ม.6)',
+                  route: 'timetable' as SettingsKey,
+                  cols: 'date, reason, target_grades, timetable_day_mapped',
+                },
+                {
+                  table: 'classrooms',
+                  desc: 'โครงสร้าง 12 ห้องเรียน (ม.1/1 - ม.6/2), แผนการเรียน, และครูที่ปรึกษา',
+                  route: 'classrooms' as SettingsKey,
+                  cols: 'name, grade_level, building, room_number, adviser_id',
+                },
+                {
+                  table: 'school_attendance_policies',
+                  desc: 'เกณฑ์เวลาเรียน 80% (สพฐ.), เวลาเริ่มนับสาย, กฎ Lock 2-3 โดดเรียน',
+                  route: 'attendance' as SettingsKey,
+                  cols: 'min_percent (80%), late_grace_min, truancy_detection',
+                },
+                {
+                  table: 'school_grading_policies',
+                  desc: 'สัดส่วนคะแนน SGS (70:15:15), เกณฑ์ตัดเกรด 8 ระดับ, เกณฑ์สอบแก้ตัว',
+                  route: 'grades' as SettingsKey,
+                  cols: 'formative_ratio, midterm, final, retest_max, half_step',
+                },
+                {
+                  table: 'school_leave_settings',
+                  desc: 'โควตาวันลาครู (ป่วย 60, กิจ 45, พักผ่อน 10) และการลานักเรียน',
+                  route: 'attendance' as SettingsKey,
+                  cols: 'teacher_sick_quota, personal_quota, doctor_cert_days',
+                },
+                {
+                  table: 'system_storage_configs',
+                  desc: 'พื้นที่ Cloudflare R2, Google Drive, Snapshots และ Clean Slate Mode',
+                  route: 'backup' as SettingsKey,
+                  cols: 'r2_bucket, auto_backup_freq, clean_slate_mode',
+                },
+                {
+                  table: 'notification_settings',
+                  desc: 'Line Notify Token, SMS Gateway, แจ้งเตือนผู้ปกครอง (ขาด/สาย/โดด)',
+                  route: 'notifications' as SettingsKey,
+                  cols: 'line_token, notify_absent, notify_late, notify_truancy',
+                },
+                {
+                  table: 'school_banner_configs',
+                  desc: 'ภาพแบนเนอร์ Hero, Sidebar Mascot, คำคม, การซูมและปรับตำแหน่ง',
+                  route: 'theme' as SettingsKey,
+                  cols: 'banner_type, image_url, quote_th, opacity, zoom, pos_x',
+                },
+              ].map((item) => (
+                <div
+                  key={item.table}
+                  onClick={() => setActiveModalKey(item.route)}
+                  className="p-3.5 rounded-xl border border-slate-200/90 bg-slate-50/50 hover:bg-white hover:border-blue-300 hover:shadow-xs transition-all cursor-pointer group flex flex-col justify-between"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                        {item.table}
+                      </span>
+                      <span className="text-[11px] font-bold text-slate-400 group-hover:text-blue-600 transition-colors">
+                        ตั้งค่า ➔
+                      </span>
+                    </div>
+                    <p className="text-xs font-semibold text-slate-800 leading-snug">
+                      {item.desc}
+                    </p>
+                  </div>
+                  <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                    <span className="truncate max-w-[200px]">{item.cols}</span>
+                    <span className="text-emerald-600 font-bold">RLS Active</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </>
+      )}
+
       {/* ==================================================================== */}
-      {/* SUB-SETTINGS WORKSPACE MODALS (FUNCTIONAL CONFIGURATIONS) */}
+      {/* RENDER MODE B: SUB-SETTINGS IN-PAGE WORKSPACE (NO POPUPS) */}
       {/* ==================================================================== */}
 
       {/* ------------------------------------------------------------------ */}
@@ -720,6 +901,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         icon={<School className="w-5 h-5" />}
         iconBgClass="bg-blue-50"
         iconColorClass="text-blue-600"
+        supabaseTable="school_profiles"
+        categoryPath="หมวด 1: ข้อมูลองค์กรและอัตลักษณ์"
         onSave={handleSaveSchoolInfo}
       >
         <div className="space-y-4">
@@ -856,6 +1039,49 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold font-mono"
                 />
               </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">รหัสสถานศึกษา 10 หลัก (สพฐ.):</label>
+                <input
+                  type="text"
+                  placeholder="เช่น 1041680123"
+                  value={schoolSettings.schoolCode10Digit || '1041680123'}
+                  onChange={(e) => setSchoolSettings({ ...schoolSettings, schoolCode10Digit: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold font-mono text-blue-900 bg-blue-50/20"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">ประเภทสถานศึกษา:</label>
+                <select
+                  value={schoolSettings.schoolType || 'HIGH_SCHOOL'}
+                  onChange={(e) => setSchoolSettings({ ...schoolSettings, schoolType: e.target.value as any })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white"
+                >
+                  <option value="HIGH_SCHOOL">โรงเรียนมัธยมศึกษา (ม.1 - ม.6)</option>
+                  <option value="EXPANSION">โรงเรียนขยายโอกาส (อ.1 - ม.3 / ป.1 - ม.3)</option>
+                  <option value="PRIMARY">โรงเรียนประถมศึกษา (ป.1 - ป.6)</option>
+                  <option value="VOCATIONAL">วิทยาลัยอาชีวศึกษา / เทคนิค</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">ชื่อ-สกุล ผู้อำนวยการโรงเรียน:</label>
+                <input
+                  type="text"
+                  placeholder="เช่น นายสมชาย ใจดี"
+                  value={schoolSettings.directorName || 'นายสมชาย ใจดี'}
+                  onChange={(e) => setSchoolSettings({ ...schoolSettings, directorName: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">ตำแหน่งผู้บริหาร:</label>
+                <input
+                  type="text"
+                  placeholder="เช่น ผู้อำนวยการโรงเรียนกุดจับประชาสรรค์"
+                  value={schoolSettings.directorPosition || 'ผู้อำนวยการโรงเรียนกุดจับประชาสรรค์'}
+                  onChange={(e) => setSchoolSettings({ ...schoolSettings, directorPosition: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800"
+                />
+              </div>
             </div>
           </div>
 
@@ -984,6 +1210,30 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">
+                  อัตลักษณ์ของสถานศึกษา (School Identity):
+                </label>
+                <input
+                  type="text"
+                  placeholder="เช่น มารยาทดี มีคุณธรรม นำวิชาการ"
+                  value={schoolSettings.schoolIdentity || 'มารยาทดี มีคุณธรรม นำวิชาการ'}
+                  onChange={(e) => setSchoolSettings({ ...schoolSettings, schoolIdentity: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-emerald-900 bg-emerald-50/20"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  เอกลักษณ์ของสถานศึกษา (School Uniqueness):
+                </label>
+                <input
+                  type="text"
+                  placeholder="เช่น โรงเรียนสิ่งแวดล้อมดี มีทักษะชีวิต"
+                  value={schoolSettings.schoolUniqueness || 'โรงเรียนสิ่งแวดล้อมดี มีทักษะชีวิต'}
+                  onChange={(e) => setSchoolSettings({ ...schoolSettings, schoolUniqueness: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-emerald-900 bg-emerald-50/20"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
                   วิสัยทัศน์ (School Vision):
                 </label>
                 <textarea
@@ -1041,6 +1291,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         icon={<User className="w-5 h-5" />}
         iconBgClass="bg-sky-50"
         iconColorClass="text-sky-600"
+        supabaseTable="school_profiles & teachers"
+        categoryPath="หมวด 1: บุคลากรและสิทธิ์"
         showSaveButton={false}
       >
         <div className="space-y-4">
@@ -1080,6 +1332,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         icon={<Presentation className="w-5 h-5" />}
         iconBgClass="bg-indigo-50"
         iconColorClass="text-indigo-600"
+        supabaseTable="classrooms"
+        categoryPath="หมวด 1: โครงสร้างห้องเรียนและครูที่ปรึกษา"
         showSaveButton={activeRole === 'STUDENT_AFFAIRS' || activeRole === 'ACADEMIC_ADMIN'}
         saveButtonText="💾 บันทึกการตั้งค่าครูที่ปรึกษา"
         onSave={async () => {
@@ -1212,6 +1466,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         icon={<BookOpen className="w-5 h-5" />}
         iconBgClass="bg-purple-50"
         iconColorClass="text-purple-600"
+        supabaseTable="courses"
+        categoryPath="หมวด 2: หลักสูตรและรายวิชา"
         showSaveButton={false}
       >
         <div className="space-y-4">
@@ -1250,6 +1506,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         icon={<CalendarDays className="w-5 h-5" />}
         iconBgClass="bg-amber-50"
         iconColorClass="text-amber-600"
+        supabaseTable="bell_schedules"
+        categoryPath="หมวด 2: โครงสร้างคาบเรียนและเสียงกริ่ง"
         onSave={handleSaveBellSchedule}
         saveButtonText="💾 บันทึกการตั้งค่าโครงสร้างเวลา"
       >
@@ -1581,6 +1839,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         icon={<ClipboardList className="w-5 h-5" />}
         iconBgClass="bg-purple-50"
         iconColorClass="text-purple-600"
+        supabaseTable="assignments"
+        categoryPath="หมวด 3: การมอบหมายงานและภาระงาน"
         onSave={() => showToast('✓ บันทึกการตั้งค่างานและแบบฝึกหัดเรียบร้อย')}
       >
         <div className="space-y-4">
@@ -1607,6 +1867,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         icon={<FileText className="w-5 h-5" />}
         iconBgClass="bg-rose-50"
         iconColorClass="text-rose-600"
+        supabaseTable="exams & item_analysis"
+        categoryPath="หมวด 3: การประเมินและการสอบ"
         onSave={() => showToast('✓ บันทึกนโยบายการสอบเรียบร้อย')}
       >
         <div className="space-y-4">
@@ -1641,6 +1903,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         icon={<CheckSquare className="w-5 h-5" />}
         iconBgClass="bg-violet-50"
         iconColorClass="text-violet-600"
+        supabaseTable="school_forms"
+        categoryPath="หมวด 3: แบบประเมินและแบบฟอร์มดิจิทัล"
         onSave={() => showToast('✓ บันทึกเกณฑ์การประเมินเรียบร้อย')}
       >
         <div className="space-y-4">
@@ -1664,6 +1928,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         icon={<UserCircle className="w-5 h-5" />}
         iconBgClass="bg-cyan-50"
         iconColorClass="text-cyan-600"
+        supabaseTable="students"
+        categoryPath="หมวด 4: ข้อมูลทะเบียนและนักเรียน"
         onSave={() => showToast('✓ บันทึกการตั้งค่านักเรียนเรียบร้อย')}
       >
         <div className="space-y-4">
@@ -1676,20 +1942,109 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         </div>
       </SettingsSubModal>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* MODAL 3.2: เช็คชื่อ/แถวเช้า */}
-      {/* ------------------------------------------------------------------ */}
       <SettingsSubModal
         isOpen={activeModalKey === 'attendance'}
         onClose={() => setActiveModalKey(null)}
-        title="ตั้งค่าเช็คชื่อและแถวเช้า (Smart Correlation)"
-        subtitle="เกณฑ์เวลาแถวเช้า กฎอนุมานโดดเรียน และเกณฑ์เวลาเรียน 80%"
+        title="ตั้งค่าเช็คชื่อและแถวเช้า (Smart Correlation & 80% Rule)"
+        subtitle="เกณฑ์เวลาแถวเช้า กฎอนุมานโดดเรียน เกณฑ์เวลาเรียน 80% และโควตาวันลา"
         icon={<ClipboardCheck className="w-5 h-5" />}
         iconBgClass="bg-emerald-50"
         iconColorClass="text-emerald-600"
-        onSave={() => showToast('✓ บันทึกกฎการเช็คชื่อเรียบร้อย')}
+        supabaseTable="school_attendance_policies & school_leave_settings"
+        categoryPath="การจัดการนักเรียน & เกณฑ์เวลาเรียน"
+        onSave={handleSaveAttendancePolicy}
       >
         <div className="space-y-4">
+          {/* Section: เกณฑ์เวลาเรียนขั้นต่ำ 80% และกฎ 4 Integrity Locks */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="flex items-center gap-2">
+                <ClipboardCheck className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-sm font-extrabold text-slate-900">เกณฑ์เวลาเรียนขั้นต่ำเพื่อมีสิทธิ์สอบ (สพฐ.)</h3>
+              </div>
+              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                Supabase: school_attendance_policies
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  เปอร์เซ็นต์เวลาเรียนขั้นต่ำ (มีสิทธิ์สอบ):
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={60}
+                    max={90}
+                    step={5}
+                    value={attendancePolicy.minAttendancePercent}
+                    onChange={(e) => setAttendancePolicy({ ...attendancePolicy, minAttendancePercent: Number(e.target.value) })}
+                    className="flex-1 accent-blue-600"
+                  />
+                  <span className="text-base font-extrabold text-blue-700 w-16 text-right">
+                    {attendancePolicy.minAttendancePercent}%
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  เกณฑ์มาตรฐาน สพฐ. กำหนด 80% (เวลาเรียนไม่ถึง 80% ติด มส.)
+                </p>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  ระยะเวลายืดหยุ่นเริ่มนับสาย (นาทีหลังเข้าแถว):
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    max={60}
+                    value={attendancePolicy.lateGraceMinutes}
+                    onChange={(e) => setAttendancePolicy({ ...attendancePolicy, lateGraceMinutes: Number(e.target.value) })}
+                    className="w-24 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold"
+                  />
+                  <span className="text-xs text-slate-500 font-semibold">นาที (เกินเวลานี้ปรับเป็นมาสาย)</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 space-y-2.5">
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={attendancePolicy.truancyDetectionEnabled}
+                  onChange={(e) => setAttendancePolicy({ ...attendancePolicy, truancyDetectionEnabled: e.target.checked })}
+                  className="rounded text-blue-600"
+                />
+                <span>เปิดใช้งานระบบตรวจจับอนุมานโดดเรียนอัตโนมัติ (Lock 2: Truancy Candidate)</span>
+              </label>
+
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={attendancePolicy.decoupledLatePromotionEnabled}
+                  onChange={(e) => setAttendancePolicy({ ...attendancePolicy, decoupledLatePromotionEnabled: e.target.checked })}
+                  className="rounded text-blue-600"
+                />
+                <span>ขาดแถวเช้าแต่มาเรียนคาบ 1 ปรับสถานะแถวเช้าเป็นสายอัตโนมัติ (Lock 3: Decoupled Morning Late)</span>
+              </label>
+
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-xs font-semibold text-slate-700">แจ้งเตือนกลุ่มเสี่ยงเมื่อขาดเรียนติดต่อกัน:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={attendancePolicy.consecutiveAbsentAlertDays}
+                  onChange={(e) => setAttendancePolicy({ ...attendancePolicy, consecutiveAbsentAlertDays: Number(e.target.value) })}
+                  className="w-16 px-2.5 py-1 rounded-xl border border-slate-200 text-xs font-bold text-center"
+                />
+                <span className="text-xs text-slate-500 font-semibold">วัน</span>
+              </div>
+            </div>
+          </div>
+
           <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
             <h3 className="text-sm font-extrabold text-slate-900">4 Integrity Locks สำหรับการเข้าเรียน</h3>
             <div className="space-y-2 text-xs">
@@ -1734,6 +2089,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         icon={<Award className="w-5 h-5" />}
         iconBgClass="bg-amber-50"
         iconColorClass="text-amber-600"
+        supabaseTable="student_behaviors"
+        categoryPath="หมวด 4: วินัยและพฤติกรรมเชิงบวก"
         onSave={() => showToast('✓ บันทึกเกณฑ์ความประพฤติเรียบร้อย')}
       >
         <div className="space-y-4">
@@ -1757,6 +2114,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         icon={<Users className="w-5 h-5" />}
         iconBgClass="bg-purple-50"
         iconColorClass="text-purple-600"
+        supabaseTable="parent_contacts"
+        categoryPath="หมวด 4: ผู้ปกครองและการสื่อสาร"
         onSave={() => showToast('✓ บันทึกระบบผู้ปกครองเรียบร้อย')}
       >
         <div className="space-y-4">
@@ -1775,16 +2134,123 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
       <SettingsSubModal
         isOpen={activeModalKey === 'grades'}
         onClose={() => setActiveModalKey(null)}
-        title="การตัดเกรด & ส่งออก SGS"
-        subtitle="เกณฑ์การคำนวณเกรด 8 ระดับ และโครงสร้างส่งออกระบบ สพฐ."
+        title="การตัดเกรด & สัดส่วนคะแนน SGS"
+        subtitle="เกณฑ์การคำนวณเกรด 8 ระดับ, สัดส่วนคะแนนเก็บ 70:15:15 และเกณฑ์สอบแก้ตัว"
         icon={<FileSpreadsheet className="w-5 h-5" />}
         iconBgClass="bg-purple-50"
         iconColorClass="text-purple-600"
-        onSave={() => showToast('✓ บันทึกเกณฑ์ตัดเกรดเรียบร้อย')}
+        supabaseTable="school_grading_policies"
+        categoryPath="ผลการเรียน & รายงาน"
+        onSave={handleSaveGradingPolicy}
       >
         <div className="space-y-4">
+          {/* Section: สัดส่วนคะแนน SGS และเกณฑ์ผ่าน */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="flex items-center gap-2">
+                <BarChart2 className="w-4 h-4 text-purple-600" />
+                <h3 className="text-sm font-extrabold text-slate-900">สัดส่วนคะแนนสะสม SGS (คะแนนเต็ม 100)</h3>
+              </div>
+              <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-200">
+                Supabase: school_grading_policies
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-3 rounded-xl bg-purple-50/50 border border-purple-200">
+                <label className="text-xs font-bold text-purple-900 block mb-1">
+                  1. คะแนนเก็บระหว่างภาค (Formative):
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={gradingPolicy.formativeRatio}
+                    onChange={(e) => setGradingPolicy({ ...gradingPolicy, formativeRatio: Number(e.target.value) })}
+                    className="w-20 px-2.5 py-1.5 rounded-xl border border-purple-300 text-xs font-extrabold text-center bg-white"
+                  />
+                  <span className="text-xs font-bold text-purple-700">คะแนน ({gradingPolicy.formativeRatio}%)</span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-purple-50/50 border border-purple-200">
+                <label className="text-xs font-bold text-purple-900 block mb-1">
+                  2. สอบกลางภาค (Midterm):
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={gradingPolicy.midtermRatio}
+                    onChange={(e) => setGradingPolicy({ ...gradingPolicy, midtermRatio: Number(e.target.value) })}
+                    className="w-20 px-2.5 py-1.5 rounded-xl border border-purple-300 text-xs font-extrabold text-center bg-white"
+                  />
+                  <span className="text-xs font-bold text-purple-700">คะแนน ({gradingPolicy.midtermRatio}%)</span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-purple-50/50 border border-purple-200">
+                <label className="text-xs font-bold text-purple-900 block mb-1">
+                  3. สอบปลายภาค (Final):
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={gradingPolicy.finalRatio}
+                    onChange={(e) => setGradingPolicy({ ...gradingPolicy, finalRatio: Number(e.target.value) })}
+                    className="w-20 px-2.5 py-1.5 rounded-xl border border-purple-300 text-xs font-extrabold text-center bg-white"
+                  />
+                  <span className="text-xs font-bold text-purple-700">คะแนน ({gradingPolicy.finalRatio}%)</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+              <span className="font-bold text-slate-700">
+                รวมคะแนนทั้งสิ้น: {gradingPolicy.formativeRatio + gradingPolicy.midtermRatio + gradingPolicy.finalRatio} / 100
+              </span>
+              {gradingPolicy.formativeRatio + gradingPolicy.midtermRatio + gradingPolicy.finalRatio === 100 ? (
+                <span className="font-bold text-emerald-600">✓ สัดส่วนถูกต้องครบ 100 คะแนน</span>
+              ) : (
+                <span className="font-bold text-rose-600">⚠️ ผลรวมต้องเท่ากับ 100 คะแนนพอดี</span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">เกณฑ์คะแนนผ่านขั้นต่ำ:</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={gradingPolicy.passingScoreMin}
+                    onChange={(e) => setGradingPolicy({ ...gradingPolicy, passingScoreMin: Number(e.target.value) })}
+                    className="w-20 px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-center"
+                  />
+                  <span className="text-xs text-slate-500 font-semibold">คะแนน (ต่ำกว่า 50 คะแนน ได้เกรด 0)</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">คะแนนสูงสุดเมื่อสอบแก้ตัว:</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={gradingPolicy.retestMaxScore}
+                    onChange={(e) => setGradingPolicy({ ...gradingPolicy, retestMaxScore: Number(e.target.value) })}
+                    className="w-20 px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-center"
+                  />
+                  <span className="text-xs text-slate-500 font-semibold">คะแนน (ตามระเบียบ สพฐ. สอบแก้ตัวได้เกรด 1)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-            <h3 className="text-sm font-extrabold text-slate-900">เกณฑ์การตัดเกรดมาตรฐาน</h3>
+            <h3 className="text-sm font-extrabold text-slate-900">เกณฑ์การตัดเกรดมาตรฐาน สพฐ. (8 ระดับ)</h3>
             <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 text-center text-xs">
               {[
                 { g: '4.0', r: '80-100' },
@@ -1817,6 +2283,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         icon={<BarChart2 className="w-5 h-5" />}
         iconBgClass="bg-emerald-50"
         iconColorClass="text-emerald-600"
+        supabaseTable="sar_reports"
+        categoryPath="หมวด 5: รายงานและ SAR"
         onSave={() => showToast('✓ บันทึกรูปแบบรายงานเรียบร้อย')}
       >
         <div className="space-y-4">
@@ -1840,6 +2308,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         icon={<TrendingUp className="w-5 h-5" />}
         iconBgClass="bg-blue-50"
         iconColorClass="text-blue-600"
+        supabaseTable="system_analytics"
+        categoryPath="หมวด 5: สถิติและภาพรวมผู้บริหาร"
         onSave={() => showToast('✓ บันทึกเกณฑ์สถิติเรียบร้อย')}
       >
         <div className="space-y-4">
@@ -1863,6 +2333,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         icon={<Cloud className="w-5 h-5" />}
         iconBgClass="bg-indigo-50"
         iconColorClass="text-indigo-600"
+        supabaseTable="system_storage_configs"
+        categoryPath="หมวด 6: พื้นที่ R2 และสำรองข้อมูล"
         onSave={() => showToast('✓ สร้างจุดสำรองข้อมูล Snapshot สำเร็จ')}
         saveButtonText="💾 สร้าง Snapshot สำรองข้อมูลทันที"
       >
@@ -1958,42 +2430,94 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
           </div>
 
           {/* SECTION: ล้างข้อมูลจำลองเพื่อเริ่มใช้งานจริง (Clean Slate Production MVP) */}
-          <div className="bg-amber-50/70 rounded-2xl border border-amber-200 p-4 space-y-3">
-            <div className="flex items-start justify-between gap-3">
+          {/* SECTION: ล้างข้อมูลจำลองเพื่อเริ่มใช้งานจริง (Clean Slate Production vs Demo Seed Mode) */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-4 shadow-2xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
               <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-extrabold text-amber-950">
-                    เริ่มใช้งานจริง: ล้างข้อมูลจำลอง (Clean Slate MVP)
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-extrabold text-slate-900">
+                    สถานะโหมดระบบ & ข้อมูลจำลอง (Clean Slate Controller)
                   </h3>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900">
-                    Production Ready
-                  </span>
+                  {isCleanSlate ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      โหมดพร้อมใช้งานจริง (Clean Slate Production)
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      โหมดข้อมูลตัวอย่าง (Demo Seed Mode)
+                    </span>
+                  )}
                 </div>
-                <p className="text-xs text-amber-800 mt-1 leading-relaxed">
-                  ล้างข้อมูลจำลองสำหรับการทดสอบ (คะแนนเก็บ, เช็คชื่อย้อนหลัง, ข้อสอบ และแชททดสอบ) 
-                  โดยยังคงรักษาข้อมูลโรงเรียน, ตารางระฆังคาบเรียน, และห้องเรียน ม.1 - ม.6 ไว้อย่างครบถ้วน 
-                  เพื่อให้คุณครูนำเข้ารายชื่อนักเรียนจริงได้ทันที (ไม่กระทบระบบการลาหลักของโรงเรียน)
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  จัดการความพร้อมของฐานข้อมูล: สลับระหว่างโหมด Clean Slate (หน้าเริ่มต้นว่างเปล่าสำหรับเริ่มปีการศึกษาใหม่) และโหมดข้อมูลตัวอย่าง (Demo Data สำหรับอบรมและสาธิตฟังก์ชัน)
                 </p>
               </div>
             </div>
-            <div className="flex items-center justify-end pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      'ยืนยันการล้างข้อมูลจำลองเพื่อเตรียมระบบพร้อมใช้งานจริง (MVP)?\nข้อมูลโรงเรียนและห้องเรียนจะยังคงอยู่ครบถ้วน'
-                    )
-                  ) {
-                    cleanSlateService.purgeTransactionalMockData();
-                    showToast('✓ ล้างข้อมูลจำลองเรียบร้อยแล้ว ระบบพร้อมสำหรับการใช้งานจริง');
-                  }
-                }}
-                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>ล้างข้อมูลจำลองเพื่อเริ่มใช้งานจริง</span>
-              </button>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+              {/* Option 1: Clean Slate Reset */}
+              <div className="p-3.5 rounded-xl border border-blue-100 bg-blue-50/40 space-y-2.5 flex flex-col justify-between">
+                <div>
+                  <h4 className="font-extrabold text-xs text-blue-900 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-blue-600" />
+                    <span>ล้างข้อมูลจำลอง (Clean Slate Reset)</span>
+                  </h4>
+                  <p className="text-[11px] text-blue-700/80 leading-relaxed mt-1">
+                    ล้างคะแนน, การบ้าน, ข้อสอบ, แชท และประวัติเข้าเรียนทั้งหมด โดยคงไว้ซึ่งโครงสร้างโรงเรียน, เวลาเรียน, และห้องเรียน ม.1 - ม.6
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        'ยืนยันการล้างข้อมูลจำลองเพื่อเตรียมระบบพร้อมใช้งานจริง (Clean Slate)?\nโครงสร้างโรงเรียนและห้องเรียนจะยังคงอยู่ครบถ้วน'
+                      )
+                    ) {
+                      cleanSlateService.purgeTransactionalMockData();
+                      setIsCleanSlate(true);
+                      showToast('✓ ล้างข้อมูลจำลองทั้งหมดเรียบร้อยแล้ว เข้าสู่โหมด Clean Slate พร้อมใช้งานจริง');
+                    }
+                  }}
+                  className="w-full py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>🧹 ล้างข้อมูลจำลองทั้งหมด (Clean Slate Reset)</span>
+                </button>
+              </div>
+
+              {/* Option 2: Demo Seed Mode */}
+              <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/40 space-y-2.5 flex flex-col justify-between">
+                <div>
+                  <h4 className="font-extrabold text-xs text-amber-900 flex items-center gap-1.5">
+                    <RefreshCw className="w-4 h-4 text-amber-600" />
+                    <span>นำเข้าข้อมูลตัวอย่าง (Demo Seed Mode)</span>
+                  </h4>
+                  <p className="text-[11px] text-amber-800/80 leading-relaxed mt-1">
+                    โหลดข้อมูลตัวอย่างสำหรับการสาธิต (คะแนน, กิจกรรม, ข้อสอบ) เพื่อทดสอบฟังก์ชันและพรีวิวหน้าจอการทำงานต่างๆ
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        'ยืนยันการเปิดใช้งานโหมดข้อมูลตัวอย่าง (Demo Seed Mode)?\nระบบจะแสดงข้อมูลจำลองเพื่อการสาธิต'
+                      )
+                    ) {
+                      cleanSlateService.seedDemoData();
+                      setIsCleanSlate(false);
+                      showToast('✓ นำเข้าข้อมูลตัวอย่างเพื่อการสาธิตเรียบร้อยแล้ว');
+                    }
+                  }}
+                  className="w-full py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>🧪 นำเข้าข้อมูลตัวอย่างเพื่อการสาธิต (Demo Mode)</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -2005,25 +2529,90 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
       <SettingsSubModal
         isOpen={activeModalKey === 'notifications'}
         onClose={() => setActiveModalKey(null)}
-        title="การตั้งค่าการแจ้งเตือน"
-        subtitle="ระบบเตือน Line Notify, เสียงเตือนคาบเรียน และการแจ้งเตือนของครู"
+        title="การตั้งค่าการแจ้งเตือน (Line Notify & SMS)"
+        subtitle="ระบบเตือน Line Notify Token, SMS Gateway และการแจ้งเตือนผู้ปกครอง (ขาด/สาย/โดด)"
         icon={<Bell className="w-5 h-5" />}
         iconBgClass="bg-amber-50"
         iconColorClass="text-amber-600"
-        onSave={() => showToast('✓ บันทึกการตั้งค่าการแจ้งเตือนเรียบร้อย')}
+        supabaseTable="notification_settings"
+        categoryPath="หมวด 6: การแจ้งเตือน & การสื่อสาร"
+        onSave={handleSaveNotificationConfig}
       >
         <div className="space-y-4">
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-            <h3 className="text-sm font-extrabold text-slate-900">Line Notify Token ประจำโรงเรียน</h3>
-            <input
-              type="password"
-              placeholder="กรอก Line Notify Token..."
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono"
-              defaultValue="line-token-khamyang-pittaya-2026"
-            />
-            <p className="text-[11px] text-slate-500">
-              ใช้สำหรับส่งการแจ้งเตือนการเข้าแถว การบ้าน และข่าวสารโรงเรียนเข้ากลุ่มครูและผู้ปกครอง
-            </p>
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-4">
+            <h3 className="text-sm font-extrabold text-slate-900">เกตเวย์การแจ้งเตือน Line & SMS ประจำโรงเรียน</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Line Notify Token ประจำโรงเรียน:</label>
+                <input
+                  type="password"
+                  placeholder="กรอก Line Notify Token..."
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono"
+                  value={notificationConfig.lineNotifyToken}
+                  onChange={(e) => setNotificationConfig({ ...notificationConfig, lineNotifyToken: e.target.value })}
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  ใช้สำหรับส่งการแจ้งเตือนเข้ากลุ่ม Line ครูและห้องเรียน
+                </p>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">SMS Sender Name (ชื่อผู้ส่ง SMS):</label>
+                <input
+                  type="text"
+                  placeholder="เช่น KPS_SCHOOL"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold"
+                  value={notificationConfig.smsSenderName}
+                  onChange={(e) => setNotificationConfig({ ...notificationConfig, smsSenderName: e.target.value })}
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  ชื่อที่จะปรากฏบนหัวข้อข้อความ SMS ที่ส่งถึงผู้ปกครอง
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 space-y-2">
+              <h4 className="text-xs font-extrabold text-slate-800">เงื่อนไขการส่งแจ้งเตือนอัตโนมัติ:</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notificationConfig.notifyParentOnAbsent}
+                    onChange={(e) => setNotificationConfig({ ...notificationConfig, notifyParentOnAbsent: e.target.checked })}
+                    className="w-4 h-4 text-blue-600 rounded"
+                  />
+                  <span>แจ้งเตือนผู้ปกครองเมื่อนักเรียนขาดเรียน (Absent)</span>
+                </label>
+                <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notificationConfig.notifyParentOnLate}
+                    onChange={(e) => setNotificationConfig({ ...notificationConfig, notifyParentOnLate: e.target.checked })}
+                    className="w-4 h-4 text-blue-600 rounded"
+                  />
+                  <span>แจ้งเตือนผู้ปกครองเมื่อนักเรียนมาสาย (Late)</span>
+                </label>
+                <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notificationConfig.notifyParentOnTruancy}
+                    onChange={(e) => setNotificationConfig({ ...notificationConfig, notifyParentOnTruancy: e.target.checked })}
+                    className="w-4 h-4 text-blue-600 rounded"
+                  />
+                  <span>แจ้งเตือนด่วนกรณีตรวจพบการโดดเรียน (Truancy Alert)</span>
+                </label>
+                <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notificationConfig.notifyTeacherOnGradingDue}
+                    onChange={(e) => setNotificationConfig({ ...notificationConfig, notifyTeacherOnGradingDue: e.target.checked })}
+                    className="w-4 h-4 text-blue-600 rounded"
+                  />
+                  <span>เตือนครูเมื่อใกล้ครบกำหนดส่งคะแนน ปพ.5 / SGS</span>
+                </label>
+              </div>
+            </div>
           </div>
         </div>
       </SettingsSubModal>
@@ -2033,94 +2622,127 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
       {/* ------------------------------------------------------------------ */}
       <SettingsSubModal
         isOpen={activeModalKey === 'theme'}
-        onClose={() => setActiveModalKey(null)}
+        onClose={() => {
+          setActiveModalKey(null);
+          setAdminBannerModalKey(null);
+        }}
         title="ธีม & จัดการภาพแบนเนอร์ทั้ง 3 ส่วน"
         subtitle="จัดการภาพแบนเนอร์ Hero, Sidebar, และ Bottom Banner สำหรับ Admin"
         icon={<Palette className="w-5 h-5" />}
         iconBgClass="bg-purple-50"
         iconColorClass="text-purple-600"
+        supabaseTable="school_banner_configs"
+        categoryPath="หมวด 6: ธีม แบนเนอร์ และมาสคอต"
+        showSaveButton={adminBannerModalKey === null}
         onSave={() => showToast('✓ บันทึกการตั้งค่าธีมและแบนเนอร์เรียบร้อย')}
       >
         <div className="space-y-4">
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-extrabold text-slate-900">ภาพแบนเนอร์ประจำระบบครู</h3>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                สิทธิ์ Admin เท่านั้น
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-              <div className="p-3 rounded-xl border border-slate-200 text-center space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800">1. Hero Banner</span>
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                </div>
-                <div className="h-16 rounded-lg bg-blue-50 border border-dashed border-blue-200 flex items-center justify-center text-xs text-blue-600 px-2 text-center">
-                  {teacherBanners.hero?.name || '1200 × 360 px'}
-                </div>
+          {adminBannerModalKey ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between bg-blue-50/80 p-3 rounded-xl border border-blue-200">
+                <span className="text-xs font-bold text-blue-800">
+                  กำลังปรับแต่งแบนเนอร์: {adminBannerModalKey === 'hero' ? 'Hero Banner' : adminBannerModalKey === 'sidebar' ? 'Sidebar Mascot' : 'Bottom Quote'}
+                </span>
                 <button
                   type="button"
-                  onClick={() => setAdminBannerModalKey('hero')}
-                  className="w-full py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
+                  onClick={() => setAdminBannerModalKey(null)}
+                  className="px-3 py-1 rounded-lg bg-white border border-blue-200 text-xs font-bold text-blue-700 hover:bg-blue-100 transition-all cursor-pointer"
                 >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>เปลี่ยนภาพแบนเนอร์</span>
+                  ← กลับไปหน้ารวมแบนเนอร์
                 </button>
               </div>
-              <div className="p-3 rounded-xl border border-slate-200 text-center space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800">2. Sidebar Mascot</span>
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                </div>
-                <div className="h-16 rounded-lg bg-blue-50 border border-dashed border-blue-200 flex items-center justify-center text-xs text-blue-600 px-2 text-center">
-                  {teacherBanners.sidebar?.name || 'สู้ๆ นะ! Mascot'}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setAdminBannerModalKey('sidebar')}
-                  className="w-full py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>เปลี่ยนภาพแบนเนอร์</span>
-                </button>
-              </div>
-              <div className="p-3 rounded-xl border border-slate-200 text-center space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800">3. Bottom Quote</span>
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                </div>
-                <div className="h-16 rounded-lg bg-blue-50 border border-dashed border-blue-200 flex items-center justify-center text-xs text-blue-600 px-2 text-center">
-                  {teacherBanners.bottom?.name || 'ภาษา...คือกุญแจ'}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setAdminBannerModalKey('bottom')}
-                  className="w-full py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>เปลี่ยนภาพแบนเนอร์</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-              <span className="text-[11px] text-slate-400">
-                นักเรียน ({Object.keys(studentBanners).length} รายการ) • ครู ({Object.keys(teacherBanners).length} รายการ)
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  teacherBannerService.resetAllBanners('ACADEMIC_ADMIN');
+              <AdminTeacherBannerModal
+                isOpen={true}
+                embedded={true}
+                onClose={() => {
+                  setAdminBannerModalKey(null);
                   setTeacherBanners(teacherBannerService.getBanners());
-                  showToast('✓ คืนค่าแบนเนอร์เริ่มต้นเรียบร้อย');
                 }}
-                className="text-xs text-slate-500 hover:text-rose-600 font-bold flex items-center gap-1 cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>คืนค่าแบนเนอร์เริ่มต้น</span>
-              </button>
+                activeRole={activeRole}
+                initialBannerKey={adminBannerModalKey}
+              />
             </div>
-          </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-extrabold text-slate-900">ภาพแบนเนอร์ประจำระบบครู</h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                  สิทธิ์ Admin เท่านั้น
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <div className="p-3 rounded-xl border border-slate-200 text-center space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800">1. Hero Banner</span>
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  </div>
+                  <div className="h-16 rounded-lg bg-blue-50 border border-dashed border-blue-200 flex items-center justify-center text-xs text-blue-600 px-2 text-center">
+                    {teacherBanners.hero?.name || '1200 × 360 px'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAdminBannerModalKey('hero')}
+                    className="w-full py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>เปลี่ยนภาพแบนเนอร์ (In-Page)</span>
+                  </button>
+                </div>
+                <div className="p-3 rounded-xl border border-slate-200 text-center space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800">2. Sidebar Mascot</span>
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  </div>
+                  <div className="h-16 rounded-lg bg-blue-50 border border-dashed border-blue-200 flex items-center justify-center text-xs text-blue-600 px-2 text-center">
+                    {teacherBanners.sidebar?.name || 'สู้ๆ นะ! Mascot'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAdminBannerModalKey('sidebar')}
+                    className="w-full py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>เปลี่ยนภาพแบนเนอร์ (In-Page)</span>
+                  </button>
+                </div>
+                <div className="p-3 rounded-xl border border-slate-200 text-center space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800">3. Bottom Quote</span>
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  </div>
+                  <div className="h-16 rounded-lg bg-blue-50 border border-dashed border-blue-200 flex items-center justify-center text-xs text-blue-600 px-2 text-center">
+                    {teacherBanners.bottom?.name || 'ภาษา...คือกุญแจ'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAdminBannerModalKey('bottom')}
+                    className="w-full py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>เปลี่ยนภาพแบนเนอร์ (In-Page)</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                <span className="text-[11px] text-slate-400">
+                  นักเรียน ({Object.keys(studentBanners).length} รายการ) • ครู ({Object.keys(teacherBanners).length} รายการ)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    teacherBannerService.resetAllBanners('ACADEMIC_ADMIN');
+                    setTeacherBanners(teacherBannerService.getBanners());
+                    showToast('✓ คืนค่าแบนเนอร์เริ่มต้นเรียบร้อย');
+                  }}
+                  className="text-xs text-slate-500 hover:text-rose-600 font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>คืนค่าแบนเนอร์เริ่มต้น</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </SettingsSubModal>
 
@@ -2135,6 +2757,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         icon={<ShieldCheck className="w-5 h-5" />}
         iconBgClass="bg-emerald-50"
         iconColorClass="text-emerald-600"
+        supabaseTable="system_security_logs"
+        categoryPath="หมวด 6: ความปลอดภัยและ Audit Logs"
         onSave={() => showToast('✓ บันทึกการตั้งค่าความปลอดภัยเรียบร้อย')}
       >
         <div className="space-y-4">
@@ -2156,16 +2780,18 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         </div>
       </SettingsSubModal>
 
-      {/* Admin Teacher Banner Studio Modal */}
-      <AdminTeacherBannerModal
-        isOpen={adminBannerModalKey !== null}
-        onClose={() => {
-          setAdminBannerModalKey(null);
-          setTeacherBanners(teacherBannerService.getBanners());
-        }}
-        activeRole={activeRole}
-        initialBannerKey={adminBannerModalKey || 'hero'}
-      />
+      {/* Fallback Banner Modal if opened outside Settings */}
+      {adminBannerModalKey !== null && activeModalKey !== 'theme' && (
+        <AdminTeacherBannerModal
+          isOpen={true}
+          onClose={() => {
+            setAdminBannerModalKey(null);
+            setTeacherBanners(teacherBannerService.getBanners());
+          }}
+          activeRole={activeRole}
+          initialBannerKey={adminBannerModalKey}
+        />
+      )}
     </div>
   );
 };

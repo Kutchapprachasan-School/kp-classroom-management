@@ -12,7 +12,7 @@ export interface CleanSlatePurgeResult {
 
 const CLEAN_SLATE_FLAG_KEY = 'kp_clean_slate_mvp_activated';
 
-// รายการ Key ข้อมูลจำลองประเภท Transaction (ข้อมูลคะแนน, บันทึกการเข้าเรียน, ข้อสอบ, แชท)
+// รายการ Key ข้อมูลจำลองประเภท Transaction (ข้อมูลคะแนน, บันทึกการเข้าเรียน, ข้อสอบ, แชท, การบ้าน)
 export const TRANSACTIONAL_STORAGE_KEYS = [
   'cls_scores_data',
   'kp_morning_assembly_records',
@@ -32,6 +32,11 @@ export const TRANSACTIONAL_STORAGE_KEYS = [
   'cms_council_suggestions_v1',
   'cms_council_voted_students_v1',
   'cls_buddy_gacha_v1',
+  'cls_assignments_data',
+  'kp_grading_queue_v2',
+  'kp_assignment_bundle_v2',
+  'kp_school_calendar_events_v2',
+  'cls_lesson_plans_v1',
 ];
 
 // รายการ Key โครงสร้างพื้นฐานของโรงเรียนที่ต้องเก็บรักษาไว้ (Preserved Infrastructure)
@@ -47,6 +52,8 @@ export const PRESERVED_INFRASTRUCTURE_KEYS = [
 class CleanSlateService {
   /**
    * ตรวจสอบว่าระบบอยู่ในสถานะ Clean Slate MVP หรือไม่
+   * - ในเบราว์เซอร์: เป็นค่าเริ่มต้น (true) เสมอ เพื่อให้เริ่มต้นด้วยหน้าว่างแบบ Zero Mock Data
+   *   ยกเว้นผู้ใช้กดปุ่มเลือกโหมดข้อมูลตัวอย่าง (Demo Mode) จะคืนค่า false
    */
   isCleanSlateActive(): boolean {
     if (typeof window === 'undefined' || !window.localStorage) {
@@ -56,8 +63,15 @@ class CleanSlateService {
     if (val === 'false') {
       return false;
     }
-    // หากมีค่า 'true' หรือผู้ใช้เข้าสู่ระบบด้วยบัญชีจริง -> Clean Slate Active เสมอ
-    return val === 'true' || Boolean(localStorage.getItem('cls_current_auth_user'));
+    if (val === 'true') {
+      return true;
+    }
+    // ในเบราว์เซอร์จริง (มี window.location) กำหนดให้ Clean Slate ทำงานเป็นค่าเริ่มต้น
+    if (typeof window.location !== 'undefined') {
+      return true;
+    }
+    // ใน Node.js test environment หากไม่มีการเซ็ต flag ให้ fallback
+    return Boolean(localStorage.getItem('cls_current_auth_user'));
   }
 
   /**
@@ -129,6 +143,25 @@ class CleanSlateService {
         window.dispatchEvent(
           new CustomEvent('kps-data-sync-event', {
             detail: { type: 'CLEAN_SLATE_RESET' },
+          })
+        );
+      } catch {
+        // SSR safe fallback
+      }
+    }
+  }
+
+  /**
+   * นำเข้าข้อมูลตัวอย่างสำหรับการสาธิต (Opt-in Demo Seed Mode)
+   * สำหรับผู้ใช้ที่ต้องการทดสอบฟังก์ชันต่างๆ ด้วยข้อมูลจำลองครบวงจร
+   */
+  seedDemoData(): void {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem(CLEAN_SLATE_FLAG_KEY, 'false');
+      try {
+        window.dispatchEvent(
+          new CustomEvent('kps-data-sync-event', {
+            detail: { type: 'DEMO_DATA_SEEDED', timestamp: new Date().toISOString() },
           })
         );
       } catch {

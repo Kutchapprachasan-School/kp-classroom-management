@@ -39,35 +39,42 @@ export const GradeDistributionBar: React.FC<GradeDistributionBarProps> = ({ item
         </span>
       </div>
 
-      <div className="space-y-2 mt-4">
-        {items.map((item) => (
-          <div key={item.grade} className="flex items-center gap-3 text-xs">
-            <div className="w-14 text-slate-500 font-medium shrink-0">
-              เกรด {item.grade}
-            </div>
+      {items.length === 0 || items.every((i) => i.count === 0) ? (
+        <div className="py-8 text-center text-slate-400 bg-slate-50/50 rounded-xl border border-dashed border-slate-200 mt-4">
+          <p className="font-semibold text-slate-600 text-xs">ยังไม่มีข้อมูลการกระจายเกรด</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">ระบบจะคำนวณการกระจายเกรดเมื่อมีคะแนนสะสมของนักเรียน</p>
+        </div>
+      ) : (
+        <div className="space-y-2 mt-4">
+          {items.map((item) => (
+            <div key={item.grade} className="flex items-center gap-3 text-xs">
+              <div className="w-14 text-slate-500 font-medium shrink-0">
+                เกรด {item.grade}
+              </div>
 
-            {/* Horizontal Bar */}
-            <div className="flex-1 bg-slate-100 rounded-full h-2.5 overflow-hidden">
-              {item.percent > 0 ? (
-                <div
-                  className={`h-2.5 rounded-full ${getBarColor(
-                    item.grade
-                  )} transition-all duration-500`}
-                  style={{ width: `${Math.max(item.percent, 3)}%` }}
-                />
-              ) : null}
-            </div>
+              {/* Horizontal Bar */}
+              <div className="flex-1 bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                {item.percent > 0 ? (
+                  <div
+                    className={`h-2.5 rounded-full ${getBarColor(
+                      item.grade
+                    )} transition-all duration-500`}
+                    style={{ width: `${Math.max(item.percent, 3)}%` }}
+                  />
+                ) : null}
+              </div>
 
-            <div className="w-12 text-right text-slate-600 font-medium shrink-0">
-              {item.count} คน
-            </div>
+              <div className="w-12 text-right text-slate-600 font-medium shrink-0">
+                {item.count} คน
+              </div>
 
-            <div className="w-10 text-right text-slate-400 shrink-0">
-              {item.percent}%
+              <div className="w-10 text-right text-slate-400 shrink-0">
+                {item.percent}%
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

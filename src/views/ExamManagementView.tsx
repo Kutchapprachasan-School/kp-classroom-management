@@ -34,6 +34,7 @@ import {
 } from '../services/onlineQuizService';
 import { cleanSlateService } from '../services/cleanSlateService';
 import { StudentExamPlayerModal } from '../components/exam/StudentExamPlayerModal';
+import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 
 const EXAMS_STORAGE_KEY = 'kp_exams_management_data_v1';
 
@@ -1013,55 +1014,19 @@ export const ExamManagementView: React.FC = () => {
         <input type="text" placeholder="ค้นหาชื่อการสอบหรือรหัสวิชา..." />
       </div>
 
-      {/* 1. Hero Banner matching Reference Image 2 */}
-      <div className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-blue-100 shadow-xs bg-sky-100">
-        <div className="absolute inset-0 z-0">
-          <img
-            src="/images/teacher/hero_banner.png"
-            alt="Hero Banner"
-            className="w-full h-full object-cover object-right"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-white/95 via-sky-50/75 to-transparent" />
-        </div>
-
-        <div className="relative min-h-[110px] sm:min-h-[130px] flex items-center justify-between px-5 sm:px-8 py-4 z-10">
-          <div className="space-y-2 max-w-xl">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md">
-                <BookOpen className="w-6 h-6" />
-              </div>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">
-                  จัดการสอบ / เก็บคะแนน
-                </h1>
-                <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5">
-                  ระบบสอบออนไลน์ เก็บคะแนนอัตโนมัติ รองรับการสอบทั้ง 3 ประเภท
-                </p>
-              </div>
-            </div>
-
-            {/* Bullets: ⏱ สอบเก็บคะแนน • สอบกลางภาค • สอบปลายภาค matching Image 2 */}
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 pl-14">
-              <span className="text-slate-400">⏱</span>
-              <span>สอบเก็บคะแนน • สอบกลางภาค • สอบปลายภาค</span>
-            </div>
-          </div>
-
-          {/* Right Quote matching Image 2 */}
-          <div className="hidden md:flex flex-col items-end text-right pr-6 lg:pr-14">
-            <p className="text-sm font-bold text-slate-800 drop-shadow-xs">
-              “ ประเมินได้แม่นยำ
-            </p>
-            <p className="text-sm font-bold text-slate-800 drop-shadow-xs">
-              ลดความผิดพลาด
-            </p>
-            <p className="text-sm font-bold text-slate-800 drop-shadow-xs flex items-center gap-1.5">
-              <span>บริหารจัดการง่าย ”</span>
-              <span className="text-blue-500 font-normal">✈</span>
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* 1. Master PageHeroBanner matching Reference Image */}
+      <PageHeroBanner
+        title="จัดการสอบ / เก็บคะแนน"
+        subtitle="ระบบสอบออนไลน์ เก็บคะแนนอัตโนมัติ รองรับการสอบทั้ง 3 ประเภท"
+        icon={<BookOpen className="w-6 h-6 text-white" />}
+        iconBgClass="bg-blue-600 text-white"
+        tagText="สอบเก็บคะแนน • สอบกลางภาค • สอบปลายภาค"
+        quoteLines={[
+          'ประเมินได้แม่นยำ',
+          'ลดความผิดพลาด',
+          'บริหารจัดการง่าย',
+        ]}
+      />
 
       {/* 2. Row 1 - Category Summary Cards & Teacher Shortcuts */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
@@ -1196,7 +1161,13 @@ export const ExamManagementView: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => setScoreGridExam(exams[0] || null)}
+              onClick={() => {
+                if (exams.length > 0) {
+                  setScoreGridExam(exams[0]);
+                } else {
+                  showToast('ยังไม่มีชุดข้อสอบในระบบ กรุณาสร้างชุดข้อสอบก่อน');
+                }
+              }}
               className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-200 transition-all cursor-pointer group"
               title="ดูผลคะแนน"
             >
@@ -1210,7 +1181,13 @@ export const ExamManagementView: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => setAnalysisExam(exams[0] || null)}
+              onClick={() => {
+                if (exams.length > 0) {
+                  setAnalysisExam(exams[0]);
+                } else {
+                  showToast('ยังไม่มีชุดข้อสอบในระบบ กรุณาสร้างชุดข้อสอบก่อน');
+                }
+              }}
               className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-200 transition-all cursor-pointer group"
               title="รายงานผล"
             >

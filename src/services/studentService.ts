@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase.ts';
 import { StudentCreateSchema, type StudentCreateInput } from './types.ts';
+import { cleanSlateService } from './cleanSlateService.ts';
 
 export interface StudentRecord {
   id: string;
@@ -181,6 +182,11 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
         // fallback
       }
     }
+  }
+  // เมื่ออยู่ในโหมด Clean Slate (เริ่มต้นใช้งานจริง) ให้คืนค่ารายการว่าง [] เสมอ
+  // เพื่อให้คุณครูเห็น Empty State และสามารถเพิ่มหรือนำเข้ารายชื่อจริงได้
+  if (cleanSlateService.isCleanSlateActive()) {
+    return [];
   }
   if (mockStudentsByRoom[classroomId]) {
     return mockStudentsByRoom[classroomId];

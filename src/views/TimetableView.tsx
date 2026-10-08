@@ -355,11 +355,16 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
           ======================================================== */}
       <PageHeroBanner
         title="ตารางสอน"
-        subtitle="จัดสรรเวลาและคาบสอนเพื่อให้นักเรียนทุกคนพัฒนาได้อย่างเต็มที่"
+        subtitle="จัดสรรเวลาและคาบสอน เพื่อให้นักเรียนทุกคนพัฒนาได้อย่างเต็มที่"
         icon={<Calendar className="w-6 h-6 text-white" />}
         iconBgClass="bg-blue-600 text-white"
         badgeText="ม.3/1"
-        quoteText="“การตั้งใจทำทุกครั้ง ช่วยให้เราก้าวหน้าได้ขึ้น นะคะ ♡”"
+        tagText="⏱️ คาบ 1 - คาบ 8 • วันจันทร์ - ศุกร์ • ภาคเรียนที่ 1/2569"
+        quoteLines={[
+          'การตั้งใจทำทุกครั้ง',
+          'ช่วยให้เราก้าวหน้าขึ้น',
+          'เยาวชนพร้อมสู่อนาคต',
+        ]}
         isAdmin={activeRole === 'ACADEMIC_ADMIN'}
         onOpenBannerSettings={() => setIsBannerStudioOpen(true)}
       />

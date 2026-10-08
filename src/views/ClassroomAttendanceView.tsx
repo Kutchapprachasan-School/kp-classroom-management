@@ -31,6 +31,8 @@ import {
   BarChart3,
   Edit3,
   UserCheck,
+  QrCode,
+  Scan,
 } from 'lucide-react';
 import {
   attendanceCorrelationService,
@@ -41,7 +43,12 @@ import {
   type ClassroomTermStatsSummary,
   JAPANESE_M31_STUDENTS,
 } from '../services/attendanceCorrelationService';
+import { cleanSlateService } from '../services/cleanSlateService';
 import type { CrossViewNavigationPayload } from '../services/teacherCopilotService';
+import { DynamicQrAttendanceModal } from '../components/attendance/DynamicQrAttendanceModal';
+import { StudentQrScannerModal } from '../components/attendance/StudentQrScannerModal';
+import { StudentIdCardModal } from '../components/attendance/StudentIdCardModal';
+import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 
 export interface ClassroomAttendanceViewProps {
   onDeepNavigate?: (payload: CrossViewNavigationPayload) => void;
@@ -136,6 +143,11 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
   // Quick Action Sheet for Mobile Status Change
   const [activeStudentForSheet, setActiveStudentForSheet] = useState<PeriodAttendanceRecord | null>(null);
 
+  // QR Code Attendance Modals State
+  const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
+  const [isStudentScannerOpen, setIsStudentScannerOpen] = useState<boolean>(false);
+  const [activeStudentForBadge, setActiveStudentForBadge] = useState<PeriodAttendanceRecord | null>(null);
+
   // Load Period Records and Calendar Info
   const loadData = () => {
     let pRecords = attendanceCorrelationService.getPeriodRecords(
@@ -145,8 +157,8 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
       selectedPeriod
     );
 
-    // If records are empty for today or selected date, generate fallback records from baseline
-    if (pRecords.length === 0) {
+    // If records are empty for today or selected date, generate fallback records from baseline (only when NOT in clean slate mode)
+    if (pRecords.length === 0 && !cleanSlateService.isCleanSlateActive()) {
       if (selectedCourse === 'ญ31201' && selectedClassroom === 'room-3-1') {
         const seeded: PeriodAttendanceRecord[] = JAPANESE_M31_STUDENTS.map((stu) => ({
           id: `per-${selectedDate.replace(/-/g, '')}-jp1-${stu.code}`,
@@ -325,11 +337,11 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
       else if (r.status === 'LEAVE') leave++;
     }
 
-    const total = periodRecords.length > 0 ? periodRecords.length : 28;
-    const presentRate = total > 0 ? Number(((present / total) * 100).toFixed(1)) : 85.7;
-    const lateRate = total > 0 ? Number(((late / total) * 100).toFixed(1)) : 7.1;
-    const absentRate = total > 0 ? Number(((absent / total) * 100).toFixed(1)) : 3.6;
-    const leaveRate = total > 0 ? Number(((leave / total) * 100).toFixed(1)) : 3.6;
+    const total = periodRecords.length;
+    const presentRate = total > 0 ? Number(((present / total) * 100).toFixed(1)) : 0;
+    const lateRate = total > 0 ? Number(((late / total) * 100).toFixed(1)) : 0;
+    const absentRate = total > 0 ? Number(((absent / total) * 100).toFixed(1)) : 0;
+    const leaveRate = total > 0 ? Number(((leave / total) * 100).toFixed(1)) : 0;
 
     return {
       total,
@@ -404,92 +416,81 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
         </div>
       )}
 
-      {/* Top Banner (Hero Header) - ตรงตามภาพ media_1791315379363.jpg */}
-      <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-[#D9EAFE] via-[#E8F2FE] to-[#FDF4FF] border border-blue-100/80 shadow-xs p-5 sm:p-7 flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="flex items-start sm:items-center gap-4 z-10">
-          {/* Hero Icon Badge */}
-          <div className="w-14 h-14 rounded-2xl bg-white/90 shadow-sm border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-            <CalendarDays className="w-7 h-7" />
-          </div>
-          <div>
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-[#163A66] tracking-tight">
-                เช็คชื่อเข้าเรียน
-              </h1>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs">
-                <Shield className="w-3.5 h-3.5 text-emerald-600" />
-                <span>เฉพาะห้องที่สอน</span>
-              </span>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-600 font-medium mt-1">
-              เลือกห้องและวิชาที่สอน เพื่อเช็คชื่อ นร. ในวันนี้
-            </p>
-          </div>
-        </div>
-
-        {/* Hero Top Action Buttons & Mobile Preview Toggle */}
-        <div className="flex flex-wrap items-center gap-2.5 z-10">
-          {/* Mobile Preview Toggle for Teachers on Desktop */}
-          <button
-            type="button"
-            onClick={() => setIsMobilePreview((prev) => !prev)}
-            className={`hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-              isMobilePreview
-                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                : 'bg-white/80 hover:bg-white text-slate-700 border-slate-200'
-            }`}
-            title="สลับโหมดจำลองมือถือ เพื่อทดสอบการใช้งานบนสมาร์ทโฟน"
-          >
-            {isMobilePreview ? <Monitor className="w-4 h-4" /> : <Smartphone className="w-4 h-4" />}
-            <span>{isMobilePreview ? 'มุมมองเดสก์ท็อป' : 'จำลองมุมมองมือถือ'}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleRunCorrelation}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/90 hover:bg-white text-blue-700 border border-blue-200 text-xs font-bold transition-all shadow-2xs cursor-pointer"
-            title="รันระบบ 4 Integrity Locks ตรวจสอบความสอดคล้อง"
-          >
-            <Sparkles className="w-4 h-4 text-blue-600" />
-            <span>ตรวจความสอดคล้อง</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleBatchMarkAllPresent}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
-          >
-            <Check className="w-4 h-4" />
-            <span>✓ มาครบทุกคน</span>
-          </button>
-
-          {onDeepNavigate && (
+      {/* Top Banner (Hero Header) - ตรงตาม Master PageHeroBanner */}
+      <PageHeroBanner
+        title="เช็คชื่อเข้าเรียน"
+        subtitle="เลือกห้องและวิชาที่สอน เพื่อเช็คชื่อนักเรียนในวันนี้"
+        icon={<CalendarDays className="w-6 h-6 text-white" />}
+        iconBgClass="bg-blue-600 text-white"
+        badgeText="เฉพาะห้องที่สอน"
+        badgeClass="bg-emerald-50 text-emerald-700 border-emerald-200/80"
+        tagText="⏱️ คาบเรียนรายวัน • เชื่อมโยงแถวเช้าอัตโนมัติ • กฎเวลาเรียน 80% ปพ.5"
+        quoteLines={[
+          'ความใส่ใจในทุกคาบเรียน',
+          'สร้างรากฐานความสำเร็จ',
+          'ให้แก่นักเรียนทุกคน',
+        ]}
+        actions={
+          <>
+            {/* Mobile Preview Toggle for Teachers on Desktop */}
             <button
               type="button"
-              onClick={() => onDeepNavigate({ view: 'morning-assembly' })}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/90 hover:bg-white text-sky-700 border border-sky-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap"
-              title="สลับไปยังหน้าเช็คแถวเช้า & โฮมรูม"
+              onClick={() => setIsMobilePreview((prev) => !prev)}
+              className={`hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                isMobilePreview
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                  : 'bg-white/90 hover:bg-white text-slate-700 border-slate-200'
+              }`}
+              title="สลับโหมดจำลองมือถือ เพื่อทดสอบการใช้งานบนสมาร์ทโฟน"
             >
-              <UserCheck className="w-4 h-4 text-sky-600" />
-              <span>ไปเช็คแถวเช้า →</span>
+              {isMobilePreview ? <Monitor className="w-4 h-4" /> : <Smartphone className="w-4 h-4" />}
+              <span>{isMobilePreview ? 'มุมมองเดสก์ท็อป' : 'จำลองมุมมองมือถือ'}</span>
             </button>
-          )}
-        </div>
 
-        {/* Hero Anime School Mascot Illustration Background Accent - ตรงตามภาพ media_1791315379363.jpg */}
-        <div className="absolute right-0 bottom-0 top-0 w-full sm:w-[540px] md:w-[680px] pointer-events-none flex items-center justify-end overflow-hidden">
-          <img
-            src="/images/teacher/hero_banner_anime.png"
-            alt="Anime School Illustration"
-            className="h-full w-full object-cover object-right opacity-90 select-none"
-            onError={(e) => {
-              (e.currentTarget as HTMLElement).style.display = 'none';
-            }}
-          />
-          {/* Subtle gradient fader from left to right so text remains perfectly readable */}
-          <div className="absolute inset-0 bg-linear-to-r from-[#D9EAFE] via-[#E8F2FE]/70 sm:via-[#E8F2FE]/30 to-transparent" />
-        </div>
-      </div>
+            {/* QR Code Attendance Button */}
+            <button
+              type="button"
+              onClick={() => setIsQrModalOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+              title="เปิด QR Code สำหรับนักเรียนสแกน หรือครูสแกนบัตรนักเรียน"
+            >
+              <QrCode className="w-4 h-4" />
+              <span>QR Code เช็คชื่อ</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleRunCorrelation}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+              title="รันระบบ 4 Integrity Locks ตรวจสอบความสอดคล้อง"
+            >
+              <Sparkles className="w-4 h-4 text-blue-600" />
+              <span>ตรวจความสอดคล้อง</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleBatchMarkAllPresent}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+            >
+              <Check className="w-4 h-4" />
+              <span>✓ มาครบทุกคน</span>
+            </button>
+
+            {onDeepNavigate && (
+              <button
+                type="button"
+                onClick={() => onDeepNavigate({ view: 'morning-assembly' })}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-blue-50 text-sky-700 border border-sky-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap"
+                title="สลับไปยังหน้าเช็คแถวเช้า & โฮมรูม"
+              >
+                <UserCheck className="w-4 h-4 text-sky-600" />
+                <span>ไปเช็คแถวเช้า →</span>
+              </button>
+            )}
+          </>
+        }
+      />
 
       {/* Selectors Bar (รายวิชาที่สอน • ห้องเรียน • วันที่ • ปุ่มเช็คชื่อวันนี้) - ตรงตามภาพ */}
       <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs">
@@ -761,77 +762,114 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
-                    {filteredRecords.map((stu, index) => {
-                      const seedData = JAPANESE_M31_STUDENTS.find((s) => s.code === stu.studentCode);
-                      const checkTime = seedData ? seedData.defaultTime : '07:45 น.';
-                      const note = seedData ? seedData.defaultNote : '-';
+                    {filteredRecords.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 px-4 text-center">
+                          <div className="max-w-sm mx-auto flex flex-col items-center justify-center text-center">
+                            <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center mb-3">
+                              <Users className="w-7 h-7" />
+                            </div>
+                            <h3 className="text-base font-bold text-slate-800 mb-1">
+                              ยังไม่มีรายชื่อนักเรียนในรายวิชานี้
+                            </h3>
+                            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                              ห้องเรียนนี้ยังไม่มีการลงทะเบียนรายชื่อนักเรียน สามารถจัดการและเพิ่มรายชื่อนักเรียนได้ที่ระบบบัญชีรายชื่อ
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => onDeepNavigate?.({ view: 'roster', classroomId: selectedClassroom })}
+                              className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+                            >
+                              <UserCheck className="w-4 h-4" />
+                              <span>ไปที่บัญชีรายชื่อนักเรียน</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredRecords.map((stu, index) => {
+                        const seedData = JAPANESE_M31_STUDENTS.find((s) => s.code === stu.studentCode);
+                        const checkTime = seedData ? seedData.defaultTime : '07:45 น.';
+                        const note = seedData ? seedData.defaultNote : '-';
 
-                      return (
-                        <tr
-                          key={stu.studentCode}
-                          className="hover:bg-blue-50/30 transition-colors group"
-                        >
-                          <td className="py-3 px-4 text-center text-slate-400 font-semibold">
-                            {index + 1}
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-3">
-                              <img
-                                src={`https://api.dicebear.com/7.x/bottts/svg?seed=${stu.studentCode}`}
-                                alt={stu.studentName}
-                                className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 shrink-0 object-cover"
-                              />
-                              <div>
-                                <div className="font-bold text-slate-900 group-hover:text-blue-700 transition-colors">
-                                  {stu.studentName}
-                                </div>
-                                <div className="text-[11px] text-slate-400 font-medium">
-                                  ภาษาญี่ปุ่น ม.3/1 • {stu.studentCode}
+                        return (
+                          <tr
+                            key={stu.studentCode}
+                            className="hover:bg-blue-50/30 transition-colors group"
+                          >
+                            <td className="py-3 px-4 text-center text-slate-400 font-semibold">
+                              {index + 1}
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-3">
+                                <img
+                                  src={`https://api.dicebear.com/7.x/bottts/svg?seed=${stu.studentCode}`}
+                                  alt={stu.studentName}
+                                  className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 shrink-0 object-cover"
+                                />
+                                <div>
+                                  <div className="font-bold text-slate-900 group-hover:text-blue-700 transition-colors">
+                                    {stu.studentName}
+                                  </div>
+                                  <div className="text-[11px] text-slate-400 font-medium">
+                                    ภาษาญี่ปุ่น ม.3/1 • {stu.studentCode}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            {/* Status Pill Button - Click to cycle status */}
-                            <button
-                              type="button"
-                              onClick={() => handleCycleStatus(stu)}
-                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all shadow-2xs cursor-pointer ${
-                                stu.status === 'PRESENT'
-                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/90 hover:bg-emerald-100'
-                                  : stu.status === 'LATE'
-                                  ? 'bg-amber-50 text-amber-700 border border-amber-200/90 hover:bg-amber-100'
-                                  : stu.status === 'ABSENT'
-                                  ? 'bg-rose-50 text-rose-700 border border-rose-200/90 hover:bg-rose-100'
-                                  : 'bg-purple-50 text-purple-700 border border-purple-200/90 hover:bg-purple-100'
-                              }`}
-                              title="คลิกเพื่อสลับสถานะ (มา -> สาย -> ขาด -> ลา)"
-                            >
-                              {stu.status === 'PRESENT' && <Check className="w-3.5 h-3.5 text-emerald-600" />}
-                              {stu.status === 'LATE' && <Clock className="w-3.5 h-3.5 text-amber-600" />}
-                              {stu.status === 'ABSENT' && <XCircle className="w-3.5 h-3.5 text-rose-600" />}
-                              {stu.status === 'LEAVE' && <FileText className="w-3.5 h-3.5 text-purple-600" />}
-                              <span>{getStatusLabel(stu.status)}</span>
-                            </button>
-                          </td>
-                          <td className="py-3 px-4 text-center text-slate-600 font-medium">
-                            {stu.status === 'ABSENT' ? '-' : checkTime}
-                          </td>
-                          <td className="py-3 px-4 text-slate-500 text-[11px]">
-                            {note}
-                          </td>
-                          <td className="py-3 px-4 text-center text-slate-400">
-                            <button
-                              type="button"
-                              onClick={() => setActiveStudentForSheet(stu)}
-                              className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              {/* Status Pill Button - Click to cycle status */}
+                              <button
+                                type="button"
+                                onClick={() => handleCycleStatus(stu)}
+                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all shadow-2xs cursor-pointer ${
+                                  stu.status === 'PRESENT'
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/90 hover:bg-emerald-100'
+                                    : stu.status === 'LATE'
+                                    ? 'bg-amber-50 text-amber-700 border border-amber-200/90 hover:bg-amber-100'
+                                    : stu.status === 'ABSENT'
+                                    ? 'bg-rose-50 text-rose-700 border border-rose-200/90 hover:bg-rose-100'
+                                    : 'bg-purple-50 text-purple-700 border border-purple-200/90 hover:bg-purple-100'
+                                }`}
+                                title="คลิกเพื่อสลับสถานะ (มา -> สาย -> ขาด -> ลา)"
+                              >
+                                {stu.status === 'PRESENT' && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                                {stu.status === 'LATE' && <Clock className="w-3.5 h-3.5 text-amber-600" />}
+                                {stu.status === 'ABSENT' && <XCircle className="w-3.5 h-3.5 text-rose-600" />}
+                                {stu.status === 'LEAVE' && <FileText className="w-3.5 h-3.5 text-purple-600" />}
+                                <span>{getStatusLabel(stu.status)}</span>
+                              </button>
+                            </td>
+                            <td className="py-3 px-4 text-center text-slate-600 font-medium">
+                              {stu.status === 'ABSENT' ? '-' : checkTime}
+                            </td>
+                            <td className="py-3 px-4 text-slate-500 text-[11px]">
+                              {note}
+                            </td>
+                            <td className="py-3 px-4 text-center text-slate-400">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveStudentForBadge(stu)}
+                                  className="p-1 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors cursor-pointer"
+                                  title="เปิด QR บัตรนักเรียนเพื่อสแกน"
+                                >
+                                  <QrCode className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveStudentForSheet(stu)}
+                                  className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                                  title="แก้ไขสถานะ"
+                                >
+                                  <MoreVertical className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -971,10 +1009,10 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                       fill="none"
                       d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                     />
-                    {/* Green Segment (85.7%) */}
+                    {/* Green Segment */}
                     <path
                       className="text-emerald-500"
-                      strokeDasharray="85.7, 100"
+                      strokeDasharray={`${stats.total > 0 ? stats.presentRate : 0}, 100`}
                       strokeWidth="3.8"
                       strokeLinecap="round"
                       stroke="currentColor"
@@ -984,7 +1022,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                     <span className="text-xl font-extrabold text-slate-900 leading-none">
-                      85.7%
+                      {stats.total > 0 ? `${stats.presentRate}%` : '0%'}
                     </span>
                     <span className="text-[10px] font-semibold text-slate-400 mt-0.5">
                       มาเรียน
@@ -996,19 +1034,19 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                 <div className="space-y-1.5 text-xs font-semibold text-slate-600">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                    <span>มา {stats.present} คน (85.7%)</span>
+                    <span>มา {stats.present} คน ({stats.total > 0 ? stats.presentRate : 0}%)</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-                    <span>สาย {stats.late} คน (7.1%)</span>
+                    <span>สาย {stats.late} คน ({stats.total > 0 ? stats.lateRate : 0}%)</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
-                    <span>ขาด {stats.absent} คน (3.6%)</span>
+                    <span>ขาด {stats.absent} คน ({stats.total > 0 ? stats.absentRate : 0}%)</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-purple-500 shrink-0" />
-                    <span>ลา {stats.leave} คน (3.6%)</span>
+                    <span>ลา {stats.leave} คน ({stats.total > 0 ? stats.leaveRate : 0}%)</span>
                   </div>
                 </div>
               </div>
@@ -1108,11 +1146,33 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                 <button
                   type="button"
                   onClick={handleBatchMarkAllPresent}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs"
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs cursor-pointer"
                 >
                   <Check className="w-4 h-4" />
                   <span>✓ เช็คชื่อวันนี้ (มาครบทุกคน)</span>
                 </button>
+
+                {/* QR Code Action Buttons on Mobile */}
+                <div className="grid grid-cols-2 gap-2 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsQrModalOpen(true)}
+                    className="py-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                    title="เปิด QR หมุนเวียนให้นักเรียนสแกน หรือครูสแกนบัตรนักเรียน"
+                  >
+                    <QrCode className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span>QR เช็คชื่อ</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsStudentScannerOpen(true)}
+                    className="py-2.5 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                    title="เปิดกล้องสแกน QR จอครู (มุมมองนักเรียน)"
+                  >
+                    <Scan className="w-4 h-4 text-slate-600 shrink-0" />
+                    <span>นักเรียนสแกน</span>
+                  </button>
+                </div>
               </div>
 
               {/* Mini KPI Bar on Mobile */}
@@ -1146,60 +1206,188 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                 />
               </div>
 
-              {/* Vertical Student List - ไม่มีสไลด์ซ้ายขวา ปุ่มแตะใหญ่ นิ้วโป้งกดง่าย */}
-              <div className="space-y-2">
-                {filteredRecords.map((stu) => {
-                  const seedData = JAPANESE_M31_STUDENTS.find((s) => s.code === stu.studentCode);
-                  const checkTime = seedData ? seedData.defaultTime : '07:45 น.';
-                  const note = seedData ? seedData.defaultNote : '-';
-
-                  return (
-                    <div
-                      key={stu.studentCode}
-                      className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3"
+              {/* Vertical Student Cards - ไม่มีสไลด์ซ้ายขวา การ์ดมนกลม ปุ่มแตะใหญ่ นิ้วโป้งกดง่าย */}
+              <div className="space-y-3">
+                {filteredRecords.length === 0 ? (
+                  <div className="bg-white rounded-2xl p-6 border border-slate-200/80 text-center flex flex-col items-center">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center mb-3">
+                      <Users className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-800 mb-1">
+                      ยังไม่มีรายชื่อนักเรียนในรายวิชานี้
+                    </h3>
+                    <p className="text-xs text-slate-500 mb-4 leading-relaxed max-w-xs">
+                      สามารถจัดการและเพิ่มรายชื่อนักเรียนได้ที่ระบบบัญชีรายชื่อนักเรียน
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => onDeepNavigate?.({ view: 'roster', classroomId: selectedClassroom })}
+                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center gap-2 cursor-pointer"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <img
-                          src={`https://api.dicebear.com/7.x/bottts/svg?seed=${stu.studentCode}`}
-                          alt={stu.studentName}
-                          className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 shrink-0"
-                        />
-                        <div className="min-w-0">
-                          <div className="text-xs sm:text-sm font-bold text-slate-900 truncate">
-                            {stu.studentName}
+                      <UserCheck className="w-4 h-4" />
+                      <span>ไปที่บัญชีรายชื่อนักเรียน</span>
+                    </button>
+                  </div>
+                ) : (
+                  filteredRecords.map((stu, index) => {
+                    const seedData = JAPANESE_M31_STUDENTS.find((s) => s.code === stu.studentCode);
+                    const checkTime = seedData ? seedData.defaultTime : '07:45 น.';
+                    const note = seedData ? seedData.defaultNote : '-';
+
+                    return (
+                      <div
+                        key={stu.studentCode}
+                        className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs space-y-3 transition-all"
+                      >
+                        {/* Student Info Row */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="relative shrink-0">
+                              <img
+                                src={`https://api.dicebear.com/7.x/bottts/svg?seed=${stu.studentCode}`}
+                                alt={stu.studentName}
+                                className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 object-cover"
+                              />
+                              <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center border border-white">
+                                {index + 1}
+                              </span>
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-extrabold text-sm text-slate-900 leading-tight truncate">
+                                {stu.studentName}
+                              </div>
+                              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-mono mt-0.5">
+                                <span>รหัส {stu.studentCode}</span>
+                                <span>•</span>
+                                <span className="font-sans text-slate-400 truncate">
+                                  {stu.status === 'ABSENT' ? `ขาด • ${note}` : checkTime}
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="text-[11px] text-slate-400">
-                            {stu.status === 'ABSENT'
-                              ? `ขาด • ${note}`
-                              : `${getStatusLabel(stu.status)} ${checkTime}`}
+
+                          {/* Status Pill Badge & ID Card QR Button */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setActiveStudentForBadge(stu)}
+                              className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold flex items-center gap-1 cursor-pointer border border-blue-200 transition-colors"
+                              title="เปิด QR บัตรนักเรียนเพื่อสแกน"
+                            >
+                              <QrCode className="w-3 h-3 text-blue-600" />
+                              <span>บัตร</span>
+                            </button>
+
+                            {stu.status === 'PRESENT' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>มา</span>
+                              </span>
+                            )}
+                            {stu.status === 'LATE' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                <span>สาย</span>
+                              </span>
+                            )}
+                            {(stu.status === 'ABSENT' || stu.status === 'TRUANCY') && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                                <span>{stu.status === 'TRUANCY' ? 'โดดเรียน' : 'ขาด'}</span>
+                              </span>
+                            )}
+                            {stu.status === 'LEAVE' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                <FileText className="w-3.5 h-3.5 text-purple-600" />
+                                <span>ลา</span>
+                              </span>
+                            )}
+                            {stu.status === 'ACTIVITY' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                <Award className="w-3.5 h-3.5 text-indigo-600" />
+                                <span>กิจกรรม</span>
+                              </span>
+                            )}
                           </div>
                         </div>
-                      </div>
 
-                      {/* Large Tap Status Pill Button (Min Height 44px) */}
-                      <button
-                        type="button"
-                        onClick={() => handleCycleStatus(stu)}
-                        className={`min-h-[44px] min-w-[76px] px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-transform active:scale-95 shadow-2xs cursor-pointer ${
-                          stu.status === 'PRESENT'
-                            ? 'bg-emerald-50 text-emerald-700 border-2 border-emerald-300'
-                            : stu.status === 'LATE'
-                            ? 'bg-amber-50 text-amber-700 border-2 border-amber-300'
-                            : stu.status === 'ABSENT'
-                            ? 'bg-rose-50 text-rose-700 border-2 border-rose-300'
-                            : 'bg-purple-50 text-purple-700 border-2 border-purple-300'
-                        }`}
-                        title="แตะเพื่อสลับสถานะ"
-                      >
-                        {stu.status === 'PRESENT' && <Check className="w-3.5 h-3.5 text-emerald-600" />}
-                        {stu.status === 'LATE' && <Clock className="w-3.5 h-3.5 text-amber-600" />}
-                        {stu.status === 'ABSENT' && <XCircle className="w-3.5 h-3.5 text-rose-600" />}
-                        {stu.status === 'LEAVE' && <FileText className="w-3.5 h-3.5 text-purple-600" />}
-                        <span>{getStatusLabel(stu.status)}</span>
-                      </button>
-                    </div>
-                  );
-                })}
+                        {/* System Inferred Hint for Lock 3 or Truancy */}
+                        {stu.source === 'SYSTEM_CORRELATION' && (
+                          <div className="flex items-center gap-1.5 text-blue-700 bg-blue-50/80 px-2.5 py-1 rounded-xl border border-blue-200 text-[11px] font-semibold">
+                            <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                            <span className="truncate">{stu.correlationNote || 'ปรับสถานะอัตโนมัติโดยระบบ'}</span>
+                          </div>
+                        )}
+
+                        {stu.isTruancyCandidate && (
+                          <div className="flex items-center gap-1.5 text-rose-700 bg-rose-50 px-2.5 py-1 rounded-xl border border-rose-200 text-[11px] font-semibold">
+                            <XCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                            <span>พบข้อสงสัย: เช้ามาเรียน แต่คาบนี้ไม่เข้าห้องเรียน</span>
+                          </div>
+                        )}
+
+                        {/* Big Thumb Touch Buttons Grid (4 Direct Statuses, Min-Height 44px for Ergonomics) */}
+                        <div className="grid grid-cols-4 gap-1.5 pt-0.5">
+                          {/* มา */}
+                          <button
+                            type="button"
+                            onClick={() => handleStatusChange(stu.studentCode, stu.studentName, 'PRESENT')}
+                            className={`h-11 min-h-[44px] rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                              stu.status === 'PRESENT'
+                                ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-300 scale-[1.02]'
+                                : 'bg-slate-100 text-slate-700 hover:bg-emerald-50 active:scale-95'
+                            }`}
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>มา</span>
+                          </button>
+
+                          {/* สาย */}
+                          <button
+                            type="button"
+                            onClick={() => handleStatusChange(stu.studentCode, stu.studentName, 'LATE')}
+                            className={`h-11 min-h-[44px] rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                              stu.status === 'LATE'
+                                ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-300 scale-[1.02]'
+                                : 'bg-slate-100 text-slate-700 hover:bg-amber-50 active:scale-95'
+                            }`}
+                          >
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>สาย</span>
+                          </button>
+
+                          {/* ขาด */}
+                          <button
+                            type="button"
+                            onClick={() => handleStatusChange(stu.studentCode, stu.studentName, 'ABSENT')}
+                            className={`h-11 min-h-[44px] rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                              stu.status === 'ABSENT' || stu.status === 'TRUANCY'
+                                ? 'bg-rose-600 text-white shadow-md ring-2 ring-rose-300 scale-[1.02]'
+                                : 'bg-slate-100 text-slate-700 hover:bg-rose-50 active:scale-95'
+                            }`}
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span>{stu.status === 'TRUANCY' ? 'โดด' : 'ขาด'}</span>
+                          </button>
+
+                          {/* ลา */}
+                          <button
+                            type="button"
+                            onClick={() => handleStatusChange(stu.studentCode, stu.studentName, 'LEAVE')}
+                            className={`h-11 min-h-[44px] rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                              stu.status === 'LEAVE'
+                                ? 'bg-purple-600 text-white shadow-md ring-2 ring-purple-300 scale-[1.02]'
+                                : 'bg-slate-100 text-slate-700 hover:bg-purple-50 active:scale-95'
+                            }`}
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>ลา</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
 
               {/* Bottom Mobile Action Button */}
@@ -1657,6 +1845,56 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
             </div>
           </div>
         </div>
+      )}
+
+      {/* ========================================================
+          QR CODE ATTENDANCE MODALS
+          ======================================================== */}
+      {/* 1. Dynamic Rotating QR Attendance Modal (Projector & Continuous Scanner) */}
+      <DynamicQrAttendanceModal
+        isOpen={isQrModalOpen}
+        onClose={() => setIsQrModalOpen(false)}
+        attendanceType="CLASSROOM_PERIOD"
+        classroomId={selectedClassroom}
+        classroomLabel={TAUGHT_CLASSROOMS.find((r) => r.id === selectedClassroom)?.label || selectedClassroom}
+        courseCode={selectedCourse}
+        courseName={TEACHER_COURSES.find((c) => c.code === selectedCourse)?.shortSubject || 'ภาษาญี่ปุ่น'}
+        periodNo={selectedPeriod}
+        date={selectedDate}
+        students={periodRecords.map((r) => ({
+          studentCode: r.studentCode,
+          studentName: r.studentName,
+          status: r.status,
+        }))}
+        onStudentCheckIn={(studentCode, studentName) => {
+          handleStatusChange(studentCode, studentName, 'PRESENT');
+          showToast(`✓ บันทึกเช็คชื่อ ${studentName} เรียบร้อยแล้ว`);
+        }}
+      />
+
+      {/* 2. Student Self QR Scanner Modal (Student scans Teacher QR) */}
+      <StudentQrScannerModal
+        isOpen={isStudentScannerOpen}
+        onClose={() => setIsStudentScannerOpen(false)}
+        expectedRoomId={selectedClassroom}
+        expectedCourseCode={selectedCourse}
+        expectedType="CLASSROOM_PERIOD"
+        onSuccessCheckIn={(studentCode, studentName) => {
+          handleStatusChange(studentCode, studentName, 'PRESENT');
+          showToast(`✓ เช็คชื่อสำเร็จ: ${studentName}`);
+        }}
+      />
+
+      {/* 3. Individual Student ID Card Modal */}
+      {activeStudentForBadge && (
+        <StudentIdCardModal
+          isOpen={true}
+          onClose={() => setActiveStudentForBadge(null)}
+          studentCode={activeStudentForBadge.studentCode}
+          studentName={activeStudentForBadge.studentName}
+          classroomLabel={TAUGHT_CLASSROOMS.find((r) => r.id === selectedClassroom)?.label || 'ม.3/1'}
+          classroomId={selectedClassroom}
+        />
       )}
     </div>
   );

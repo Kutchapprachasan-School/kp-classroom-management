@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
-import { X, ArrowLeft, Check, Sparkles } from 'lucide-react';
+import { ArrowLeft, Check, Sparkles, Database } from 'lucide-react';
 
-interface SettingsSubModalProps {
+export interface SettingsSubModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
@@ -13,6 +13,8 @@ interface SettingsSubModalProps {
   onSave?: () => void;
   saveButtonText?: string;
   showSaveButton?: boolean;
+  supabaseTable?: string;
+  categoryPath?: string;
 }
 
 export const SettingsSubModal: React.FC<SettingsSubModalProps> = ({
@@ -27,8 +29,10 @@ export const SettingsSubModal: React.FC<SettingsSubModalProps> = ({
   onSave,
   saveButtonText = '💾 บันทึกการตั้งค่า',
   showSaveButton = true,
+  supabaseTable,
+  categoryPath = 'การตั้งค่าระบบ',
 }) => {
-  // ESC to close
+  // ESC to return to overview
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
@@ -42,80 +46,108 @@ export const SettingsSubModal: React.FC<SettingsSubModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 animate-fade-in font-sans">
-      <div className="bg-white rounded-3xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden shadow-2xl border border-slate-200">
-        {/* Top Header with Breadcrumbs */}
-        <div className="px-5 py-3.5 bg-gradient-to-r from-blue-50/80 via-white to-sky-50/60 border-b border-slate-200/90 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            {/* Back button */}
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-bold"
-              title="กลับไปหน้าตั้งค่ารวม"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span className="hidden sm:inline">กลับ</span>
-            </button>
-
-            {/* Icon & Title */}
-            <div
-              className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs ${iconBgClass} ${iconColorClass}`}
-            >
-              {icon}
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-extrabold text-[#163A66]">
-                  {title}
-                </h2>
-                <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
-                  Settings
-                </span>
-              </div>
-              <p className="text-xs text-[#6B7C93] font-medium">
-                {subtitle}
-              </p>
-            </div>
-          </div>
-
+    <div className="w-full space-y-4 animate-fade-in font-sans">
+      {/* Top Breadcrumb & Navigation Controls Bar */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
-            title="ปิดหน้าต่าง"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-blue-50/80 hover:bg-blue-100 text-blue-700 text-xs font-bold transition-all cursor-pointer border border-blue-200/80 shadow-2xs group"
+            title="กลับไปหน้ารวมการตั้งค่า"
           >
-            <X className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+            <span>กลับไปหน้ารวมการตั้งค่า</span>
           </button>
+
+          <div className="h-5 w-px bg-slate-200 hidden sm:block" />
+
+          {/* Breadcrumb Path */}
+          <nav className="flex items-center gap-1.5 text-xs text-slate-500 font-medium overflow-hidden">
+            <span className="text-slate-400">ตั้งค่าระบบ</span>
+            <span>/</span>
+            <span className="text-slate-500">{categoryPath}</span>
+            <span>/</span>
+            <span className="font-bold text-[#163A66] truncate">{title}</span>
+          </nav>
         </div>
 
-        {/* Modal Scrollable Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-[#F8FAFC]">
+        {/* Action Button & Supabase Indicator */}
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          {supabaseTable && (
+            <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+              <Database className="w-3.5 h-3.5 text-blue-600" />
+              <span>Table: {supabaseTable}</span>
+            </span>
+          )}
+
+          {showSaveButton && onSave && (
+            <button
+              type="button"
+              onClick={onSave}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
+            >
+              <Check className="w-4 h-4" />
+              <span>{saveButtonText}</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Main In-Page Card Container */}
+      <div className="bg-white rounded-2xl shadow-card border border-slate-200/90 overflow-hidden">
+        {/* Banner Header */}
+        <div className="px-5 py-4 bg-gradient-to-r from-blue-50/80 via-white to-sky-50/60 border-b border-slate-200/90 flex items-center justify-between">
+          <div className="flex items-center gap-3.5">
+            <div
+              className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs ${iconBgClass} ${iconColorClass}`}
+            >
+              {icon}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-extrabold text-[#163A66]">{title}</h2>
+                {supabaseTable && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    🟢 Supabase Linked
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[#6B7C93] font-medium mt-0.5">{subtitle}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Body Content */}
+        <div className="p-5 sm:p-7 bg-[#F8FAFC]">
           {children}
         </div>
 
-        {/* Modal Sticky Footer */}
-        <div className="px-5 py-3.5 bg-white border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
-          <div className="flex items-center gap-1.5 text-slate-500 font-medium">
+        {/* Sticky Bottom Footer */}
+        <div className="px-5 py-3.5 bg-white border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2 text-slate-500 font-medium">
             <Sparkles className="w-4 h-4 text-amber-500" />
-            <span>การตั้งค่าจะถูกบันทึกลงระบบทันทีเพื่อความปลอดภัย</span>
+            <span>การตั้งค่าเชื่อมโยงสดกับระบบและฐานข้อมูล Supabase</span>
+            {supabaseTable && (
+              <code className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[11px] font-mono border border-slate-200">
+                {supabaseTable}
+              </code>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition-colors cursor-pointer"
+              className="px-3.5 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold transition-colors cursor-pointer"
             >
-              ปิด
+              ← กลับไปหน้ารวม
             </button>
-
             {showSaveButton && onSave && (
               <button
                 type="button"
                 onClick={onSave}
-                className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold shadow-sm transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-xs transition-colors cursor-pointer"
               >
                 <Check className="w-4 h-4" />
                 <span>{saveButtonText}</span>

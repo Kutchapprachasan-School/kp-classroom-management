@@ -758,6 +758,9 @@ export const attendanceCorrelationService = {
     }
 
     if (list.length === 0) {
+      if (cleanSlateService.isCleanSlateActive()) {
+        return [];
+      }
       const initial = generateMockPeriodRecords();
       writeStorage(STORAGE_KEYS.PERIOD_ATTENDANCE, initial);
       return initial.filter(

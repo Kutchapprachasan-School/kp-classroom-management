@@ -9,8 +9,10 @@ import {
   Download,
   FileSpreadsheet,
   BookMarked,
+  BookOpen,
   X,
 } from 'lucide-react';
+import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 import { AtRiskCard } from '../components/teacher/AtRiskCard';
 import { IncompleteGradingCard } from '../components/teacher/IncompleteGradingCard';
 import { LowestAssignmentsCard } from '../components/teacher/LowestAssignmentsCard';
@@ -45,6 +47,7 @@ import type { CrossViewNavigationPayload } from '../services/teacherCopilotServi
 import {
   TEACHER_SUBJECTS_LIST,
 } from '../services/teacherCourseAssignmentService';
+import { cleanSlateService } from '../services/cleanSlateService';
 
 const formatThaiDate = (isoDate: string): string => {
   if (!isoDate || !isoDate.includes('-')) return isoDate;
@@ -766,7 +769,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
     } catch {
       // fallback
     }
-    return atRiskStudentsData;
+    return cleanSlateService.isCleanSlateActive() ? [] : atRiskStudentsData;
   }, [selectedSubjectCode, selectedClassroom]);
 
   return (
@@ -777,6 +780,21 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
           <span>{toastMessage}</span>
         </div>
       )}
+
+      {/* Master PageHeroBanner Design */}
+      <PageHeroBanner
+        title="ภาพรวมชั้นเรียน & การสอน"
+        subtitle={`จัดการการเรียนการสอนรายวิชา ${selectedSubjectCode} ${currentSubject?.name || 'ศิลปะ'} ชั้น ${selectedClassroom}`}
+        icon={<BookOpen className="w-6 h-6 text-white" />}
+        iconBgClass="bg-blue-600 text-white"
+        badgeText={`ชั้น ${selectedClassroom}`}
+        tagText="✨ เช็คชื่อเข้าเรียน • คะแนน ปพ.5 • สั่งงาน/ตรวจงาน • ระบบติดตามกลุ่มเสี่ยง"
+        quoteLines={[
+          'มุ่งมั่นพัฒนาคุณภาพการเรียนรู้',
+          'ร่วมสร้างอนาคตที่สดใส',
+          'ให้แก่นักเรียนทุกคน',
+        ]}
+      />
 
       {/* แถบเลือกรายวิชา & ห้องเรียน (รองรับครูสอนหลายวิชา หลายห้อง) พร้อมป้ายห้องที่ปรึกษา ม.3/1 */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-3 sm:p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -912,10 +930,16 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
             onSelectStudent={onSelectStudent}
             onViewFullTable={onViewFullTable}
           />
-          <IncompleteGradingCard items={incompleteGradingData} />
+          <IncompleteGradingCard
+            items={cleanSlateService.isCleanSlateActive() ? [] : incompleteGradingData}
+          />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <LowestAssignmentsCard items={lowestAssignmentsData} />
-            <GradeDistributionBar items={gradeDistributionData} />
+            <LowestAssignmentsCard
+              items={cleanSlateService.isCleanSlateActive() ? [] : lowestAssignmentsData}
+            />
+            <GradeDistributionBar
+              items={cleanSlateService.isCleanSlateActive() ? [] : gradeDistributionData}
+            />
           </div>
         </div>
       )}

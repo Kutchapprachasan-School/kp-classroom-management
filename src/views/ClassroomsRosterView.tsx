@@ -31,6 +31,7 @@ import { trashService } from '../services/trashService';
 import { messagingService, STUDENT_TRANSFERRED_EVENT } from '../services/messagingService';
 import type { ClassroomRosterItem, AtRiskStudent } from '../types/viewModels';
 import type { SchoolUserRole } from '../config/schoolRoles';
+import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 
 interface ClassroomsRosterViewProps {
   onSelectStudent: (student: AtRiskStudent) => void;
@@ -507,46 +508,38 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in font-sans text-slate-800 select-none">
-      {/* 1. Hero Banner ตรงตามภาพต้นแบบ Reference Image 1 */}
-      <div className="relative rounded-2xl md:rounded-3xl overflow-hidden border border-sky-100 shadow-sm bg-gradient-to-r from-sky-400/90 via-blue-400/80 to-sky-300/90 min-h-[140px] sm:min-h-[160px] flex items-center justify-between p-5 sm:p-7 text-white">
-        {/* Background Artwork */}
-        <div className="absolute inset-0 z-0">
-          <img
-            src="/images/teacher/hero_banner.png"
-            alt="Hero Banner"
-            className="w-full h-full object-cover object-right md:object-center opacity-85"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-sky-900/60 via-sky-800/40 to-transparent" />
-        </div>
-
-        {/* Banner Left Content ตรงตาม Reference Image 1 */}
-        <div className="relative z-10 max-w-xl space-y-1 sm:space-y-1.5">
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-sm">
-            ห้องเรียน / นักเรียน
-          </h1>
-          <p className="text-xs sm:text-sm text-sky-50 font-medium drop-shadow-sm">
-            จัดการข้อมูลนักเรียนในรายวิชาของคุณได้อย่างง่ายดาย
-          </p>
-        </div>
-
-        {/* Banner Right Action Buttons ตรงตามภาพ Reference Image 1 */}
-        <div className="relative z-10 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5">
-          <button
-            onClick={() => setIsAddStudentOpen(true)}
-            className="flex items-center justify-center gap-1.5 px-4 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-blue-900/20 hover:shadow-lg transition-all cursor-pointer active:scale-95"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>+ เพิ่มนักเรียน</span>
-          </button>
-          <button
-            onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center justify-center gap-1.5 px-3.5 py-2 sm:py-2.5 bg-white/95 hover:bg-white text-slate-800 rounded-xl text-xs sm:text-sm font-bold border border-white/80 shadow-md shadow-slate-900/10 hover:shadow-lg transition-all cursor-pointer active:scale-95"
-          >
-            <Upload className="w-4 h-4 text-blue-600" />
-            <span>นำเข้ารายชื่อ Excel/SGS</span>
-          </button>
-        </div>
-      </div>
+      {/* 1. Master PageHeroBanner */}
+      <PageHeroBanner
+        title="ห้องเรียน / บัญชีรายชื่อนักเรียน"
+        subtitle="จัดการข้อมูลนักเรียนในรายวิชาของคุณได้อย่างง่ายดาย"
+        icon={<Users className="w-6 h-6 text-white" />}
+        iconBgClass="bg-blue-600 text-white"
+        badgeText={selectedClass?.roomNumber || 'ม.3/1'}
+        tagText="🎓 บัญชีรายชื่อนักเรียน • ตรวจสอบสถิติสะสม • Radar Chart 5 มิติ"
+        quoteLines={[
+          'ใส่ใจนักเรียนทุกคน',
+          'พัฒนาศักยภาพรอบด้าน',
+          'เติบโตอย่างมีคุณภาพ',
+        ]}
+        actions={
+          <>
+            <button
+              onClick={() => setIsAddStudentOpen(true)}
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-blue-900/20 transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>+ เพิ่มนักเรียน</span>
+            </button>
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-white hover:bg-blue-50 text-slate-800 rounded-xl text-xs sm:text-sm font-bold border border-slate-200 shadow-2xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+            >
+              <Upload className="w-4 h-4 text-blue-600" />
+              <span>นำเข้ารายชื่อ Excel/SGS</span>
+            </button>
+          </>
+        }
+      />
 
       {/* Transfer Success Notice Banner */}
       {transferSuccessNotice && (
@@ -916,6 +909,42 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                     <div className="flex flex-col items-center justify-center gap-2">
                       <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
                       <span>กำลังโหลดรายชื่อนักเรียน...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : students.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-16 text-center">
+                    <div className="flex flex-col items-center justify-center max-w-md mx-auto space-y-3 px-4">
+                      <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center shadow-2xs border border-blue-100">
+                        <Users className="w-8 h-8" />
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="text-base font-bold text-slate-800">
+                          ยังไม่มีรายชื่อนักเรียนในห้อง {selectedClass?.name || 'ม.3/1'}
+                        </h4>
+                        <p className="text-xs text-slate-500 leading-relaxed">
+                          เริ่มต้นปีการศึกษาด้วยการเพิ่มนักเรียนรายบุคคล หรือนำเข้าไฟล์ Excel / SGS ของ สพฐ. เพื่อเริ่มต้นการจัดการชั้นเรียนและบันทึกข้อมูล
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsAddStudentOpen(true)}
+                          className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>+ เพิ่มนักเรียน</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsImportModalOpen(true)}
+                          className="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                        >
+                          <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                          <span>📥 นำเข้ารายชื่อ Excel/SGS</span>
+                        </button>
+                      </div>
                     </div>
                   </td>
                 </tr>

@@ -22,6 +22,7 @@ import {
   type SdqLevel,
   type StudentAttendanceLeavePolicy,
 } from '../services/homeVisitService';
+import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 
 export const HomeVisitSdqView: React.FC = () => {
   const [records, setRecords] = useState<HomeVisitRecord[]>(() =>
@@ -348,35 +349,44 @@ export const HomeVisitSdqView: React.FC = () => {
         </div>
       )}
 
-      {/* 1. Actionable Header Bar (Zero Clutter) */}
-      <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-3.5 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <h1 className="text-base sm:text-lg font-bold text-slate-900">
-          เยี่ยมบ้านนักเรียน (นร.01) & ทุน กสศ.
-        </h1>
+      {/* 1. Master PageHeroBanner Design */}
+      <PageHeroBanner
+        title="เยี่ยมบ้านนักเรียน (นร.01) & ทุน กสศ."
+        subtitle="บันทึกข้อมูลเยี่ยมบ้าน นร.01 และคัดกรองทุนเสมอภาคเชื่อมโยงระบบ CCT กสศ."
+        icon={<Home className="w-6 h-6 text-white" />}
+        iconBgClass="bg-blue-600 text-white"
+        badgeText="นร./กสศ.01"
+        tagText="🏠 เยี่ยมบ้าน • แบบประเมิน SDQ • คัดกรองทุน กสศ. CCT • พิกัด GPS & รูปถ่าย"
+        quoteLines={[
+          'เข้าใจชีวิตความเป็นอยู่',
+          'ร่วมเติมเต็มโอกาสทางการศึกษา',
+          'เพื่ออนาคตของนักเรียนทุกคน',
+        ]}
+        actions={
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              onClick={() => setIsLeavePolicyOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+            >
+              <Settings2 className="w-3.5 h-3.5 text-slate-500" />
+              <span>กติกาเวลาเรียน</span>
+            </button>
 
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <button
-            onClick={() => setIsLeavePolicyOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
-          >
-            <Settings2 className="w-3.5 h-3.5 text-slate-500" />
-            <span>กติกาเวลาเรียน</span>
-          </button>
-
-          <button
-            onClick={handleBatchSyncToCct}
-            disabled={isBatchSyncing}
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
-          >
-            <CloudUpload className="w-4 h-4" />
-            <span>
-              {isBatchSyncing
-                ? 'กำลังส่งข้อมูลขึ้น กสศ....'
-                : 'ส่งข้อมูลขึ้น กสศ. ทั้งห้อง'}
-            </span>
-          </button>
-        </div>
-      </div>
+            <button
+              onClick={handleBatchSyncToCct}
+              disabled={isBatchSyncing}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+            >
+              <CloudUpload className="w-4 h-4" />
+              <span>
+                {isBatchSyncing
+                  ? 'กำลังส่งข้อมูลขึ้น กสศ....'
+                  : 'ส่งข้อมูลขึ้น กสศ. ทั้งห้อง'}
+              </span>
+            </button>
+          </div>
+        }
+      />
 
       {/* 2. Rule of Thirds (กฎสามส่วน): 3 Balanced Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

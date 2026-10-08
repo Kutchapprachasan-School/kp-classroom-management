@@ -20,6 +20,7 @@ import {
   LayoutGrid,
 } from 'lucide-react';
 import type { SchoolUserRole } from '../config/schoolRoles';
+import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 
 interface CrossClassSarViewProps {
   activeRole?: SchoolUserRole;
@@ -671,69 +672,56 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in font-sans text-slate-800 select-none">
-      {/* 1. Header Hero Banner ตรงตาม Reference Image 2 */}
-      <div className="relative rounded-2xl md:rounded-3xl overflow-hidden border border-sky-100 shadow-sm bg-gradient-to-r from-sky-400/90 via-blue-400/80 to-sky-300/90 min-h-[140px] sm:min-h-[160px] flex items-center justify-between p-5 sm:p-7 text-white">
-        {/* Background Artwork */}
-        <div className="absolute inset-0 z-0">
-          <img
-            src="/images/teacher/hero_banner.png"
-            alt="Hero Banner"
-            className="w-full h-full object-cover object-right md:object-center opacity-85"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-sky-900/60 via-sky-800/40 to-transparent" />
-        </div>
+      {/* 1. Master PageHeroBanner */}
+      <PageHeroBanner
+        title="สรุปผลการเรียน (Academic Grades & SAR)"
+        subtitle="ภาพรวมผลการเรียนของนักเรียนในรายวิชาที่สอน"
+        icon={<BarChart2 className="w-6 h-6 text-white" />}
+        iconBgClass="bg-blue-600 text-white"
+        badgeText="SAR Report"
+        tagText="📊 การกระจายเกรด • เกณฑ์ผ่าน 80% (SAR) • ติดตามกลุ่มเสี่ยง 0/ร/มส"
+        quoteLines={[
+          'มุ่งมั่นพัฒนาผู้เรียน',
+          'สร้างผลสัมฤทธิ์ที่ยั่งยืน',
+          'ก้าวสู่อนาคตที่สดใส',
+        ]}
+        actions={
+          <div className="relative" ref={termDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsTermDropdownOpen((prev) => !prev)}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-blue-50 text-slate-800 text-xs sm:text-sm font-bold border border-slate-200 shadow-2xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+            >
+              <Calendar className="w-4 h-4 text-blue-600" />
+              <span>{selectedTerm}</span>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            </button>
 
-        {/* Banner Left Content */}
-        <div className="relative z-10 flex items-center gap-3.5 sm:gap-4 max-w-xl">
-          <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 text-white flex items-center justify-center shadow-lg shadow-sky-900/20 shrink-0">
-            <BarChart2 className="w-6 h-6 text-white" />
+            {isTermDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-1.5 text-xs space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
+                {['ภาคเรียนที่ 1/2569', 'ภาคเรียนที่ 2/2568', 'ภาคเรียนที่ 1/2568'].map((term) => (
+                  <button
+                    key={term}
+                    type="button"
+                    onClick={() => {
+                      setSelectedTerm(term);
+                      setIsTermDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
+                      selectedTerm === term
+                        ? 'bg-blue-50 text-blue-700 font-bold'
+                        : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <span>{term}</span>
+                    {selectedTerm === term && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          <div className="space-y-1">
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-sm">
-              สรุปผลการเรียน
-            </h1>
-            <p className="text-xs sm:text-sm text-sky-50 font-medium drop-shadow-sm">
-              ภาพรวมผลการเรียนของนักเรียนในรายวิชาที่สอน
-            </p>
-          </div>
-        </div>
-
-        {/* Banner Right: Dropdown เลือกภาคเรียน ตรงตามภาพ Reference Image 2 */}
-        <div className="relative z-10" ref={termDropdownRef}>
-          <button
-            type="button"
-            onClick={() => setIsTermDropdownOpen((prev) => !prev)}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/95 hover:bg-white text-slate-800 text-xs sm:text-sm font-bold border border-white/80 shadow-md shadow-slate-900/10 hover:shadow-lg transition-all cursor-pointer active:scale-95"
-          >
-            <Calendar className="w-4 h-4 text-blue-600" />
-            <span>เลือกภาคเรียน {selectedTerm}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-          </button>
-
-          {isTermDropdownOpen && (
-            <div className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-1.5 text-xs space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
-              {['ภาคเรียนที่ 1/2569', 'ภาคเรียนที่ 2/2568', 'ภาคเรียนที่ 1/2568'].map((term) => (
-                <button
-                  key={term}
-                  type="button"
-                  onClick={() => {
-                    setSelectedTerm(term);
-                    setIsTermDropdownOpen(false);
-                  }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
-                    selectedTerm === term
-                      ? 'bg-blue-50 text-blue-700 font-bold'
-                      : 'hover:bg-slate-50 text-slate-700'
-                  }`}
-                >
-                  <span>{term}</span>
-                  {selectedTerm === term && <Check className="w-3.5 h-3.5 text-blue-600" />}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+        }
+      />
 
       {/* 2. Controls Filter Bar: Dropdown เลือกชั้น/ห้อง, เลือกรายวิชา, เลือกผู้สอน (ตามโจทย์ระบุชัดเจน) */}
       <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">

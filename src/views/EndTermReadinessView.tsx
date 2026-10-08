@@ -11,6 +11,7 @@ import {
 import { assignmentService } from '../services/assignmentService';
 import { scoreService } from '../services/scoreService';
 import { teacherCopilotService } from '../services/teacherCopilotService';
+import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 
 interface ReadinessTask {
   id: string;
@@ -200,39 +201,50 @@ export const EndTermReadinessView: React.FC<EndTermReadinessViewProps> = ({
         </div>
       )}
 
-      {/* Pre-SGS Action Bar (Actionable, Zero-Clutter) */}
-      <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-3.5 shadow-xs flex flex-wrap items-center justify-between gap-2.5">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="px-2.5 py-0.5 rounded-full bg-slate-900 text-white text-[11px] font-bold">
-            ด่านส่งเกรด SGS
-          </span>
-          <span className="text-xs font-bold text-slate-800">
-            {isAllReadyForSgs
-              ? '✓ ผ่านเกณฑ์ครบ — พร้อมส่งออกไฟล์ SGS 100%'
-              : `ค้าง ${totalEmptyScores} ช่องคะแนนว่าง · รอประเมินคุณลักษณะฯ ${unratedTraitsCount} คน`}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          {!isAllReadyForSgs && (
+      {/* Master PageHeroBanner Design */}
+      <PageHeroBanner
+        title="ความพร้อมก่อนปิดภาคเรียน & ส่งเกรด SGS"
+        subtitle={
+          isAllReadyForSgs
+            ? '✓ ข้อมูลคะแนนและคุณลักษณะฯ ครบถ้วน 100% พร้อมส่งออกไฟล์ SGS ทันที'
+            : `ตรวจพบงานค้าง: ${totalEmptyScores} ช่องคะแนนว่าง และรอประเมินคุณลักษณะฯ ${unratedTraitsCount} คน`
+        }
+        icon={<Zap className="w-6 h-6 text-white" />}
+        iconBgClass="bg-blue-600 text-white"
+        badgeText={isAllReadyForSgs ? '100% READY' : 'PENDING'}
+        badgeClass={
+          isAllReadyForSgs
+            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+            : 'bg-amber-100 text-amber-800 border-amber-300'
+        }
+        tagText="⚡ ตรวจช่องคะแนนว่าง • ประเมินคุณลักษณะฯ • สรุปผล ปพ.5 • ส่งออก SGS"
+        quoteLines={[
+          'เตรียมพร้อมทุกมิติ',
+          'ปิดเทอมอย่างมั่นใจ',
+          'ไม่มีงานค้างคาใจ',
+        ]}
+        actions={
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {!isAllReadyForSgs && (
+              <button
+                type="button"
+                onClick={handleOneClickFixAllBlockers}
+                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md transition-all inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span>⚡ เคลียร์งานค้าง (1 คลิก)</span>
+              </button>
+            )}
             <button
-              type="button"
-              onClick={handleOneClickFixAllBlockers}
-              className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-2xs transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+              onClick={() => setIsOverviewModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-blue-50 text-slate-700 text-xs font-semibold rounded-xl shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
             >
-              <Zap className="w-3.5 h-3.5" />
-              <span>⚡ เคลียร์งานค้างให้พร้อมส่ง SGS (1 คลิก)</span>
+              <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
+              <span>ดูตารางสรุปคะแนน</span>
             </button>
-          )}
-          <button
-            onClick={() => setIsOverviewModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-teal-600" />
-            <span>ดูตารางสรุปคะแนน</span>
-          </button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       {/* 2. Rule of Thirds (กฎสามส่วน): 3 Balanced Summary Zones */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

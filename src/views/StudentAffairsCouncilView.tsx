@@ -23,6 +23,7 @@ import {
 } from '../services/teacherCopilotService';
 import { MobileVerticalAttendanceSheet } from '../components/teacher/MobileVerticalAttendanceSheet';
 import { PaperRegisterLedger } from '../components/teacher/PaperRegisterLedger';
+import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 
 interface StudentAffairsCouncilViewProps {
   initialSection?: 'AFFAIRS' | 'COUNCIL';
@@ -166,11 +167,19 @@ export const StudentAffairsCouncilView: React.FC<
 
       {mainSection === 'COUNCIL' && (
         <>
-          <div className="bg-white rounded-xl border border-slate-200 px-4 py-2.5 shadow-xs">
-            <h1 className="text-sm sm:text-base font-bold text-slate-900">
-              สภานักเรียน & เลือกตั้งออนไลน์ (E-Voting)
-            </h1>
-          </div>
+          <PageHeroBanner
+            title="สภานักเรียน & เลือกตั้งออนไลน์ (E-Voting)"
+            subtitle="ระบบลงคะแนนเลือกตั้งสภานักเรียนออนไลน์แบบเรียลไทม์ และรับฟังข้อเสนอแนะของนักเรียน"
+            icon={<Vote className="w-6 h-6 text-white" />}
+            iconBgClass="bg-blue-600 text-white"
+            badgeText="E-Voting 2569"
+            tagText="🗳️ ผู้ใช้สิทธิ์เรียลไทม์ • พรรคผู้สมัคร • กล่องข้อเสนอแนะนักเรียน"
+            quoteLines={[
+              'ประชาธิปไตยในโรงเรียน',
+              'สร้างผู้นำรุ่นใหม่',
+              'เพื่อสังคมที่ดีกว่า',
+            ]}
+          />
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
@@ -237,7 +246,21 @@ export const StudentAffairsCouncilView: React.FC<
           SECTION 1: ระบบบริหารงานกิจการนักเรียน (ออกแบบเน้นมือถือแนวตั้ง ตัดข้อความรกออกทั้งหมด)
          ===================================================================== */}
       {mainSection === 'AFFAIRS' && (
-        <div className="space-y-3">
+        <div className="space-y-4">
+          <PageHeroBanner
+            title="กิจการนักเรียน & ใบลา (Student Affairs)"
+            subtitle="ดูแลความประพฤติ พิจารณาคำขอลาออนไลน์ และกิจกรรมเสริมสร้างวินัยเชิงบวก"
+            icon={<ShieldAlert className="w-6 h-6 text-white" />}
+            iconBgClass="bg-blue-600 text-white"
+            badgeText="Student Affairs"
+            tagText="🛡️ พิจารณาใบลาออนไลน์ • บันทึกวินัยเชิงบวก • ตรวจสอบความสอดคล้อง"
+            quoteLines={[
+              'วินัยเชิงบวกสร้างคนดี',
+              'ดูแลด้วยความเข้าใจ',
+              'พัฒนาสู่อนาคตที่มั่นคง',
+            ]}
+          />
+
           {/* แถบไอคอนสลับงาน 3 ปุ่มสั้นๆ เข้าใจทันที (เช็คแถวเช้า | ใบลา | ความประพฤติ) */}
           <div className="max-w-xl mx-auto grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-2xl border border-slate-200">
             <button

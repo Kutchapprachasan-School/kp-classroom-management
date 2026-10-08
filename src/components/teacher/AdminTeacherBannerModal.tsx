@@ -33,6 +33,7 @@ interface AdminTeacherBannerModalProps {
   onClose: () => void;
   activeRole?: SchoolUserRole;
   initialBannerKey?: TeacherBannerKey;
+  embedded?: boolean;
 }
 
 export const AdminTeacherBannerModal: React.FC<AdminTeacherBannerModalProps> = ({
@@ -40,6 +41,7 @@ export const AdminTeacherBannerModal: React.FC<AdminTeacherBannerModalProps> = (
   onClose,
   activeRole = 'ACADEMIC_ADMIN',
   initialBannerKey = 'hero',
+  embedded = false,
 }) => {
   const [selectedKey, setSelectedKey] = useState<TeacherBannerKey>(initialBannerKey);
   const [banners, setBanners] = useState<Record<TeacherBannerKey, TeacherBannerItem>>(() =>
@@ -267,9 +269,14 @@ export const AdminTeacherBannerModal: React.FC<AdminTeacherBannerModalProps> = (
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in font-sans">
-      <div className="bg-white w-full max-w-4xl rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col my-auto max-h-[94vh]">
+  const modalContent = (
+    <div
+      className={`bg-white w-full ${
+        embedded
+          ? 'rounded-2xl border border-slate-200 shadow-card'
+          : 'max-w-4xl rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 my-auto max-h-[94vh]'
+      } overflow-hidden flex flex-col`}
+    >
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-200 bg-gradient-to-r from-blue-700 via-indigo-700 to-sky-700 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -819,6 +826,15 @@ export const AdminTeacherBannerModal: React.FC<AdminTeacherBannerModalProps> = (
           </div>
         </div>
       </div>
+  );
+
+  if (embedded) {
+    return <div className="w-full animate-fade-in font-sans my-2">{modalContent}</div>;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in font-sans">
+      {modalContent}
     </div>
   );
 };

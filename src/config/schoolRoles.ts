@@ -50,6 +50,15 @@ export interface SchoolBrandingSettings {
   philosophy?: string;
   vision?: string;
   mission?: string;
+  schoolCode10Digit?: string;
+  schoolType?: 'HIGH_SCHOOL' | 'EXPANSION' | 'PRIMARY' | 'VOCATIONAL';
+  directorName?: string;
+  directorPosition?: string;
+  directorSignatureUrl?: string;
+  schoolIdentity?: string;
+  schoolUniqueness?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
   addressLine?: string;
   subdistrict?: string;
   district?: string;
@@ -134,6 +143,15 @@ export const KUTCHAP_SCHOOL_INFO: SchoolBrandingSettings = {
   philosophy: 'ประพฤติดี มีวิชา กีฬาเด่น เน้นคุณธรรม',
   vision: 'มุ่งมั่นพัฒนาผู้เรียนสู่มาตรฐานสากล บนพื้นฐานความเป็นไทยและหลักปรัชญาของเศรษฐกิจพอเพียง',
   mission: '1. จัดการศึกษาขั้นพื้นฐานอย่างมีคุณภาพและเสมอภาค\n2. ส่งเสริมการใช้เทคโนโลยีดิจิทัลเพื่อการเรียนรู้\n3. พัฒนาทักษะและศักยภาพผู้เรียนในศตวรรษที่ 21',
+  schoolCode10Digit: '1041680123',
+  schoolType: 'HIGH_SCHOOL',
+  directorName: 'นายสมชาย ใจดี',
+  directorPosition: 'ผู้อำนวยการโรงเรียนกุดจับประชาสรรค์',
+  directorSignatureUrl: '',
+  schoolIdentity: 'มารยาทดี มีคุณธรรม นำวิชาการ',
+  schoolUniqueness: 'โรงเรียนสิ่งแวดล้อมดี มีทักษะชีวิต',
+  primaryColor: '#3B82F6',
+  secondaryColor: '#10B981',
   addressLine: 'เลขที่ 199 หมู่ 1 ถนนกุดจับ-เชียงพิณ',
   subdistrict: 'เมืองเพีย',
   district: 'กุดจับ',
