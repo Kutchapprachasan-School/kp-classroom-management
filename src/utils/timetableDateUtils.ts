@@ -76,6 +76,53 @@ export interface ComputedWeekInfo {
   canNext: boolean;
 }
 
+/**
+ * Bangkok Timezone (Asia/Bangkok, UTC+7) Helpers
+ */
+export const BANGKOK_TIMEZONE = 'Asia/Bangkok';
+
+export const getBangkokNow = (): Date => {
+  const now = new Date();
+  const bangkokStr = now.toLocaleString('en-US', { timeZone: BANGKOK_TIMEZONE });
+  return new Date(bangkokStr);
+};
+
+export const getBangkokTodayString = (): string => {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BANGKOK_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  return formatter.format(new Date());
+};
+
+export const getBangkokDayName = (): 'อาทิตย์' | 'จันทร์' | 'อังคาร' | 'พุธ' | 'พฤหัสบดี' | 'ศุกร์' | 'เสาร์' => {
+  const dayNames: ('อาทิตย์' | 'จันทร์' | 'อังคาร' | 'พุธ' | 'พฤหัสบดี' | 'ศุกร์' | 'เสาร์')[] = [
+    'อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'
+  ];
+  const bDate = getBangkokNow();
+  return dayNames[bDate.getDay()];
+};
+
+export const formatThaiDateFull = (dateStrOrObj?: string | Date): string => {
+  const d = dateStrOrObj ? (typeof dateStrOrObj === 'string' ? new Date(dateStrOrObj) : dateStrOrObj) : new Date();
+  return new Intl.DateTimeFormat('th-TH', {
+    timeZone: BANGKOK_TIMEZONE,
+    dateStyle: 'full',
+  }).format(d);
+};
+
+export const formatThaiDateShort = (dateStrOrObj?: string | Date): string => {
+  const d = dateStrOrObj ? (typeof dateStrOrObj === 'string' ? new Date(dateStrOrObj) : dateStrOrObj) : new Date();
+  return new Intl.DateTimeFormat('th-TH', {
+    timeZone: BANGKOK_TIMEZONE,
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(d);
+};
+
 export const computeWeekInfo = (offset: number): ComputedWeekInfo => {
   // Base semester instructional duration is 20 weeks
   // Anchor current week at week 16
@@ -85,7 +132,6 @@ export const computeWeekInfo = (offset: number): ComputedWeekInfo => {
   const effectiveOffset = weekNumber - baseWeek;
 
   // Base anchor Monday: 29 Sep 2026 (2569 BE) - corresponds to week 16
-  // Base Thursday (Today): 2 Oct 2026 (2569 BE)
   const baseMonday = new Date(2026, 8, 29); // 0-indexed month 8 = September
   const startMonday = new Date(baseMonday);
   startMonday.setDate(baseMonday.getDate() + effectiveOffset * 7);
@@ -108,13 +154,15 @@ export const computeWeekInfo = (offset: number): ComputedWeekInfo => {
     'ศุกร์',
   ];
 
+  const currentBangkokDay = getBangkokDayName();
+
   const days: WeekDayInfo[] = dayKeys.map((key, i) => {
     const cur = new Date(startMonday);
     cur.setDate(startMonday.getDate() + i);
     return {
       key,
       dateLabel: formatThaiDate(cur),
-      isToday: effectiveOffset === 0 && key === 'พฤหัสบดี',
+      isToday: effectiveOffset === 0 && key === currentBangkokDay,
     };
   });
 

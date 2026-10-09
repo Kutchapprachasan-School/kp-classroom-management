@@ -178,8 +178,10 @@ export interface ClassroomRosterItem {
   name: string;
   level: string;
   roomNumber: string;
-  adviser: string;
-  coAdviser?: string;
+  adviser: string;           // ครูที่ปรึกษาคนที่ 1 (หลัก)
+  coAdviser?: string;        // ครูที่ปรึกษาคนที่ 2
+  thirdAdviser?: string;     // ครูที่ปรึกษาคนที่ 3
+  advisers?: string[];       // รายชื่อครูที่ปรึกษาทั้งหมด (สูงสุด 3 คน)
   studentCount: number;
 }
 

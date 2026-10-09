@@ -821,12 +821,11 @@ const morningViewCheckPath = './src/views/MorningAssemblyView.tsx';
 assert.ok(existsSync(morningViewCheckPath), 'src/views/MorningAssemblyView.tsx must exist');
 const morningSource = readFileSync(morningViewCheckPath, 'utf8');
 
-// 7.1 Advisory Room Lock & Today Default
-assert.ok(morningSource.includes("ADVISORY_ROOM = 'room-3-1'"), 'Morning assembly must be locked to advisory room room-3-1');
-assert.ok(morningSource.includes('ม.3/1 (ห้องประจำชั้น)'), 'Must display homeroom advisory label ม.3/1 (ห้องประจำชั้น)');
-assert.ok(morningSource.includes("DEFAULT_TODAY = '2026-10-02'"), 'Must default to today 2026-10-02');
+// 7.1 Dynamic Advisory Room & Bangkok Today Default
+assert.ok(morningSource.includes('getBangkokTodayString') || morningSource.includes('DEFAULT_TODAY'), 'Must use Bangkok today date');
+assert.ok(morningSource.includes('classroomService') || morningSource.includes('getTeacherAdvisoryClassroom'), 'Must dynamically detect advisory classroom');
 assert.ok(morningSource.includes('โฮมรูม'), 'Must render โฮมรูม badge adjacent to title');
-console.log('  ✓ Advisory homeroom lock and today default verified');
+console.log('  ✓ Dynamic advisory homeroom and Bangkok today verified');
 
 // 7.2 Action Buttons & 5 KPI Metric Cards Parity with media_1791314921886.png
 assert.ok(morningSource.includes('✓ มาแถวครบทุกคน'), 'Must have ✓ มาแถวครบทุกคน button');

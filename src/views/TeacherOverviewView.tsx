@@ -48,6 +48,7 @@ import {
   TEACHER_SUBJECTS_LIST,
 } from '../services/teacherCourseAssignmentService';
 import { cleanSlateService } from '../services/cleanSlateService';
+import { getBangkokTodayString } from '../utils/timetableDateUtils';
 
 const formatThaiDate = (isoDate: string): string => {
   if (!isoDate || !isoDate.includes('-')) return isoDate;
@@ -78,7 +79,7 @@ const parseToIsoDate = (dateStr: string): string => {
     const y = String(Number(parts[3]) - 543);
     return `${y}-${m}-${d}`;
   }
-  return '2026-10-02';
+  return getBangkokTodayString();
 };
 
 interface TeacherOverviewViewProps {
@@ -238,21 +239,23 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
   const [transferInDate, setTransferInDate] = useState('2026-08-15');
   const [transferInU1Score, setTransferInU1Score] = useState(12);
 
-  const [selectedDateIso, setSelectedDateIso] = useState<string>('2026-10-02');
+  const [selectedDateIso, setSelectedDateIso] = useState<string>(() => getBangkokTodayString());
 
   // Interactive Attendance Rows matching Image 4 and synced with attendanceCorrelationService
-  const [attendanceRows, setAttendanceRows] = useState([
-    {
-      isoDate: '2026-10-02',
-      date: 'ศ. 2 ต.ค. 2569',
-      period: 'คาบ 1-2',
-      topic: 'การประเมินผลงานและสรุปบทเรียน',
-      status: 'NORMAL' as const,
-      statusLabel: 'สอนปกติ',
-      checkStatus: 'CHECKED',
-      attendedCount: 10 as number | null,
-      leaveCount: 1 as number | null,
-    },
+  const [attendanceRows, setAttendanceRows] = useState(() => {
+    const todayIso = getBangkokTodayString();
+    return [
+      {
+        isoDate: todayIso,
+        date: formatThaiDate(todayIso),
+        period: 'คาบ 1-2',
+        topic: 'การประเมินผลงานและสรุปบทเรียน',
+        status: 'NORMAL' as const,
+        statusLabel: 'สอนปกติ',
+        checkStatus: 'CHECKED',
+        attendedCount: 10 as number | null,
+        leaveCount: 1 as number | null,
+      },
     {
       isoDate: '2026-10-01',
       date: 'พฤ. 1 ต.ค. 2569',
@@ -308,7 +311,8 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
       attendedCount: 13 as number | null,
       leaveCount: 2 as number | null,
     },
-  ]);
+  ];
+});
 
   const loadAttendanceDataFromCorrelation = useCallback(() => {
     try {

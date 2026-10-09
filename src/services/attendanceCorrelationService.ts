@@ -12,6 +12,7 @@
  */
 
 import { cleanSlateService } from './cleanSlateService.ts';
+import { getBangkokTodayString } from '../utils/timetableDateUtils.ts';
 
 export type AttendanceStatusCode =
   | 'PRESENT'   // มาเรียน / มาแถวปกติ (ได้เวลาเรียน 100%)
@@ -1304,7 +1305,7 @@ export const attendanceCorrelationService = {
     classroomId: string,
     year: number,
     month: number,
-    referenceDate = '2026-10-02'
+    referenceDate = getBangkokTodayString()
   ): AssemblyCalendarDayInfo[] {
     const targetRoom = normalizeClassroomId(classroomId);
     let allRecords = this.getAllMorningRecords().filter(
@@ -1371,7 +1372,7 @@ export const attendanceCorrelationService = {
     classroomId: string,
     year: number,
     month: number,
-    referenceDate = '2026-10-02'
+    referenceDate = getBangkokTodayString()
   ): AssemblyCalendarDayInfo[] {
     const targetRoom = normalizeClassroomId(classroomId);
     const targetCourse = normalizeCourseCode(courseCode);

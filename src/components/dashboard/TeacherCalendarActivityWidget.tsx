@@ -22,6 +22,8 @@ import {
 } from '../../services/calendarEventStorageService';
 import { ACADEMIC_CALENDAR_EVENT } from '../../services/academicCalendarService';
 
+import { getBangkokNow } from '../../utils/timetableDateUtils';
+
 const THAI_MONTHS_NAMES = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
   'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
@@ -37,10 +39,10 @@ interface TeacherCalendarActivityWidgetProps {
 export const TeacherCalendarActivityWidget: React.FC<
   TeacherCalendarActivityWidgetProps
 > = ({ onNavigateToCalendar, onDeepNavigate }) => {
-  // วันที่ปัจจุบันสำหรับระบบ: 2 ตุลาคม 2569 (2026-10-02)
-  const [currentYear, setCurrentYear] = useState<number>(2026);
-  const [currentMonth, setCurrentMonth] = useState<number>(10); // 1 - 12
-  const [selectedDay, setSelectedDay] = useState<number>(2);
+  // วันที่ปัจจุบันสำหรับระบบตาม Time Zone Asia/Bangkok
+  const [currentYear, setCurrentYear] = useState<number>(() => getBangkokNow().getFullYear());
+  const [currentMonth, setCurrentMonth] = useState<number>(() => getBangkokNow().getMonth() + 1); // 1 - 12
+  const [selectedDay, setSelectedDay] = useState<number>(() => getBangkokNow().getDate());
 
   // Pop-up modal กิจกรรมประจำวันที่ถูกเลือก
   const [activeModalDate, setActiveModalDate] = useState<{

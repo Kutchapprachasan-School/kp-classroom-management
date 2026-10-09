@@ -10,6 +10,7 @@ import {
 import { cleanSlateService } from './cleanSlateService';
 import {
   INITIAL_MATRIX_SLOTS,
+  getBangkokNow,
   type TimetableMatrixSlot,
 } from '../utils/timetableDateUtils';
 
@@ -484,7 +485,7 @@ export const calendarEventStorageService = {
     } catch {}
   },
 
-  // ดึงวันปัจจุบันของสัปดาห์ในระบบโรงเรียน (ค่ามาตรฐานคือ 'พฤหัสบดี' วันที่ 2 ต.ค. 2569)
+  // ดึงวันปัจจุบันของสัปดาห์ในระบบโรงเรียนตาม Time Zone Asia/Bangkok
   getTodayDayKey(): 'จันทร์' | 'อังคาร' | 'พุธ' | 'พฤหัสบดี' | 'ศุกร์' {
     const dayMap: Record<number, 'จันทร์' | 'อังคาร' | 'พุธ' | 'พฤหัสบดี' | 'ศุกร์'> = {
       1: 'จันทร์',
@@ -493,9 +494,10 @@ export const calendarEventStorageService = {
       4: 'พฤหัสบดี',
       5: 'ศุกร์',
     };
-    const jsDay = new Date().getDay();
-    // หากเป็นวันจันทร์-ศุกร์ให้ใช้วันจริง หากเป็นเสาร์-อาทิตย์ให้ใช้ค่าฐานของระบบคือพฤหัสบดี
-    return dayMap[jsDay] || 'พฤหัสบดี';
+    const bDate = getBangkokNow();
+    const jsDay = bDate.getDay();
+    // หากเป็นวันจันทร์-ศุกร์ให้ใช้วันจริง หากเป็นเสาร์-อาทิตย์ให้ใช้ค่าวันศุกร์เพื่อแสดงผลตารางสอน
+    return dayMap[jsDay] || 'ศุกร์';
   },
 
   // อ่าน Matrix Slots ทั้งหมดจาก LocalStorage (ซิงค์ตรงกับหน้าตารางสอน TimetableView)

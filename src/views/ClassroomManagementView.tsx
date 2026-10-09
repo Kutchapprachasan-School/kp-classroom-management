@@ -2,8 +2,9 @@
 // หน้าจัดการห้องเรียน (Classroom Management View)
 // ออกแบบตาม Master Design System: Pastel Anime Education Dashboard
 // รองรับ: การแยกสีสายชั้น (ม.1 - ม.6), ดึงรายชื่อครูที่ปรึกษาจาก Supabase User table จริง
+// รองรับ: ครูที่ปรึกษาสูงสุด 3 คน (หลัก, ร่วม 1, ร่วม 2), ส่งออก CSV และนำเข้า CSV พร้อมระบบตรวจสอบ Fuzzy Match
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Layers,
   Users,
@@ -16,6 +17,12 @@ import {
   CheckCircle2,
   UserCheck,
   Building,
+  Download,
+  Upload,
+  FileSpreadsheet,
+  Check,
+  Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import { classroomService, type TeacherAccountItem } from '../services/classroomService';
 import type { ClassroomRosterItem } from '../types/viewModels';
@@ -26,10 +33,27 @@ import {
   GRADE_LEVEL_LIST,
   GRADE_LEVEL_THEMES,
 } from '../utils/gradeLevelTheme';
+import {
+  matchTeacherWithDatabase,
+  normalizeWhitespace,
+  type TeacherMatchResult,
+} from '../utils/fuzzyNameMatcher';
 
 interface ClassroomManagementViewProps {
   onManageStudents: (classroom: ClassroomRosterItem) => void;
   activeRole?: SchoolUserRole;
+}
+
+export interface ImportPreviewRow {
+  roomName: string;
+  level: string;
+  adv1: string;
+  adv1Match: TeacherMatchResult;
+  adv2: string;
+  adv2Match: TeacherMatchResult;
+  adv3: string;
+  adv3Match: TeacherMatchResult;
+  isExisting: boolean;
 }
 
 export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = ({
@@ -46,15 +70,24 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [activeClassroom, setActiveClassroom] = useState<ClassroomRosterItem | null>(null);
 
-  // Form states
+  // Form states (Up to 3 Homeroom Advisors)
   const [formName, setFormName] = useState('');
   const [formLevel, setFormLevel] = useState('ม.1');
   const [formAdviser, setFormAdviser] = useState('');
+  const [formCoAdviser, setFormCoAdviser] = useState('');
+  const [formThirdAdviser, setFormThirdAdviser] = useState('');
   const [formTeacherSearch, setFormTeacherSearch] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Import State
+  const [importRawText, setImportRawText] = useState('');
+  const [importPreviewRows, setImportPreviewRows] = useState<ImportPreviewRow[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Toast notice
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -134,8 +167,10 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
         const q = searchTerm.toLowerCase();
         const matchesName = c.name.toLowerCase().includes(q);
         const matchesLevel = c.level.toLowerCase().includes(q);
-        const matchesAdviser = (c.adviser || '').toLowerCase().includes(q);
-        if (!matchesName && !matchesLevel && !matchesAdviser) return false;
+        const matchesAdviser1 = (c.adviser || '').toLowerCase().includes(q);
+        const matchesAdviser2 = (c.coAdviser || '').toLowerCase().includes(q);
+        const matchesAdviser3 = (c.thirdAdviser || '').toLowerCase().includes(q);
+        if (!matchesName && !matchesLevel && !matchesAdviser1 && !matchesAdviser2 && !matchesAdviser3) return false;
       }
       return true;
     });
@@ -146,6 +181,8 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
     setFormName('');
     setFormLevel(selectedGradeTab !== 'ALL' ? selectedGradeTab : 'ม.1');
     setFormAdviser(teacherAccounts[0]?.name || 'ยังไม่ได้กำหนด');
+    setFormCoAdviser('');
+    setFormThirdAdviser('');
     setFormTeacherSearch('');
     setFormError(null);
     setIsAddModalOpen(true);
@@ -157,6 +194,8 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
     setFormName(room.name);
     setFormLevel(room.level || getGradeLevelTheme(room.name).shortLabel);
     setFormAdviser(room.adviser || '');
+    setFormCoAdviser(room.coAdviser || '');
+    setFormThirdAdviser(room.thirdAdviser || '');
     setFormTeacherSearch('');
     setFormError(null);
     setIsEditModalOpen(true);
@@ -181,6 +220,8 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
         name: formName.trim(),
         level: formLevel,
         adviser: formAdviser.trim() || 'ยังไม่ได้กำหนด',
+        coAdviser: formCoAdviser.trim() || undefined,
+        thirdAdviser: formThirdAdviser.trim() || undefined,
       });
       setIsAddModalOpen(false);
       setToastMessage(`เพิ่มห้องเรียน ${formName} เรียบร้อยแล้ว`);
@@ -206,6 +247,8 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
         name: formName.trim(),
         level: formLevel,
         adviser: formAdviser.trim() || 'ยังไม่ได้กำหนด',
+        coAdviser: formCoAdviser.trim() || undefined,
+        thirdAdviser: formThirdAdviser.trim() || undefined,
       });
       setIsEditModalOpen(false);
       setToastMessage(`แก้ไขข้อมูลห้องเรียน ${formName} สำเร็จ`);
@@ -224,7 +267,7 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
     try {
       await classroomService.delete(activeClassroom.id);
       setIsDeleteModalOpen(false);
-      setToastMessage(`ลบห้องเรียน ${activeClassroom.name} และย้ายไปยังถังขยะเรียบร้อย`);
+      setToastMessage(`ลบห้องเรียน ${activeClassroom.name} เรียบร้อยแล้ว`);
       await loadData();
     } catch (err: any) {
       alert(err.message || 'เกิดข้อผิดพลาดในการลบห้องเรียน');
@@ -233,26 +276,206 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
     }
   };
 
+  // Export CSV with UTF-8 BOM
+  const handleExportCsv = () => {
+    const headers = [
+      'ห้องเรียน',
+      'ระดับชั้น',
+      'ครูที่ปรึกษาคนที่ 1 (หลัก)',
+      'ครูที่ปรึกษาคนที่ 2 (ร่วม)',
+      'ครูที่ปรึกษาคนที่ 3 (ร่วม)',
+      'จำนวนนักเรียน',
+    ];
+
+    const rows = classrooms.map((c) => [
+      `"${c.name || ''}"`,
+      `"${c.level || ''}"`,
+      `"${c.adviser || ''}"`,
+      `"${c.coAdviser || ''}"`,
+      `"${c.thirdAdviser || ''}"`,
+      c.studentCount || 0,
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `รายชื่อห้องเรียนและครูที่ปรึกษา_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    setToastMessage('✓ ส่งออกไฟล์ CSV รายชื่อห้องและครูที่ปรึกษาเรียบร้อยแล้ว');
+  };
+
+  // Parse CSV for Import with Fuzzy Match
+  const handleParseCsvText = (text: string) => {
+    setImportRawText(text);
+    if (!text.trim()) {
+      setImportPreviewRows([]);
+      return;
+    }
+
+    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    const parsed: ImportPreviewRow[] = [];
+
+    // Check if line 1 is header
+    const firstLineLower = lines[0].toLowerCase();
+    const startIndex =
+      firstLineLower.includes('ห้อง') ||
+      firstLineLower.includes('ระดับ') ||
+      firstLineLower.includes('room') ||
+      firstLineLower.includes('class')
+        ? 1
+        : 0;
+
+    for (let i = startIndex; i < lines.length; i++) {
+      const line = lines[i];
+      const parts = line.split(/[,;\t]/).map((p) => p.replace(/^["']|["']$/g, '').trim());
+      if (parts.length === 0 || !parts[0]) continue;
+
+      const roomName = normalizeWhitespace(parts[0]);
+      if (!roomName) continue;
+
+      // Extract grade level e.g. ม.1/3 -> ม.1
+      let level = 'ม.1';
+      const levelMatch = roomName.match(/ม\.?\s*(\d+)/);
+      if (levelMatch) {
+        level = `ม.${levelMatch[1]}`;
+      } else if (parts[1] && parts[1].startsWith('ม.')) {
+        level = parts[1];
+      }
+
+      let adv1 = '';
+      let adv2 = '';
+      let adv3 = '';
+
+      if (parts[1] && (parts[1].startsWith('ม.') || parts[1].includes('ชั้น'))) {
+        adv1 = parts[2] || '';
+        adv2 = parts[3] || '';
+        adv3 = parts[4] || '';
+      } else {
+        adv1 = parts[1] || '';
+        adv2 = parts[2] || '';
+        adv3 = parts[3] || '';
+      }
+
+      const adv1Match = matchTeacherWithDatabase(adv1, teacherAccounts);
+      const adv2Match = matchTeacherWithDatabase(adv2, teacherAccounts);
+      const adv3Match = matchTeacherWithDatabase(adv3, teacherAccounts);
+
+      const isExisting = classrooms.some(
+        (c) => normalizeWhitespace(c.name) === roomName || normalizeWhitespace(c.id) === roomName
+      );
+
+      parsed.push({
+        roomName,
+        level,
+        adv1,
+        adv1Match,
+        adv2,
+        adv2Match,
+        adv3,
+        adv3Match,
+        isExisting,
+      });
+    }
+
+    setImportPreviewRows(parsed);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const content = evt.target?.result as string;
+      if (content) handleParseCsvText(content);
+    };
+    reader.readAsText(file, 'utf-8');
+  };
+
+  const handleConfirmImport = async () => {
+    if (importPreviewRows.length === 0) return;
+    setIsImporting(true);
+    try {
+      const itemsToUpsert = importPreviewRows.map((r) => {
+        // Use matched teacher name if available, otherwise raw input
+        const finalAdv1 = r.adv1Match.matchedTeacher?.name || r.adv1.trim() || 'ยังไม่ได้กำหนด';
+        const finalAdv2 = r.adv2Match.matchedTeacher?.name || r.adv2.trim() || undefined;
+        const finalAdv3 = r.adv3Match.matchedTeacher?.name || r.adv3.trim() || undefined;
+
+        return {
+          name: r.roomName,
+          level: r.level,
+          adviser: finalAdv1,
+          coAdviser: finalAdv2,
+          thirdAdviser: finalAdv3,
+        };
+      });
+
+      await classroomService.upsertClassrooms(itemsToUpsert);
+      setIsImportModalOpen(false);
+      setToastMessage(
+        `✓ นำเข้าข้อมูลสำเร็จ ${importPreviewRows.length} ห้องเรียน (อัปเดตห้องเดิมและเพิ่มห้องใหม่เรียบร้อย)`
+      );
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'เกิดข้อผิดพลาดในการนำเข้าข้อมูล');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16 animate-fade-in font-sans text-slate-800 select-none">
       {/* 1. Header Hero Banner */}
       <PageHeroBanner
         title="จัดการห้องเรียน"
-        subtitle="โครงสร้างชั้นเรียน ระดับสายชั้น และกำหนดครูที่ปรึกษาประจำห้อง (ระบบฐานข้อมูลกลาง)"
+        subtitle="โครงสร้างชั้นเรียน ระดับสายชั้น และกำหนดครูที่ปรึกษาประจำห้อง สูงสุด 3 คน (ระบบฐานข้อมูลกลาง)"
         icon={<Building className="w-6 h-6 text-white" />}
         iconBgClass="bg-blue-600 text-white"
         badgeText={`${classrooms.length} ห้องเรียน`}
         actions={
-          isFullAccess && (
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
-              onClick={handleOpenAddModal}
-              className="flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-blue-900/20 transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+              onClick={handleExportCsv}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs sm:text-sm font-bold border border-slate-200 shadow-2xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+              title="ส่งออกรายชื่อห้องเรียนและครูที่ปรึกษาเป็นไฟล์ CSV"
             >
-              <Plus className="w-4 h-4" />
-              <span>+ เพิ่มห้องเรียน</span>
+              <Download className="w-4 h-4 text-blue-600" />
+              <span>ส่งออก CSV</span>
             </button>
-          )
+
+            {isFullAccess && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsImportModalOpen(true);
+                    setImportRawText('');
+                    setImportPreviewRows([]);
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-emerald-50 text-emerald-700 rounded-xl text-xs sm:text-sm font-bold border border-slate-200 hover:border-emerald-300 shadow-2xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+                  title="นำเข้ารายชื่อห้องเรียนและครูที่ปรึกษา พร้อมตรวจสอบชื่อในฐานข้อมูล"
+                >
+                  <Upload className="w-4 h-4 text-emerald-600" />
+                  <span>นำเข้า CSV</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleOpenAddModal}
+                  className="flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-blue-900/20 transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ เพิ่มห้องเรียน</span>
+                </button>
+              </>
+            )}
+          </div>
         }
       />
 
@@ -438,23 +661,52 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
                         </span>
                       </td>
 
-                      {/* 4. ครูที่ปรึกษา */}
+                      {/* 4. ครูที่ปรึกษา (สูงสุด 3 คน) */}
                       <td className="py-3.5 px-4 font-medium text-slate-800">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={
-                              room.adviser && room.adviser !== 'ยังไม่ได้กำหนด'
-                                ? 'text-slate-800 font-medium'
-                                : 'text-slate-400 italic'
-                            }
-                          >
-                            {room.adviser || 'ยังไม่ได้กำหนด'}
-                          </span>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-1">
+                            {/* ครูที่ปรึกษาคนที่ 1 (หลัก) */}
+                            <div className="flex items-center gap-1.5">
+                              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+                                หลัก
+                              </span>
+                              <span
+                                className={
+                                  room.adviser && room.adviser !== 'ยังไม่ได้กำหนด'
+                                    ? 'text-slate-800 font-semibold'
+                                    : 'text-slate-400 italic'
+                                }
+                              >
+                                {room.adviser || 'ยังไม่ได้กำหนด'}
+                              </span>
+                            </div>
+
+                            {/* ครูที่ปรึกษาคนที่ 2 (ร่วม) */}
+                            {room.coAdviser && room.coAdviser !== 'ยังไม่ได้กำหนด' && room.coAdviser.trim() !== '' && (
+                              <div className="flex items-center gap-1.5 text-slate-600 text-[11px]">
+                                <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                                  ร่วม 1
+                                </span>
+                                <span>{room.coAdviser}</span>
+                              </div>
+                            )}
+
+                            {/* ครูที่ปรึกษาคนที่ 3 (ร่วม) */}
+                            {room.thirdAdviser && room.thirdAdviser !== 'ยังไม่ได้กำหนด' && room.thirdAdviser.trim() !== '' && (
+                              <div className="flex items-center gap-1.5 text-slate-600 text-[11px]">
+                                <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                                  ร่วม 2
+                                </span>
+                                <span>{room.thirdAdviser}</span>
+                              </div>
+                            )}
+                          </div>
+
                           {isFullAccess && (
                             <button
                               type="button"
                               onClick={() => handleOpenEditModal(room)}
-                              className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-blue-600 rounded transition-opacity cursor-pointer"
+                              className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-blue-600 rounded transition-opacity cursor-pointer shrink-0 mt-0.5"
                               title="แก้ไขครูที่ปรึกษา"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
@@ -549,15 +801,29 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
                     </div>
                   </div>
 
-                  {/* Card Body: Adviser */}
-                  <div className="flex items-center gap-2 text-xs text-slate-600 bg-slate-50/80 p-2.5 rounded-xl border border-slate-100">
-                    <UserCheck className="w-4 h-4 text-blue-600 shrink-0" />
-                    <div className="flex-1 truncate">
-                      <span className="text-slate-400 text-[11px]">ครูที่ปรึกษา: </span>
-                      <span className="font-semibold text-slate-800">
-                        {room.adviser || 'ยังไม่ได้กำหนด'}
-                      </span>
+                  {/* Card Body: Advisors (Up to 3) */}
+                  <div className="bg-slate-50/80 p-2.5 rounded-xl border border-slate-100 space-y-1.5 text-xs">
+                    <div className="flex items-center gap-2">
+                      <UserCheck className="w-4 h-4 text-blue-600 shrink-0" />
+                      <div className="flex-1 truncate">
+                        <span className="text-slate-400 text-[11px]">ที่ปรึกษาหลัก: </span>
+                        <span className="font-semibold text-slate-800">
+                          {room.adviser || 'ยังไม่ได้กำหนด'}
+                        </span>
+                      </div>
                     </div>
+                    {room.coAdviser && room.coAdviser !== 'ยังไม่ได้กำหนด' && room.coAdviser.trim() !== '' && (
+                      <div className="flex items-center gap-2 pl-6 text-[11px] text-slate-600">
+                        <span className="text-slate-400">ร่วม 1: </span>
+                        <span className="font-medium text-slate-700">{room.coAdviser}</span>
+                      </div>
+                    )}
+                    {room.thirdAdviser && room.thirdAdviser !== 'ยังไม่ได้กำหนด' && room.thirdAdviser.trim() !== '' && (
+                      <div className="flex items-center gap-2 pl-6 text-[11px] text-slate-600">
+                        <span className="text-slate-400">ร่วม 2: </span>
+                        <span className="font-medium text-slate-700">{room.thirdAdviser}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Card Actions: Primary Button (min-height 44px) + Admin Controls */}
@@ -601,11 +867,11 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
       </div>
 
       {/* ========================================================
-          MODAL: ADD CLASSROOM (เพิ่มห้องเรียน)
+          MODAL: ADD CLASSROOM (เพิ่มห้องเรียน - รองรับ 3 ครูที่ปรึกษา)
          ======================================================== */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xl max-w-md w-full p-6 animate-scale-up space-y-4">
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xl max-w-lg w-full p-6 animate-scale-up space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
@@ -630,64 +896,106 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
             )}
 
             <form onSubmit={handleCreateClassroom} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">
+                    ชื่อห้องเรียน <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="เช่น ม.1/4, ม.3/2, ม.6/1"
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-xs font-semibold"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">ระดับชั้น</label>
+                  <select
+                    value={formLevel}
+                    onChange={(e) => setFormLevel(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-xs font-semibold cursor-pointer"
+                  >
+                    {GRADE_LEVEL_LIST.map((g) => (
+                      <option key={g} value={g}>
+                        {GRADE_LEVEL_THEMES[g]?.label || g}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* ค้นหาครู */}
               <div>
                 <label className="block text-slate-700 font-bold mb-1">
-                  ชื่อห้องเรียน <span className="text-rose-500">*</span>
+                  ค้นหาบัญชีครู (ดึงจากฐานข้อมูลจริง)
                 </label>
                 <input
                   type="text"
-                  placeholder="เช่น ม.1/4, ม.3/2, ม.6/1"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-xs font-semibold"
-                  required
+                  placeholder="พิมพ์ชื่อครู หรือกลุ่มสาระเพื่อกรองตัวเลือก..."
+                  value={formTeacherSearch}
+                  onChange={(e) => setFormTeacherSearch(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500"
                 />
               </div>
 
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">ระดับชั้น</label>
+              {/* ครูที่ปรึกษาคนที่ 1 (หลัก) */}
+              <div className="bg-blue-50/40 p-3 rounded-xl border border-blue-100 space-y-1">
+                <label className="block text-slate-800 font-bold">
+                  ครูที่ปรึกษาคนที่ 1 (หลัก) <span className="text-rose-500">*</span>
+                </label>
                 <select
-                  value={formLevel}
-                  onChange={(e) => setFormLevel(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-xs font-semibold cursor-pointer"
+                  value={formAdviser}
+                  onChange={(e) => setFormAdviser(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 text-xs font-semibold cursor-pointer"
                 >
-                  {GRADE_LEVEL_LIST.map((g) => (
-                    <option key={g} value={g}>
-                      {GRADE_LEVEL_THEMES[g]?.label || g}
+                  <option value="ยังไม่ได้กำหนด">-- ยังไม่ได้กำหนดครูที่ปรึกษา --</option>
+                  {filteredTeacherAccounts.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name} {t.subjectGroup ? `(${t.subjectGroup})` : t.position ? `(${t.position})` : ''}
                     </option>
                   ))}
                 </select>
               </div>
 
-              {/* Adviser dropdown from real accounts */}
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">
-                  ครูที่ปรึกษาประจำห้อง (ดึงจากบัญชีครูจริง)
+              {/* ครูที่ปรึกษาคนที่ 2 (ร่วม) */}
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+                <label className="block text-slate-700 font-bold">
+                  ครูที่ปรึกษาคนที่ 2 (ร่วม) <span className="text-slate-400 font-normal">(ถ้ามี)</span>
                 </label>
-                <div className="space-y-1.5">
-                  <input
-                    type="text"
-                    placeholder="ค้นหาชื่อครู หรือกลุ่มสาระ..."
-                    value={formTeacherSearch}
-                    onChange={(e) => setFormTeacherSearch(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500"
-                  />
-                  <select
-                    value={formAdviser}
-                    onChange={(e) => setFormAdviser(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-xs font-semibold cursor-pointer max-h-40"
-                  >
-                    <option value="ยังไม่ได้กำหนด">-- ยังไม่ได้กำหนดครูที่ปรึกษา --</option>
-                    {filteredTeacherAccounts.map((t) => (
-                      <option key={t.id} value={t.name}>
-                        {t.name} {t.subjectGroup ? `(${t.subjectGroup})` : t.position ? `(${t.position})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  * ดึงข้อมูลตรงจากฐานข้อมูลบุคลากรของโรงเรียนกุดจับประชาสรรค์
-                </p>
+                <select
+                  value={formCoAdviser}
+                  onChange={(e) => setFormCoAdviser(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 text-xs font-semibold cursor-pointer"
+                >
+                  <option value="">-- ไม่มีครูที่ปรึกษาร่วมคนที่ 2 --</option>
+                  {filteredTeacherAccounts.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name} {t.subjectGroup ? `(${t.subjectGroup})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* ครูที่ปรึกษาคนที่ 3 (ร่วม) */}
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+                <label className="block text-slate-700 font-bold">
+                  ครูที่ปรึกษาคนที่ 3 (ร่วม) <span className="text-slate-400 font-normal">(ถ้ามี)</span>
+                </label>
+                <select
+                  value={formThirdAdviser}
+                  onChange={(e) => setFormThirdAdviser(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 text-xs font-semibold cursor-pointer"
+                >
+                  <option value="">-- ไม่มีครูที่ปรึกษาร่วมคนที่ 3 --</option>
+                  {filteredTeacherAccounts.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name} {t.subjectGroup ? `(${t.subjectGroup})` : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
@@ -712,17 +1020,19 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
       )}
 
       {/* ========================================================
-          MODAL: EDIT CLASSROOM (แก้ไขห้องเรียน)
+          MODAL: EDIT CLASSROOM (แก้ไขห้องเรียน - รองรับ 3 ครูที่ปรึกษา)
          ======================================================== */}
       {isEditModalOpen && activeClassroom && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xl max-w-md w-full p-6 animate-scale-up space-y-4">
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xl max-w-lg w-full p-6 animate-scale-up space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
                   <Edit2 className="w-4 h-4" />
                 </div>
-                <h3 className="text-base font-bold text-slate-900">แก้ไขข้อมูลห้องเรียน</h3>
+                <h3 className="text-base font-bold text-slate-900">
+                  แก้ไขข้อมูลห้องเรียน {activeClassroom.name}
+                </h3>
               </div>
               <button
                 type="button"
@@ -741,59 +1051,105 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
             )}
 
             <form onSubmit={handleUpdateClassroom} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">
+                    ชื่อห้องเรียน <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-xs font-semibold"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">ระดับชั้น</label>
+                  <select
+                    value={formLevel}
+                    onChange={(e) => setFormLevel(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-xs font-semibold cursor-pointer"
+                  >
+                    {GRADE_LEVEL_LIST.map((g) => (
+                      <option key={g} value={g}>
+                        {GRADE_LEVEL_THEMES[g]?.label || g}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* ค้นหาครู */}
               <div>
                 <label className="block text-slate-700 font-bold mb-1">
-                  ชื่อห้องเรียน <span className="text-rose-500">*</span>
+                  ค้นหาบัญชีครู (ดึงจากฐานข้อมูลจริง)
                 </label>
                 <input
                   type="text"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-xs font-semibold"
-                  required
+                  placeholder="พิมพ์ชื่อครู หรือกลุ่มสาระเพื่อกรองตัวเลือก..."
+                  value={formTeacherSearch}
+                  onChange={(e) => setFormTeacherSearch(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500"
                 />
               </div>
 
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">ระดับชั้น</label>
+              {/* ครูที่ปรึกษาคนที่ 1 (หลัก) */}
+              <div className="bg-blue-50/40 p-3 rounded-xl border border-blue-100 space-y-1">
+                <label className="block text-slate-800 font-bold">
+                  ครูที่ปรึกษาคนที่ 1 (หลัก) <span className="text-rose-500">*</span>
+                </label>
                 <select
-                  value={formLevel}
-                  onChange={(e) => setFormLevel(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-xs font-semibold cursor-pointer"
+                  value={formAdviser}
+                  onChange={(e) => setFormAdviser(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 text-xs font-semibold cursor-pointer"
                 >
-                  {GRADE_LEVEL_LIST.map((g) => (
-                    <option key={g} value={g}>
-                      {GRADE_LEVEL_THEMES[g]?.label || g}
+                  <option value="ยังไม่ได้กำหนด">-- ยังไม่ได้กำหนดครูที่ปรึกษา --</option>
+                  {filteredTeacherAccounts.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name} {t.subjectGroup ? `(${t.subjectGroup})` : t.position ? `(${t.position})` : ''}
                     </option>
                   ))}
                 </select>
               </div>
 
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">
-                  ครูที่ปรึกษาประจำห้อง (ดึงจากบัญชีครูจริง)
+              {/* ครูที่ปรึกษาคนที่ 2 (ร่วม) */}
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+                <label className="block text-slate-700 font-bold">
+                  ครูที่ปรึกษาคนที่ 2 (ร่วม) <span className="text-slate-400 font-normal">(ถ้ามี)</span>
                 </label>
-                <div className="space-y-1.5">
-                  <input
-                    type="text"
-                    placeholder="ค้นหาชื่อครู หรือกลุ่มสาระ..."
-                    value={formTeacherSearch}
-                    onChange={(e) => setFormTeacherSearch(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500"
-                  />
-                  <select
-                    value={formAdviser}
-                    onChange={(e) => setFormAdviser(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-xs font-semibold cursor-pointer"
-                  >
-                    <option value="ยังไม่ได้กำหนด">-- ยังไม่ได้กำหนดครูที่ปรึกษา --</option>
-                    {filteredTeacherAccounts.map((t) => (
-                      <option key={t.id} value={t.name}>
-                        {t.name} {t.subjectGroup ? `(${t.subjectGroup})` : t.position ? `(${t.position})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <select
+                  value={formCoAdviser}
+                  onChange={(e) => setFormCoAdviser(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 text-xs font-semibold cursor-pointer"
+                >
+                  <option value="">-- ไม่มีครูที่ปรึกษาร่วมคนที่ 2 --</option>
+                  {filteredTeacherAccounts.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name} {t.subjectGroup ? `(${t.subjectGroup})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* ครูที่ปรึกษาคนที่ 3 (ร่วม) */}
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+                <label className="block text-slate-700 font-bold">
+                  ครูที่ปรึกษาคนที่ 3 (ร่วม) <span className="text-slate-400 font-normal">(ถ้ามี)</span>
+                </label>
+                <select
+                  value={formThirdAdviser}
+                  onChange={(e) => setFormThirdAdviser(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 text-xs font-semibold cursor-pointer"
+                >
+                  <option value="">-- ไม่มีครูที่ปรึกษาร่วมคนที่ 3 --</option>
+                  {filteredTeacherAccounts.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name} {t.subjectGroup ? `(${t.subjectGroup})` : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
@@ -818,6 +1174,228 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
       )}
 
       {/* ========================================================
+          MODAL: IMPORT CSV WITH FUZZY NAME VERIFICATION
+         ======================================================== */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xl max-w-4xl w-full p-6 animate-scale-up space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                  <Upload className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    นำเข้ารายชื่อห้องเรียนและครูที่ปรึกษา (CSV / ข้อความ)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    ระบบจะตรวจสอบชื่อครูกับฐานข้อมูลอัตโนมัติ (แก้ไขเว้นวรรคและจับคู่ชื่อใกล้เคียง) • หากห้องมีอยู่แล้วจะเปลี่ยนเฉพาะครูที่ปรึกษาโดยไม่สร้างห้องซ้ำ
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Input Controls: File upload or paste text */}
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <label className="text-xs font-bold text-slate-700">
+                  วางข้อความ CSV หรืออัปโหลดไฟล์ (.csv, .txt):
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept=".csv,.txt"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>เลือกไฟล์จากเครื่อง...</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const sample =
+                        'ห้องเรียน,ระดับชั้น,ครูที่ปรึกษา 1,ครูที่ปรึกษา 2,ครูที่ปรึกษา 3\n' +
+                        'ม.1/1,ม.1,นายภาสภูมิ เรืองปราชญ์,นางวิภาดา จิตดี,\n' +
+                        'ม.1/2,ม.1,ครูสมชาย  สุขใจ,นางสาวรัตนา สว่างศรี,\n' +
+                        'ม.3/1,ม.3,นายปัญจพล กาญจนโภคิน,นายภาสภูมิ เรืองปราชญ์,\n' +
+                        'ม.3/2,ม.3,นายธนากรณ์ โสภณ,,,';
+                      handleParseCsvText(sample);
+                    }}
+                    className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-semibold cursor-pointer"
+                  >
+                    โหลดตัวอย่าง
+                  </button>
+                </div>
+              </div>
+
+              <textarea
+                rows={4}
+                value={importRawText}
+                onChange={(e) => handleParseCsvText(e.target.value)}
+                placeholder="รูปแบบ: ห้องเรียน, ระดับชั้น, ครูที่ปรึกษาคนที่ 1, ครูที่ปรึกษาคนที่ 2, ครูที่ปรึกษาคนที่ 3&#10;ตัวอย่าง:&#10;ม.1/1, ม.1, นายภาสภูมิ เรืองปราชญ์, นางสมศรี เจริญดี,&#10;ม.1/2, ม.1, นายวิชัย บุญมา,,"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:border-blue-500 focus:bg-white"
+              />
+            </div>
+
+            {/* Verification Preview Table */}
+            {importPreviewRows.length > 0 && (
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-emerald-600" />
+                    <span>ตารางตรวจสอบก่อนนำเข้า ({importPreviewRows.length} รายการ)</span>
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-normal">
+                    * สีเขียว = ตรงฐานข้อมูล • สีส้ม = ชื่อใกล้เคียงแนะนำ • สีฟ้า = ห้องใหม่
+                  </span>
+                </div>
+
+                <div className="border border-slate-200 rounded-xl overflow-x-auto max-h-60 overflow-y-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-slate-50 text-slate-600 sticky top-0 font-bold border-b border-slate-200">
+                      <tr>
+                        <th className="py-2 px-3 w-10 text-center">#</th>
+                        <th className="py-2 px-3 w-24">ห้องเรียน</th>
+                        <th className="py-2 px-3">ที่ปรึกษา 1 (หลัก)</th>
+                        <th className="py-2 px-3">ที่ปรึกษา 2 (ร่วม)</th>
+                        <th className="py-2 px-3">ที่ปรึกษา 3 (ร่วม)</th>
+                        <th className="py-2 px-3 w-28 text-center">การดำเนินการ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {importPreviewRows.map((row, idx) => {
+                        const renderMatchBadge = (m: TeacherMatchResult, raw: string) => {
+                          if (!raw || raw.trim() === '-' || raw === 'ยังไม่ได้กำหนด') {
+                            return <span className="text-slate-400 italic text-[11px]">-</span>;
+                          }
+                          if (m.matchType === 'EXACT') {
+                            return (
+                              <div className="flex items-center gap-1">
+                                <span className="font-semibold text-slate-800">{m.matchedTeacher?.name || raw}</span>
+                                <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  ✓ ตรง
+                                </span>
+                              </div>
+                            );
+                          }
+                          if (m.matchType === 'FUZZY_SUGGESTED' && m.matchedTeacher) {
+                            return (
+                              <div>
+                                <div className="flex items-center gap-1">
+                                  <span className="font-semibold text-amber-800">{m.matchedTeacher.name}</span>
+                                  <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                    แนะนำ
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-slate-400">เดิม: "{raw}"</div>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div>
+                              <span className="text-slate-700">{raw}</span>
+                              <span className="ml-1 px-1 py-0.2 rounded text-[9px] font-medium bg-slate-100 text-slate-500">
+                                ไม่พบ
+                              </span>
+                            </div>
+                          );
+                        };
+
+                        return (
+                          <tr key={idx} className="hover:bg-slate-50/70">
+                            <td className="py-2 px-3 text-center text-slate-400 font-mono text-[11px]">
+                              {idx + 1}
+                            </td>
+                            <td className="py-2 px-3 font-bold text-slate-900">
+                              {row.roomName}
+                            </td>
+                            <td className="py-2 px-3">
+                              {renderMatchBadge(row.adv1Match, row.adv1)}
+                            </td>
+                            <td className="py-2 px-3">
+                              {renderMatchBadge(row.adv2Match, row.adv2)}
+                            </td>
+                            <td className="py-2 px-3">
+                              {renderMatchBadge(row.adv3Match, row.adv3)}
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              {row.isExisting ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  อัปเดตห้องเดิม
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                  + เพิ่มห้องใหม่
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+              <div className="text-xs text-slate-500">
+                {importPreviewRows.length > 0 && (
+                  <span>
+                    พร้อมนำเข้า: <strong>{importPreviewRows.length}</strong> ห้อง (
+                    {importPreviewRows.filter((r) => r.isExisting).length} อัปเดต,{' '}
+                    {importPreviewRows.filter((r) => !r.isExisting).length} สร้างใหม่)
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsImportModalOpen(false)}
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-xs cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  disabled={importPreviewRows.length === 0 || isImporting}
+                  onClick={handleConfirmImport}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isImporting ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>กำลังนำเข้า...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>ยืนยันนำเข้าข้อมูล</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
           MODAL: DELETE CLASSROOM (ยืนยันการลบห้องเรียน)
          ======================================================== */}
       {isDeleteModalOpen && activeClassroom && (
@@ -832,8 +1410,7 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
                 ยืนยันการลบห้องเรียน {activeClassroom.name}?
               </h3>
               <p className="text-xs text-slate-500">
-                ระบบจะย้ายห้องเรียนนี้ไปยังถังขยะ สามารถกู้คืนได้ภายใน 30 วัน
-                และข้อมูลนักเรียนจะยังคงปลอดภัยในระบบ
+                ระบบจะลบห้องเรียนนี้และย้ายไปยังถังขยะ และป้องกันไม่ให้ห้องเรียนนี้คืนค่ากลับมา
               </p>
             </div>
 

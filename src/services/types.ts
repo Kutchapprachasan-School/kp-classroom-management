@@ -7,6 +7,8 @@ export const ClassroomCreateSchema = z.object({
   subjectCode: z.string().optional().default('ศ23101'),
   subjectName: z.string().optional().default('ศิลปะ'),
   adviser: z.string().optional(),
+  coAdviser: z.string().optional(),
+  thirdAdviser: z.string().optional(),
   termId: z.string().optional().default('term-1-2569'),
 });
 export type ClassroomCreateInput = z.input<typeof ClassroomCreateSchema>;

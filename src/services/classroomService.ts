@@ -3,21 +3,59 @@ import type { ClassroomRosterItem } from '../types/viewModels';
 import { ClassroomCreateSchema, type ClassroomCreateInput } from './types';
 
 const STORAGE_KEY = 'cls_classrooms_data';
+const DELETED_ROOMS_KEY = 'cls_deleted_classrooms_set';
+
+export const getDeletedRoomsSet = (): Set<string> => {
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const stored = localStorage.getItem(DELETED_ROOMS_KEY);
+      if (stored) {
+        const arr = JSON.parse(stored);
+        if (Array.isArray(arr)) return new Set(arr);
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return new Set();
+};
+
+export const saveDeletedRoomsSet = (set: Set<string>) => {
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(DELETED_ROOMS_KEY, JSON.stringify(Array.from(set)));
+    } catch {
+      // ignore
+    }
+  }
+};
 
 // Helper to get local persisted classrooms
 const getLocalClassrooms = (): ClassroomRosterItem[] => {
+  const deletedSet = getDeletedRoomsSet();
+  let result = INITIAL_SEED_CLASSROOMS;
   if (typeof localStorage !== 'undefined') {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          result = parsed;
+        }
       } catch {
         // fallback
       }
     }
   }
-  return INITIAL_SEED_CLASSROOMS;
+  return result
+    .filter((c) => !deletedSet.has(c.id) && !deletedSet.has(c.name))
+    .map((c) => {
+      const advisers = c.advisers || [c.adviser, c.coAdviser, c.thirdAdviser].filter(Boolean) as string[];
+      return {
+        ...c,
+        advisers,
+      };
+    });
 };
 
 const saveLocalClassrooms = (items: ClassroomRosterItem[]) => {
@@ -202,6 +240,7 @@ export const classroomService = {
   },
   // READ: List all classrooms directly from Supabase (Zero Mock Data)
   async getAll(): Promise<ClassroomRosterItem[]> {
+    const deletedSet = getDeletedRoomsSet();
     if (isSupabaseConfigured) {
       logDbOperation('SELECT * FROM classrooms WHERE status = ACTIVE');
       try {
@@ -213,14 +252,25 @@ export const classroomService = {
           .order('room_number', { ascending: true });
 
         if (!error && data && data.length > 0) {
-          const mapped: ClassroomRosterItem[] = data.map((item) => ({
-            id: item.id,
-            name: item.name,
-            level: item.level || `ม.${item.grade_level || 1}`,
-            roomNumber: item.name,
-            adviser: item.adviser || 'ยังไม่ได้กำหนด',
-            studentCount: Number(item.student_count || 0),
-          }));
+          const mapped: ClassroomRosterItem[] = data
+            .filter((item) => !deletedSet.has(item.id) && !deletedSet.has(item.name))
+            .map((item) => {
+              const adviser = item.adviser || 'ยังไม่ได้กำหนด';
+              const coAdviser = item.co_adviser || item.coAdviser || undefined;
+              const thirdAdviser = item.third_adviser || item.thirdAdviser || undefined;
+              const advisers = [adviser, coAdviser, thirdAdviser].filter(Boolean) as string[];
+              return {
+                id: item.id,
+                name: item.name,
+                level: item.level || `ม.${item.grade_level || 1}`,
+                roomNumber: item.name,
+                adviser,
+                coAdviser,
+                thirdAdviser,
+                advisers,
+                studentCount: Number(item.student_count || 0),
+              };
+            });
           saveLocalClassrooms(mapped);
           return mapped;
         }
@@ -238,14 +288,25 @@ export const classroomService = {
           .order('roomNumber', { ascending: true });
 
         if (!tErr && tData && tData.length > 0) {
-          const mapped: ClassroomRosterItem[] = tData.map((item) => ({
-            id: item.id,
-            name: item.name,
-            level: `ม.${item.gradeLevel || 1}`,
-            roomNumber: item.name,
-            adviser: item.adviser || 'ยังไม่ได้กำหนด',
-            studentCount: 0,
-          }));
+          const mapped: ClassroomRosterItem[] = tData
+            .filter((item) => !deletedSet.has(item.id) && !deletedSet.has(item.name))
+            .map((item) => {
+              const adviser = item.adviser || 'ยังไม่ได้กำหนด';
+              const coAdviser = item.coAdviser || undefined;
+              const thirdAdviser = item.thirdAdviser || undefined;
+              const advisers = [adviser, coAdviser, thirdAdviser].filter(Boolean) as string[];
+              return {
+                id: item.id,
+                name: item.name,
+                level: `ม.${item.gradeLevel || 1}`,
+                roomNumber: item.name,
+                adviser,
+                coAdviser,
+                thirdAdviser,
+                advisers,
+                studentCount: 0,
+              };
+            });
           saveLocalClassrooms(mapped);
           return mapped;
         }
@@ -257,16 +318,50 @@ export const classroomService = {
     return getLocalClassrooms();
   },
 
+  // READ: List all classrooms (alias for getClassrooms)
+  async getClassrooms(): Promise<ClassroomRosterItem[]> {
+    return this.getAll();
+  },
+
+  // READ: List all classrooms synchronously from local storage / cache
+  getClassroomsSync(): ClassroomRosterItem[] {
+    return getLocalClassrooms();
+  },
+
   // READ: Get single classroom
   async getById(id: string): Promise<ClassroomRosterItem | undefined> {
     const list = await this.getAll();
     return list.find((c) => c.id === id || c.name === id);
   },
 
+  // Find advisory classroom for teacher (checks adviser, coAdviser, thirdAdviser)
+  async getTeacherAdvisoryClassroom(teacherNameOrId?: string | null): Promise<ClassroomRosterItem | null> {
+    if (!teacherNameOrId || !teacherNameOrId.trim()) return null;
+    const cleanQuery = teacherNameOrId.trim();
+    const all = await this.getAll();
+    for (const room of all) {
+      const list = [room.adviser, room.coAdviser, room.thirdAdviser, ...(room.advisers || [])].filter(Boolean) as string[];
+      for (const adv of list) {
+        if (!adv || adv === 'ยังไม่ได้กำหนด') continue;
+        if (adv === cleanQuery || adv.includes(cleanQuery) || cleanQuery.includes(adv)) {
+          return room;
+        }
+      }
+    }
+    return null;
+  },
+
   // CREATE: Add new classroom in Supabase
   async create(input: ClassroomCreateInput): Promise<ClassroomRosterItem> {
     const validated = ClassroomCreateSchema.parse(input);
     const newId = `room-${Date.now()}`;
+
+    // If room was previously in deleted set, remove it
+    const deletedSet = getDeletedRoomsSet();
+    if (deletedSet.has(validated.name)) {
+      deletedSet.delete(validated.name);
+      saveDeletedRoomsSet(deletedSet);
+    }
 
     // Extract grade level and room number from name (e.g. "ม.1/3" -> grade 1, room 3)
     let gradeLevel = 1;
@@ -280,12 +375,20 @@ export const classroomService = {
       if (levelMatch) gradeLevel = parseInt(levelMatch[0], 10);
     }
 
+    const adviser = validated.adviser || 'ยังไม่ได้กำหนด';
+    const coAdviser = validated.coAdviser;
+    const thirdAdviser = validated.thirdAdviser;
+    const advisers = [adviser, coAdviser, thirdAdviser].filter(Boolean) as string[];
+
     const newClassroom: ClassroomRosterItem = {
       id: newId,
       name: validated.name,
       level: validated.level,
       roomNumber: validated.name,
-      adviser: validated.adviser || 'ยังไม่ได้กำหนด',
+      adviser,
+      coAdviser,
+      thirdAdviser,
+      advisers,
       studentCount: 0,
     };
 
@@ -322,18 +425,26 @@ export const classroomService = {
     return newClassroom;
   },
 
-  // UPDATE: Edit classroom details (Name, Adviser, etc.)
+  // UPDATE: Edit classroom details (Name, Advisers, etc.)
   async update(id: string, updates: Partial<ClassroomRosterItem>): Promise<ClassroomRosterItem> {
     const current = getLocalClassrooms();
     const index = current.findIndex((c) => c.id === id || c.name === id);
     const existing = index !== -1 ? current[index] : null;
+
+    const adviser = updates.adviser !== undefined ? updates.adviser : (existing?.adviser || 'ยังไม่ได้กำหนด');
+    const coAdviser = updates.coAdviser !== undefined ? updates.coAdviser : existing?.coAdviser;
+    const thirdAdviser = updates.thirdAdviser !== undefined ? updates.thirdAdviser : existing?.thirdAdviser;
+    const advisers = [adviser, coAdviser, thirdAdviser].filter(Boolean) as string[];
 
     const updatedItem: ClassroomRosterItem = {
       id,
       name: updates.name || existing?.name || id,
       level: updates.level || existing?.level || 'ม.1',
       roomNumber: updates.name || existing?.roomNumber || id,
-      adviser: updates.adviser !== undefined ? updates.adviser : (existing?.adviser || 'ยังไม่ได้กำหนด'),
+      adviser,
+      coAdviser,
+      thirdAdviser,
+      advisers,
       studentCount: updates.studentCount !== undefined ? updates.studentCount : (existing?.studentCount || 0),
     };
 
@@ -351,7 +462,7 @@ export const classroomService = {
         if (updates.name) payload.name = updates.name;
         if (updates.adviser !== undefined) payload.adviser = updates.adviser;
 
-        await supabase.from('ClassRoom').update(payload).eq('id', id);
+        await supabase.from('ClassRoom').update(payload).or(`id.eq.${id},name.eq.${existing?.name || id}`);
       } catch (err) {
         console.error('Failed to update ClassRoom in Supabase:', err);
       }
@@ -368,18 +479,71 @@ export const classroomService = {
     return updatedItem;
   },
 
-  // UPDATE ADVISERS: Set primary advisor and co-advisor
-  async updateAdvisers(id: string, adviser: string, coAdviser?: string): Promise<ClassroomRosterItem> {
-    return this.update(id, { adviser, coAdviser });
+  // UPDATE ADVISERS: Set up to 3 advisors
+  async updateAdvisers(
+    id: string,
+    adviser: string,
+    coAdviser?: string,
+    thirdAdviser?: string
+  ): Promise<ClassroomRosterItem> {
+    return this.update(id, { adviser, coAdviser, thirdAdviser });
   },
 
-  // DELETE: Soft delete classroom (mark status = INACTIVE / DELETED in Supabase)
+  // UPSERT: If room already exists, update advisors. If not, create new classroom.
+  async upsertClassrooms(
+    items: Array<{
+      name: string;
+      level?: string;
+      adviser?: string;
+      coAdviser?: string;
+      thirdAdviser?: string;
+      studentCount?: number;
+    }>
+  ): Promise<{ updatedCount: number; createdCount: number }> {
+    const current = await this.getAll();
+    let updatedCount = 0;
+    let createdCount = 0;
+
+    for (const item of items) {
+      const cleanName = item.name.trim();
+      if (!cleanName) continue;
+      const existing = current.find((c) => c.name === cleanName || c.roomNumber === cleanName);
+      if (existing) {
+        await this.update(existing.id, {
+          adviser: item.adviser?.trim() || existing.adviser,
+          coAdviser: item.coAdviser?.trim() !== undefined ? item.coAdviser.trim() : existing.coAdviser,
+          thirdAdviser: item.thirdAdviser?.trim() !== undefined ? item.thirdAdviser.trim() : existing.thirdAdviser,
+        });
+        updatedCount++;
+      } else {
+        await this.create({
+          name: cleanName,
+          level: item.level || 'ม.1',
+          adviser: item.adviser?.trim() || 'ยังไม่ได้กำหนด',
+          coAdviser: item.coAdviser?.trim(),
+          thirdAdviser: item.thirdAdviser?.trim(),
+        });
+        createdCount++;
+      }
+    }
+
+    return { updatedCount, createdCount };
+  },
+
+  // DELETE: Soft delete classroom (mark status = INACTIVE / DELETED in Supabase & blacklist locally)
   async delete(id: string): Promise<boolean> {
     const current = getLocalClassrooms();
     const target = current.find((c) => c.id === id || c.name === id);
+    const targetName = target?.name || id;
+
+    // Record into deleted blacklist so it NEVER resurfaces
+    const deletedSet = getDeletedRoomsSet();
+    deletedSet.add(id);
+    if (target?.name) deletedSet.add(target.name);
+    saveDeletedRoomsSet(deletedSet);
 
     // Filter out from local active
-    const filtered = current.filter((c) => c.id !== id && c.name !== id);
+    const filtered = current.filter((c) => c.id !== id && c.name !== id && c.name !== targetName);
     saveLocalClassrooms(filtered);
 
     // Record into trash
@@ -389,11 +553,11 @@ export const classroomService = {
       trashItems.unshift({
         id: `del-${Date.now()}`,
         entityType: 'ชั้นเรียน',
-        name: target?.name || id,
+        name: targetName,
         deletedAt: new Date().toLocaleDateString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }),
         deletedBy: 'ผู้ดูแลระบบวิชาการ',
         daysRemaining: 30,
-        originalData: target,
+        originalData: target || { id, name: targetName },
       });
       localStorage.setItem(trashKey, JSON.stringify(trashItems));
     }
@@ -404,7 +568,7 @@ export const classroomService = {
         await supabase
           .from('ClassRoom')
           .update({ status: 'INACTIVE', updatedAt: new Date().toISOString() })
-          .eq('id', id);
+          .or(`id.eq.${id},name.eq.${targetName}`);
       } catch (err) {
         console.error('Failed to soft-delete ClassRoom in Supabase:', err);
       }
@@ -412,7 +576,7 @@ export const classroomService = {
 
     try {
       window.dispatchEvent(new CustomEvent('kps-data-sync-event', {
-        detail: { type: 'CLASSROOM_DELETED', classroomId: id }
+        detail: { type: 'CLASSROOM_DELETED', classroomId: id, classroomName: targetName }
       }));
     } catch {
       // safe SSR

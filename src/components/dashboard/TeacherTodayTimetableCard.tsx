@@ -26,6 +26,8 @@ import {
 } from '../../services/calendarEventStorageService';
 import { getSubjectIcon } from '../../config/subjectIcons';
 import type { TimetableMatrixSlot } from '../../utils/timetableDateUtils';
+import { classroomService } from '../../services/classroomService';
+import type { ClassroomRosterItem } from '../../types/viewModels';
 
 export interface TodayPeriodItem {
   periodNumber: number;
@@ -70,12 +72,12 @@ export const TODAY_PERIODS_MOCK: TodayPeriodItem[] = [
   {
     periodNumber: 2,
     timeRange: '09:20 - 10:10',
-    iconType: 'hiragana',
-    iconBgColor: 'bg-[#EF4444]',
-    subjectTitle: 'ภาษาญี่ปุ่น ม.3/1',
-    courseCode: 'ญ31201',
-    credits: '0.5 หน่วยกิต',
-    totalPeriods: '20 คาบ',
+    iconType: 'torii',
+    iconBgColor: 'bg-[#3B82F6]',
+    subjectTitle: 'ศิลปะ 3 (ทัศนศิลป์) ม.3/1',
+    courseCode: 'ศ23101',
+    credits: '1.5 หน่วยกิต',
+    totalPeriods: '60 คาบ',
     classroom: 'ห้อง ม.3/1',
     hasGradingButton: true,
   },
@@ -187,21 +189,41 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
     }
   }, [matrixSlots, todayDayKey]);
 
+  // ดึงห้องที่ปรึกษาจริงของครูผู้สอนเพื่อไม่ให้ fallback ม.3/1 หากไม่มีห้องประจำชั้น
+  const [teacherAdvisoryRoom, setTeacherAdvisoryRoom] = useState<ClassroomRosterItem | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    classroomService
+      .getTeacherAdvisoryClassroom(currentUser?.name || currentUser?.username)
+      .then((room) => {
+        if (isMounted) {
+          setTeacherAdvisoryRoom(room);
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser]);
+
   // คำนวณรายการคาบสอนวันนี้จาก matrixSlots จริง ไม่ใช้ mock data
   const periodsList = useMemo<TodayPeriodItem[]>(() => {
-    // คาบที่ 0: กิจกรรมเข้าแถวเคารพธงชาติ & โฮมรูม
-    const period0: TodayPeriodItem = {
-      periodNumber: 0,
-      timeRange: `${bellConfig.morningAssemblyStart} - ${bellConfig.morningAssemblyEnd}`,
-      iconType: 'morning',
-      iconBgColor: 'bg-sky-500',
-      subjectTitle: `เช็คแถวเช้า & โฮมรูม (${currentUser?.classroomId || 'ม.3/1'})`,
-      courseCode: 'โฮมรูม',
-      classroom: `ห้อง ${currentUser?.classroomId || 'ม.3/1'} (ห้องประจำชั้น)`,
-      isMorningAssembly: true,
-      hasGradingButton: false,
-      isCompleted: completedPeriods.includes(0),
-    };
+    // คาบที่ 0: กิจกรรมเข้าแถวเคารพธงชาติ & โฮมรูม (แสดงเฉพาะกรณีครูมีห้องที่ปรึกษาจริง)
+    const effectiveAdvisoryRoom = teacherAdvisoryRoom?.name || currentUser?.classroomId;
+    const period0: TodayPeriodItem | null = effectiveAdvisoryRoom
+      ? {
+          periodNumber: 0,
+          timeRange: `${bellConfig.morningAssemblyStart} - ${bellConfig.morningAssemblyEnd}`,
+          iconType: 'morning',
+          iconBgColor: 'bg-sky-500',
+          subjectTitle: `เช็คแถวเช้า & โฮมรูม (${effectiveAdvisoryRoom})`,
+          courseCode: 'โฮมรูม',
+          classroom: `ห้อง ${effectiveAdvisoryRoom} (ห้องประจำชั้น)`,
+          isMorningAssembly: true,
+          hasGradingButton: false,
+          isCompleted: completedPeriods.includes(0),
+        }
+      : null;
 
     // คาบการสอนจริงจาก matrixSlots ในวันปัจจุบัน
     const dayTeachingSlots = matrixSlots
@@ -218,7 +240,7 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
 
     // หากยังไม่มีคาบสอนจริงถูกบันทึกในตาราง ให้ fallback ไปที่คาบมาตรฐาน
     if (dayTeachingSlots.length === 0) {
-      return [period0];
+      return period0 ? [period0] : [];
     }
 
     const teachingItems: TodayPeriodItem[] = dayTeachingSlots.map((s) => {
@@ -265,8 +287,8 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
       };
     });
 
-    return [period0, ...teachingItems];
-  }, [matrixSlots, todayDayKey, bellConfig, currentUser, completedPeriods]);
+    return period0 ? [period0, ...teachingItems] : teachingItems;
+  }, [matrixSlots, todayDayKey, bellConfig, teacherAdvisoryRoom, currentUser, completedPeriods]);
 
   // ตั้งค่าเริ่มต้น: ซ่อนคาบที่เสร็จแล้วเป็นค่าเริ่มต้น และบันทึกสถานะลง localStorage
   const [hideCompleted, setHideCompleted] = useState<boolean>(() => {

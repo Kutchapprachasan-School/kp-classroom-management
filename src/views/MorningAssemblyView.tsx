@@ -49,26 +49,31 @@ import { DynamicQrAttendanceModal } from '../components/attendance/DynamicQrAtte
 import { StudentQrScannerModal } from '../components/attendance/StudentQrScannerModal';
 import { StudentIdCardModal } from '../components/attendance/StudentIdCardModal';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
+import { getBangkokNow, getBangkokTodayString } from '../utils/timetableDateUtils';
+import { classroomService } from '../services/classroomService';
+import type { ClassroomRosterItem } from '../types/viewModels';
+import { authService } from '../services/authService';
 
 export interface MorningAssemblyViewProps {
   onDeepNavigate?: (payload: CrossViewNavigationPayload) => void;
 }
-
-const DEFAULT_TODAY = '2026-10-02';
-const ADVISORY_ROOM = 'room-3-1';
-const ADVISORY_LABEL = 'ม.3/1 (ห้องประจำชั้น)';
 
 const THAI_MONTH_NAMES = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
   'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
 ];
 
+const DEFAULT_TODAY = getBangkokTodayString();
+
 export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeepNavigate }) => {
   // ----------------------------------------------------
   // Core States
   // ----------------------------------------------------
-  const [selectedClassroom] = useState<string>(ADVISORY_ROOM);
-  const [selectedDate, setSelectedDate] = useState<string>(DEFAULT_TODAY);
+  const [allClassrooms, setAllClassrooms] = useState<ClassroomRosterItem[]>([]);
+  const [selectedClassroom, setSelectedClassroom] = useState<string>('room-3-1');
+  const [selectedClassroomName, setSelectedClassroomName] = useState<string>('ม.3/1');
+  const [isTeacherAdvisor, setIsTeacherAdvisor] = useState<boolean>(true);
+  const [selectedDate, setSelectedDate] = useState<string>(() => getBangkokTodayString());
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [records, setRecords] = useState<MorningAssemblyRecord[]>([]);
@@ -82,8 +87,8 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
   // Mini-Calendar Popover State
   const [isCalendarOpen, setIsCalendarOpen] = useState<boolean>(false);
   const calendarRef = useRef<HTMLDivElement>(null);
-  const [calendarYear, setCalendarYear] = useState<number>(2026);
-  const [calendarMonth, setCalendarMonth] = useState<number>(10); // 10 = ตุลาคม
+  const [calendarYear, setCalendarYear] = useState<number>(() => getBangkokNow().getFullYear());
+  const [calendarMonth, setCalendarMonth] = useState<number>(() => getBangkokNow().getMonth() + 1);
 
   // Classroom Cumulative Stats Modal State
   const [isStatsModalOpen, setIsStatsModalOpen] = useState<boolean>(false);
@@ -96,6 +101,42 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
   const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
   const [isStudentScannerOpen, setIsStudentScannerOpen] = useState<boolean>(false);
   const [activeStudentForBadge, setActiveStudentForBadge] = useState<MorningAssemblyRecord | null>(null);
+
+  // โหลดรายการห้องเรียนและตรวจสอบห้องที่ปรึกษาจริงของครูผู้สอน
+  useEffect(() => {
+    let isMounted = true;
+    classroomService.getAll().then((rooms) => {
+      if (!isMounted) return;
+      setAllClassrooms(rooms);
+      const currentUser = authService.getCurrentUser();
+      const teacherName = currentUser?.name || currentUser?.username;
+
+      let myRoom = rooms.find((r) => {
+        const advList = [r.adviser, r.coAdviser, r.thirdAdviser, ...(r.advisers || [])].filter(Boolean) as string[];
+        return advList.some((name) => name && teacherName && (name === teacherName || name.includes(teacherName) || teacherName.includes(name)));
+      });
+
+      if (!myRoom && currentUser?.classroomId) {
+        myRoom = rooms.find((r) => r.id === currentUser.classroomId || r.name === currentUser.classroomId);
+      }
+
+      if (myRoom) {
+        setSelectedClassroom(myRoom.id);
+        setSelectedClassroomName(myRoom.name);
+        setIsTeacherAdvisor(true);
+      } else {
+        // ครูผู้สอนยังไม่ได้เป็นครูที่ปรึกษาประจำห้องใดๆ
+        setIsTeacherAdvisor(false);
+        if (rooms.length > 0) {
+          setSelectedClassroom(rooms[0].id);
+          setSelectedClassroomName(rooms[0].name);
+        }
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // ----------------------------------------------------
   // Data Loading & Roster Normalization
@@ -381,13 +422,35 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
       <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-100 shadow-xs flex flex-wrap items-center justify-between gap-3">
         {/* Left: Advisory Classroom & Mini-Calendar Trigger */}
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Classroom Selector */}
           <div
             className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs font-bold shadow-2xs"
-            title="การเช็คแถวตอนเช้ากำหนดให้เช็คได้เฉพาะห้องที่ปรึกษาเท่านั้น"
+            title="ห้องประจำชั้น"
           >
-            <Users className="w-4 h-4 text-slate-400 shrink-0" />
-            <span>{ADVISORY_LABEL}</span>
+            <Users className="w-4 h-4 text-blue-600 shrink-0" />
+            <select
+              value={selectedClassroom}
+              onChange={(e) => {
+                const r = allClassrooms.find((c) => c.id === e.target.value);
+                setSelectedClassroom(e.target.value);
+                if (r) setSelectedClassroomName(r.name);
+              }}
+              className="bg-transparent font-bold text-slate-800 text-xs outline-none cursor-pointer"
+            >
+              {allClassrooms.map((room) => (
+                <option key={room.id} value={room.id}>
+                  ห้อง {room.name} {room.id === selectedClassroom && isTeacherAdvisor ? '(ห้องประจำชั้น)' : ''}
+                </option>
+              ))}
+            </select>
           </div>
+
+          {!isTeacherAdvisor && (
+            <span className="px-2.5 py-1 rounded-xl text-[11px] bg-amber-50 text-amber-700 border border-amber-200 font-semibold inline-flex items-center gap-1">
+              <span>⚠️</span>
+              <span>ยังไม่ได้กำหนดห้องประจำชั้น (โหมดตรวจแทน)</span>
+            </span>
+          )}
 
           {/* Date Selector Button (opens Expandable Mini-Calendar) */}
           <div className="relative" ref={calendarRef}>
@@ -409,7 +472,7 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
             {!isSelectedDateToday && (
               <button
                 type="button"
-                onClick={() => setSelectedDate(DEFAULT_TODAY)}
+                onClick={() => setSelectedDate(getBangkokTodayString())}
                 className="ml-1 px-2.5 py-1 rounded-lg bg-blue-600 text-white text-[11px] font-bold hover:bg-blue-700 shadow-2xs transition-all cursor-pointer inline-flex items-center gap-1"
                 title="กลับมาเช็คชื่อของวันนี้ทันที"
               >
@@ -755,7 +818,7 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
               </div>
               <div className="space-y-1">
                 <h4 className="text-base font-bold text-slate-800">
-                  ยังไม่มีรายชื่อนักเรียนในห้องที่ปรึกษา {ADVISORY_LABEL}
+                  ยังไม่มีรายชื่อนักเรียนในห้องที่ปรึกษา ห้อง {selectedClassroomName}
                 </h4>
                 <p className="text-xs text-slate-500 leading-relaxed">
                   กรุณาเพิ่มนักเรียนหรือนำเข้ารายชื่อจากระบบ SGS / Excel ในหน้าบัญชีรายชื่อนักเรียน เพื่อเริ่มต้นเช็คแถวหน้าเสาธง
@@ -1075,7 +1138,7 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
             <div className="flex items-start justify-between border-b border-slate-100 pb-3">
               <div>
                 <h3 className="text-base font-black text-slate-900">
-                  สถิติเวลาเข้าแถวรวมทั้งภาคเรียน ({ADVISORY_LABEL})
+                  สถิติเวลาเข้าแถวรวมทั้งภาคเรียน (ห้อง {selectedClassroomName})
                 </h3>
                 <p className="text-xs text-slate-500 font-medium">
                   ภาคเรียนที่ 1/2569 • คำนวณร้อยละการเข้าร่วมกิจกรรมโฮมรูม
@@ -1140,7 +1203,7 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
         onClose={() => setIsQrModalOpen(false)}
         attendanceType="MORNING_ASSEMBLY"
         classroomId={selectedClassroom}
-        classroomLabel={ADVISORY_LABEL}
+        classroomLabel={`ห้อง ${selectedClassroomName}`}
         date={selectedDate}
         students={records.map((r) => ({
           studentCode: r.studentCode,
@@ -1170,7 +1233,7 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
           onClose={() => setActiveStudentForBadge(null)}
           studentCode={activeStudentForBadge.studentCode}
           studentName={activeStudentForBadge.studentName}
-          classroomLabel={ADVISORY_LABEL}
+          classroomLabel={`ห้อง ${selectedClassroomName}`}
           classroomId={selectedClassroom}
         />
       )}
