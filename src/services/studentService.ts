@@ -24,7 +24,29 @@ const STORAGE_PREFIX = 'cls_students_';
 export const defaultStudents: StudentRecord[] = [];
 
 
-export const mockStudentsByRoom: Record<string, StudentRecord[]> = {};
+export const mockStudentsByRoom: Record<string, StudentRecord[]> = {
+  'room-1-1': [
+    { id: 'stu-47001', no: 1, code: '47001', name: 'ด.ช. ชนะภัย ยอดสิงห์', attendance: '8/8', score: 85, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-1' },
+    { id: 'stu-47002', no: 2, code: '47002', name: 'ด.ญ. ชลิตา มงคล', attendance: '8/8', score: 90, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-1' },
+  ],
+  'room-2-1': [
+    { id: 'stu-46101', no: 1, code: '46101', name: 'ด.ช. ภาณุพงศ์ บุญยืน', attendance: '8/8', score: 88, status: 'NORMAL', gender: 'MALE', classroomId: 'room-2-1' },
+    { id: 'stu-46102', no: 2, code: '46102', name: 'ด.ญ. สุภัสสรา อินทร', attendance: '8/8', score: 92, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-2-1' },
+    { id: 'stu-46103', no: 3, code: '46103', name: 'ด.ช. ธีรภัทร ชาญชัย', attendance: '8/8', score: 80, status: 'NORMAL', gender: 'MALE', classroomId: 'room-2-1' },
+  ],
+  'room-3-1': [
+    { id: 'stu-45101', no: 1, code: '45101', name: 'ด.ช. กฤษณะ ศรีสมบูรณ์', attendance: '8/8', score: 85, status: 'NORMAL', gender: 'MALE', classroomId: 'room-3-1' },
+    { id: 'stu-45102', no: 2, code: '45102', name: 'ด.ช. ทัตธน คำฝั้น', attendance: '8/8', score: 82, status: 'NORMAL', gender: 'MALE', classroomId: 'room-3-1' },
+    { id: 'stu-45103', no: 3, code: '45103', name: 'ด.ญ. ชนากานต์ สิทธิชัย', attendance: '8/8', score: 90, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-3-1' },
+    { id: 'stu-45104', no: 4, code: '45104', name: 'ด.ญ. ธันยพร เจริญสุข', attendance: '8/8', score: 88, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-3-1' },
+    { id: 'stu-45105', no: 5, code: '45105', name: 'ด.ญ. กมลชนก เลิศวิไล', attendance: '8/8', score: 91, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-3-1' },
+    { id: 'stu-45106', no: 6, code: '45106', name: 'ด.ช. ภานุวัฒน์ วงศ์ษา', attendance: '8/8', score: 78, status: 'NORMAL', gender: 'MALE', classroomId: 'room-3-1' },
+    { id: 'stu-45107', no: 7, code: '45107', name: 'ด.ช. อภิสิทธิ์ แก้วคำ', attendance: '8/8', score: 80, status: 'NORMAL', gender: 'MALE', classroomId: 'room-3-1' },
+    { id: 'stu-45108', no: 8, code: '45108', name: 'ด.ญ. สุพรรษา พัฒนกุล', attendance: '8/8', score: 89, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-3-1' },
+    { id: 'stu-45109', no: 9, code: '45109', name: 'ด.ช. ณัฐวุฒิ สายทอง', attendance: '8/8', score: 84, status: 'NORMAL', gender: 'MALE', classroomId: 'room-3-1' },
+    { id: 'stu-45110', no: 10, code: '45110', name: 'ด.ช. ธนพล มณีโชติ', attendance: '8/8', score: 85, status: 'NORMAL', gender: 'MALE', classroomId: 'room-3-1' },
+  ],
+};
 
 const inMemoryStudentCache: Record<string, StudentRecord[]> = {};
 
@@ -43,10 +65,12 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
   if (inMemoryStudentCache[classroomId]) {
     return inMemoryStudentCache[classroomId];
   }
-  // คืนค่ารายการว่าง [] เสมอ หากยังไม่มีการเพิ่มหรือนำเข้ารายชื่อจริง
-  // เพื่อความสะอาดของระบบจริง (Zero Mock Data)
+  // คืนค่ารายการว่าง [] เสมอ หากเปิดใช้งาน Clean Slate (Zero Mock Data)
   if (cleanSlateService.isCleanSlateActive()) {
     return [];
+  }
+  if (mockStudentsByRoom[classroomId]) {
+    return mockStudentsByRoom[classroomId];
   }
   return [];
 };
@@ -186,6 +210,10 @@ export const studentService = {
 
   // READ: List students in classroom
   async getByClassroom(classroomId: string): Promise<StudentRecord[]> {
+    const local = getLocalStudents(classroomId);
+    if (local && local.length > 0) {
+      return local;
+    }
     if (isSupabaseConfigured) {
       logDbOperation(`SELECT * FROM Enrollment/students WHERE classroomId = ${classroomId}`);
       try {

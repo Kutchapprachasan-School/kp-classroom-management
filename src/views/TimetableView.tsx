@@ -33,6 +33,7 @@ import {
 import type { CrossViewNavigationPayload } from '../services/teacherCopilotService';
 import { studentAffairsCouncilService } from '../services/studentAffairsCouncilService';
 import { AddEditTimetableSlotModal } from '../components/timetable/AddEditTimetableSlotModal';
+import { AssignWaitingSlotModal } from '../components/timetable/AssignWaitingSlotModal';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 import type { SchoolUserRole } from '../config/schoolRoles';
 import {
@@ -40,6 +41,7 @@ import {
   BELL_SCHEDULE_UPDATED_EVENT,
   type SchoolBellScheduleConfig,
 } from '../services/bellScheduleService';
+import { coursesCurriculumService } from '../services/coursesCurriculumService';
 
 import {
   type TimetableColorTheme,
@@ -71,7 +73,6 @@ interface TimetableViewProps {
 }
 
 const MATRIX_STORAGE_KEY = 'kp_teacher_matrix_slots';
-const UNASSIGNED_STORAGE_KEY = 'kp_unassigned_matrix_slots';
 
 const loadSavedMatrixSlots = (): TimetableMatrixSlot[] => {
   if (typeof window !== 'undefined' && window.localStorage) {
@@ -79,28 +80,15 @@ const loadSavedMatrixSlots = (): TimetableMatrixSlot[] => {
       const stored = window.localStorage.getItem(MATRIX_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return coursesCurriculumService.sanitizeMatrixSlotsWithCurriculum(parsed);
+        }
       }
     } catch {
       // ignore
     }
   }
-  return INITIAL_MATRIX_SLOTS;
-};
-
-const loadUnassignedSlots = (): TimetableMatrixSlot[] => {
-  if (typeof window !== 'undefined' && window.localStorage) {
-    try {
-      const stored = window.localStorage.getItem(UNASSIGNED_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch {
-      // ignore
-    }
-  }
-  return [];
+  return coursesCurriculumService.sanitizeMatrixSlotsWithCurriculum(INITIAL_MATRIX_SLOTS);
 };
 
 const DAY_ORDER: Record<string, number> = {
@@ -119,8 +107,15 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
   // ------------------------------------------
   const [weekOffset, setWeekOffset] = useState<number>(0);
   const [matrixSlots, setMatrixSlots] = useState<TimetableMatrixSlot[]>(loadSavedMatrixSlots);
-  const [unassignedSlots, setUnassignedSlots] = useState<TimetableMatrixSlot[]>(loadUnassignedSlots);
+
+  // คำนวณ Waiting Pool โดยตรงจากหลักสูตรที่เลือกใช้ หักลบด้วยจำนวนคาบที่ลงตารางแล้ว (โควตาตามหน่วยกิต)
+  const unassignedSlots = useMemo(() => {
+    return coursesCurriculumService.getCurriculumWaitingPoolSlots(matrixSlots);
+  }, [matrixSlots]);
+
   const [selectedSlot, setSelectedSlot] = useState<TimetableMatrixSlot | null>(null);
+  const [assignWaitingSlotTarget, setAssignWaitingSlotTarget] = useState<TimetableMatrixSlot | null>(null);
+
 
   // View Mode: 'DAY' (รายวัน), 'WEEK' (รายสัปดาห์), 'MONTH' (รายเดือน)
   const [viewModeTab, setViewModeTab] = useState<'DAY' | 'WEEK' | 'MONTH'>('WEEK');
@@ -404,6 +399,20 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
   };
 
   const handleSaveSlot = (slotToSave: TimetableMatrixSlot) => {
+    // ตรวจสอบโควตาตามหน่วยกิตก่อนบันทึก (1.5 หน่วยกิต = 3 คาบ/ห้อง, 1.0 หน่วยกิต = 2 คาบ/ห้อง)
+    if (!slotToSave.isFreePeriod && slotToSave.subjectCode) {
+      const quotaCheck = coursesCurriculumService.canAssignPeriod(
+        matrixSlots,
+        slotToSave.subjectCode,
+        slotToSave.room,
+        slotToSave.id
+      );
+      if (!quotaCheck.allowed) {
+        showToast(quotaCheck.reason || 'วิชานี้ลงครบโควตาตามหน่วยกิตแล้ว ไม่สามารถลงเกินได้');
+        return;
+      }
+    }
+
     const existingIdx = matrixSlots.findIndex(
       (s) => s.id === slotToSave.id || (s.day === slotToSave.day && s.period === slotToSave.period)
     );
@@ -414,7 +423,8 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
     } else {
       updated = [...matrixSlots, slotToSave];
     }
-    saveMatrixSlotsWithDispatch(updated);
+    const sanitized = coursesCurriculumService.sanitizeMatrixSlotsWithCurriculum(updated);
+    saveMatrixSlotsWithDispatch(sanitized);
     showToast(`บันทึกรายวิชา ${slotToSave.subjectCode} (${slotToSave.day} คาบที่ ${slotToSave.period}) สำเร็จ`);
   };
 
@@ -428,23 +438,14 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
 
   // เอาคาบออกเพื่อรอลงคาบสอน (Unassign to Waiting Pool)
   const handleUnassignSlot = (slot: TimetableMatrixSlot) => {
-    setUnassignedSlots((prev) => {
-      const updated = [...prev.filter((s) => s.id !== slot.id), slot];
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(UNASSIGNED_STORAGE_KEY, JSON.stringify(updated));
-      }
-      return updated;
-    });
-
     const updated = matrixSlots.map((s) =>
       s.id === slot.id
         ? { ...s, isFreePeriod: true, category: 'free' as const, subjectCode: '', subjectName: '' }
         : s
     );
     saveMatrixSlotsWithDispatch(updated);
-
     setSelectedSlot(null);
-    showToast(`นำคาบ ${slot.subjectCode} ออกไปพักไว้ที่ "คาบรอลงตาราง" เรียบร้อย`);
+    showToast(`นำคาบ ${slot.subjectCode} (${slot.room}) ออกไปพักไว้ที่ "คาบรอลงตาราง" เรียบร้อย`);
   };
 
   // ย้ายคาบสอน (Move / Swap Slot)
@@ -497,23 +498,27 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
 
   // กำหนดคาบจาก Waiting Pool ลงตาราง
   const handleAssignWaitingSlot = (waitingSlot: TimetableMatrixSlot, targetDay: string, targetPeriod: number) => {
+    const quotaCheck = coursesCurriculumService.canAssignPeriod(
+      matrixSlots,
+      waitingSlot.subjectCode,
+      waitingSlot.room
+    );
+    if (!quotaCheck.allowed) {
+      showToast(quotaCheck.reason || 'วิชานี้ลงครบโควตาตามหน่วยกิตแล้ว ไม่สามารถลงเกินได้');
+      return;
+    }
+
     const updatedSlot: TimetableMatrixSlot = {
       ...waitingSlot,
+      id: `slot-${targetDay}-${targetPeriod}`,
       day: targetDay as any,
       period: targetPeriod,
       isFreePeriod: false,
     };
     handleSaveSlot(updatedSlot);
-
-    setUnassignedSlots((prev) => {
-      const filtered = prev.filter((s) => s.id !== waitingSlot.id);
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(UNASSIGNED_STORAGE_KEY, JSON.stringify(filtered));
-      }
-      return filtered;
-    });
-    showToast(`ลงคาบ ${waitingSlot.subjectCode} ในวัน${targetDay} คาบที่ ${targetPeriod} เรียบร้อย`);
+    setAssignWaitingSlotTarget(null);
   };
+
 
   const handleMarkAllPresent = () => {
     const updated: Record<number, 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE'> = {};
@@ -1219,26 +1224,31 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                 className="p-3 bg-white rounded-2xl border border-amber-200 shadow-2xs flex items-center justify-between text-xs"
               >
                 <div>
-                  <div className="font-black text-slate-900">{slot.subjectCode}</div>
-                  <div className="text-[11px] text-slate-500 truncate">{slot.subjectName || slot.room}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-black text-slate-900">{slot.subjectCode}</span>
+                    <span className="text-[10px] px-2 py-0.2 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-200">
+                      {slot.room}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-600 font-medium truncate max-w-[170px] mt-0.5">
+                    {slot.subjectName || slot.room}
+                  </div>
+                  <div className="text-[10px] text-amber-800 font-bold mt-0.5">
+                    {slot.totalPeriods || `${slot.credits} หน่วยกิต`}
+                  </div>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => {
-                    const targetDay = prompt('เลือกวันที่ต้องการลง (จันทร์, อังคาร, พุธ, พฤหัสบดี, ศุกร์):', 'พฤหัสบดี');
-                    const targetPeriodStr = prompt('เลือกคาบที่ (1 - 8):', '3');
-                    if (targetDay && targetPeriodStr) {
-                      handleAssignWaitingSlot(slot, targetDay, parseInt(targetPeriodStr, 10));
-                    }
-                  }}
-                  className="px-2.5 py-1 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold cursor-pointer transition-colors shadow-2xs"
+                  onClick={() => setAssignWaitingSlotTarget(slot)}
+                  className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold cursor-pointer transition-colors shadow-2xs flex items-center gap-1 shrink-0"
                 >
-                  + ลงตาราง
+                  <span>+ ลงตาราง</span>
                 </button>
               </div>
             ))}
           </div>
+
         </div>
       )}
 
@@ -1466,8 +1476,22 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
         onSaveSlot={handleSaveSlot}
         onDeleteSlot={handleDeleteSlot}
         initialSlot={editingSlot}
+        matrixSlots={matrixSlots}
+        maxPeriods={activePeriods.length}
+      />
+
+      {/* ========================================================
+          MODAL 4: ASSIGN WAITING SLOT MODAL
+          ======================================================== */}
+      <AssignWaitingSlotModal
+        isOpen={Boolean(assignWaitingSlotTarget)}
+        onClose={() => setAssignWaitingSlotTarget(null)}
+        waitingSlot={assignWaitingSlotTarget}
+        matrixSlots={matrixSlots}
+        onAssignSlot={handleAssignWaitingSlot}
         maxPeriods={activePeriods.length}
       />
     </div>
   );
 };
+

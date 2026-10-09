@@ -195,7 +195,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     },
     {
       key: 'exams',
-      label: 'จัดการสอบ/เก็บคะแนน',
+      label: 'จัดการสอบ / เก็บคะแนน',
       icon: ClipboardList,
     },
     {

@@ -1159,6 +1159,97 @@ assert.ok(sidebarSrc.includes("'classrooms'"), 'TeacherSidebar must have classro
 assert.ok(sidebarSrc.includes("'roster'"), 'TeacherSidebar must have roster menu (หน้ารายชื่อนักเรียน)');
 console.log('  ✓ TeacherSidebar.tsx includes both classrooms and roster menus');
 
-console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE, SUBJECT ICONS, BANNER COMPRESSOR, SIDEBAR UX, BELL SCHEDULE, MORNING ASSEMBLY, CLASSROOM ATTENDANCE, STICKERS CATALOG, ELAPSED ATTENDANCE %, PHASE 1 UNIFIED ARCHITECTURE, HOME ZERO-MOCK SYNC & CLASSROOMS/ROSTER CHECKS PASSED!');
+// ----------------------------------------------------
+// Step 14: Curriculum Credit Quota Enforcement & Zero-Dummy Waiting Pool Parity
+// ----------------------------------------------------
+console.log('\n--- 14. Checking Curriculum Credit Quota Enforcement & Zero-Dummy Waiting Pool ---');
+
+const { coursesCurriculumService } = await import('./src/services/coursesCurriculumService.ts');
+const { INITIAL_MATRIX_SLOTS } = await import('./src/utils/timetableDateUtils.ts');
+
+// 14.1 Test canAssignPeriod quota checks (1.5 credits = 3 periods/room, 1.0 credit = 2 periods/room)
+const slots3Art = [
+  { id: 's1', subjectCode: 'ศ23101', room: 'ม.3/1', isFreePeriod: false },
+  { id: 's2', subjectCode: 'ศ23101', room: 'ม.3/1', isFreePeriod: false },
+  { id: 's3', subjectCode: 'ศ23101', room: 'ม.3/1', isFreePeriod: false },
+];
+const checkArtExceeded = coursesCurriculumService.canAssignPeriod(slots3Art, 'ศ23101', 'ม.3/1');
+assert.strictEqual(checkArtExceeded.allowed, false, 'Must block 4th period of ศ23101 for ม.3/1 (1.5 credits allows max 3)');
+assert.strictEqual(checkArtExceeded.currentCount, 3);
+assert.strictEqual(checkArtExceeded.maxPeriods, 3);
+assert.ok(checkArtExceeded.reason.includes('ไม่สามารถลงเกินได้'), 'Reason must explain quota exceeded');
+console.log('  ✓ canAssignPeriod blocks exceeding 1.5 credits (3 periods/room) for ศ23101');
+
+// When editing existing slot with excludeSlotId, should allow
+const checkArtEditing = coursesCurriculumService.canAssignPeriod(slots3Art, 'ศ23101', 'ม.3/1', 's2');
+assert.strictEqual(checkArtEditing.allowed, true, 'Editing existing slot must exclude it from count');
+assert.strictEqual(checkArtEditing.currentCount, 2);
+console.log('  ✓ canAssignPeriod correctly excludes current slot when editing');
+
+// Test Japanese 1.0 credit = 2 periods/room
+const slots2Jp = [
+  { id: 'j1', subjectCode: 'ญ31201', room: 'ม.3/1', isFreePeriod: false },
+  { id: 'j2', subjectCode: 'ญ31201', room: 'ม.3/1', isFreePeriod: false },
+];
+const checkJpExceeded = coursesCurriculumService.canAssignPeriod(slots2Jp, 'ญ31201', 'ม.3/1');
+assert.strictEqual(checkJpExceeded.allowed, false, 'Must block 3rd period of ญ31201 for ม.3/1 (1.0 credit allows max 2)');
+assert.strictEqual(checkJpExceeded.currentCount, 2);
+assert.strictEqual(checkJpExceeded.maxPeriods, 2);
+console.log('  ✓ canAssignPeriod blocks exceeding 1.0 credit (2 periods/room) for ญ31201');
+
+// Test unknown course not in curriculum
+const checkUnknown = coursesCurriculumService.canAssignPeriod([], 'คณิต', 'ม.3/1');
+assert.strictEqual(checkUnknown.allowed, false, 'Must block courses not in active curriculum');
+assert.ok(checkUnknown.reason.includes('ไม่พบรายวิชา'), 'Reason must state not in curriculum');
+console.log('  ✓ canAssignPeriod rejects courses not in active curriculum');
+
+// 14.2 Test sanitizeMatrixSlotsWithCurriculum
+const testSlotsWithExcess = [
+  { id: 's1', subjectCode: 'ศ23101', room: 'ม.3/1', isFreePeriod: false },
+  { id: 's2', subjectCode: 'ศ23101', room: 'ม.3/1', isFreePeriod: false },
+  { id: 's3', subjectCode: 'ศ23101', room: 'ม.3/1', isFreePeriod: false },
+  { id: 's4', subjectCode: 'ศ23101', room: 'ม.3/1', isFreePeriod: false }, // Excess 4th period!
+  { id: 's5', subjectCode: 'คณิต', room: 'ม.3/1', isFreePeriod: false },    // Dummy subject!
+  { id: 's6', subjectCode: 'พักกลางวัน', isLunchSlot: true, status: 'LUNCH' },
+];
+const sanitized = coursesCurriculumService.sanitizeMatrixSlotsWithCurriculum(testSlotsWithExcess);
+const artCount = sanitized.filter((s) => !s.isFreePeriod && s.subjectCode === 'ศ23101').length;
+assert.strictEqual(artCount, 3, 'Must cap ศ23101 to exactly 3 periods');
+assert.strictEqual(sanitized[3].isFreePeriod, true, 'Excess 4th period must be converted to free period');
+assert.strictEqual(sanitized[4].isFreePeriod, true, 'Dummy subject must be converted to free period');
+assert.strictEqual(sanitized[5].isLunchSlot, true, 'Lunch slot preserved');
+console.log('  ✓ sanitizeMatrixSlotsWithCurriculum caps surplus periods and purges dummy subjects');
+
+// 14.3 Test getCurriculumWaitingPoolSlots contains ONLY active curriculum courses
+const waitingPool = coursesCurriculumService.getCurriculumWaitingPoolSlots(INITIAL_MATRIX_SLOTS);
+assert.ok(waitingPool.length > 0, 'Waiting pool must have remaining periods');
+waitingPool.forEach((slot) => {
+  assert.ok(['ศ23101', 'ญ31201'].includes(slot.subjectCode), `Waiting pool must ONLY contain active curriculum subjects, got ${slot.subjectCode}`);
+});
+// Room 3/1 has full quota (3 for ศ23101, 2 for ญ31201), so 0 waiting pool slots for ม.3/1
+const room31Waiting = waitingPool.filter((s) => s.room.includes('ม.3/1'));
+assert.strictEqual(room31Waiting.length, 0, 'Room ม.3/1 has met its full quota, must have 0 waiting slots');
+console.log(`  ✓ getCurriculumWaitingPoolSlots verified: ${waitingPool.length} slots strictly from active curriculum, zero dummy courses`);
+
+// 14.4 Check AddEditTimetableSlotModal.tsx source integration
+const addEditModalSrc = readFileSync('src/components/timetable/AddEditTimetableSlotModal.tsx', 'utf8');
+assert.ok(addEditModalSrc.includes('canAssignPeriod'), 'Must call canAssignPeriod');
+assert.ok(addEditModalSrc.includes('quotaCheck'), 'Must compute quotaCheck');
+assert.ok(addEditModalSrc.includes('disabled={Boolean(quotaCheck && !quotaCheck.allowed)}'), 'Must disable submit button when quota exceeded');
+console.log('  ✓ AddEditTimetableSlotModal.tsx credit quota validation and disabled state verified');
+
+// 14.5 Check AssignWaitingSlotModal.tsx and TimetableView.tsx source integration
+assert.ok(existsSync('src/components/timetable/AssignWaitingSlotModal.tsx'), 'AssignWaitingSlotModal.tsx must exist');
+const assignModalSrc = readFileSync('src/components/timetable/AssignWaitingSlotModal.tsx', 'utf8');
+assert.ok(assignModalSrc.includes('AssignWaitingSlotModal'), 'Must export AssignWaitingSlotModal');
+
+const timetableViewSrc2 = readFileSync('src/views/TimetableView.tsx', 'utf8');
+assert.ok(timetableViewSrc2.includes('AssignWaitingSlotModal'), 'TimetableView must render AssignWaitingSlotModal');
+assert.ok(timetableViewSrc2.includes('getCurriculumWaitingPoolSlots'), 'TimetableView must derive Waiting Pool from curriculum');
+assert.ok(!timetableViewSrc2.includes("prompt('เลือกวันที่ต้องการลง"), 'TimetableView must NOT use raw window.prompt');
+console.log('  ✓ AssignWaitingSlotModal.tsx and TimetableView.tsx seamless Waiting Pool integration verified');
+
+console.log('\n🎉 ALL ATTENDANCE CORRELATION ENGINE, SUBJECT ICONS, BANNER COMPRESSOR, SIDEBAR UX, BELL SCHEDULE, MORNING ASSEMBLY, CLASSROOM ATTENDANCE, STICKERS CATALOG, ELAPSED ATTENDANCE %, PHASE 1 UNIFIED ARCHITECTURE, HOME ZERO-MOCK SYNC, CLASSROOMS/ROSTER & CURRICULUM CREDIT QUOTA CHECKS PASSED!');
+
 
 

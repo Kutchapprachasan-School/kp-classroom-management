@@ -589,6 +589,226 @@ class CoursesCurriculumService {
     this.save();
     return cloned;
   }
+
+  /**
+   * ตรวจสอบว่าสามารถลงคาบเรียนนี้ได้หรือไม่ โดยไม่เกินโควตาตามหน่วยกิต
+   * 0.5 หน่วยกิต = 1 คาบ/ห้อง
+   * 1.0 หน่วยกิต = 2 คาบ/ห้อง
+   * 1.5 หน่วยกิต = 3 คาบ/ห้อง
+   * 2.0 หน่วยกิต = 4 คาบ/ห้อง
+   */
+  public canAssignPeriod(
+    matrixSlots: Array<{
+      id?: string;
+      subjectCode?: string;
+      room?: string;
+      isFreePeriod?: boolean;
+      isLunchSlot?: boolean;
+      status?: string;
+    }>,
+    courseCode: string,
+    room: string,
+    excludeSlotId?: string,
+    academicYear: string = '2569',
+    term: string = '1'
+  ): {
+    allowed: boolean;
+    currentCount: number;
+    maxPeriods: number;
+    reason?: string;
+    course?: CourseCurriculumRecord;
+  } {
+    const allCourses = this.getCourses(academicYear, term);
+    const course = allCourses.find((c) => c.code.trim() === courseCode.trim());
+    if (!course) {
+      return {
+        allowed: false,
+        currentCount: 0,
+        maxPeriods: 0,
+        reason: `ไม่พบรายวิชารหัส "${courseCode}" ในหลักสูตรที่เลือกใช้ (ปีการศึกษา ${academicYear} ภาคเรียนที่ ${term})`,
+      };
+    }
+
+    const normalizedTargetRoom = (room || '').split('•')[0].trim();
+    const maxPeriods = Math.max(1, Math.round((Number(course.credits) || 1) * 2));
+
+    const currentCount = matrixSlots.filter((s) => {
+      if (s.id && excludeSlotId && s.id === excludeSlotId) return false;
+      if (s.isFreePeriod || s.isLunchSlot || s.status === 'LUNCH' || !s.subjectCode) return false;
+      if (s.subjectCode.trim() !== course.code.trim()) return false;
+      const slotRoom = (s.room || '').split('•')[0].trim();
+      return (
+        slotRoom === normalizedTargetRoom ||
+        slotRoom.includes(normalizedTargetRoom) ||
+        normalizedTargetRoom.includes(slotRoom)
+      );
+    }).length;
+
+    if (currentCount >= maxPeriods) {
+      return {
+        allowed: false,
+        currentCount,
+        maxPeriods,
+        course,
+        reason: `วิชา ${course.code} ${course.name} มีภาระการสอน ${course.credits} หน่วยกิต (${maxPeriods} คาบ/ห้อง) สำหรับห้อง ${normalizedTargetRoom} ซึ่งลงครบโควตาแล้ว (${currentCount}/${maxPeriods} คาบ) ไม่สามารถลงเกินได้`,
+      };
+    }
+
+    return {
+      allowed: true,
+      currentCount,
+      maxPeriods,
+      course,
+    };
+  }
+
+  /**
+   * ดึงรายการคาบที่รอจัดตาราง (Waiting Pool) เฉพาะที่มีในหลักสูตรที่เลือกใช้
+   * คำนวณจาก (โควตาสูงสุดตามหน่วยกิต - จำนวนคาบที่ลงตารางแล้ว)
+   */
+  public getCurriculumWaitingPoolSlots(
+    matrixSlots: Array<{
+      id?: string;
+      subjectCode?: string;
+      room?: string;
+      isFreePeriod?: boolean;
+      isLunchSlot?: boolean;
+      status?: string;
+    }>,
+    academicYear: string = '2569',
+    term: string = '1'
+  ): Array<{
+    id: string;
+    day: 'จันทร์' | 'อังคาร' | 'พุธ' | 'พฤหัสบดี' | 'ศุกร์';
+    period: number;
+    subjectCode: string;
+    subjectName: string;
+    room: string;
+    credits: string;
+    totalPeriods: string;
+    colorTheme: 'blue' | 'teal' | 'purple' | 'green' | 'pink' | 'amber';
+    category: 'subject';
+    isFreePeriod: boolean;
+    status: 'UNCHECKED';
+  }> {
+    const courses = this.getCourses(academicYear, term);
+    const waitingSlots: Array<any> = [];
+
+    courses.forEach((course) => {
+      const maxPeriodsPerRoom = Math.max(1, Math.round((Number(course.credits) || 1) * 2));
+      const classrooms =
+        course.assignedClassrooms && course.assignedClassrooms.length > 0
+          ? course.assignedClassrooms
+          : ['ม.3/1'];
+
+      classrooms.forEach((cls) => {
+        const normalizedRoom = cls.split('•')[0].trim();
+        const scheduledCount = matrixSlots.filter((s) => {
+          if (s.isFreePeriod || s.isLunchSlot || s.status === 'LUNCH' || !s.subjectCode) return false;
+          if (s.subjectCode.trim() !== course.code.trim()) return false;
+          const slotRoom = (s.room || '').split('•')[0].trim();
+          return (
+            slotRoom === normalizedRoom ||
+            slotRoom.includes(normalizedRoom) ||
+            normalizedRoom.includes(slotRoom)
+          );
+        }).length;
+
+        const remainingCount = Math.max(0, maxPeriodsPerRoom - scheduledCount);
+        for (let i = 1; i <= remainingCount; i++) {
+          const periodIndex = scheduledCount + i;
+          waitingSlots.push({
+            id: `waiting-${course.code}-${normalizedRoom.replace(/[^a-zA-Z0-9ก-๙]/g, '-')}-${i}`,
+            day: 'จันทร์',
+            period: 1,
+            subjectCode: course.code,
+            subjectName: course.name,
+            room: `ห้อง ${normalizedRoom}`,
+            credits: `${course.credits} หน่วยกิต`,
+            totalPeriods: `คาบที่ ${periodIndex}/${maxPeriodsPerRoom} (${course.credits} นก.)`,
+            colorTheme: course.code.startsWith('ศ') ? 'pink' : 'blue',
+            category: 'subject',
+            isFreePeriod: false,
+            status: 'UNCHECKED',
+          });
+        }
+      });
+    });
+
+    return waitingSlots;
+  }
+
+  /**
+   * คัดกรองและปรับแก้ Matrix Slots ให้สอดคล้องกับหลักสูตรที่เลือกใช้:
+   * 1. กำจัด mock data หรือวิชานอกหลักสูตร (คณิต, วิทย์, แนะแนว, ฯลฯ) ให้กลายเป็นคาบว่าง
+   * 2. จำกัดจำนวนคาบไม่ให้เกินโควตาตามหน่วยกิต (เช่น 1.5 หน่วยกิต = สูงสุด 3 คาบ/ห้อง)
+   */
+  public sanitizeMatrixSlotsWithCurriculum(
+    slots: Array<any>,
+    academicYear: string = '2569',
+    term: string = '1'
+  ): Array<any> {
+    const courses = this.getCourses(academicYear, term);
+    const courseMap = new Map<string, CourseCurriculumRecord>();
+    courses.forEach((c) => {
+      courseMap.set(c.code.trim(), c);
+    });
+
+    const roomCounts: Record<string, number> = {};
+
+    return slots.map((slot) => {
+      if (slot.isLunchSlot || slot.status === 'LUNCH') {
+        return slot;
+      }
+      if (slot.isFreePeriod || !slot.subjectCode) {
+        return {
+          ...slot,
+          isFreePeriod: true,
+          category: 'free',
+          subjectCode: '',
+          subjectName: '',
+        };
+      }
+
+      const code = slot.subjectCode.trim();
+      const course = courseMap.get(code);
+
+      // หากไม่อยู่ในหลักสูตรที่เลือกใช้ ให้แปลงเป็นคาบว่างทันที
+      if (!course) {
+        return {
+          ...slot,
+          isFreePeriod: true,
+          category: 'free',
+          subjectCode: '',
+          subjectName: '',
+        };
+      }
+
+      const maxPeriods = Math.max(1, Math.round((Number(course.credits) || 1) * 2));
+      const normalizedRoom = (slot.room || 'ม.3/1').split('•')[0].trim();
+      const key = `${course.code}::${normalizedRoom}`;
+      const countSoFar = roomCounts[key] || 0;
+
+      // หากเกินโควตาตามหน่วยกิต ให้ตัดทิ้งเป็นคาบว่าง
+      if (countSoFar >= maxPeriods) {
+        return {
+          ...slot,
+          isFreePeriod: true,
+          category: 'free',
+          subjectCode: '',
+          subjectName: '',
+        };
+      }
+
+      roomCounts[key] = countSoFar + 1;
+      return {
+        ...slot,
+        subjectName: course.name,
+        isFreePeriod: false,
+      };
+    });
+  }
 }
 
 export const coursesCurriculumService = new CoursesCurriculumService();
+

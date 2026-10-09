@@ -384,7 +384,7 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
                 ตารางสอนวันนี้
               </h2>
               <h2 className="font-extrabold text-slate-800 text-sm leading-tight sm:hidden">
-                วัน{todayDayKey} - 2 ต.ค. 2569
+                วันนี้ - 2 ตุลาคม 2569
               </h2>
             </div>
             <p className="text-xs text-slate-500 font-medium hidden sm:block">

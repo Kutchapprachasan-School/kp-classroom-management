@@ -234,7 +234,7 @@ export const App: React.FC = () => {
       case 'classroom-attendance':
         return 'เช็คชื่อเข้าเรียน (Classroom Attendance)';
       case 'exams':
-        return 'จัดการสอบ/เก็บคะแนน';
+        return 'จัดการการสอบ (Exam Management)';
       case 'assignments':
         return 'ตรวจงาน';
       case 'readiness':

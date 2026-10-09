@@ -15,6 +15,7 @@ import {
   MapPin,
   Sparkles,
   ChevronDown,
+  AlertCircle,
 } from 'lucide-react';
 import type { TimetableMatrixSlot, TimetableColorTheme } from '../../utils/timetableDateUtils';
 import {
@@ -37,6 +38,7 @@ export interface AddEditTimetableSlotModalProps {
   initialSlot?: Partial<TimetableMatrixSlot> | null;
   dayOptions?: string[];
   maxPeriods?: number;
+  matrixSlots?: TimetableMatrixSlot[];
 }
 
 const DEFAULT_DAYS = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์'];
@@ -58,8 +60,10 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
   initialSlot,
   dayOptions = DEFAULT_DAYS,
   maxPeriods = 7,
+  matrixSlots = [],
 }) => {
   const isEditing = Boolean(initialSlot?.id && !initialSlot?.isFreePeriod);
+
 
   // Curriculum Master Catalog State
   const [catalogCourses, setCatalogCourses] = useState<CourseCurriculumRecord[]>(() =>
@@ -132,6 +136,17 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
     }
   }, [subjectCode, subjectName, isManualIconSet]);
 
+  // คำนวณการตรวจสอบโควตาตามหน่วยกิต (Credit Quota Check)
+  const quotaCheck = React.useMemo(() => {
+    if (!subjectCode.trim()) return null;
+    return coursesCurriculumService.canAssignPeriod(
+      matrixSlots,
+      subjectCode.trim(),
+      classroom,
+      initialSlot?.id
+    );
+  }, [subjectCode, classroom, matrixSlots, initialSlot?.id]);
+
   if (!isOpen) return null;
 
   const currentIcon = selectedIcon || getSubjectIcon(subjectCode, subjectName);
@@ -160,10 +175,16 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
     setIsManualIconSet(false);
   };
 
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!subjectCode.trim()) {
       alert('กรุณากรอกรหัสวิชา');
+      return;
+    }
+
+    if (quotaCheck && !quotaCheck.allowed) {
+      alert(quotaCheck.reason || 'วิชานี้ลงครบโควตาตามหน่วยกิตแล้ว ไม่สามารถลงเกินได้');
       return;
     }
 
@@ -414,6 +435,33 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
               </div>
             )}
 
+            {/* Quota Exceeded Warning */}
+            {quotaCheck && !quotaCheck.allowed && (
+              <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800 space-y-1">
+                <div className="flex items-center gap-1.5 font-bold text-rose-900">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>ไม่สามารถลงคาบเรียนนี้ได้ (เกินโควตาตามหน่วยกิต)</span>
+                </div>
+                <p className="text-[11px] leading-relaxed">
+                  {quotaCheck.reason}
+                </p>
+              </div>
+            )}
+
+            {/* Quota Allowed Indicator */}
+            {quotaCheck && quotaCheck.allowed && quotaCheck.course && (
+              <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-xs text-emerald-800 flex items-center justify-between">
+                <span className="font-bold flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>โควตาคาบสอนห้อง {classroom}:</span>
+                </span>
+                <span className="font-extrabold text-emerald-700 bg-white px-2.5 py-0.5 rounded-full border border-emerald-200 shadow-2xs">
+                  ลงแล้ว {quotaCheck.currentCount} / สูงสุด {quotaCheck.maxPeriods} คาบ ({quotaCheck.course.credits} หน่วยกิต)
+                </span>
+              </div>
+            )}
+
+
             {/* Subject Icon Selector Card */}
             <div className="p-3.5 rounded-2xl border border-blue-100 bg-blue-50/50 space-y-2">
               <div className="flex items-center justify-between">
@@ -509,11 +557,18 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                  disabled={Boolean(quotaCheck && !quotaCheck.allowed)}
+                  className={`px-5 py-2 rounded-xl text-white text-xs sm:text-sm font-bold shadow-xs transition-all flex items-center gap-1.5 ${
+                    quotaCheck && !quotaCheck.allowed
+                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-70'
+                      : 'bg-blue-600 hover:bg-blue-700 cursor-pointer'
+                  }`}
+                  title={quotaCheck && !quotaCheck.allowed ? quotaCheck.reason : undefined}
                 >
                   <Check className="w-4 h-4 stroke-[2.5]" />
                   <span>{isEditing ? 'บันทึกการแก้ไข' : 'เพิ่มลงตารางสอน'}</span>
                 </button>
+
               </div>
             </div>
           </form>

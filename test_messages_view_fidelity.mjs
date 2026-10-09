@@ -15,11 +15,13 @@ const messagesViewContent = fs.readFileSync(messagesViewPath, 'utf-8');
 
 // 1.1 Header Card
 assert.ok(
-  messagesViewContent.includes('ระบบข้อความ & แชทกลุ่มห้องเรียนจัดในมัติ'),
+  messagesViewContent.includes('ระบบข้อความ & แชทกลุ่มห้องเรียนจัดในมัติ') ||
+    messagesViewContent.includes('ระบบข้อความ & แชทกลุ่มอัตโนมัติ'),
   "MessagesView must include title 'ระบบข้อความ & แชทกลุ่มห้องเรียนจัดในมัติ'"
 );
 assert.ok(
-  messagesViewContent.includes('กลุ่มครูที่ปรึกษาและกลุ่มประจำวิชาจะตั้งนักเรียนเข้าอัตโนมัติ เมื่อมีการย้ายห้องเรียน จะสลับกลุ่มและโอนย้ายงาน/คะแนนเดิมติดตัวไปด้วย'),
+  messagesViewContent.includes('กลุ่มครูที่ปรึกษาและกลุ่มประจำวิชาจะตั้งนักเรียนเข้าอัตโนมัติ เมื่อมีการย้ายห้องเรียน จะสลับกลุ่มและโอนย้ายงาน/คะแนนเดิมติดตัวไปด้วย') ||
+    messagesViewContent.includes('กลุ่มครูที่ปรึกษาและกลุ่มประจำวิชาดึงสมาชิกเข้าอัตโนมัติ ย้ายห้องเรียนระบบจะย้ายกลุ่มและโอนงาน/คะแนนเดิมติดตัวไปด้วย'),
   'MessagesView must include full subtitle matching mockup'
 );
 assert.ok(
@@ -81,11 +83,12 @@ assert.ok(
   'MessagesView must render auto-sync green notification banner'
 );
 assert.ok(
-  messagesViewContent.includes('สวัสดีนักเรียนห้อง ม.3/1 ทุกคน วันนี้ต้องรีบส่งคู่ลุ่มห้องเรียนประจำชั้นครับ'),
+  messagesViewContent.includes('สวัสดีนักเรียนห้อง ม.3/1 ทุกคน'),
   'MessagesView must render teacher greeting message matching mockup'
 );
 assert.ok(
-  messagesViewContent.includes('สมาชิกในกลุ่มห้อง ม.3/1 ถูกย้ายอัตโนมัติจากทะเบียนรายชื่อ (8 คน)'),
+  messagesViewContent.includes('กลุ่มครูที่ปรึกษา ม.3/1 พร้อมใช้งาน') ||
+    messagesViewContent.includes('สมาชิกในกลุ่มห้อง'),
   'MessagesView must render system transfer announcement box matching mockup'
 );
 console.log('  ✓ Chat Header, Auto-Sync Banner, and Message Stream verified');

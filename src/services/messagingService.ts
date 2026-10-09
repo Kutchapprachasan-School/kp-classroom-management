@@ -346,7 +346,22 @@ export const messagingService = {
 
   // Helper อ่านรายชื่อนักเรียนของห้องจาก LocalStorage หรือ Mock
   getStudentsForClassroom(classroomId: string): StudentRecord[] {
-    return studentService.getLocalStudents(classroomId);
+    const list = studentService.getLocalStudents(classroomId);
+    if (list && list.length > 0) return list;
+    if (classroomId === 'room-1-1' || classroomId === 'ม.1/1') {
+      return [
+        { id: 'stu-47001', no: 1, code: '47001', name: 'ด.ช. ชนะภัย ยอดสิงห์', attendance: '8/8', score: 85, status: 'NORMAL', gender: 'MALE' },
+        { id: 'stu-47002', no: 2, code: '47002', name: 'ด.ญ. ชลิตา มงคล', attendance: '8/8', score: 90, status: 'NORMAL', gender: 'FEMALE' },
+      ];
+    }
+    if (classroomId === 'room-2-1' || classroomId === 'ม.2/1') {
+      return [
+        { id: 'stu-46101', no: 1, code: '46101', name: 'ด.ช. ภาณุพงศ์ บุญยืน', attendance: '8/8', score: 88, status: 'NORMAL', gender: 'MALE' },
+        { id: 'stu-46102', no: 2, code: '46102', name: 'ด.ญ. สุภัสสรา อินทร', attendance: '8/8', score: 92, status: 'NORMAL', gender: 'FEMALE' },
+        { id: 'stu-46103', no: 3, code: '46103', name: 'ด.ช. ธีรภัทร ชาญชัย', attendance: '8/8', score: 80, status: 'NORMAL', gender: 'MALE' },
+      ];
+    }
+    return [];
   },
 
   // ดึงรายการกลุ่มแชททั้งหมด
@@ -492,11 +507,9 @@ export const messagingService = {
     const updatedFromStudents = fromRoomStudents.filter(
       (s) => s.code !== payload.studentCode && s.id !== payload.studentCode
     );
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(`cls_students_${fromRoom.id}`, JSON.stringify(updatedFromStudents));
-      if (fromRoom.roomNumber && fromRoom.roomNumber !== fromRoom.id) {
-        localStorage.setItem(`cls_students_${fromRoom.roomNumber}`, JSON.stringify(updatedFromStudents));
-      }
+    studentService.saveLocalStudents(fromRoom.id, updatedFromStudents);
+    if (fromRoom.roomNumber && fromRoom.roomNumber !== fromRoom.id) {
+      studentService.saveLocalStudents(fromRoom.roomNumber, updatedFromStudents);
     }
 
     const toRoomStudents = this.getStudentsForClassroom(toRoom.id);
@@ -524,11 +537,9 @@ export const messagingService = {
       updatedToStudents = [...toRoomStudents, newStudentItem];
     }
 
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(`cls_students_${toRoom.id}`, JSON.stringify(updatedToStudents));
-      if (toRoom.roomNumber && toRoom.roomNumber !== toRoom.id) {
-        localStorage.setItem(`cls_students_${toRoom.roomNumber}`, JSON.stringify(updatedToStudents));
-      }
+    studentService.saveLocalStudents(toRoom.id, updatedToStudents);
+    if (toRoom.roomNumber && toRoom.roomNumber !== toRoom.id) {
+      studentService.saveLocalStudents(toRoom.roomNumber, updatedToStudents);
     }
 
     // 3. ตรวจสอบและรักษา "งานที่ส่งแล้ว และคะแนนทั้งหมด" ให้ติดตัวนักเรียนไป 100%
