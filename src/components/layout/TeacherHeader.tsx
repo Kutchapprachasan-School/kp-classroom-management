@@ -26,6 +26,7 @@ import {
   type SchoolUserRole,
 } from '../../config/schoolRoles';
 import type { AuthUser } from '../../services/authService';
+import { formatThaiDateFull } from '../../utils/timetableDateUtils';
 
 interface TeacherHeaderProps {
   title?: string;
@@ -94,6 +95,18 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
   const [isFontDropdownOpen, setIsFontDropdownOpen] = useState(false);
   const [isBellOpen, setIsBellOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  const [todayThaiDate, setTodayThaiDate] = useState<string>(() =>
+    formatThaiDateFull(new Date())
+  );
+
+  useEffect(() => {
+    // Update live Bangkok date every 60 seconds
+    const interval = setInterval(() => {
+      setTodayThaiDate(formatThaiDateFull(new Date()));
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const [urgentItems, setUrgentItems] = useState<UrgentTriageItem[]>(() =>
     teacherCopilotService.getUrgentTriageQueue()
@@ -514,7 +527,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
             <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
             <div className="flex flex-col text-left leading-tight">
               <span className="text-xs font-bold text-slate-800">
-                วันพฤหัสบดีที่ 2 ตุลาคม 2569
+                {todayThaiDate}
               </span>
               <span className="text-[10px] text-slate-500 font-medium">
                 {termLabel}

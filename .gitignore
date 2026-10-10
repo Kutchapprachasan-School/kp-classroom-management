@@ -25,3 +25,6 @@ dist-test*
 *.sw?
 .agents/
 
+
+.vercel
+.env*

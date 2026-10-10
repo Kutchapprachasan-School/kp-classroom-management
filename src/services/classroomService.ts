@@ -1,6 +1,7 @@
-import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase.ts';
 import type { ClassroomRosterItem } from '../types/viewModels';
-import { ClassroomCreateSchema, type ClassroomCreateInput } from './types';
+import { ClassroomCreateSchema, type ClassroomCreateInput } from './types.ts';
+import { cleanSlateService } from './cleanSlateService.ts';
 
 const STORAGE_KEY = 'cls_classrooms_data';
 const DELETED_ROOMS_KEY = 'cls_deleted_classrooms_set';
@@ -33,13 +34,13 @@ export const saveDeletedRoomsSet = (set: Set<string>) => {
 // Helper to get local persisted classrooms
 const getLocalClassrooms = (): ClassroomRosterItem[] => {
   const deletedSet = getDeletedRoomsSet();
-  let result = INITIAL_SEED_CLASSROOMS;
+  let result: ClassroomRosterItem[] = cleanSlateService.isCleanSlateActive() ? [] : INITIAL_SEED_CLASSROOMS;
   if (typeof localStorage !== 'undefined') {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           result = parsed;
         }
       } catch {
@@ -234,6 +235,10 @@ export const classroomService = {
           // ignore
         }
       }
+    }
+
+    if (cleanSlateService.isCleanSlateActive()) {
+      return [];
     }
 
     return DEFAULT_TEACHER_ACCOUNTS;

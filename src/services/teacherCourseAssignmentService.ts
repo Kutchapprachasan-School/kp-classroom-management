@@ -8,7 +8,8 @@
 // 5. ระบบหมวดหมู่งานรวม สั่ง 20 งาน ส่ง 10 ได้ 5 คะแนน พร้อมสูตรเฉลี่ยและสวิตช์ปัดทศนิยม >= 0.5 อัตโนมัติ
 // ============================================================================
 
-import { cleanSlateService } from './cleanSlateService';
+import { cleanSlateService } from './cleanSlateService.ts';
+import { coursesCurriculumService } from './coursesCurriculumService.ts';
 
 export interface TeachingSubjectInfo {
   code: string;
@@ -25,48 +26,74 @@ export interface TeachingCourseClassroom {
   label: string;
 }
 
-export const TEACHER_SUBJECTS_LIST: TeachingSubjectInfo[] = [
-  {
-    code: 'ญ31201',
-    name: 'ภาษาญี่ปุ่น 1',
-    shortName: 'ภาษาญี่ปุ่น ม.3',
-    classrooms: ['ม.3/1', 'ม.3/2'],
-    credits: 1.5,
-    colorBadge: 'bg-rose-100 text-rose-800 border-rose-300',
+/**
+ * ดึงรายวิชาที่สอนจริงจากหลักสูตร (Curriculum Service) แบบ Real-time
+ * หากมีรายวิชาในหลักสูตร จะใช้ข้อมูลจริงทันที
+ */
+export const getDynamicTeachingSubjects = (): TeachingSubjectInfo[] => {
+  const curriculumCourses = coursesCurriculumService.getCourses();
+  if (curriculumCourses && curriculumCourses.length > 0) {
+    const colorMap: Record<number, string> = {
+      0: 'bg-rose-100 text-rose-800 border-rose-300',
+      1: 'bg-teal-100 text-teal-800 border-teal-300',
+      2: 'bg-blue-100 text-blue-800 border-blue-300',
+      3: 'bg-purple-100 text-purple-800 border-purple-300',
+      4: 'bg-amber-100 text-amber-800 border-amber-300',
+    };
+    return curriculumCourses.map((c, idx) => ({
+      code: c.code,
+      name: c.name,
+      shortName: c.name.length > 15 ? `${c.name.slice(0, 15)}...` : c.name,
+      classrooms: c.assignedClassrooms && c.assignedClassrooms.length > 0 ? c.assignedClassrooms : ['ม.3/1'],
+      credits: Number(c.credits) || 1.0,
+      colorBadge: colorMap[idx % 5] || 'bg-blue-100 text-blue-800 border-blue-300',
+    }));
+  }
+
+  // หากไม่มีวิชาในหลักสูตรและเป็น Clean Slate ให้ส่งค่าว่าง [] เพื่อไม่ให้มี fake mock subjects
+  if (cleanSlateService.isCleanSlateActive()) {
+    return [];
+  }
+
+  // Fallback เฉพาะ 2 วิชาหลักที่เป็นจริง ไม่ใส่ fake วิชาดนตรี/อังกฤษที่ไม่ได้สอน
+  return [
+    {
+      code: 'ญ31201',
+      name: 'ภาษาญี่ปุ่น 1',
+      shortName: 'ภาษาญี่ปุ่น ม.3',
+      classrooms: ['ม.3/1', 'ม.3/2'],
+      credits: 1.5,
+      colorBadge: 'bg-rose-100 text-rose-800 border-rose-300',
+    },
+    {
+      code: 'ศ23101',
+      name: 'ศิลปะ 3 (ทัศนศิลป์)',
+      shortName: 'ศิลปะ ม.3',
+      classrooms: ['ม.3/1', 'ม.3/2'],
+      credits: 1.5,
+      colorBadge: 'bg-teal-100 text-teal-800 border-teal-300',
+    },
+  ];
+};
+
+/**
+ * Proxy array สำหรับคง backward compatibility กับ import เดิม
+ * แต่จะอัปเดตสมาชิกตามหลักสูตรจริงอยู่เสมอ
+ */
+export const TEACHER_SUBJECTS_LIST: TeachingSubjectInfo[] = new Proxy([] as TeachingSubjectInfo[], {
+  get(_target, prop) {
+    const list = getDynamicTeachingSubjects();
+    if (prop === 'length') return list.length;
+    if (typeof prop === 'string' && !Number.isNaN(Number(prop))) {
+      return list[Number(prop)];
+    }
+    const val = Reflect.get(list, prop);
+    if (typeof val === 'function') {
+      return val.bind(list);
+    }
+    return val;
   },
-  {
-    code: 'ศ23101',
-    name: 'ศิลปะ 3 (ทัศนศิลป์)',
-    shortName: 'ศิลปะ ม.3',
-    classrooms: ['ม.3/1', 'ม.3/2'],
-    credits: 1.5,
-    colorBadge: 'bg-teal-100 text-teal-800 border-teal-300',
-  },
-  {
-    code: 'ศ20223',
-    name: 'ดนตรีสากลปฏิบัติ',
-    shortName: 'ดนตรี ม.2',
-    classrooms: ['ม.2/1', 'ม.2/2'],
-    credits: 1.0,
-    colorBadge: 'bg-indigo-100 text-indigo-800 border-indigo-300',
-  },
-  {
-    code: 'ศ20221',
-    name: 'ดนตรี-นาฏศิลป์ไทย',
-    shortName: 'นาฏศิลป์ ม.1',
-    classrooms: ['ม.1/8', 'ม.1/2'],
-    credits: 1.0,
-    colorBadge: 'bg-purple-100 text-purple-800 border-purple-300',
-  },
-  {
-    code: 'อ23101',
-    name: 'ภาษาอังกฤษเพื่อการสื่อสาร 5',
-    shortName: 'ภาษาอังกฤษ ม.3',
-    classrooms: ['ม.3/1', 'ม.3/2'],
-    credits: 1.5,
-    colorBadge: 'bg-blue-100 text-blue-800 border-blue-300',
-  },
-];
+});
 
 // ห้องที่ปรึกษาประจำตัวครู (Homeroom Advisory)
 export const HOMEROOM_ADVISORY = {

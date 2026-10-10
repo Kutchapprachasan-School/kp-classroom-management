@@ -4,6 +4,8 @@
  * สอดคล้องกับมาตรฐาน Pastel Anime Education Dashboard
  */
 
+import { cleanSlateService } from './cleanSlateService.ts';
+
 export type MediaType = 'DOCUMENT' | 'WORKSHEET' | 'EXAM_QUIZ' | 'VIDEO' | 'LINK';
 
 export interface UnitMediaItem {
@@ -238,6 +240,12 @@ class CoursesCurriculumService {
       }
     } catch {
       // ignore
+    }
+
+    if (cleanSlateService.isCleanSlateActive()) {
+      this.cache = [];
+      this.save();
+      return this.cache;
     }
 
     this.cache = [...INITIAL_COURSES];

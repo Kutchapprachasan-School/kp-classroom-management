@@ -12,6 +12,7 @@ import { studentBannerService } from '../../services/studentBannerService';
 import type { SchoolUserRole } from '../../config/schoolRoles';
 import type { AuthUser } from '../../services/authService';
 import { cleanSlateService } from '../../services/cleanSlateService';
+import { formatThaiDateFull } from '../../utils/timetableDateUtils';
 
 interface StudentHeaderProps {
   onExit: () => void;
@@ -121,7 +122,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
         {/* Date Chip */}
         <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200/90 bg-slate-50/70 text-xs font-medium text-slate-700 shadow-2xs">
           <Calendar2Regular className="w-3.5 h-3.5 text-slate-500" />
-          <span>อังคารที่ 1 ตุลาคม 2569</span>
+          <span>{formatThaiDateFull(new Date())}</span>
         </div>
 
         {/* XP Badge */}

@@ -134,12 +134,19 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
   const currentSubject = useMemo(() => {
     return (
       TEACHER_SUBJECTS_LIST.find((s) => s.code === selectedSubjectCode) ||
-      TEACHER_SUBJECTS_LIST[0]
+      TEACHER_SUBJECTS_LIST[0] || {
+        code: 'ศ23101',
+        name: 'ศิลปะ 3 (ทัศนศิลป์)',
+        shortName: 'ศิลปะ ม.3',
+        classrooms: ['ม.3/1', 'ม.3/2'],
+        credits: 1.5,
+        colorBadge: 'bg-teal-100 text-teal-800 border-teal-300',
+      }
     );
   }, [selectedSubjectCode]);
 
   useEffect(() => {
-    if (currentSubject && !currentSubject.classrooms.includes(selectedClassroom)) {
+    if (currentSubject && currentSubject.classrooms && !currentSubject.classrooms.includes(selectedClassroom)) {
       setSelectedClassroom(currentSubject.classrooms[0] || 'ม.3/1');
     }
   }, [currentSubject, selectedClassroom]);
@@ -825,7 +832,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
               onChange={(e) => setSelectedClassroom(e.target.value)}
               className="font-extrabold text-slate-900 bg-transparent focus:outline-none cursor-pointer"
             >
-              {currentSubject.classrooms.map((rm) => (
+              {(currentSubject.classrooms || ['ม.3/1']).map((rm) => (
                 <option key={rm} value={rm}>
                   ชั้น {rm}
                 </option>

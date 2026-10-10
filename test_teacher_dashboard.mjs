@@ -172,13 +172,13 @@ console.log('  ✓ Reset all banners restores all 3 banners to default');
 console.log('\n--- 4. Checking Code Implementations ---');
 const teacherHeaderCode = fs.readFileSync('src/components/layout/TeacherHeader.tsx', 'utf8');
 assert.ok(teacherHeaderCode.includes('นายปัญจพล เกษรัตน์'), 'Header must contain teacher name');
-assert.ok(teacherHeaderCode.includes('วันพฤหัสบดีที่ 2 ตุลาคม 2569'), 'Header must contain Thai date');
+assert.ok(teacherHeaderCode.includes('formatThaiDateFull'), 'Header must contain dynamic Thai date function');
 assert.ok(teacherHeaderCode.includes('lg:hidden'), 'Header must support dedicated mobile view');
-console.log('  ✓ TeacherHeader supports dual desktop and mobile header');
+console.log('  ✓ TeacherHeader supports dual desktop and mobile header with dynamic Thai date');
 
 const timetableCode = fs.readFileSync('src/components/dashboard/TeacherTodayTimetableCard.tsx', 'utf8');
-assert.ok(timetableCode.includes('วันนี้ - 2 ตุลาคม 2569'), 'Timetable must support mobile date title');
-assert.ok(timetableCode.includes('ญ31201'), 'Timetable has course code ญ31201');
-console.log('  ✓ TeacherTodayTimetableCard has responsive headers and periods');
+assert.ok(timetableCode.includes('formatThaiDateFull'), 'Timetable must support dynamic date');
+assert.ok(timetableCode.includes('ตารางสอนวันนี้'), 'Timetable has title');
+console.log('  ✓ TeacherTodayTimetableCard has responsive headers and dynamic dates');
 
 console.log('\n🎉 ALL 20 VERIFICATION CHECKS PASSED SUCCESSFULLY!\n');

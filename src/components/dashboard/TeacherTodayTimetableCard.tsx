@@ -25,7 +25,7 @@ import {
   MATRIX_SLOTS_UPDATED_EVENT,
 } from '../../services/calendarEventStorageService';
 import { getSubjectIcon } from '../../config/subjectIcons';
-import type { TimetableMatrixSlot } from '../../utils/timetableDateUtils';
+import { formatThaiDateFull, type TimetableMatrixSlot } from '../../utils/timetableDateUtils';
 import { classroomService } from '../../services/classroomService';
 import type { ClassroomRosterItem } from '../../types/viewModels';
 
@@ -406,11 +406,11 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
                 ตารางสอนวันนี้
               </h2>
               <h2 className="font-extrabold text-slate-800 text-sm leading-tight sm:hidden">
-                วันนี้ - 2 ตุลาคม 2569
+                {formatThaiDateFull(new Date())}
               </h2>
             </div>
             <p className="text-xs text-slate-500 font-medium hidden sm:block">
-              วัน{todayDayKey}ที่ 2 ตุลาคม 2569 ({Math.max(0, periodsList.length - 1)} คาบสอน)
+              {formatThaiDateFull(new Date())} ({Math.max(0, periodsList.length - 1)} คาบสอน)
             </p>
           </div>
         </div>

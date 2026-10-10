@@ -28,16 +28,37 @@ export const SgsClassroomMatrixModal: React.FC<SgsClassroomMatrixModalProps> = (
   defaultSubjectCode = 'ศ23101',
   defaultRoom = 'ม.3/1',
 }) => {
-  const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>(defaultSubjectCode);
-  const [selectedRoom, setSelectedRoom] = useState<string>(defaultRoom);
-  const [searchTerm, setSearchTerm] = useState<string>('');
+  const teachingSubjects = useMemo(() => {
+    return Array.from(TEACHER_SUBJECTS_LIST);
+  }, []);
+
+  const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>(() => {
+    if (teachingSubjects.some((s) => s.code === defaultSubjectCode)) {
+      return defaultSubjectCode;
+    }
+    return teachingSubjects[0]?.code || 'ศ23101';
+  });
 
   const currentSubject = useMemo(() => {
     return (
-      TEACHER_SUBJECTS_LIST.find((s) => s.code === selectedSubjectCode) ||
-      TEACHER_SUBJECTS_LIST[0]
+      teachingSubjects.find((s) => s.code === selectedSubjectCode) ||
+      teachingSubjects[0] || {
+        code: 'ศ23101',
+        name: 'ศิลปะ 3 (ทัศนศิลป์)',
+        shortName: 'ศิลปะ ม.3',
+        classrooms: ['ม.3/1'],
+        credits: 1.5,
+        colorBadge: 'bg-teal-100 text-teal-800 border-teal-300',
+      }
     );
-  }, [selectedSubjectCode]);
+  }, [selectedSubjectCode, teachingSubjects]);
+
+  const [selectedRoom, setSelectedRoom] = useState<string>(() => {
+    return currentSubject?.classrooms?.includes(defaultRoom)
+      ? defaultRoom
+      : currentSubject?.classrooms?.[0] || 'ม.3/1';
+  });
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   const roster: SgsStudentRecord[] = useMemo(() => {
     return sgsRosterAndSubmissionService.getSgsRoster();
@@ -123,7 +144,7 @@ export const SgsClassroomMatrixModal: React.FC<SgsClassroomMatrixModalProps> = (
                 onChange={(e) => setSelectedSubjectCode(e.target.value)}
                 className="bg-transparent text-xs font-bold text-slate-900 focus:outline-none cursor-pointer"
               >
-                {TEACHER_SUBJECTS_LIST.map((subj) => (
+                {teachingSubjects.map((subj) => (
                   <option key={subj.code} value={subj.code}>
                     {subj.code} {subj.name}
                   </option>

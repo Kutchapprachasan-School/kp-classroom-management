@@ -1,5 +1,6 @@
 import React from 'react';
 import { Calendar, GraduationCap, Users, FileText } from 'lucide-react';
+import { formatThaiDateFull } from '../../utils/timetableDateUtils';
 
 interface TeacherOverviewStatCardsProps {
   periodsTodayCount?: number;
@@ -24,7 +25,7 @@ export const TeacherOverviewStatCards: React.FC<TeacherOverviewStatCardsProps> =
         <div className="min-w-0">
           <div className="text-xs font-medium text-slate-500">วันนี้</div>
           <div className="text-xs sm:text-sm font-bold text-slate-900 leading-snug truncate">
-            พฤหัสบดีที่ 8 ตุลาคม 2569
+            {formatThaiDateFull(new Date())}
           </div>
           <div className="text-[11px] text-slate-400 mt-0.5">{termLabel}</div>
         </div>
