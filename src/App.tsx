@@ -23,6 +23,7 @@ import { SchoolPortalView, type TeacherLoginChannel } from './views/SchoolPortal
 import { HomeVisitSdqView } from './views/HomeVisitSdqView';
 import { StudentAffairsCouncilView } from './views/StudentAffairsCouncilView';
 import { AdminExecutiveDashboardView } from './views/AdminExecutiveDashboardView';
+import { SchoolLeaveExecutiveDashboardView } from './views/SchoolLeaveExecutiveDashboardView';
 import { MorningAssemblyView } from './views/MorningAssemblyView';
 import { ClassroomAttendanceView } from './views/ClassroomAttendanceView';
 import { QuickSearchModal } from './components/common/QuickSearchModal';
@@ -37,27 +38,32 @@ import {
   CheckCircle2,
   Users,
   CalendarDays,
-  ClipboardList,
-  MoreHorizontal,
   PenTool,
   LogIn,
   HeartHandshake,
+  FileCheck,
   ShieldAlert,
   Vote,
   ChevronDown,
   ChevronUp,
   ShieldCheck,
-  MessageSquare,
   Folder,
 } from 'lucide-react';
-import { TeacherCalendarMobileView } from './components/dashboard/TeacherCalendarMobileView';
-import { TeacherAllTasksMobileView } from './components/dashboard/TeacherAllTasksMobileView';
-import { TeacherMoreAccountMobileView } from './components/dashboard/TeacherMoreAccountMobileView';
-import { TeacherTaskDetailModal } from './components/dashboard/TeacherTaskDetailModal';
 import {
-  teacherCalendarTodoService,
-  type DailyTodoItem,
-} from './services/teacherCalendarTodoService';
+  TeacherMobileBottomNav,
+  TeacherMobileHomeScreen,
+  TeacherMobileGradingListScreen,
+  TeacherMobileClassSubmissionsScreen,
+  TeacherMobileSubmissionDetailScreen,
+  TeacherMobileCreateAssignmentScreen,
+  TeacherMobileCalendarScreen,
+  TeacherMobileGradingSummaryScreen,
+  TeacherMobileRoomScoresScreen,
+  TeacherMobileSchoolInfoScreen,
+  TeacherMobileMoreMenuScreen,
+} from './components/mobile';
+import { TeacherTaskDetailModal } from './components/dashboard/TeacherTaskDetailModal';
+import type { DailyTodoItem } from './services/teacherCalendarTodoService';
 import type { CrossViewNavigationPayload } from './services/teacherCopilotService';
 import type { ClassSubTab } from './views/TeacherOverviewView';
 import type { QuickFilterMode } from './views/AssignmentManagementView';
@@ -227,6 +233,8 @@ export const App: React.FC = () => {
         return 'หน้าแรก';
       case 'admin-dashboard':
         return `แดชบอร์ดผู้บริหาร • ${schoolSettings.nameTh}`;
+      case 'school-leave-dashboard':
+        return `แดชบอร์ดบริหารระบบการลา • ${schoolSettings.nameTh}`;
       case 'class-overview':
         return 'คะแนนนักเรียน (ปพ.5)';
       case 'morning-assembly':
@@ -248,9 +256,9 @@ export const App: React.FC = () => {
       case 'student-council':
         return 'สภานักเรียน';
       case 'courses':
-        return 'หลักสูตร/แผนการสอน';
+        return 'สื่อการสอน / ไฟล์';
       case 'lessons':
-        return 'หลักสูตร/แผนการสอน';
+        return 'แผนการสอน / จัดการแผนการสอน';
       case 'classrooms':
         return 'จัดการห้องเรียน (Classrooms)';
       case 'roster':
@@ -275,6 +283,20 @@ export const App: React.FC = () => {
         return 'งานทั้งหมด';
       case 'mobile-more':
         return 'เมนู & บัญชี';
+      case 'mobile-grading-list':
+        return 'ตรวจงานนักเรียน';
+      case 'mobile-class-submissions':
+        return 'ห้อง ม.3/1 รายชื่อนักเรียน & ตรวจงานห้อง';
+      case 'mobile-submission-detail':
+        return 'รายละเอียดงานนักเรียน';
+      case 'mobile-create-assignment':
+        return 'มอบหมายงานใหม่';
+      case 'mobile-grading-summary':
+        return 'สรุปการตรวจงาน';
+      case 'mobile-room-scores':
+        return 'คะแนนรายห้องเรียน';
+      case 'mobile-school-info':
+        return 'ข้อมูลโรงเรียน';
       default:
         return `${schoolSettings.classroomSystemTitle} • ${schoolSettings.nameTh}`;
     }
@@ -285,7 +307,21 @@ export const App: React.FC = () => {
   };
 
   const handleBack = () => {
-    if (currentView !== 'home') {
+    if (currentView === 'mobile-submission-detail') {
+      setCurrentView('mobile-class-submissions');
+    } else if (currentView === 'mobile-class-submissions') {
+      setCurrentView('mobile-grading-list');
+    } else if (
+      currentView === 'mobile-grading-list' ||
+      currentView === 'mobile-create-assignment' ||
+      currentView === 'mobile-grading-summary' ||
+      currentView === 'mobile-room-scores' ||
+      currentView === 'mobile-school-info' ||
+      currentView === 'mobile-calendar' ||
+      currentView === 'mobile-more'
+    ) {
+      setCurrentView('home');
+    } else if (currentView !== 'home') {
       setCurrentView('home');
     }
   };
@@ -411,6 +447,7 @@ export const App: React.FC = () => {
               {[
                 { key: 'school-login', label: 'หน้า Login', icon: LogIn },
                 { key: 'admin-dashboard', label: '★ Dashboard ผู้บริหาร', icon: LayoutDashboard },
+                { key: 'school-leave-dashboard', label: '★ Dashboard ระบบการลา', icon: FileCheck },
                 { key: 'home', label: '1. หน้าหลักครู', icon: Home },
                 { key: 'class-overview', label: '2. คะแนนนักเรียน (ปพ.5)', icon: Users },
                 { key: 'home-visit', label: '3. เยี่ยมบ้าน นร.01 (CCT)', icon: HeartHandshake },
@@ -492,6 +529,17 @@ export const App: React.FC = () => {
           currentUser={currentAuthUser}
           schoolSettings={schoolSettings}
         />
+      ) : currentView === 'school-leave-dashboard' ? (
+        <SchoolLeaveExecutiveDashboardView
+          activeRole={activeRole}
+          onChangeRole={handleChangeRole}
+          onNavigateToView={(viewKey) => {
+            setCurrentView(viewKey as TeacherViewKey);
+          }}
+          onLogout={handleLogout}
+          currentUser={currentAuthUser}
+          schoolSettings={schoolSettings}
+        />
       ) : (
         /* Teacher Mode Layout */
         <div className="flex flex-1 min-h-0">
@@ -538,20 +586,29 @@ export const App: React.FC = () => {
             {/* Dynamic View Body */}
             <main className="flex-1 p-3.5 sm:p-6 md:p-8 overflow-y-auto overflow-x-hidden">
               {currentView === 'home' && (
-                <TeacherGlobalDashboardView
-                  activeRole={activeRole}
-                  onNavigateToClass={() => setCurrentView('class-overview')}
-                  onNavigateToAttendance={() => {
-                    setCurrentView('classroom-attendance');
-                  }}
-                  onNavigateToReadiness={() => setCurrentView('readiness')}
-                  onNavigateToAcademicYear={() => setCurrentView('academic-year')}
-                  onNavigateToCourses={() => setCurrentView('courses')}
-                  onNavigateToLessons={() => setCurrentView('lessons')}
-                  onNavigateToMorningAssembly={() => setCurrentView('morning-assembly')}
-                  onDeepNavigate={handleDeepNavigate}
-                  currentUser={currentAuthUser}
-                />
+                <>
+                  <div className="hidden lg:block">
+                    <TeacherGlobalDashboardView
+                      activeRole={activeRole}
+                      onNavigateToClass={() => setCurrentView('class-overview')}
+                      onNavigateToAttendance={() => {
+                        setCurrentView('classroom-attendance');
+                      }}
+                      onNavigateToReadiness={() => setCurrentView('readiness')}
+                      onNavigateToAcademicYear={() => setCurrentView('academic-year')}
+                      onNavigateToCourses={() => setCurrentView('courses')}
+                      onNavigateToLessons={() => setCurrentView('lessons')}
+                      onNavigateToMorningAssembly={() => setCurrentView('morning-assembly')}
+                      onDeepNavigate={handleDeepNavigate}
+                      currentUser={currentAuthUser}
+                    />
+                  </div>
+                  <div className="lg:hidden">
+                    <TeacherMobileHomeScreen
+                      onNavigate={(v) => setCurrentView(v)}
+                    />
+                  </div>
+                </>
               )}
 
               {currentView === 'class-overview' && (
@@ -690,114 +747,81 @@ export const App: React.FC = () => {
               )}
 
               {currentView === 'mobile-calendar' && (
-                <TeacherCalendarMobileView
-                  todos={teacherCalendarTodoService.getTodayTodos()}
-                  onSelectTask={(task) => setSelectedTaskForModal(task)}
-                  onActionClick={handleDeepNavigate}
+                <TeacherMobileCalendarScreen
+                  onNavigate={(v) => setCurrentView(v)}
+                  onBack={handleBack}
                 />
               )}
 
               {currentView === 'mobile-all-tasks' && (
-                <TeacherAllTasksMobileView
-                  todos={teacherCalendarTodoService.getTodayTodos()}
-                  onSelectTask={(task) => setSelectedTaskForModal(task)}
-                  onActionClick={handleDeepNavigate}
-                  onToggleTodo={(id) => {
-                    teacherCalendarTodoService.toggleTodoComplete(id);
-                  }}
+                <TeacherMobileGradingListScreen
+                  onNavigate={(v) => setCurrentView(v)}
+                  onBack={handleBack}
+                />
+              )}
+
+              {currentView === 'mobile-grading-list' && (
+                <TeacherMobileGradingListScreen
+                  onNavigate={(v) => setCurrentView(v)}
+                  onBack={handleBack}
+                />
+              )}
+
+              {currentView === 'mobile-class-submissions' && (
+                <TeacherMobileClassSubmissionsScreen
+                  onNavigate={(v) => setCurrentView(v)}
+                  onBack={handleBack}
+                />
+              )}
+
+              {currentView === 'mobile-submission-detail' && (
+                <TeacherMobileSubmissionDetailScreen
+                  onNavigate={(v) => setCurrentView(v)}
+                  onBack={handleBack}
+                />
+              )}
+
+              {currentView === 'mobile-create-assignment' && (
+                <TeacherMobileCreateAssignmentScreen
+                  onNavigate={(v) => setCurrentView(v)}
+                  onBack={handleBack}
+                />
+              )}
+
+              {currentView === 'mobile-grading-summary' && (
+                <TeacherMobileGradingSummaryScreen
+                  onNavigate={(v) => setCurrentView(v)}
+                  onBack={handleBack}
+                />
+              )}
+
+              {currentView === 'mobile-room-scores' && (
+                <TeacherMobileRoomScoresScreen
+                  onNavigate={(v) => setCurrentView(v)}
+                  onBack={handleBack}
+                />
+              )}
+
+              {currentView === 'mobile-school-info' && (
+                <TeacherMobileSchoolInfoScreen
+                  onNavigate={(v) => setCurrentView(v)}
+                  onBack={handleBack}
                 />
               )}
 
               {currentView === 'mobile-more' && (
-                <TeacherMoreAccountMobileView
-                  onNavigate={(view) => setCurrentView(view)}
-                  onLogout={() => setCurrentView('school-login')}
-                  activeRole={activeRole}
+                <TeacherMobileMoreMenuScreen
+                  onNavigate={(v) => setCurrentView(v)}
+                  onLogout={handleLogout}
                 />
               )}
             </main>
 
-            {/* Mobile Bottom Navigation Bar (ตรงตาม Mockup Image 2: หน้าหลัก | งาน | ข้อความ | เพิ่มเติม) */}
-            <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-3 py-1.5 grid grid-cols-4 gap-1 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] select-none">
-              <button
-                type="button"
-                onClick={() => setCurrentView('home')}
-                className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
-                  currentView === 'home'
-                    ? 'text-blue-600 bg-blue-50/80'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                <Home
-                  className={`w-4 h-4 mb-0.5 ${
-                    currentView === 'home'
-                      ? 'text-blue-600 stroke-[2.5]'
-                      : 'text-slate-500'
-                  }`}
-                />
-                <span>หน้าหลัก</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setCurrentView('mobile-all-tasks')}
-                className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
-                  currentView === 'mobile-all-tasks' || currentView === 'assignments'
-                    ? 'text-blue-600 bg-blue-50/80'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                <ClipboardList
-                  className={`w-4 h-4 mb-0.5 ${
-                    currentView === 'mobile-all-tasks' || currentView === 'assignments'
-                      ? 'text-blue-600 stroke-[2.5]'
-                      : 'text-slate-500'
-                  }`}
-                />
-                <span>งาน</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setCurrentView('messages')}
-                className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer relative ${
-                  currentView === 'messages'
-                    ? 'text-blue-600 bg-blue-50/80'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                <div className="relative">
-                  <MessageSquare
-                    className={`w-4 h-4 mb-0.5 ${
-                      currentView === 'messages'
-                        ? 'text-blue-600 stroke-[2.5]'
-                        : 'text-slate-500'
-                    }`}
-                  />
-                  <span className="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-rose-500" />
-                </div>
-                <span>ข้อความ</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setCurrentView('mobile-more')}
-                className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
-                  currentView === 'mobile-more' || currentView === 'settings'
-                    ? 'text-blue-600 bg-blue-50/80'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                <MoreHorizontal
-                  className={`w-4 h-4 mb-0.5 ${
-                    currentView === 'mobile-more' || currentView === 'settings'
-                      ? 'text-blue-600 stroke-[2.5]'
-                      : 'text-slate-500'
-                  }`}
-                />
-                <span>เพิ่มเติม</span>
-              </button>
-            </nav>
+            {/* Mobile Bottom Navigation Bar (ตรงตาม Mockup Image: 5 ปุ่ม หน้าหลัก | งาน | (+) มอบหมายงาน | ข้อความ | เพิ่มเติม) */}
+            <TeacherMobileBottomNav
+              currentView={currentView}
+              onNavigate={(v) => setCurrentView(v)}
+            />
 
             {/* Task Detail Modal (เปิดเมื่อครูกดการ์ดงานจากหน้าปฏิทิน หรือหน้ารวมงาน) */}
             <TeacherTaskDetailModal

@@ -61,10 +61,18 @@ export type TeacherViewKey =
   | 'settings'
   | 'trash'
   | 'accounts'
+  | 'school-leave-dashboard'
   | 'student-portal'
   | 'mobile-calendar'
   | 'mobile-all-tasks'
-  | 'mobile-more';
+  | 'mobile-more'
+  | 'mobile-grading-list'
+  | 'mobile-class-submissions'
+  | 'mobile-submission-detail'
+  | 'mobile-create-assignment'
+  | 'mobile-grading-summary'
+  | 'mobile-room-scores'
+  | 'mobile-school-info';
 
 interface TeacherSidebarProps {
   currentView: TeacherViewKey;
@@ -148,22 +156,24 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       : []),
     {
       key: 'timetable',
-      label: 'ตารางสอน',
+      label: 'ตารางสอน/วันนี้',
       icon: Calendar,
     },
     {
       key: 'morning-assembly',
       label: 'เช็คแถวเช้า',
       icon: UserCheck,
+      badge: '3',
+      badgeStyle: 'bg-rose-500 text-white font-extrabold',
     },
     {
       key: 'classroom-attendance',
-      label: 'เช็คชื่อเข้าเรียน',
+      label: 'เช็คชื่อนักเรียน',
       icon: ClipboardCheck,
     },
     {
       key: 'assignments',
-      label: 'ตรวจงาน',
+      label: 'ภาระงาน / สอน',
       icon: BookOpen,
       badge: '3',
       badgeStyle: 'bg-rose-500 text-white font-extrabold',
@@ -180,7 +190,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     },
     {
       key: 'roster',
-      label: 'รายชื่อนักเรียน',
+      label: 'นักเรียน',
       icon: Users,
     },
     {
@@ -190,12 +200,12 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     },
     {
       key: 'courses',
-      label: 'หลักสูตร/แผนการสอน',
+      label: 'สื่อการสอน / ไฟล์',
       icon: Folder,
     },
     {
       key: 'exams',
-      label: 'จัดการสอบ / เก็บคะแนน',
+      label: 'ประเมิน / แบบฟอร์ม',
       icon: ClipboardList,
     },
     {
@@ -204,6 +214,11 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       icon: CalendarDays,
       badge: '5',
       badgeStyle: 'bg-rose-500 text-white font-extrabold',
+    },
+    {
+      key: 'lessons',
+      label: 'แผนการสอน',
+      icon: BookOpen,
     },
     {
       key: 'messages',
