@@ -109,26 +109,29 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
 }) => {
   // เริ่มต้นที่แท็บ "เช็คชื่อเข้าเรียน" เป็นอันดับแรกสุดก่อนเริ่มสอน หรือตาม Deep-Link ที่ส่งมา
   const [activeTab, setActiveTab] = useState<ClassSubTab>(initialTab);
-  const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>('ศ23101');
-  const [selectedClassroom, setSelectedClassroom] = useState<string>('ม.3/1');
+  const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>(() => TEACHER_SUBJECTS_LIST[0]?.code || '');
+  const [selectedClassroom, setSelectedClassroom] = useState<string>(() => TEACHER_SUBJECTS_LIST[0]?.classrooms?.[0] || '');
 
   const currentSubject = useMemo(() => {
     return (
       TEACHER_SUBJECTS_LIST.find((s) => s.code === selectedSubjectCode) ||
-      TEACHER_SUBJECTS_LIST[0] || {
-        code: 'ศ23101',
-        name: 'ศิลปะ 3 (ทัศนศิลป์)',
-        shortName: 'ศิลปะ ม.3',
-        classrooms: ['ม.3/1', 'ม.3/2'],
-        credits: 1.5,
-        colorBadge: 'bg-teal-100 text-teal-800 border-teal-300',
-      }
+      TEACHER_SUBJECTS_LIST[0] || null
     );
   }, [selectedSubjectCode]);
 
   useEffect(() => {
-    if (currentSubject && currentSubject.classrooms && !currentSubject.classrooms.includes(selectedClassroom)) {
-      setSelectedClassroom(currentSubject.classrooms[0] || 'ม.3/1');
+    if (TEACHER_SUBJECTS_LIST.length > 0) {
+      if (!selectedSubjectCode || !TEACHER_SUBJECTS_LIST.some((s) => s.code === selectedSubjectCode)) {
+        setSelectedSubjectCode(TEACHER_SUBJECTS_LIST[0].code);
+      }
+    }
+  }, [selectedSubjectCode]);
+
+  useEffect(() => {
+    if (currentSubject && currentSubject.classrooms && currentSubject.classrooms.length > 0) {
+      if (!currentSubject.classrooms.includes(selectedClassroom)) {
+        setSelectedClassroom(currentSubject.classrooms[0]);
+      }
     }
   }, [currentSubject, selectedClassroom]);
 
@@ -489,19 +492,20 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
     if (!newTitle.trim()) return;
 
     try {
-      const created = await assignmentService.create('room-3-1', {
+      const targetRoomId = selectedClassroom ? `room-${selectedClassroom.replace(/[^0-9-]/g, '')}` : 'room-1';
+      const created = await assignmentService.create(targetRoomId, {
         title: newTitle,
         category: 'เก็บหลังกลางภาค',
         sgsUnit: newSgsUnit,
         maxScore: Number(newMaxScore),
         dueDate: newDueDate || 'ไม่ระบุ',
-        sharedTag: 'เฉพาะ ม.3/1',
+        sharedTag: selectedClassroom ? `เฉพาะ ${selectedClassroom}` : 'ทุกห้องเรียน',
       });
 
       const newRow = {
         id: created.id,
         title: created.title,
-        sharedTag: created.sharedTag || 'เฉพาะ ม.3/1',
+        sharedTag: created.sharedTag || (selectedClassroom ? `เฉพาะ ${selectedClassroom}` : 'ทุกห้องเรียน'),
         subtext: created.subtext,
         category: created.category,
         sgsUnit: created.sgsUnit,
@@ -713,10 +717,14 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
       {/* Master PageHeroBanner Design */}
       <PageHeroBanner
         title="ภาพรวมชั้นเรียน & การสอน"
-        subtitle={`จัดการการเรียนการสอนรายวิชา ${selectedSubjectCode} ${currentSubject?.name || 'ศิลปะ'} ชั้น ${selectedClassroom}`}
+        subtitle={
+          currentSubject
+            ? `จัดการการเรียนการสอนรายวิชา ${selectedSubjectCode} ${currentSubject.name} ชั้น ${selectedClassroom}`
+            : 'จัดการการเรียนการสอนรายวิชาและคะแนน ปพ.5'
+        }
         icon={<BookOpen className="w-6 h-6 text-white" />}
         iconBgClass="bg-blue-600 text-white"
-        badgeText={`ชั้น ${selectedClassroom}`}
+        badgeText={selectedClassroom ? `ชั้น ${selectedClassroom}` : 'ห้องเรียน'}
         tagText="✨ เช็คชื่อเข้าเรียน • คะแนน ปพ.5 • สั่งงาน/ตรวจงาน • ระบบติดตามกลุ่มเสี่ยง"
         quoteLines={[
           'มุ่งมั่นพัฒนาคุณภาพการเรียนรู้',
@@ -725,7 +733,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
         ]}
       />
 
-      {/* แถบเลือกรายวิชา & ห้องเรียน (รองรับครูสอนหลายวิชา หลายห้อง) พร้อมป้ายห้องที่ปรึกษา ม.3/1 */}
+      {/* แถบเลือกรายวิชา & ห้องเรียน (รองรับครูสอนหลายวิชา หลายห้อง) */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-3 sm:p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs shadow-2xs">
@@ -750,7 +758,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
               onChange={(e) => setSelectedClassroom(e.target.value)}
               className="font-extrabold text-slate-900 bg-transparent focus:outline-none cursor-pointer"
             >
-              {(currentSubject.classrooms || ['ม.3/1']).map((rm) => (
+              {(currentSubject?.classrooms || []).map((rm) => (
                 <option key={rm} value={rm}>
                   ชั้น {rm}
                 </option>
@@ -1046,7 +1054,8 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
             <PaperRegisterLedger
               initialMode="CLASS_ATTENDANCE"
               defaultRoom={selectedClassroom}
-              subjectLabel={`${selectedSubjectCode} ${currentSubject.name}`}
+              availableRooms={currentSubject?.classrooms || []}
+              subjectLabel={`${selectedSubjectCode} ${currentSubject?.name || ''}`}
               hideModeSwitcher={true}
               hideMorningAssembly={true}
             />
@@ -1289,7 +1298,8 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
           <PaperRegisterLedger
             initialMode="SCORE_GRADEBOOK"
             defaultRoom={selectedClassroom}
-            subjectLabel={`${selectedSubjectCode} ${currentSubject.name}`}
+            availableRooms={currentSubject?.classrooms || []}
+            subjectLabel={`${selectedSubjectCode} ${currentSubject?.name || ''}`}
             hideMorningAssembly={true}
           />
 
@@ -2036,7 +2046,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
             <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
               <div>
                 <h3 className="font-bold text-slate-800 text-sm">
-                  เช็คชื่อรายคาบ: {selectedDateForRollCall} (ศิลปะ ม.3/1)
+                  เช็คชื่อรายคาบ: {selectedDateForRollCall} ({currentSubject?.name || 'รายวิชา'} {selectedClassroom})
                 </h3>
               </div>
               <button
@@ -2262,7 +2272,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
             <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-100 text-xs text-emerald-800 space-y-1">
               <span className="font-bold">เชื่อมต่อบัญชี Google Workspace สำเร็จ</span>
               <p className="text-[11px] text-emerald-700">
-                ห้องเรียน: ศ23101 ศิลปะ ม.3/1 (Class ID: gc-art-301)
+                ห้องเรียน: {currentSubject?.code || ''} {currentSubject?.name || 'รายวิชา'} {selectedClassroom} (Class ID: gc-{currentSubject?.code?.toLowerCase() || 'cls'}-{selectedClassroom?.replace(/[^0-9]/g, '') || '01'})
               </p>
             </div>
 
@@ -2314,7 +2324,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                 <h3 className="font-bold text-slate-800 text-base">
                   บันทึกคะแนน: {selectedAssignmentForGrading}
                 </h3>
-                <p className="text-xs text-slate-500">ม.3/1 • คะแนนเต็ม 10 คะแนน</p>
+                <p className="text-xs text-slate-500">{selectedClassroom || 'ห้องเรียน'} • คะแนนเต็ม 10 คะแนน</p>
               </div>
               <button onClick={() => setIsGradebookModalOpen(false)} className="text-slate-400">
                 <X className="w-5 h-5" />

@@ -38,8 +38,8 @@ interface Submission3ColorMatrixModalProps {
 export const Submission3ColorMatrixModal: React.FC<Submission3ColorMatrixModalProps> = ({
   isOpen,
   onClose,
-  defaultSubjectCode = 'ศ23101',
-  defaultRoom = 'ม.3/1',
+  defaultSubjectCode = '',
+  defaultRoom = '',
   onOpenPreview,
   onGradeQuick,
 }) => {
@@ -48,30 +48,24 @@ export const Submission3ColorMatrixModal: React.FC<Submission3ColorMatrixModalPr
   }, []);
 
   const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>(() => {
-    if (teachingSubjects.some((s) => s.code === defaultSubjectCode)) {
+    if (defaultSubjectCode && teachingSubjects.some((s) => s.code === defaultSubjectCode)) {
       return defaultSubjectCode;
     }
-    return teachingSubjects[0]?.code || 'ศ23101';
+    return teachingSubjects[0]?.code || '';
   });
 
   const currentSubjectInfo = useMemo(() => {
     return (
       teachingSubjects.find((s) => s.code === selectedSubjectCode) ||
-      teachingSubjects[0] || {
-        code: 'ศ23101',
-        name: 'ศิลปะ 3 (ทัศนศิลป์)',
-        shortName: 'ศิลปะ ม.3',
-        classrooms: ['ม.3/1'],
-        credits: 1.5,
-        colorBadge: 'bg-teal-100 text-teal-800 border-teal-300',
-      }
+      teachingSubjects[0] || null
     );
   }, [selectedSubjectCode, teachingSubjects]);
 
   const [selectedRoom, setSelectedRoom] = useState<string>(() => {
-    return currentSubjectInfo?.classrooms?.includes(defaultRoom)
-      ? defaultRoom
-      : currentSubjectInfo?.classrooms?.[0] || 'ม.3/1';
+    if (defaultRoom && currentSubjectInfo?.classrooms?.includes(defaultRoom)) {
+      return defaultRoom;
+    }
+    return currentSubjectInfo?.classrooms?.[0] || '';
   });
   const [matrixSearch, setMatrixSearch] = useState<string>('');
 

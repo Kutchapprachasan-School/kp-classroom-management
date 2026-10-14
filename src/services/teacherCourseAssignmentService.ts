@@ -44,7 +44,7 @@ export const getDynamicTeachingSubjects = (): TeachingSubjectInfo[] => {
       code: c.code,
       name: c.name,
       shortName: c.name.length > 15 ? `${c.name.slice(0, 15)}...` : c.name,
-      classrooms: c.assignedClassrooms && c.assignedClassrooms.length > 0 ? c.assignedClassrooms : ['ม.3/1'],
+      classrooms: c.assignedClassrooms && c.assignedClassrooms.length > 0 ? c.assignedClassrooms : [],
       credits: Number(c.credits) || 1.0,
       colorBadge: colorMap[idx % 5] || 'bg-blue-100 text-blue-800 border-blue-300',
     }));

@@ -144,41 +144,42 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
 
   const availableCourseOptions: TeacherCourseOption[] = useMemo(() => {
     if (!curriculumCourses || curriculumCourses.length === 0) {
-      return TEACHER_COURSES;
+      return [];
     }
-    const mapped: TeacherCourseOption[] = curriculumCourses.map((c, idx) => {
-      const primaryRoomName = c.assignedClassrooms?.[0] || 'ม.3/1';
+    return curriculumCourses.map((c, idx) => {
+      const primaryRoomName = c.assignedClassrooms?.[0] || '';
       const matchedRoom = allClassrooms.find(
         (r: ClassroomRosterItem) => r.name === primaryRoomName || r.roomNumber === primaryRoomName || r.id === primaryRoomName
       );
-      const roomId = matchedRoom?.id || `room-${primaryRoomName.replace(/[^0-9-]/g, '')}`;
+      const roomId = matchedRoom?.id || (primaryRoomName ? `room-${primaryRoomName.replace(/[^0-9-]/g, '')}` : '');
       return {
         code: c.code,
         name: `${c.code} ${c.name}`,
         shortSubject: c.name,
         room: roomId,
-        roomLabel: primaryRoomName,
+        roomLabel: primaryRoomName || 'ยังไม่กำหนดห้องเรียน',
         period: (idx % 6) + 1,
       };
     });
-
-    // Ensure default fallback TEACHER_COURSES are present if not already in curriculum
-    TEACHER_COURSES.forEach((tc) => {
-      if (!mapped.some((m) => m.code === tc.code)) {
-        mapped.push(tc);
-      }
-    });
-
-    return mapped;
   }, [curriculumCourses, allClassrooms]);
 
   // Course, Room, Date state
   const todayBangkok = getBangkokTodayString();
   const nowBangkok = getBangkokNow();
-  const [selectedCourse, setSelectedCourse] = useState<string>('ญ31201');
-  const [selectedClassroom, setSelectedClassroom] = useState<string>('room-3-1');
+  const [selectedCourse, setSelectedCourse] = useState<string>(() => availableCourseOptions[0]?.code || '');
+  const [selectedClassroom, setSelectedClassroom] = useState<string>(() => availableCourseOptions[0]?.room || '');
   const [selectedDate, setSelectedDate] = useState<string>(todayBangkok);
   const [selectedPeriod, setSelectedPeriod] = useState<number>(1);
+
+  // Auto-select valid course and classroom when availableCourseOptions updates
+  useEffect(() => {
+    if (availableCourseOptions.length > 0) {
+      if (!selectedCourse || !availableCourseOptions.some((c) => c.code === selectedCourse)) {
+        setSelectedCourse(availableCourseOptions[0].code);
+        setSelectedClassroom(availableCourseOptions[0].room);
+      }
+    }
+  }, [availableCourseOptions, selectedCourse]);
 
   // Available classrooms dynamically filtered based on selected curriculum course
   const availableClassroomOptions = useMemo(() => {
@@ -188,7 +189,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
         const found = allClassrooms.find(
           (c: ClassroomRosterItem) => c.name === roomName || c.roomNumber === roomName || c.id === roomName
         );
-        const isAdvisory = found?.adviser?.includes('ปัญจพล') || roomName === 'ม.3/1';
+        const isAdvisory = found?.adviser?.includes('ปัญจพล');
         return {
           id: found?.id || `room-${roomName.replace(/[^0-9-]/g, '')}`,
           label: `${roomName}${isAdvisory ? ' (ห้องประจำชั้น)' : ''}`,
@@ -196,15 +197,14 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
       });
     }
 
-    const teacherCourse = TEACHER_COURSES.find((c) => c.code === selectedCourse);
-    if (teacherCourse) {
-      return [
-        { id: teacherCourse.room, label: teacherCourse.roomLabel },
-        ...TAUGHT_CLASSROOMS.filter((r) => r.id !== teacherCourse.room),
-      ];
+    if (allClassrooms && allClassrooms.length > 0) {
+      return allClassrooms.map((c) => ({
+        id: c.id,
+        label: `${c.name || c.roomNumber}${c.adviser?.includes('ปัญจพล') ? ' (ห้องประจำชั้น)' : ''}`,
+      }));
     }
 
-    return TAUGHT_CLASSROOMS;
+    return [];
   }, [selectedCourse, curriculumCourses, allClassrooms]);
 
   // Keep selected classroom valid when course changes
@@ -257,7 +257,14 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
         period: selectedPeriod,
       };
     }
-    return TEACHER_COURSES[0];
+    return {
+      code: selectedCourse || '',
+      name: selectedCourse ? `${selectedCourse}` : 'ไม่มีรายวิชา',
+      shortSubject: 'รายวิชา',
+      room: selectedClassroom,
+      roomLabel: 'ห้องเรียน',
+      period: selectedPeriod || 1,
+    };
   }, [availableCourseOptions, curriculumCourses, selectedCourse, selectedClassroom, availableClassroomOptions, selectedPeriod]);
 
   const showToast = (msg: string) => {
@@ -269,6 +276,13 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
   // Load Period Records and Calendar Info
   // ----------------------------------------------------
   const loadData = () => {
+    if (!selectedCourse || !selectedClassroom) {
+      setPeriodRecords([]);
+      setHasUnsavedChanges(false);
+      setMonthCalendarDays([]);
+      return;
+    }
+
     let pRecords = attendanceCorrelationService.getPeriodRecords(
       selectedCourse,
       selectedClassroom,
@@ -524,6 +538,26 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
         }
       />
 
+      {availableCourseOptions.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-8 sm:p-12 text-center flex flex-col items-center justify-center shadow-xs">
+          <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
+            <BookOpen className="w-8 h-8" />
+          </div>
+          <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-1">ยังไม่มีรายวิชาที่สอนในระบบ</h3>
+          <p className="text-xs sm:text-sm text-slate-500 mb-6 leading-relaxed max-w-md">
+            กรุณาเพิ่มรายวิชาที่สอนและกำหนดห้องเรียนในเมนู 'หลักสูตร / รายวิชา' เพื่อเริ่มต้นเช็คชื่อนักเรียน
+          </p>
+          <button
+            type="button"
+            onClick={() => onDeepNavigate?.({ view: 'settings' })}
+            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>ไปที่การตั้งค่าหลักสูตร / รายวิชา</span>
+          </button>
+        </div>
+      ) : (
+        <>
       {/* ========================================================================= */}
       {/* CONTROLS BAR: เลือกรายวิชา • ห้องเรียน • วันที่ • เช็คชื่อวันนี้          */}
       {/* ========================================================================= */}
@@ -1245,6 +1279,8 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
           </div>
         </div>
       </div>
+        </>
+      )}
 
       {/* ========================================================================= */}
       {/* MODAL: CLASSROOM TERM CUMULATIVE STATS                                    */}

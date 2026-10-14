@@ -16,6 +16,7 @@ import {
   type MorningAssemblyRecord,
 } from '../../services/attendanceCorrelationService';
 import { cleanSlateService } from '../../services/cleanSlateService';
+import { studentService } from '../../services/studentService';
 
 export type PaperLedgerMode =
   | 'MORNING_ASSEMBLY'
@@ -66,112 +67,26 @@ const DEFAULT_PERIODS: PeriodDef[] = [
   { index: 4, label: 'คาบ 5 (วันนี้)', date: '28 ก.ย.' },
 ];
 
-const DEFAULT_ASSIGNMENTS: AssignmentColumnDef[] = [
-  {
-    id: 'hw-1',
-    shortTitle: 'งาน 1',
-    fullTitle: 'ใบงานที่ 1: ทัศนธาตุและหลักการวาดเส้น',
-    maxScore: 15,
-    dueDate: '10 ก.ย.',
-  },
-  {
-    id: 'hw-2',
-    shortTitle: 'งาน 2',
-    fullTitle: 'ชิ้นงานที่ 2: ออกแบบโปสเตอร์ (Canva / รูป R2)',
-    maxScore: 15,
-    dueDate: '17 ก.ย.',
-  },
-  {
-    id: 'hw-3',
-    shortTitle: 'งาน 3',
-    fullTitle: 'ใบงานที่ 3: ทฤษฎีสีและการระบายสีน้ำ',
-    maxScore: 15,
-    dueDate: '24 ก.ย.',
-  },
-  {
-    id: 'hw-4',
-    shortTitle: 'งาน 4',
-    fullTitle: 'แฟ้มสะสมงานศิลปะ (Portfolio)',
-    maxScore: 15,
-    dueDate: '28 ก.ย.',
-  },
-];
+const DEFAULT_ASSIGNMENTS: AssignmentColumnDef[] = [];
 
-const INITIAL_STUDENT_NAMES = [
-  { id: '45101', name: 'เด็กชายกันต์ริศย์ ทวีเศรษฐกร' },
-  { id: '45102', name: 'เด็กชายกิตติรัตน์ แสนสะกุล' },
-  { id: '45103', name: 'เด็กชายเขมินทรา วงศ์ประทุม' },
-  { id: '45104', name: 'เด็กชายเจษฎาภรณ์ แก้วมณี' },
-  { id: '45105', name: 'เด็กชายชยพล พงศ์พิพัฒน์' },
-  { id: '45106', name: 'เด็กชายณัฐพงศ์ ศรีสุวรรณ' },
-  { id: '45107', name: 'เด็กชายธนกฤต วงศ์สว่าง' },
-  { id: '45108', name: 'เด็กชายธีรภัทร อินทร์แปลง' },
-  { id: '45109', name: 'เด็กชายนภัสกร จันทร์เพ็ญ' },
-  { id: '45110', name: 'เด็กชายปุณณวิชญ์ โคตรสมบัติ' },
-  { id: '45111', name: 'เด็กหญิงกมลชนก ทองดี' },
-  { id: '45112', name: 'เด็กหญิงกัญญาณัฐ พรมราช' },
-  { id: '45113', name: 'เด็กหญิงจิดาภา แสงสุวรรณ' },
-  { id: '45114', name: 'เด็กหญิงชนากานต์ วงศ์คำ' },
-  { id: '45115', name: 'เด็กหญิงชลธิชา นามวงศ์' },
-  { id: '45116', name: 'เด็กหญิงณัฐณิชา ศรีบุญเรือง' },
-  { id: '45117', name: 'เด็กหญิงธัญญารัตน์ คำภีระ' },
-  { id: '45118', name: 'เด็กหญิงนันท์นภัส สุขเกษม' },
-  { id: '45119', name: 'เด็กหญิงปภาวรินท์ ไชยราช' },
-  { id: '45120', name: 'เด็กหญิงพิมลพรรณ วงศ์สะอาด' },
-];
-
-function buildInitialRows(): StudentPaperRow[] {
-  if (cleanSlateService.isCleanSlateActive()) {
+function buildInitialRows(selectedRoom?: string): StudentPaperRow[] {
+  if (cleanSlateService.isCleanSlateActive() || !selectedRoom) {
     return [];
   }
-  return INITIAL_STUDENT_NAMES.map((st, idx) => {
-    const isMissingSome = idx === 2 || idx === 6 || idx === 13;
-    return {
-      no: idx + 1,
-      studentId: st.id,
-      fullName: st.name,
-      morningStatus: idx === 2 ? 'ABSENT' : idx === 6 ? 'LATE' : idx === 13 ? 'LEAVE' : 'PRESENT',
-      classPeriods: [
-        'PRESENT',
-        idx === 6 ? 'LATE' : 'PRESENT',
-        idx === 2 ? 'ABSENT' : 'PRESENT',
-        idx === 13 ? 'LEAVE' : 'PRESENT',
-        idx === 2 ? 'ABSENT' : idx === 6 ? 'LATE' : 'PRESENT',
-      ],
-      homeworks: {
-        'hw-1': {
-          submitted: true,
-          score: 14 - (idx % 3),
-          attachmentType: 'R2_IMAGE',
-          attachmentLabel: 'ใบงาน_1.webp',
-          attachmentUrl: 'https://r2.kutchap.ac.th/art/hw1-sample.webp',
-        },
-        'hw-2': {
-          submitted: !isMissingSome,
-          score: isMissingSome ? '' : 15 - (idx % 2),
-          attachmentType: isMissingSome ? 'NONE' : 'CANVA_LINK',
-          attachmentLabel: isMissingSome ? '' : 'Canva โปสเตอร์',
-          attachmentUrl: 'https://www.canva.com/design/DAFkutchap/view',
-        },
-        'hw-3': {
-          submitted: idx !== 2,
-          score: idx === 2 ? '' : 13 + (idx % 3),
-          attachmentType: idx === 2 ? 'NONE' : 'R2_IMAGE',
-          attachmentLabel: idx === 2 ? '' : 'สีน้ำ_3.webp',
-          attachmentUrl: 'https://r2.kutchap.ac.th/art/hw3-sample.webp',
-        },
-        'hw-4': {
-          submitted: !isMissingSome && idx !== 10,
-          score: isMissingSome || idx === 10 ? '' : 14,
-          attachmentType: isMissingSome || idx === 10 ? 'NONE' : 'CANVA_LINK',
-          attachmentLabel: 'Portfolio',
-          attachmentUrl: 'https://www.canva.com/design/DAFportfolio/view',
-        },
-      },
-      midtermScore: idx === 2 ? 11 : 15 + (idx % 4),
-      finalScore: idx === 2 ? 12 : 16 + (idx % 4),
-    };
-  });
+  const students = studentService.getStudents(selectedRoom);
+  if (!students || students.length === 0) {
+    return [];
+  }
+  return students.map((st, idx) => ({
+    no: st.no || idx + 1,
+    studentId: st.code || st.id,
+    fullName: st.name,
+    morningStatus: 'PRESENT',
+    classPeriods: ['PRESENT', 'PRESENT', 'PRESENT', 'PRESENT', 'PRESENT'],
+    homeworks: {},
+    midtermScore: '',
+    finalScore: '',
+  }));
 }
 
 function computeThaiGrade(total: number, hasMissingWork: boolean): string {
@@ -196,6 +111,7 @@ const NEXT_STATUS: Record<AttendanceStatus, AttendanceStatus> = {
 interface PaperRegisterLedgerProps {
   initialMode?: PaperLedgerMode;
   defaultRoom?: string;
+  availableRooms?: string[];
   subjectLabel?: string;
   hideModeSwitcher?: boolean;
   hideMorningAssembly?: boolean;
@@ -205,8 +121,9 @@ interface PaperRegisterLedgerProps {
 
 export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
   initialMode = 'HOMEWORK_CHECK',
-  defaultRoom = 'ม.3/1',
-  subjectLabel = 'ศ23101 ศิลปะ 3',
+  defaultRoom = '',
+  availableRooms = [],
+  subjectLabel = '',
   hideModeSwitcher = false,
   hideMorningAssembly = false,
   onModeChange,
@@ -219,7 +136,7 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
     return initialMode;
   });
   const containerRef = useRef<HTMLDivElement>(null);
-  const [selectedRoom, setSelectedRoom] = useState<string>(defaultRoom);
+  const [selectedRoom, setSelectedRoom] = useState<string>(defaultRoom || availableRooms[0] || '');
   const [attendanceViewType, setAttendanceViewType] = useState<'MULTI_PERIOD' | 'TODAY_SINGLE'>('MULTI_PERIOD');
   const [assignments, setAssignments] = useState<AssignmentColumnDef[]>(() =>
     cleanSlateService.isCleanSlateActive() ? [] : DEFAULT_ASSIGNMENTS
@@ -237,7 +154,19 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
     return 'AUTO_PREFILL';
   });
 
-  const [rows, setRows] = useState<StudentPaperRow[]>(() => buildInitialRows());
+  const [rows, setRows] = useState<StudentPaperRow[]>(() => buildInitialRows(defaultRoom || availableRooms[0] || ''));
+
+  useEffect(() => {
+    if (defaultRoom) {
+      setSelectedRoom(defaultRoom);
+    } else if (availableRooms.length > 0 && !selectedRoom) {
+      setSelectedRoom(availableRooms[0]);
+    }
+  }, [defaultRoom, availableRooms]);
+
+  useEffect(() => {
+    setRows(buildInitialRows(selectedRoom));
+  }, [selectedRoom]);
   const [savedToast, setSavedToast] = useState<string | null>(null);
   const [previewAttachment, setPreviewAttachment] = useState<{
     studentName: string;
@@ -627,7 +556,7 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
             สมุด ปพ.5 • ชั้น {selectedRoom} ({rows.length} คน)
           </span>
           <div className="inline-flex rounded-lg bg-white/90 p-0.5 border border-cyan-300">
-            {['ม.2/1', 'ม.3/1', 'ม.1/8'].map((rm) => (
+            {(availableRooms && availableRooms.length > 0 ? availableRooms : selectedRoom ? [selectedRoom] : []).map((rm) => (
               <button
                 key={rm}
                 type="button"
@@ -699,7 +628,7 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
               </button>
             </div>
 
-            {/* ทางลัดไปเช็คแถวเช้าห้องที่ปรึกษา ม.3/1 (แยกตามคำสั่ง) */}
+            {/* ทางลัดไปเช็คแถวเช้าห้องที่ปรึกษา */}
             {hideMorningAssembly && (
               <button
                 type="button"
@@ -711,9 +640,9 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
                   }
                 }}
                 className="px-2.5 py-1 rounded-xl bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
-                title="สลับไปหน้าเช็คแถวเช้า 07:45 น. ห้องที่ปรึกษา ม.3/1"
+                title="สลับไปหน้าเช็คแถวเช้า 07:45 น. (ห้องที่ปรึกษา)"
               >
-                <span>☀️ ไปเช็คแถวเช้า ม.3/1 (ที่ปรึกษา) ↗</span>
+                <span>☀️ ไปเช็คแถวเช้า (ห้องที่ปรึกษา) ↗</span>
               </button>
             )}
           </div>

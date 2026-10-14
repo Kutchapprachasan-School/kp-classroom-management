@@ -1,8 +1,9 @@
 // src/components/dashboard/TeacherAnnouncementsWidget.tsx
-// วิดเจ็ตข่าวสาร / ประกาศ ตามภาพต้นแบบ Mockup Image 1
+// วิดเจ็ตข่าวสาร / ประกาศ เชื่อมต่อกับระบบประกาศจริง (Zero Mock Data)
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Megaphone, ChevronRight } from 'lucide-react';
+import { messagingService } from '../../services/messagingService.ts';
 
 interface AnnouncementItem {
   id: string;
@@ -11,21 +12,6 @@ interface AnnouncementItem {
   timestamp: string;
 }
 
-const ANNOUNCEMENTS_MOCK: AnnouncementItem[] = [
-  {
-    id: 'a-1',
-    dotColor: 'bg-amber-500',
-    title: 'ประกาศ : กิจกรรมวันภาษาอังกฤษ (2 ต.ค. 2569)',
-    timestamp: 'เมื่อวานนี้ 16:30',
-  },
-  {
-    id: 'a-2',
-    dotColor: 'bg-blue-500',
-    title: 'แจ้งนักเรียน : การส่งงานภาษาญี่ปุ่น',
-    timestamp: '1 ต.ค. 2569 10:15',
-  },
-];
-
 interface TeacherAnnouncementsWidgetProps {
   onViewAll?: () => void;
 }
@@ -33,6 +19,28 @@ interface TeacherAnnouncementsWidgetProps {
 export const TeacherAnnouncementsWidget: React.FC<TeacherAnnouncementsWidgetProps> = ({
   onViewAll,
 }) => {
+  // ดึงประกาศจริงจากกลุ่มประชาสัมพันธ์ทางการของโรงเรียน
+  const announcements = useMemo<AnnouncementItem[]>(() => {
+    try {
+      const officialGroup = messagingService.getGroupById('grp-official-announcements');
+      if (officialGroup && officialGroup.messages) {
+        return officialGroup.messages
+          .filter((m) => !m.isSystemAudit)
+          .slice(-3)
+          .reverse()
+          .map((m, idx) => ({
+            id: m.id,
+            dotColor: idx === 0 ? 'bg-amber-500' : 'bg-blue-500',
+            title: m.content.length > 65 ? `${m.content.slice(0, 65)}...` : m.content,
+            timestamp: m.timestamp,
+          }));
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  }, []);
+
   return (
     <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-xs overflow-hidden select-none">
       {/* Header */}
@@ -53,23 +61,38 @@ export const TeacherAnnouncementsWidget: React.FC<TeacherAnnouncementsWidgetProp
         </button>
       </div>
 
-      {/* List */}
-      <div className="p-3 sm:p-4 space-y-3">
-        {ANNOUNCEMENTS_MOCK.map((item) => (
-          <div key={item.id} className="flex items-start gap-2.5">
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${item.dotColor} shrink-0 mt-1.5 ring-4 ring-slate-50`}
-            />
-            <div className="min-w-0 flex-1">
-              <h3 className="font-bold text-slate-800 text-xs sm:text-sm leading-snug hover:text-blue-600 transition-colors cursor-pointer">
-                {item.title}
-              </h3>
-              <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                {item.timestamp}
-              </p>
-            </div>
+      {/* List or Empty State */}
+      <div className="p-3 sm:p-4">
+        {announcements.length > 0 ? (
+          <div className="space-y-3">
+            {announcements.map((item) => (
+              <div key={item.id} className="flex items-start gap-2.5">
+                <span
+                  className={`w-2.5 h-2.5 rounded-full ${item.dotColor} shrink-0 mt-1.5 ring-4 ring-slate-50`}
+                />
+                <div className="min-w-0 flex-1">
+                  <h3
+                    onClick={onViewAll}
+                    className="font-bold text-slate-800 text-xs sm:text-sm leading-snug hover:text-blue-600 transition-colors cursor-pointer"
+                  >
+                    {item.title}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                    {item.timestamp}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
+        ) : (
+          <div className="text-center py-5 flex flex-col items-center justify-center">
+            <div className="w-9 h-9 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center mb-1.5">
+              <Megaphone className="w-4 h-4 text-blue-500" />
+            </div>
+            <p className="font-bold text-slate-700 text-xs sm:text-sm">ไม่มีข่าวสารหรือประกาศใหม่</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">ประกาศทางการของโรงเรียนจะแสดงที่นี่</p>
+          </div>
+        )}
       </div>
     </div>
   );

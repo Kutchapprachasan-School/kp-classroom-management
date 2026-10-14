@@ -393,12 +393,13 @@ export const convertHolidayToCalendarEvent = (
   holiday: SpecialHolidayRecord
 ): CalendarEventItem => {
   const { day, month, year } = parseThaiDateString(holiday.date);
+  const cleanDate = holiday.date.startsWith('วันที่') ? holiday.date : `วันที่ ${holiday.date}`;
   return {
     id: `holiday-${holiday.id}`,
     day,
     month,
     year,
-    fullDateLabel: `วันที่ ${day} ${holiday.date}`,
+    fullDateLabel: cleanDate,
     title: holiday.name.startsWith('วัน') ? holiday.name : `วันหยุด: ${holiday.name}`,
     category: 'OTHER',
     colorType: holiday.type === 'GOVERNMENT' ? 'PURPLE' : 'ORANGE',
@@ -413,12 +414,13 @@ export const convertMakeupDayToCalendarEvent = (
   makeup: WeekendMakeupDayRecord
 ): CalendarEventItem => {
   const { day, month, year } = parseThaiDateString(makeup.date);
+  const cleanDate = makeup.date.startsWith('วันที่') ? makeup.date : `วันที่ ${makeup.date}`;
   return {
     id: `makeup-${makeup.id}`,
     day,
     month,
     year,
-    fullDateLabel: `วันที่ ${day} ${makeup.date}`,
+    fullDateLabel: cleanDate,
     title: makeup.title,
     category: 'ACADEMIC',
     colorType: 'GREEN',

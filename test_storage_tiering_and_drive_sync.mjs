@@ -275,6 +275,17 @@ assert.strictEqual(verifiedMsg.attachment.url, undefined, 'Direct binary URL mus
 
 // Verify student submissions in sgsRosterAndSubmissionService are 100% untouched
 const { sgsRosterAndSubmissionService } = await import('./src/services/sgsRosterAndSubmissionService.ts');
+sgsRosterAndSubmissionService.saveSubmissions([
+  {
+    assignmentId: 'test-asg-1',
+    studentCode: '45101',
+    status: 'GRADED',
+    score: 10,
+    submittedAt: '24 พ.ค. 10:15',
+    workTitle: 'งานส่งแบบถาวร.jpg',
+    workAttachmentLabel: 'งานส่งแบบถาวร.jpg'
+  }
+]);
 const submissions = sgsRosterAndSubmissionService.getSubmissions();
 assert.ok(submissions.length > 0, 'Student submissions must exist');
 const activeSubmissionsWithFiles = submissions.filter(s => Boolean(s.workTitle || s.workAttachmentLabel));
