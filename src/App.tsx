@@ -22,7 +22,6 @@ import { StudentPortalView } from './views/StudentPortalView';
 import { SchoolPortalView, type TeacherLoginChannel } from './views/SchoolPortalView';
 import { HomeVisitSdqView } from './views/HomeVisitSdqView';
 import { StudentAffairsCouncilView } from './views/StudentAffairsCouncilView';
-import { AdminExecutiveDashboardView } from './views/AdminExecutiveDashboardView';
 import { SchoolLeaveExecutiveDashboardView } from './views/SchoolLeaveExecutiveDashboardView';
 import { MorningAssemblyView } from './views/MorningAssemblyView';
 import { ClassroomAttendanceView } from './views/ClassroomAttendanceView';
@@ -31,7 +30,6 @@ import type { AtRiskStudent } from './types/viewModels';
 import {
   Eye,
   GraduationCap,
-  LayoutDashboard,
   Home,
   UserCheck,
   FileSpreadsheet,
@@ -241,8 +239,6 @@ export const App: React.FC = () => {
     switch (currentView) {
       case 'home':
         return 'หน้าแรก';
-      case 'admin-dashboard':
-        return `แดชบอร์ดผู้บริหาร • ${schoolSettings.nameTh}`;
       case 'school-leave-dashboard':
         return `แดชบอร์ดบริหารระบบการลา • ${schoolSettings.nameTh}`;
       case 'class-overview':
@@ -456,7 +452,6 @@ export const App: React.FC = () => {
             <div className="max-w-7xl mx-auto flex items-center gap-1.5 flex-wrap mt-2 pt-2 border-t border-slate-800">
               {[
                 { key: 'school-login', label: 'หน้า Login', icon: LogIn },
-                { key: 'admin-dashboard', label: '★ Dashboard ผู้บริหาร', icon: LayoutDashboard },
                 { key: 'school-leave-dashboard', label: '★ Dashboard ระบบการลา', icon: FileCheck },
                 { key: 'home', label: '1. หน้าหลักครู', icon: Home },
                 { key: 'class-overview', label: '2. คะแนนนักเรียน (ปพ.5)', icon: Users },
@@ -527,17 +522,6 @@ export const App: React.FC = () => {
           onChangeStudentRole={(stuRole) => setActiveRole(stuRole)}
           onSwitchToTeacherRole={(tRole) => handleChangeRole(tRole)}
           onExit={handleLogout}
-        />
-      ) : currentView === 'admin-dashboard' ? (
-        <AdminExecutiveDashboardView
-          activeRole={activeRole}
-          onChangeRole={handleChangeRole}
-          onNavigateToView={(viewKey) => {
-            setCurrentView(viewKey as TeacherViewKey);
-          }}
-          onLogout={handleLogout}
-          currentUser={currentAuthUser}
-          schoolSettings={schoolSettings}
         />
       ) : currentView === 'school-leave-dashboard' ? (
         <SchoolLeaveExecutiveDashboardView

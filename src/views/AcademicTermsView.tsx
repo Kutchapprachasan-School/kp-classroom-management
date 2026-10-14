@@ -601,8 +601,11 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
   const [roleFilter, setRoleFilter] = useState<'TEACHER' | 'STUDENT'>('TEACHER');
   const [viewMode, setViewMode] = useState<'MONTH' | 'WEEK' | 'DAY'>('MONTH');
   const [selectedMonthOffset, setSelectedMonthOffset] = useState<number>(0); // -1 = ก.ย., 0 = ต.ค., 1 = พ.ย.
-  const [selectedDayNumber, setSelectedDayNumber] = useState<number>(2); // Default 2 ต.ค. (วันนี้)
-  const [selectedWeekIndex, setSelectedWeekIndex] = useState<number>(0); // Default week 0 (contains 2 ต.ค.)
+  const [selectedDayNumber, setSelectedDayNumber] = useState<number>(() => new Date().getDate()); // วันที่ปัจจุบัน
+  const [selectedWeekIndex, setSelectedWeekIndex] = useState<number>(() => {
+    const d = new Date().getDate();
+    return Math.min(4, Math.max(0, Math.floor((d + 2) / 7)));
+  });
 
   const [events, setEvents] = useState<CalendarEventItem[]>(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -660,8 +663,8 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
   // Form state for new / edit activity event (รองรับวันที่จัดกิจกรรมเต็มรูปแบบ)
   const [isMultiDay, setIsMultiDay] = useState(false);
   const [newEventTitle, setNewEventTitle] = useState('');
-  const [newEventDay, setNewEventDay] = useState<number>(2);
-  const [newEventEndDay, setNewEventEndDay] = useState<number>(2);
+  const [newEventDay, setNewEventDay] = useState<number>(() => new Date().getDate());
+  const [newEventEndDay, setNewEventEndDay] = useState<number>(() => new Date().getDate());
   const [newEventMonth, setNewEventMonth] = useState<number>(10);
   const [newEventYear, setNewEventYear] = useState<number>(2569);
   const [newEventIsAllDay, setNewEventIsAllDay] = useState(false);
@@ -674,7 +677,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
   const [newEventDescription, setNewEventDescription] = useState('');
 
   // ฟังก์ชันเปิดโมดอลสร้างกิจกรรมใหม่
-  const handleOpenCreateModal = (day = 2) => {
+  const handleOpenCreateModal = (day = new Date().getDate()) => {
     setEditingEventId(null);
     setNewEventTitle('');
     setNewEventDay(day);
@@ -1090,9 +1093,13 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
             <button
               type="button"
               onClick={() => {
+                const today = new Date();
+                const todayDate = today.getDate();
                 setSelectedMonthOffset(0);
+                setSelectedDayNumber(todayDate);
+                setSelectedWeekIndex(Math.min(4, Math.max(0, Math.floor((todayDate + 2) / 7))));
                 setViewMode('MONTH');
-                const todayItem = allEvents.find((e) => e.day === 2);
+                const todayItem = allEvents.find((e) => e.day === todayDate);
                 if (todayItem) setSelectedEvent(todayItem);
               }}
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-blue-200 bg-white hover:bg-blue-50/50 text-blue-600 font-bold text-xs shadow-2xs transition-colors cursor-pointer"
@@ -1110,25 +1117,35 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
               <div className="min-w-[700px] lg:min-w-0">
                 {/* 7 Columns Header Row */}
                 <div className="grid grid-cols-7 border-b border-slate-200 divide-x divide-slate-100 text-center font-bold text-xs sm:text-sm">
-                  <div className="py-2.5 text-rose-700 bg-rose-50/50">อาทิตย์</div>
-                  <div className="py-2.5 text-slate-700 bg-slate-50/40">จันทร์</div>
-                  <div className="py-2.5 text-slate-700 bg-slate-50/40">อังคาร</div>
-                  <div className="py-2.5 text-slate-700 bg-slate-50/40">พุธ</div>
-                  <div className="py-2.5 text-blue-700 bg-blue-50/60 font-extrabold border-x border-blue-100/70">
-                    พฤหัสบดี
-                  </div>
-                  <div className="py-2.5 text-slate-700 bg-slate-50/40">ศุกร์</div>
-                  <div className="py-2.5 text-rose-700 bg-rose-50/50">เสาร์</div>
+                  {['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'].map((dayName, colIdx) => {
+                    const isTodayColumn = colIdx === new Date().getDay() && selectedMonthOffset === 0;
+                    const isWeekendCol = colIdx === 0 || colIdx === 6;
+                    return (
+                      <div
+                        key={dayName}
+                        className={`py-2.5 ${
+                          isTodayColumn
+                            ? 'text-blue-700 bg-blue-50/60 font-extrabold border-x border-blue-100/70'
+                            : isWeekendCol
+                            ? 'text-rose-700 bg-rose-50/50'
+                            : 'text-slate-700 bg-slate-50/40'
+                        }`}
+                      >
+                        {dayName}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* 35 Calendar Cells Grid (5 Rows x 7 Columns) */}
                 <div className="grid grid-cols-7 divide-x divide-slate-100">
                   {calendarCells.map((cell, idx) => {
+                    const todayDate = new Date().getDate();
                     const isCurrentMonth = cell.isCurrentMonth;
                     const dayNumber = cell.day;
                     const colIndex = idx % 7;
-                    const isThursday = colIndex === 4;
-                    const isToday = isCurrentMonth && dayNumber === 2;
+                    const isTodayColumn = colIndex === new Date().getDay() && selectedMonthOffset === 0;
+                    const isToday = isCurrentMonth && dayNumber === todayDate && selectedMonthOffset === 0;
                     const isLastRow = idx >= 28;
                     const dayEvents = isCurrentMonth
                       ? allEvents.filter((e) => {
@@ -1155,7 +1172,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                       ? 'bg-rose-50/90 border border-rose-200/90 hover:bg-rose-100/70'
                       : isWeekend
                       ? 'bg-rose-50/30 hover:bg-rose-50/60'
-                      : isThursday
+                      : isTodayColumn
                       ? 'bg-blue-50/20 hover:bg-blue-50/40'
                       : 'bg-white hover:bg-slate-50/60';
 
@@ -1310,7 +1327,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
               {weekDays.map((cell, colIdx) => {
                 const dayNumber = cell.day;
                 const isCurrentMonth = cell.isCurrentMonth;
-                const isToday = isCurrentMonth && dayNumber === 2;
+                const isToday = isCurrentMonth && dayNumber === new Date().getDate() && selectedMonthOffset === 0;
                 const dayName = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'][colIdx];
 
                 const dayEvents = isCurrentMonth
@@ -1443,7 +1460,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                   <span className="font-black text-base sm:text-lg text-slate-900">
                     วัน{getThaiDayOfWeekName(selectedDayNumber)}ที่ {selectedDayNumber} ตุลาคม 2569
                   </span>
-                  {selectedDayNumber === 2 && (
+                  {selectedDayNumber === new Date().getDate() && selectedMonthOffset === 0 && (
                     <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-blue-600 text-white shadow-2xs">
                       วันนี้
                     </span>

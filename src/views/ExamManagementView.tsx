@@ -307,16 +307,37 @@ D) ผู้อำนวยการ
 
   // User-requested Student Exam KPIs: สอบแล้วกี่คน, ยังไม่สอบกี่คน, สอบตกกี่คน (ซ่อมผ่าน/เหลือซ่อม)
   const studentExamKpis = useMemo(() => {
-    // คำนวณสรุปผลภาพรวมนักเรียนในระดับชั้น / ห้องเรียน
-    const totalStudentsInRoom = 39;
-    const completedCount = 38;
-    const pendingCount = 1;
-    const completedPct = 97.4;
-    const pendingPct = 2.6;
+    if (exams.length === 0) {
+      return {
+        totalStudentsInRoom: 0,
+        completedCount: 0,
+        pendingCount: 0,
+        completedPct: 0,
+        pendingPct: 0,
+        failedTotal: 0,
+        remedialPassed: 0,
+        remedialPending: 0,
+      };
+    }
 
-    const failedTotal = 4;
-    const remedialPassed = 3;
-    const remedialPending = 1;
+    // คำนวณสรุปผลภาพรวมนักเรียนจากการสอบจริงในระบบ
+    let totalCompleted = 0;
+    let totalRoster = 0;
+    exams.forEach((ex) => {
+      if (ex.statusRatio && ex.statusRatio.includes('/')) {
+        const [done, total] = ex.statusRatio.split('/').map(Number);
+        if (!isNaN(done) && !isNaN(total) && total > 0) {
+          totalCompleted = Math.max(totalCompleted, done);
+          totalRoster = Math.max(totalRoster, total);
+        }
+      }
+    });
+
+    const totalStudentsInRoom = totalRoster > 0 ? totalRoster : 0;
+    const completedCount = totalCompleted > 0 ? Math.min(totalCompleted, totalStudentsInRoom) : 0;
+    const pendingCount = Math.max(0, totalStudentsInRoom - completedCount);
+    const completedPct = totalStudentsInRoom > 0 ? Number(((completedCount / totalStudentsInRoom) * 100).toFixed(1)) : 0;
+    const pendingPct = totalStudentsInRoom > 0 ? Number(((pendingCount / totalStudentsInRoom) * 100).toFixed(1)) : 0;
 
     return {
       totalStudentsInRoom,
@@ -324,9 +345,9 @@ D) ผู้อำนวยการ
       pendingCount,
       completedPct,
       pendingPct,
-      failedTotal,
-      remedialPassed,
-      remedialPending,
+      failedTotal: 0,
+      remedialPassed: 0,
+      remedialPending: 0,
     };
   }, [exams]);
 

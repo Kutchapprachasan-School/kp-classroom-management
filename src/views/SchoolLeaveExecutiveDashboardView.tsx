@@ -159,7 +159,7 @@ export const SchoolLeaveExecutiveDashboardView: React.FC<
         <AdminSidebar
           currentMenu="personnel-hr"
           onSelectMenu={(key) => {
-            if (key === 'home') onNavigateToView?.('admin-dashboard');
+            if (key === 'home') onNavigateToView?.('home');
             else if (key === 'system-settings') onNavigateToView?.('settings');
             else if (key === 'attendance') onNavigateToView?.('student-affairs');
             else if (key === 'academic-results') onNavigateToView?.('readiness');
@@ -195,10 +195,10 @@ export const SchoolLeaveExecutiveDashboardView: React.FC<
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => onNavigateToView?.('admin-dashboard')}
+                onClick={() => onNavigateToView?.('home')}
                 className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
               >
-                <span>กลับสู่ Dashboard กลาง</span>
+                <span>กลับสู่หน้าหลัก</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
 

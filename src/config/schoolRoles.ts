@@ -518,7 +518,7 @@ export const SCHOOL_ROLE_PROFILES: Record<SchoolUserRole, SchoolRoleProfile> = {
     userPosition: 'ผู้อำนวยการโรงเรียน • ผู้บริหารและผู้ดูแลระบบ',
     emailOrCode: 'admin@khamyang.ac.th',
     department: 'ฝ่ายบริหารโรงเรียนคำยางพิทยา',
-    defaultView: 'admin-dashboard',
+    defaultView: 'home',
     description:
       'แดชบอร์ดผู้บริหารโรงเรียนคำยางพิทยา กำกับติดตามผลการเรียน การเข้าเรียน ประเมินบุคลากร งบประมาณการเงิน งานซ่อมบำรุง และ AI ผู้ช่วยผู้บริหาร',
     keyPermissions: [

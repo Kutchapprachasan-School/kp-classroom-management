@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import type { SchoolUserRole } from '../config/schoolRoles';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
+import { cleanSlateService } from '../services/cleanSlateService';
 
 interface CrossClassSarViewProps {
   activeRole?: SchoolUserRole;
@@ -435,6 +436,26 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
 
   // ดึงชุดข้อมูลผู้สอนที่เลือก (รองรับดูทุกคน และดูรายบุคคล)
   const currentTeacherProfile = useMemo<TeacherProfileOption>(() => {
+    if (cleanSlateService.isCleanSlateActive()) {
+      return {
+        id: selectedTeacherKey,
+        name: isExecutiveOrAdmin && selectedTeacherKey === 'ALL' ? 'ครูผู้สอนทุกคน (ภาพรวมทั้งโรงเรียน)' : 'นายภาสภูมิ เรืองปราชญ์',
+        department: isExecutiveOrAdmin && selectedTeacherKey === 'ALL' ? 'ทุกกลุ่มสาระการเรียนรู้' : 'กลุ่มสาระการเรียนรู้ศิลปะ (ดนตรี)',
+        courses: [],
+        kpiStats: {
+          gpaPercent: 0,
+          gpaTrend: '0%',
+          totalStudents: 0,
+          passedCount: 0,
+          passedPercent: 0,
+          remedialCount: 0,
+          remedialPercent: 0,
+          goodAboveCount: 0,
+          goodAbovePercent: 0,
+        },
+      };
+    }
+
     if (!isExecutiveOrAdmin) {
       // ครูทั่วไปถูกล็อกให้ดูเฉพาะงานของตนเอง
       return ALL_TEACHERS_DATA['passapoom'];
@@ -604,16 +625,7 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
 
   // สรุปสถิติ KPI (หากเป็นมุมมองเริ่มต้นของครูภาสภูมิ จะใช้ตัวเลขเป๊ะตาม Image 2 มิฉะนั้นคำนวณตามข้อมูลจริง)
   const stats = useMemo(() => {
-    if (
-      selectedTeacherKey === 'passapoom' &&
-      selectedGradeLevelFilter === 'ALL' &&
-      selectedRoomFilter === 'ALL' &&
-      selectedSubjectFilter === 'ALL'
-    ) {
-      return ALL_TEACHERS_DATA.passapoom.kpiStats;
-    }
-
-    if (displayedCourses.length === 0) {
+    if (cleanSlateService.isCleanSlateActive() || displayedCourses.length === 0) {
       return {
         gpaPercent: 0,
         gpaTrend: '0%',
@@ -625,6 +637,17 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
         goodAboveCount: 0,
         goodAbovePercent: 0,
       };
+    }
+
+    if (
+      !cleanSlateService.isCleanSlateActive() &&
+      selectedTeacherKey === 'passapoom' &&
+      selectedGradeLevelFilter === 'ALL' &&
+      selectedRoomFilter === 'ALL' &&
+      selectedSubjectFilter === 'ALL' &&
+      displayedCourses.length > 0
+    ) {
+      return ALL_TEACHERS_DATA.passapoom.kpiStats;
     }
 
     const totalStudents = displayedCourses.reduce((sum, c) => sum + c.studentCount, 0);

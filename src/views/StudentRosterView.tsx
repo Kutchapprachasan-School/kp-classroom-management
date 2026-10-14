@@ -227,13 +227,13 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
   }, [students]);
 
   // 4 KPI Stat calculations
-  const totalCount = students.length || 32;
+  const totalCount = students.length;
   const normalCount = useMemo(() => {
     let count = 0;
     students.forEach((s) => {
       if (studentAttendanceMap.get(s.id) === 'NORMAL') count++;
     });
-    return count || 28;
+    return count;
   }, [students, studentAttendanceMap]);
 
   const absentCount = useMemo(() => {
@@ -241,7 +241,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
     students.forEach((s) => {
       if (studentAttendanceMap.get(s.id) === 'ABSENT') count++;
     });
-    return count || 3;
+    return count;
   }, [students, studentAttendanceMap]);
 
   const leaveCount = useMemo(() => {
@@ -249,12 +249,12 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
     students.forEach((s) => {
       if (studentAttendanceMap.get(s.id) === 'LEAVE') count++;
     });
-    return count || 1;
+    return count;
   }, [students, studentAttendanceMap]);
 
-  const normalPct = Math.round((normalCount / totalCount) * 100);
-  const absentPct = Math.round((absentCount / totalCount) * 100);
-  const leavePct = Math.round((leaveCount / totalCount) * 100);
+  const normalPct = totalCount > 0 ? Math.round((normalCount / totalCount) * 100) : 0;
+  const absentPct = totalCount > 0 ? Math.round((absentCount / totalCount) * 100) : 0;
+  const leavePct = totalCount > 0 ? Math.round((leaveCount / totalCount) * 100) : 0;
 
   // Filter & Sort Students
   const filteredStudents = useMemo(() => {

@@ -28,6 +28,7 @@ import {
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 import { coursesCurriculumService, type CourseCurriculumRecord } from '../services/coursesCurriculumService';
 import { cleanSlateService } from '../services/cleanSlateService';
+import { classroomService } from '../services/classroomService';
 
 // ==========================================
 // DATA TYPES
@@ -419,11 +420,30 @@ export const LessonPlansView: React.FC = () => {
   });
   const [selectedCourseIndex, setSelectedCourseIndex] = useState(0);
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
-  const [selectedClassroom, setSelectedClassroom] = useState('ม.3/1');
+  const [classroomsList, setClassroomsList] = useState<string[]>([]);
+  const [selectedClassroom, setSelectedClassroom] = useState('');
   const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
   const [selectedSemester, setSelectedSemester] = useState('ภาคเรียนที่ 1/2569');
   const [isSemesterDropdownOpen, setIsSemesterDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Load classrooms dynamically from classroomService
+  useEffect(() => {
+    let mounted = true;
+    classroomService.getAll().then((rooms) => {
+      if (!mounted) return;
+      const names = rooms.map((r) => r.name || r.roomNumber).filter(Boolean);
+      setClassroomsList(names);
+      if (names.length > 0) {
+        setSelectedClassroom((prev) => (prev && names.includes(prev) ? prev : names[0]));
+      } else {
+        setSelectedClassroom('');
+      }
+    }).catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const LESSON_PLANS_STORAGE_KEY = 'cls_lesson_plans_v1';
 
@@ -739,27 +759,33 @@ export const LessonPlansView: React.FC = () => {
                 onClick={() => setIsClassDropdownOpen((prev) => !prev)}
                 className="flex items-center justify-between gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 min-w-[95px] transition-all cursor-pointer"
               >
-                <span>{selectedClassroom}</span>
+                <span>{selectedClassroom || (classroomsList.length > 0 ? classroomsList[0] : 'ยังไม่มีห้องเรียน')}</span>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
               </button>
 
               {isClassDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1.5 w-36 bg-white border border-slate-200 rounded-xl shadow-lg z-30 py-1.5 animate-fade-in">
-                  {['ม.3/1', 'ม.3/2', 'ม.4/1'].map((rm) => (
-                    <button
-                      key={rm}
-                      type="button"
-                      onClick={() => {
-                        setSelectedClassroom(rm);
-                        setIsClassDropdownOpen(false);
-                      }}
-                      className={`w-full text-left px-3.5 py-2 text-xs font-semibold hover:bg-blue-50 ${
-                        selectedClassroom === rm ? 'text-blue-600 bg-blue-50/60 font-bold' : 'text-slate-700'
-                      }`}
-                    >
-                      {rm}
-                    </button>
-                  ))}
+                <div className="absolute top-full left-0 mt-1.5 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-30 py-1.5 animate-fade-in">
+                  {classroomsList.length === 0 ? (
+                    <div className="px-3.5 py-2 text-xs text-slate-400">
+                      ยังไม่ได้สร้างห้องเรียนในระบบ
+                    </div>
+                  ) : (
+                    classroomsList.map((rm) => (
+                      <button
+                        key={rm}
+                        type="button"
+                        onClick={() => {
+                          setSelectedClassroom(rm);
+                          setIsClassDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-3.5 py-2 text-xs font-semibold hover:bg-blue-50 ${
+                          selectedClassroom === rm ? 'text-blue-600 bg-blue-50/60 font-bold' : 'text-slate-700'
+                        }`}
+                      >
+                        {rm}
+                      </button>
+                    ))
+                  )}
                 </div>
               )}
             </div>
@@ -1328,7 +1354,7 @@ export const LessonPlansView: React.FC = () => {
                 onClick={() => setIsClassDropdownOpen((prev) => !prev)}
                 className="w-full flex items-center justify-between px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 cursor-pointer"
               >
-                <span>{selectedClassroom}</span>
+                <span>{selectedClassroom || (classroomsList.length > 0 ? classroomsList[0] : 'ยังไม่มีห้องเรียน')}</span>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
               </button>
             </div>
@@ -1342,28 +1368,36 @@ export const LessonPlansView: React.FC = () => {
                     <Users className="w-4 h-4 text-blue-500" />
                     <span>นักเรียนทั้งหมด</span>
                   </div>
-                  <span className="font-extrabold text-slate-900">32 คน</span>
+                  <span className="font-extrabold text-slate-900">
+                    {cleanSlateService.isCleanSlateActive() || !selectedClassroom ? '0 คน' : '32 คน'}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-slate-600">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                     <span>เข้าเรียนเฉลี่ย</span>
                   </div>
-                  <span className="font-extrabold text-emerald-600">93%</span>
+                  <span className="font-extrabold text-emerald-600">
+                    {cleanSlateService.isCleanSlateActive() || !selectedClassroom ? '0%' : '93%'}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-slate-600">
                     <AlertTriangle className="w-4 h-4 text-amber-500" />
                     <span>ขาดเรียน</span>
                   </div>
-                  <span className="font-extrabold text-amber-600">2 คน</span>
+                  <span className="font-extrabold text-amber-600">
+                    {cleanSlateService.isCleanSlateActive() || !selectedClassroom ? '0 คน' : '2 คน'}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-slate-600">
                     <FileText className="w-4 h-4 text-rose-500" />
                     <span>ลากิจ/ลาป่วย</span>
                   </div>
-                  <span className="font-extrabold text-rose-600">1 คน</span>
+                  <span className="font-extrabold text-rose-600">
+                    {cleanSlateService.isCleanSlateActive() || !selectedClassroom ? '0 คน' : '1 คน'}
+                  </span>
                 </div>
               </div>
             </div>

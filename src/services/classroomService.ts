@@ -559,7 +559,7 @@ export const classroomService = {
         id: `del-${Date.now()}`,
         entityType: 'ชั้นเรียน',
         name: targetName,
-        deletedAt: new Date().toLocaleDateString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }),
+        deletedAt: new Date().toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }),
         deletedBy: 'ผู้ดูแลระบบวิชาการ',
         daysRemaining: 30,
         originalData: target || { id, name: targetName },
