@@ -19,6 +19,7 @@ import {
   RotateCcw,
   Archive,
   Check,
+  BookOpen,
 } from 'lucide-react';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 import {
@@ -30,8 +31,15 @@ import {
 } from '../services/coursesCurriculumService';
 import { classroomService } from '../services/classroomService';
 import type { ClassroomRosterItem } from '../types/viewModels';
+import type { CrossViewNavigationPayload } from '../services/teacherCopilotService';
 
-export const CoursesCurriculumView: React.FC = () => {
+export interface CoursesCurriculumViewProps {
+  onDeepNavigate?: (payload: CrossViewNavigationPayload) => void;
+}
+
+export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
+  onDeepNavigate,
+}) => {
   const [courses, setCourses] = useState<CourseCurriculumRecord[]>(() =>
     coursesCurriculumService.getCourses()
   );
@@ -504,8 +512,8 @@ export const CoursesCurriculumView: React.FC = () => {
 
       {/* 1. Master PageHeroBanner (Clean & Uncluttered) */}
       <PageHeroBanner
-        title="หลักสูตร / แผนการสอน (Curriculum & Lesson Plans)"
-        subtitle="จัดการโครงสร้างรายวิชา หน่วยการเรียนรู้ สื่อการสอน และคัดลอกแผนข้ามปีการศึกษา"
+        title="หลักสูตร (Curriculum & Course Structure)"
+        subtitle="จัดการโครงสร้างรายวิชา หน่วยการเรียนรู้ สื่อการสอน กำหนดหลักสูตรก่อนสร้างแผนการสอนรายสัปดาห์"
         icon={<BookMarked className="w-6 h-6 text-white" />}
         iconBgClass="bg-blue-600 text-white"
         badgeText={`${courses.length} รายวิชา`}
@@ -554,7 +562,7 @@ export const CoursesCurriculumView: React.FC = () => {
           })}
         </div>
 
-        {/* Action Buttons: [+ สร้างรายวิชาใหม่], [ใช้แผนเดิมข้ามปี], [ถังขยะสื่อ] */}
+        {/* Action Buttons: [+ สร้างรายวิชาใหม่], [ใช้แผนเดิมข้ามปี], [ถังขยะสื่อ], [ไปยังแผนการสอนต่อ →] */}
         <div className="flex items-center gap-2 flex-wrap shrink-0">
           <button
             type="button"
@@ -589,6 +597,18 @@ export const CoursesCurriculumView: React.FC = () => {
               </span>
             )}
           </button>
+
+          {onDeepNavigate && (
+            <button
+              type="button"
+              onClick={() => onDeepNavigate({ view: 'lessons' })}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs sm:text-sm font-bold shadow-2xs transition-all cursor-pointer whitespace-nowrap active:scale-95"
+              title="สร้างหลักสูตรเสร็จแล้ว ไปยังแผนการสอนต่อ"
+            >
+              <BookOpen className="w-4 h-4 text-indigo-600" />
+              <span>ไปยังแผนการสอนต่อ →</span>
+            </button>
+          )}
         </div>
       </div>
 

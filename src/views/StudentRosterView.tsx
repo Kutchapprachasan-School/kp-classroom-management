@@ -25,7 +25,6 @@ import {
   User,
   MoreHorizontal,
   ArrowLeft,
-  CheckSquare,
   AlertTriangle,
   Clock,
 } from 'lucide-react';
@@ -226,35 +225,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
     return map;
   }, [students]);
 
-  // 4 KPI Stat calculations
   const totalCount = students.length;
-  const normalCount = useMemo(() => {
-    let count = 0;
-    students.forEach((s) => {
-      if (studentAttendanceMap.get(s.id) === 'NORMAL') count++;
-    });
-    return count;
-  }, [students, studentAttendanceMap]);
-
-  const absentCount = useMemo(() => {
-    let count = 0;
-    students.forEach((s) => {
-      if (studentAttendanceMap.get(s.id) === 'ABSENT') count++;
-    });
-    return count;
-  }, [students, studentAttendanceMap]);
-
-  const leaveCount = useMemo(() => {
-    let count = 0;
-    students.forEach((s) => {
-      if (studentAttendanceMap.get(s.id) === 'LEAVE') count++;
-    });
-    return count;
-  }, [students, studentAttendanceMap]);
-
-  const normalPct = totalCount > 0 ? Math.round((normalCount / totalCount) * 100) : 0;
-  const absentPct = totalCount > 0 ? Math.round((absentCount / totalCount) * 100) : 0;
-  const leavePct = totalCount > 0 ? Math.round((leaveCount / totalCount) * 100) : 0;
 
   // Filter & Sort Students
   const filteredStudents = useMemo(() => {
@@ -579,77 +550,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
         </div>
       )}
 
-      {/* ========================================================
-          2. 4 STAT KPI CARDS (ตรงตามภาพ Mockup แถวที่ 2)
-         ======================================================== */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* KPI 1: นักเรียนทั้งหมด */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-xs flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0">
-            <Users className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-xs text-slate-500 font-semibold">นักเรียนทั้งหมด</p>
-            <p className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">
-              {totalCount} คน
-            </p>
-          </div>
-        </div>
 
-        {/* KPI 2: มาเรียนปกติ */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-xs flex items-center justify-between">
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center shrink-0">
-              <CheckSquare className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 font-semibold">มาเรียนปกติ</p>
-              <p className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">
-                {normalCount} คน
-              </p>
-            </div>
-          </div>
-          <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600 font-bold text-xs border border-emerald-200">
-            {normalPct}%
-          </span>
-        </div>
-
-        {/* KPI 3: ขาดเรียน */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-xs flex items-center justify-between">
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center shrink-0">
-              <AlertTriangle className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 font-semibold">ขาดเรียน</p>
-              <p className="text-xl sm:text-2xl font-black text-rose-600 mt-0.5">
-                {absentCount} คน
-              </p>
-            </div>
-          </div>
-          <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-600 font-bold text-xs border border-rose-200">
-            {absentPct}%
-          </span>
-        </div>
-
-        {/* KPI 4: ลาเรียน */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-xs flex items-center justify-between">
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-purple-50 text-purple-600 border border-purple-200 flex items-center justify-center shrink-0">
-              <Clock className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 font-semibold">ลาเรียน</p>
-              <p className="text-xl sm:text-2xl font-black text-purple-600 mt-0.5">
-                {leaveCount} คน
-              </p>
-            </div>
-          </div>
-          <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-600 font-bold text-xs border border-purple-200">
-            {leavePct}%
-          </span>
-        </div>
-      </div>
 
       {/* ========================================================
           3. FILTER AND CONTROLS BAR (ตามภาพ Mockup แถวที่ 3)

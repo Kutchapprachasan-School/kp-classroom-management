@@ -853,15 +853,12 @@ assert.ok(morningSource.includes('classroomService') || morningSource.includes('
 assert.ok(morningSource.includes('โฮมรูม'), 'Must render โฮมรูม badge adjacent to title');
 console.log('  ✓ Dynamic advisory homeroom and Bangkok today verified');
 
-// 7.2 Action Buttons & 5 KPI Metric Cards Parity with media_1791314921886.png
+// 7.2 Action Buttons & Streamlined Clean Toolbar
 assert.ok(morningSource.includes('✓ มาแถวครบทุกคน'), 'Must have ✓ มาแถวครบทุกคน button');
 assert.ok(morningSource.includes('ตรวจความสอดคล้อง'), 'Must have ตรวจความสอดคล้อง button');
-assert.ok(morningSource.includes('นักเรียนทั้งหมด'), 'Must have นักเรียนทั้งหมด metric card');
-assert.ok(morningSource.includes('มาแถว ('), 'Must have มาแถว rate metric card');
-assert.ok(morningSource.includes('สาย'), 'Must have สาย metric card');
-assert.ok(morningSource.includes('ขาด'), 'Must have ขาด metric card');
-assert.ok(morningSource.includes('ลา / กิจกรรม'), 'Must have ลา / กิจกรรม metric card');
-console.log('  ✓ Action buttons and 5 KPI metric cards parity verified');
+assert.ok(morningSource.includes('QR Code เช็คชื่อ'), 'Must have QR Code button');
+assert.ok(morningSource.includes('ดูสถิติห้อง'), 'Must have ดูสถิติห้อง button');
+console.log('  ✓ Action buttons and balanced streamlined toolbar verified');
 
 // 7.3 Lock 3 Decoupled Morning Late Rule Banner
 assert.ok(
@@ -1169,14 +1166,11 @@ console.log('  ✓ ClassroomManagementView.tsx grade colors, manage student navi
 // 13.4 Check StudentRosterView.tsx
 const stuRosterSrc = readFileSync('src/views/StudentRosterView.tsx', 'utf8');
 assert.ok(stuRosterSrc.includes('จัดการนักเรียน / นักเรียน'), 'Must match mockup title: จัดการนักเรียน / นักเรียน');
-assert.ok(stuRosterSrc.includes('มาเรียนปกติ'), 'Must have KPI: มาเรียนปกติ');
-assert.ok(stuRosterSrc.includes('ขาดเรียน'), 'Must have KPI: ขาดเรียน');
-assert.ok(stuRosterSrc.includes('ลาเรียน'), 'Must have KPI: ลาเรียน');
 assert.ok(stuRosterSrc.includes('โปรไฟล์'), 'Must have action: โปรไฟล์');
 assert.ok(stuRosterSrc.includes('ผลการเรียน'), 'Must have action: ผลการเรียน');
 assert.ok(stuRosterSrc.includes('md:hidden'), 'Must have mobile stacked cards view');
 assert.ok(stuRosterSrc.includes('onBackToClassrooms'), 'Must support back navigation to classrooms');
-console.log('  ✓ StudentRosterView.tsx mockup parity, 4 KPIs, actions, and mobile view verified');
+console.log('  ✓ StudentRosterView.tsx mockup parity, streamlined clean layout, actions, and mobile view verified');
 
 // 13.5 Check TeacherSidebar.tsx navigation items
 const sidebarSrc = readFileSync('src/components/layout/TeacherSidebar.tsx', 'utf8');

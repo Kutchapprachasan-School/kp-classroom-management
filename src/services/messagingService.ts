@@ -174,7 +174,7 @@ export const messagingService = {
       teacherName: 'ฝ่ายบริหารโรงเรียนกุดจับประชาสรรค์',
       teacherRoleLabel: 'ผู้ดูแลระบบกลาง',
       autoManaged: true,
-      unreadCount: 1,
+      unreadCount: 0,
       members: [
         {
           id: 'u-admin',
@@ -268,7 +268,7 @@ export const messagingService = {
         teacherRoleLabel: 'ครูที่ปรึกษาประจำชั้น',
         autoManaged: true,
         members: groupMembers,
-        unreadCount: cls.id === 'room-3-1' || cls.id === 'room-1-1' ? 2 : 0,
+        unreadCount: 0,
         messages: [
           {
             id: `msg-hr-${cls.id}-1`,
@@ -438,6 +438,22 @@ export const messagingService = {
 
     this.saveGroups(groups);
     return newMsg;
+  },
+
+  // คำนวณจำนวนข้อความที่ยังไม่ได้อ่านทั้งหมด (เฉพาะที่มีข้อความใหม่จริง)
+  getTotalUnreadCount(): number {
+    const groups = this.getGroups();
+    return groups.reduce((acc, g) => acc + (g.unreadCount || 0), 0);
+  },
+
+  // ทำเครื่องหมายว่าอ่านข้อความในกลุ่มนี้แล้ว
+  markGroupAsRead(groupId: string): void {
+    const groups = this.getGroups();
+    const group = groups.find((g) => g.id === groupId);
+    if (group && (group.unreadCount || 0) > 0) {
+      group.unreadCount = 0;
+      this.saveGroups(groups);
+    }
   },
 
   // ซิงค์สมาชิกทุกกลุ่มให้ตรงกับทะเบียนห้องเรียนล่าสุด

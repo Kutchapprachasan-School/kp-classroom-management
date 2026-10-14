@@ -37,6 +37,7 @@ interface UiGroupItem {
   fullTitle: string;
   roomName: string;
   tag: string;
+  gradeLevel?: 'ม.3' | 'ม.1' | 'ALL';
   isActiveBadge?: boolean;
   studentCount: number;
   lastUpdate: string;
@@ -63,6 +64,7 @@ const UI_GROUPS: UiGroupItem[] = [
     fullTitle: 'แชทนักเรียนกับโรงเรียน (School Broadcast)',
     roomName: 'ทั้งโรงเรียน (ม.1 - ม.6)',
     tag: 'ประกาศโรงเรียน',
+    gradeLevel: 'ALL',
     isActiveBadge: true,
     studentCount: 1248,
     lastUpdate: 'วันนี้',
@@ -77,6 +79,7 @@ const UI_GROUPS: UiGroupItem[] = [
     fullTitle: 'กลุ่มครูที่ปรึกษา ม.3/1',
     roomName: 'ม.3/1',
     tag: 'กลุ่มครูที่ปรึกษา',
+    gradeLevel: 'ม.3',
     isActiveBadge: true,
     studentCount: 8,
     lastUpdate: '08:01 น.',
@@ -91,6 +94,7 @@ const UI_GROUPS: UiGroupItem[] = [
     fullTitle: 'กลุ่มห้องเรียน ม.3/1',
     roomName: 'ม.3/1',
     tag: 'กลุ่มห้องเรียน',
+    gradeLevel: 'ม.3',
     studentCount: 29,
     lastUpdate: '08:01 น.',
     adviser: 'ครูภาณุวุฒิ เรื่องประเสริฐ',
@@ -103,6 +107,7 @@ const UI_GROUPS: UiGroupItem[] = [
     fullTitle: 'กลุ่มห้องเรียน ม.3/2',
     roomName: 'ม.3/2',
     tag: 'กลุ่มห้องเรียน',
+    gradeLevel: 'ม.3',
     studentCount: 28,
     lastUpdate: '08:01 น.',
     adviser: 'ครูวิภาดา สมบูรณ์',
@@ -115,6 +120,7 @@ const UI_GROUPS: UiGroupItem[] = [
     fullTitle: 'กลุ่มห้องเรียน ม.1/8',
     roomName: 'ม.1/8',
     tag: 'กลุ่มห้องเรียน',
+    gradeLevel: 'ม.1',
     studentCount: 25,
     lastUpdate: '08:01 น.',
     adviser: 'ครูเอกชัย มิ่งขวัญ',
@@ -127,6 +133,7 @@ const UI_GROUPS: UiGroupItem[] = [
     fullTitle: 'กลุ่มห้องเรียน ม.1/9',
     roomName: 'ม.1/9',
     tag: 'กลุ่มห้องเรียน',
+    gradeLevel: 'ม.1',
     studentCount: 26,
     lastUpdate: '08:01 น.',
     adviser: 'ครูชนิกา ทรัพย์สุข',
@@ -288,22 +295,51 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
 
   const currentMessages = messagesMap[selectedGroupId] || [];
 
-  // Filter groups based on search
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState<
+    'ALL' | 'HOMEROOM' | 'GRADE_3' | 'GRADE_1'
+  >('ALL');
+
+  const handleSelectGroup = (groupId: string) => {
+    setSelectedGroupId(groupId);
+    messagingService.markGroupAsRead(groupId);
+  };
+
+  useEffect(() => {
+    messagingService.markGroupAsRead(selectedGroupId);
+  }, [selectedGroupId]);
+
+  // Filter groups based on search & active tab
+  const matchesSearch = (g: UiGroupItem) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      g.title.toLowerCase().includes(q) ||
+      g.roomName.toLowerCase().includes(q) ||
+      g.fullTitle.toLowerCase().includes(q)
+    );
+  };
+
   const filteredHomeroom = UI_GROUPS.filter(
     (g) =>
       g.category === 'HOMEROOM' &&
-      (!searchQuery.trim() ||
-        g.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        g.roomName.toLowerCase().includes(searchQuery.toLowerCase()))
+      matchesSearch(g) &&
+      (activeCategoryFilter === 'ALL' ||
+        activeCategoryFilter === 'HOMEROOM' ||
+        (activeCategoryFilter === 'GRADE_3' && g.gradeLevel === 'ม.3'))
   );
 
   const filteredClassroom = UI_GROUPS.filter(
     (g) =>
       g.category === 'CLASSROOM' &&
-      (!searchQuery.trim() ||
-        g.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        g.roomName.toLowerCase().includes(searchQuery.toLowerCase()))
+      matchesSearch(g) &&
+      (activeCategoryFilter === 'ALL' ||
+        (activeCategoryFilter === 'GRADE_3' && g.gradeLevel === 'ม.3') ||
+        (activeCategoryFilter === 'GRADE_1' && g.gradeLevel === 'ม.1'))
   );
+
+  const grade3Classrooms = filteredClassroom.filter((g) => g.gradeLevel === 'ม.3');
+  const grade1Classrooms = filteredClassroom.filter((g) => g.gradeLevel === 'ม.1');
+  const broadcastClassrooms = filteredClassroom.filter((g) => g.gradeLevel === 'ALL');
 
   const handleSendMessage = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -420,6 +456,54 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* Left Column: Groups Navigation (Width ~ 350px / 4 Cols on large screen) */}
         <div className="lg:col-span-5 xl:col-span-4 bg-white rounded-2xl border border-[#E6EEF7] p-4 shadow-xs space-y-3.5">
+          {/* Quick Filter Tabs for Classroom Groups */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            <button
+              type="button"
+              onClick={() => setActiveCategoryFilter('ALL')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 border ${
+                activeCategoryFilter === 'ALL'
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              ทั้งหมด
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveCategoryFilter('HOMEROOM')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 border ${
+                activeCategoryFilter === 'HOMEROOM'
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              กลุ่มที่ปรึกษา
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveCategoryFilter('GRADE_3')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 border ${
+                activeCategoryFilter === 'GRADE_3'
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              ระดับ ม.3
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveCategoryFilter('GRADE_1')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 border ${
+                activeCategoryFilter === 'GRADE_1'
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              ระดับ ม.1
+            </button>
+          </div>
+
           {/* Search bar */}
           <div className="relative">
             <Search className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -433,117 +517,224 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
           </div>
 
           {/* Section 1: กลุ่มครูที่ปรึกษา */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between px-1 py-0.5">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-[#1D75D8] text-white flex items-center justify-center shrink-0 shadow-2xs">
-                  <Users className="w-3.5 h-3.5" />
-                </div>
-                <span className="font-bold text-xs sm:text-sm text-[#163A66]">
-                  กลุ่มครูที่ปรึกษา
-                </span>
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#E8F2FF] text-[#1D75D8]">
-                {filteredHomeroom.length}
-              </span>
-            </div>
-
-            {/* Homeroom List */}
-            {filteredHomeroom.map((group) => {
-              const isSelected = selectedGroupId === group.id;
-              return (
-                <div
-                  key={group.id}
-                  onClick={() => setSelectedGroupId(group.id)}
-                  className={`rounded-2xl border p-3 flex items-center justify-between transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-[#EBFBF5] border-[#A7F3D0] shadow-xs'
-                      : 'bg-[#F9FCFA] border-[#E2E8F0] hover:bg-[#F0FDF4]'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-full bg-[#10B981] text-white flex items-center justify-center shrink-0 shadow-2xs">
-                      <Users className="w-5 h-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-bold text-xs sm:text-sm text-[#163A66] truncate">
-                          {group.title}
-                        </span>
-                        {group.isActiveBadge && (
-                          <span className="bg-[#10B981] text-white text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">
-                            Active
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-[#6B7C93] mt-0.5 truncate">
-                        นักเรียน {group.studentCount} คน • อัปเดตล่าสุด {group.lastUpdate}
-                      </p>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-[#10B981] shrink-0 ml-2" />
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Section 2: กลุ่มห้องเรียน */}
-          <div className="space-y-2 pt-1">
-            <div className="flex items-center justify-between px-1 py-0.5">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-[#1D75D8] text-white flex items-center justify-center shrink-0 shadow-2xs">
-                  <Users className="w-3.5 h-3.5" />
-                </div>
-                <span className="font-bold text-xs sm:text-sm text-[#163A66]">
-                  กลุ่มห้องเรียน
-                </span>
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#E8F2FF] text-[#1D75D8]">
-                {filteredClassroom.length}
-              </span>
-            </div>
-
-            {/* Classroom Cards List */}
+          {filteredHomeroom.length > 0 && (
             <div className="space-y-2">
-              {filteredClassroom.map((group) => {
-                const isSelected = selectedGroupId === group.id;
-                const badgeColor = getBadgeBg(group.colorType);
+              <div className="flex items-center justify-between px-1 py-0.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-[#1D75D8] text-white flex items-center justify-center shrink-0 shadow-2xs">
+                    <Users className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="font-bold text-xs sm:text-sm text-[#163A66]">
+                    กลุ่มครูที่ปรึกษา
+                  </span>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#E8F2FF] text-[#1D75D8]">
+                  {filteredHomeroom.length}
+                </span>
+              </div>
 
+              {/* Homeroom List */}
+              {filteredHomeroom.map((group) => {
+                const isSelected = selectedGroupId === group.id;
                 return (
                   <div
                     key={group.id}
-                    onClick={() => setSelectedGroupId(group.id)}
+                    onClick={() => handleSelectGroup(group.id)}
                     className={`rounded-2xl border p-3 flex items-center justify-between transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-[#E8F2FF] border-[#BFDBFE] shadow-xs'
-                        : 'bg-white border-[#E6EEF7] hover:bg-[#F8FAFC]'
+                        ? 'bg-[#EBFBF5] border-[#A7F3D0] shadow-xs'
+                        : 'bg-[#F9FCFA] border-[#E2E8F0] hover:bg-[#F0FDF4]'
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className={`w-10 h-10 rounded-full ${badgeColor} text-white flex items-center justify-center shrink-0 shadow-2xs`}
-                      >
+                      <div className="w-10 h-10 rounded-full bg-[#10B981] text-white flex items-center justify-center shrink-0 shadow-2xs">
                         <Users className="w-5 h-5" />
                       </div>
                       <div className="min-w-0">
-                        <span className="font-bold text-xs sm:text-sm text-[#163A66] truncate block">
-                          {group.title}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-xs sm:text-sm text-[#163A66] truncate">
+                            {group.title}
+                          </span>
+                          {group.isActiveBadge && (
+                            <span className="bg-[#10B981] text-white text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">
+                              Active
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[11px] text-[#6B7C93] mt-0.5 truncate">
                           นักเรียน {group.studentCount} คน • อัปเดตล่าสุด {group.lastUpdate}
                         </p>
                       </div>
                     </div>
-                    <ChevronRight
-                      className={`w-4 h-4 shrink-0 ml-2 ${
-                        isSelected ? 'text-[#1D75D8]' : 'text-[#94A3B8]'
-                      }`}
-                    />
+                    <ChevronRight className="w-4 h-4 text-[#10B981] shrink-0 ml-2" />
                   </div>
                 );
               })}
             </div>
-          </div>
+          )}
+
+          {/* Section 2: กลุ่มห้องเรียน (Grouped by Grade Level) */}
+          {filteredClassroom.length > 0 && (
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center justify-between px-1 py-0.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-[#1D75D8] text-white flex items-center justify-center shrink-0 shadow-2xs">
+                    <Users className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="font-bold text-xs sm:text-sm text-[#163A66]">
+                    กลุ่มห้องเรียน
+                  </span>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#E8F2FF] text-[#1D75D8]">
+                  {filteredClassroom.length}
+                </span>
+              </div>
+
+              {/* Sub-Group: ระดับชั้น ม.3 */}
+              {grade3Classrooms.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between px-1 text-[11px] font-bold text-slate-500">
+                    <span>ระดับชั้น ม.3 ({grade3Classrooms.length} ห้อง)</span>
+                  </div>
+                  <div className="space-y-2">
+                    {grade3Classrooms.map((group) => {
+                      const isSelected = selectedGroupId === group.id;
+                      const badgeColor = getBadgeBg(group.colorType);
+
+                      return (
+                        <div
+                          key={group.id}
+                          onClick={() => handleSelectGroup(group.id)}
+                          className={`rounded-2xl border p-3 flex items-center justify-between transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#E8F2FF] border-[#BFDBFE] shadow-xs'
+                              : 'bg-white border-[#E6EEF7] hover:bg-[#F8FAFC]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              className={`w-10 h-10 rounded-full ${badgeColor} text-white flex items-center justify-center shrink-0 shadow-2xs`}
+                            >
+                              <Users className="w-5 h-5" />
+                            </div>
+                            <div className="min-w-0">
+                              <span className="font-bold text-xs sm:text-sm text-[#163A66] truncate block">
+                                {group.title}
+                              </span>
+                              <p className="text-[11px] text-[#6B7C93] mt-0.5 truncate">
+                                นักเรียน {group.studentCount} คน • อัปเดตล่าสุด {group.lastUpdate}
+                              </p>
+                            </div>
+                          </div>
+                          <ChevronRight
+                            className={`w-4 h-4 shrink-0 ml-2 ${
+                              isSelected ? 'text-[#1D75D8]' : 'text-[#94A3B8]'
+                            }`}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Sub-Group: ระดับชั้น ม.1 */}
+              {grade1Classrooms.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between px-1 text-[11px] font-bold text-slate-500">
+                    <span>ระดับชั้น ม.1 ({grade1Classrooms.length} ห้อง)</span>
+                  </div>
+                  <div className="space-y-2">
+                    {grade1Classrooms.map((group) => {
+                      const isSelected = selectedGroupId === group.id;
+                      const badgeColor = getBadgeBg(group.colorType);
+
+                      return (
+                        <div
+                          key={group.id}
+                          onClick={() => handleSelectGroup(group.id)}
+                          className={`rounded-2xl border p-3 flex items-center justify-between transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#E8F2FF] border-[#BFDBFE] shadow-xs'
+                              : 'bg-white border-[#E6EEF7] hover:bg-[#F8FAFC]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              className={`w-10 h-10 rounded-full ${badgeColor} text-white flex items-center justify-center shrink-0 shadow-2xs`}
+                            >
+                              <Users className="w-5 h-5" />
+                            </div>
+                            <div className="min-w-0">
+                              <span className="font-bold text-xs sm:text-sm text-[#163A66] truncate block">
+                                {group.title}
+                              </span>
+                              <p className="text-[11px] text-[#6B7C93] mt-0.5 truncate">
+                                นักเรียน {group.studentCount} คน • อัปเดตล่าสุด {group.lastUpdate}
+                              </p>
+                            </div>
+                          </div>
+                          <ChevronRight
+                            className={`w-4 h-4 shrink-0 ml-2 ${
+                              isSelected ? 'text-[#1D75D8]' : 'text-[#94A3B8]'
+                            }`}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Sub-Group: ประกาศโรงเรียน */}
+              {broadcastClassrooms.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between px-1 text-[11px] font-bold text-slate-500">
+                    <span>ประกาศและส่วนกลาง</span>
+                  </div>
+                  <div className="space-y-2">
+                    {broadcastClassrooms.map((group) => {
+                      const isSelected = selectedGroupId === group.id;
+                      const badgeColor = getBadgeBg(group.colorType);
+
+                      return (
+                        <div
+                          key={group.id}
+                          onClick={() => handleSelectGroup(group.id)}
+                          className={`rounded-2xl border p-3 flex items-center justify-between transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#E8F2FF] border-[#BFDBFE] shadow-xs'
+                              : 'bg-white border-[#E6EEF7] hover:bg-[#F8FAFC]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              className={`w-10 h-10 rounded-full ${badgeColor} text-white flex items-center justify-center shrink-0 shadow-2xs`}
+                            >
+                              <Users className="w-5 h-5" />
+                            </div>
+                            <div className="min-w-0">
+                              <span className="font-bold text-xs sm:text-sm text-[#163A66] truncate block">
+                                {group.title}
+                              </span>
+                              <p className="text-[11px] text-[#6B7C93] mt-0.5 truncate">
+                                นักเรียน {group.studentCount} คน • อัปเดตล่าสุด {group.lastUpdate}
+                              </p>
+                            </div>
+                          </div>
+                          <ChevronRight
+                            className={`w-4 h-4 shrink-0 ml-2 ${
+                              isSelected ? 'text-[#1D75D8]' : 'text-[#94A3B8]'
+                            }`}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right Column: Chat Box matching media_1791273562793.png (8 Cols) */}

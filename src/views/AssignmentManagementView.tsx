@@ -4,14 +4,12 @@ import {
   Clock,
   Eye,
   Check,
-  Calculator,
   BookOpen,
   CheckSquare,
   Search,
   Layers,
   FileSpreadsheet,
   Edit3,
-  AlertTriangle,
   Play,
   RotateCcw,
 } from 'lucide-react';
@@ -215,75 +213,6 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         badgeText="FIFO Queue"
       />
 
-      {/* ==================================================================== */}
-      {/* 3. 5 KPI SUMMARY STAT CARDS (ตรงตามสไตล์ใน Mockup) */}
-      {/* ==================================================================== */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {/* Total Submissions */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 p-3.5 sm:p-4 shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <BookOpen className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[11px] font-bold text-slate-500 block">งานที่ส่งทั้งหมด</span>
-            <span className="text-lg sm:text-xl font-extrabold text-slate-900 tabular-nums">
-              {stats.total} <span className="text-xs font-semibold text-slate-500">งาน</span>
-            </span>
-          </div>
-        </div>
-
-        {/* Pending Review */}
-        <div className="bg-white rounded-2xl border border-amber-200/90 p-3.5 sm:p-4 shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-            <Clock className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[11px] font-bold text-amber-700 block">⏳ รอตรวจ</span>
-            <span className="text-lg sm:text-xl font-extrabold text-amber-900 tabular-nums">
-              {stats.pending} <span className="text-xs font-semibold text-amber-700">งาน</span>
-            </span>
-          </div>
-        </div>
-
-        {/* Graded */}
-        <div className="bg-white rounded-2xl border border-emerald-200/90 p-3.5 sm:p-4 shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[11px] font-bold text-emerald-700 block">✅ ตรวจแล้ว</span>
-            <span className="text-lg sm:text-xl font-extrabold text-emerald-900 tabular-nums">
-              {stats.graded} <span className="text-xs font-semibold text-emerald-700">งาน</span>
-            </span>
-          </div>
-        </div>
-
-        {/* Late Submissions */}
-        <div className="bg-white rounded-2xl border border-rose-200/90 p-3.5 sm:p-4 shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-            <AlertTriangle className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[11px] font-bold text-rose-700 block">⚠️ ส่งล่าช้า</span>
-            <span className="text-lg sm:text-xl font-extrabold text-rose-900 tabular-nums">
-              {stats.late} <span className="text-xs font-semibold text-rose-700">งาน</span>
-            </span>
-          </div>
-        </div>
-
-        {/* Average Score */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 p-3.5 sm:p-4 shadow-xs flex items-center gap-3 col-span-2 sm:col-span-1">
-          <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-            <Calculator className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[11px] font-bold text-slate-500 block">⭐ คะแนนเฉลี่ย</span>
-            <span className="text-lg sm:text-xl font-extrabold text-slate-900 tabular-nums">
-              {stats.avgScore} <span className="text-xs font-semibold text-slate-500">คะแนน</span>
-            </span>
-          </div>
-        </div>
-      </div>
 
       {/* ==================================================================== */}
       {/* 4. FILTER TOOLBAR: รายวิชา | ชั้น | สถานะ | ค้นหา */}

@@ -13,10 +13,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  CheckCircle2,
-  Clock,
-  XCircle,
-  FileText,
   Award,
   Sparkles,
   Calendar,
@@ -622,95 +618,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* 5 KPI METRIC CARDS                                                        */}
-      {/* ========================================================================= */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-        {/* ทั้งหมด */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <Users className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-xs font-semibold text-slate-400">ทั้งหมด</div>
-            <div className="text-lg sm:text-xl font-extrabold text-slate-900">
-              {stats.total} คน
-            </div>
-          </div>
-        </div>
 
-        {/* มา + กิจกรรม */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-xs font-semibold text-slate-400">มา / กิจกรรม</div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-lg sm:text-xl font-extrabold text-slate-900">
-                {stats.present + stats.activity} คน
-              </span>
-              <span className="text-xs font-bold text-emerald-600">
-                ({stats.presentRate}%)
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* สาย */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-            <Clock className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-xs font-semibold text-slate-400">สาย</div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-lg sm:text-xl font-extrabold text-slate-900">
-                {stats.late} คน
-              </span>
-              <span className="text-xs font-bold text-amber-600">
-                ({stats.lateRate}%)
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* ขาด + โดดเรียน */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-            <XCircle className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-xs font-semibold text-slate-400">ขาด / โดดเรียน</div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-lg sm:text-xl font-extrabold text-slate-900">
-                {stats.absent + stats.truancy} คน
-              </span>
-              <span className="text-xs font-bold text-rose-600">
-                ({stats.absentRate}%)
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* ลา */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex items-center gap-3.5 col-span-2 sm:col-span-1">
-          <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-            <FileText className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-xs font-semibold text-slate-400">ลา</div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-lg sm:text-xl font-extrabold text-slate-900">
-                {stats.leave} คน
-              </span>
-              <span className="text-xs font-bold text-purple-600">
-                ({stats.leaveRate}%)
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* ========================================================================= */}
       {/* MOBILE SCREEN MODE TABS (LIST vs CALENDAR)                                */}

@@ -13,9 +13,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   UserCheck,
   CheckCircle2,
-  Clock,
-  XCircle,
-  FileText,
   Sparkles,
   Calendar,
   Users,
@@ -31,13 +28,11 @@ import {
   QrCode,
   Save,
   Flame,
-  TrendingUp,
 } from 'lucide-react';
 import {
   attendanceCorrelationService,
   type MorningAssemblyRecord,
   type AttendanceStatusCode,
-  type MorningAssemblyStats,
   type ClassroomTermStatsSummary,
   type StudentCumulativeStats,
   type AssemblyCalendarDayInfo,
@@ -77,7 +72,6 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [records, setRecords] = useState<MorningAssemblyRecord[]>([]);
-  const [stats, setStats] = useState<MorningAssemblyStats | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
 
@@ -148,7 +142,6 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
 
     if (existingList.length > 0) {
       setRecords(existingList);
-      setStats(attendanceCorrelationService.getMorningAssemblyStats(selectedClassroom, selectedDate));
       setHasUnsavedChanges(false);
       return;
     }
@@ -169,24 +162,11 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
         markedAt: `${selectedDate}T07:55:00.000Z`,
       }));
       setRecords(initialRoster);
-      setStats({
-        classroomId: selectedClassroom,
-        date: selectedDate,
-        totalStudents: initialRoster.length,
-        presentCount: initialRoster.length,
-        lateCount: 0,
-        absentCount: 0,
-        leaveCount: 0,
-        activityCount: 0,
-        attendanceRate: 100,
-        isCompleted: false,
-      });
       setHasUnsavedChanges(false);
       return;
     }
 
     setRecords([]);
-    setStats(null);
     setHasUnsavedChanges(false);
   };
 
@@ -235,28 +215,6 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
           : r
       );
 
-      // Recompute quick stats
-      const total = updated.length;
-      const present = updated.filter((r) => r.status === 'PRESENT').length;
-      const late = updated.filter((r) => r.status === 'LATE').length;
-      const absent = updated.filter((r) => r.status === 'ABSENT').length;
-      const leave = updated.filter((r) => r.status === 'LEAVE').length;
-      const activity = updated.filter((r) => r.status === 'ACTIVITY').length;
-      const rate = total > 0 ? Math.round(((present + late + activity) / total) * 100) : 100;
-
-      setStats({
-        classroomId: selectedClassroom,
-        date: selectedDate,
-        totalStudents: total,
-        presentCount: present,
-        lateCount: late,
-        absentCount: absent,
-        leaveCount: leave,
-        activityCount: activity,
-        attendanceRate: rate,
-        isCompleted: true,
-      });
-
       return updated;
     });
 
@@ -271,20 +229,6 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
         markedAt: new Date().toISOString(),
       }))
     );
-    if (records.length > 0) {
-      setStats({
-        classroomId: selectedClassroom,
-        date: selectedDate,
-        totalStudents: records.length,
-        presentCount: records.length,
-        lateCount: 0,
-        absentCount: 0,
-        leaveCount: 0,
-        activityCount: 0,
-        attendanceRate: 100,
-        isCompleted: true,
-      });
-    }
     setHasUnsavedChanges(true);
     showToast('✓ ปรับสถานะทุกคนเป็น "มา" (กดบันทึกผลด้านล่างเพื่อยืนยัน)');
   };
@@ -410,21 +354,21 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
           ======================================================== */}
       <PageHeroBanner
         title="เช็คแถวเช้า (Morning Assembly)"
-        subtitle="บันทึกการเข้าแถวเคารพธงชาติและกิจกรรมโฮมรูม ม.3/1"
+        subtitle="บันทึกการเข้าแถวเคารพธงชาติและกิจกรรมโฮมรูม"
         icon={<UserCheck className="w-6 h-6 text-white" />}
         iconBgClass="bg-blue-600 text-white"
         badgeText="โฮมรูม"
       />
 
       {/* ========================================================
-          2. FILTERS & SELECTION CONTROLS BAR
+          2. FILTERS & SELECTION CONTROLS BAR (Balanced & Orderly)
           ======================================================== */}
-      <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-100 shadow-xs flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-3">
         {/* Left: Advisory Classroom & Mini-Calendar Trigger */}
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Classroom Selector */}
           <div
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs font-bold shadow-2xs"
+            className="flex items-center gap-2 h-10 px-3.5 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs font-bold shadow-2xs hover:border-blue-300 transition-all"
             title="ห้องประจำชั้น"
           >
             <Users className="w-4 h-4 text-blue-600 shrink-0" />
@@ -435,7 +379,7 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
                 setSelectedClassroom(e.target.value);
                 if (r) setSelectedClassroomName(r.name);
               }}
-              className="bg-transparent font-bold text-slate-800 text-xs outline-none cursor-pointer"
+              className="bg-transparent font-bold text-slate-800 text-xs outline-none cursor-pointer pr-1"
             >
               {allClassrooms.map((room) => (
                 <option key={room.id} value={room.id}>
@@ -446,18 +390,18 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
           </div>
 
           {!isTeacherAdvisor && (
-            <span className="px-2.5 py-1 rounded-xl text-[11px] bg-amber-50 text-amber-700 border border-amber-200 font-semibold inline-flex items-center gap-1">
+            <span className="h-10 px-3 rounded-xl text-[11px] bg-amber-50 text-amber-700 border border-amber-200 font-semibold inline-flex items-center gap-1">
               <span>⚠️</span>
               <span>ยังไม่ได้กำหนดห้องประจำชั้น (โหมดตรวจแทน)</span>
             </span>
           )}
 
           {/* Date Selector Button (opens Expandable Mini-Calendar) */}
-          <div className="relative" ref={calendarRef}>
+          <div className="relative flex items-center gap-1.5" ref={calendarRef}>
             <button
               type="button"
               onClick={() => setIsCalendarOpen((prev) => !prev)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold shadow-2xs transition-all cursor-pointer ${
+              className={`flex items-center gap-2 h-10 px-3.5 rounded-xl border text-xs font-bold shadow-2xs transition-all cursor-pointer ${
                 isCalendarOpen
                   ? 'border-blue-500 bg-blue-50/60 text-blue-700 ring-2 ring-blue-100'
                   : 'border-slate-200 bg-white text-slate-800 hover:border-blue-300'
@@ -466,14 +410,14 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
             >
               <Calendar className="w-4 h-4 text-slate-500" />
               <span>{formattedDatePill}</span>
-              <CalendarDays className="w-3.5 h-3.5 text-blue-600 ml-1" />
+              <CalendarDays className="w-3.5 h-3.5 text-blue-600 ml-0.5" />
             </button>
 
             {!isSelectedDateToday && (
               <button
                 type="button"
                 onClick={() => setSelectedDate(getBangkokTodayString())}
-                className="ml-1 px-2.5 py-1 rounded-lg bg-blue-600 text-white text-[11px] font-bold hover:bg-blue-700 shadow-2xs transition-all cursor-pointer inline-flex items-center gap-1"
+                className="h-10 px-3 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 shadow-2xs transition-all cursor-pointer inline-flex items-center gap-1.5 active:scale-95"
                 title="กลับมาเช็คชื่อของวันนี้ทันที"
               >
                 <span>📅 วันนี้</span>
@@ -611,20 +555,20 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
         {/* Right: Search & Status Filter */}
         <div className="flex items-center gap-2 flex-1 justify-end max-w-md">
           <div className="relative flex-1">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               placeholder="ค้นหาชื่อ หรือเลขประจำตัว..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-100"
+              className="w-full h-10 pl-9 pr-3.5 rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all"
             />
           </div>
 
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 cursor-pointer focus:outline-hidden"
+            className="h-10 px-3.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-blue-100 hover:border-blue-300 transition-all shrink-0"
           >
             <option value="ALL">ทุกสถานะ</option>
             <option value="PRESENT">มา</option>
@@ -637,88 +581,9 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
       </div>
 
       {/* ========================================================
-          3. STATS METRIC SUMMARY CARDS
-          ======================================================== */}
-      {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-2xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-              <Users className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 block">นักเรียนทั้งหมด</span>
-              <span className="text-lg font-black text-slate-900 leading-tight">
-                {stats.totalStudents} คน
-              </span>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-2xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-              <CheckCircle2 className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 block">มาแถว ({stats.attendanceRate}%)</span>
-              <span className="text-lg font-black text-emerald-700 leading-tight">
-                {stats.presentCount} คน
-              </span>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-2xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-              <Clock className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 block">สาย</span>
-              <span className="text-lg font-black text-amber-700 leading-tight">
-                {stats.lateCount} คน
-              </span>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-2xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-              <XCircle className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 block">ขาด</span>
-              <span className="text-lg font-black text-rose-700 leading-tight">
-                {stats.absentCount} คน
-              </span>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-2xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-              <FileText className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 block">ลา / กิจกรรม</span>
-              <span className="text-lg font-black text-purple-700 leading-tight">
-                {stats.leaveCount} คน
-              </span>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-2xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 block">ร้อยละการมา</span>
-              <span className="text-lg font-black text-blue-900 leading-tight">
-                {stats.attendanceRate}%
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================
           4. ROSTER ATTENDANCE CONTAINER (หัวตารางพร้อมปุ่ม QR & Action Toolbar)
           ======================================================== */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
         {/* Table/List Toolbar Header: รวมปุ่ม QR เช็คชื่อ, มาแถวครบทุกคน, ตรวจความสอดคล้อง */}
         <div className="px-4 sm:px-6 py-3.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/40">
           <div className="flex items-center gap-2">
@@ -754,54 +619,55 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
               </button>
             </div>
 
-            {/* Button 1: QR Code เช็คชื่อ */}
-            <button
-              type="button"
-              onClick={() => setIsQrModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-2xs cursor-pointer transition-all active:scale-95"
-              title="เปิดระบบ QR Code เช็คชื่อไดนามิก"
-            >
-              <QrCode className="w-3.5 h-3.5" />
-              <span>QR Code เช็คชื่อ</span>
-            </button>
-
-            {/* Button 2: มาแถวครบทุกคน */}
+            {/* Button 1: มาแถวครบทุกคน (Primary Emerald CTA) */}
             <button
               type="button"
               onClick={handleBatchMarkAllPresent}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs cursor-pointer transition-all active:scale-95"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold shadow-xs cursor-pointer transition-all active:scale-95"
               title="เช็คทุกคนเป็นมาเรียน"
             >
               <Check className="w-3.5 h-3.5 stroke-[3]" />
               <span>✓ มาแถวครบทุกคน</span>
             </button>
 
-            {/* Button 3: ตรวจความสอดคล้อง */}
+            {/* Button 2: QR Code เช็คชื่อ (Primary Blue CTA) */}
+            <button
+              type="button"
+              onClick={() => setIsQrModalOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold shadow-xs cursor-pointer transition-all active:scale-95"
+              title="เปิดระบบ QR Code เช็คชื่อไดนามิก"
+            >
+              <QrCode className="w-3.5 h-3.5" />
+              <span>QR Code เช็คชื่อ</span>
+            </button>
+
+            {/* Button 3: ตรวจความสอดคล้อง (Soft Blue Outline) */}
             <button
               type="button"
               onClick={handleRunCorrelation}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold shadow-2xs cursor-pointer transition-all"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-50/70 hover:bg-blue-100/80 text-blue-700 border border-blue-200 text-xs font-bold shadow-2xs cursor-pointer transition-all"
               title="ตรวจความสอดคล้องระหว่างแถวเช้าและคาบเรียน"
             >
               <Sparkles className="w-3.5 h-3.5 text-blue-600" />
               <span>ตรวจความสอดคล้อง</span>
             </button>
 
-            {/* Button 4: ดูสถิติรวมทั้งห้อง */}
+            {/* Button 4: ดูสถิติห้อง (Soft Slate Outline) */}
             <button
               type="button"
               onClick={handleOpenStatsModal}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold shadow-2xs cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold shadow-2xs cursor-pointer transition-all"
               title="ดูสถิติเวลาเข้าแถวรวมทั้งเทอมของทุกคน"
             >
               <BarChart2 className="w-3.5 h-3.5 text-slate-500" />
               <span>ดูสถิติห้อง</span>
             </button>
 
+            {/* Button 5: Refresh */}
             <button
               type="button"
               onClick={loadData}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-white transition-colors cursor-pointer"
+              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 border border-slate-200/80 transition-all cursor-pointer"
               title="รีเฟรชข้อมูล"
             >
               <RefreshCw className="w-4 h-4" />

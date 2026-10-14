@@ -20,8 +20,9 @@ assert.ok(
 );
 assert.ok(
   sidebarContent.includes("label: 'ประเมิน / แบบฟอร์ม'") ||
-    sidebarContent.includes("label: 'จัดการสอบ / เก็บคะแนน'"),
-  "TeacherSidebar must have label 'ประเมิน / แบบฟอร์ม' or 'จัดการสอบ / เก็บคะแนน'"
+    sidebarContent.includes("label: 'จัดการสอบ / เก็บคะแนน'") ||
+    sidebarContent.includes("label: 'จัดการสอบ/เก็บคะแนน'"),
+  "TeacherSidebar must have label 'ประเมิน / แบบฟอร์ม' or 'จัดการสอบ/เก็บคะแนน'"
 );
 
 // Check that exams is NOT wrapped inside isAdmin ternary in menuItems
@@ -40,8 +41,9 @@ assert.ok(fs.existsSync(appPath), 'App.tsx must exist');
 const appContent = fs.readFileSync(appPath, 'utf-8');
 
 assert.ok(
-  appContent.includes("case 'exams':\n        return 'จัดการการสอบ (Exam Management)';"),
-  "App.tsx getHeaderTitle must return 'จัดการการสอบ (Exam Management)' for 'exams'"
+  appContent.includes("case 'exams':\n        return 'จัดการการสอบ (Exam Management)';") ||
+    appContent.includes("case 'exams':\n        return 'จัดการสอบ/เก็บคะแนน (Exam Management)';"),
+  "App.tsx getHeaderTitle must return title for 'exams'"
 );
 assert.ok(
   appContent.includes("{currentView === 'exams' && <ExamManagementView />}"),

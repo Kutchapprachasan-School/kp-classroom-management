@@ -9,7 +9,6 @@ import {
   BookOpen,
   Users,
   BarChart2,
-  Folder,
   ClipboardList,
   CalendarDays,
   MessageSquare,
@@ -22,6 +21,7 @@ import {
   ClipboardCheck,
   Award,
   Layers,
+  BookMarked,
 } from 'lucide-react';
 import {
   getSchoolSettings,
@@ -34,6 +34,7 @@ import {
   TEACHER_BANNERS_EVENT,
   type TeacherBannerItem,
 } from '../../services/teacherBannerService';
+import { messagingService, CHAT_GROUPS_EVENT } from '../../services/messagingService';
 import { AdminTeacherBannerModal } from '../teacher/AdminTeacherBannerModal';
 
 export type TeacherViewKey =
@@ -136,6 +137,18 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     return () => window.removeEventListener('kps-school-settings-updated', handleSettingsUpdate);
   }, []);
 
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(() =>
+    messagingService.getTotalUnreadCount()
+  );
+
+  useEffect(() => {
+    const handleChatSync = () => {
+      setUnreadMessagesCount(messagingService.getTotalUnreadCount());
+    };
+    window.addEventListener(CHAT_GROUPS_EVENT, handleChatSync);
+    return () => window.removeEventListener(CHAT_GROUPS_EVENT, handleChatSync);
+  }, []);
+
   // เมนูหลักของครูตามแบบ Pastel Anime Education Dashboard
   const menuItems: NavMenuItem[] = [
     {
@@ -189,20 +202,8 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     },
     {
       key: 'courses',
-      label: 'สื่อการสอน / ไฟล์',
-      icon: Folder,
-    },
-    {
-      key: 'exams',
-      label: 'ประเมิน / แบบฟอร์ม',
-      icon: ClipboardList,
-    },
-    {
-      key: 'academic-year',
-      label: 'ปฏิทินกิจกรรม',
-      icon: CalendarDays,
-      badge: '5',
-      badgeStyle: 'bg-rose-500 text-white font-extrabold',
+      label: 'หลักสูตร',
+      icon: BookMarked,
     },
     {
       key: 'lessons',
@@ -210,11 +211,25 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       icon: BookOpen,
     },
     {
+      key: 'exams',
+      label: 'จัดการสอบ/เก็บคะแนน',
+      icon: ClipboardList,
+    },
+    {
+      key: 'academic-year',
+      label: 'ปฏิทินกิจกรรม',
+      icon: CalendarDays,
+    },
+    {
       key: 'messages',
       label: 'ข้อความ & แชท',
       icon: MessageSquare,
-      badge: '5',
-      badgeStyle: 'bg-blue-500 text-white font-extrabold',
+      ...(unreadMessagesCount > 0
+        ? {
+            badge: String(unreadMessagesCount),
+            badgeStyle: 'bg-blue-500 text-white font-extrabold',
+          }
+        : {}),
     },
     ...(activeRole === 'STUDENT_AFFAIRS'
       ? [

@@ -248,7 +248,7 @@ export const App: React.FC = () => {
       case 'classroom-attendance':
         return 'เช็คชื่อเข้าเรียน (Classroom Attendance)';
       case 'exams':
-        return 'จัดการการสอบ (Exam Management)';
+        return 'จัดการสอบ/เก็บคะแนน (Exam Management)';
       case 'assignments':
         return 'ตรวจงาน';
       case 'readiness':
@@ -262,9 +262,9 @@ export const App: React.FC = () => {
       case 'student-council':
         return 'สภานักเรียน';
       case 'courses':
-        return 'สื่อการสอน / ไฟล์';
+        return 'หลักสูตร (Curriculum)';
       case 'lessons':
-        return 'แผนการสอน / จัดการแผนการสอน';
+        return 'แผนการสอน (Lesson Plans)';
       case 'classrooms':
         return 'จัดการห้องเรียน (Classrooms)';
       case 'roster':
@@ -672,7 +672,9 @@ export const App: React.FC = () => {
                 />
               )}
 
-              {currentView === 'courses' && <CoursesCurriculumView />}
+              {currentView === 'courses' && (
+                <CoursesCurriculumView onDeepNavigate={handleDeepNavigate} />
+              )}
 
               {currentView === 'lessons' && <LessonPlansView />}
 
