@@ -150,8 +150,7 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
           earnedScore = (earnedScore / totalAssignmentMax) * unit.maxScore;
         }
       } else {
-        // Fallback default score if clean slate is not active
-        earnedScore = isClean ? 0 : Math.round(unit.maxScore * 0.88 * 10) / 10;
+        earnedScore = 0;
       }
 
       earnedScore = Math.min(unit.maxScore, Math.max(0, earnedScore));
@@ -164,19 +163,13 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
         percent: unit.maxScore > 0 ? Math.round((earnedScore / unit.maxScore) * 100) : 0,
       };
     });
-  }, [activeCourse, assignments, submissions, currentStudentSgs, isClean]);
+  }, [activeCourse, assignments, submissions, currentStudentSgs]);
 
   // Midterm & Final scores
-  const midtermScore = isClean
-    ? 0
-    : currentStudentSgs?.midtermScore !== undefined
-    ? currentStudentSgs.midtermScore
-    : 17;
-  const finalScore = isClean
-    ? 0
-    : currentStudentSgs?.finalScore !== undefined
-    ? currentStudentSgs.finalScore
-    : 26;
+  const midtermScore =
+    currentStudentSgs?.midtermScore !== undefined ? currentStudentSgs.midtermScore : 0;
+  const finalScore =
+    currentStudentSgs?.finalScore !== undefined ? currentStudentSgs.finalScore : 0;
 
   // Total Formative (Units) Score
   const totalUnitsScore = unitBreakdown.reduce((sum, u) => sum + u.earnedScore, 0);
@@ -190,7 +183,7 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
 
   // Compute Grade Point (0.0 - 4.0)
   const gradeInfo = useMemo(() => {
-    if (isClean && grandTotalScore === 0) {
+    if (grandTotalScore === 0) {
       return { gpa: '-', label: 'รอดำเนินการประเมิน', color: 'text-slate-400', badgeBg: 'bg-slate-100 text-slate-600' };
     }
     if (grandTotalScore >= 80) {
@@ -215,36 +208,35 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
       return { gpa: '1.0', label: 'ผ่านเกณฑ์ขั้นต่ำ (D)', color: 'text-rose-500', badgeBg: 'bg-rose-50 text-rose-700 border-rose-200' };
     }
     return { gpa: '0.0', label: 'ต่ำกว่าเกณฑ์ (F)', color: 'text-rose-600', badgeBg: 'bg-rose-100 text-rose-800 border-rose-300' };
-  }, [grandTotalScore, isClean]);
+  }, [grandTotalScore]);
 
   // Attendance rate
-  const attendanceRate = isClean
-    ? 100
-    : currentStudentSgs?.attendancePercent !== undefined
-    ? currentStudentSgs.attendancePercent
-    : 96.5;
+  const attendanceRate =
+    currentStudentSgs?.attendancePercent !== undefined
+      ? currentStudentSgs.attendancePercent
+      : 100;
 
   // Radar chart data based on student performance
   const radarData = useMemo(() => {
-    if (isClean && grandTotalScore === 0) {
+    if (grandTotalScore === 0) {
       return [
-        { subject: 'คะแนนเก็บ', student: 100, classAvg: 100 },
-        { subject: 'คะแนนสอบ', student: 100, classAvg: 100 },
-        { subject: 'ส่งงานตรงเวลา', student: 100, classAvg: 100 },
-        { subject: 'เวลาเรียน', student: 100, classAvg: 100 },
+        { subject: 'คะแนนเก็บ', student: 0, classAvg: 0 },
+        { subject: 'คะแนนสอบ', student: 0, classAvg: 0 },
+        { subject: 'ส่งงานตรงเวลา', student: 0, classAvg: 0 },
+        { subject: 'เวลาเรียน', student: Math.round(attendanceRate), classAvg: 100 },
         { subject: 'พฤติกรรม', student: 100, classAvg: 100 },
       ];
     }
-    const unitsPercent = totalUnitsMax > 0 ? Math.round((totalUnitsScore / totalUnitsMax) * 100) : 85;
+    const unitsPercent = totalUnitsMax > 0 ? Math.round((totalUnitsScore / totalUnitsMax) * 100) : 0;
     const examPercent = Math.round(((midtermScore + finalScore) / 50) * 100);
     return [
-      { subject: 'คะแนนเก็บ', student: unitsPercent, classAvg: 80 },
-      { subject: 'คะแนนสอบ', student: examPercent, classAvg: 74 },
-      { subject: 'ส่งงานตรงเวลา', student: 92, classAvg: 82 },
-      { subject: 'เวลาเรียน', student: Math.round(attendanceRate), classAvg: 89 },
-      { subject: 'พฤติกรรม', student: 90, classAvg: 84 },
+      { subject: 'คะแนนเก็บ', student: unitsPercent, classAvg: 75 },
+      { subject: 'คะแนนสอบ', student: examPercent, classAvg: 70 },
+      { subject: 'ส่งงานตรงเวลา', student: unitsPercent, classAvg: 75 },
+      { subject: 'เวลาเรียน', student: Math.round(attendanceRate), classAvg: 90 },
+      { subject: 'พฤติกรรม', student: 100, classAvg: 90 },
     ];
-  }, [isClean, grandTotalScore, totalUnitsScore, totalUnitsMax, midtermScore, finalScore, attendanceRate]);
+  }, [grandTotalScore, totalUnitsScore, totalUnitsMax, midtermScore, finalScore, attendanceRate]);
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-12 animate-fade-in font-['Prompt',sans-serif] text-slate-800 select-none">

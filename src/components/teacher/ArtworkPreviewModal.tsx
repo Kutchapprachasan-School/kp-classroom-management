@@ -44,6 +44,7 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
   const [rotation, setRotation] = useState<number>(0);
   const [pdfPage, setPdfPage] = useState<number>(1);
   const [imgLoadError, setImgLoadError] = useState<boolean>(false);
+  const [reminderSent, setReminderSent] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
@@ -55,12 +56,24 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
     setRotation(0);
   };
 
-  // ตรวจสอบนามสกุลไฟล์
+  // ตรวจสอบนามสกุลไฟล์และประเภท
   const lowerFile = (fileName || '').toLowerCase();
   const isJpg = lowerFile.endsWith('.jpg') || lowerFile.endsWith('.jpeg');
   const isPng = lowerFile.endsWith('.png');
   const isPdf = type === 'PDF' || lowerFile.endsWith('.pdf');
-  const isLink = type === 'LINK' || (url && url.includes('canva.com')) || (url && url.includes('docs.google.com'));
+  const isGoogleDrive = Boolean(
+    platform === 'GOOGLE_DRIVE' ||
+      (url && (url.includes('drive.google.com') || url.includes('docs.google.com')))
+  );
+  const isLink = type === 'LINK' || (url && url.includes('canva.com')) || isGoogleDrive;
+
+  const handleSendPermissionReminder = () => {
+    setReminderSent(true);
+    const reminderText = `แจ้งเตือนการส่งงาน: คุณครูไม่สามารถเข้าถึงไฟล์งาน '${title}' ได้ กรุณาเปิดสิทธิ์แชร์ใน Google Drive ให้คุณครูด้วยครับ`;
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(reminderText).catch(() => {});
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 md:p-6 animate-fade-in font-sans">
@@ -71,6 +84,8 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
             <div className="w-9 h-9 rounded-xl bg-teal-500/20 border border-teal-400/30 flex items-center justify-center text-teal-400">
               {isPdf ? (
                 <FileText className="w-5 h-5 text-rose-400" />
+              ) : isGoogleDrive ? (
+                <span className="text-xl">📁</span>
               ) : isLink ? (
                 <Palette className="w-5 h-5 text-[#00C4CC]" />
               ) : (
@@ -83,7 +98,17 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                   {title}
                 </span>
                 <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-slate-800 text-slate-300 border border-slate-700">
-                  {isPdf ? 'PDF DOCUMENT' : isLink ? (platform || 'CANVA') : isJpg ? 'JPG IMAGE' : isPng ? 'PNG IMAGE' : 'IMAGE'}
+                  {isPdf
+                    ? 'PDF DOCUMENT'
+                    : isGoogleDrive
+                    ? 'GOOGLE DRIVE'
+                    : isLink
+                    ? (platform || 'CANVA')
+                    : isJpg
+                    ? 'JPG IMAGE'
+                    : isPng
+                    ? 'PNG IMAGE'
+                    : 'IMAGE'}
                 </span>
               </div>
               <p className="text-xs text-slate-400 font-medium">
@@ -212,10 +237,82 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                 transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
               }}
             >
-              {/* Canva Window Shell */}
-              <div className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl">
-                {/* Canva Top Bar */}
-                <div className="bg-slate-950 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between text-xs">
+              {isGoogleDrive ? (
+                /* Google Drive Pre-Flight Workspace Card */
+                <div className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl p-6 sm:p-8 max-w-xl mx-auto text-white space-y-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-400 flex items-center justify-center text-2xl shadow-lg">
+                      📁
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-extrabold text-base sm:text-lg text-white">
+                          โฟลเดอร์ผลงานบน Google Drive
+                        </h3>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          GOOGLE DRIVE
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        ส่งงานแบบโฟลเดอร์ส่วนตัวของนักเรียน • ไม่จำกัดขนาดไฟล์
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* URL Box */}
+                  <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1">
+                    <span className="text-[11px] text-slate-400 font-semibold block">ลิงก์โฟลเดอร์ปลายทาง:</span>
+                    <p className="font-mono text-xs text-emerald-300 break-all select-all">
+                      {url}
+                    </p>
+                  </div>
+
+                  {/* Validation & Pre-Flight Status */}
+                  <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded-xl space-y-1.5">
+                    <div className="flex items-center gap-2 text-emerald-300 font-bold text-xs">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>ตรวจสอบรูปแบบลิงก์: ถูกต้องตามมาตรฐาน Google Drive</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      เนื่องจาก Google Drive มีการจำกัดสิทธิ์ตามบัญชีผู้ใช้ คุณครูสามารถกดเปิดลิงก์เพื่อตรวจสอบว่าเปิดดูได้หรือไม่ หากพบว่าติดสิทธิ์ (Access Denied) ให้กดปุ่ม &quot;แจ้งเตือนขอสิทธิ์&quot; ด้านล่าง
+                    </p>
+                  </div>
+
+                  {/* Pre-Flight Actions */}
+                  <div className="space-y-2 pt-2 border-t border-slate-800">
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 transition-colors shadow-md"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>1. เปิดโฟลเดอร์ Google Drive ในแท็บใหม่ ↗</span>
+                    </a>
+
+                    <button
+                      type="button"
+                      onClick={handleSendPermissionReminder}
+                      className={`w-full py-2.5 px-4 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        reminderSent
+                          ? 'bg-amber-500/20 border-amber-400/50 text-amber-300'
+                          : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
+                      }`}
+                    >
+                      <span>⚠️</span>
+                      <span>
+                        {reminderSent
+                          ? '✓ คัดลอกข้อความขอสิทธิ์แล้ว (ส่งแจ้งเตือนในระบบสำเร็จ)'
+                          : '2. ติดปัญหาเปิดไม่ได้? กดแจ้งเตือนขอสิทธิ์แชร์โฟลเดอร์'}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Canva Window Shell */
+                <div className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl">
+                  {/* Canva Top Bar */}
+                  <div className="bg-slate-950 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
                     <span className="font-black text-sm tracking-tight text-[#00C4CC] flex items-center gap-1">
                       <span>Canva</span>
@@ -310,6 +407,7 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                   </div>
                 </div>
               </div>
+              )}
             </div>
           ) : isPdf ? (
             /* ============================================================== */

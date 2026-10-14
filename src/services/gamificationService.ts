@@ -1,5 +1,4 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase';
-import { studentAdventureQuests } from '../data/mockData';
 import type { StudentQuestItem, StudentLeaderboardEntry, BadgeItem } from '../types/viewModels';
 import { behaviorService } from './behaviorService';
 import { cleanSlateService } from './cleanSlateService';
@@ -7,13 +6,7 @@ import { cleanSlateService } from './cleanSlateService';
 const STORAGE_KEY_QUESTS = 'cls_student_quests';
 const STORAGE_KEY_STREAK = 'cls_student_streak';
 
-const defaultLeaderboard: StudentLeaderboardEntry[] = [
-  { rank: 1, name: 'ด.ญ. ปรียาภรณ์ ชัยแก้ว', classroom: 'ม.3/1', xp: 1450, streakDays: 14, avatarText: 'ป' },
-  { rank: 2, name: 'ด.ช. จิรายุ เดชปันคำ', classroom: 'ม.3/8', xp: 1280, streakDays: 12, avatarText: 'จ', isCurrentUser: true },
-  { rank: 3, name: 'ด.ช. กฤษณะ ศรีสมบูรณ์', classroom: 'ม.3/1', xp: 1150, streakDays: 10, avatarText: 'ก' },
-  { rank: 4, name: 'ด.ช. ทัตธน คำฝั้น', classroom: 'ม.3/1', xp: 980, streakDays: 8, avatarText: 'ท' },
-  { rank: 5, name: 'ด.ญ. อคิราห์ วิรากร', classroom: 'ม.3/1', xp: 750, streakDays: 5, avatarText: 'อ' },
-];
+const defaultLeaderboard: StudentLeaderboardEntry[] = [];
 
 const defaultBadges: BadgeItem[] = [
   {
@@ -21,8 +14,8 @@ const defaultBadges: BadgeItem[] = [
     title: 'จอมยุทธตรงต่อเวลา',
     description: 'ส่งงานตรงเวลาติดต่อกันครบ 5 ชิ้นงาน',
     iconType: 'clock',
-    isUnlocked: true,
-    unlockedAt: '15 ส.ค. 2569',
+    isUnlocked: false,
+    progressPercent: 0,
     tier: 'GOLD',
   },
   {
@@ -30,8 +23,8 @@ const defaultBadges: BadgeItem[] = [
     title: 'ผู้พิชิตคะแนนเต็ม',
     description: 'สอบได้คะแนนเต็ม 100% ในชิ้นงานใดก็ได้',
     iconType: 'star',
-    isUnlocked: true,
-    unlockedAt: '10 ส.ค. 2569',
+    isUnlocked: false,
+    progressPercent: 0,
     tier: 'SILVER',
   },
   {
@@ -39,8 +32,8 @@ const defaultBadges: BadgeItem[] = [
     title: 'มิตรแท้ห้องเรียน',
     description: 'ช่วยเพื่อนและได้รับคำชมเชยจากครู',
     iconType: 'heart',
-    isUnlocked: true,
-    unlockedAt: '22 ส.ค. 2569',
+    isUnlocked: false,
+    progressPercent: 0,
     tier: 'BRONZE',
   },
   {
@@ -49,24 +42,23 @@ const defaultBadges: BadgeItem[] = [
     description: 'สะสม XP ครบ 2,000 แต้มในหมวดวิชาศิลปะ-ดนตรี',
     iconType: 'trophy',
     isUnlocked: false,
-    progressPercent: 64,
+    progressPercent: 0,
     tier: 'SPECIAL',
   },
 ];
 
 const getLocalQuests = (): StudentQuestItem[] => {
+  if (typeof localStorage === 'undefined') return [];
   const raw = localStorage.getItem(STORAGE_KEY_QUESTS);
   if (raw) {
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
     } catch {
       // fallback
     }
   }
-  if (cleanSlateService.isCleanSlateActive()) {
-    return [];
-  }
-  return studentAdventureQuests;
+  return [];
 };
 
 const saveLocalQuests = (items: StudentQuestItem[]) => {
@@ -154,7 +146,7 @@ export const gamificationService = {
   async claimDailyCheckin(studentId = 'stu-2'): Promise<{ streak: number; xpAwarded: number; isFirstToday: boolean }> {
     const today = new Date().toISOString().split('T')[0];
     const lastCheckin = localStorage.getItem(`${STORAGE_KEY_STREAK}_${studentId}_date`);
-    const defaultInitialStreak = cleanSlateService.isCleanSlateActive() ? '0' : '12';
+    const defaultInitialStreak = '0';
     const currentStreak = parseInt(localStorage.getItem(`${STORAGE_KEY_STREAK}_${studentId}_count`) || defaultInitialStreak, 10);
 
     if (lastCheckin === today) {
@@ -173,7 +165,7 @@ export const gamificationService = {
   },
 
   getStreak(studentId = 'stu-2'): number {
-    const defaultInitialStreak = cleanSlateService.isCleanSlateActive() ? '0' : '12';
+    const defaultInitialStreak = '0';
     return parseInt(localStorage.getItem(`${STORAGE_KEY_STREAK}_${studentId}_count`) || defaultInitialStreak, 10);
   },
 };

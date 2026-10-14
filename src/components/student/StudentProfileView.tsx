@@ -1,13 +1,9 @@
-// src/components/student/StudentProfileView.tsx
-// หน้าข้อมูลส่วนตัวของนักเรียน เชื่อมโยงข้อมูลผู้ใช้จริงจากระบบ
-
 import React from 'react';
 import { User } from 'lucide-react';
 import type { AuthUser } from '../../services/authService';
 import type { SchoolSettingsConfig } from '../../config/schoolSettings';
 import { getSchoolSettings } from '../../config/schoolSettings';
-import { classroomsListData } from '../../data/mockData';
-import { cleanSlateService } from '../../services/cleanSlateService';
+import { classroomService } from '../../services/classroomService';
 
 interface StudentProfileViewProps {
   onBack: () => void;
@@ -26,13 +22,12 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
   const classroomId = currentUser?.classroomId || 'ม.3/1';
 
   // Find classroom details and advisor
-  const matchedRoom = classroomsListData.find(
+  const rooms = classroomService.getClassroomsSync();
+  const matchedRoom = rooms.find(
     (c) => c.id === classroomId || c.roomNumber === classroomId || c.name.includes(classroomId)
   );
-  const roomName = matchedRoom ? `ชั้น${matchedRoom.roomNumber}` : `ชั้น ${classroomId}`;
+  const roomName = matchedRoom ? `ชั้น ${matchedRoom.roomNumber}` : `ชั้น ${classroomId}`;
   const adviserName = matchedRoom?.adviser || 'ครูที่ปรึกษาประจำชั้น';
-
-  const isClean = cleanSlateService.isCleanSlateActive();
 
   return (
     <div className="font-['Prompt',sans-serif] space-y-5 animate-fade-in select-none">
@@ -93,10 +88,10 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
               <div className="p-3 rounded-xl bg-blue-50/60 border border-blue-100">
                 <span className="text-[11px] text-slate-500">เกรดเฉลี่ยสะสม (GPAX)</span>
                 <div className="text-lg font-bold text-blue-700 mt-0.5">
-                  {isClean ? '-' : '3.82'}
+                  -
                 </div>
                 <div className="text-[10px] text-slate-400">
-                  {isClean ? 'รอประมวลผลสิ้นภาคเรียน' : 'ภาคเรียนล่าสุด'}
+                  รอประมวลผลสิ้นภาคเรียน
                 </div>
               </div>
               <div className="p-3 rounded-xl bg-emerald-50/60 border border-emerald-100">
@@ -107,10 +102,10 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
               <div className="p-3 rounded-xl bg-amber-50/60 border border-amber-100">
                 <span className="text-[11px] text-slate-500">แต้มการเรียนรู้ (XP)</span>
                 <div className="text-lg font-bold text-amber-700 mt-0.5">
-                  {isClean ? '0 XP' : '670 XP'}
+                  0 XP
                 </div>
                 <div className="text-[10px] text-amber-600 font-medium">
-                  {isClean ? 'เริ่มต้นสะสมแต้ม' : 'ระดับผู้เริ่มต้น'}
+                  เริ่มต้นสะสมแต้ม
                 </div>
               </div>
             </div>

@@ -24,49 +24,21 @@ export interface XpTransactionRecord {
 const STORAGE_KEY_BEHAVIOR = 'cls_behavior_logs';
 const STORAGE_KEY_XP = 'cls_xp_transactions';
 
-const defaultBehaviors: BehaviorRecord[] = [
-  {
-    id: 'beh-1',
-    studentName: 'ด.ช. จิรายุ เดชปันคำ',
-    studentId: 'stu-2',
-    type: 'POSITIVE',
-    text: 'ช่วยจัดเก็บอุปกรณ์เครื่องดนตรีหลังเลิกเรียนอย่างเรียบร้อย',
-    points: '+10 XP',
-    date: '22 ส.ค. 2569',
-    author: 'ครูภาสภูมิ',
-  },
-  {
-    id: 'beh-2',
-    studentName: 'ด.ช. กฤษณะ ศรีสมบูรณ์',
-    studentId: 'stu-1',
-    type: 'POSITIVE',
-    text: 'แนะนำและสอนเพื่อนร่วมกลุ่มอ่านโน้ตเพลงไทย',
-    points: '+5 XP',
-    date: '21 ส.ค. 2569',
-    author: 'ครูภาสภูมิ',
-  },
-  {
-    id: 'beh-3',
-    studentName: 'ด.ช. ภูรินท์ บัณฑิต',
-    studentId: 'stu-7',
-    type: 'NEGATIVE',
-    text: 'ไม่นำสมุดบันทึกโน้ตมาเรียนและพูดคุยส่งเสียงดัง',
-    points: '-2 คะแนน',
-    date: '18 ส.ค. 2569',
-    author: 'ครูภาสภูมิ',
-  },
-];
-
 const getLocalBehaviors = (): BehaviorRecord[] => {
+  if (typeof localStorage === 'undefined') return [];
   const raw = localStorage.getItem(STORAGE_KEY_BEHAVIOR);
   if (raw) {
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const legacyMockIds = new Set(['beh-1', 'beh-2', 'beh-3']);
+        return parsed.filter((b: BehaviorRecord) => !legacyMockIds.has(b.id));
+      }
     } catch {
       // fallback
     }
   }
-  return defaultBehaviors;
+  return [];
 };
 
 const saveLocalBehaviors = (items: BehaviorRecord[]) => {
@@ -74,6 +46,7 @@ const saveLocalBehaviors = (items: BehaviorRecord[]) => {
 };
 
 const getLocalXpTransactions = (): XpTransactionRecord[] => {
+  if (typeof localStorage === 'undefined') return [];
   const raw = localStorage.getItem(STORAGE_KEY_XP);
   if (raw) {
     try {
@@ -82,24 +55,7 @@ const getLocalXpTransactions = (): XpTransactionRecord[] => {
       // fallback
     }
   }
-  return [
-    {
-      id: 'xp-tx-1',
-      studentId: 'stu-2',
-      amount: 50,
-      reason: 'ส่งงานเควสต์ My Soundtrack ตรงเวลา',
-      idempotencyKey: 'quest-asg-1-stu-2',
-      createdAt: '2026-08-20T10:05:00Z',
-    },
-    {
-      id: 'xp-tx-2',
-      studentId: 'stu-1',
-      amount: 30,
-      reason: 'เข้าเรียนเช็คชื่อตรงเวลา 5 วันรวด (Streak)',
-      idempotencyKey: 'streak-week-1-stu-1',
-      createdAt: '2026-08-21T08:30:00Z',
-    },
-  ];
+  return [];
 };
 
 const saveLocalXpTransactions = (items: XpTransactionRecord[]) => {

@@ -242,20 +242,20 @@ export function saveSchoolSettings(next: Partial<SchoolBrandingSettings>): Schoo
       try {
         const { error } = await supabase
           .from('SystemSettings')
-          .update({
+          .upsert({
+            id: 'default',
             schoolName: merged.nameTh,
             affiliation: merged.affiliation,
             logoUrl: merged.logoUrl,
             updatedAt: new Date().toISOString(),
-          })
-          .eq('id', 'default');
+          });
         if (error) {
-          console.warn('[Supabase Sync] Failed to update SystemSettings:', error.message);
+          console.warn('[Supabase Sync] Failed to upsert SystemSettings:', error.message);
         } else {
-          console.log('[Supabase Sync] SystemSettings updated successfully with logo and school info');
+          console.log('[Supabase Sync] SystemSettings upserted successfully with logo and school info');
         }
       } catch (err) {
-        console.warn('[Supabase Sync] Error updating SystemSettings:', err);
+        console.warn('[Supabase Sync] Error upserting SystemSettings:', err);
       }
     })();
   }
@@ -269,18 +269,18 @@ export async function saveSchoolSettingsAsync(next: Partial<SchoolBrandingSettin
     try {
       const { error } = await supabase
         .from('SystemSettings')
-        .update({
+        .upsert({
+          id: 'default',
           schoolName: merged.nameTh,
           affiliation: merged.affiliation,
           logoUrl: merged.logoUrl,
           updatedAt: new Date().toISOString(),
-        })
-        .eq('id', 'default');
+        });
       if (error) {
-        console.warn('[Supabase Sync] Failed to update SystemSettings:', error.message);
+        console.warn('[Supabase Sync] Failed to upsert SystemSettings:', error.message);
       }
     } catch (err) {
-      console.warn('[Supabase Sync] Error updating SystemSettings:', err);
+      console.warn('[Supabase Sync] Error upserting SystemSettings:', err);
     }
   }
   return merged;
@@ -298,10 +298,45 @@ export async function fetchAndSyncSchoolSettingsFromSupabase(): Promise<SchoolBr
     if (error || !data) return null;
 
     const current = getSchoolSettings();
+
+    // Check custom logo provenance
+    const isLocalLogoCustom = Boolean(
+      current.logoUrl &&
+      current.logoUrl !== DEFAULT_KUTCHAP_LOGO_SVG &&
+      current.logoUrl.trim() !== ''
+    );
+    const isSupabaseLogoCustom = Boolean(
+      data.logoUrl &&
+      data.logoUrl !== DEFAULT_KUTCHAP_LOGO_SVG &&
+      data.logoUrl.trim() !== ''
+    );
+
+    // If local has a custom logo but Supabase only has default or empty,
+    // NEVER overwrite local with default! Keep local and push it to Supabase.
+    let resolvedLogo = current.logoUrl;
+    if (isSupabaseLogoCustom) {
+      resolvedLogo = data.logoUrl;
+    } else if (isLocalLogoCustom && !isSupabaseLogoCustom) {
+      resolvedLogo = current.logoUrl;
+      // Push local custom logo to Supabase so it's backed up in cloud
+      supabase
+        .from('SystemSettings')
+        .upsert({
+          id: 'default',
+          schoolName: current.nameTh,
+          affiliation: current.affiliation,
+          logoUrl: current.logoUrl,
+          updatedAt: new Date().toISOString(),
+        })
+        .then(() => {});
+    } else {
+      resolvedLogo = data.logoUrl || current.logoUrl || DEFAULT_KUTCHAP_LOGO_SVG;
+    }
+
     const hasChange =
       (data.schoolName && data.schoolName !== current.nameTh) ||
       (data.affiliation && data.affiliation !== current.affiliation) ||
-      (data.logoUrl && data.logoUrl !== current.logoUrl);
+      (resolvedLogo !== current.logoUrl);
 
     if (!hasChange) {
       return current;
@@ -311,7 +346,7 @@ export async function fetchAndSyncSchoolSettingsFromSupabase(): Promise<SchoolBr
       ...current,
       nameTh: data.schoolName || current.nameTh,
       affiliation: data.affiliation || current.affiliation,
-      logoUrl: data.logoUrl || current.logoUrl,
+      logoUrl: resolvedLogo,
     };
 
     if (typeof window !== 'undefined') {

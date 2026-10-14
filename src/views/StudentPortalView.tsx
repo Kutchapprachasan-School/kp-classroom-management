@@ -28,7 +28,6 @@ import { gamificationService } from '../services/gamificationService';
 import { studentBannerService } from '../services/studentBannerService';
 import { authService, type AuthUser } from '../services/authService';
 import { getSchoolSettings, type SchoolSettingsConfig } from '../config/schoolSettings';
-import { cleanSlateService } from '../services/cleanSlateService';
 import { type SchoolUserRole } from '../config/schoolRoles';
 
 interface StudentPortalViewProps {
@@ -56,9 +55,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
   const studentClassroom = effectiveUser?.classroomId || 'ม.3/1';
 
   const [activeTab, setActiveTab] = useState<StudentTabKey>('home');
-  const [currentXp, setCurrentXp] = useState<number>(() =>
-    cleanSlateService.isCleanSlateActive() ? 0 : 670
-  );
+  const [currentXp, setCurrentXp] = useState<number>(0);
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const saved = window.localStorage.getItem('kp_student_sidebar_open');

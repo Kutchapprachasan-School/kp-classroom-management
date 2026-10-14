@@ -1,19 +1,20 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase';
-import { softDeletedData } from '../data/mockData';
 import type { SoftDeletedItem } from '../types/viewModels';
 
 const STORAGE_KEY_TRASH = 'cls_trash_data';
 
 const getLocalTrash = (): SoftDeletedItem[] => {
+  if (typeof localStorage === 'undefined') return [];
   const raw = localStorage.getItem(STORAGE_KEY_TRASH);
   if (raw) {
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
     } catch {
       // fallback
     }
   }
-  return softDeletedData;
+  return [];
 };
 
 const saveLocalTrash = (items: SoftDeletedItem[]) => {
@@ -50,7 +51,7 @@ export const trashService = {
     id: string,
     entityType: 'ชั้นเรียน' | 'งาน/การบ้าน' | 'ชุดข้อสอบ' | 'นักเรียน',
     name: string,
-    deletedBy = 'ครูภาสภูมิ'
+    deletedBy = 'ครูผู้สอน'
   ): Promise<SoftDeletedItem> {
     const newItem: SoftDeletedItem = {
       id,

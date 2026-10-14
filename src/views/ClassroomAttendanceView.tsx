@@ -1090,31 +1090,52 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
             </div>
 
             {/* Calendar Grid (อา - ส) */}
-            <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-bold text-slate-400 pb-1">
-              <span>อา</span>
-              <span>จ</span>
-              <span>อ</span>
-              <span>พ</span>
-              <span>พฤ</span>
-              <span>ศ</span>
-              <span>ส</span>
+            <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-bold pb-1">
+              <span className="text-rose-500 font-extrabold">อา</span>
+              <span className="text-slate-400">จ</span>
+              <span className="text-slate-400">อ</span>
+              <span className="text-slate-400">พ</span>
+              <span className="text-slate-400">พฤ</span>
+              <span className="text-slate-400">ศ</span>
+              <span className="text-rose-500 font-extrabold">ส</span>
             </div>
 
             <div className="grid grid-cols-7 gap-1">
+              {/* Padding offset for the first day of the month */}
+              {Array.from({ length: new Date(calendarYear, calendarMonth - 1, 1).getDay() }).map((_, i) => (
+                <div key={`empty-cal-pad-${i}`} className="h-8 w-8 mx-auto" />
+              ))}
               {monthCalendarDays.map((day) => {
                 const isSelected = day.date === selectedDate;
                 const isChecked = day.isChecked;
+                const isWeekend = day.isWeekend ?? (day.dayOfWeek === 0 || day.dayOfWeek === 6);
+                const isHoliday =
+                  day.isHoliday ||
+                  (calendarMonth === 10 && (day.dayOfMonth === 13 || day.dayOfMonth === 23));
 
                 return (
                   <button
                     key={day.date}
                     type="button"
                     onClick={() => handleSelectCalendarDate(day.date)}
+                    title={
+                      isHoliday
+                        ? `วันหยุด: ${day.holidayName || (day.dayOfMonth === 13 ? 'วันนวมินทรมหาราช' : 'วันปิยมหาราช')}`
+                        : isWeekend
+                        ? 'วันหยุดสุดสัปดาห์ (เสาร์-อาทิตย์)'
+                        : isChecked
+                        ? 'สอนแล้ว (บันทึกเวลาเรียนแล้ว)'
+                        : 'ยังไม่ได้เช็คชื่อ'
+                    }
                     className={`h-8 w-8 mx-auto rounded-full text-xs font-extrabold flex items-center justify-center transition-all cursor-pointer ${
                       isSelected
                         ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-300'
+                        : isHoliday
+                        ? 'bg-rose-100 text-rose-700 font-black border border-rose-200 hover:bg-rose-200'
                         : isChecked
-                        ? 'bg-emerald-100/90 text-emerald-800 hover:bg-emerald-200'
+                        ? 'bg-emerald-100/90 text-emerald-800 hover:bg-emerald-200 font-bold'
+                        : isWeekend
+                        ? 'bg-rose-50/70 text-rose-500 hover:bg-rose-100/70'
                         : day.isPastOrToday && day.isWeekday
                         ? 'bg-rose-100/90 text-rose-700 hover:bg-rose-200'
                         : 'text-slate-400 hover:bg-slate-100'
@@ -1127,18 +1148,22 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
             </div>
 
             {/* Calendar Legend */}
-            <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] font-semibold text-slate-500">
+            <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-[11px] font-semibold text-slate-500">
               <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
                 <span>สอนแล้ว</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                <div className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
+                <span>วันที่เลือก</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
                 <span>ยังไม่เช็ค</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-blue-600" />
-                <span>เลือกอยู่</span>
+                <div className="w-2.5 h-2.5 rounded-full bg-rose-200 border border-rose-300 shrink-0" />
+                <span>วันหยุด / เสาร์-อาทิตย์</span>
               </div>
             </div>
           </div>

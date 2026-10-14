@@ -30,6 +30,7 @@ import {
   type TrashMediaItem,
 } from '../services/coursesCurriculumService';
 import { classroomService } from '../services/classroomService';
+import { academicCalendarService } from '../services/academicCalendarService';
 import type { ClassroomRosterItem } from '../types/viewModels';
 import type { CrossViewNavigationPayload } from '../services/teacherCopilotService';
 
@@ -247,6 +248,22 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
       .map((c) => c.name);
     const initialRooms = defaultRooms.length > 0 ? defaultRooms.slice(0, 2) : ['ม.3/1', 'ม.3/2'];
     const { periodsPerRoom } = calculatePeriodsPerWeek(1.5, initialRooms.length);
+    let defaultTerm = '1';
+    let defaultYear = '2569';
+    if (termFilter !== 'ALL' && termFilter.includes('/')) {
+      const parts = termFilter.split('/');
+      defaultTerm = parts[0] || '1';
+      defaultYear = parts[1] || '2569';
+    } else {
+      try {
+        const active = academicCalendarService.getActiveTerm();
+        defaultTerm = String(active.semesterNo || '1');
+        defaultYear = String(active.year || '2569');
+      } catch {
+        // fallback
+      }
+    }
+
     setCourseForm({
       code: '',
       name: '',
@@ -254,8 +271,8 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
       level: defaultLevel,
       credits: 1.5,
       periodsPerWeek: periodsPerRoom,
-      academicYear: '2569',
-      term: '1',
+      academicYear: defaultYear,
+      term: defaultTerm,
       assignedClassrooms: initialRooms,
     });
     setRoomFilterTab('ม.3');
@@ -975,6 +992,51 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
             </div>
 
             <form onSubmit={handleSaveAddCourse} className="space-y-3.5 text-xs">
+              {/* Academic Year and Term Selector (วางแผนล่วงหน้าได้) */}
+              <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/90 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-blue-900 flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-blue-600" />
+                    <span>ปีการศึกษาและภาคเรียนที่เปิดสอน:</span>
+                  </span>
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                    วางแผนล่วงหน้าได้
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      ปีการศึกษา:
+                    </label>
+                    <select
+                      value={courseForm.academicYear}
+                      onChange={(e) => setCourseForm({ ...courseForm, academicYear: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-blue-200 bg-white font-bold text-slate-800 focus:border-blue-500 focus:outline-none cursor-pointer"
+                    >
+                      <option value="2568">ปีการศึกษา 2568</option>
+                      <option value="2569">ปีการศึกษา 2569</option>
+                      <option value="2570">ปีการศึกษา 2570 (ล่วงหน้า)</option>
+                      <option value="2571">ปีการศึกษา 2571 (ล่วงหน้า)</option>
+                      <option value="2572">ปีการศึกษา 2572 (ล่วงหน้า)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      ภาคเรียน:
+                    </label>
+                    <select
+                      value={courseForm.term}
+                      onChange={(e) => setCourseForm({ ...courseForm, term: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-blue-200 bg-white font-bold text-slate-800 focus:border-blue-500 focus:outline-none cursor-pointer"
+                    >
+                      <option value="1">ภาคเรียนที่ 1</option>
+                      <option value="2">ภาคเรียนที่ 2</option>
+                      <option value="summer">ภาคฤดูร้อน (Summer)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">รหัสวิชา (Code):</label>
@@ -1204,6 +1266,51 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
             </div>
 
             <form onSubmit={handleSaveEditCourse} className="space-y-3.5 text-xs">
+              {/* Academic Year and Term Selector (แก้ไขภาคเรียน/ปีการศึกษา) */}
+              <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/90 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-blue-900 flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-blue-600" />
+                    <span>ปีการศึกษาและภาคเรียนที่เปิดสอน:</span>
+                  </span>
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                    ปรับเปลี่ยนได้
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      ปีการศึกษา:
+                    </label>
+                    <select
+                      value={courseForm.academicYear}
+                      onChange={(e) => setCourseForm({ ...courseForm, academicYear: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-blue-200 bg-white font-bold text-slate-800 focus:border-blue-500 focus:outline-none cursor-pointer"
+                    >
+                      <option value="2568">ปีการศึกษา 2568</option>
+                      <option value="2569">ปีการศึกษา 2569</option>
+                      <option value="2570">ปีการศึกษา 2570</option>
+                      <option value="2571">ปีการศึกษา 2571</option>
+                      <option value="2572">ปีการศึกษา 2572</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      ภาคเรียน:
+                    </label>
+                    <select
+                      value={courseForm.term}
+                      onChange={(e) => setCourseForm({ ...courseForm, term: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-blue-200 bg-white font-bold text-slate-800 focus:border-blue-500 focus:outline-none cursor-pointer"
+                    >
+                      <option value="1">ภาคเรียนที่ 1</option>
+                      <option value="2">ภาคเรียนที่ 2</option>
+                      <option value="summer">ภาคฤดูร้อน (Summer)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="font-bold text-slate-700 block mb-1">ชื่อรายวิชา:</label>
                 <input

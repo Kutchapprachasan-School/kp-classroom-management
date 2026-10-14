@@ -17,12 +17,7 @@ import { AtRiskCard } from '../components/teacher/AtRiskCard';
 import { IncompleteGradingCard } from '../components/teacher/IncompleteGradingCard';
 import { LowestAssignmentsCard } from '../components/teacher/LowestAssignmentsCard';
 import { GradeDistributionBar } from '../components/teacher/GradeDistributionBar';
-import {
-  atRiskStudentsData,
-  incompleteGradingData,
-  lowestAssignmentsData,
-  gradeDistributionData,
-} from '../data/mockData';
+import { studentService, type StudentRecord } from '../services/studentService';
 import type { AtRiskStudent } from '../types/viewModels';
 import { assignmentService } from '../services/assignmentService';
 import {
@@ -47,7 +42,6 @@ import type { CrossViewNavigationPayload } from '../services/teacherCopilotServi
 import {
   TEACHER_SUBJECTS_LIST,
 } from '../services/teacherCourseAssignmentService';
-import { cleanSlateService } from '../services/cleanSlateService';
 import { getBangkokTodayString } from '../utils/timetableDateUtils';
 
 const formatThaiDate = (isoDate: string): string => {
@@ -102,19 +96,6 @@ export type ClassSubTab =
   | 'behavior'
   | 'reflection'
   | 'adventure';
-
-interface StudentRosterScore {
-  no: number;
-  code: string;
-  name: string;
-  u1: number;
-  u2: number;
-  midterm: number;
-  u3: number;
-  final: number;
-  total: number;
-  grade: string;
-}
 
 export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
   onSelectStudent,
@@ -429,123 +410,40 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
       })
   );
 
-  // Assignments Data matching Image 3
-  const [assignmentRows, setAssignmentRows] = useState([
-    {
-      id: 'asg-1',
-      title: 'My Soundtrack',
-      sharedTag: 'ใช้ร่วม 5 ห้อง',
-      subtext: 'นำเข้าจาก Google Classroom • 16 ก.ค. 2569 11:21:42',
-      category: 'เก็บก่อนกลางภาค',
-      sgsUnit: 'ช่อง 2 • หน่วยที่ 1',
-      dueDate: '20 ส.ค.',
-      maxScore: 10,
-      submittedText: '23 / 23',
-      isFull: true,
-      status: 'ACTIVE',
-    },
-    {
-      id: 'asg-2',
-      title: 'อินโฟกราฟิค องค์ประกอบทางดนตรี',
-      sharedTag: 'ใช้ร่วม 6 ห้อง',
-      subtext: 'นำเข้าจาก Google Classroom • 16 ก.ค. 2569 11:21:42',
-      category: 'เก็บก่อนกลางภาค',
-      sgsUnit: 'ช่อง 1 • หน่วยที่ 2',
-      dueDate: '10 ส.ค.',
-      maxScore: 10,
-      submittedText: '23 / 23',
-      isFull: true,
-      status: 'ACTIVE',
-    },
-    {
-      id: 'asg-3',
-      title: 'เพลงแบบเพลง',
-      sharedTag: 'ใช้ร่วม 6 ห้อง',
-      subtext: 'นำเข้าจาก Google Classroom • 16 ก.ค. 2569 11:21:42',
-      category: 'เก็บก่อนกลางภาค',
-      sgsUnit: 'ช่อง 2 • หน่วยที่ 1',
-      dueDate: '5 ส.ค.',
-      maxScore: 10,
-      submittedText: '21 / 23',
-      isFull: false,
-      status: 'ACTIVE',
-    },
-    {
-      id: 'asg-4',
-      title: 'วิดีโอนำเสนอดนตรีไทยในสมัยต่าง ๆ',
-      sharedTag: 'ใช้ร่วม 6 ห้อง',
-      subtext: 'มอบหมายเมื่อ 1 ก.ย. 2569',
-      category: 'เก็บหลังกลางภาค',
-      sgsUnit: 'ช่อง 11 • หน่วยที่ 4',
-      dueDate: '25 ก.ย.',
-      maxScore: 10,
-      submittedText: '0 / 23',
-      isFull: false,
-      status: 'ACTIVE',
-    },
-  ]);
+  // Assignments Data (Zero Mock Data - loaded dynamically)
+  const [assignmentRows, setAssignmentRows] = useState<{
+    id: string;
+    title: string;
+    sharedTag: string;
+    subtext: string;
+    category: string;
+    sgsUnit: string;
+    dueDate: string;
+    maxScore: number;
+    submittedText: string;
+    isFull: boolean;
+    status: string;
+  }[]>([]);
 
-  // Full 23 Student Gradebook Data
-  const sampleGradesRoster: StudentRosterScore[] = [
-    { no: 1, code: '45101', name: 'ด.ช. กฤษณะ ศรีสมบูรณ์', u1: 14.5, u2: 18.0, midterm: 18.0, u3: 13.5, final: 26.0, total: 90.0, grade: '4.0' },
-    { no: 2, code: '45102', name: 'ด.ช. จิรายุ เดชปันคำ', u1: 13.5, u2: 16.0, midterm: 17.5, u3: 12.5, final: 23.0, total: 82.5, grade: '3.5' },
-    { no: 3, code: '45103', name: 'ด.ช. ชลธี ปัญญาวงศ์', u1: 12.0, u2: 15.0, midterm: 15.0, u3: 11.5, final: 21.0, total: 74.5, grade: '3.0' },
-    { no: 4, code: '45104', name: 'ด.ช. ณภัทร ธรรมรักษ์', u1: 13.0, u2: 17.0, midterm: 16.0, u3: 13.0, final: 24.0, total: 83.0, grade: '3.5' },
-    { no: 5, code: '45105', name: 'ด.ช. ทิวากร บุญมาก', u1: 11.0, u2: 14.0, midterm: 14.0, u3: 10.5, final: 19.0, total: 68.5, grade: '2.5' },
-    { no: 6, code: '45106', name: 'ด.ช. พงศกร มหาวรรณ', u1: 14.0, u2: 17.5, midterm: 17.0, u3: 13.0, final: 25.5, total: 87.0, grade: '4.0' },
-    { no: 7, code: '45107', name: 'ด.ช. ภูรินท์ บัณฑิต', u1: 6.0, u2: 7.0, midterm: 6.5, u3: 5.0, final: 3.8, total: 28.3, grade: '0' },
-    { no: 8, code: '45108', name: 'ด.ช. มงคลชัย สิทธิผล', u1: 12.5, u2: 15.5, midterm: 16.0, u3: 12.0, final: 22.0, total: 78.0, grade: '3.5' },
-    { no: 9, code: '45109', name: 'ด.ช. วรัญญู สุรเดช', u1: 13.0, u2: 16.5, midterm: 17.0, u3: 12.5, final: 24.0, total: 83.0, grade: '3.5' },
-    { no: 10, code: '45110', name: 'ด.ช. อัศวิน วนเกษตรกุล', u1: 7.0, u2: 8.5, midterm: 8.0, u3: 6.0, final: 4.8, total: 34.3, grade: '0' },
-    { no: 11, code: '45111', name: 'ด.ช. กิตติพงษ์ แก้วเรือง', u1: 13.5, u2: 17.0, midterm: 17.5, u3: 13.0, final: 25.0, total: 86.0, grade: '4.0' },
-    { no: 12, code: '45112', name: 'ด.ช. ชัยมงคล วงศ์บุตร', u1: 7.5, u2: 9.0, midterm: 8.5, u3: 6.0, final: 4.0, total: 35.0, grade: '0' },
-    { no: 13, code: '45113', name: 'ด.ช. ณัชพล อินทร์จันทร์', u1: 12.0, u2: 15.0, midterm: 15.5, u3: 11.0, final: 21.5, total: 75.0, grade: '3.5' },
-    { no: 14, code: '45114', name: 'ด.ช. ธนกร พลอยดี', u1: 13.0, u2: 16.0, midterm: 16.5, u3: 12.5, final: 23.0, total: 81.0, grade: '3.5' },
-    { no: 15, code: '45115', name: 'ด.ช. ทัตธน คำฝั้น', u1: 12.5, u2: 15.5, midterm: 16.5, u3: 12.0, final: 22.0, total: 78.5, grade: '3.5' },
-    { no: 16, code: '45116', name: 'ด.ช. บารมี สังข์ทอง', u1: 14.0, u2: 18.0, midterm: 18.5, u3: 14.0, final: 27.0, total: 91.5, grade: '4.0' },
-    { no: 17, code: '45117', name: 'ด.ช. ภาณุเดช มีสุข', u1: 11.5, u2: 14.0, midterm: 14.5, u3: 11.0, final: 20.0, total: 71.0, grade: '3.0' },
-    { no: 18, code: '45118', name: 'ด.ช. ยุทธนา ชัยศรี', u1: 13.5, u2: 16.5, midterm: 17.0, u3: 13.0, final: 24.5, total: 84.5, grade: '3.5' },
-    { no: 19, code: '45119', name: 'ด.ช. รัชชานนท์ ทองสุข', u1: 12.0, u2: 15.0, midterm: 15.0, u3: 12.0, final: 21.0, total: 75.0, grade: '3.5' },
-    { no: 20, code: '45120', name: 'ด.ช. วรพล ศรีเมือง', u1: 13.0, u2: 16.0, midterm: 16.0, u3: 12.5, final: 23.5, total: 81.0, grade: '3.5' },
-    { no: 21, code: '45121', name: 'ด.ช. ศิรชัช ไชยยศ', u1: 11.0, u2: 13.5, midterm: 14.0, u3: 10.5, final: 19.5, total: 68.5, grade: '2.5' },
-    { no: 22, code: '45122', name: 'ด.ญ. อคิราห์ วิรากร', u1: 8.0, u2: 9.5, midterm: 9.0, u3: 7.0, final: 5.5, total: 39.0, grade: '0' },
-    { no: 23, code: '45123', name: 'ด.ญ. ปรียาภรณ์ ชัยแก้ว', u1: 15.0, u2: 19.0, midterm: 19.5, u3: 14.5, final: 27.0, total: 95.0, grade: '4.0' },
-  ];
+  // Real students for the selected classroom
+  const [realClassroomStudents, setRealClassroomStudents] = useState<StudentRecord[]>([]);
 
-  // Behavior Ledger
-  const [behaviorLogs, setBehaviorLogs] = useState([
-    { id: 'b-1', studentName: 'ด.ช. จิรายุ เดชปันคำ', type: 'POSITIVE', text: 'ช่วยจัดเก็บอุปกรณ์สีน้ำส่วนรวมของห้อง', points: '+5 XP', date: '22 ก.ย. 2569' },
-    { id: 'b-2', studentName: 'ด.ญ. ปรียาภรณ์ ชัยแก้ว', type: 'POSITIVE', text: 'ให้คำแนะนำเพื่อนร่วมกลุ่มเรื่องการผสมแม่สี', points: '+10 XP', date: '20 ก.ย. 2569' },
-    { id: 'b-3', studentName: 'ด.ช. ภูรินท์ บัณฑิต', type: 'NEGATIVE', text: 'ลืมนำสมุดวาดเขียนมาในชั่วโมงเรียน', points: '-2 คะแนน', date: '18 ก.ย. 2569' },
-    { id: 'b-4', studentName: 'ด.ช. ชัยมงคล วงศ์บุตร', type: 'POSITIVE', text: 'ส่งงาน My Soundtrack แก้ไขตรงตามคำแนะนำ', points: '+5 XP', date: '15 ก.ย. 2569' },
-  ]);
+  // Behavior Ledger (Zero Mock Data)
+  const [behaviorLogs, setBehaviorLogs] = useState<{ id: string; studentName: string; type: string; text: string; points: string; date: string }[]>([]);
 
-  // Reflection records
-  const [reflectionLogs, setReflectionLogs] = useState([
-    {
-      period: 'คาบ 8-9 (17 ก.ย. 2569)',
-      topic: 'เทคนิคการไล่น้ำหนักสีโปสเตอร์',
-      success: 'นักเรียนส่วนใหญ่ (90%) ผสมสีไล่น้ำหนัก 5 ระดับได้อย่างถูกต้อง เข้าใจการควบคุมปริมาณน้ำ',
-      obstacle: 'นักเรียน 3 คน (เลขที่ 7, 10, 12) ขาดการเตรียมพู่กันเบอร์เล็ก ทำให้ตัดขอบไม่คม',
-      solution: 'จัดพู่กันสำรองของห้องให้ยืม พร้อมแนะนำให้ทำแบบฝึกหัดตัดเส้นเพิ่มเติม',
-    },
-    {
-      period: 'คาบ 8-9 (10 ก.ย. 2569)',
-      topic: 'ทฤษฎีสีและวงจรสีสากล',
-      success: 'สามารถตอบคำถามเรื่องคู่สีตรงข้ามและวรรณะของสีได้อย่างคล่องแคล่ว',
-      obstacle: 'เวลาฝึกปฏิบัติในห้องไม่พอเนื่องจากกิจกรรมหน้าเสาธงเลิกช้า',
-      solution: 'ปรับการบ้านให้เป็นใบงานระบายสีเติมเต็มช่องวงจรสี 12 สีส่งสัปดาห์ถัดไป',
-    },
-  ]);
+  // Reflection records (Zero Mock Data)
+  const [reflectionLogs, setReflectionLogs] = useState<{ period: string; topic: string; success: string; obstacle: string; solution: string }[]>([]);
 
   useEffect(() => {
-    assignmentService.getByClassroom('room-3-1').then((asgs) => {
+    let mounted = true;
+    assignmentService.getByClassroom(selectedClassroom).then((asgs) => {
+      if (!mounted) return;
       if (asgs && asgs.length > 0) {
         setAssignmentRows(
           asgs.map((a) => ({
             id: a.id,
             title: a.title,
-            sharedTag: a.sharedTag || 'เฉพาะ ม.3/1',
+            sharedTag: a.sharedTag || `เฉพาะ ${selectedClassroom}`,
             subtext: a.subtext,
             category: a.category,
             sgsUnit: a.sgsUnit,
@@ -556,15 +454,35 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
             status: a.status,
           }))
         );
+      } else {
+        setAssignmentRows([]);
       }
+    }).catch(() => {
+      if (mounted) setAssignmentRows([]);
+    });
+
+    studentService.getByClassroom(selectedClassroom).then((stus) => {
+      if (!mounted) return;
+      setRealClassroomStudents(stus);
+    }).catch(() => {
+      if (mounted) setRealClassroomStudents([]);
     });
 
     behaviorService.getAll().then((logs) => {
+      if (!mounted) return;
       if (logs && logs.length > 0) {
         setBehaviorLogs(logs);
+      } else {
+        setBehaviorLogs([]);
       }
+    }).catch(() => {
+      if (mounted) setBehaviorLogs([]);
     });
-  }, []);
+
+    return () => {
+      mounted = false;
+    };
+  }, [selectedClassroom]);
 
   const handleCreateAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -780,7 +698,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
     } catch {
       // fallback
     }
-    return cleanSlateService.isCleanSlateActive() ? [] : atRiskStudentsData;
+    return [];
   }, [selectedSubjectCode, selectedClassroom]);
 
   return (
@@ -942,14 +860,14 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
             onViewFullTable={onViewFullTable}
           />
           <IncompleteGradingCard
-            items={cleanSlateService.isCleanSlateActive() ? [] : incompleteGradingData}
+            items={[]}
           />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <LowestAssignmentsCard
-              items={cleanSlateService.isCleanSlateActive() ? [] : lowestAssignmentsData}
+              items={[]}
             />
             <GradeDistributionBar
-              items={cleanSlateService.isCleanSlateActive() ? [] : gradeDistributionData}
+              items={[]}
             />
           </div>
         </div>
@@ -2404,23 +2322,29 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-2 text-xs pr-1">
-              {sampleGradesRoster.slice(0, 8).map((stu) => (
-                <div key={stu.no} className="flex items-center justify-between gap-3 p-2 bg-slate-50 rounded-xl">
-                  <span className="font-medium text-slate-800">
-                    {stu.no}. {stu.name}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      max="10"
-                      min="0"
-                      defaultValue={stu.total > 50 ? (stu.total / 10).toFixed(1) : 4.0}
-                      className="w-16 px-2 py-1 bg-white border border-slate-300 rounded text-center font-bold focus:outline-none focus:border-blue-500"
-                    />
-                    <span className="text-slate-400">/ 10</span>
-                  </div>
+              {realClassroomStudents.length === 0 ? (
+                <div className="p-4 text-center text-slate-400 bg-slate-50 rounded-xl">
+                  ไม่พบรายชื่อนักเรียนในห้องนี้
                 </div>
-              ))}
+              ) : (
+                realClassroomStudents.map((stu) => (
+                  <div key={stu.id || stu.no} className="flex items-center justify-between gap-3 p-2 bg-slate-50 rounded-xl">
+                    <span className="font-medium text-slate-800">
+                      {stu.no}. {stu.name}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        max="10"
+                        min="0"
+                        defaultValue={stu.score > 0 ? (stu.score / 10).toFixed(1) : 5.0}
+                        className="w-16 px-2 py-1 bg-white border border-slate-300 rounded text-center font-bold focus:outline-none focus:border-blue-500"
+                      />
+                      <span className="text-slate-400">/ 10</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="pt-3 border-t border-slate-100 flex justify-end gap-2 text-xs">
@@ -2432,16 +2356,18 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
               </button>
               <button
                 onClick={async () => {
-                  await scoreService.batchUpsertScores(
-                    'asg-1',
-                    'room-3-1',
-                    10,
-                    sampleGradesRoster.slice(0, 8).map((stu) => ({
-                      enrollmentId: `stu-${stu.no}`,
-                      value: stu.total > 50 ? Number((stu.total / 10).toFixed(1)) : 4.0,
-                      reason: `บันทึกคะแนน ${selectedAssignmentForGrading || 'ชิ้นงาน'} (ด่วน)`,
-                    }))
-                  );
+                  if (realClassroomStudents.length > 0) {
+                    await scoreService.batchUpsertScores(
+                      'asg-1',
+                      selectedClassroom || 'room-3-1',
+                      10,
+                      realClassroomStudents.map((stu) => ({
+                        enrollmentId: stu.id || `stu-${stu.no}`,
+                        value: stu.score > 0 ? Number((stu.score / 10).toFixed(1)) : 5.0,
+                        reason: `บันทึกคะแนน ${selectedAssignmentForGrading || 'ชิ้นงาน'} (ด่วน)`,
+                      }))
+                    );
+                  }
                   setIsGradebookModalOpen(false);
                   alert(`บันทึกคะแนน ${selectedAssignmentForGrading} พร้อม Audit Log เรียบร้อยแล้ว!`);
                 }}

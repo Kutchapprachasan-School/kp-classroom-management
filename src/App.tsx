@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TeacherSidebar, type TeacherViewKey } from './components/layout/TeacherSidebar';
 import { TeacherHeader } from './components/layout/TeacherHeader';
 import { TeacherGlobalDashboardView } from './views/TeacherGlobalDashboardView';
@@ -73,9 +73,25 @@ import {
   type SchoolUserRole,
 } from './config/schoolRoles';
 import { authService, type AuthUser } from './services/authService';
+import {
+  academicCalendarService,
+  ACADEMIC_CALENDAR_EVENT,
+} from './services/academicCalendarService';
 
 export const App: React.FC = () => {
   const [schoolSettings, setSchoolSettings] = useState(() => getSchoolSettings());
+  const [activeAcademicTerm, setActiveAcademicTerm] = useState(() =>
+    academicCalendarService.getActiveTerm()
+  );
+
+  useEffect(() => {
+    const handleCalendarUpdate = () => {
+      setActiveAcademicTerm(academicCalendarService.getActiveTerm());
+    };
+    window.addEventListener(ACADEMIC_CALENDAR_EVENT, handleCalendarUpdate);
+    return () => window.removeEventListener(ACADEMIC_CALENDAR_EVENT, handleCalendarUpdate);
+  }, []);
+
   const [currentAuthUser, setCurrentAuthUser] = useState<AuthUser | null>(() => authService.getCurrentUser());
   const [currentView, setCurrentView] = useState<TeacherViewKey>(() => {
     const user = authService.getCurrentUser();
@@ -166,6 +182,13 @@ export const App: React.FC = () => {
     };
   }, []);
 
+  // Normalize legacy admin-dashboard view to home
+  useEffect(() => {
+    if ((currentView as string) === 'admin-dashboard') {
+      setCurrentView('home');
+    }
+  }, [currentView]);
+
   // Context-Aware Deep-Link Navigation States
   const [deepLinkClassTab, setDeepLinkClassTab] = useState<ClassSubTab>('attendance');
   const [deepLinkAffairsTab, setDeepLinkAffairsTab] = useState<
@@ -187,7 +210,11 @@ export const App: React.FC = () => {
     }
 
     if (nextRole === 'ACADEMIC_ADMIN') {
-      if (currentView === 'student-portal' || currentView === 'school-login') {
+      if (
+        currentView === 'student-portal' ||
+        currentView === 'school-login' ||
+        (currentView as string) === 'admin-dashboard'
+      ) {
         setCurrentView('home');
       }
       return;
@@ -197,7 +224,7 @@ export const App: React.FC = () => {
     if (
       currentView === 'student-portal' ||
       currentView === 'school-login' ||
-      currentView === 'admin-dashboard'
+      (currentView as string) === 'admin-dashboard'
     ) {
       setCurrentView(defaultTarget);
       return;
@@ -238,6 +265,7 @@ export const App: React.FC = () => {
   const getHeaderTitle = () => {
     switch (currentView) {
       case 'home':
+      case 'admin-dashboard' as any:
         return 'หน้าแรก';
       case 'school-leave-dashboard':
         return `แดชบอร์ดบริหารระบบการลา • ${schoolSettings.nameTh}`;
@@ -404,7 +432,7 @@ export const App: React.FC = () => {
               <button
                 onClick={() => {
                   handleChangeRole('ACADEMIC_ADMIN');
-                  setCurrentView('admin-dashboard');
+                  setCurrentView('home');
                 }}
                 className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${
                   currentView !== 'school-login' &&
@@ -569,7 +597,7 @@ export const App: React.FC = () => {
               onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
               isSidebarOpen={isDesktopSidebarOpen}
               onToggleSidebar={handleToggleSidebar}
-              termLabel="ภาคเรียนที่ 1/2569"
+              termLabel={`${activeAcademicTerm.termName}/${activeAcademicTerm.year}`}
               activeRole={activeRole}
               onChangeRole={handleChangeRole}
               currentUser={currentAuthUser}
@@ -579,30 +607,27 @@ export const App: React.FC = () => {
 
             {/* Dynamic View Body */}
             <main className="flex-1 p-3.5 sm:p-6 md:p-8 overflow-y-auto overflow-x-hidden">
-              {currentView === 'home' && (
-                <>
-                  <div className="hidden lg:block">
-                    <TeacherGlobalDashboardView
-                      activeRole={activeRole}
-                      onNavigateToClass={() => setCurrentView('class-overview')}
-                      onNavigateToAttendance={() => {
-                        setCurrentView('classroom-attendance');
-                      }}
-                      onNavigateToReadiness={() => setCurrentView('readiness')}
-                      onNavigateToAcademicYear={() => setCurrentView('academic-year')}
-                      onNavigateToCourses={() => setCurrentView('courses')}
-                      onNavigateToLessons={() => setCurrentView('lessons')}
-                      onNavigateToMorningAssembly={() => setCurrentView('morning-assembly')}
-                      onDeepNavigate={handleDeepNavigate}
-                      currentUser={currentAuthUser}
-                    />
-                  </div>
-                  <div className="lg:hidden">
-                    <TeacherMobileHomeScreen
-                      onNavigate={(v) => setCurrentView(v)}
-                    />
-                  </div>
-                </>
+              {(currentView === 'home' || (currentView as string) === 'admin-dashboard') && (
+                <TeacherGlobalDashboardView
+                  activeRole={activeRole}
+                  onNavigateToClass={() => setCurrentView('class-overview')}
+                  onNavigateToAttendance={() => {
+                    setCurrentView('classroom-attendance');
+                  }}
+                  onNavigateToReadiness={() => setCurrentView('readiness')}
+                  onNavigateToAcademicYear={() => setCurrentView('academic-year')}
+                  onNavigateToCourses={() => setCurrentView('courses')}
+                  onNavigateToLessons={() => setCurrentView('lessons')}
+                  onNavigateToMorningAssembly={() => setCurrentView('morning-assembly')}
+                  onDeepNavigate={handleDeepNavigate}
+                  currentUser={currentAuthUser}
+                />
+              )}
+
+              {currentView === 'mobile-home' && (
+                <TeacherMobileHomeScreen
+                  onNavigate={(v) => setCurrentView(v)}
+                />
               )}
 
               {currentView === 'class-overview' && (

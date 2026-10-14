@@ -6,6 +6,11 @@
 
 import { sgsRosterAndSubmissionService } from './sgsRosterAndSubmissionService';
 import { studentAffairsCouncilService } from './studentAffairsCouncilService';
+import {
+  attendanceCorrelationService,
+  type Attendance80Summary,
+} from './attendanceCorrelationService';
+import { getBangkokTodayString } from '../utils/timetableDateUtils';
 
 export type TimeOfDayScenario =
   | 'MORNING_0745'
@@ -569,6 +574,10 @@ export const teacherCopilotService = {
 
   getUrgentTriageQueue(): UrgentTriageItem[] {
     const st = loadState();
+    const todayStr = getBangkokTodayString();
+    const isHoliday = attendanceCorrelationService.isHoliday(todayStr);
+    const isWeekend = attendanceCorrelationService.isWeekend(todayStr);
+
     const submissions = sgsRosterAndSubmissionService.getSubmissions();
     const roster = sgsRosterAndSubmissionService.getSgsRoster();
     const leaves = studentAffairsCouncilService.getStudentLeaves();
@@ -584,10 +593,20 @@ export const teacherCopilotService = {
       )
     );
 
+    const morningRecords = attendanceCorrelationService.getMorningRecords('room-3-1', todayStr);
+    const morningDone = st.morningAssemblyDone || morningRecords.length > 0 || isHoliday || isWeekend;
+
+    const period7Records = attendanceCorrelationService.getPeriodRecords('ก23901', 'room-3-1', todayStr, 7);
+    const period7Done = st.period7Done || period7Records.length > 0 || isHoliday || isWeekend;
+
+    const summaries = attendanceCorrelationService.calculate80Rule('room-3-1');
+    const atRiskList = summaries.filter((s: Attendance80Summary) => !s.isEligibleForExam);
+    const atRiskStudent = atRiskList[0];
+
     const pendingLeaveDesc =
       pendingLeaves.length > 0
         ? `${pendingLeaves.map((l) => `${l.studentName} (${l.leaveType})`).join(', ')} ส่งใบลาออนไลน์ · กดยืนยันเพื่ออนุมัติและซิงก์เข้าทุกคาบเรียนวันนี้`
-        : 'ด.ญ. พิมพ์ชนก (ลาป่วย) และ ด.ช. ทัตธน (ลากิจ) ซิงก์สถานะลาเข้าทุกคาบเรียนเรียบร้อยแล้ว';
+        : 'ไม่มีใบลารอดำเนินการ — นักเรียนทุกคนมีสถานะเข้าเรียนปกติ';
 
     const items: UrgentTriageItem[] = [
       {
@@ -595,7 +614,10 @@ export const teacherCopilotService = {
         level: 'CRITICAL',
         levelLabel: 'ด่วนที่สุด · 07:45 น.',
         timeTag: '07:45 น. หน้าเสาธง',
-        title: `เช็คชื่อแถวตอนเช้า ม.3/1 & อนุมัติใบลาออนไลน์ (${pendingLeaves.length || 1} รายการ)`,
+        title:
+          pendingLeaves.length > 0
+            ? `เช็คชื่อแถวตอนเช้า ม.3/1 & อนุมัติใบลาออนไลน์ (${pendingLeaves.length} รายการ)`
+            : 'เช็คชื่อแถวตอนเช้า ม.3/1 (โฮมรูม)',
         subtitle: pendingLeaveDesc,
         impactNote: 'ช่วยให้ครูประจำวิชาคาบ 1–8 ไม่ต้องเช็คชื่อผิดเป็นขาดเรียน',
         quickActionLabel: '✓ ยืนยันเช็คแถวเช้า & ซิงก์ใบลา (1 คลิก)',
@@ -604,8 +626,10 @@ export const teacherCopilotService = {
           view: 'morning-assembly',
           highlightBanner: 'ลำดับที่ 1: เช็คชื่อแถวเช้า ม.3/1 และอนุมัติใบลาออนไลน์ซิงก์เข้าทุกคาบ',
         },
-        isResolved: st.morningAssemblyDone,
-        resolvedMessage: 'บันทึกเช็คชื่อแถวเช้าและอนุมัติใบลาซิงก์เข้าทุกคาบเรียบร้อยแล้ว',
+        isResolved: morningDone,
+        resolvedMessage: isHoliday || isWeekend
+          ? 'วันนี้เป็นวันหยุด ไม่มีภาระงานเช็คแถวตอนเช้า'
+          : 'บันทึกเช็คชื่อแถวเช้าและอนุมัติใบลาซิงก์เข้าทุกคาบเรียบร้อยแล้ว',
       },
       {
         id: 'urgent-period-7',
@@ -622,20 +646,24 @@ export const teacherCopilotService = {
           view: 'classroom-attendance',
           highlightBanner: 'เช็คชื่อคาบเรียนโดยอ้างอิงสถานะจากแถวตอนเช้าอัตโนมัติ',
         },
-        isResolved: st.period7Done,
-        resolvedMessage: 'บันทึกเช็คชื่อคาบ 7 เรียบร้อยแล้ว (มา 22 · ลา 1)',
+        isResolved: period7Done,
+        resolvedMessage: isHoliday || isWeekend
+          ? 'วันนี้เป็นวันหยุด ไม่มีภาระงานสอนรายคาบ'
+          : 'บันทึกเช็คชื่อคาบ 7 เรียบร้อยแล้ว (ซิงก์สถานะสมบูรณ์)',
       },
       {
         id: 'urgent-pending-submissions',
         level: 'URGENT',
         levelLabel: 'รีบทำ · รอครูตรวจปลด ร',
-        timeTag: `ส่งเข้ามาใหม่ ${pendingSubmissions.length} ชิ้น`,
+        timeTag: pendingSubmissions.length > 0 ? `ส่งเข้ามาใหม่ ${pendingSubmissions.length} ชิ้น` : 'ไม่มีงานรอตรวจ',
         title:
           pendingSubmissions.length > 0
             ? `นักเรียนส่งงานซ่อมตัวชี้วัดบังคับแล้ว (${pendingNames.join(', ')})`
             : 'งานซ่อมตัวชี้วัดบังคับได้รับการตรวจและปลด ร ครบแล้ว',
         subtitle:
-          'อัปโหลดไฟล์ WebP บน Cloudflare R2 & ลิงก์ Canva เรียบร้อยแล้ว · รอครูกดอนุมัติคะแนนเพื่อปลด ร อัตโนมัติ',
+          pendingSubmissions.length > 0
+            ? 'อัปโหลดไฟล์ WebP บน Cloudflare R2 & ลิงก์ Canva เรียบร้อยแล้ว · รอครูกดอนุมัติคะแนนเพื่อปลด ร อัตโนมัติ'
+            : 'ไม่มีชิ้นงานค้างตรวจในระบบ นักเรียนส่งงานและตรวจครบถ้วนแล้ว',
         impactNote: 'เมื่อตรวจผ่าน ระบบคำนวณคะแนนหน่วยที่ 2–3 และเปลี่ยนเกรดจาก "ร" เป็นเกรดปกติทันที',
         quickActionLabel: `⚡ ตรวจผ่านทั้งหมด (${pendingSubmissions.length} ชิ้น) & ปลด ร ทันที`,
         navigateLabel: 'เปิดดูไฟล์งานที่ส่ง (กรองรอตรวจ)',
@@ -653,10 +681,13 @@ export const teacherCopilotService = {
         id: 'urgent-ms-risk',
         level: 'CRITICAL',
         levelLabel: 'เสี่ยง มส. · ต้องรีบแจ้งผู้ปกครอง',
-        timeTag: 'เวลาเรียน 78.5% (< 80%)',
-        title: 'ด.ช. อัศวิน วนเกษตรกุล (เลขที่ 4 ม.3/1) เสี่ยงติด มส. และโดดเรียนคาบเรียน',
-        subtitle:
-          'เวลาเรียนปัจจุบัน 78.5% ต่ำกว่าเกณฑ์ 80% มาแถวเช้าแต่ขาดคาบเรียน และค้างงานบังคับ 2 ชิ้น (ติด ร + มส.)',
+        timeTag: atRiskStudent ? `เวลาเรียน ${atRiskStudent.attendanceRate}% (< 80%)` : 'เวลาเรียนผ่านเกณฑ์ 100%',
+        title: atRiskStudent
+          ? `นักเรียนรหัส ${atRiskStudent.studentCode} (ม.3/1) เสี่ยงติด มส. และโดดเรียนคาบเรียน`
+          : 'นักเรียนทุกคนมีเวลาเรียนผ่านเกณฑ์ 80% (ไม่มีกลุ่มเสี่ยง มส.)',
+        subtitle: atRiskStudent
+          ? `เวลาเรียนปัจจุบัน ${atRiskStudent.attendanceRate}% ต่ำกว่าเกณฑ์ 80% มีสถิติขาด/โดดเรียน ต้องทำกิจกรรมซ่อมเสริม`
+          : 'สถิติการเข้าเรียนของนักเรียนทุกคนปกติ ไม่มีนักเรียนที่เสี่ยงหมดสิทธิ์สอบ',
         impactNote: 'ต้องแจ้งผู้ปกครองและนัดทำกิจกรรมซ่อมเวลาเรียนก่อนปิดระบบ SGS ในอีก 10 วัน',
         quickActionLabel: '📲 ส่ง LINE แจ้งผู้ปกครอง & นัดซ่อม (1 คลิก)',
         navigateLabel: 'เปิดตารางตามงานคนติด ร/มส.',
@@ -665,10 +696,11 @@ export const teacherCopilotService = {
           assignmentQuickFilter: 'MISSING_OR_R',
           highlightBanner: 'กรองเฉพาะนักเรียนที่ค้างงานบังคับ (ติด ร) หรือเวลาเรียนไม่ถึงเกณฑ์ (มส.)',
         },
-        isResolved: st.resolvedItemIds.includes('urgent-ms-risk'),
-        resolvedMessage: 'ส่งข้อความแจ้งผู้ปกครองและบันทึกนัดซ่อมเวลาเรียน ด.ช. อัศวิน เรียบร้อยแล้ว',
-        lineNotificationTemplate:
-          'แจ้งผู้ปกครอง ด.ช. อัศวิน วนเกษตรกุล (ม.3/1 เลขที่ 4): ปัจจุบันเวลาเรียนวิชาศิลปะอยู่ที่ 78.5% (เกณฑ์ต้องไม่ต่ำกว่า 80%) และมีงานบังคับค้างส่ง 2 ชิ้น (ชิ้นงานที่ 3 และ 5) ขอความอนุเคราะห์ให้นักเรียนส่งงานผ่านพอร์ทัลนักเรียนภายในสัปดาห์นี้เพื่อป้องกันการติด ร/มส. ครับ',
+        isResolved: !atRiskStudent || st.resolvedItemIds.includes('urgent-ms-risk'),
+        resolvedMessage: 'ตรวจสอบเวลาเรียนเรียบร้อยแล้ว (ไม่มีนักเรียนเสี่ยงติด มส.)',
+        lineNotificationTemplate: atRiskStudent
+          ? `แจ้งผู้ปกครองนักเรียนรหัส ${atRiskStudent.studentCode} (ม.3/1): ปัจจุบันเวลาเรียนอยู่ที่ ${atRiskStudent.attendanceRate}% (เกณฑ์ต้องไม่ต่ำกว่า 80%) ขอความอนุเคราะห์ให้นักเรียนเข้าร่วมกิจกรรมชดเชยเวลาเรียนครับ`
+          : undefined,
       },
     ];
 

@@ -311,9 +311,10 @@ export const sgsRosterAndSubmissionService = {
   getSgsRoster(): SgsStudentRecord[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_SGS_ROSTER);
-      return raw ? JSON.parse(raw) : [];
+      if (raw) return JSON.parse(raw);
+      return cleanSlateService.isCleanSlateActive() ? [] : INITIAL_SGS_ROSTER;
     } catch {
-      return [];
+      return cleanSlateService.isCleanSlateActive() ? [] : INITIAL_SGS_ROSTER;
     }
   },
 
@@ -578,9 +579,10 @@ export const sgsRosterAndSubmissionService = {
   getSubmissions(): StudentWorkSubmission[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_WORK_SUBMISSIONS);
-      return raw ? JSON.parse(raw) : [];
+      if (raw) return JSON.parse(raw);
+      return cleanSlateService.isCleanSlateActive() ? [] : INITIAL_SUBMISSIONS;
     } catch {
-      return [];
+      return cleanSlateService.isCleanSlateActive() ? [] : INITIAL_SUBMISSIONS;
     }
   },
 

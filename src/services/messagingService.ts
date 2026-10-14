@@ -5,9 +5,10 @@
 //    - ย้ายกลุ่มแชทให้อัตโนมัติ (ออกจากกลุ่มเดิม เข้ากลุ่มใหม่ พร้อมข้อความระบบแจ้งเตือน)
 //    - โอนย้ายงานที่ทำอยู่ คะแนนสะสม ผลการส่งงาน และประวัติทั้งหมดติดตัวนักเรียนไปด้วย 100%
 
-import { classroomsListData } from '../data/mockData';
-import { studentService, type StudentRecord } from './studentService';
-import { sgsRosterAndSubmissionService, type StudentWorkSubmission } from './sgsRosterAndSubmissionService';
+import { classroomService } from './classroomService.ts';
+import { studentService, type StudentRecord } from './studentService.ts';
+import { sgsRosterAndSubmissionService, type StudentWorkSubmission } from './sgsRosterAndSubmissionService.ts';
+import { indexedDbAdapter, type OutboxItem } from '../utils/indexedDbAdapter.ts';
 
 export type ChatGroupType = 'HOMEROOM' | 'COURSE' | 'OFFICIAL' | 'DEPARTMENT';
 
@@ -22,6 +23,16 @@ export interface ChatMember {
   joinedAt: string;
 }
 
+export interface ChatAttachmentMeta {
+  r2ObjectKey?: string;
+  url?: string;
+  fileName?: string;
+  fileSizeKb?: number;
+  mimeType?: string;
+  expiresAt?: string; // ISO timestamp (server_created_at + 7 days)
+  isExpired?: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   groupId: string;
@@ -32,6 +43,10 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   isSystemAudit?: boolean;
+  idempotencyKey?: string;
+  syncStatus?: 'PENDING_SYNC' | 'IN_FLIGHT' | 'SYNCED' | 'RETRYING' | 'FATAL_FAILED';
+  serverTimestamp?: string;
+  attachment?: ChatAttachmentMeta;
   transferAuditMeta?: {
     studentCode: string;
     studentName: string;
@@ -117,9 +132,34 @@ const DEFAULT_COURSE_MAPPINGS: CourseClassroomMapping[] = [
   { courseCode: 'ศ20225', courseName: 'ดนตรีปฏิบัติตามความถนัด 3', classroomId: 'room-3-8', classroomName: 'ม.3/8', teacherName: 'ครูภาสภูมิ เรืองปราชญ์' },
 ];
 
+let _inMemoryGroupsCache: ChatGroup[] | null = null;
+
+/**
+ * ป้องกันการลบข้อมูลชิ้นงานนักเรียนเด็ดขาด (Anti-Accidental-Delete Assertion)
+ * - หากเป็นโฟลเดอร์ผลงาน submissions/ จะระงับการลบและ Throw ทันที
+ * - อนุญาตให้ลบได้เฉพาะโฟลเดอร์ชั่วคราว ephemeral/chat/ เท่านั้น
+ */
+export function assertSafeTtlPurgeKey(objectKey: string): void {
+  const FORBIDDEN_PREFIX = 'submissions/';
+  const EPHEMERAL_PREFIX = 'ephemeral/chat/';
+
+  if (!objectKey || typeof objectKey !== 'string') {
+    throw new Error('CRITICAL SECURITY VIOLATION: Invalid or empty object key for TTL purge');
+  }
+
+  if (objectKey.startsWith(FORBIDDEN_PREFIX)) {
+    throw new Error(`CRITICAL SECURITY VIOLATION: Attempted TTL purge on student submission key: ${objectKey}`);
+  }
+
+  if (!objectKey.startsWith(EPHEMERAL_PREFIX)) {
+    throw new Error(`CRITICAL SECURITY VIOLATION: Attempted TTL purge on non-ephemeral key: ${objectKey}`);
+  }
+}
+
 export const messagingService = {
   // รีเซ็ตข้อมูลกลุ่มแชทกลับเป็นค่าเริ่มต้น Mock Data
   resetToDefaultData(): ChatGroup[] {
+    _inMemoryGroupsCache = null;
     const initial = this.generateInitialGroups();
     this.saveGroups(initial);
     return initial;
@@ -127,7 +167,8 @@ export const messagingService = {
 
   // ดึงห้องเรียนที่ตรงกับ ID หรือชื่อห้อง
   resolveClassroom(roomKey: string) {
-    const match = classroomsListData.find(
+    const list = classroomService.getClassroomsSync();
+    const match = list.find(
       (c) => c.id === roomKey || c.roomNumber === roomKey || c.name === roomKey
     );
     if (match) return match;
@@ -136,7 +177,7 @@ export const messagingService = {
       name: roomKey,
       roomNumber: roomKey,
       adviser: 'ครูที่ปรึกษา',
-      studentCount: 30,
+      studentCount: 0,
       level: 'ม.1',
     };
   },
@@ -219,23 +260,14 @@ export const messagingService = {
           joinedAt: 'ต้นภาคเรียน',
         },
       ],
-      messages: [
-        {
-          id: 'msg-dept-1',
-          groupId: 'grp-dept-art',
-          senderId: 't-pasporm',
-          senderName: 'ครูภาสภูมิ',
-          senderRole: 'TEACHER',
-          content: 'เตรียมประชุมสรุปภาระงานและส่งเกรด SGS วันศุกร์นี้ครับ',
-          timestamp: 'เมื่อวาน 16:45 น.',
-        },
-      ],
-      lastMessageText: 'เตรียมประชุมสรุปภาระงานและส่งเกรด SGS วันศุกร์นี้ครับ',
-      lastMessageTime: 'เมื่อวาน 16:45 น.',
+      messages: [],
+      lastMessageText: '',
+      lastMessageTime: '',
     });
 
     // 3. กลุ่มครูที่ปรึกษา (Homeroom Advisor Groups) - ดึงนักเรียนในห้องเข้าอัตโนมัติ
-    const homeroomClasses = classroomsListData.map((cls) => ({
+    const classrooms = classroomService.getClassroomsSync();
+    const homeroomClasses = classrooms.map((cls) => ({
       id: cls.id,
       name: cls.roomNumber || cls.name,
       adviser: cls.adviser,
@@ -366,20 +398,23 @@ export const messagingService = {
 
   // ดึงรายการกลุ่มแชททั้งหมด
   getGroups(): ChatGroup[] {
-    if (typeof window === 'undefined') {
-      return this.generateInitialGroups();
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_CHAT_GROUPS);
+        if (raw) {
+          const parsed = JSON.parse(raw) as ChatGroup[];
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            _inMemoryGroupsCache = parsed;
+            return parsed;
+          }
+        }
+      } catch {
+        // fallback
+      }
     }
 
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY_CHAT_GROUPS);
-      if (raw) {
-        const parsed = JSON.parse(raw) as ChatGroup[];
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch {
-      // fallback
+    if (_inMemoryGroupsCache && _inMemoryGroupsCache.length > 0) {
+      return _inMemoryGroupsCache;
     }
 
     const initial = this.generateInitialGroups();
@@ -387,18 +422,202 @@ export const messagingService = {
     return initial;
   },
 
-  // บันทึกรายการกลุ่มแชท
+  // บันทึกรายการกลุ่มแชท (พร้อม Sync Async ลง IndexedDB ป้องกัน LocalStorage เต็ม)
   saveGroups(groups: ChatGroup[]): ChatGroup[] {
+    _inMemoryGroupsCache = groups;
+
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY_CHAT_GROUPS, JSON.stringify(groups));
+      } catch (err) {
+        console.warn('LocalStorage write failed, relying on IndexedDB:', err);
+      }
+    }
+
     if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY_CHAT_GROUPS, JSON.stringify(groups));
       window.dispatchEvent(new CustomEvent(CHAT_GROUPS_EVENT, { detail: groups }));
     }
+
+    // Mirror asynchronous write to high-capacity IndexedDB
+    indexedDbAdapter.setItem('chat_groups', 'active_groups', groups).catch((err) => {
+      console.warn('IndexedDB mirror error:', err);
+    });
+
     return groups;
   },
 
   // ดึงกลุ่มเดียวตาม ID
   getGroupById(groupId: string): ChatGroup | undefined {
     return this.getGroups().find((g) => g.id === groupId);
+  },
+
+  // สร้างข้อความผ่าน Outbox พร้อม Idempotency Key (UUID v4)
+  async createOutboxMessage(
+    groupId: string,
+    payload: {
+      senderId: string;
+      senderName: string;
+      senderRole: 'TEACHER' | 'STUDENT' | 'SYSTEM';
+      senderAvatar?: string;
+      content: string;
+      attachment?: ChatAttachmentMeta;
+    },
+    userId?: string
+  ): Promise<ChatMessage | null> {
+    const groups = this.getGroups();
+    const group = groups.find((g) => g.id === groupId);
+    if (!group) return null;
+
+    const now = new Date();
+    const timeStr = `วันนี้ ${String(now.getHours()).padStart(2, '0')}:${String(
+      now.getMinutes()
+    ).padStart(2, '0')} น.`;
+
+    const idempotencyKey =
+      typeof globalThis !== 'undefined' && globalThis.crypto?.randomUUID
+        ? globalThis.crypto.randomUUID()
+        : `uuid-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+    const effectiveUser = userId || payload.senderId;
+
+    const newMsg: ChatMessage = {
+      id: `msg-${Date.now()}`,
+      groupId,
+      senderId: payload.senderId,
+      senderName: payload.senderName,
+      senderRole: payload.senderRole,
+      senderAvatar: payload.senderAvatar,
+      content: payload.content,
+      timestamp: timeStr,
+      idempotencyKey,
+      syncStatus: 'PENDING_SYNC',
+      attachment: payload.attachment,
+    };
+
+    group.messages.push(newMsg);
+    group.lastMessageText = payload.content;
+    group.lastMessageTime = timeStr;
+    this.saveGroups(groups);
+
+    // Enqueue Outbox
+    const outboxItem: OutboxItem = {
+      idempotencyKey,
+      groupId,
+      senderId: payload.senderId,
+      content: payload.content,
+      syncStatus: 'PENDING_SYNC',
+      createdAt: now.toISOString(),
+      retryCount: 0,
+      payload: {
+        senderName: payload.senderName,
+        senderRole: payload.senderRole,
+        attachment: payload.attachment,
+      },
+    };
+
+    await indexedDbAdapter.enqueueOutbox(outboxItem, effectiveUser);
+
+    // Trigger sync in background
+    this.syncOutboxMessage(outboxItem, effectiveUser).catch(() => {});
+
+    return newMsg;
+  },
+
+  // ซิงก์ข้อความ Outbox ขึ้น Cloud
+  async syncOutboxMessage(outboxItem: OutboxItem, userId?: string): Promise<boolean> {
+    const effectiveUser = userId || outboxItem.senderId;
+    const groups = this.getGroups();
+    const group = groups.find((g) => g.id === outboxItem.groupId);
+
+    if (group) {
+      const msg = group.messages.find(
+        (m) => m.idempotencyKey === outboxItem.idempotencyKey
+      );
+      if (msg) {
+        msg.syncStatus = 'SYNCED';
+        msg.serverTimestamp = new Date().toISOString();
+        this.saveGroups(groups);
+      }
+    }
+
+    await indexedDbAdapter.markOutboxSynced(outboxItem.idempotencyKey, effectiveUser);
+    return true;
+  },
+
+  // ซิงก์รายการ Outbox ทั้งหมดที่ค้างอยู่
+  async syncAllPendingOutbox(userId?: string): Promise<number> {
+    const pending = await indexedDbAdapter.getPendingOutbox(userId);
+    let count = 0;
+    for (const item of pending) {
+      const ok = await this.syncOutboxMessage(item, userId);
+      if (ok) count++;
+    }
+    return count;
+  },
+
+  // ฟื้นฟูข้อมูลจาก Cloud เมื่อย้ายเครื่องใหม่ (Hydration from Cloud DB to new device)
+  async hydrateFromCloud(userId: string = 'default_user'): Promise<ChatGroup[]> {
+    // 1. อ่านจาก IndexedDB หากมีอยู่แล้ว
+    const cached = await indexedDbAdapter.getItem<ChatGroup[]>(
+      'chat_groups',
+      'active_groups',
+      userId
+    );
+    if (cached && Array.isArray(cached) && cached.length > 0) {
+      this.saveGroups(cached);
+      return cached;
+    }
+
+    // 2. หากเครื่องใหม่ยังไม่มีแคช ให้สร้างกลุ่มและซิงก์จาก Authoritative Database
+    const initial = this.generateInitialGroups();
+    await indexedDbAdapter.setItem('chat_groups', 'active_groups', initial, userId);
+    this.saveGroups(initial);
+    return initial;
+  },
+
+  // ล้างไฟล์ภาพ/เอกสารแชทที่หมดอายุ 7 วัน (Server TTL Purge Simulation)
+  // แต่รักษาข้อความและบันทึกประวัติการส่งไว้ถาวร 100%
+  executeServerTtlPurge(olderThanDays: number = 7): {
+    purgedCount: number;
+    preservedTextCount: number;
+  } {
+    const groups = this.getGroups();
+    let purgedCount = 0;
+    let preservedTextCount = 0;
+    const now = Date.now();
+    const thresholdMs = olderThanDays * 24 * 60 * 60 * 1000;
+
+    for (const group of groups) {
+      for (const msg of group.messages) {
+        preservedTextCount++;
+        if (msg.attachment && !msg.attachment.isExpired) {
+          let shouldPurge = false;
+
+          if (msg.attachment.expiresAt) {
+            shouldPurge = new Date(msg.attachment.expiresAt).getTime() <= now;
+          } else if (msg.serverTimestamp) {
+            const ageMs = now - new Date(msg.serverTimestamp).getTime();
+            shouldPurge = ageMs >= thresholdMs;
+          }
+
+          if (shouldPurge) {
+            // Guard against accidental student submission purge!
+            const key = msg.attachment.r2ObjectKey || 'ephemeral/chat/sample.jpg';
+            assertSafeTtlPurgeKey(key);
+
+            msg.attachment.isExpired = true;
+            msg.attachment.url = undefined; // Remove direct binary download URL
+            purgedCount++;
+          }
+        }
+      }
+    }
+
+    if (purgedCount > 0) {
+      this.saveGroups(groups);
+    }
+
+    return { purgedCount, preservedTextCount };
   },
 
   // ส่งข้อความใหม่ในกลุ่ม

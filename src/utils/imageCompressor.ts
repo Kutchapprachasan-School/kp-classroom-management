@@ -171,7 +171,11 @@ export function formatBytes(bytes: number, decimals = 1): string {
  */
 export function isImageFile(file: File | Blob): boolean {
   if (!file) return false;
-  return Boolean(file.type && file.type.startsWith('image/'));
+  if (file.type && file.type.startsWith('image/')) return true;
+  if ('name' in file && typeof (file as { name?: unknown }).name === 'string') {
+    return /\.(png|jpe?g|svg|webp|gif|bmp|ico|avif)$/i.test((file as { name: string }).name);
+  }
+  return false;
 }
 
 /**
@@ -235,111 +239,111 @@ export async function compressSubjectBannerImage(
 
   // Browser Canvas Environment
   let objectUrl: string | null = null;
-  const img = new Image();
-
   try {
+    const img = new Image();
     objectUrl = URL.createObjectURL(file);
     await new Promise<void>((resolve, reject) => {
       img.onload = () => resolve();
       img.onerror = () => reject(new Error('ไม่สามารถโหลดรูปภาพสำหรับบีบอัดได้ (Invalid image source)'));
       img.src = objectUrl!;
     });
+
+    const origWidth = img.naturalWidth || img.width || opts.maxWidth;
+    const origHeight = img.naturalHeight || img.height || opts.maxHeight;
+    const { width: targetWidth, height: targetHeight } = calculateAspectRatioDimensions(
+      origWidth,
+      origHeight,
+      opts.maxWidth,
+      opts.maxHeight
+    );
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('ไม่สามารถเข้าถึง Canvas 2D Rendering Context ได้');
+    }
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+    let chosenMime = opts.mimeType;
+    let quality = opts.initialQuality;
+    let dataUrl = canvas.toDataURL(chosenMime, quality);
+
+    // WebP fallback check: If WebP is unsupported, browser produces image/png
+    if (chosenMime === 'image/webp' && !dataUrl.startsWith('data:image/webp')) {
+      chosenMime = opts.fallbackMimeType || 'image/jpeg';
+      dataUrl = canvas.toDataURL(chosenMime, quality);
+    }
+
+    let sizeBytes = estimateBase64SizeBytes(dataUrl);
+
+    // Compression loop: Reduce quality until within quota or minQuality reached
+    while (sizeBytes > opts.maxSizeBytes && quality > opts.minQuality) {
+      quality = Math.max(opts.minQuality, Number((quality - opts.qualityStep).toFixed(2)));
+      const nextDataUrl = canvas.toDataURL(chosenMime, quality);
+      const nextSize = estimateBase64SizeBytes(nextDataUrl);
+      dataUrl = nextDataUrl;
+      sizeBytes = nextSize;
+      if (quality <= opts.minQuality) break;
+    }
+
+    // Downscale loop: If still over quota at minQuality, gently reduce dimensions
+    let currentWidth = targetWidth;
+    let currentHeight = targetHeight;
+    let downscaleAttempts = 0;
+    const minDim = Math.min(64, Math.floor(opts.maxWidth / 2));
+
+    while (sizeBytes > opts.maxSizeBytes && downscaleAttempts < 4 && currentWidth > minDim && currentHeight > minDim) {
+      downscaleAttempts++;
+      currentWidth = Math.round(currentWidth * 0.85);
+      currentHeight = Math.round(currentHeight * 0.85);
+
+      canvas.width = currentWidth;
+      canvas.height = currentHeight;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, currentWidth, currentHeight);
+
+      dataUrl = canvas.toDataURL(chosenMime, opts.minQuality);
+      sizeBytes = estimateBase64SizeBytes(dataUrl);
+    }
+
+    const origSize = (file as Blob).size || sizeBytes || 1;
+    const compressionRatio = Number((sizeBytes / origSize).toFixed(4));
+    const isWithinQuota = sizeBytes <= opts.maxSizeBytes;
+
+    const mimeMatch = dataUrl.match(/^data:([^;]+);/);
+    const finalMime = mimeMatch ? mimeMatch[1] : chosenMime;
+
+    return {
+      dataUrl,
+      sizeBytes,
+      width: canvas.width,
+      height: canvas.height,
+      mimeType: finalMime,
+      compressionRatio,
+      isWithinQuota,
+    };
   } finally {
     if (objectUrl) {
       URL.revokeObjectURL(objectUrl);
     }
   }
-
-  const origWidth = img.naturalWidth || img.width || opts.maxWidth;
-  const origHeight = img.naturalHeight || img.height || opts.maxHeight;
-  const { width: targetWidth, height: targetHeight } = calculateAspectRatioDimensions(
-    origWidth,
-    origHeight,
-    opts.maxWidth,
-    opts.maxHeight
-  );
-
-  const canvas = document.createElement('canvas');
-  canvas.width = targetWidth;
-  canvas.height = targetHeight;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    throw new Error('ไม่สามารถเข้าถึง Canvas 2D Rendering Context ได้');
-  }
-
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
-
-  let chosenMime = opts.mimeType;
-  let quality = opts.initialQuality;
-  let dataUrl = canvas.toDataURL(chosenMime, quality);
-
-  // WebP fallback check: If WebP is unsupported, browser produces image/png
-  if (chosenMime === 'image/webp' && !dataUrl.startsWith('data:image/webp')) {
-    chosenMime = opts.fallbackMimeType || 'image/jpeg';
-    dataUrl = canvas.toDataURL(chosenMime, quality);
-  }
-
-  let sizeBytes = estimateBase64SizeBytes(dataUrl);
-
-  // Compression loop: Reduce quality until within quota or minQuality reached
-  while (sizeBytes > opts.maxSizeBytes && quality > opts.minQuality) {
-    quality = Math.max(opts.minQuality, Number((quality - opts.qualityStep).toFixed(2)));
-    const nextDataUrl = canvas.toDataURL(chosenMime, quality);
-    const nextSize = estimateBase64SizeBytes(nextDataUrl);
-    dataUrl = nextDataUrl;
-    sizeBytes = nextSize;
-    if (quality <= opts.minQuality) break;
-  }
-
-  // Downscale loop: If still over quota at minQuality, gently reduce dimensions
-  let currentWidth = targetWidth;
-  let currentHeight = targetHeight;
-  let downscaleAttempts = 0;
-
-  while (sizeBytes > opts.maxSizeBytes && downscaleAttempts < 3 && currentWidth > 320 && currentHeight > 96) {
-    downscaleAttempts++;
-    currentWidth = Math.round(currentWidth * 0.85);
-    currentHeight = Math.round(currentHeight * 0.85);
-
-    canvas.width = currentWidth;
-    canvas.height = currentHeight;
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, 0, 0, currentWidth, currentHeight);
-
-    dataUrl = canvas.toDataURL(chosenMime, opts.minQuality);
-    sizeBytes = estimateBase64SizeBytes(dataUrl);
-  }
-
-  const origSize = (file as Blob).size || sizeBytes || 1;
-  const compressionRatio = Number((sizeBytes / origSize).toFixed(4));
-  const isWithinQuota = sizeBytes <= opts.maxSizeBytes;
-
-  const mimeMatch = dataUrl.match(/^data:([^;]+);/);
-  const finalMime = mimeMatch ? mimeMatch[1] : chosenMime;
-
-  return {
-    dataUrl,
-    sizeBytes,
-    width: canvas.width,
-    height: canvas.height,
-    mimeType: finalMime,
-    compressionRatio,
-    isWithinQuota,
-  };
 }
 
 export const DEFAULT_LOGO_COMPRESSION_OPTIONS: CompressionOptions = {
   maxWidth: 256,
   maxHeight: 256,
   maxSizeBytes: 81920, // 80 KB
-  initialQuality: 0.90,
-  minQuality: 0.70,
+  initialQuality: 0.88,
+  minQuality: 0.65,
   qualityStep: 0.05,
-  mimeType: 'image/png',
-  fallbackMimeType: 'image/webp',
+  mimeType: 'image/webp',
+  fallbackMimeType: 'image/png',
 };
 
 /**

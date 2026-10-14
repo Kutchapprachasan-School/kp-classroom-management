@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { studentService, type StudentRecord } from '../../services/studentService';
+import { authService } from '../../services/authService';
 import {
   ChevronLeft,
   ChevronRight,
@@ -56,104 +58,39 @@ interface StudentRosterItem {
   phone: string;
 }
 
-const MOCK_STUDENTS: StudentRosterItem[] = [
-  {
-    id: 's-1',
-    no: 1,
-    name: 'ด.ญ. ปรียากานต์ ชัยแก้ว',
-    code: '10321',
-    status: 'NORMAL',
-    statusLabel: 'ปกติ',
-    avatar: '👧',
-    gender: 'female',
-    birthDate: '12 ม.ค. 2553',
-    age: 16,
-    address: '142/8 หมู่ 4 ต.ขุนพร อ.เมือง จ.เชียงใหม่ 50200',
-    guardian: 'นางสาวจิดาภา ชัยแก้ว',
-    guardianRelation: 'มารดา',
-    phone: '081-234-5678',
-  },
-  {
-    id: 's-2',
-    no: 2,
-    name: 'ด.ช. กฤษณะ ศรีสมบูรณ์',
-    code: '10322',
-    status: 'RISK',
-    statusLabel: 'เสี่ยง',
-    avatar: '👦',
-    gender: 'male',
-    birthDate: '05 มี.ค. 2553',
-    age: 16,
-    address: '88/1 หมู่ 2 ต.ขุนพร อ.เมือง จ.เชียงใหม่ 50200',
-    guardian: 'นายสมพร ศรีสมบูรณ์',
-    guardianRelation: 'บิดา',
-    phone: '089-876-5432',
-  },
-  {
-    id: 's-3',
-    no: 3,
-    name: 'ด.ญ. กัญญารัตน์ โพธิ์ทอง',
-    code: '10323',
-    status: 'NORMAL',
-    statusLabel: 'ปกติ',
-    avatar: '👧',
-    gender: 'female',
-    birthDate: '19 ก.ย. 2553',
-    age: 15,
-    address: '56 หมู่ 1 ต.ขุนพร อ.เมือง จ.เชียงใหม่ 50200',
-    guardian: 'นางปราณี โพธิ์ทอง',
-    guardianRelation: 'มารดา',
-    phone: '084-555-1234',
-  },
-  {
-    id: 's-4',
-    no: 4,
-    name: 'ด.ช. ชัยวัฒน์ บุญมี',
-    code: '10324',
-    status: 'RISK',
-    statusLabel: 'เสี่ยง',
-    avatar: '👦',
-    gender: 'male',
-    birthDate: '11 ก.ค. 2553',
-    age: 16,
-    address: '12/3 หมู่ 3 ต.ขุนพร อ.เมือง จ.เชียงใหม่ 50200',
-    guardian: 'นางสมศรี บุญมี',
-    guardianRelation: 'มารดา',
-    phone: '082-333-7788',
-  },
-  {
-    id: 's-5',
-    no: 5,
-    name: 'ด.ญ. ณัฐริกา แสนสุข',
-    code: '10325',
-    status: 'NORMAL',
-    statusLabel: 'ปกติ',
-    avatar: '👧',
-    gender: 'female',
-    birthDate: '28 ต.ค. 2553',
-    age: 15,
-    address: '99/4 หมู่ 5 ต.ขุนพร อ.เมือง จ.เชียงใหม่ 50200',
-    guardian: 'นายสุรชัย แสนสุข',
-    guardianRelation: 'บิดา',
-    phone: '086-444-9911',
-  },
-  {
-    id: 's-6',
-    no: 6,
-    name: 'ด.ช. ธนกร วงศ์คำ',
-    code: '10326',
-    status: 'NORMAL',
-    statusLabel: 'ปกติ',
-    avatar: '👦',
-    gender: 'male',
-    birthDate: '14 ธ.ค. 2553',
-    age: 15,
-    address: '33/2 หมู่ 2 ต.ขุนพร อ.เมือง จ.เชียงใหม่ 50200',
-    guardian: 'นางอัมพร วงศ์คำ',
-    guardianRelation: 'มารดา',
-    phone: '085-777-6655',
-  },
-];
+const mapStudentRecordToRosterItem = (s: StudentRecord, idx: number): StudentRosterItem => ({
+  id: s.id,
+  no: s.no || idx + 1,
+  name: s.name,
+  code: s.code,
+  status: s.status === 'AT_RISK' ? 'RISK' : 'NORMAL',
+  statusLabel: s.status === 'AT_RISK' ? 'เสี่ยง' : 'ปกติ',
+  avatar: s.gender === 'FEMALE' ? '👧' : '👦',
+  gender: s.gender === 'FEMALE' ? 'female' : 'male',
+  birthDate: '-',
+  age: 15,
+  address: 'โรงเรียนกุดจับประชาสรรค์',
+  guardian: '-',
+  guardianRelation: 'ผู้ปกครอง',
+  phone: '-',
+});
+
+const DEFAULT_FALLBACK_STUDENT: StudentRosterItem = {
+  id: 's-none',
+  no: 1,
+  name: 'ไม่มีข้อมูลนักเรียน',
+  code: '-',
+  status: 'NORMAL',
+  statusLabel: 'ปกติ',
+  avatar: '👦',
+  gender: 'male',
+  birthDate: '-',
+  age: 15,
+  address: 'โรงเรียนกุดจับประชาสรรค์',
+  guardian: '-',
+  guardianRelation: 'ผู้ปกครอง',
+  phone: '-',
+};
 
 interface StudentMobileCareViewProps {
   initialScreen?: MobileScreenKey;
@@ -166,7 +103,29 @@ export const StudentMobileCareView: React.FC<StudentMobileCareViewProps> = ({
 }) => {
   const [currentScreen, setCurrentScreen] = useState<MobileScreenKey>(initialScreen);
   const [isMobileFrameMode, setIsMobileFrameMode] = useState(true);
-  const [selectedStudent, setSelectedStudent] = useState<StudentRosterItem>(MOCK_STUDENTS[0]);
+  const [studentsList, setStudentsList] = useState<StudentRosterItem[]>(() => {
+    const cached = studentService.getStudents('room-3-1');
+    return cached.length > 0 ? cached.map(mapStudentRecordToRosterItem) : [];
+  });
+  const [selectedStudent, setSelectedStudent] = useState<StudentRosterItem>(
+    () => studentsList[0] || DEFAULT_FALLBACK_STUDENT
+  );
+
+  useEffect(() => {
+    studentService.getByClassroom('room-3-1').then((res) => {
+      if (res && res.length > 0) {
+        const mapped = res.map(mapStudentRecordToRosterItem);
+        setStudentsList(mapped);
+        setSelectedStudent((prev) => (prev.id === 's-none' ? mapped[0] : prev));
+      }
+    });
+  }, []);
+
+  const currentTeacher = authService.getCurrentUser();
+  const teacherName = currentTeacher?.name || 'ครูประจำชั้น';
+  const totalCount = studentsList.length;
+  const riskCount = studentsList.filter((s) => s.status === 'RISK').length;
+  const normalCount = Math.max(0, totalCount - riskCount);
 
   // Screen 3 Detail Tab: GENERAL | BEHAVIOR | ACTIVITIES
   const [detailTab, setDetailTab] = useState<'GENERAL' | 'BEHAVIOR' | 'ACTIVITIES'>('GENERAL');
@@ -350,7 +309,7 @@ export const StudentMobileCareView: React.FC<StudentMobileCareViewProps> = ({
                   สวัสดีครับ/ค่ะ
                 </span>
                 <h2 className="text-lg font-black mt-0.5">
-                  นางสาวสวยเลิศ (ครูประจำชั้น)
+                  {teacherName}
                 </h2>
                 <p className="text-xs text-teal-200 mt-1">
                   ภาคเรียนที่ 1/2569
@@ -363,28 +322,28 @@ export const StudentMobileCareView: React.FC<StudentMobileCareViewProps> = ({
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-extrabold text-slate-900">
-                    ชั้นมัธยมศึกษาปีที่ 3/8
+                    ชั้นมัธยมศึกษาปีที่ 3/1
                   </h3>
                   <p className="text-[11px] text-slate-500">
                     ดูแลนักเรียนในความรับผิดชอบ
                   </p>
                 </div>
-                <span className="text-xs font-bold text-[#0C6D5B]">ม.3/8</span>
+                <span className="text-xs font-bold text-[#0C6D5B]">ม.3/1</span>
               </div>
 
               {/* 3 Metric Pills */}
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="bg-white rounded-2xl p-2.5 border border-slate-200/70 shadow-2xs">
                   <span className="text-[10px] text-slate-400 font-semibold block">นักเรียนทั้งหมด</span>
-                  <span className="text-sm font-black text-slate-900">32 คน</span>
+                  <span className="text-sm font-black text-slate-900">{totalCount} คน</span>
                 </div>
                 <div className="bg-white rounded-2xl p-2.5 border border-orange-200/80 shadow-2xs">
                   <span className="text-[10px] text-orange-600 font-bold block">เสี่ยง/ต้องติดตาม</span>
-                  <span className="text-sm font-black text-orange-600">5 คน</span>
+                  <span className="text-sm font-black text-orange-600">{riskCount} คน</span>
                 </div>
                 <div className="bg-white rounded-2xl p-2.5 border border-emerald-200/80 shadow-2xs">
                   <span className="text-[10px] text-emerald-700 font-bold block">ปกติ</span>
-                  <span className="text-sm font-black text-emerald-700">27 คน</span>
+                  <span className="text-sm font-black text-emerald-700">{normalCount} คน</span>
                 </div>
               </div>
             </div>
@@ -450,7 +409,7 @@ export const StudentMobileCareView: React.FC<StudentMobileCareViewProps> = ({
             {/* Filter Pill */}
             <div className="flex items-center justify-between">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#0C6D5B] text-white text-xs font-bold shadow-2xs">
-                <span>ชั้น ม.3/8</span>
+                <span>ชั้น ม.3/1</span>
                 <span className="text-[10px]">▼</span>
               </div>
               <span className="text-[11px] text-slate-400">เรียงตามเลขที่ 1-32</span>
@@ -458,7 +417,7 @@ export const StudentMobileCareView: React.FC<StudentMobileCareViewProps> = ({
 
             {/* Student List */}
             <div className="space-y-2">
-              {MOCK_STUDENTS.map((stu) => (
+              {studentsList.map((stu) => (
                 <div
                   key={stu.id}
                   onClick={() => goToStudentDetail(stu)}
@@ -1081,16 +1040,16 @@ export const StudentMobileCareView: React.FC<StudentMobileCareViewProps> = ({
             {/* Summary Card (ม.3/8) */}
             <div className="bg-slate-50 border border-slate-200/80 rounded-3xl p-4 space-y-3">
               <h3 className="text-xs font-extrabold text-slate-900">
-                สรุปภาพรวมชั้น ม.3/8
+                สรุปภาพรวมชั้น ม.3/1
               </h3>
               <div className="grid grid-cols-3 gap-2 text-center text-xs">
                 <div className="bg-white rounded-2xl p-2.5 border border-emerald-200 shadow-2xs">
                   <span className="text-slate-400 text-[10px] block">ปกติ</span>
-                  <span className="text-base font-black text-emerald-700">27</span>
+                  <span className="text-base font-black text-emerald-700">{normalCount}</span>
                 </div>
                 <div className="bg-white rounded-2xl p-2.5 border border-orange-200 shadow-2xs">
                   <span className="text-slate-400 text-[10px] block">เสี่ยง</span>
-                  <span className="text-base font-black text-orange-600">5</span>
+                  <span className="text-base font-black text-orange-600">{riskCount}</span>
                 </div>
                 <div className="bg-white rounded-2xl p-2.5 border border-slate-200 shadow-2xs">
                   <span className="text-slate-400 text-[10px] block">ต้องติดตาม</span>
@@ -1160,23 +1119,23 @@ export const StudentMobileCareView: React.FC<StudentMobileCareViewProps> = ({
             {/* Settings Menu List (ตรงตาม Screen 9 เป๊ะ) */}
             <div className="space-y-2">
               <div
-                onClick={() => showToast('ข้อมูลส่วนตัวครูสวยเลิศ')}
+                onClick={() => showToast(`ข้อมูลส่วนตัว ${teacherName}`)}
                 className="bg-white border border-slate-200/80 rounded-2xl p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors"
               >
                 <div>
                   <h4 className="text-xs font-bold text-slate-900">ข้อมูลส่วนตัว</h4>
-                  <p className="text-[11px] text-slate-400">ครู ประจำชั้น (นางสาวสวยเลิศ)</p>
+                  <p className="text-[11px] text-slate-400">{teacherName}</p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
               </div>
 
               <div
-                onClick={() => showToast('ชั้นที่รับผิดชอบ: ม.3/8')}
+                onClick={() => showToast('ชั้นที่รับผิดชอบ: ม.3/1')}
                 className="bg-white border border-slate-200/80 rounded-2xl p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors"
               >
                 <div>
                   <h4 className="text-xs font-bold text-slate-900">ชั้นที่รับผิดชอบ</h4>
-                  <p className="text-[11px] text-slate-400">มัธยมศึกษาปีที่ 3/8</p>
+                  <p className="text-[11px] text-slate-400">มัธยมศึกษาปีที่ 3/1</p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
               </div>

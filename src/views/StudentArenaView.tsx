@@ -11,7 +11,6 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import type { QuizQuestion, StudentLeaderboardEntry } from '../types/viewModels';
-import { cleanSlateService } from '../services/cleanSlateService';
 import { gamificationService } from '../services/gamificationService';
 import { authService, type AuthUser } from '../services/authService';
 
@@ -47,37 +46,35 @@ export const StudentArenaView: React.FC<StudentArenaViewProps> = ({ currentUser 
   const effectiveUser = currentUser || authService.getCurrentUser();
   const studentName = effectiveUser?.name || 'นักเรียน';
   const studentRoom = effectiveUser?.classroomId || 'ม.3/1';
-  const isClean = cleanSlateService.isCleanSlateActive();
   const [streakDays, setStreakDays] = useState<number>(() =>
-    isClean ? 0 : gamificationService.getStreak(effectiveUser?.id || 'stu-2')
+    gamificationService.getStreak(effectiveUser?.id || '')
   );
 
   useEffect(() => {
-    if (isClean) {
-      setStreakDays(0);
-    } else {
-      setStreakDays(gamificationService.getStreak(effectiveUser?.id || 'stu-2'));
-    }
-  }, [isClean, effectiveUser?.id]);
+    setStreakDays(gamificationService.getStreak(effectiveUser?.id || ''));
+  }, [effectiveUser?.id]);
 
-  const leaderboard: StudentLeaderboardEntry[] = isClean
-    ? [
-        {
-          rank: 1,
-          name: `${studentName} (คุณ)`,
-          classroom: studentRoom,
-          xp: 0,
-          streakDays: streakDays,
-          avatarText: studentName.charAt(0) || 'น',
-          isCurrentUser: true,
-        },
-      ]
-    : [
-        { rank: 1, name: 'ด.ญ. ปรียาภรณ์ ชัยแก้ว', classroom: studentRoom, xp: 1240, streakDays: 12, avatarText: 'ป' },
-        { rank: 2, name: 'ด.ช. กฤษณะ ศรีสมบูรณ์', classroom: studentRoom, xp: 1120, streakDays: 9, avatarText: 'ก' },
-        { rank: 3, name: 'ด.ช. ชัยมงคล วงศ์บุตร', classroom: studentRoom, xp: 980, streakDays: 7, avatarText: 'ช' },
-        { rank: 4, name: `${studentName} (คุณ)`, classroom: studentRoom, xp: 650, streakDays: streakDays || 4, avatarText: studentName.charAt(0) || 'น', isCurrentUser: true },
-      ];
+  const [leaderboard, setLeaderboard] = useState<StudentLeaderboardEntry[]>([]);
+
+  useEffect(() => {
+    gamificationService.getLeaderboard().then((data) => {
+      if (data && data.length > 0) {
+        setLeaderboard(data);
+      } else {
+        setLeaderboard([
+          {
+            rank: 1,
+            name: `${studentName} (คุณ)`,
+            classroom: studentRoom,
+            xp: 0,
+            streakDays: streakDays,
+            avatarText: studentName.charAt(0) || 'น',
+            isCurrentUser: true,
+          },
+        ]);
+      }
+    });
+  }, [studentName, studentRoom, streakDays]);
   const [quizState, setQuizState] = useState<'IDLE' | 'PLAYING' | 'RESULT'>('IDLE');
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);

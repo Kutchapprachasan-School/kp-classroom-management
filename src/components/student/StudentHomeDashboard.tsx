@@ -393,7 +393,7 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
                     คะแนนรวม
                   </div>
                   <div className="text-xs sm:text-sm font-bold text-slate-800 mt-0.5">
-                    {isClean ? 'รอประเมิน' : '88.5%'}
+                    รอประเมิน
                   </div>
                 </div>
               </div>
@@ -408,7 +408,7 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
                     XP ทั้งหมด
                   </div>
                   <div className="text-xs sm:text-sm font-bold text-slate-800 mt-0.5">
-                    {isClean ? '0' : '670'}
+                    0
                   </div>
                 </div>
               </div>

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { StudentRadarChart } from '../components/teacher/StudentRadarChart';
 import { StudentNotesCard } from '../components/teacher/StudentNotesCard';
-import { studentTatthanProfile, classroomsListData } from '../data/mockData';
 import { homeVisitService, type HomeVisitRecord } from '../services/homeVisitService';
 import { messagingService, STUDENT_TRANSFERRED_EVENT } from '../services/messagingService';
 import { studentService } from '../services/studentService';
-import type { ClassroomRosterItem } from '../types/viewModels';
+import { classroomService } from '../services/classroomService';
+import type { ClassroomRosterItem, StudentProfileDetail } from '../types/viewModels';
 import {
   HeartHandshake,
   MapPin,
@@ -23,22 +23,43 @@ import {
 } from 'lucide-react';
 
 interface StudentDetailViewProps {
+  studentCode?: string;
   onOpenHomeVisit?: () => void;
   onBack?: () => void;
 }
 
-export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ onOpenHomeVisit, onBack }) => {
+export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ studentCode, onOpenHomeVisit, onBack }) => {
   const [visitRecord, setVisitRecord] = useState<HomeVisitRecord | null>(null);
+  const [allClassrooms, setAllClassrooms] = useState<ClassroomRosterItem[]>(() => classroomService.getClassroomsSync());
+
+  useEffect(() => {
+    classroomService.getAll().then((rooms) => {
+      if (rooms.length > 0) setAllClassrooms(rooms);
+    });
+  }, []);
+
+  const targetCode = studentCode || '';
+  const found = targetCode ? studentService.findStudentByCode(targetCode) : null;
+  const currentStudent = found?.student;
+  const currentClassroomId = found?.classroomId;
+  const studentName = currentStudent?.name || (targetCode ? `นักเรียนรหัส ${targetCode}` : 'ไม่พบข้อมูลนักเรียน');
+  const studentNo = currentStudent?.no || 1;
 
   const resolveCurrentRoom = (): ClassroomRosterItem => {
-    const found = studentService.findStudentByCode('45102');
-    if (found) {
-      const match = classroomsListData.find(
-        (c) => c.id === found.classroomId || c.roomNumber === found.classroomId
+    if (currentClassroomId) {
+      const match = allClassrooms.find(
+        (c) => c.id === currentClassroomId || c.roomNumber === currentClassroomId || c.name === currentClassroomId
       );
       if (match) return match;
     }
-    return classroomsListData.find((c) => c.roomNumber === 'ม.3/1') || classroomsListData[0];
+    return allClassrooms.find((c) => c.roomNumber === 'ม.3/1') || allClassrooms[0] || {
+      id: 'room-3-1',
+      name: 'ม.3/1',
+      level: 'ม.3',
+      roomNumber: 'ม.3/1',
+      studentCount: 0,
+      adviser: 'ครูที่ปรึกษา',
+    };
   };
 
   const [currentRoom, setCurrentRoom] = useState<ClassroomRosterItem>(() => resolveCurrentRoom());
@@ -46,7 +67,7 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ onOpenHome
 
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [targetRoomId, setTargetRoomId] = useState(() => {
-    const defaultTarget = classroomsListData.find(
+    const defaultTarget = allClassrooms.find(
       (c) => c.id !== resolveCurrentRoom().id && c.roomNumber !== resolveCurrentRoom().roomNumber
     );
     return defaultTarget ? defaultTarget.id : 'room-3-2';
@@ -54,18 +75,38 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ onOpenHome
   const [transferReason, setTransferReason] = useState('');
   const [transferSuccessNotice, setTransferSuccessNotice] = useState<string | null>(null);
 
+  const dynamicProfile: StudentProfileDetail = {
+    id: currentStudent?.id || (targetCode ? `stu-${targetCode}` : 'unknown'),
+    name: studentName,
+    studentNo: studentNo,
+    classroomName: currentRoomName,
+    subjectCode: 'ศ20221',
+    subjectName: 'ดนตรีปฏิบัติตามความถนัด 1',
+    peerCount: currentRoom.studentCount || 0,
+    radarMetrics: [
+      { dimension: 'คะแนนเก็บ', studentScore: currentStudent?.score ? Math.min(100, Math.round(currentStudent.score * 10)) : 0, classAverage: 0, diff: 0 },
+      { dimension: 'คะแนนสอบ', studentScore: 0, classAverage: 0, diff: 0 },
+      { dimension: 'ส่งงานตรงเวลา', studentScore: 0, classAverage: 0, diff: 0 },
+      { dimension: 'เวลาเรียน', studentScore: 0, classAverage: 0, diff: 0 },
+      { dimension: 'พฤติกรรม', studentScore: 0, classAverage: 0, diff: 0 },
+    ],
+    weakestPoint: { dimension: '-', diff: 0 },
+    strongestPoint: { dimension: '-', diff: 0 },
+    specialNotes: [],
+  };
+
   useEffect(() => {
     const records = homeVisitService.getAll();
-    const match = records.find((r) => r.studentCode === '45102') || records[0] || null;
+    const match = records.find((r) => r.studentCode === targetCode) || records[0] || null;
     setVisitRecord(match);
-  }, []);
+  }, [targetCode]);
 
   // ซิงค์การย้ายห้องเรียนอัตโนมัติจากทุกหน้าจอ
   useEffect(() => {
     const handleTransferred = (e: Event) => {
       const customEvent = e as CustomEvent<any>;
-      if (customEvent.detail && customEvent.detail.student.code === '45102') {
-        const nextRoom = classroomsListData.find(
+      if (customEvent.detail && customEvent.detail.student.code === targetCode) {
+        const nextRoom = allClassrooms.find(
           (c) =>
             c.id === customEvent.detail.toClassroomId ||
             c.roomNumber === customEvent.detail.toClassroomName
@@ -77,10 +118,10 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ onOpenHome
     };
     window.addEventListener(STUDENT_TRANSFERRED_EVENT, handleTransferred);
     return () => window.removeEventListener(STUDENT_TRANSFERRED_EVENT, handleTransferred);
-  }, []);
+  }, [targetCode, allClassrooms]);
 
   const handleOpenTransferModal = () => {
-    const nextRoom = classroomsListData.find(
+    const nextRoom = allClassrooms.find(
       (c) => c.id !== currentRoom.id && c.roomNumber !== currentRoom.roomNumber
     );
     if (nextRoom) {
@@ -93,13 +134,13 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ onOpenHome
     e.preventDefault();
     try {
       const res = messagingService.executeStudentTransfer({
-        studentCode: '45102',
+        studentCode: targetCode,
         fromClassroomId: currentRoom.id,
         toClassroomId: targetRoomId,
         transferReason: transferReason.trim() || undefined,
         actorLabel: 'ครูผู้สอน / แอดมินวิชาการ',
       });
-      const targetRoom = classroomsListData.find((c) => c.id === targetRoomId);
+      const targetRoom = allClassrooms.find((c) => c.id === targetRoomId);
       if (targetRoom) {
         setCurrentRoom(targetRoom);
       }
@@ -132,19 +173,19 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ onOpenHome
       <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-sm">
-            #{studentTatthanProfile.studentNo}
+            #{dynamicProfile.studentNo}
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-base font-bold text-slate-900">
-                {studentTatthanProfile.name}
+                {dynamicProfile.name}
               </h2>
               <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-semibold border border-blue-200">
                 ห้อง {currentRoomName}
               </span>
             </div>
             <p className="text-xs text-slate-500 font-mono">
-              รหัสนักเรียน: 45102 • รายวิชา: {studentTatthanProfile.subjectCode} {studentTatthanProfile.subjectName}
+              รหัสนักเรียน: {targetCode} • รายวิชา: {dynamicProfile.subjectCode} {dynamicProfile.subjectName}
             </p>
           </div>
         </div>
@@ -176,7 +217,7 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ onOpenHome
       )}
 
       {/* 1. Radar Chart with 5 dimensions & Comparison metrics */}
-      <StudentRadarChart profile={studentTatthanProfile} />
+      <StudentRadarChart profile={dynamicProfile} />
 
       {/* 2. Integrated Home Visit & SDQ Student Care Card (เชื่อมข้อมูลทางบ้านคู่กับผลการเรียน) */}
       {visitRecord && (
@@ -351,7 +392,7 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ onOpenHome
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
                 <ArrowRightLeft className="w-5 h-5 text-indigo-600" />
-                <span>ย้ายห้องเรียน & ซิงค์กลุ่มแชท ({studentTatthanProfile.name})</span>
+                <span>ย้ายห้องเรียน & ซิงค์กลุ่มแชท ({dynamicProfile.name})</span>
               </h3>
               <button
                 type="button"
@@ -364,14 +405,14 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ onOpenHome
 
             <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">
-                #{studentTatthanProfile.studentNo}
+                #{dynamicProfile.studentNo}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-bold text-slate-800 text-sm truncate">
-                  {studentTatthanProfile.name}
+                  {dynamicProfile.name}
                 </div>
                 <div className="text-xs text-slate-500 font-mono">
-                  รหัส 45102 • ห้องเดิม: {currentRoomName}
+                  รหัส {targetCode} • ห้องเดิม: {currentRoomName}
                 </div>
               </div>
             </div>
@@ -386,7 +427,7 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ onOpenHome
                   onChange={(e) => setTargetRoomId(e.target.value)}
                   className="w-full px-3 py-2 bg-white border border-indigo-300 rounded-xl font-bold text-indigo-700 focus:outline-none focus:border-indigo-500"
                 >
-                  {classroomsListData
+                  {allClassrooms
                     .filter((c) => c.id !== currentRoom.id && c.roomNumber !== currentRoom.roomNumber)
                     .map((c) => (
                       <option key={c.id} value={c.id}>

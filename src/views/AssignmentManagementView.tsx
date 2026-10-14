@@ -451,7 +451,12 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                     filteredSubmissions.map((item) => {
                       const isGraded = item.status === 'GRADED';
                       const isPdf = item.submissionChannel === 'PDF_UPLOAD' || (item.fileName || '').endsWith('.pdf');
-                      const isLink = item.submissionChannel === 'LINK_URL' || item.externalLinkUrl;
+                      const isDrive = Boolean(
+                        item.externalLinkUrl?.includes('drive.google.com') ||
+                          item.externalLinkUrl?.includes('docs.google.com') ||
+                          item.externalPlatform === 'GOOGLE_DRIVE'
+                      );
+                      const isLink = item.submissionChannel === 'LINK_URL' || item.externalLinkUrl || isDrive;
 
                       return (
                         <tr
@@ -522,19 +527,27 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                                   type: isPdf ? 'PDF' : isLink ? 'LINK' : 'IMAGE',
                                   url: item.filePreviewUrl || item.externalLinkUrl,
                                   fileName: item.fileName,
-                                  platform: item.externalPlatform,
+                                  platform: isDrive ? 'GOOGLE_DRIVE' : item.externalPlatform,
                                 });
                               }}
-                              className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-700 hover:text-blue-700 text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                              title="คลิกเพื่อพรีวิวผลงานเต็มตา"
+                              className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                                isDrive
+                                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
+                                  : isPdf
+                                  ? 'bg-rose-50 border-rose-200 text-rose-800 hover:bg-rose-100'
+                                  : isLink
+                                  ? 'bg-indigo-50 border-indigo-200 text-indigo-800 hover:bg-indigo-100'
+                                  : 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100'
+                              }`}
+                              title={isDrive ? 'คลิกเพื่อตรวจสอบโฟลเดอร์ Google Drive (Pre-Flight Link Check)' : 'คลิกเพื่อพรีวิวผลงานเต็มตา'}
                             >
-                              <Eye className="w-3.5 h-3.5 text-blue-600" />
-                              <span className="truncate max-w-[100px]">
-                                {isPdf ? 'PDF' : isLink ? (item.externalPlatform || 'Link') : 'รูปภาพ'}
+                              <Eye className="w-3.5 h-3.5" />
+                              <span className="truncate max-w-[120px]">
+                                {isDrive ? '📁 Google Drive' : isPdf ? '📄 PDF' : isLink ? (item.externalPlatform || 'Link') : '☁️ รูปภาพ R2'}
                               </span>
                             </button>
                             <span className="text-[11px] text-slate-500 truncate max-w-[90px]" title={item.fileName}>
-                              {item.fileName || 'ไฟล์ผลงาน'}
+                              {item.fileName || (isDrive ? 'โฟลเดอร์งาน' : 'ไฟล์ผลงาน')}
                             </span>
                           </div>
                         </td>
@@ -631,7 +644,12 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                 filteredSubmissions.map((item) => {
                 const isGraded = item.status === 'GRADED';
                 const isPdf = item.submissionChannel === 'PDF_UPLOAD' || (item.fileName || '').endsWith('.pdf');
-                const isLink = item.submissionChannel === 'LINK_URL' || item.externalLinkUrl;
+                const isDrive = Boolean(
+                  item.externalLinkUrl?.includes('drive.google.com') ||
+                    item.externalLinkUrl?.includes('docs.google.com') ||
+                    item.externalPlatform === 'GOOGLE_DRIVE'
+                );
+                const isLink = item.submissionChannel === 'LINK_URL' || item.externalLinkUrl || isDrive;
 
                 return (
                   <div
@@ -700,13 +718,24 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                             type: isPdf ? 'PDF' : isLink ? 'LINK' : 'IMAGE',
                             url: item.filePreviewUrl || item.externalLinkUrl,
                             fileName: item.fileName,
-                            platform: item.externalPlatform,
+                            platform: isDrive ? 'GOOGLE_DRIVE' : item.externalPlatform,
                           });
                         }}
-                        className="py-1.5 px-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                        className={`py-1.5 px-3 rounded-xl border text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                          isDrive
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
+                            : isPdf
+                            ? 'bg-rose-50 border-rose-200 text-rose-800 hover:bg-rose-100'
+                            : isLink
+                            ? 'bg-indigo-50 border-indigo-200 text-indigo-800 hover:bg-indigo-100'
+                            : 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100'
+                        }`}
+                        title={isDrive ? 'คลิกเพื่อตรวจสอบโฟลเดอร์ Google Drive' : 'คลิกเพื่อดูผลงาน'}
                       >
-                        <Eye className="w-3.5 h-3.5 text-blue-600" />
-                        <span>ดูผลงาน ({isPdf ? 'PDF' : isLink ? 'Link' : 'รูปภาพ'})</span>
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>
+                          {isDrive ? '📁 Google Drive' : isPdf ? '📄 PDF' : isLink ? (item.externalPlatform || 'Link') : '☁️ รูปภาพ R2'}
+                        </span>
                       </button>
 
                       <span className="text-[11px] text-slate-500">

@@ -1,6 +1,5 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase';
 import { ScoreUpdateSchema, type ScoreUpdateInput } from './types';
-import { cleanSlateService } from './cleanSlateService';
 
 export interface ScoreRecord {
   id: string;
@@ -30,63 +29,50 @@ export interface ScoreAuditLogRecord {
 const STORAGE_KEY_SCORES = 'cls_scores_data';
 const STORAGE_KEY_AUDIT = 'cls_score_audit_data';
 
-// Initial default score records
-const defaultScores: ScoreRecord[] = [
-  { id: 'sc-1', assignmentId: 'asg-1', enrollmentId: 'stu-1', classroomId: 'room-3-1', score: 10, maxScore: 10, isExempt: false, state: 'SUBMITTED', updatedAt: '2026-08-20T10:00:00Z' },
-  { id: 'sc-2', assignmentId: 'asg-1', enrollmentId: 'stu-2', classroomId: 'room-3-1', score: 9.5, maxScore: 10, isExempt: false, state: 'SUBMITTED', updatedAt: '2026-08-20T10:05:00Z' },
-  { id: 'sc-3', assignmentId: 'asg-1', enrollmentId: 'stu-7', classroomId: 'room-3-1', score: 3.0, maxScore: 10, isExempt: false, state: 'SUBMITTED', updatedAt: '2026-08-20T10:10:00Z' },
-  { id: 'sc-4', assignmentId: 'asg-1', enrollmentId: 'stu-10', classroomId: 'room-3-1', score: 4.0, maxScore: 10, isExempt: false, state: 'SUBMITTED', updatedAt: '2026-08-20T10:15:00Z' },
-  { id: 'sc-5', assignmentId: 'asg-2', enrollmentId: 'stu-1', classroomId: 'room-3-1', score: 10, maxScore: 10, isExempt: false, state: 'SUBMITTED', updatedAt: '2026-08-10T10:00:00Z' },
-  { id: 'sc-6', assignmentId: 'asg-2', enrollmentId: 'stu-2', classroomId: 'room-3-1', score: 10, maxScore: 10, isExempt: false, state: 'SUBMITTED', updatedAt: '2026-08-10T10:05:00Z' },
-  { id: 'sc-7', assignmentId: 'asg-3', enrollmentId: 'stu-1', classroomId: 'room-3-1', score: 9.0, maxScore: 10, isExempt: false, state: 'DRAFT', updatedAt: '2026-08-05T10:00:00Z' },
-  { id: 'sc-8', assignmentId: 'asg-3', enrollmentId: 'stu-7', classroomId: 'room-3-1', score: null, maxScore: 10, isExempt: false, state: 'DRAFT', updatedAt: '2026-08-05T10:00:00Z' },
-];
-
 const getLocalScores = (): ScoreRecord[] => {
+  if (typeof localStorage === 'undefined') return [];
   const raw = localStorage.getItem(STORAGE_KEY_SCORES);
   if (raw) {
     try {
-      return JSON.parse(raw);
+      const parsed: ScoreRecord[] = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        // Strip legacy mock score fixtures
+        const legacyMockIds = new Set(['sc-1', 'sc-2', 'sc-3', 'sc-4', 'sc-5', 'sc-6', 'sc-7', 'sc-8']);
+        return parsed.filter((s) => !legacyMockIds.has(s.id));
+      }
     } catch {
       // fallback
     }
   }
-  if (cleanSlateService.isCleanSlateActive()) {
-    return [];
-  }
-  return defaultScores;
+  return [];
 };
 
 const saveLocalScores = (items: ScoreRecord[]) => {
-  localStorage.setItem(STORAGE_KEY_SCORES, JSON.stringify(items));
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_SCORES, JSON.stringify(items));
+  }
 };
 
 const getLocalAuditLogs = (): ScoreAuditLogRecord[] => {
+  if (typeof localStorage === 'undefined') return [];
   const raw = localStorage.getItem(STORAGE_KEY_AUDIT);
   if (raw) {
     try {
-      return JSON.parse(raw);
+      const parsed: ScoreAuditLogRecord[] = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((l) => l.id !== 'audit-init-1');
+      }
     } catch {
       // fallback
     }
   }
-  return [
-    {
-      id: 'audit-init-1',
-      scoreId: 'sc-3',
-      assignmentId: 'asg-1',
-      enrollmentId: 'stu-7',
-      oldValue: 0,
-      newValue: 3.0,
-      reason: 'นักเรียนส่งงานแก้รอบสอง ตรวจให้คะแนนผ่านเกณฑ์ขั้นต่ำ',
-      changedBy: 'ครูภาสภูมิ เรืองปราชญ์',
-      timestamp: '2026-08-21T09:30:00.000Z',
-    },
-  ];
+  return [];
 };
 
 const saveLocalAuditLogs = (items: ScoreAuditLogRecord[]) => {
-  localStorage.setItem(STORAGE_KEY_AUDIT, JSON.stringify(items));
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_AUDIT, JSON.stringify(items));
+  }
 };
 
 export const scoreService = {

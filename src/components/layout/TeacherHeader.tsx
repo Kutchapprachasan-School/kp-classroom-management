@@ -17,7 +17,13 @@ import {
   Settings,
   Cloud,
   RefreshCw,
+  X,
 } from 'lucide-react';
+import {
+  academicCalendarService,
+  ACADEMIC_CALENDAR_EVENT,
+  type AcademicTermRecord,
+} from '../../services/academicCalendarService';
 import { cloudDataService, type CloudSyncState } from '../../services/cloudDataService';
 import {
   teacherCopilotService,
@@ -26,6 +32,7 @@ import {
 } from '../../services/teacherCopilotService';
 import {
   getSchoolSettings,
+  DEFAULT_KUTCHAP_LOGO_SVG,
   type SchoolUserRole,
   type SchoolBrandingSettings,
 } from '../../config/schoolRoles';
@@ -138,9 +145,26 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
   );
   const [bellFeedback, setBellFeedback] = useState<string | null>(null);
 
+  const [isTermSwitcherOpen, setIsTermSwitcherOpen] = useState(false);
+  const [termsList, setTermsList] = useState<AcademicTermRecord[]>(() =>
+    academicCalendarService.getTerms()
+  );
+  const termSwitcherRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleCalendarSync = () => {
+      setTermsList(academicCalendarService.getTerms());
+    };
+    window.addEventListener(ACADEMIC_CALENDAR_EVENT, handleCalendarSync);
+    return () => window.removeEventListener(ACADEMIC_CALENDAR_EVENT, handleCalendarSync);
+  }, []);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
   const bellRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+
+  const unresolvedItems = urgentItems.filter((i) => !i.isResolved);
+  const unresolvedCount = unresolvedItems.length;
 
   const refreshCopilot = () => {
     setUrgentItems(teacherCopilotService.getUrgentTriageQueue());
@@ -181,6 +205,9 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
         setIsProfileOpen(false);
       }
+      if (termSwitcherRef.current && !termSwitcherRef.current.contains(e.target as Node)) {
+        setIsTermSwitcherOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -205,8 +232,14 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
             เรียงตามความสำคัญที่ต้องดำเนินการ
           </div>
         </div>
-        <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-bold">
-          3 รายการ
+        <span
+          className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+            unresolvedCount > 0
+              ? 'bg-rose-50 text-rose-700 border border-rose-200'
+              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+          }`}
+        >
+          {unresolvedCount > 0 ? `${unresolvedCount} รายการ` : 'ครบถ้วน'}
         </span>
       </div>
 
@@ -218,71 +251,190 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
       )}
 
       <div className="max-h-80 overflow-y-auto space-y-2 pr-0.5">
-        {urgentItems.slice(0, 3).map((item) => (
-          <div
-            key={item.id}
-            className={`p-3 rounded-xl border text-xs transition-colors ${
-              item.isResolved
-                ? 'bg-slate-50/70 border-slate-200/70 text-slate-400'
-                : item.level === 'CRITICAL'
-                ? 'bg-rose-50/50 border-rose-200 text-slate-800'
-                : item.level === 'URGENT'
-                ? 'bg-amber-50/60 border-amber-200 text-slate-800'
-                : 'bg-white border-slate-200 text-slate-800'
-            }`}
-          >
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <span
-                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                  item.isResolved
-                    ? 'bg-teal-50 text-teal-700 border border-teal-200'
-                    : item.level === 'CRITICAL'
-                    ? 'bg-rose-600 text-white'
-                    : 'bg-blue-600 text-white'
-                }`}
-              >
-                {item.isResolved ? '✓ เรียบร้อย' : item.levelLabel}
-              </span>
-              <span className="text-[10px] font-semibold text-slate-500">
-                {item.timeTag}
-              </span>
+        {urgentItems.length === 0 || unresolvedCount === 0 ? (
+          <div className="py-6 px-4 text-center space-y-2 bg-slate-50/60 rounded-xl border border-dashed border-slate-200">
+            <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 mx-auto flex items-center justify-center">
+              <CheckCircle2 className="w-5 h-5" />
             </div>
-
+            <div className="text-xs font-bold text-slate-800">ไม่มีภาระงานด่วนค้าง</div>
+            <div className="text-[11px] text-slate-400">ทุกภาระงานได้รับการบันทึกและตรวจสอบเรียบร้อยแล้ว ✨</div>
+          </div>
+        ) : (
+          urgentItems.map((item) => (
             <div
-              className={`font-bold ${
-                item.isResolved ? 'line-through text-slate-400' : 'text-slate-900'
+              key={item.id}
+              className={`p-3 rounded-xl border text-xs transition-colors ${
+                item.isResolved
+                  ? 'bg-slate-50/70 border-slate-200/70 text-slate-400'
+                  : item.level === 'CRITICAL'
+                  ? 'bg-rose-50/50 border-rose-200 text-slate-800'
+                  : item.level === 'URGENT'
+                  ? 'bg-amber-50/60 border-amber-200 text-slate-800'
+                  : 'bg-white border-slate-200 text-slate-800'
               }`}
             >
-              {item.title}
-            </div>
-            <div className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-              {item.isResolved ? item.resolvedMessage : item.subtitle}
-            </div>
-
-            {!item.isResolved && (
-              <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => handleQuickResolve(item.id)}
-                  className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold transition-colors cursor-pointer"
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    item.isResolved
+                      ? 'bg-teal-50 text-teal-700 border border-teal-200'
+                      : item.level === 'CRITICAL'
+                      ? 'bg-rose-600 text-white'
+                      : 'bg-blue-600 text-white'
+                  }`}
                 >
-                  {item.quickActionLabel}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsBellOpen(false);
-                    onDeepNavigate?.(item.targetPayload);
-                  }}
-                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer"
-                >
-                  <span>{item.navigateLabel}</span>
-                  <ArrowUpRight className="w-3 h-3" />
-                </button>
+                  {item.isResolved ? '✓ เรียบร้อย' : item.levelLabel}
+                </span>
+                <span className="text-[10px] font-semibold text-slate-500">
+                  {item.timeTag}
+                </span>
               </div>
-            )}
+
+              <div
+                className={`font-bold ${
+                  item.isResolved ? 'line-through text-slate-400' : 'text-slate-900'
+                }`}
+              >
+                {item.title}
+              </div>
+              <div className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                {item.isResolved ? item.resolvedMessage : item.subtitle}
+              </div>
+
+              {!item.isResolved && (
+                <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => handleQuickResolve(item.id)}
+                    className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold transition-colors cursor-pointer"
+                  >
+                    {item.quickActionLabel}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsBellOpen(false);
+                      onDeepNavigate?.(item.targetPayload);
+                    }}
+                    className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>{item.navigateLabel}</span>
+                    <ArrowUpRight className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
+  // Admin Term Switcher Modal
+  const termSwitcherModal = isTermSwitcherOpen && (
+    <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in">
+      <div
+        ref={termSwitcherRef}
+        className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-slide-up space-y-4"
+      >
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+              <Calendar className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900">
+                ปรับเปลี่ยนภาคเรียนและปีการศึกษา
+              </h3>
+              <p className="text-[11px] text-slate-500">
+                สิทธิ์แอดมิน: สลับภาคเรียนที่เปิดสอนในระบบ
+              </p>
+            </div>
           </div>
-        ))}
+          <button
+            type="button"
+            onClick={() => setIsTermSwitcherOpen(false)}
+            className="p-1 rounded-full text-slate-400 hover:text-slate-700 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-slate-700 block">
+            เลือกภาคเรียนปัจจุบันที่ต้องการใช้งาน:
+          </label>
+          <div className="space-y-2 max-h-60 overflow-y-auto pr-0.5">
+            {termsList.map((term) => {
+              const isCurrent = term.isActive;
+              return (
+                <div
+                  key={term.id}
+                  onClick={() => {
+                    academicCalendarService.setActiveTerm(term.id);
+                    setIsTermSwitcherOpen(false);
+                  }}
+                  className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                    isCurrent
+                      ? 'bg-blue-50/80 border-blue-400 ring-2 ring-blue-500/20'
+                      : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-slate-50/80'
+                  }`}
+                >
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-900">
+                        {term.termName}/{term.year}
+                      </span>
+                      {isCurrent && (
+                        <span className="px-2 py-0.2 rounded-full text-[10px] font-extrabold bg-blue-600 text-white">
+                          ใช้งานอยู่
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      ช่วงเวลา: {term.startDate} - {term.endDate}
+                    </div>
+                  </div>
+                  <div className="shrink-0">
+                    {isCurrent ? (
+                      <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center">
+                        <Check className="w-3.5 h-3.5" />
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-slate-200 bg-white text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200"
+                      >
+                        เปิดใช้
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+          <button
+            type="button"
+            onClick={() => {
+              setIsTermSwitcherOpen(false);
+              onDeepNavigate?.({ view: 'settings' });
+            }}
+            className="text-blue-600 hover:underline font-bold inline-flex items-center gap-1 cursor-pointer"
+          >
+            <Settings className="w-3.5 h-3.5" />
+            <span>ไปที่หน้าตั้งค่าปีการศึกษาแบบละเอียด</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsTermSwitcherOpen(false)}
+            className="px-3.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 font-bold text-slate-700 cursor-pointer"
+          >
+            ปิด
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -436,11 +588,11 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
 
           <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 flex items-center justify-center shadow-2xs">
             <img
-              src={schoolSettings.logoUrl || '/images/teacher/school_logo.png'}
+              src={schoolSettings.logoUrl || DEFAULT_KUTCHAP_LOGO_SVG}
               alt={schoolSettings.nameTh}
               className="w-full h-full object-contain"
               onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src = '/images/teacher/school_logo.png';
+                (e.currentTarget as HTMLImageElement).src = DEFAULT_KUTCHAP_LOGO_SVG;
               }}
             />
           </div>
@@ -478,9 +630,11 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
               title="การแจ้งเตือน"
             >
               <Bell className="w-3.5 h-3.5" />
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold shadow-xs">
-                3
-              </span>
+              {unresolvedCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold shadow-xs">
+                  {unresolvedCount}
+                </span>
+              )}
             </button>
             {bellDropdownContent}
           </div>
@@ -570,15 +724,38 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
           </div>
 
           {/* 2.1 Date & Term Card matching Image 1 */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-blue-100/90 bg-blue-50/50 shadow-2xs">
+          <div
+            onClick={() => {
+              if (activeRole === 'ACADEMIC_ADMIN') {
+                setIsTermSwitcherOpen(true);
+              }
+            }}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border border-blue-100/90 bg-blue-50/50 shadow-2xs transition-all ${
+              activeRole === 'ACADEMIC_ADMIN'
+                ? 'cursor-pointer hover:bg-blue-100/80 hover:border-blue-300'
+                : ''
+            }`}
+            title={
+              activeRole === 'ACADEMIC_ADMIN'
+                ? 'คลิกเพื่อปรับเปลี่ยนภาคเรียนและปีการศึกษา (สิทธิ์แอดมิน)'
+                : undefined
+            }
+          >
             <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
             <div className="flex flex-col text-left leading-tight">
               <span className="text-xs font-bold text-slate-800">
                 {todayThaiDate}
               </span>
-              <span className="text-[10px] text-slate-500 font-medium">
-                {termLabel}
-              </span>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-slate-500 font-medium">
+                  {termLabel}
+                </span>
+                {activeRole === 'ACADEMIC_ADMIN' && (
+                  <span className="text-[9px] px-1 py-0.2 rounded bg-blue-200/80 text-blue-800 font-bold">
+                    สลับ ▾
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -714,9 +891,11 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
               aria-label="การแจ้งเตือน"
             >
               <Bell className="w-4 h-4" />
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold shadow-xs">
-                3
-              </span>
+              {unresolvedCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold shadow-xs">
+                  {unresolvedCount}
+                </span>
+              )}
             </button>
             {bellDropdownContent}
           </div>
@@ -750,6 +929,9 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Admin Academic Term & Year Switcher Modal */}
+      {termSwitcherModal}
     </header>
   );
 };

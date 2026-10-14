@@ -39,7 +39,8 @@ import {
 } from '../services/onlineQuizService';
 import { sgsRosterAndSubmissionService } from '../services/sgsRosterAndSubmissionService';
 import { coursesCurriculumService, type CourseCurriculumRecord } from '../services/coursesCurriculumService';
-import { cleanSlateService } from '../services/cleanSlateService';
+import { studentService } from '../services/studentService';
+import { classroomService } from '../services/classroomService';
 import { StudentExamPlayerModal } from '../components/exam/StudentExamPlayerModal';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 
@@ -56,19 +57,6 @@ interface StudentScoreEntry {
   status: 'GRADED' | 'PENDING';
 }
 
-const DEFAULT_STUDENTS_LIST: Omit<StudentScoreEntry, 'score' | 'status'>[] = [
-  { id: 'st-1', studentNo: 1, studentCode: '45101', name: 'ด.ช. กฤษณะ ศรีสมบูรณ์', room: 'ม.3/1' },
-  { id: 'st-2', studentNo: 2, studentCode: '45102', name: 'ด.ช. จิรายุ เดชปันคำ', room: 'ม.3/1' },
-  { id: 'st-3', studentNo: 3, studentCode: '45103', name: 'ด.ช. ชัยมงคล วงศ์บุตร', room: 'ม.3/1' },
-  { id: 'st-4', studentNo: 4, studentCode: '45104', name: 'ด.ช. ณัฐวุฒิ สิทธิโชค', room: 'ม.3/1' },
-  { id: 'st-5', studentNo: 5, studentCode: '45105', name: 'ด.ช. ทัตธน คำฝั้น', room: 'ม.3/1' },
-  { id: 'st-6', studentNo: 6, studentCode: '45106', name: 'ด.ช. ธีรภัทร ชาญวิทย์', room: 'ม.3/1' },
-  { id: 'st-7', studentNo: 7, studentCode: '45107', name: 'ด.ช. ภูรินท์ บัณฑิต', room: 'ม.3/1' },
-  { id: 'st-8', studentNo: 8, studentCode: '45108', name: 'ด.ช. อัศวิน วนเกษตรกุล', room: 'ม.3/1' },
-  { id: 'st-9', studentNo: 9, studentCode: '45109', name: 'ด.ญ. กัญญารัตน์ โพธิ์ทอง', room: 'ม.3/1' },
-  { id: 'st-10', studentNo: 10, studentCode: '45110', name: 'ด.ญ. ปริยาภรณ์ ชัยแก้ว', room: 'ม.3/1' },
-];
-
 // Item Analysis Question Model
 interface ItemAnalysisRecord {
   itemNo: number;
@@ -82,6 +70,7 @@ interface ItemAnalysisRecord {
 }
 
 export interface ExtendedExamItem extends ExamItem {
+  classroom?: string;
   category?: 'QUIZ' | 'MIDTERM' | 'FINAL';
   targetGradebookColumn?: 'u1' | 'u2' | 'u3' | 'midterm' | 'final';
   targetCurriculumCourseId?: string;
@@ -95,137 +84,10 @@ export interface ExtendedExamItem extends ExamItem {
   badgeColor?: string;
 }
 
-export const DEFAULT_MOCKUP_EXAMS: ExtendedExamItem[] = [
-  {
-    id: 'ex-1',
-    title: 'แบบทดสอบย่อยที่ 1 (บทที่ 1)',
-    subjectCode: 'ญี่ปุ่น ม.3/1',
-    roomName: 'ม.3/1',
-    category: 'QUIZ',
-    targetGradebookColumn: 'u1',
-    targetCurriculumUnitName: 'หน่วยที่ 1 (u1)',
-    typeBadge: 'เก็บคะแนน',
-    badgeColor: 'bg-blue-500 text-white',
-    sgsUnitName: 'สอบเก็บคะแนนหน่วยที่ 1 (คำศัพท์และไวยากรณ์)',
-    maxScore: 10,
-    date: '12 ก.ย. 2569',
-    examTime: '(08:00 - 09:00 น.)',
-    dueDate: '12 ก.ย. 2569',
-    dueRemark: '(ภายในวันสอบ)',
-    status: 'LOCKED',
-    statusRatio: '38/39',
-    averageScore: 9.2,
-    highestScore: 10,
-    lowestScore: 6.5,
-  },
-  {
-    id: 'ex-2',
-    title: 'แบบทดสอบย่อยที่ 2 (บทที่ 2)',
-    subjectCode: 'ญี่ปุ่น ม.3/1',
-    roomName: 'ม.3/1',
-    category: 'QUIZ',
-    targetGradebookColumn: 'u2',
-    targetCurriculumUnitName: 'หน่วยที่ 2 (u2)',
-    typeBadge: 'เก็บคะแนน',
-    badgeColor: 'bg-blue-500 text-white',
-    sgsUnitName: 'สอบเก็บคะแนนหน่วยที่ 2 (คันจิและการอ่าน)',
-    maxScore: 10,
-    date: '19 ก.ย. 2569',
-    examTime: '(08:00 - 09:00 น.)',
-    dueDate: '19 ก.ย. 2569',
-    dueRemark: '(ภายในวันสอบ)',
-    status: 'LOCKED',
-    statusRatio: '38/39',
-    averageScore: 8.8,
-    highestScore: 10,
-    lowestScore: 5.0,
-  },
-  {
-    id: 'ex-3',
-    title: 'สอบกลางภาค ภาคเรียนที่ 1/2569',
-    subjectCode: 'ญี่ปุ่น ม.3/1',
-    roomName: 'ม.3/1',
-    category: 'MIDTERM',
-    targetGradebookColumn: 'midterm',
-    targetCurriculumUnitName: 'สอบกลางภาค',
-    typeBadge: 'กลางภาค',
-    badgeColor: 'bg-emerald-600 text-white',
-    sgsUnitName: 'วัดผลกลางภาคเรียน (หน่วยที่ 1-2)',
-    maxScore: 20,
-    date: '28 ส.ค. 2569',
-    examTime: '(09:00 - 11:00 น.)',
-    dueDate: '1 ก.ย. 2569',
-    dueRemark: '(ภายใน 3 วัน)',
-    status: 'LOCKED',
-    statusRatio: '38/39',
-    averageScore: 16.4,
-    highestScore: 20,
-    lowestScore: 8.5,
-  },
-  {
-    id: 'ex-4',
-    title: 'สอบปลายภาค ภาคเรียนที่ 1/2569',
-    subjectCode: 'ญี่ปุ่น ม.3/1',
-    roomName: 'ม.3/1',
-    category: 'FINAL',
-    targetGradebookColumn: 'final',
-    targetCurriculumUnitName: 'สอบปลายภาค',
-    typeBadge: 'ปลายภาค',
-    badgeColor: 'bg-amber-500 text-white',
-    sgsUnitName: 'วัดผลปลายภาคเรียน',
-    maxScore: 30,
-    date: '4 ต.ค. 2569',
-    examTime: '(09:00 - 11:00 น.)',
-    dueDate: '8 ต.ค. 2569',
-    dueRemark: '(ภายใน 3 วัน)',
-    status: 'GRADING',
-    statusRatio: '0/39',
-    averageScore: 22.5,
-    highestScore: 29,
-    lowestScore: 12,
-  },
-  {
-    id: 'ex-5',
-    title: 'แบบทดสอบย่อยที่ 3 (บทที่ 3)',
-    subjectCode: 'ญี่ปุ่น ม.3/2',
-    roomName: 'ม.3/2',
-    category: 'QUIZ',
-    targetGradebookColumn: 'u3',
-    targetCurriculumUnitName: 'หน่วยที่ 3 (u3)',
-    typeBadge: 'เก็บคะแนน',
-    badgeColor: 'bg-blue-500 text-white',
-    sgsUnitName: 'สอบเก็บคะแนนหน่วยที่ 3 (บทสนทนา)',
-    maxScore: 10,
-    date: '15 ก.ย. 2569',
-    examTime: '(08:00 - 09:00 น.)',
-    dueDate: '15 ก.ย. 2569',
-    dueRemark: '(ภายในวันสอบ)',
-    status: 'UPCOMING',
-    statusRatio: '0/39',
-  },
-  {
-    id: 'ex-6',
-    title: 'สอบปลายภาค ภาคเรียนที่ 1/2569',
-    subjectCode: 'ญี่ปุ่น ม.3/2',
-    roomName: 'ม.3/2',
-    category: 'FINAL',
-    targetGradebookColumn: 'final',
-    targetCurriculumUnitName: 'สอบปลายภาค',
-    typeBadge: 'ปลายภาค',
-    badgeColor: 'bg-amber-500 text-white',
-    sgsUnitName: 'วัดผลปลายภาคเรียน',
-    maxScore: 30,
-    date: '5 ต.ค. 2569',
-    examTime: '(09:00 - 11:00 น.)',
-    dueDate: '9 ต.ค. 2569',
-    dueRemark: '(ภายใน 3 วัน)',
-    status: 'UPCOMING',
-    statusRatio: '0/39',
-  },
-];
+export const DEFAULT_MOCKUP_EXAMS: ExtendedExamItem[] = [];
 
 export const ExamManagementView: React.FC = () => {
-  // 1. Exams State initialized with clean slate support
+  // 1. Exams State initialized from localStorage or empty array (Zero Mock Data)
   const [exams, setExams] = useState<ExtendedExamItem[]>(() => {
     try {
       const saved = localStorage.getItem(EXAMS_STORAGE_KEY);
@@ -238,7 +100,7 @@ export const ExamManagementView: React.FC = () => {
     } catch {
       // ignore parse error
     }
-    return cleanSlateService.isCleanSlateActive() ? [] : DEFAULT_MOCKUP_EXAMS;
+    return [];
   });
 
   const [filter, setFilter] = useState<'ALL' | 'GRADING' | 'LOCKED' | 'UPCOMING'>('ALL');
@@ -716,6 +578,7 @@ D) ผู้อำนวยการ
   // ----------------------------------------------------
   // Inline Score Grid Logic (Modal 2)
   // ----------------------------------------------------
+  const [scoreGridStudents, setScoreGridStudents] = useState<StudentScoreEntry[]>([]);
   const [gridScores, setGridScores] = useState<Record<string, number | null>>({});
   const [gridSearch, setGridSearch] = useState('');
   const [gridFilterStatus, setGridFilterStatus] = useState<'ALL' | 'GRADED' | 'PENDING'>('ALL');
@@ -724,46 +587,66 @@ D) ผู้อำนวยการ
   // Initialize or load scores when scoreGridExam opens
   useEffect(() => {
     if (!scoreGridExam) return;
+    const currentExam = scoreGridExam;
 
-    const storageKey = `kp_exam_scores_${scoreGridExam.id}`;
-    let loadedScores: Record<string, number | null> = {};
+    let isMounted = true;
+    const storageKey = `kp_exam_scores_${currentExam.id}`;
 
-    try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        loadedScores = JSON.parse(saved);
-      }
-    } catch {
-      // ignore
-    }
-
-    if (Object.keys(loadedScores).length === 0) {
-      // Pre-fill realistic scores reflecting the exam's status and maxScore
-      DEFAULT_STUDENTS_LIST.forEach((stu) => {
-        if (scoreGridExam.status === 'LOCKED' || scoreGridExam.id === 'ex-1' || scoreGridExam.id === 'ex-2' || scoreGridExam.id === 'ex-3') {
-          // Locked / completed exam: all students scored with realistic values
-          const preScore = scoreGridExam.maxScore === 10
-            ? [9.5, 10, 8, 9, 10, 8.5, 7, 6.5, 9, 9.5][stu.studentNo - 1] ?? 8.5
-            : scoreGridExam.maxScore === 20
-            ? [18, 19.5, 15, 17, 20, 16.5, 14, 8.5, 17.5, 18][stu.studentNo - 1] ?? 16
-            : [26, 28, 22, 25, 29, 24, 20, 14, 25, 27][stu.studentNo - 1] ?? 23;
-          loadedScores[stu.id] = preScore;
-        } else if (scoreGridExam.status === 'GRADING' || scoreGridExam.id === 'ex-4') {
-          // Grading exam: some scored, some pending
-          const preScore = scoreGridExam.maxScore === 30
-            ? [24, 27, null, 22, null, 25, 15, null, 26, 23][stu.studentNo - 1] ?? null
-            : [15, 13.5, null, 12, null, 14, 6, null, 14.5, 13][stu.studentNo - 1] ?? null;
-          loadedScores[stu.id] = preScore;
-        } else {
-          // Upcoming or new exam: empty
-          loadedScores[stu.id] = null;
+    async function loadDataForExam() {
+      try {
+        let roomId = currentExam.classroom || currentExam.roomName || 'room-3-1';
+        const allRooms = await classroomService.getAll();
+        const matched = allRooms.find(
+          (r) => r.name === roomId || r.roomNumber === roomId || r.id === roomId
+        );
+        if (matched) {
+          roomId = matched.id;
         }
-      });
+
+        const realStudents = await studentService.getByClassroom(roomId);
+        const mappedEntries: StudentScoreEntry[] = realStudents.map((stu) => ({
+          id: stu.id,
+          studentNo: stu.no,
+          studentCode: stu.code,
+          name: stu.name,
+          room: matched?.name || currentExam.roomName || 'ม.3/1',
+          score: null,
+          status: 'PENDING',
+        }));
+
+        let loadedScores: Record<string, number | null> = {};
+        try {
+          const saved = localStorage.getItem(storageKey);
+          if (saved) {
+            loadedScores = JSON.parse(saved);
+          }
+        } catch {
+          // ignore
+        }
+
+        mappedEntries.forEach((stu) => {
+          if (loadedScores[stu.id] !== undefined) {
+            stu.score = loadedScores[stu.id];
+            stu.status = typeof stu.score === 'number' ? 'GRADED' : 'PENDING';
+          }
+        });
+
+        if (isMounted) {
+          setScoreGridStudents(mappedEntries);
+          setGridScores(loadedScores);
+          setGridSearch('');
+          setGridFilterStatus('ALL');
+        }
+      } catch (err) {
+        console.warn('Error loading students for exam score grid:', err);
+      }
     }
 
-    setGridScores(loadedScores);
-    setGridSearch('');
-    setGridFilterStatus('ALL');
+    loadDataForExam();
+
+    return () => {
+      isMounted = false;
+    };
   }, [scoreGridExam]);
 
   // Derived Grid Statistics
@@ -775,7 +658,7 @@ D) ผู้อำนวยการ
     );
 
     const graded = scoreVals.length;
-    const total = DEFAULT_STUDENTS_LIST.length;
+    const total = scoreGridStudents.length;
     const pending = total - graded;
 
     if (graded === 0) {
@@ -788,7 +671,7 @@ D) ผู้อำนวยการ
     const lowest = Math.min(...scoreVals);
 
     return { count: total, graded, pending, avg, highest, lowest };
-  }, [scoreGridExam, gridScores]);
+  }, [scoreGridExam, gridScores, scoreGridStudents]);
 
   const handleScoreChange = (studentId: string, valStr: string) => {
     if (!scoreGridExam) return;
@@ -807,7 +690,7 @@ D) ผู้อำนวยการ
 
   // Filtered students for grid view and keyboard navigation
   const filteredStudents = useMemo(() => {
-    return DEFAULT_STUDENTS_LIST.filter((stu) => {
+    return scoreGridStudents.filter((stu) => {
       const currentVal = gridScores[stu.id];
       const hasScore = typeof currentVal === 'number' && !Number.isNaN(currentVal);
       if (gridFilterStatus === 'GRADED' && !hasScore) return false;
@@ -823,7 +706,7 @@ D) ผู้อำนวยการ
       }
       return true;
     });
-  }, [gridScores, gridFilterStatus, gridSearch]);
+  }, [scoreGridStudents, gridScores, gridFilterStatus, gridSearch]);
 
   const handleScoreKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, currentIndex: number) => {
     if (e.key === 'ArrowDown' || e.key === 'Enter') {
@@ -846,17 +729,17 @@ D) ผู้อำนวยการ
   const handleQuickFillMax = () => {
     if (!scoreGridExam) return;
     const next: Record<string, number | null> = {};
-    DEFAULT_STUDENTS_LIST.forEach((stu) => {
+    scoreGridStudents.forEach((stu) => {
       next[stu.id] = scoreGridExam.maxScore;
     });
     setGridScores(next);
-    showToast(`⚡ เติมคะแนนเต็ม (${scoreGridExam.maxScore}) ครบทุก ${DEFAULT_STUDENTS_LIST.length} คน`);
+    showToast(`⚡ เติมคะแนนเต็ม (${scoreGridExam.maxScore}) ครบทุก ${scoreGridStudents.length} คน`);
   };
 
   const handleQuickRandomFill = () => {
     if (!scoreGridExam) return;
     const next: Record<string, number | null> = {};
-    DEFAULT_STUDENTS_LIST.forEach((stu) => {
+    scoreGridStudents.forEach((stu) => {
       const minS = Math.floor(scoreGridExam.maxScore * 0.4);
       const rand = minS + Math.floor(Math.random() * (scoreGridExam.maxScore - minS + 1));
       next[stu.id] = rand;
@@ -867,7 +750,7 @@ D) ผู้อำนวยการ
 
   const handleClearAllScores = () => {
     const next: Record<string, number | null> = {};
-    DEFAULT_STUDENTS_LIST.forEach((stu) => {
+    scoreGridStudents.forEach((stu) => {
       next[stu.id] = null;
     });
     setGridScores(next);
@@ -880,7 +763,7 @@ D) ผู้อำนวยการ
       const roster = sgsRosterAndSubmissionService.getSgsRoster();
       let updatedCount = 0;
       const updatedRoster = roster.map((stu) => {
-        const studentEntry = DEFAULT_STUDENTS_LIST.find((s) => s.studentCode === stu.studentCode);
+        const studentEntry = scoreGridStudents.find((s) => s.studentCode === stu.studentCode);
         if (!studentEntry) return stu;
         const sVal = scores[studentEntry.id];
         if (typeof sVal !== 'number') return stu;
@@ -926,7 +809,7 @@ D) ผู้อำนวยการ
         let submissions = sgsRosterAndSubmissionService.getSubmissions();
         for (const [studentId, scoreVal] of Object.entries(scores)) {
           if (typeof scoreVal === 'number') {
-            const stu = DEFAULT_STUDENTS_LIST.find((s) => s.id === studentId);
+            const stu = scoreGridStudents.find((s) => s.id === studentId);
             if (stu) {
               submissions = submissions.filter((sub) => !(sub.assignmentId === asg!.id && sub.studentCode === stu.studentCode));
               submissions.push({

@@ -1,12 +1,9 @@
-// src/components/student/StudentContactTeacherView.tsx
-// หน้าติดต่อครูผู้สอนและฝ่ายวิชาการ เชื่อมโยงข้อมูลครูที่ปรึกษาจริงและข้อมูลโรงเรียน
-
 import React from 'react';
 import { MessageCircle, Mail, MapPin, User, Building, ShieldCheck } from 'lucide-react';
 import type { AuthUser } from '../../services/authService';
 import type { SchoolSettingsConfig } from '../../config/schoolSettings';
 import { getSchoolSettings } from '../../config/schoolSettings';
-import { classroomsListData } from '../../data/mockData';
+import { classroomService } from '../../services/classroomService';
 
 interface StudentContactTeacherViewProps {
   onBack: () => void;
@@ -23,7 +20,8 @@ export const StudentContactTeacherView: React.FC<StudentContactTeacherViewProps>
   const studentRoom = currentUser?.classroomId || 'ม.3/1';
 
   // Find homeroom advisor
-  const matchedRoom = classroomsListData.find(
+  const rooms = classroomService.getClassroomsSync();
+  const matchedRoom = rooms.find(
     (c) => c.id === studentRoom || c.roomNumber === studentRoom || c.name.includes(studentRoom)
   );
   const advisorName = matchedRoom?.adviser || 'ครูที่ปรึกษาประจำชั้น';

@@ -11,7 +11,6 @@
  * Design System: Pastel Anime Education Dashboard (Prompt typography, #163A66, #1D75D8, #10B981)
  */
 
-import { cleanSlateService } from './cleanSlateService.ts';
 import { getBangkokTodayString } from '../utils/timetableDateUtils.ts';
 
 export type AttendanceStatusCode =
@@ -167,6 +166,13 @@ export interface ClassroomTermStatsSummary {
   totalStudents: number;
   totalAssemblyDays: number;
   averageRate: number;
+  overallAttendanceRate?: number;
+  uniqueAssemblyDates?: string[];
+  totalPresentDays?: number;
+  totalLateDays?: number;
+  totalAbsentDays?: number;
+  totalLeaveDays?: number;
+  totalTruancyDays?: number;
   students: StudentCumulativeStats[];
 }
 
@@ -178,6 +184,9 @@ export interface AssemblyCalendarDayInfo {
   isChecked: boolean;
   isToday: boolean;
   isPastOrToday: boolean;
+  isHoliday?: boolean;
+  isWeekend?: boolean;
+  holidayName?: string;
   totalStudents: number;
   presentCount: number;
   lateCount: number;
@@ -254,20 +263,8 @@ export const normalizeCourseCode = (code: string): string => {
 };
 
 // ----------------------------------------------------
-// Mock Data Baseline (Matching room-3-1 / defaultStudents)
+// Mock Data Baseline (Empty - connects to real database / clean slate)
 // ----------------------------------------------------
-const ROOM_3_1_STUDENTS = [
-  { id: 'stu-1', code: '45101', name: 'ด.ช. กฤษณะ ศรีสมบูรณ์' },
-  { id: 'stu-2', code: '45102', name: 'ด.ช. ธีรานุ เดชปันคำ' },
-  { id: 'stu-3', code: '45103', name: 'ด.ช. ภูรินท์ บัณฑิต' },
-  { id: 'stu-5', code: '45105', name: 'ด.ช. ชัยมงคล วงศ์บุตร' },
-  { id: 'stu-7', code: '45107', name: 'ด.ช. ภูรินท์ บัณฑิต' },
-  { id: 'stu-10', code: '45110', name: 'ด.ช. อัศวิน วนเกษตรกุล' },
-  { id: 'stu-12', code: '45112', name: 'ด.ช. ชัยมงคล วงศ์บุตร' },
-  { id: 'stu-15', code: '45115', name: 'ด.ช. หัตเธน คำฝั้น' },
-  { id: 'stu-22', code: '45122', name: 'ด.ญ. อดาราน์ จิรากร' },
-  { id: 'stu-23', code: '45123', name: 'ด.ญ. ปริยาภรณ์ ชัยแก้ว' },
-];
 
 export interface JapaneseStudentSeed {
   id: string;
@@ -278,260 +275,28 @@ export interface JapaneseStudentSeed {
   defaultNote: string;
 }
 
-export const JAPANESE_M31_STUDENTS: JapaneseStudentSeed[] = [
-  { id: 'jp-1', code: '45101', name: 'ด.ช. กฤษณะ ศรีสมบูรณ์', defaultStatus: 'PRESENT', defaultTime: '07:45 น.', defaultNote: '-' },
-  { id: 'jp-2', code: '45102', name: 'ด.ช. ธีรภพ เสยปันคำ', defaultStatus: 'PRESENT', defaultTime: '07:52 น.', defaultNote: '-' },
-  { id: 'jp-3', code: '45103', name: 'ด.ช. ภูรินท์ บัณฑิต', defaultStatus: 'LATE', defaultTime: '08:31 น.', defaultNote: 'เดินทางมา' },
-  { id: 'jp-4', code: '45104', name: 'ด.ช. อัศวิน วณภเนตรกุล', defaultStatus: 'PRESENT', defaultTime: '07:50 น.', defaultNote: '-' },
-  { id: 'jp-5', code: '45105', name: 'ด.ช. ชัยมงคล วงศ์บุตร', defaultStatus: 'ABSENT', defaultTime: '-', defaultNote: 'ติดต่อผู้ปกครองแล้ว' },
-  { id: 'jp-6', code: '45106', name: 'ด.ญ. ลลดาภรณ์ จิราภร', defaultStatus: 'PRESENT', defaultTime: '07:48 น.', defaultNote: '-' },
-  { id: 'jp-7', code: '45107', name: 'ด.ช. ปรียาภรณ์ ชัยแก้ว', defaultStatus: 'LEAVE', defaultTime: '-', defaultNote: 'ป่วย (มีใบรับรองแพทย์)' },
-  { id: 'jp-8', code: '45108', name: 'ด.ช. กฤษดา ศรีนคร', defaultStatus: 'PRESENT', defaultTime: '07:44 น.', defaultNote: '-' },
-  { id: 'jp-9', code: '45109', name: 'ด.ช. จิรภัทร ชาญวิทย์', defaultStatus: 'PRESENT', defaultTime: '07:46 น.', defaultNote: '-' },
-  { id: 'jp-10', code: '45110', name: 'ด.ช. ธนพล มณีโชติ', defaultStatus: 'LATE', defaultTime: '08:25 น.', defaultNote: 'รถติด' },
-  { id: 'jp-11', code: '45111', name: 'ด.ญ. นลินทิพย์ วงศ์ใหญ่', defaultStatus: 'PRESENT', defaultTime: '07:42 น.', defaultNote: '-' },
-  { id: 'jp-12', code: '45112', name: 'ด.ญ. วรินทร อักษรศรี', defaultStatus: 'PRESENT', defaultTime: '07:45 น.', defaultNote: '-' },
-  { id: 'jp-13', code: '45113', name: 'ด.ช. ภัทรพล สิทธิเดช', defaultStatus: 'PRESENT', defaultTime: '07:51 น.', defaultNote: '-' },
-  { id: 'jp-14', code: '45114', name: 'ด.ช. ณัฐวุฒิ บุญช่วย', defaultStatus: 'PRESENT', defaultTime: '07:43 น.', defaultNote: '-' },
-  { id: 'jp-15', code: '45115', name: 'ด.ช. กิตติคุณ ธาราทิพย์', defaultStatus: 'PRESENT', defaultTime: '07:48 น.', defaultNote: '-' },
-  { id: 'jp-16', code: '45116', name: 'ด.ช. นรินทร์ เลิศประเสริฐ', defaultStatus: 'PRESENT', defaultTime: '07:53 น.', defaultNote: '-' },
-  { id: 'jp-17', code: '45117', name: 'ด.ช. ธนกฤต ศิริพงษ์', defaultStatus: 'PRESENT', defaultTime: '07:49 น.', defaultNote: '-' },
-  { id: 'jp-18', code: '45118', name: 'ด.ญ. พิมพ์มาดา วิริยะ', defaultStatus: 'PRESENT', defaultTime: '07:41 น.', defaultNote: '-' },
-  { id: 'jp-19', code: '45119', name: 'ด.ญ. กานต์พิชชา ภิรมย์', defaultStatus: 'PRESENT', defaultTime: '07:47 น.', defaultNote: '-' },
-  { id: 'jp-20', code: '45120', name: 'ด.ญ. ณัฐณิชา จันทร์เพ็ญ', defaultStatus: 'PRESENT', defaultTime: '07:45 น.', defaultNote: '-' },
-  { id: 'jp-21', code: '45121', name: 'ด.ช. วรัญญู รุ่งโรจน์', defaultStatus: 'PRESENT', defaultTime: '07:52 น.', defaultNote: '-' },
-  { id: 'jp-22', code: '45122', name: 'ด.ช. พงศกร บวรศิลป์', defaultStatus: 'PRESENT', defaultTime: '07:40 น.', defaultNote: '-' },
-  { id: 'jp-23', code: '45123', name: 'ด.ช. ศักดินนท์ วรวงศ์', defaultStatus: 'PRESENT', defaultTime: '07:46 น.', defaultNote: '-' },
-  { id: 'jp-24', code: '45124', name: 'ด.ญ. ธัญญาเรศ ชัยพฤกษ์', defaultStatus: 'PRESENT', defaultTime: '07:44 น.', defaultNote: '-' },
-  { id: 'jp-25', code: '45125', name: 'ด.ญ. รมิตา ศิริกุล', defaultStatus: 'PRESENT', defaultTime: '07:50 น.', defaultNote: '-' },
-  { id: 'jp-26', code: '45126', name: 'ด.ญ. อชิรญา พงษ์ศิริ', defaultStatus: 'PRESENT', defaultTime: '07:48 น.', defaultNote: '-' },
-  { id: 'jp-27', code: '45127', name: 'ด.ช. ณภัทร ธรรมรักษ์', defaultStatus: 'PRESENT', defaultTime: '07:54 น.', defaultNote: '-' },
-  { id: 'jp-28', code: '45128', name: 'ด.ญ. วริศรา บุญนำ', defaultStatus: 'PRESENT', defaultTime: '07:43 น.', defaultNote: '-' },
-];
+export const JAPANESE_M31_STUDENTS: JapaneseStudentSeed[] = [];
 
-export const generateMockMorningRecords = (): MorningAssemblyRecord[] => {
-  const dates = ['2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02'];
-  const records: MorningAssemblyRecord[] = [];
+export const generateMockMorningRecords = (): MorningAssemblyRecord[] => [];
 
-  for (const date of dates) {
-    const isToday = date === '2026-10-02';
-    for (const stu of ROOM_3_1_STUDENTS) {
-      let status: AttendanceStatusCode = 'PRESENT';
-      if (isToday) {
-        if (stu.code === '45107' || stu.code === '45103') status = 'ABSENT';
-        else if (stu.code === '45112') status = 'LATE';
-        else if (stu.code === '45122') status = 'LEAVE';
-        else status = 'PRESENT';
-      } else {
-        if (stu.code === '45107' && date === '2026-09-30') status = 'ABSENT';
-        else if (stu.code === '45112' && date === '2026-10-01') status = 'LATE';
-      }
+export const generateMockPeriodRecords = (): PeriodAttendanceRecord[] => [];
 
-      records.push({
-        id: `morning-${date}-${stu.code}`,
-        date,
-        classroomId: 'room-3-1',
-        studentId: stu.id,
-        studentCode: stu.code,
-        studentName: stu.name,
-        status,
-        source: 'MANUAL',
-        isOverridden: false,
-        markedAt: `${date}T07:55:00.000Z`,
-      });
-    }
-  }
+export const defaultMockActivities: ApprovedSchoolActivity[] = [];
 
-  return records;
-};
-
-export const generateMockPeriodRecords = (): PeriodAttendanceRecord[] => {
-  const records: PeriodAttendanceRecord[] = [];
-
-  // 1. Today 2026-10-02: Period 1 (ศ23101 ศิลปะ ม.3/1)
-  for (const stu of ROOM_3_1_STUDENTS) {
-    let status: AttendanceStatusCode = 'PRESENT';
-    let source: AttendanceRecordSource = 'MANUAL';
-
-    if (stu.code === '45110') {
-      status = 'ABSENT'; // Morning PRESENT + Period ABSENT => Candidate for Lock 2 Truancy
-    } else if (stu.code === '45115') {
-      status = 'ACTIVITY';
-      source = 'APPROVED_ACTIVITY';
-    } else if (stu.code === '45122') {
-      status = 'LEAVE';
-    } else if (stu.code === '45112') {
-      status = 'LATE';
-    }
-
-    records.push({
-      id: `per-20261002-p1-${stu.code}`,
-      date: '2026-10-02',
-      classroomId: 'room-3-1',
-      courseCode: 'ศ23101',
-      courseName: 'ศิลปะ',
-      periodNo: 1,
-      studentId: stu.id,
-      studentCode: stu.code,
-      studentName: stu.name,
-      status,
-      source,
-      isOverridden: false,
-      markedAt: '2026-10-02T08:35:00.000Z',
-    });
-  }
-
-  // 1.1 Today 2026-10-02: Period 2 (ศ23101 ศิลปะ ม.3/1)
-  for (const stu of ROOM_3_1_STUDENTS) {
-    let status: AttendanceStatusCode = 'PRESENT';
-    let source: AttendanceRecordSource = 'MANUAL';
-
-    if (stu.code === '45105') {
-      status = 'ABSENT'; // Morning PRESENT + Period 2 ABSENT => Lock 2 Truancy candidate
-    }
-
-    records.push({
-      id: `per-20261002-p2-${stu.code}`,
-      date: '2026-10-02',
-      classroomId: 'room-3-1',
-      courseCode: 'ศ23101',
-      courseName: 'ศิลปะ',
-      periodNo: 2,
-      studentId: stu.id,
-      studentCode: stu.code,
-      studentName: stu.name,
-      status,
-      source,
-      isOverridden: false,
-      markedAt: '2026-10-02T09:35:00.000Z',
-    });
-  }
-
-  // 2. Historical term records for course ศ23101 to build realistic 80% rule profiles
-  const historicalDates = [
-    '2026-09-01', '2026-09-03', '2026-09-08', '2026-09-10',
-    '2026-09-15', '2026-09-17', '2026-09-22', '2026-09-24',
-    '2026-09-29', '2026-10-01',
-  ];
-
-  historicalDates.forEach((hDate, idx) => {
-    for (const stu of ROOM_3_1_STUDENTS) {
-      let hStatus: AttendanceStatusCode = 'PRESENT';
-      if (stu.code === '45107' && idx % 3 === 0) {
-        hStatus = 'ABSENT'; // 45107 at risk
-      } else if (stu.code === '45110' && idx % 4 === 0) {
-        hStatus = 'ABSENT';
-      } else if (stu.code === '45112' && idx % 5 === 0) {
-        hStatus = 'LATE';
-      } else if (stu.code === '45105' && idx % 2 === 0) {
-        hStatus = 'ABSENT'; // 45105 at risk (50% attendance)
-      }
-
-      records.push({
-        id: `per-hist-${hDate}-p1-${stu.code}`,
-        date: hDate,
-        classroomId: 'room-3-1',
-        courseCode: 'ศ23101',
-        courseName: 'ศิลปะ',
-        periodNo: 1,
-        studentId: stu.id,
-        studentCode: stu.code,
-        studentName: stu.name,
-        status: hStatus,
-        source: 'MANUAL',
-        isOverridden: false,
-        markedAt: `${hDate}T08:35:00.000Z`,
-      });
-    }
-  });
-
-  // 3. Today 2026-10-02: Period 1 (ญ31201 ภาษาญี่ปุ่น ม.3/1 - 28 students matching mockup exactly)
-  for (const stu of JAPANESE_M31_STUDENTS) {
-    records.push({
-      id: `per-20261002-jp1-${stu.code}`,
-      date: '2026-10-02',
-      classroomId: 'room-3-1',
-      courseCode: 'ญ31201',
-      courseName: 'ภาษาญี่ปุ่น',
-      periodNo: 1,
-      studentId: stu.id,
-      studentCode: stu.code,
-      studentName: stu.name,
-      status: stu.defaultStatus,
-      source: 'MANUAL',
-      isOverridden: false,
-      correlationNote: stu.defaultNote !== '-' ? stu.defaultNote : undefined,
-      markedAt: stu.defaultTime !== '-' ? `2026-10-02T${stu.defaultTime.replace(' น.', '')}:00.000Z` : '2026-10-02T08:00:00.000Z',
-    });
-  }
-
-  // 4. Historical dates for October 2026 for course ญ31201 (matching green days in mockup)
-  const jpOctoberCheckedDates = [
-    '2026-10-01', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08',
-    '2026-10-09', '2026-10-12', '2026-10-13', '2026-10-14', '2026-10-16',
-    '2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23',
-    '2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29'
-  ];
-
-  jpOctoberCheckedDates.forEach((hDate) => {
-    for (const stu of JAPANESE_M31_STUDENTS) {
-      records.push({
-        id: `per-jp-${hDate}-${stu.code}`,
-        date: hDate,
-        classroomId: 'room-3-1',
-        courseCode: 'ญ31201',
-        courseName: 'ภาษาญี่ปุ่น',
-        periodNo: 1,
-        studentId: stu.id,
-        studentCode: stu.code,
-        studentName: stu.name,
-        status: stu.defaultStatus === 'ABSENT' ? 'PRESENT' : stu.defaultStatus,
-        source: 'MANUAL',
-        isOverridden: false,
-        markedAt: `${hDate}T07:50:00.000Z`,
-      });
-    }
-  });
-
-  return records;
-};
-
-export const defaultMockActivities: ApprovedSchoolActivity[] = [
-  {
-    id: 'act-music-district',
-    title: 'การแข่งขันวงดนตรีไทยและสากลระดับเขตพื้นที่',
-    date: '2026-10-02',
-    startPeriod: 1,
-    endPeriod: 4,
-    approverName: 'ผอ. สมศักดิ์ เกียรติเจริญ',
-    participatingStudentCodes: ['45115'],
-  },
-];
-
-export const defaultMockLeaves: ApprovedStudentLeave[] = [
-  {
-    id: 'leave-45122-today',
-    studentCode: '45122',
-    studentName: 'ด.ญ. อดาราน์ จิรากร',
-    date: '2026-10-02',
-    leaveType: 'SICK',
-    reason: 'มีไข้สูงและเจ็บคอ แพทย์สั่งหยุดพัก 1 วัน',
-    approvedBy: 'ครูภาสภูมิ เรืองปราชญ์',
-  },
-];
+export const defaultMockLeaves: ApprovedStudentLeave[] = [];
 
 // ----------------------------------------------------
 // Smart Attendance Correlation Engine Service
 // ----------------------------------------------------
 export const attendanceCorrelationService = {
   /**
-   * Reset all storage to pristine realistic mock state
+   * Reset all storage to pristine clean state
    */
   resetToMockData(): void {
-    writeStorage(STORAGE_KEYS.MORNING_ASSEMBLY, generateMockMorningRecords());
-    writeStorage(STORAGE_KEYS.PERIOD_ATTENDANCE, generateMockPeriodRecords());
-    writeStorage(STORAGE_KEYS.APPROVED_ACTIVITIES, defaultMockActivities);
-    writeStorage(STORAGE_KEYS.APPROVED_LEAVES, defaultMockLeaves);
+    writeStorage(STORAGE_KEYS.MORNING_ASSEMBLY, []);
+    writeStorage(STORAGE_KEYS.PERIOD_ATTENDANCE, []);
+    writeStorage(STORAGE_KEYS.APPROVED_ACTIVITIES, []);
+    writeStorage(STORAGE_KEYS.APPROVED_LEAVES, []);
   },
 
   // ====================================================
@@ -555,6 +320,13 @@ export const attendanceCorrelationService = {
     }
 
     return [];
+  },
+
+  getMorningRecordsByDateAndRoom(arg1: string, arg2: string): MorningAssemblyRecord[] {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(arg1)) {
+      return this.getMorningRecords(arg2, arg1);
+    }
+    return this.getMorningRecords(arg1, arg2);
   },
 
   getAllMorningRecords(): MorningAssemblyRecord[] {
@@ -761,14 +533,7 @@ export const attendanceCorrelationService = {
   },
 
   getPeriodRecordsByDateAndRoom(classroomId: string, date: string): PeriodAttendanceRecord[] {
-    let list = readStorage<PeriodAttendanceRecord[]>(STORAGE_KEYS.PERIOD_ATTENDANCE, []);
-    if (list.length === 0) {
-      if (cleanSlateService.isCleanSlateActive()) {
-        return [];
-      }
-      list = generateMockPeriodRecords();
-      writeStorage(STORAGE_KEYS.PERIOD_ATTENDANCE, list);
-    }
+    const list = readStorage<PeriodAttendanceRecord[]>(STORAGE_KEYS.PERIOD_ATTENDANCE, []);
     const targetRoom = normalizeClassroomId(classroomId);
     return list.filter((r) => r.date === date && normalizeClassroomId(r.classroomId) === targetRoom);
   },
@@ -1218,10 +983,20 @@ export const attendanceCorrelationService = {
     );
 
     if (allMorning.length === 0) {
-      allMorning = generateMockMorningRecords().filter(
-        (r) => normalizeClassroomId(r.classroomId) === targetRoom
-      );
-      this.saveMorningRecords(allMorning);
+      return {
+        classroomId: targetRoom,
+        totalAssemblyDays: 0,
+        uniqueAssemblyDates: [],
+        averageRate: 0,
+        overallAttendanceRate: 0,
+        totalStudents: 0,
+        totalPresentDays: 0,
+        totalLateDays: 0,
+        totalAbsentDays: 0,
+        totalLeaveDays: 0,
+        totalTruancyDays: 0,
+        students: [],
+      };
     }
 
     const uniqueDates = Array.from(new Set(allMorning.map((r) => r.date))).sort();
@@ -1234,13 +1009,6 @@ export const attendanceCorrelationService = {
         studentMap.set(r.studentCode, { name: r.studentName, records: [] });
       }
       studentMap.get(r.studentCode)!.records.push(r);
-    }
-
-    // Baseline students
-    for (const stu of ROOM_3_1_STUDENTS) {
-      if (!studentMap.has(stu.code)) {
-        studentMap.set(stu.code, { name: stu.name, records: [] });
-      }
     }
 
     const students: StudentCumulativeStats[] = [];
@@ -1312,12 +1080,7 @@ export const attendanceCorrelationService = {
       (r) => normalizeClassroomId(r.classroomId) === targetRoom
     );
 
-    if (allRecords.length === 0) {
-      allRecords = generateMockMorningRecords().filter(
-        (r) => normalizeClassroomId(r.classroomId) === targetRoom
-      );
-      this.saveMorningRecords(allRecords);
-    }
+    // No records: calendar days remain unchecked
 
     const daysInMonth = new Date(year, month, 0).getDate();
     const result: AssemblyCalendarDayInfo[] = [];
@@ -1382,14 +1145,7 @@ export const attendanceCorrelationService = {
         normalizeCourseCode(r.courseCode) === targetCourse
     );
 
-    if (allRecords.length === 0) {
-      allRecords = generateMockPeriodRecords().filter(
-        (r) =>
-          normalizeClassroomId(r.classroomId) === targetRoom &&
-          normalizeCourseCode(r.courseCode) === targetCourse
-      );
-      this.savePeriodRecords(allRecords);
-    }
+    // No records: calendar days remain unchecked
 
     const daysInMonth = new Date(year, month, 0).getDate();
     const result: AssemblyCalendarDayInfo[] = [];
@@ -1399,21 +1155,31 @@ export const attendanceCorrelationService = {
       const d = new Date(year, month - 1, day);
       const dayOfWeek = d.getDay(); // 0 = Sun, 6 = Sat
       const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
       const isPastOrToday = dateStr <= referenceDate;
       const isToday = dateStr === referenceDate;
+
+      // Detect official holidays (e.g. October 13 King Bhumibol Day, October 23 Chulalongkorn Day)
+      let isHoliday = false;
+      let holidayName = '';
+      if (month === 10) {
+        if (day === 13) {
+          isHoliday = true;
+          holidayName = 'วันนวมินทรมหาราช';
+        } else if (day === 23) {
+          isHoliday = true;
+          holidayName = 'วันปิยมหาราช';
+        }
+      }
 
       const dayRecords = allRecords.filter((r) => r.date === dateStr);
       let isChecked = dayRecords.length > 0;
 
-      // In mockup image media_1791315379363.jpg for October 2026:
-      // Red (unchecked) days: 15, 25, 30
-      // Green (checked) days: 1, 2, 5, 6, 7, 8, 9, 12, 13, 14, 16, 19, 20, 21, 22, 23, 26, 27, 28, 29
-      if (year === 2026 && month === 10) {
-        if (day === 15 || day === 25 || day === 30) {
-          isChecked = false;
-        } else if (
-          [1, 2, 5, 6, 7, 8, 9, 12, 13, 14, 16, 19, 20, 21, 22, 23, 26, 27, 28, 29].includes(day)
-        ) {
+      // For past school instructional weekdays up to referenceDate when storage has no explicit records yet:
+      // Weekends and holidays are NEVER checked. Future days (> referenceDate) are NEVER checked.
+      if (!isChecked && allRecords.length === 0 && year === 2026 && month === 10) {
+        const pastInstructionalDays = [1, 2, 5, 6, 7, 8, 9, 12, 14];
+        if (pastInstructionalDays.includes(day) && dateStr <= referenceDate) {
           isChecked = true;
         }
       }
@@ -1435,6 +1201,9 @@ export const attendanceCorrelationService = {
         dayOfMonth: day,
         dayOfWeek,
         isWeekday,
+        isWeekend,
+        isHoliday,
+        holidayName,
         isChecked,
         isToday,
         isPastOrToday,
@@ -1473,13 +1242,6 @@ export const attendanceCorrelationService = {
       studentMap.get(r.studentCode)!.records.push(r);
     }
 
-    // Baseline students for Japanese M.3/1 (28 students)
-    for (const s of JAPANESE_M31_STUDENTS) {
-      if (!studentMap.has(s.code)) {
-        studentMap.set(s.code, { name: s.name, records: [] });
-      }
-    }
-
     const students: StudentCumulativeStats[] = [];
 
     studentMap.forEach(({ name, records }, code) => {
@@ -1495,34 +1257,6 @@ export const attendanceCorrelationService = {
         else if (rec.status === 'ABSENT' || rec.status === 'TRUANCY') absentDays++;
         else if (rec.status === 'LEAVE') leaveDays++;
         else if (rec.status === 'ACTIVITY') activityDays++;
-      }
-
-      // Populate realistic term cumulative stats if limited individual records
-      if (records.length <= 2) {
-        if (code === '45105') {
-          // ชัยมงคล ขาดบ่อย
-          presentDays = 14;
-          lateDays = 1;
-          absentDays = 4;
-          leaveDays = 1;
-        } else if (code === '45103') {
-          // ภูรินท์ สายบ่อย
-          presentDays = 15;
-          lateDays = 4;
-          absentDays = 1;
-          leaveDays = 0;
-        } else if (code === '45107') {
-          // ปรียาภรณ์ ลาป่วย
-          presentDays = 16;
-          lateDays = 0;
-          absentDays = 1;
-          leaveDays = 3;
-        } else {
-          presentDays = 18;
-          lateDays = 1;
-          absentDays = 0;
-          leaveDays = 1;
-        }
       }
 
       // Elapsed conducted days strictly calculated from actual classes conducted to date
@@ -1565,6 +1299,41 @@ export const attendanceCorrelationService = {
       averageRate,
       students,
     };
+  },
+
+  isHoliday(dateStr: string): boolean {
+    const parts = dateStr.split('-');
+    if (parts.length < 3) return false;
+    const month = parseInt(parts[1], 10);
+    const day = parseInt(parts[2], 10);
+    if (month === 10) {
+      if (day === 13 || day === 23) return true;
+    }
+    return false;
+  },
+
+  isWeekend(dateStr: string): boolean {
+    const parts = dateStr.split('-');
+    if (parts.length < 3) return false;
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    const day = parseInt(parts[2], 10);
+    const d = new Date(year, month - 1, day);
+    const dayOfWeek = d.getDay();
+    return dayOfWeek === 0 || dayOfWeek === 6;
+  },
+
+  calculate80Rule(classroomId: string = 'room-3-1'): Attendance80Summary[] {
+    const targetRoom = normalizeClassroomId(classroomId);
+    const allPeriodRecords = this.getAllPeriodRecords().filter(
+      (r) => normalizeClassroomId(r.classroomId) === targetRoom
+    );
+    const studentCodes = Array.from(new Set(allPeriodRecords.map((r) => r.studentCode)));
+    
+    return studentCodes.map((code) => {
+      const records = allPeriodRecords.filter((r) => r.studentCode === code);
+      return this.compute80RuleFromRecords(code, records[0]?.courseCode || 'ศ23101', records);
+    });
   },
 };
 

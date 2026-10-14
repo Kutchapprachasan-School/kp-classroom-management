@@ -113,10 +113,18 @@ export const TeacherCalendarActivityWidget: React.FC<
     const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
     const daysInPrevMonth = new Date(currentYear, currentMonth - 1, 0).getDate();
 
+    const nowBangkok = getBangkokNow();
+    const todayYear = nowBangkok.getFullYear();
+    const todayMonth = nowBangkok.getMonth() + 1;
+    const todayDate = nowBangkok.getDate();
+
     const cells: {
       day: number;
       currentMonth: boolean;
       isToday: boolean;
+      isHoliday: boolean;
+      isWeekend: boolean;
+      holidayTitle?: string;
       eventCount: number;
       dotColor?: 'blue' | 'green' | 'red' | 'purple';
       events: CalendarEventItem[];
@@ -124,10 +132,15 @@ export const TeacherCalendarActivityWidget: React.FC<
 
     // เติมวันของเดือนก่อนหน้า
     for (let i = firstDayIndex - 1; i >= 0; i--) {
+      const prevD = daysInPrevMonth - i;
+      const prevDate = new Date(currentYear, currentMonth - 2, prevD);
+      const isWeekend = prevDate.getDay() === 0 || prevDate.getDay() === 6;
       cells.push({
-        day: daysInPrevMonth - i,
+        day: prevD,
         currentMonth: false,
         isToday: false,
+        isHoliday: false,
+        isWeekend,
         eventCount: 0,
         events: [],
       });
@@ -135,7 +148,11 @@ export const TeacherCalendarActivityWidget: React.FC<
 
     // เติมวันของเดือนปัจจุบัน
     for (let d = 1; d <= daysInMonth; d++) {
-      const isToday = currentYear === 2026 && currentMonth === 10 && d === 2;
+      const isToday = currentYear === todayYear && currentMonth === todayMonth && d === todayDate;
+      const dayDate = new Date(currentYear, currentMonth - 1, d);
+      const dayOfWeek = dayDate.getDay();
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
       const dayEvents = visibleEvents.filter((ev) => {
         const evMonth = ev.month || 10;
         const evYear = ev.year > 2500 ? ev.year - 543 : ev.year;
@@ -145,8 +162,23 @@ export const TeacherCalendarActivityWidget: React.FC<
         return matchesSingle || isRange;
       });
 
+      // ตรวจสอบวันหยุด (Holidays)
+      const holidayEvent = dayEvents.find(
+        (ev) =>
+          (ev as any).category === 'HOLIDAY' ||
+          ev.title?.includes('วันหยุด') ||
+          ev.title?.includes('วันนวมินทร') ||
+          ev.title?.includes('วันปิยมหาราช') ||
+          ev.location?.includes('วันหยุด')
+      );
+      const isFixedHoliday = currentMonth === 10 && (d === 13 || d === 23);
+      const isHoliday = !!holidayEvent || isFixedHoliday;
+      const holidayTitle = holidayEvent?.title || (d === 13 ? 'วันนวมินทรมหาราช' : d === 23 ? 'วันปิยมหาราช' : undefined);
+
       let dotColor: 'blue' | 'green' | 'red' | 'purple' | undefined = undefined;
-      if (dayEvents.length > 0) {
+      if (isHoliday) {
+        dotColor = 'red';
+      } else if (dayEvents.length > 0) {
         const firstCategory = dayEvents[0].category;
         if (firstCategory === 'EXAM' || firstCategory === 'SUBMISSION') dotColor = 'red';
         else if (firstCategory === 'MEETING') dotColor = 'blue';
@@ -158,6 +190,9 @@ export const TeacherCalendarActivityWidget: React.FC<
         day: d,
         currentMonth: true,
         isToday,
+        isHoliday,
+        isWeekend,
+        holidayTitle,
         eventCount: dayEvents.length,
         dotColor,
         events: dayEvents,
@@ -168,10 +203,14 @@ export const TeacherCalendarActivityWidget: React.FC<
     const remaining = 7 - (cells.length % 7);
     if (remaining < 7) {
       for (let nextD = 1; nextD <= remaining; nextD++) {
+        const nextDate = new Date(currentYear, currentMonth, nextD);
+        const isWeekend = nextDate.getDay() === 0 || nextDate.getDay() === 6;
         cells.push({
           day: nextD,
           currentMonth: false,
           isToday: false,
+          isHoliday: false,
+          isWeekend,
           eventCount: 0,
           events: [],
         });
@@ -181,9 +220,10 @@ export const TeacherCalendarActivityWidget: React.FC<
     return cells;
   }, [currentYear, currentMonth, visibleEvents]);
 
-  // สรุปจำนวนกิจกรรมตามวันที่เลือก (ค่าเริ่มต้น: วันนี้ 2 ต.ค. 2569)
+  // สรุปจำนวนกิจกรรมตามวันที่เลือก (ค่าเริ่มต้น: วันปัจจุบันตามเวลาไทย)
   const selectedDayEvents = useMemo(() => {
-    const targetDay = selectedDay || 2;
+    const nowBangkok = getBangkokNow();
+    const targetDay = selectedDay || nowBangkok.getDate();
     return visibleEvents.filter((ev) => {
       const evMonth = ev.month || 10;
       const evYear = ev.year > 2500 ? ev.year - 543 : ev.year;
@@ -289,8 +329,8 @@ export const TeacherCalendarActivityWidget: React.FC<
             {WEEKDAYS.map((wd, i) => (
               <span
                 key={wd}
-                className={`text-[10px] sm:text-[11px] font-bold py-0.5 ${
-                  i === 0 ? 'text-rose-500' : i === 6 ? 'text-purple-500' : 'text-slate-400'
+                className={`text-[10px] sm:text-[11px] font-extrabold py-0.5 rounded-sm ${
+                  i === 0 || i === 6 ? 'text-rose-500 bg-rose-50/70 font-black' : 'text-slate-400'
                 }`}
               >
                 {wd}
@@ -303,6 +343,8 @@ export const TeacherCalendarActivityWidget: React.FC<
             {calendarCells.map((cell, idx) => {
               const isSelected = cell.currentMonth && cell.day === selectedDay;
               const hasEvents = cell.eventCount > 0;
+              const colIndex = idx % 7;
+              const isWeekendCol = colIndex === 0 || colIndex === 6;
 
               return (
                 <button
@@ -317,22 +359,30 @@ export const TeacherCalendarActivityWidget: React.FC<
                       ? 'bg-blue-600 text-white font-extrabold shadow-xs cursor-pointer'
                       : cell.isToday
                       ? 'border-2 border-blue-500 text-blue-700 font-extrabold cursor-pointer hover:bg-blue-50'
+                      : cell.isHoliday
+                      ? 'bg-rose-100 text-rose-700 font-extrabold border border-rose-200 hover:bg-rose-200 cursor-pointer'
+                      : isWeekendCol
+                      ? 'bg-rose-50/70 text-rose-600 font-medium hover:bg-rose-100/70 cursor-pointer'
                       : hasEvents
                       ? 'text-slate-900 font-bold hover:bg-blue-50 cursor-pointer'
                       : 'text-slate-700 hover:bg-slate-100 cursor-pointer'
                   }`}
                   title={
-                    cell.currentMonth && hasEvents
+                    cell.currentMonth && cell.isHoliday
+                      ? `วันหยุด: ${cell.holidayTitle || 'วันหยุดราชการ'}`
+                      : cell.currentMonth && hasEvents
                       ? `วันที่ ${cell.day}: มี ${cell.eventCount} กิจกรรม (คลิกเพื่อดูรายละเอียด)`
+                      : cell.currentMonth && isWeekendCol
+                      ? `วันที่ ${cell.day}: วันหยุดสุดสัปดาห์ (เสาร์-อาทิตย์)`
                       : undefined
                   }
                 >
                   <span className="leading-none">{cell.day}</span>
-                  {/* Indicator Dot สำหรับวันที่มีกิจกรรม */}
-                  {hasEvents && !isSelected && (
+                  {/* Indicator Dot สำหรับวันที่มีกิจกรรม หรือวันหยุด */}
+                  {(hasEvents || cell.isHoliday) && !isSelected && (
                     <span
                       className={`absolute bottom-0.5 w-1.5 h-1.5 rounded-full ${
-                        cell.dotColor === 'red'
+                        cell.isHoliday || cell.dotColor === 'red'
                           ? 'bg-rose-500'
                           : cell.dotColor === 'green'
                           ? 'bg-emerald-500'
@@ -353,7 +403,9 @@ export const TeacherCalendarActivityWidget: React.FC<
           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
             <Clock className="w-3.5 h-3.5 text-blue-600" />
             <span>
-              {selectedDay === 2 && currentMonth === 10 && currentYear === 2026
+              {selectedDay === getBangkokNow().getDate() &&
+              currentMonth === getBangkokNow().getMonth() + 1 &&
+              currentYear === getBangkokNow().getFullYear()
                 ? 'วันนี้'
                 : `วันที่ ${selectedDay} ${THAI_MONTHS_NAMES[currentMonth - 1]}`}
             </span>

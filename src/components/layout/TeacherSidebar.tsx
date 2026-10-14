@@ -36,6 +36,9 @@ import {
 } from '../../services/teacherBannerService';
 import { messagingService, CHAT_GROUPS_EVENT } from '../../services/messagingService';
 import { AdminTeacherBannerModal } from '../teacher/AdminTeacherBannerModal';
+import { attendanceCorrelationService } from '../../services/attendanceCorrelationService';
+import { sgsRosterAndSubmissionService } from '../../services/sgsRosterAndSubmissionService';
+import { getBangkokTodayString } from '../../utils/timetableDateUtils';
 
 export type TeacherViewKey =
   | 'school-login'
@@ -73,7 +76,8 @@ export type TeacherViewKey =
   | 'mobile-create-assignment'
   | 'mobile-grading-summary'
   | 'mobile-room-scores'
-  | 'mobile-school-info';
+  | 'mobile-school-info'
+  | 'mobile-home';
 
 interface TeacherSidebarProps {
   currentView: TeacherViewKey;
@@ -137,16 +141,43 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     return () => window.removeEventListener('kps-school-settings-updated', handleSettingsUpdate);
   }, []);
 
+  const checkAssemblyPending = () => {
+    const todayStr = getBangkokTodayString();
+    const isHoliday = attendanceCorrelationService.isHoliday(todayStr);
+    const isWeekend = attendanceCorrelationService.isWeekend(todayStr);
+    if (isHoliday || isWeekend) return false;
+    const records = attendanceCorrelationService.getMorningRecords('room-3-1', todayStr);
+    return records.length === 0;
+  };
+
+  const getPendingAssignmentsCount = () => {
+    return sgsRosterAndSubmissionService
+      .getSubmissions()
+      .filter((s) => s.status === 'SUBMITTED_PENDING').length;
+  };
+
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(() =>
     messagingService.getTotalUnreadCount()
   );
+  const [isAssemblyPending, setIsAssemblyPending] = useState<boolean>(() => checkAssemblyPending());
+  const [pendingAssignmentsCount, setPendingAssignmentsCount] = useState<number>(() =>
+    getPendingAssignmentsCount()
+  );
 
   useEffect(() => {
-    const handleChatSync = () => {
+    const handleSync = () => {
       setUnreadMessagesCount(messagingService.getTotalUnreadCount());
+      setIsAssemblyPending(checkAssemblyPending());
+      setPendingAssignmentsCount(getPendingAssignmentsCount());
     };
-    window.addEventListener(CHAT_GROUPS_EVENT, handleChatSync);
-    return () => window.removeEventListener(CHAT_GROUPS_EVENT, handleChatSync);
+    window.addEventListener(CHAT_GROUPS_EVENT, handleSync);
+    window.addEventListener('kp-copilot-updated', handleSync);
+    window.addEventListener('kps-attendance-synced', handleSync);
+    return () => {
+      window.removeEventListener(CHAT_GROUPS_EVENT, handleSync);
+      window.removeEventListener('kp-copilot-updated', handleSync);
+      window.removeEventListener('kps-attendance-synced', handleSync);
+    };
   }, []);
 
   // เมนูหลักของครูตามแบบ Pastel Anime Education Dashboard
@@ -165,8 +196,12 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       key: 'morning-assembly',
       label: 'เช็คแถวเช้า',
       icon: UserCheck,
-      badge: '3',
-      badgeStyle: 'bg-rose-500 text-white font-extrabold',
+      ...(isAssemblyPending
+        ? {
+            badge: '1',
+            badgeStyle: 'bg-rose-500 text-white font-extrabold',
+          }
+        : {}),
     },
     {
       key: 'classroom-attendance',
@@ -177,8 +212,12 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       key: 'assignments',
       label: 'ภาระงาน / สอน',
       icon: BookOpen,
-      badge: '3',
-      badgeStyle: 'bg-rose-500 text-white font-extrabold',
+      ...(pendingAssignmentsCount > 0
+        ? {
+            badge: String(pendingAssignmentsCount),
+            badgeStyle: 'bg-rose-500 text-white font-extrabold',
+          }
+        : {}),
     },
     {
       key: 'class-overview',

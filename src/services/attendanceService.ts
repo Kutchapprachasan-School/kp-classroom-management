@@ -1,5 +1,4 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase.ts';
-import { timetableScheduleData } from '../data/mockData.ts';
 import type { TimetableSlot } from '../types/viewModels.ts';
 import { RollCallBatchSchema, type RollCallBatchInput } from './types.ts';
 import {
@@ -45,12 +44,13 @@ const getLocalTimetable = (): TimetableSlot[] => {
   const raw = getStorage().getItem(STORAGE_KEY_TIMETABLE);
   if (raw) {
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
     } catch {
       // fallback
     }
   }
-  return timetableScheduleData;
+  return [];
 };
 
 const saveLocalTimetable = (items: TimetableSlot[]) => {

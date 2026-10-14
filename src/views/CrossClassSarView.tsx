@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   BarChart2,
   Calendar,
@@ -25,7 +25,9 @@ import {
 } from 'lucide-react';
 import type { SchoolUserRole } from '../config/schoolRoles';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
-import { cleanSlateService } from '../services/cleanSlateService';
+import { classroomService, type TeacherAccountItem } from '../services/classroomService';
+import { coursesCurriculumService, type CourseCurriculumRecord } from '../services/coursesCurriculumService';
+import type { ClassroomRosterItem } from '../types/viewModels';
 
 interface CrossClassSarViewProps {
   activeRole?: SchoolUserRole;
@@ -75,301 +77,6 @@ interface TeacherProfileOption {
   };
 }
 
-// 1. ข้อมูลรายวิชาของ ครูภาสภูมิ เรืองปราชญ์ (ตรงตาม Reference Image 2 เป๊ะๆ)
-const PASSAPOOM_COURSES: CourseItemData[] = [
-  {
-    id: 'c-1',
-    code: 'ท20221',
-    codeColor: 'pink',
-    name: 'ดนตรีปฏิบัติตามความถนัด 1',
-    level: 'ม.1',
-    rooms: 'ม.1/8',
-    studentCount: 27,
-    averageScore: 71.1,
-    percentage: 70.4,
-    barPercent: 70.4,
-    grades: {
-      g4: { count: 9, percent: 33 },
-      g3_5: { count: 5, percent: 19 },
-      g3: { count: 5, percent: 19 },
-      g2_5: { count: 5, percent: 19 },
-      g2: { count: 0, percent: 0 },
-      g1_5: { count: 0, percent: 0 },
-      g1: { count: 1, percent: 4 },
-      g0: { count: 2, percent: 7 },
-    },
-  },
-  {
-    id: 'c-2',
-    code: 'ท20223',
-    codeColor: 'orange',
-    name: 'ดนตรีปฏิบัติตามความถนัด 3',
-    level: 'ม.2',
-    rooms: 'ม.2/8',
-    studentCount: 35,
-    averageScore: 87.2,
-    percentage: 88.2,
-    barPercent: 88.6,
-    grades: {
-      g4: { count: 30, percent: 86 },
-      g3_5: { count: 1, percent: 3 },
-      g3: { count: 0, percent: 0 },
-      g2_5: { count: 0, percent: 0 },
-      g2: { count: 2, percent: 6 },
-      g1_5: { count: 0, percent: 0 },
-      g1: { count: 0, percent: 0 },
-      g0: { count: 2, percent: 6 },
-    },
-  },
-  {
-    id: 'c-3',
-    code: 'ท23101',
-    codeColor: 'cyan',
-    name: 'ศิลปะ',
-    level: 'ม.3',
-    rooms: 'ม.3/1, ม.3/2, ม.3/5, ม.3/6, ม.3/7, ม.3/8',
-    studentCount: 182,
-    averageScore: 80.5,
-    percentage: 80.5,
-    barPercent: 83.5,
-    grades: {
-      g4: { count: 114, percent: 63 },
-      g3_5: { count: 25, percent: 14 },
-      g3: { count: 13, percent: 7 },
-      g2_5: { count: 11, percent: 6 },
-      g2: { count: 6, percent: 3 },
-      g1_5: { count: 4, percent: 2 },
-      g1: { count: 1, percent: 1 },
-      g0: { count: 8, percent: 4 },
-    },
-  },
-  {
-    id: 'c-4',
-    code: 'ท23265',
-    codeColor: 'purple',
-    name: 'ดนตรีปฏิบัติตามความถนัด 5',
-    level: 'ม.3',
-    rooms: 'ม.3/8',
-    studentCount: 32,
-    averageScore: 92.4,
-    percentage: 92.4,
-    barPercent: 100.0,
-    grades: {
-      g4: { count: 31, percent: 97 },
-      g3_5: { count: 0, percent: 0 },
-      g3: { count: 0, percent: 0 },
-      g2_5: { count: 0, percent: 0 },
-      g2: { count: 0, percent: 0 },
-      g1_5: { count: 0, percent: 0 },
-      g1: { count: 0, percent: 0 },
-      g0: { count: 0, percent: 0 },
-    },
-  },
-];
-
-// ข้อมูลสำหรับ ผอ./Admin สลับดูผู้สอนท่านอื่นในโรงเรียน
-const ALL_TEACHERS_DATA: Record<string, TeacherProfileOption> = {
-  passapoom: {
-    id: 'passapoom',
-    name: 'ครูภาสภูมิ เรืองปราชญ์',
-    department: 'กลุ่มสาระฯ ศิลปะ (ที่ปรึกษา ม.3/1)',
-    courses: PASSAPOOM_COURSES,
-    kpiStats: {
-      gpaPercent: 84.8,
-      gpaTrend: '+6.2%',
-      totalStudents: 234,
-      passedCount: 276,
-      passedPercent: 88.6,
-      remedialCount: 4,
-      remedialPercent: 1.4,
-      goodAboveCount: 234,
-      goodAbovePercent: 100,
-    },
-  },
-  wiphada: {
-    id: 'wiphada',
-    name: 'ครูวิภาดา สมบูรณ์',
-    department: 'กลุ่มสาระฯ ภาษาไทย (กิจการนักเรียน)',
-    courses: [
-      {
-        id: 'w-1',
-        code: 'ท21101',
-        codeColor: 'pink',
-        name: 'ภาษาไทยพื้นฐาน 1',
-        level: 'ม.1',
-        rooms: 'ม.1/1, ม.1/2',
-        studentCount: 72,
-        averageScore: 78.4,
-        percentage: 82.0,
-        barPercent: 82.0,
-        grades: {
-          g4: { count: 28, percent: 39 },
-          g3_5: { count: 15, percent: 21 },
-          g3: { count: 12, percent: 17 },
-          g2_5: { count: 8, percent: 11 },
-          g2: { count: 4, percent: 5 },
-          g1_5: { count: 2, percent: 3 },
-          g1: { count: 2, percent: 3 },
-          g0: { count: 1, percent: 1 },
-        },
-      },
-      {
-        id: 'w-2',
-        code: 'ท23102',
-        codeColor: 'cyan',
-        name: 'การอ่านและการเขียนเชิงสร้างสรรค์',
-        level: 'ม.3',
-        rooms: 'ม.3/2, ม.3/5',
-        studentCount: 65,
-        averageScore: 84.1,
-        percentage: 88.5,
-        barPercent: 89.0,
-        grades: {
-          g4: { count: 35, percent: 54 },
-          g3_5: { count: 14, percent: 22 },
-          g3: { count: 8, percent: 12 },
-          g2_5: { count: 4, percent: 6 },
-          g2: { count: 2, percent: 3 },
-          g1_5: { count: 1, percent: 1 },
-          g1: { count: 1, percent: 1 },
-          g0: { count: 0, percent: 0 },
-        },
-      },
-    ],
-    kpiStats: {
-      gpaPercent: 81.2,
-      gpaTrend: '+4.1%',
-      totalStudents: 137,
-      passedCount: 134,
-      passedPercent: 97.8,
-      remedialCount: 3,
-      remedialPercent: 2.2,
-      goodAboveCount: 116,
-      goodAbovePercent: 84.7,
-    },
-  },
-  ekkachai: {
-    id: 'ekkachai',
-    name: 'ครูเอกชัย มิ่งขวัญ',
-    department: 'กลุ่มสาระฯ คณิตศาสตร์ (ที่ปรึกษา ม.1/8)',
-    courses: [
-      {
-        id: 'e-1',
-        code: 'ค21101',
-        codeColor: 'orange',
-        name: 'คณิตศาสตร์พื้นฐาน 1',
-        level: 'ม.1',
-        rooms: 'ม.1/1, ม.1/8',
-        studentCount: 61,
-        averageScore: 75.3,
-        percentage: 76.5,
-        barPercent: 78.0,
-        grades: {
-          g4: { count: 18, percent: 30 },
-          g3_5: { count: 12, percent: 20 },
-          g3: { count: 10, percent: 16 },
-          g2_5: { count: 9, percent: 15 },
-          g2: { count: 5, percent: 8 },
-          g1_5: { count: 3, percent: 5 },
-          g1: { count: 2, percent: 3 },
-          g0: { count: 2, percent: 3 },
-        },
-      },
-    ],
-    kpiStats: {
-      gpaPercent: 76.8,
-      gpaTrend: '+3.5%',
-      totalStudents: 61,
-      passedCount: 57,
-      passedPercent: 93.4,
-      remedialCount: 4,
-      remedialPercent: 6.6,
-      goodAboveCount: 49,
-      goodAbovePercent: 80.3,
-    },
-  },
-  piyapol: {
-    id: 'piyapol',
-    name: 'ครูปิยพล เกษรัตน์',
-    department: 'กลุ่มสาระฯ ภาษาต่างประเทศ (ภาษาญี่ปุ่น)',
-    courses: [
-      {
-        id: 'p-1',
-        code: 'ญ23101',
-        codeColor: 'purple',
-        name: 'ภาษาญี่ปุ่นพื้นฐาน 1',
-        level: 'ม.3',
-        rooms: 'ม.3/1, ม.3/8',
-        studentCount: 58,
-        averageScore: 88.6,
-        percentage: 91.2,
-        barPercent: 94.0,
-        grades: {
-          g4: { count: 38, percent: 66 },
-          g3_5: { count: 10, percent: 17 },
-          g3: { count: 6, percent: 10 },
-          g2_5: { count: 2, percent: 3 },
-          g2: { count: 1, percent: 2 },
-          g1_5: { count: 1, percent: 2 },
-          g1: { count: 0, percent: 0 },
-          g0: { count: 0, percent: 0 },
-        },
-      },
-    ],
-    kpiStats: {
-      gpaPercent: 88.6,
-      gpaTrend: '+8.3%',
-      totalStudents: 58,
-      passedCount: 57,
-      passedPercent: 98.3,
-      remedialCount: 1,
-      remedialPercent: 1.7,
-      goodAboveCount: 54,
-      goodAbovePercent: 93.1,
-    },
-  },
-  chanika: {
-    id: 'chanika',
-    name: 'ครูชนิกา ทรัพย์สุข',
-    department: 'กลุ่มสาระฯ วิทยาศาสตร์ (ที่ปรึกษา ม.2/8)',
-    courses: [
-      {
-        id: 'ch-1',
-        code: 'ว22101',
-        codeColor: 'cyan',
-        name: 'วิทยาศาสตร์กายภาพ 3',
-        level: 'ม.2',
-        rooms: 'ม.2/1, ม.2/8',
-        studentCount: 71,
-        averageScore: 82.3,
-        percentage: 84.5,
-        barPercent: 86.0,
-        grades: {
-          g4: { count: 32, percent: 45 },
-          g3_5: { count: 18, percent: 25 },
-          g3: { count: 11, percent: 15 },
-          g2_5: { count: 5, percent: 7 },
-          g2: { count: 3, percent: 4 },
-          g1_5: { count: 1, percent: 1 },
-          g1: { count: 1, percent: 1 },
-          g0: { count: 0, percent: 0 },
-        },
-      },
-    ],
-    kpiStats: {
-      gpaPercent: 82.3,
-      gpaTrend: '+5.1%',
-      totalStudents: 71,
-      passedCount: 71,
-      passedPercent: 100,
-      remedialCount: 0,
-      remedialPercent: 0,
-      goodAboveCount: 61,
-      goodAbovePercent: 85.9,
-    },
-  },
-};
-
 export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
   activeRole = 'TEACHER_GENERAL',
 }) => {
@@ -383,12 +90,44 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
     (activeRole as string) === 'ADMIN' ||
     (activeRole as string) === 'DIRECTOR';
 
+  // Real database states
+  const [teacherAccounts, setTeacherAccounts] = useState<TeacherAccountItem[]>([]);
+  const [curriculumCourses, setCurriculumCourses] = useState<CourseCurriculumRecord[]>([]);
+  const [classroomsList, setClassroomsList] = useState<ClassroomRosterItem[]>([]);
+
   // State สำหรับ Filters ต่างๆ (รองรับดูรายห้อง รายชั้น รายวิชา และรายผู้สอน)
   const [selectedTerm, setSelectedTerm] = useState('ภาคเรียนที่ 1/2569');
-  const [selectedTeacherKey, setSelectedTeacherKey] = useState<string>('passapoom');
+  const [selectedTeacherKey, setSelectedTeacherKey] = useState<string>('ALL');
   const [selectedGradeLevelFilter, setSelectedGradeLevelFilter] = useState<string>('ALL');
   const [selectedRoomFilter, setSelectedRoomFilter] = useState<string>('ALL');
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('ALL');
+
+  useEffect(() => {
+    let isMounted = true;
+    async function initRealData() {
+      try {
+        const [teachers, rooms] = await Promise.all([
+          classroomService.getTeacherAccounts(),
+          classroomService.getAll(),
+        ]);
+        const courses = coursesCurriculumService.getCourses();
+        if (isMounted) {
+          setTeacherAccounts(teachers);
+          setClassroomsList(rooms);
+          setCurriculumCourses(courses);
+          if (!isExecutiveOrAdmin && teachers.length > 0) {
+            setSelectedTeacherKey(teachers[0].id);
+          }
+        }
+      } catch (err) {
+        console.warn('Error loading real teacher data for SAR:', err);
+      }
+    }
+    initRealData();
+    return () => {
+      isMounted = false;
+    };
+  }, [isExecutiveOrAdmin]);
 
   // โหมดการแสดงผลการกระจายเกรด: 'both' (แสดงทั้งคู่), 'histogram' (กราฟ Histogram), 'table' (ตารางแจกแจง)
   const [distributionViewMode, setDistributionViewMode] = useState<'both' | 'histogram' | 'table'>('both');
@@ -429,54 +168,84 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const getCourseCodeColor = (code: string): CourseItemData['codeColor'] => {
+    const ch = (code || '').charAt(0);
+    switch (ch) {
+      case 'ท': return 'pink';
+      case 'ค': return 'orange';
+      case 'ว': return 'cyan';
+      case 'ญ':
+      case 'จ':
+      case 'อ': return 'purple';
+      default: return 'blue';
+    }
+  };
+
+  const mapCurriculumToCourseItem = useCallback((c: CourseCurriculumRecord): CourseItemData => {
+    const assignedRooms = c.assignedClassrooms || [];
+    let studentTotal = 0;
+    assignedRooms.forEach((rName) => {
+      const matchRoom = classroomsList.find(
+        (cr) => cr.name === rName || cr.roomNumber === rName
+      );
+      if (matchRoom) {
+        studentTotal += matchRoom.studentCount || 0;
+      }
+    });
+
+    return {
+      id: c.id,
+      code: c.code,
+      codeColor: getCourseCodeColor(c.code),
+      name: c.name,
+      level: c.level || 'ม.3',
+      rooms: assignedRooms.join(', ') || 'ม.3/1',
+      studentCount: studentTotal,
+      averageScore: 0,
+      percentage: 0,
+      barPercent: 0,
+      grades: {
+        g4: { count: 0, percent: 0 },
+        g3_5: { count: 0, percent: 0 },
+        g3: { count: 0, percent: 0 },
+        g2_5: { count: 0, percent: 0 },
+        g2: { count: 0, percent: 0 },
+        g1_5: { count: 0, percent: 0 },
+        g1: { count: 0, percent: 0 },
+        g0: { count: 0, percent: 0 },
+        ro: { count: 0, percent: 0 },
+        ms: { count: 0, percent: 0 },
+      },
+    };
+  }, [classroomsList]);
+
   // รวมรายวิชาทั้งหมดของทุกครูในโรงเรียน
-  const allSchoolCourses = useMemo(() => {
-    return Object.values(ALL_TEACHERS_DATA).flatMap((t) => t.courses);
-  }, []);
+  const allSchoolCourses = useMemo<CourseItemData[]>(() => {
+    return curriculumCourses.map(mapCurriculumToCourseItem);
+  }, [curriculumCourses, mapCurriculumToCourseItem]);
 
   // ดึงชุดข้อมูลผู้สอนที่เลือก (รองรับดูทุกคน และดูรายบุคคล)
   const currentTeacherProfile = useMemo<TeacherProfileOption>(() => {
-    if (cleanSlateService.isCleanSlateActive()) {
-      return {
-        id: selectedTeacherKey,
-        name: isExecutiveOrAdmin && selectedTeacherKey === 'ALL' ? 'ครูผู้สอนทุกคน (ภาพรวมทั้งโรงเรียน)' : 'นายภาสภูมิ เรืองปราชญ์',
-        department: isExecutiveOrAdmin && selectedTeacherKey === 'ALL' ? 'ทุกกลุ่มสาระการเรียนรู้' : 'กลุ่มสาระการเรียนรู้ศิลปะ (ดนตรี)',
-        courses: [],
-        kpiStats: {
-          gpaPercent: 0,
-          gpaTrend: '0%',
-          totalStudents: 0,
-          passedCount: 0,
-          passedPercent: 0,
-          remedialCount: 0,
-          remedialPercent: 0,
-          goodAboveCount: 0,
-          goodAbovePercent: 0,
-        },
-      };
-    }
-
-    if (!isExecutiveOrAdmin) {
-      // ครูทั่วไปถูกล็อกให้ดูเฉพาะงานของตนเอง
-      return ALL_TEACHERS_DATA['passapoom'];
-    }
     if (selectedTeacherKey === 'ALL') {
       const totalStudents = allSchoolCourses.reduce((sum, c) => sum + c.studentCount, 0);
       const passedCount = allSchoolCourses.reduce(
         (sum, c) =>
           sum +
-          (c.grades.g4.count +
-            c.grades.g3_5.count +
-            c.grades.g3.count +
-            c.grades.g2_5.count +
-            c.grades.g2.count +
-            c.grades.g1_5.count +
-            c.grades.g1.count),
+          c.grades.g4.count +
+          c.grades.g3_5.count +
+          c.grades.g3.count +
+          c.grades.g2_5.count +
+          c.grades.g2.count +
+          c.grades.g1_5.count +
+          c.grades.g1.count,
         0
       );
-      const remedialCount = allSchoolCourses.reduce((sum, c) => sum + c.grades.g0.count, 0);
+      const remedialCount = allSchoolCourses.reduce(
+        (sum, c) => sum + c.grades.g0.count + (c.grades.ro?.count || 0) + (c.grades.ms?.count || 0),
+        0
+      );
       const goodAboveCount = allSchoolCourses.reduce(
-        (sum, c) => sum + (c.grades.g4.count + c.grades.g3_5.count + c.grades.g3.count),
+        (sum, c) => sum + c.grades.g4.count + c.grades.g3_5.count + c.grades.g3.count,
         0
       );
       const gpaPercent =
@@ -487,31 +256,90 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
                 totalStudents
               ).toFixed(1)
             )
-          : 82.5;
+          : 0;
 
       return {
         id: 'ALL',
         name: 'ครูผู้สอนทุกคน (ภาพรวมทั้งโรงเรียน)',
-        department: 'ทุกกลุ่มสาระการเรียนรู้ (5 ท่าน)',
+        department: `ทุกกลุ่มสาระการเรียนรู้ (${teacherAccounts.length} ท่าน)`,
         courses: allSchoolCourses,
         kpiStats: {
           gpaPercent,
-          gpaTrend: '+5.8%',
+          gpaTrend: '+0.0%',
           totalStudents,
           passedCount,
-          passedPercent:
-            totalStudents > 0 ? Number(((passedCount / totalStudents) * 100).toFixed(1)) : 94.2,
+          passedPercent: totalStudents > 0 ? Number(((passedCount / totalStudents) * 100).toFixed(1)) : 0,
           remedialCount,
-          remedialPercent:
-            totalStudents > 0 ? Number(((remedialCount / totalStudents) * 100).toFixed(1)) : 1.8,
+          remedialPercent: totalStudents > 0 ? Number(((remedialCount / totalStudents) * 100).toFixed(1)) : 0,
           goodAboveCount,
-          goodAbovePercent:
-            totalStudents > 0 ? Number(((goodAboveCount / totalStudents) * 100).toFixed(1)) : 89.6,
+          goodAbovePercent: totalStudents > 0 ? Number(((goodAboveCount / totalStudents) * 100).toFixed(1)) : 0,
         },
       };
     }
-    return ALL_TEACHERS_DATA[selectedTeacherKey] || ALL_TEACHERS_DATA['passapoom'];
-  }, [isExecutiveOrAdmin, selectedTeacherKey, allSchoolCourses]);
+
+    const teacher = teacherAccounts.find((t) => t.id === selectedTeacherKey);
+    const teacherName = teacher?.name || 'ครูผู้สอน';
+    const teacherDept = teacher?.position || teacher?.subjectGroup || 'กลุ่มสาระการเรียนรู้';
+
+    // ค้นหารายวิชาของครูท่านนี้
+    const matchedCourses = curriculumCourses.filter((c) => {
+      if (!c.teacherName) return false;
+      return (
+        c.teacherName.includes(teacherName) ||
+        teacherName.includes(c.teacherName)
+      );
+    });
+    const courses = matchedCourses.map(mapCurriculumToCourseItem);
+
+    const totalStudents = courses.reduce((sum, c) => sum + c.studentCount, 0);
+    const passedCount = courses.reduce(
+      (sum, c) =>
+        sum +
+        c.grades.g4.count +
+        c.grades.g3_5.count +
+        c.grades.g3.count +
+        c.grades.g2_5.count +
+        c.grades.g2.count +
+        c.grades.g1_5.count +
+        c.grades.g1.count,
+      0
+    );
+    const remedialCount = courses.reduce(
+      (sum, c) => sum + c.grades.g0.count + (c.grades.ro?.count || 0) + (c.grades.ms?.count || 0),
+      0
+    );
+    const goodAboveCount = courses.reduce(
+      (sum, c) => sum + c.grades.g4.count + c.grades.g3_5.count + c.grades.g3.count,
+      0
+    );
+    const gpaPercent =
+      totalStudents > 0
+        ? Number(
+            (
+              courses.reduce((sum, c) => sum + c.percentage * c.studentCount, 0) /
+              totalStudents
+            ).toFixed(1)
+          )
+        : 0;
+
+    return {
+      id: selectedTeacherKey,
+      name: teacherName,
+      department: teacherDept,
+      courses,
+      kpiStats: {
+        gpaPercent,
+        gpaTrend: '+0.0%',
+        totalStudents,
+        passedCount,
+        passedPercent: totalStudents > 0 ? Number(((passedCount / totalStudents) * 100).toFixed(1)) : 0,
+        remedialCount,
+        remedialPercent: totalStudents > 0 ? Number(((remedialCount / totalStudents) * 100).toFixed(1)) : 0,
+        goodAboveCount,
+        goodAbovePercent: totalStudents > 0 ? Number(((goodAboveCount / totalStudents) * 100).toFixed(1)) : 0,
+      },
+    };
+  }, [selectedTeacherKey, allSchoolCourses, teacherAccounts, curriculumCourses, mapCurriculumToCourseItem]);
 
   // 1. ตัวเลือกระดับชั้น (Grade Levels)
   const availableGradeLevelOptions = useMemo(() => {
@@ -623,12 +451,12 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
     return list;
   }, [currentTeacherProfile, selectedGradeLevelFilter, selectedRoomFilter, selectedSubjectFilter]);
 
-  // สรุปสถิติ KPI (หากเป็นมุมมองเริ่มต้นของครูภาสภูมิ จะใช้ตัวเลขเป๊ะตาม Image 2 มิฉะนั้นคำนวณตามข้อมูลจริง)
+  // สรุปสถิติ KPI คำนวณตามข้อมูลจริง
   const stats = useMemo(() => {
-    if (cleanSlateService.isCleanSlateActive() || displayedCourses.length === 0) {
+    if (displayedCourses.length === 0) {
       return {
         gpaPercent: 0,
-        gpaTrend: '0%',
+        gpaTrend: '+0.0%',
         totalStudents: 0,
         passedCount: 0,
         passedPercent: 0,
@@ -637,17 +465,6 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
         goodAboveCount: 0,
         goodAbovePercent: 0,
       };
-    }
-
-    if (
-      !cleanSlateService.isCleanSlateActive() &&
-      selectedTeacherKey === 'passapoom' &&
-      selectedGradeLevelFilter === 'ALL' &&
-      selectedRoomFilter === 'ALL' &&
-      selectedSubjectFilter === 'ALL' &&
-      displayedCourses.length > 0
-    ) {
-      return ALL_TEACHERS_DATA.passapoom.kpiStats;
     }
 
     const totalStudents = displayedCourses.reduce((sum, c) => sum + c.studentCount, 0);
@@ -697,8 +514,8 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
   // คำนวณสรุป เกรด 0, ร, มส
   const remedialBreakdown = useMemo(() => {
     const g0 = displayedCourses.reduce((sum, c) => sum + (c.grades.g0?.count || 0), 0);
-    const ro = displayedCourses.reduce((sum, c) => sum + (c.grades.ro?.count ?? (c.studentCount > 30 ? 1 : 0)), 0);
-    const ms = displayedCourses.reduce((sum, c) => sum + (c.grades.ms?.count ?? (c.studentCount > 50 ? 1 : 0)), 0);
+    const ro = displayedCourses.reduce((sum, c) => sum + (c.grades.ro?.count || 0), 0);
+    const ms = displayedCourses.reduce((sum, c) => sum + (c.grades.ms?.count || 0), 0);
     const totalFail = g0 + ro + ms;
     return { g0, ro, ms, totalFail };
   }, [displayedCourses]);
@@ -799,8 +616,8 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
       c.grades.g1_5.count,
       c.grades.g1.count,
       c.grades.g0.count,
-      c.grades.ro?.count ?? (c.studentCount > 30 ? 1 : 0),
-      c.grades.ms?.count ?? (c.studentCount > 50 ? 1 : 0),
+      c.grades.ro?.count || 0,
+      c.grades.ms?.count || 0,
     ]);
 
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
@@ -1008,7 +825,7 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
                     <div>
                       <span className="block font-bold">👑 ครูผู้สอนทุกคน (ทั้งโรงเรียน)</span>
                       <span className="text-[10px] text-slate-400 block">
-                        ดูผลสัมฤทธิ์ภาพรวมของผู้สอนทุกคน (5 ท่าน)
+                        ดูผลสัมฤทธิ์ภาพรวมของผู้สอนทุกคน ({teacherAccounts.length} ท่าน)
                       </span>
                     </div>
                     {selectedTeacherKey === 'ALL' && (
@@ -1018,9 +835,9 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
 
                   <div className="border-t border-slate-100 my-1 pt-1">
                     <span className="text-[10px] font-bold text-slate-400 px-2 uppercase block mb-1">
-                      ครูผู้สอนรายบุคคล
+                      ครูผู้สอนรายบุคคล ({teacherAccounts.length} ท่าน)
                     </span>
-                    {Object.values(ALL_TEACHERS_DATA).map((t) => (
+                    {teacherAccounts.map((t) => (
                       <button
                         key={t.id}
                         type="button"
@@ -1039,7 +856,7 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
                       >
                         <div>
                           <span className="block font-medium">{t.name}</span>
-                          <span className="text-[10px] text-slate-400 block truncate">{t.department}</span>
+                          <span className="text-[10px] text-slate-400 block truncate">{t.position || t.subjectGroup || 'ครูผู้สอน'}</span>
                         </div>
                         {selectedTeacherKey === t.id && (
                           <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
@@ -1686,10 +1503,10 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
                       <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g1)}</td>
                       <td className="py-3.5 px-3 text-center">{formatGradeCell(c.grades.g0)}</td>
                       <td className="py-3.5 px-3 text-center">
-                        {formatGradeCell(c.grades.ro ?? { count: c.studentCount > 30 ? 1 : 0, percent: c.studentCount > 30 ? 3 : 0 })}
+                        {formatGradeCell(c.grades.ro ?? { count: 0, percent: 0 })}
                       </td>
                       <td className="py-3.5 px-3 text-center">
-                        {formatGradeCell(c.grades.ms ?? { count: c.studentCount > 50 ? 1 : 0, percent: c.studentCount > 50 ? 2 : 0 })}
+                        {formatGradeCell(c.grades.ms ?? { count: 0, percent: 0 })}
                       </td>
                     </tr>
                   ))

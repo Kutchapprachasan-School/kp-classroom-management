@@ -31,6 +31,7 @@ import {
 import { classroomService } from '../services/classroomService';
 import { studentService, type StudentRecord } from '../services/studentService';
 import { messagingService, STUDENT_TRANSFERRED_EVENT } from '../services/messagingService';
+import { attendanceCorrelationService, type MorningAssemblyRecord } from '../services/attendanceCorrelationService';
 import type { ClassroomRosterItem, AtRiskStudent } from '../types/viewModels';
 import type { SchoolUserRole } from '../config/schoolRoles';
 import { getGradeLevelTheme } from '../utils/gradeLevelTheme';
@@ -212,18 +213,25 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
   // Map each student to attendance state: 'NORMAL' (มาเรียนปกติ) | 'ABSENT' (ขาดเรียน) | 'LEAVE' (ลาเรียน)
   const studentAttendanceMap = useMemo(() => {
     const map = new Map<string, 'NORMAL' | 'ABSENT' | 'LEAVE'>();
-    students.forEach((s, idx) => {
-      // Use index or actual status to create realistic distribution matching mockup (Row 3 ขาดเรียน, Row 5 ลาเรียน)
-      if (s.status === 'AT_RISK' || idx === 2) {
+    const today = new Date().toISOString().split('T')[0];
+    const morningRecords = selectedClass?.id
+      ? attendanceCorrelationService.getMorningRecordsByDateAndRoom(today, selectedClass.id)
+      : [];
+    const morningMap = new Map(morningRecords.map((r: MorningAssemblyRecord) => [r.studentCode, r.status]));
+
+    students.forEach((s) => {
+      const code = s.code || s.studentCode || '';
+      const morningStatus = morningMap.get(code);
+      if (morningStatus === 'ABSENT' || s.status === 'AT_RISK') {
         map.set(s.id, 'ABSENT');
-      } else if (idx === 4) {
+      } else if (morningStatus === 'LEAVE') {
         map.set(s.id, 'LEAVE');
       } else {
         map.set(s.id, 'NORMAL');
       }
     });
     return map;
-  }, [students]);
+  }, [students, selectedClass?.id]);
 
   const totalCount = students.length;
 
@@ -1398,9 +1406,16 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
 
             <div className="space-y-3 text-xs">
               <div className="p-3 bg-purple-50/50 rounded-xl border border-purple-100 flex items-center justify-between">
-                <span className="font-semibold text-purple-900">คะแนนสะสมเฉลี่ย (GPAX)</span>
+                <span className="font-semibold text-purple-900">คะแนนสะสมเฉลี่ย (GPA)</span>
                 <span className="text-lg font-black text-purple-700">
-                  {gradeModalStudent.score >= 80 ? '3.85' : '3.20'}
+                  {gradeModalStudent.score >= 80 ? '4.00' :
+                   gradeModalStudent.score >= 75 ? '3.50' :
+                   gradeModalStudent.score >= 70 ? '3.00' :
+                   gradeModalStudent.score >= 65 ? '2.50' :
+                   gradeModalStudent.score >= 60 ? '2.00' :
+                   gradeModalStudent.score >= 55 ? '1.50' :
+                   gradeModalStudent.score >= 50 ? '1.00' :
+                   gradeModalStudent.score > 0 ? '0.00' : '-'}
                 </span>
               </div>
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
@@ -1411,7 +1426,9 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
               </div>
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
                 <span className="font-semibold text-slate-700">สถานะผลการเรียน</span>
-                <span className="font-bold text-emerald-600">ผ่านเกณฑ์มาตรฐาน</span>
+                <span className={`font-bold ${gradeModalStudent.score >= 50 ? 'text-emerald-600' : gradeModalStudent.score > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                  {gradeModalStudent.score >= 50 ? 'ผ่านเกณฑ์มาตรฐาน' : gradeModalStudent.score > 0 ? 'ไม่ผ่านเกณฑ์ (ต้องปรับปรุง)' : 'รอประเมิน'}
+                </span>
               </div>
             </div>
 

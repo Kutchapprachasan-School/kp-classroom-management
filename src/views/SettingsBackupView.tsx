@@ -249,11 +249,13 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
     const onLeaveChange = () => setLeaveSettings(schoolLeaveSettingsService.getSettings());
     const onBannersChange = () => setStudentBanners(studentBannerService.getBanners());
     const onTeacherBannersChange = () => setTeacherBanners(teacherBannerService.getBanners());
+    const onSchoolSettingsChange = () => setSchoolSettings(getSchoolSettings());
 
     window.addEventListener(ACADEMIC_CALENDAR_EVENT, handleCalendarChange);
     window.addEventListener(SCHOOL_LEAVE_SETTINGS_EVENT, onLeaveChange);
     window.addEventListener(STUDENT_BANNERS_EVENT, onBannersChange);
     window.addEventListener(TEACHER_BANNERS_EVENT, onTeacherBannersChange);
+    window.addEventListener('kps-school-settings-updated', onSchoolSettingsChange);
 
     return () => {
       window.removeEventListener('kps-data-sync-event', handleClassroomChange);
@@ -261,6 +263,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
       window.removeEventListener(SCHOOL_LEAVE_SETTINGS_EVENT, onLeaveChange);
       window.removeEventListener(STUDENT_BANNERS_EVENT, onBannersChange);
       window.removeEventListener(TEACHER_BANNERS_EVENT, onTeacherBannersChange);
+      window.removeEventListener('kps-school-settings-updated', onSchoolSettingsChange);
     };
   }, []);
 
@@ -286,15 +289,19 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
+    const isImg =
+      file.type.startsWith('image/') ||
+      /\.(png|jpe?g|svg|webp|gif|bmp|ico|avif)$/i.test(file.name);
+    if (!isImg) {
       showToast('⚠️ กรุณาเลือกไฟล์รูปภาพเท่านั้น (PNG, JPG, SVG, WebP)');
       return;
     }
 
     try {
-      showToast('⏳ กำลังประมวลผลและบีบอัดรูปภาพตราโรงเรียน...');
+      showToast('⏳ กำลังประมวลผลและบันทึกรูปภาพตราโรงเรียน...');
       let finalDataUrl = '';
-      if (file.type === 'image/svg+xml') {
+      const isSvg = file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg');
+      if (isSvg) {
         finalDataUrl = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);

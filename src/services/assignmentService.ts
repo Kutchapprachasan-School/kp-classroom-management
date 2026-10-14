@@ -1,6 +1,5 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase';
 import { AssignmentCreateSchema, type AssignmentCreateInput } from './types';
-import { cleanSlateService } from './cleanSlateService';
 
 export interface AssignmentRecord {
   id: string;
@@ -20,82 +19,22 @@ export interface AssignmentRecord {
 
 const STORAGE_KEY = 'cls_assignments_data';
 
-const defaultAssignments: AssignmentRecord[] = [
-  {
-    id: 'asg-1',
-    classroomId: 'room-3-1',
-    title: 'My Soundtrack',
-    sharedTag: 'ใช้ร่วม 5 ห้อง',
-    subtext: 'นำเข้าจาก Google Classroom • 16 ก.ค. 2569 11:21:42',
-    category: 'เก็บก่อนกลางภาค',
-    sgsUnit: 'ช่อง 2 • หน่วยที่ 1',
-    dueDate: '20 ส.ค.',
-    maxScore: 10,
-    submittedCount: 23,
-    totalStudents: 23,
-    isFull: true,
-    status: 'ACTIVE',
-  },
-  {
-    id: 'asg-2',
-    classroomId: 'room-3-1',
-    title: 'อินโฟกราฟิค องค์ประกอบทางดนตรี',
-    sharedTag: 'ใช้ร่วม 6 ห้อง',
-    subtext: 'นำเข้าจาก Google Classroom • 16 ก.ค. 2569 11:21:42',
-    category: 'เก็บก่อนกลางภาค',
-    sgsUnit: 'ช่อง 1 • หน่วยที่ 2',
-    dueDate: '10 ส.ค.',
-    maxScore: 10,
-    submittedCount: 23,
-    totalStudents: 23,
-    isFull: true,
-    status: 'ACTIVE',
-  },
-  {
-    id: 'asg-3',
-    classroomId: 'room-3-1',
-    title: 'เพลงแบบเพลง',
-    sharedTag: 'ใช้ร่วม 6 ห้อง',
-    subtext: 'นำเข้าจาก Google Classroom • 16 ก.ค. 2569 11:21:42',
-    category: 'เก็บก่อนกลางภาค',
-    sgsUnit: 'ช่อง 2 • หน่วยที่ 1',
-    dueDate: '5 ส.ค.',
-    maxScore: 10,
-    submittedCount: 21,
-    totalStudents: 23,
-    isFull: false,
-    status: 'ACTIVE',
-  },
-  {
-    id: 'asg-4',
-    classroomId: 'room-3-1',
-    title: 'วิดีโอนำเสนอดนตรีไทยในสมัยต่าง ๆ',
-    sharedTag: 'ใช้ร่วม 6 ห้อง',
-    subtext: 'มอบหมายเมื่อ 1 ก.ย. 2569',
-    category: 'เก็บหลังกลางภาค',
-    sgsUnit: 'ช่อง 11 • หน่วยที่ 4',
-    dueDate: '25 ก.ย.',
-    maxScore: 10,
-    submittedCount: 0,
-    totalStudents: 23,
-    isFull: false,
-    status: 'ACTIVE',
-  },
-];
-
 const getLocalAssignments = (): AssignmentRecord[] => {
+  if (typeof localStorage === 'undefined') return [];
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw) {
     try {
-      return JSON.parse(raw);
+      const parsed: AssignmentRecord[] = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        // Strip out legacy mock assignment fixtures
+        const legacyMockIds = new Set(['asg-1', 'asg-2', 'asg-3', 'asg-4']);
+        return parsed.filter((a) => !legacyMockIds.has(a.id) && a.title !== 'My Soundtrack');
+      }
     } catch {
       // fallback
     }
   }
-  if (cleanSlateService.isCleanSlateActive()) {
-    return [];
-  }
-  return defaultAssignments;
+  return [];
 };
 
 const saveLocalAssignments = (items: AssignmentRecord[]) => {
@@ -130,7 +69,7 @@ export const assignmentService = {
       }
     }
     const all = getLocalAssignments();
-    return all.filter((a) => !a.classroomId || a.classroomId === classroomId || classroomId === 'room-3-1');
+    return all.filter((a) => !a.classroomId || a.classroomId === classroomId);
   },
 
   // CREATE: Add assignment

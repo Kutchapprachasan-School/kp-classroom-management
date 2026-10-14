@@ -117,6 +117,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
   );
 
   const classDropdownRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isFullAccess =
     activeRole === 'ACADEMIC_ADMIN' ||
@@ -443,23 +444,53 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
     }
   };
 
-  // นำเข้ารายชื่อ Excel/SGS
-  const handleBatchImport = async () => {
-    if (!selectedClass) return;
+  // นำเข้ารายชื่อ Excel/SGS จากไฟล์จริง
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedClass) return;
+
     try {
-      const mockBatch = [
-        { no: students.length + 1, code: `45${Date.now().toString().slice(-3)}1`, name: 'ด.ช. ธนพล มณีโชติ', attendance: '8/8', score: 85, status: 'NORMAL' as const },
-        { no: students.length + 2, code: `45${Date.now().toString().slice(-3)}2`, name: 'ด.ญ. นลินทิพย์ วงศ์ใหญ่', attendance: '8/8', score: 92, status: 'NORMAL' as const },
-      ];
-      await studentService.batchImport(selectedClass.id, mockBatch);
-      await loadStudentsForClass(selectedClass.id);
-      setIsImportModalOpen(false);
-      setTransferSuccessNotice(`นำเข้ารายชื่อนักเรียนในห้อง ${selectedClass.name} สำเร็จ`);
-      setTimeout(() => setTransferSuccessNotice(null), 3500);
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      const parsedStudents: Array<Omit<StudentRecord, 'id'>> = [];
+
+      lines.forEach((line) => {
+        if (line.includes('เลขที่') || line.includes('ชื่อ') || line.includes('รหัส')) return;
+        const parts = line.split(/[,\t]/).map((p) => p.trim().replace(/^"|"$/g, ''));
+        if (parts.length >= 2) {
+          const seatNo = parseInt(parts[0], 10) || parsedStudents.length + 1;
+          const code = parts[1] || `45${String(seatNo).padStart(3, '0')}`;
+          const name = parts[2] || parts[1];
+          parsedStudents.push({
+            no: seatNo,
+            code,
+            name,
+            attendance: '0/0',
+            score: 0,
+            status: 'NORMAL',
+          });
+        }
+      });
+
+      if (parsedStudents.length > 0) {
+        await studentService.batchImport(selectedClass.id, parsedStudents);
+        await loadStudentsForClass(selectedClass.id);
+        setIsImportModalOpen(false);
+        setTransferSuccessNotice(`นำเข้ารายชื่อนักเรียน ${parsedStudents.length} คน ในห้อง ${selectedClass.name} สำเร็จ`);
+        setTimeout(() => setTransferSuccessNotice(null), 3500);
+      } else {
+        alert('ไม่พบข้อมูลนักเรียนในไฟล์ กรุณาตรวจสอบว่ามีข้อมูลรูปแบบ: เลขที่, รหัสนักเรียน, ชื่อ-นามสกุล');
+      }
     } catch (err) {
       console.error('Import error:', err);
-      alert('เกิดข้อผิดพลาดในการนำเข้าข้อมูล');
+      alert('เกิดข้อผิดพลาดในการอ่านไฟล์');
+    } finally {
+      if (e.target) e.target.value = '';
     }
+  };
+
+  const handleBatchImport = () => {
+    fileInputRef.current?.click();
   };
 
   // ย้ายห้องเรียน
@@ -1586,9 +1617,16 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
               onClick={handleBatchImport}
               className="p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center space-y-2 bg-slate-50/50 hover:bg-blue-50/30 transition-colors cursor-pointer"
             >
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept=".csv,.txt,.tsv"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
               <Upload className="w-8 h-8 text-blue-600 mx-auto" />
               <p className="text-xs font-semibold text-slate-700">
-                ลากไฟล์ Excel (.xlsx, .csv) มาวางที่นี่ (คลิกเพื่อทดสอบนำเข้า)
+                คลิกเพื่อเลือกไฟล์รายชื่อ (.csv, .txt) เพื่อนำเข้าระบบจริง
               </p>
               <p className="text-[11px] text-slate-400">
                 รองรับโครงสร้างคอลัมน์ระบบ SGS สพฐ. (เลขที่, รหัสนักเรียน, คำนำหน้า, ชื่อ, นามสกุล)

@@ -27,8 +27,9 @@ import {
 } from 'lucide-react';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 import { coursesCurriculumService, type CourseCurriculumRecord } from '../services/coursesCurriculumService';
-import { cleanSlateService } from '../services/cleanSlateService';
 import { classroomService } from '../services/classroomService';
+import { studentService } from '../services/studentService';
+import { attendanceCorrelationService } from '../services/attendanceCorrelationService';
 
 // ==========================================
 // DATA TYPES
@@ -95,311 +96,6 @@ export interface CourseFilterOption {
 }
 
 // ==========================================
-// INITIAL MOCK DATA (Matching Mockup 100%)
-// ==========================================
-const INITIAL_COURSES: CourseFilterOption[] = [
-  {
-    code: 'ญ23101',
-    name: 'ภาษาญี่ปุ่น ม.3/1',
-    classroom: 'ม.3/1',
-    semester: 'ภาคเรียนที่ 1/2569',
-  },
-  {
-    code: 'ญ32101',
-    name: 'ภาษาญี่ปุ่น ม.4/1',
-    classroom: 'ม.4/1',
-    semester: 'ภาคเรียนที่ 1/2569',
-  },
-  {
-    code: 'ญ33101',
-    name: 'ภาษาญี่ปุ่น ม.5/1',
-    classroom: 'ม.5/1',
-    semester: 'ภาคเรียนที่ 1/2569',
-  },
-];
-
-const INITIAL_UNITS: UnitPlanItem[] = [
-  {
-    id: 'unit-1',
-    unitNumber: 1,
-    titleJa: '日常のあいさつ',
-    titleTh: 'การทักทายประจำวัน',
-    displayTitle: '日常のあいさつ (การทักทายประจำวัน)',
-    periods: 4,
-    periodDurationText: '4 คาบ (50 นาที/คาบ)',
-    weekNumber: 1,
-    dateRange: 'สัปดาห์ที่ 1 (2 – 6 ต.ค. 2569)',
-    status: 'DONE',
-    statusLabel: 'เสร็จสิ้น',
-    statusBadgeClass: 'bg-emerald-50 text-emerald-600 border-emerald-200',
-    circleColorClass: 'bg-blue-500',
-    indicatorsSummary: '1.1 ตัวชี้วัด',
-    courseCode: 'ญ23101',
-    courseName: 'ภาษาญี่ปุ่น',
-    classroom: 'ม.3/1',
-    objectives: [
-      '1. อธิบายและใช้คำทักทายพื้นฐานในชีวิตประจำวันได้ (ต 1.1 ม.3/1)',
-      '2. ฟังและพูดโต้ตอบในการทักทายได้อย่างเหมาะสม (ต 2.1 ม.3/1)',
-    ],
-    evaluations: [
-      { id: 'ev1', title: 'การมีส่วนร่วม', weightPercent: 20, criteria: 'สังเกตพฤติกรรม' },
-      { id: 'ev2', title: 'งาน/ใบงาน', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
-      { id: 'ev3', title: 'สอบย่อย', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
-      { id: 'ev4', title: 'สอบปลายหน่วย', weightPercent: 20, criteria: 'ผ่านเกณฑ์ 70%' },
-    ],
-    files: [
-      {
-        id: 'f1',
-        name: 'แผนการสอน_หน่วยที่1_การทักทายประจำวัน.pdf',
-        type: 'PDF',
-        size: '1.4 MB',
-        updatedAt: '2 ต.ค. 2569',
-      },
-      {
-        id: 'f2',
-        name: 'สไลด์ประกอบการสอน_คำทักทายและวัฒนธรรม.pptx',
-        type: 'PPTX',
-        size: '6.8 MB',
-        updatedAt: '2 ต.ค. 2569',
-      },
-    ],
-    worksheets: [
-      {
-        id: 'ws1',
-        name: 'ใบงานที่ 1.1: ฝึกเขียนบทสนทนาทักทายยามเช้าและเย็น',
-        fullScore: 10,
-        submittedCount: 32,
-        totalCount: 32,
-        dueDate: '4 ต.ค. 2569',
-      },
-      {
-        id: 'ws2',
-        name: 'ใบงานที่ 1.2: คัดคำศัพท์ฮิรางานะหมวดการทักทาย',
-        fullScore: 10,
-        submittedCount: 31,
-        totalCount: 32,
-        dueDate: '6 ต.ค. 2569',
-      },
-    ],
-    reflection: {
-      conductedDate: '6 ต.ค. 2569',
-      summary:
-        'นักเรียนระดับชั้น ม.3/1 จำนวน 32 คน มีความกระตือรือร้นในการฝึกออกเสียงคำทักทาย สามารถใช้คำว่า "Konnichiwa" และ "Arigatou gozaimasu" ได้ถูกต้องตามสถานการณ์คิดเป็น 93% ของผู้เรียน',
-      problem: 'นักเรียนบางคนยังสับสนระหว่างคำทักทายทางการกับคำทักทายเพื่อนสนิท',
-      solution: 'จัดกิจกรรมบทบาทสมมติ (Role-play) โดยแบ่งสถานการณ์ระหว่างครูกับนักเรียน และเพื่อนกับเพื่อน',
-      recordedBy: 'นายปัญจพล เกษรัตน์ (ครูผู้สอน)',
-    },
-  },
-  {
-    id: 'unit-2',
-    unitNumber: 2,
-    titleJa: '家族と友達',
-    titleTh: 'ครอบครัวและเพื่อน',
-    displayTitle: '家族と友達 (ครอบครัวและเพื่อน)',
-    periods: 4,
-    periodDurationText: '4 คาบ (50 นาที/คาบ)',
-    weekNumber: 2,
-    dateRange: 'สัปดาห์ที่ 2 (9 – 13 ต.ค. 2569)',
-    status: 'IN_PROGRESS',
-    statusLabel: 'กำลังดำเนินการ',
-    statusBadgeClass: 'bg-blue-50 text-blue-600 border-blue-200',
-    circleColorClass: 'bg-purple-500',
-    indicatorsSummary: '1.1 ตัวชี้วัด',
-    courseCode: 'ญ23101',
-    courseName: 'ภาษาญี่ปุ่น',
-    classroom: 'ม.3/1',
-    objectives: [
-      '1. แนะนำสมาชิกในครอบครัวและเพื่อนสนิทเป็นภาษาญี่ปุ่นได้ (ต 1.1 ม.3/1)',
-      '2. ใช้คำสรรพนามและคำแสดงความเป็นเจ้าของได้อย่างถูกต้อง (ต 2.1 ม.3/1)',
-    ],
-    evaluations: [
-      { id: 'ev2-1', title: 'การมีส่วนร่วม', weightPercent: 20, criteria: 'สังเกตพฤติกรรม' },
-      { id: 'ev2-2', title: 'งาน/ใบงาน', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
-      { id: 'ev2-3', title: 'สอบย่อย', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
-      { id: 'ev2-4', title: 'สอบปลายหน่วย', weightPercent: 20, criteria: 'ผ่านเกณฑ์ 70%' },
-    ],
-    files: [
-      {
-        id: 'f2-1',
-        name: 'แผนการสอน_หน่วยที่2_ครอบครัวและเพื่อน.pdf',
-        type: 'PDF',
-        size: '1.2 MB',
-        updatedAt: '8 ต.ค. 2569',
-      },
-    ],
-    worksheets: [
-      {
-        id: 'ws2-1',
-        name: 'ใบงานผังครอบครัว (Kazoku)',
-        fullScore: 10,
-        submittedCount: 28,
-        totalCount: 32,
-        dueDate: '12 ต.ค. 2569',
-      },
-    ],
-    reflection: {
-      conductedDate: 'กำลังดำเนินการสอน',
-      summary: 'กำลังจัดการเรียนรู้ในหัวข้อคำเรียกบุคคลในครอบครัวของตนเองและผู้อื่น',
-      problem: 'ยังไม่พบปัญหาที่เด่นชัด',
-      solution: 'เน้นย้ำความแตกต่างระหว่าง ちち (พ่อฉัน) กับ おとうさん (พ่อคนอื่น)',
-      recordedBy: 'นายปัญจพล เกษรัตน์',
-    },
-  },
-  {
-    id: 'unit-3',
-    unitNumber: 3,
-    titleJa: '学校生活',
-    titleTh: 'ชีวิตในโรงเรียน',
-    displayTitle: '学校生活 (ชีวิตในโรงเรียน)',
-    periods: 4,
-    periodDurationText: '4 คาบ (50 นาที/คาบ)',
-    weekNumber: 3,
-    dateRange: 'สัปดาห์ที่ 3 (16 – 20 ต.ค. 2569)',
-    status: 'NOT_STARTED',
-    statusLabel: 'ยังไม่เริ่ม',
-    statusBadgeClass: 'bg-slate-100 text-slate-500 border-slate-200',
-    circleColorClass: 'bg-emerald-500',
-    indicatorsSummary: '1.2 ตัวชี้วัด',
-    courseCode: 'ญ23101',
-    courseName: 'ภาษาญี่ปุ่น',
-    classroom: 'ม.3/1',
-    objectives: [
-      '1. บอกชื่อวิชา สถานที่ และอุปกรณ์ในโรงเรียนได้ (ต 1.2 ม.3/1)',
-      '2. ถามและบอกตารางเรียนประจำวันได้ (ต 2.1 ม.3/2)',
-    ],
-    evaluations: [
-      { id: 'ev3-1', title: 'การมีส่วนร่วม', weightPercent: 20, criteria: 'สังเกตพฤติกรรม' },
-      { id: 'ev3-2', title: 'งาน/ใบงาน', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
-      { id: 'ev3-3', title: 'สอบย่อย', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
-      { id: 'ev3-4', title: 'สอบปลายหน่วย', weightPercent: 20, criteria: 'ผ่านเกณฑ์ 70%' },
-    ],
-    files: [],
-    worksheets: [],
-    reflection: {
-      conductedDate: '-',
-      summary: 'ยังไม่ได้ดำเนินการสอน (กำหนดสัปดาห์ที่ 3)',
-      problem: '-',
-      solution: '-',
-      recordedBy: 'นายปัญจพล เกษรัตน์',
-    },
-  },
-  {
-    id: 'unit-4',
-    unitNumber: 4,
-    titleJa: '食べ物と飲み物',
-    titleTh: 'อาหารและเครื่องดื่ม',
-    displayTitle: '食べ物と飲み物 (อาหารและเครื่องดื่ม)',
-    periods: 4,
-    periodDurationText: '4 คาบ (50 นาที/คาบ)',
-    weekNumber: 4,
-    dateRange: 'สัปดาห์ที่ 4 (23 – 27 ต.ค. 2569)',
-    status: 'NOT_STARTED',
-    statusLabel: 'ยังไม่เริ่ม',
-    statusBadgeClass: 'bg-slate-100 text-slate-500 border-slate-200',
-    circleColorClass: 'bg-amber-500',
-    indicatorsSummary: '1.1 ตัวชี้วัด',
-    courseCode: 'ญ23101',
-    courseName: 'ภาษาญี่ปุ่น',
-    classroom: 'ม.3/1',
-    objectives: [
-      '1. สั่งอาหารและเครื่องดื่มในร้านอาหารญี่ปุ่นได้ (ต 1.1 ม.3/1)',
-      '2. บอกความชอบและรสชาติของอาหารได้ (ต 1.3 ม.3/1)',
-    ],
-    evaluations: [
-      { id: 'ev4-1', title: 'การมีส่วนร่วม', weightPercent: 20, criteria: 'สังเกตพฤติกรรม' },
-      { id: 'ev4-2', title: 'งาน/ใบงาน', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
-      { id: 'ev4-3', title: 'สอบย่อย', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
-      { id: 'ev4-4', title: 'สอบปลายหน่วย', weightPercent: 20, criteria: 'ผ่านเกณฑ์ 70%' },
-    ],
-    files: [],
-    worksheets: [],
-    reflection: {
-      conductedDate: '-',
-      summary: 'ยังไม่ได้ดำเนินการสอน',
-      problem: '-',
-      solution: '-',
-      recordedBy: 'นายปัญจพล เกษรัตน์',
-    },
-  },
-  {
-    id: 'unit-5',
-    unitNumber: 5,
-    titleJa: '旅行',
-    titleTh: 'การท่องเที่ยว',
-    displayTitle: '旅行 (การท่องเที่ยว)',
-    periods: 4,
-    periodDurationText: '4 คาบ (50 นาที/คาบ)',
-    weekNumber: 5,
-    dateRange: 'สัปดาห์ที่ 5 (30 ต.ค. – 3 พ.ย. 2569)',
-    status: 'NOT_STARTED',
-    statusLabel: 'ยังไม่เริ่ม',
-    statusBadgeClass: 'bg-slate-100 text-slate-500 border-slate-200',
-    circleColorClass: 'bg-rose-500',
-    indicatorsSummary: '1.1 ตัวชี้วัด',
-    courseCode: 'ญ23101',
-    courseName: 'ภาษาญี่ปุ่น',
-    classroom: 'ม.3/1',
-    objectives: [
-      '1. ถามทางและบอกทิศทางสถานที่ท่องเที่ยวในญี่ปุ่นได้ (ต 1.1 ม.3/1)',
-      '2. ซื้อตั๋วรถไฟและสอบถามข้อมูลยานพาหนะได้ (ต 2.1 ม.3/1)',
-    ],
-    evaluations: [
-      { id: 'ev5-1', title: 'การมีส่วนร่วม', weightPercent: 20, criteria: 'สังเกตพฤติกรรม' },
-      { id: 'ev5-2', title: 'งาน/ใบงาน', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
-      { id: 'ev5-3', title: 'สอบย่อย', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
-      { id: 'ev5-4', title: 'สอบปลายหน่วย', weightPercent: 20, criteria: 'ผ่านเกณฑ์ 70%' },
-    ],
-    files: [],
-    worksheets: [],
-    reflection: {
-      conductedDate: '-',
-      summary: 'ยังไม่ได้ดำเนินการสอน',
-      problem: '-',
-      solution: '-',
-      recordedBy: 'นายปัญจพล เกษรัตน์',
-    },
-  },
-  {
-    id: 'unit-6',
-    unitNumber: 6,
-    titleJa: '文化と行事',
-    titleTh: 'วัฒนธรรมและเทศกาล',
-    displayTitle: '文化と行事 (วัฒนธรรมและเทศกาล)',
-    periods: 4,
-    periodDurationText: '4 คาบ (50 นาที/คาบ)',
-    weekNumber: 6,
-    dateRange: 'สัปดาห์ที่ 6 (6 – 10 พ.ย. 2569)',
-    status: 'NOT_STARTED',
-    statusLabel: 'ยังไม่เริ่ม',
-    statusBadgeClass: 'bg-slate-100 text-slate-500 border-slate-200',
-    circleColorClass: 'bg-teal-500',
-    indicatorsSummary: '1.1 ตัวชี้วัด',
-    courseCode: 'ญ23101',
-    courseName: 'ภาษาญี่ปุ่น',
-    classroom: 'ม.3/1',
-    objectives: [
-      '1. อธิบายประเพณีและเทศกาลสำคัญของญี่ปุ่นได้ (ต 2.1 ม.3/1)',
-      '2. เปรียบเทียบวัฒนธรรมไทยกับวัฒนธรรมญี่ปุ่นได้อย่างถูกต้อง (ต 2.2 ม.3/1)',
-    ],
-    evaluations: [
-      { id: 'ev6-1', title: 'การมีส่วนร่วม', weightPercent: 20, criteria: 'สังเกตพฤติกรรม' },
-      { id: 'ev6-2', title: 'งาน/ใบงาน', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
-      { id: 'ev6-3', title: 'สอบย่อย', weightPercent: 30, criteria: 'ผ่านเกณฑ์ 70%' },
-      { id: 'ev6-4', title: 'สอบปลายหน่วย', weightPercent: 20, criteria: 'ผ่านเกณฑ์ 70%' },
-    ],
-    files: [],
-    worksheets: [],
-    reflection: {
-      conductedDate: '-',
-      summary: 'ยังไม่ได้ดำเนินการสอน',
-      problem: '-',
-      solution: '-',
-      recordedBy: 'นายปัญจพล เกษรัตน์',
-    },
-  },
-];
-
-// ==========================================
 // COMPONENT
 // ==========================================
 export const LessonPlansView: React.FC = () => {
@@ -416,7 +112,7 @@ export const LessonPlansView: React.FC = () => {
         }));
       }
     } catch {}
-    return cleanSlateService.isCleanSlateActive() ? [] : INITIAL_COURSES;
+    return [];
   });
   const [selectedCourseIndex, setSelectedCourseIndex] = useState(0);
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
@@ -426,6 +122,12 @@ export const LessonPlansView: React.FC = () => {
   const [selectedSemester, setSelectedSemester] = useState('ภาคเรียนที่ 1/2569');
   const [isSemesterDropdownOpen, setIsSemesterDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Real classroom statistics
+  const [classStudentCount, setClassStudentCount] = useState(0);
+  const [classAttendanceRate, setClassAttendanceRate] = useState(0);
+  const [classAbsentCount, setClassAbsentCount] = useState(0);
+  const [classLeaveCount, setClassLeaveCount] = useState(0);
 
   // Load classrooms dynamically from classroomService
   useEffect(() => {
@@ -445,6 +147,40 @@ export const LessonPlansView: React.FC = () => {
     };
   }, []);
 
+  // Sync real classroom statistics from studentService and attendanceCorrelationService
+  useEffect(() => {
+    if (!selectedClassroom) {
+      setClassStudentCount(0);
+      setClassAttendanceRate(0);
+      setClassAbsentCount(0);
+      setClassLeaveCount(0);
+      return;
+    }
+    let mounted = true;
+    studentService.getByClassroom(selectedClassroom).then((stus) => {
+      if (!mounted) return;
+      setClassStudentCount(stus.length);
+    }).catch(() => {});
+
+    try {
+      const stats = attendanceCorrelationService.getClassroomCumulativeStats(selectedClassroom);
+      if (mounted) {
+        setClassAttendanceRate(stats.overallAttendanceRate || 0);
+        setClassAbsentCount(stats.totalAbsentDays || 0);
+        setClassLeaveCount(stats.totalLeaveDays || 0);
+      }
+    } catch {
+      if (mounted) {
+        setClassAttendanceRate(0);
+        setClassAbsentCount(0);
+        setClassLeaveCount(0);
+      }
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [selectedClassroom]);
+
   const LESSON_PLANS_STORAGE_KEY = 'cls_lesson_plans_v1';
 
   // Units list state with localStorage persistence, default to empty array (Zero Mock Data)
@@ -454,7 +190,7 @@ export const LessonPlansView: React.FC = () => {
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed)) {
             return parsed;
           }
         } catch (e) {
@@ -462,7 +198,7 @@ export const LessonPlansView: React.FC = () => {
         }
       }
     }
-    return cleanSlateService.isCleanSlateActive() ? [] : INITIAL_UNITS;
+    return [];
   });
 
   // Sync units to localStorage whenever changed
@@ -1369,7 +1105,7 @@ export const LessonPlansView: React.FC = () => {
                     <span>นักเรียนทั้งหมด</span>
                   </div>
                   <span className="font-extrabold text-slate-900">
-                    {cleanSlateService.isCleanSlateActive() || !selectedClassroom ? '0 คน' : '32 คน'}
+                    {classStudentCount > 0 ? `${classStudentCount} คน` : '0 คน'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -1378,7 +1114,7 @@ export const LessonPlansView: React.FC = () => {
                     <span>เข้าเรียนเฉลี่ย</span>
                   </div>
                   <span className="font-extrabold text-emerald-600">
-                    {cleanSlateService.isCleanSlateActive() || !selectedClassroom ? '0%' : '93%'}
+                    {classAttendanceRate > 0 ? `${classAttendanceRate.toFixed(1)}%` : '0%'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -1387,7 +1123,7 @@ export const LessonPlansView: React.FC = () => {
                     <span>ขาดเรียน</span>
                   </div>
                   <span className="font-extrabold text-amber-600">
-                    {cleanSlateService.isCleanSlateActive() || !selectedClassroom ? '0 คน' : '2 คน'}
+                    {classAbsentCount} คน
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -1396,7 +1132,7 @@ export const LessonPlansView: React.FC = () => {
                     <span>ลากิจ/ลาป่วย</span>
                   </div>
                   <span className="font-extrabold text-rose-600">
-                    {cleanSlateService.isCleanSlateActive() || !selectedClassroom ? '0 คน' : '1 คน'}
+                    {classLeaveCount} คน
                   </span>
                 </div>
               </div>
@@ -1428,7 +1164,9 @@ export const LessonPlansView: React.FC = () => {
                   </div>
                   <div>
                     <div className="font-bold text-slate-800">สื่อการสอน (PDF)</div>
-                    <div className="text-[10px] text-slate-400">2 ไฟล์</div>
+                    <div className="text-[10px] text-slate-400">
+                      {currentUnit ? `${currentUnit.files.filter((f) => f.type === 'PDF' || f.name.toLowerCase().endsWith('.pdf')).length} ไฟล์` : '0 ไฟล์'}
+                    </div>
                   </div>
                 </div>
                 <button
@@ -1448,7 +1186,9 @@ export const LessonPlansView: React.FC = () => {
                   </div>
                   <div>
                     <div className="font-bold text-slate-800">ใบงาน (Word/PDF)</div>
-                    <div className="text-[10px] text-slate-400">3 ไฟล์</div>
+                    <div className="text-[10px] text-slate-400">
+                      {currentUnit ? `${currentUnit.worksheets.length} ไฟล์` : '0 ไฟล์'}
+                    </div>
                   </div>
                 </div>
                 <button
@@ -1468,7 +1208,9 @@ export const LessonPlansView: React.FC = () => {
                   </div>
                   <div>
                     <div className="font-bold text-slate-800">สื่อวิดีโอ (YouTube)</div>
-                    <div className="text-[10px] text-slate-400">1 ลิงก์</div>
+                    <div className="text-[10px] text-slate-400">
+                      {currentUnit ? `${currentUnit.files.filter((f) => (f.type as string) === 'VIDEO' || f.type === 'MP4').length} ลิงก์` : '0 ลิงก์'}
+                    </div>
                   </div>
                 </div>
                 <button
@@ -2139,19 +1881,27 @@ export const LessonPlansView: React.FC = () => {
             <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
               <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-xl">
                 <span className="text-slate-500 font-medium">นักเรียนทั้งหมด</span>
-                <div className="text-lg font-extrabold text-blue-700 mt-1">32 คน</div>
+                <div className="text-lg font-extrabold text-blue-700 mt-1">
+                  {classStudentCount > 0 ? `${classStudentCount} คน` : '0 คน'}
+                </div>
               </div>
               <div className="p-3 bg-emerald-50/70 border border-emerald-100 rounded-xl">
                 <span className="text-slate-500 font-medium">เข้าเรียนเฉลี่ย</span>
-                <div className="text-lg font-extrabold text-emerald-700 mt-1">93.2%</div>
+                <div className="text-lg font-extrabold text-emerald-700 mt-1">
+                  {classAttendanceRate > 0 ? `${classAttendanceRate.toFixed(1)}%` : '0%'}
+                </div>
               </div>
               <div className="p-3 bg-amber-50/70 border border-amber-100 rounded-xl">
                 <span className="text-slate-500 font-medium">ขาดเรียนสะสม</span>
-                <div className="text-lg font-extrabold text-amber-700 mt-1">2 คน</div>
+                <div className="text-lg font-extrabold text-amber-700 mt-1">
+                  {classAbsentCount} คน
+                </div>
               </div>
               <div className="p-3 bg-rose-50/70 border border-rose-100 rounded-xl">
-                <span className="text-slate-500 font-medium">การส่งใบงานเฉลี่ย</span>
-                <div className="text-lg font-extrabold text-rose-700 mt-1">96.8%</div>
+                <span className="text-slate-500 font-medium">ลากิจ/ลาป่วย</span>
+                <div className="text-lg font-extrabold text-rose-700 mt-1">
+                  {classLeaveCount} คน
+                </div>
               </div>
             </div>
 

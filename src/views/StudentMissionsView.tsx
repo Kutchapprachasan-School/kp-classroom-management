@@ -11,10 +11,14 @@ import {
   CheckCircle2,
   HelpCircle,
   Award,
+  Folder,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { gamificationService } from '../services/gamificationService';
 import { sgsRosterAndSubmissionService } from '../services/sgsRosterAndSubmissionService';
 import { cleanSlateService } from '../services/cleanSlateService';
+import { validateGoogleDriveUrl, generateRecommendedFolderPath } from '../utils/googleDriveUtils';
 import type { StudentQuestItem, StudentLeaderboardEntry } from '../types/viewModels';
 import type { AuthUser } from '../services/authService';
 
@@ -28,9 +32,11 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
   const [leaderboard, setLeaderboard] = useState<StudentLeaderboardEntry[]>([]);
   const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'SUBMITTED'>('ALL');
   const [selectedQuest, setSelectedQuest] = useState<StudentQuestItem | null>(null);
+  const [submissionType, setSubmissionType] = useState<'R2_FILE' | 'CANVA_VIDEO' | 'GOOGLE_DRIVE'>('R2_FILE');
   const [submitLink, setSubmitLink] = useState('');
   const [selectedFileName, setSelectedFileName] = useState('perspective_2point_45102.jpg');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [folderCopied, setFolderCopied] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   // Weekly Quiz Modal State
@@ -59,26 +65,65 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
     e.preventDefault();
     if (!selectedQuest) return;
 
+    if (submissionType === 'GOOGLE_DRIVE') {
+      const driveValidation = validateGoogleDriveUrl(submitLink);
+      if (!driveValidation.isValidFormat) {
+        setToastMsg(`⚠️ ${driveValidation.permissionWarningNotice}`);
+        setTimeout(() => setToastMsg(null), 3500);
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
       await gamificationService.submitQuest(selectedQuest.id, submitLink, 'stu-2');
-      sgsRosterAndSubmissionService.submitStudentWorkToR2({
-        assignmentId: 'asg-3',
-        studentCode: '45102',
-        workTitle: selectedQuest.title,
-        fileName: selectedFileName || 'student_work_45102.jpg',
-        originalSizeKb: 4250,
-        compressedSizeKb: 148,
-        externalLinkUrl: submitLink.trim() || undefined,
-        academicYearTerm: '1/2569',
-      });
+
+      if (submissionType === 'GOOGLE_DRIVE') {
+        sgsRosterAndSubmissionService.submitStudentWorkToR2({
+          assignmentId: 'asg-3',
+          studentCode: '45102',
+          workTitle: selectedQuest.title,
+          externalLinkUrl: submitLink.trim(),
+          academicYearTerm: '1/2569',
+          originalSizeKb: 0,
+          compressedSizeKb: 0,
+        });
+        setToastMsg(
+          `📁 ส่งโฟลเดอร์ Google Drive สำเร็จ! ประหยัดพื้นที่จัดเก็บโรงเรียน 100% (+${selectedQuest.xpReward} XP)`
+        );
+      } else if (submissionType === 'CANVA_VIDEO') {
+        sgsRosterAndSubmissionService.submitStudentWorkToR2({
+          assignmentId: 'asg-3',
+          studentCode: '45102',
+          workTitle: selectedQuest.title,
+          externalLinkUrl: submitLink.trim(),
+          academicYearTerm: '1/2569',
+          originalSizeKb: 0,
+          compressedSizeKb: 0,
+        });
+        setToastMsg(
+          `🎨 ส่งลิงก์ชิ้นงาน Canva สำเร็จ! (+${selectedQuest.xpReward} XP)`
+        );
+      } else {
+        sgsRosterAndSubmissionService.submitStudentWorkToR2({
+          assignmentId: 'asg-3',
+          studentCode: '45102',
+          workTitle: selectedQuest.title,
+          fileName: selectedFileName || 'student_work_45102.jpg',
+          originalSizeKb: 4250,
+          compressedSizeKb: 148,
+          academicYearTerm: '1/2569',
+        });
+        setToastMsg(
+          `☁️ อัปโหลด "${selectedFileName.replace(/\.(jpg|jpeg|png)$/i, '.webp')}" (บีบอัดเหลือ 148 KB) เข้า Cloudflare R2 สำเร็จ! (+${selectedQuest.xpReward} XP)`
+        );
+      }
+
       await loadQuests();
-      setToastMsg(
-        `☁️ อัปโหลด "${selectedFileName.replace(/\.(jpg|jpeg|png)$/i, '.webp')}" (บีบอัดเหลือ 148 KB) เข้า Cloudflare R2 สำเร็จ! (+${selectedQuest.xpReward} XP)`
-      );
       setTimeout(() => setToastMsg(null), 3500);
       setSelectedQuest(null);
       setSubmitLink('');
+      setSubmissionType('R2_FILE');
     } finally {
       setIsSubmitting(false);
     }
@@ -504,34 +549,57 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
 
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl text-xs font-bold">
+                {/* 3 Submission Tabs */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-xl text-xs font-bold">
                   <button
                     type="button"
-                    onClick={() => setSubmitLink('')}
-                    className={`py-2 px-3 rounded-lg transition-colors ${
-                      !submitLink
+                    onClick={() => {
+                      setSubmissionType('R2_FILE');
+                      setSubmitLink('');
+                    }}
+                    className={`py-2 px-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+                      submissionType === 'R2_FILE'
                         ? 'bg-white text-teal-800 shadow-2xs border border-teal-200'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    🖼️ 1. อัปโหลดรูป / PDF (ขึ้น R2)
+                    <Upload className="w-3.5 h-3.5 text-teal-600" />
+                    <span>1. รูป/PDF (R2)</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() =>
-                      setSubmitLink('https://www.canva.com/design/DAFxArtwork45102/view')
-                    }
-                    className={`py-2 px-3 rounded-lg transition-colors ${
-                      submitLink
+                    onClick={() => {
+                      setSubmissionType('CANVA_VIDEO');
+                      setSubmitLink('https://www.canva.com/design/DAFxArtwork45102/view');
+                    }}
+                    className={`py-2 px-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+                      submissionType === 'CANVA_VIDEO'
                         ? 'bg-white text-indigo-800 shadow-2xs border border-indigo-200'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    🎨 2. ส่งลิงก์ Canva / ลิงก์วิดีโอ
+                    <Link className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>2. Canva / วิดีโอ</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSubmissionType('GOOGLE_DRIVE');
+                      setSubmitLink('');
+                    }}
+                    className={`py-2 px-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+                      submissionType === 'GOOGLE_DRIVE'
+                        ? 'bg-white text-emerald-800 shadow-2xs border border-emerald-200'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Folder className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>3. Google Drive โฟลเดอร์</span>
                   </button>
                 </div>
 
-                {!submitLink ? (
+                {/* Tab 1: R2 Upload */}
+                {submissionType === 'R2_FILE' && (
                   <label className="block p-4 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl text-center space-y-2 cursor-pointer hover:bg-teal-50/30 transition-colors">
                     <Upload className="w-6 h-6 text-[#0C6D5B] mx-auto" />
                     <p className="font-bold text-slate-700">
@@ -549,9 +617,10 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                         if (!f) return;
                         if (/\.(mp4|mov|avi|mkv|webm)$/i.test(f.name)) {
                           setToastMsg(
-                            '🚫 ระบบไม่อนุญาตให้อัปโหลดไฟล์วิดีโอเข้า R2 กรุณาส่งเป็นลิงก์ Canva หรือลิงก์วิดีโอแทนครับ'
+                            '🚫 ระบบไม่อนุญาตให้อัปโหลดไฟล์วิดีโอเข้า R2 กรุณาส่งเป็นลิงก์ Canva หรือโฟลเดอร์ Google Drive แทนครับ'
                           );
                           setTimeout(() => setToastMsg(null), 4000);
+                          setSubmissionType('CANVA_VIDEO');
                           setSubmitLink('https://www.canva.com/design/DAFxArtwork45102/view');
                           return;
                         }
@@ -559,7 +628,10 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                       }}
                     />
                   </label>
-                ) : (
+                )}
+
+                {/* Tab 2: Canva / Video Link */}
+                {submissionType === 'CANVA_VIDEO' && (
                   <div className="p-4 bg-indigo-50/50 border border-indigo-200 rounded-2xl space-y-2">
                     <label className="block font-bold text-indigo-950 flex items-center gap-1.5">
                       <Link className="w-3.5 h-3.5 text-indigo-600" />
@@ -577,27 +649,124 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                     </p>
                   </div>
                 )}
+
+                {/* Tab 3: Google Drive Folder */}
+                {submissionType === 'GOOGLE_DRIVE' && (() => {
+                  const subjectCode = selectedQuest.subjectTitle?.split(' ')[0] || 'ศ23101';
+                  const folderTemplate = generateRecommendedFolderPath({
+                    schoolName: 'โรงเรียนกุดจับประชาสรรค์',
+                    termYear: '2569_1',
+                    subjectCode,
+                    assignmentTitle: selectedQuest.title,
+                  });
+                  const driveValidation = validateGoogleDriveUrl(submitLink);
+
+                  return (
+                    <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl space-y-3">
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <span className="font-bold text-emerald-950 flex items-center gap-1.5">
+                            <Folder className="w-4 h-4 text-emerald-600" />
+                            <span>โครงสร้างโฟลเดอร์ Google Drive ที่แนะนำ:</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(folderTemplate.copyableText);
+                              setFolderCopied(true);
+                              setTimeout(() => setFolderCopied(false), 2000);
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold text-[10px] flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                          >
+                            {folderCopied ? <Check className="w-3 h-3 text-emerald-700" /> : <Copy className="w-3 h-3 text-emerald-700" />}
+                            <span>{folderCopied ? 'คัดลอกแล้ว' : 'คัดลอกชื่อ'}</span>
+                          </button>
+                        </div>
+                        <div className="bg-white p-2.5 rounded-xl border border-emerald-200 font-mono text-[11px] text-emerald-900 select-all">
+                          {folderTemplate.copyableText}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block font-bold text-slate-800">
+                          วางลิงก์โฟลเดอร์ Google Drive ของคุณ:
+                        </label>
+                        <input
+                          type="url"
+                          placeholder="https://drive.google.com/drive/folders/..."
+                          value={submitLink}
+                          onChange={(e) => setSubmitLink(e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl focus:border-emerald-600 focus:outline-none text-xs"
+                        />
+                      </div>
+
+                      {submitLink.trim() && (
+                        <div>
+                          {driveValidation.isValidFormat ? (
+                            <div className="p-2.5 bg-white border border-emerald-300 rounded-xl space-y-2 text-[11px]">
+                              <div className="flex items-center gap-1.5 text-emerald-700 font-bold">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                <span>{driveValidation.permissionWarningNotice}</span>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1 border-t border-slate-100">
+                                {driveValidation.suggestedPolicies.map((pol) => (
+                                  <div key={pol.id} className="p-2 bg-slate-50 rounded-lg border border-slate-200">
+                                    <div className="font-bold text-slate-800 flex items-center gap-1">
+                                      {pol.isRecommendedForPii ? '🛡️ ' : '🌐 '}
+                                      <span>{pol.label}</span>
+                                    </div>
+                                    <p className="text-slate-500 text-[10px] mt-0.5">{pol.description}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-2 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-[11px] font-semibold">
+                              ⚠️ {driveValidation.permissionWarningNotice}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <p className="text-[11px] text-emerald-700 font-medium">
+                        ✓ ส่งลิงก์โฟลเดอร์ Google Drive ของตนเอง ช่วยประหยัดพื้นที่ R2 ของโรงเรียน (0 KB)
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-800 flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>ส่งไฟล์ตรงเข้า Cloudflare R2 โดยไม่ต้องล็อกอิน Google Drive และได้รับ +{selectedQuest.xpReward} XP</span>
+                <span>
+                  {submissionType === 'GOOGLE_DRIVE'
+                    ? 'ส่งโฟลเดอร์ Google Drive ของตนเอง ไม่จำกัดขนาดไฟล์ และได้รับ +' + selectedQuest.xpReward + ' XP'
+                    : submissionType === 'CANVA_VIDEO'
+                    ? 'ส่งลิงก์ Canva หรือวิดีโอภายนอก และได้รับ +' + selectedQuest.xpReward + ' XP'
+                    : 'ส่งไฟล์ตรงเข้า Cloudflare R2 โดยไม่ต้องล็อกอิน Google Drive และได้รับ +' + selectedQuest.xpReward + ' XP'}
+                </span>
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setSelectedQuest(null)}
-                  className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl font-semibold"
+                  className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl font-semibold cursor-pointer"
                 >
                   ยกเลิก
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 bg-[#0C6D5B] hover:bg-[#095748] text-white rounded-xl font-bold shadow-xs transition-colors flex items-center gap-1.5"
+                  className="px-5 py-2 bg-[#0C6D5B] hover:bg-[#095748] text-white rounded-xl font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  {isSubmitting ? 'กำลังอัปโหลดขึ้น R2...' : '☁️ อัปโหลดขึ้น R2 & ส่งงาน'}
+                  {isSubmitting
+                    ? 'กำลังส่งงาน...'
+                    : submissionType === 'GOOGLE_DRIVE'
+                    ? '📁 ส่งโฟลเดอร์ Google Drive'
+                    : submissionType === 'CANVA_VIDEO'
+                    ? '🎨 ส่งลิงก์ชิ้นงาน'
+                    : '☁️ อัปโหลดขึ้น R2 & ส่งงาน'}
                 </button>
               </div>
             </form>
