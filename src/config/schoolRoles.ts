@@ -227,7 +227,11 @@ export function saveSchoolSettings(next: Partial<SchoolBrandingSettings>): Schoo
   }
   merged.baseFontSizePx = clampFontSize11To20(merged.baseFontSizePx);
   if (typeof window !== 'undefined') {
-    window.localStorage.setItem(SCHOOL_SETTINGS_STORAGE_KEY, JSON.stringify(merged));
+    try {
+      window.localStorage.setItem(SCHOOL_SETTINGS_STORAGE_KEY, JSON.stringify(merged));
+    } catch (storageErr) {
+      console.warn('[LocalStorage] Could not write school settings to localStorage:', storageErr);
+    }
     applySchoolBrandingAndTypography(merged);
     window.dispatchEvent(new Event('kps-school-settings-updated'));
   }
@@ -256,6 +260,29 @@ export function saveSchoolSettings(next: Partial<SchoolBrandingSettings>): Schoo
     })();
   }
 
+  return merged;
+}
+
+export async function saveSchoolSettingsAsync(next: Partial<SchoolBrandingSettings>): Promise<SchoolBrandingSettings> {
+  const merged = saveSchoolSettings(next);
+  if (isSupabaseConfigured) {
+    try {
+      const { error } = await supabase
+        .from('SystemSettings')
+        .update({
+          schoolName: merged.nameTh,
+          affiliation: merged.affiliation,
+          logoUrl: merged.logoUrl,
+          updatedAt: new Date().toISOString(),
+        })
+        .eq('id', 'default');
+      if (error) {
+        console.warn('[Supabase Sync] Failed to update SystemSettings:', error.message);
+      }
+    } catch (err) {
+      console.warn('[Supabase Sync] Error updating SystemSettings:', err);
+    }
+  }
   return merged;
 }
 

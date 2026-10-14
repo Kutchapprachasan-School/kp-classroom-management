@@ -27,6 +27,7 @@ import {
 import {
   getSchoolSettings,
   type SchoolUserRole,
+  type SchoolBrandingSettings,
 } from '../../config/schoolRoles';
 import type { AuthUser } from '../../services/authService';
 import { formatThaiDateFull } from '../../utils/timetableDateUtils';
@@ -73,7 +74,17 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
   onLogout,
   onDeepNavigate,
 }) => {
-  const schoolSettings = getSchoolSettings();
+  const [schoolSettings, setSchoolSettings] = useState<SchoolBrandingSettings>(() =>
+    getSchoolSettings()
+  );
+
+  useEffect(() => {
+    const handleSettingsUpdate = () => {
+      setSchoolSettings(getSchoolSettings());
+    };
+    window.addEventListener('kps-school-settings-updated', handleSettingsUpdate);
+    return () => window.removeEventListener('kps-school-settings-updated', handleSettingsUpdate);
+  }, []);
 
   const [fontScale, setFontScale] = useState<FontScaleMode>(() => {
     if (typeof window !== 'undefined') {
@@ -425,11 +436,11 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
 
           <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 flex items-center justify-center shadow-2xs">
             <img
-              src="/images/teacher/school_logo.png"
+              src={schoolSettings.logoUrl || '/images/teacher/school_logo.png'}
               alt={schoolSettings.nameTh}
               className="w-full h-full object-contain"
               onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src = schoolSettings.logoUrl;
+                (e.currentTarget as HTMLImageElement).src = '/images/teacher/school_logo.png';
               }}
             />
           </div>

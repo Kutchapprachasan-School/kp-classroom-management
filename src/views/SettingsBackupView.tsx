@@ -36,10 +36,12 @@ import {
 import {
   getSchoolSettings,
   saveSchoolSettings,
+  saveSchoolSettingsAsync,
   DEFAULT_KUTCHAP_LOGO_SVG,
   type SchoolUserRole,
   type SchoolBrandingSettings,
 } from '../config/schoolRoles';
+import { compressSchoolLogoImage } from '../utils/imageCompressor';
 
 import {
   schoolPoliciesService,
@@ -280,7 +282,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
   // --------------------------------------------------------------------------
   const logoFileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleLogoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -289,35 +291,53 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      if (dataUrl) {
+    try {
+      showToast('⏳ กำลังประมวลผลและบีบอัดรูปภาพตราโรงเรียน...');
+      let finalDataUrl = '';
+      if (file.type === 'image/svg+xml') {
+        finalDataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error('ไม่สามารถอ่านไฟล์ SVG ได้'));
+          reader.readAsDataURL(file);
+        });
+      } else {
+        const compressed = await compressSchoolLogoImage(file);
+        finalDataUrl = compressed.dataUrl;
+      }
+
+      if (finalDataUrl) {
         setSchoolSettings((prev) => {
-          const updated = { ...prev, logoUrl: dataUrl };
+          const updated = { ...prev, logoUrl: finalDataUrl };
           saveSchoolSettings(updated);
           return updated;
         });
-        showToast('✓ อัปโหลดตราโรงเรียนและบันทึกลงฐานข้อมูล Supabase เรียบร้อยแล้ว');
+        await saveSchoolSettingsAsync({ logoUrl: finalDataUrl });
+        showToast('✓ บันทึกตราโรงเรียนและซิงค์คลาวด์ Supabase สำเร็จ');
       }
-    };
-    reader.onerror = () => {
-      showToast('❌ ไม่สามารถอ่านไฟล์รูปภาพได้');
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Logo upload error:', err);
+      showToast('❌ ไม่สามารถอัปโหลดตราโรงเรียนได้ กรุณาลองใหม่อีกครั้ง');
+    } finally {
+      if (e.target) {
+        e.target.value = '';
+      }
+    }
   };
 
-  const handleResetLogoToDefault = () => {
+  const handleResetLogoToDefault = async () => {
     setSchoolSettings((prev) => {
       const updated = { ...prev, logoUrl: DEFAULT_KUTCHAP_LOGO_SVG };
       saveSchoolSettings(updated);
       return updated;
     });
+    await saveSchoolSettingsAsync({ logoUrl: DEFAULT_KUTCHAP_LOGO_SVG });
     showToast('🔄 คืนค่าตราโรงเรียนมาตรฐานและบันทึกเรียบร้อย');
   };
 
-  const handleSaveSchoolInfo = () => {
+  const handleSaveSchoolInfo = async () => {
     saveSchoolSettings(schoolSettings);
+    await saveSchoolSettingsAsync(schoolSettings);
     showToast('✓ บันทึกข้อมูลโรงเรียน อัตลักษณ์ และตราสัญลักษณ์เรียบร้อยแล้ว');
   };
 

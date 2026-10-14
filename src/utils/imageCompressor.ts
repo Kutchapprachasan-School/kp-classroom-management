@@ -330,3 +330,29 @@ export async function compressSubjectBannerImage(
     isWithinQuota,
   };
 }
+
+export const DEFAULT_LOGO_COMPRESSION_OPTIONS: CompressionOptions = {
+  maxWidth: 256,
+  maxHeight: 256,
+  maxSizeBytes: 81920, // 80 KB
+  initialQuality: 0.90,
+  minQuality: 0.70,
+  qualityStep: 0.05,
+  mimeType: 'image/png',
+  fallbackMimeType: 'image/webp',
+};
+
+/**
+ * Compresses uploaded school logos down to max 256x256 and < 80KB
+ * preserving transparency while preventing localStorage QuotaExceededError.
+ */
+export async function compressSchoolLogoImage(
+  file: File | Blob,
+  options?: Partial<CompressionOptions>
+): Promise<CompressedImageResult> {
+  return compressSubjectBannerImage(file, {
+    ...DEFAULT_LOGO_COMPRESSION_OPTIONS,
+    ...options,
+  });
+}
+

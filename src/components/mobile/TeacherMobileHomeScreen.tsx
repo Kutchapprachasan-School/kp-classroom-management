@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  Bell,
   Home,
   Calendar,
   FileSpreadsheet,
@@ -9,10 +8,8 @@ import {
   BarChart2,
   ClipboardList,
   ChevronRight,
-  Cloud,
 } from 'lucide-react';
 import type { TeacherViewKey } from '../layout/TeacherSidebar';
-import { getSchoolSettings } from '../../config/schoolRoles';
 
 interface TeacherMobileHomeScreenProps {
   onNavigate: (view: TeacherViewKey) => void;
@@ -27,75 +24,8 @@ export const TeacherMobileHomeScreen: React.FC<TeacherMobileHomeScreenProps> = (
   department = 'ครู กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ',
   avatarUrl = '/images/teacher/teacher_avatar.png',
 }) => {
-  const schoolSettings = getSchoolSettings();
-
   return (
     <div className="w-full max-w-md mx-auto space-y-4 pb-24 font-sans select-none text-slate-800">
-      {/* 1. TOP HEADER: School Brand + Teacher Avatar & Bell */}
-      <div className="flex items-center justify-between gap-2 pt-1 pb-1">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0 bg-white border border-slate-100 p-0.5 shadow-2xs flex items-center justify-center">
-            <img
-              src={schoolSettings.logoUrl || '/images/teacher/school_logo.png'}
-              alt={schoolSettings.nameTh}
-              className="w-full h-full object-contain"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src = '/images/teacher/school_logo.png';
-              }}
-            />
-          </div>
-          <div className="min-w-0">
-            <h1 className="font-extrabold text-slate-900 text-xs sm:text-sm leading-tight truncate">
-              {schoolSettings.nameTh || 'โรงเรียนคำยางพิทยา'}
-            </h1>
-            <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
-              {schoolSettings.districtProvince || 'ต.นาสูง อ.วังสามหมอ จ.อุดรธานี'}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Cloud Sync Status Badge */}
-          <div
-            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-[10px] font-bold text-emerald-700 shadow-2xs"
-            title="เชื่อมต่อฐานข้อมูลคลาวด์ Supabase แล้ว (เปลี่ยนเครื่องข้อมูลไม่หาย)"
-          >
-            <Cloud className="w-3 h-3 text-emerald-600" />
-            <span className="hidden xs:inline">คลาวด์</span>
-          </div>
-
-          {/* Notification Bell with Badge 3 */}
-          <button
-            type="button"
-            onClick={() => onNavigate('messages')}
-            className="p-2 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-600 relative transition-colors cursor-pointer"
-            title="การแจ้งเตือน"
-            aria-label="การแจ้งเตือน"
-          >
-            <Bell className="w-4 h-4 text-slate-600" />
-            <span className="absolute top-1 right-1 min-w-3.5 h-3.5 px-0.5 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center border border-white">
-              3
-            </span>
-          </button>
-
-          {/* Profile Avatar */}
-          <button
-            type="button"
-            onClick={() => onNavigate('mobile-more')}
-            className="w-8 h-8 rounded-full overflow-hidden border border-blue-200/90 shadow-2xs bg-blue-50 cursor-pointer"
-          >
-            <img
-              src={avatarUrl}
-              alt={teacherName}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src =
-                  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150';
-              }}
-            />
-          </button>
-        </div>
-      </div>
 
       {/* 2. HERO BANNER: สวัสดีครับ + ครูปัญจพล + ภาพโรงเรียนและอนิเมะ */}
       <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 p-4 shadow-sm text-white">

@@ -464,20 +464,27 @@ console.log('  ✓ Static source checks for dimensions, smoothing, and format fa
 
 const {
   compressSubjectBannerImage,
+  compressSchoolLogoImage,
   estimateBase64SizeBytes,
   dataUrlToBlob,
   calculateAspectRatioDimensions,
   formatBytes,
   isImageFile,
   DEFAULT_BANNER_COMPRESSION_OPTIONS,
+  DEFAULT_LOGO_COMPRESSION_OPTIONS,
 } = await import('./src/utils/imageCompressor.ts');
 
 assert.ok(typeof compressSubjectBannerImage === 'function', 'compressSubjectBannerImage must be exported');
+assert.ok(typeof compressSchoolLogoImage === 'function', 'compressSchoolLogoImage must be exported');
 assert.ok(typeof estimateBase64SizeBytes === 'function', 'estimateBase64SizeBytes must be exported');
 assert.ok(typeof dataUrlToBlob === 'function', 'dataUrlToBlob must be exported');
 assert.ok(DEFAULT_BANNER_COMPRESSION_OPTIONS.maxWidth === 1200);
 assert.ok(DEFAULT_BANNER_COMPRESSION_OPTIONS.maxHeight === 360);
 assert.ok(DEFAULT_BANNER_COMPRESSION_OPTIONS.maxSizeBytes === 153600);
+assert.ok(DEFAULT_LOGO_COMPRESSION_OPTIONS.maxWidth === 256);
+assert.ok(DEFAULT_LOGO_COMPRESSION_OPTIONS.maxHeight === 256);
+assert.ok(DEFAULT_LOGO_COMPRESSION_OPTIONS.maxSizeBytes === 81920);
+
 
 // Test 4.1: Base64 byte size estimation accuracy with padding and schemes
 console.log('  Testing 4.1: Base64 byte size estimation accuracy...');
@@ -545,6 +552,25 @@ assert.strictEqual(formatBytes(153600), '150 KB');
 assert.strictEqual(isImageFile(mockBannerBlob), true);
 assert.strictEqual(isImageFile(new Blob(['hello'], { type: 'text/plain' })), false);
 console.log('  ✓ Utility formatting helpers verified');
+
+// Check Mobile Header & School Logo Fixes
+const mobileHomePath = './src/components/mobile/TeacherMobileHomeScreen.tsx';
+assert.ok(existsSync(mobileHomePath));
+const mobileHomeSource = readFileSync(mobileHomePath, 'utf8');
+assert.ok(!mobileHomeSource.includes('{/* 1. TOP HEADER: School Brand + Teacher Avatar & Bell */}'), 'Must remove redundant top header from mobile home screen');
+
+const teacherHeaderPath = './src/components/layout/TeacherHeader.tsx';
+assert.ok(existsSync(teacherHeaderPath));
+const teacherHeaderSource = readFileSync(teacherHeaderPath, 'utf8');
+assert.ok(teacherHeaderSource.includes("schoolSettings.logoUrl || '/images/teacher/school_logo.png'"), 'TeacherHeader mobile logo must prioritize schoolSettings.logoUrl');
+assert.ok(teacherHeaderSource.includes('kps-school-settings-updated'), 'TeacherHeader must subscribe to kps-school-settings-updated');
+
+const logoSettingsViewPath = './src/views/SettingsBackupView.tsx';
+assert.ok(existsSync(logoSettingsViewPath));
+const logoSettingsViewSource = readFileSync(logoSettingsViewPath, 'utf8');
+assert.ok(logoSettingsViewSource.includes('compressSchoolLogoImage'), 'SettingsBackupView must use compressSchoolLogoImage');
+console.log('  ✓ Mobile header deduplication and reactive school logo rendering verified');
+
 
 // ----------------------------------------------------
 // Step 5: Teacher Sidebar Reorganization & App Navigation Verification (Task 4)
