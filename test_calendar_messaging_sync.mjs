@@ -157,6 +157,97 @@ console.log('  ✓ Weekend makeup day created successfully with target grades');
 // 2. Verify Messaging Service & Auto Group Creation
 // ---------------------------------------------------------------------------
 console.log('\n--- 2. Testing Messaging Service & Auto-Groups ---');
+const { coursesCurriculumService } = await import('./src/services/coursesCurriculumService.ts');
+const { studentService } = await import('./src/services/studentService.ts');
+const { sgsRosterAndSubmissionService } = await import('./src/services/sgsRosterAndSubmissionService.ts');
+
+// Seed test curriculum courses for the test suite
+coursesCurriculumService.saveCourses([
+  {
+    id: 'course-math-101',
+    code: 'ค21101',
+    name: 'คณิตศาสตร์พื้นฐาน 1',
+    strand: 'คณิตศาสตร์',
+    level: 'ม.1',
+    credits: 1.5,
+    periodsPerWeek: 3,
+    academicYear: '2569',
+    term: '1',
+    assignedClassrooms: ['ม.1/1', 'ม.1/2'],
+    teacherName: 'ครูวิชัย ศรีสุนทร',
+    units: [],
+  },
+  {
+    id: 'course-math-201',
+    code: 'ค22101',
+    name: 'คณิตศาสตร์พื้นฐาน 3',
+    strand: 'คณิตศาสตร์',
+    level: 'ม.2',
+    credits: 1.5,
+    periodsPerWeek: 3,
+    academicYear: '2569',
+    term: '1',
+    assignedClassrooms: ['ม.2/1'],
+    teacherName: 'ครูวิชัย ศรีสุนทร',
+    units: [],
+  },
+]);
+
+// Seed test student rosters
+studentService.saveLocalStudents('room-1-1', [
+  { id: 'stu-47001', no: 1, code: '47001', name: 'ด.ช. ชนะภัย ยอดสิงห์', attendance: '8/8', score: 85, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-1' },
+  { id: 'stu-47002', no: 2, code: '47002', name: 'ด.ญ. ชลิตา มงคล', attendance: '8/8', score: 90, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-1' },
+]);
+studentService.saveLocalStudents('ม.1/1', studentService.getLocalStudents('room-1-1'));
+
+studentService.saveLocalStudents('room-1-2', [
+  { id: 'stu-47010', no: 1, code: '47010', name: 'ด.ช. ภานุวัฒน์ แสนสุข', attendance: '8/8', score: 80, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-2' },
+]);
+studentService.saveLocalStudents('ม.1/2', studentService.getLocalStudents('room-1-2'));
+
+studentService.saveLocalStudents('room-2-1', [
+  { id: 'stu-48001', no: 1, code: '48001', name: 'ด.ช. ภาณุพงศ์ มีสุข', attendance: '8/8', score: 82, status: 'NORMAL', gender: 'MALE', classroomId: 'room-2-1' },
+  { id: 'stu-48002', no: 2, code: '48002', name: 'ด.ญ. สุภัสสรา รุ่งเรือง', attendance: '8/8', score: 88, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-2-1' },
+  { id: 'stu-48003', no: 3, code: '48003', name: 'ด.ช. ธีรภัทร ชนะภัย', attendance: '8/8', score: 75, status: 'NORMAL', gender: 'MALE', classroomId: 'room-2-1' },
+]);
+studentService.saveLocalStudents('ม.2/1', studentService.getLocalStudents('room-2-1'));
+
+// Seed test student submissions for student 47001
+sgsRosterAndSubmissionService.saveSubmissions([
+  {
+    assignmentId: 'asg-1',
+    studentCode: '47001',
+    status: 'GRADED',
+    score: 9.5,
+    submittedAt: '2026-05-20T10:00:00Z',
+    workTitle: 'ใบงานที่ 1: วงจรสีธรรมชาติ',
+  },
+  {
+    assignmentId: 'asg-2',
+    studentCode: '47001',
+    status: 'GRADED',
+    score: 5.0,
+    submittedAt: '2026-06-05T11:00:00Z',
+    workTitle: 'ชิ้นงานที่ 2: แรงเงาแสงเงาหุ่นนิ่ง',
+  },
+]);
+
+// Seed test SGS roster
+sgsRosterAndSubmissionService.saveSgsRoster([
+  {
+    sgsSeatNo: 1,
+    studentCode: '47001',
+    studentName: 'ด.ช. ชนะภัย ยอดสิงห์',
+    gender: 'MALE',
+    classroom: 'ม.1/1',
+    transferState: 'ACTIVE',
+    attendancePercent: 100,
+    morningStatusLabel: 'มาเข้าแถวปกติ',
+    midtermScore: 18,
+    finalScore: 28,
+  },
+]);
+
 const { messagingService } = await import('./src/services/messagingService.ts');
 
 const groups = messagingService.getGroups();
@@ -201,9 +292,6 @@ console.log('  ✓ Chat message sent and group lastMessageText updated');
 // 3. Verify Student Transfer Synchronization (ม.1/1 -> ม.1/2)
 // ---------------------------------------------------------------------------
 console.log('\n--- 3. Testing Student Transfer Sync & Data Preservation ---');
-
-const { sgsRosterAndSubmissionService } = await import('./src/services/sgsRosterAndSubmissionService.ts');
-const { studentService } = await import('./src/services/studentService.ts');
 
 const initialSubmissions = sgsRosterAndSubmissionService.getSubmissions()
   .filter((sub) => sub.studentCode === '47001');

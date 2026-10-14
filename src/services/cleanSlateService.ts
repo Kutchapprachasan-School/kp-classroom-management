@@ -20,6 +20,8 @@ export const TRANSACTIONAL_STORAGE_KEYS = [
   'cls_attendance_records',
   'cls_timetable_data',
   'cls_chat_messages',
+  'kp_chat_groups_v3',
+  'kp_chat_groups_v4',
   'kp_exams_management_data_v1',
   'kp_student_quiz_attempts',
   'kp_assignment_submissions_v1',

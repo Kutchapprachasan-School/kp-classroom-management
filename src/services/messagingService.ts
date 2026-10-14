@@ -7,6 +7,8 @@
 
 import { classroomService } from './classroomService.ts';
 import { studentService, type StudentRecord } from './studentService.ts';
+import { coursesCurriculumService } from './coursesCurriculumService.ts';
+import { cleanSlateService } from './cleanSlateService.ts';
 import { sgsRosterAndSubmissionService, type StudentWorkSubmission } from './sgsRosterAndSubmissionService.ts';
 import { indexedDbAdapter, type OutboxItem } from '../utils/indexedDbAdapter.ts';
 
@@ -103,34 +105,18 @@ export interface StudentTransferResult {
   transferredAt: string;
 }
 
-const STORAGE_KEY_CHAT_GROUPS = 'kp_chat_groups_v3';
+const STORAGE_KEY_CHAT_GROUPS = 'kp_chat_groups_v4';
 export const CHAT_GROUPS_EVENT = 'kp-chat-updated';
 export const STUDENT_TRANSFERRED_EVENT = 'kp-student-transferred';
 
 // ข้อมูลหลักสูตรประจำห้องสำหรับสร้างกลุ่มประจำวิชาอัตโนมัติ
-interface CourseClassroomMapping {
+export interface CourseClassroomMapping {
   courseCode: string;
   courseName: string;
   classroomId: string;
   classroomName: string;
   teacherName: string;
 }
-
-const DEFAULT_COURSE_MAPPINGS: CourseClassroomMapping[] = [
-  { courseCode: 'ศ23101', courseName: 'ศิลปะ (ทัศนศิลป์ ดนตรี)', classroomId: 'room-3-1', classroomName: 'ม.3/1', teacherName: 'ครูภาสภูมิ เรืองปราชญ์' },
-  { courseCode: 'ญ32101', courseName: 'ภาษาญี่ปุ่นเพื่อการสื่อสาร', classroomId: 'room-3-1', classroomName: 'ม.3/1', teacherName: 'ครูภาสภูมิ เรืองปราชญ์' },
-  { courseCode: 'ศ23101', courseName: 'ศิลปะ (ทัศนศิลป์ ดนตรี)', classroomId: 'room-3-2', classroomName: 'ม.3/2', teacherName: 'ครูภาสภูมิ เรืองปราชญ์' },
-  { courseCode: 'ว23101', courseName: 'วิทยาศาสตร์และเทคโนโลยี 5', classroomId: 'room-3-2', classroomName: 'ม.3/2', teacherName: 'ครูกิตติ มั่นคง' },
-  { courseCode: 'ค21101', courseName: 'คณิตศาสตร์พื้นฐาน 1', classroomId: 'room-1-1', classroomName: 'ม.1/1', teacherName: 'ครูวิชัย ศรีสุนทร' },
-  { courseCode: 'ค21101', courseName: 'คณิตศาสตร์พื้นฐาน 1', classroomId: 'room-1-2', classroomName: 'ม.1/2', teacherName: 'ครูวิชัย ศรีสุนทร' },
-  { courseCode: 'ท21101', courseName: 'ภาษาไทย 1', classroomId: 'room-1-1', classroomName: 'ม.1/1', teacherName: 'ครูรัตนา วัฒนา' },
-  { courseCode: 'ท21101', courseName: 'ภาษาไทย 1', classroomId: 'room-1-2', classroomName: 'ม.1/2', teacherName: 'ครูรัตนา วัฒนา' },
-  { courseCode: 'ค22101', courseName: 'คณิตศาสตร์พื้นฐาน 3', classroomId: 'room-2-1', classroomName: 'ม.2/1', teacherName: 'ครูวิชัย ศรีสุนทร' },
-  { courseCode: 'ท22101', courseName: 'ภาษาไทย 3', classroomId: 'room-2-1', classroomName: 'ม.2/1', teacherName: 'ครูรัตนา วัฒนา' },
-  { courseCode: 'ศ20221', courseName: 'ดนตรีปฏิบัติตามความถนัด 1', classroomId: 'room-1-8', classroomName: 'ม.1/8', teacherName: 'ครูภาสภูมิ เรืองปราชญ์' },
-  { courseCode: 'ศ20223', courseName: 'ดนตรีปฏิบัติตามความถนัด 2', classroomId: 'room-2-8', classroomName: 'ม.2/8', teacherName: 'ครูภาสภูมิ เรืองปราชญ์' },
-  { courseCode: 'ศ20225', courseName: 'ดนตรีปฏิบัติตามความถนัด 3', classroomId: 'room-3-8', classroomName: 'ม.3/8', teacherName: 'ครูภาสภูมิ เรืองปราชญ์' },
-];
 
 let _inMemoryGroupsCache: ChatGroup[] | null = null;
 
@@ -201,18 +187,49 @@ export const messagingService = {
     };
   },
 
-  // สร้างกลุ่มเริ่มต้นโดยดึงสมาชิกจากทะเบียนห้องเรียนอัตโนมัติ
+  // ดึง Mapping รายวิชาจริงจาก coursesCurriculumService
+  getCourseClassroomMappings(): CourseClassroomMapping[] {
+    const curriculumCourses = coursesCurriculumService.getCourses();
+    if (!curriculumCourses || curriculumCourses.length === 0) {
+      return [];
+    }
+
+    const allClassrooms = classroomService.getClassroomsSync();
+    const mappings: CourseClassroomMapping[] = [];
+
+    curriculumCourses.forEach((c) => {
+      if (c.assignedClassrooms && c.assignedClassrooms.length > 0) {
+        c.assignedClassrooms.forEach((roomName) => {
+          const matched = allClassrooms.find(
+            (r) => r.name === roomName || r.roomNumber === roomName || r.id === roomName
+          );
+          const roomId = matched?.id || `room-${roomName.replace(/[^0-9-]/g, '')}`;
+          mappings.push({
+            courseCode: c.code,
+            courseName: c.name,
+            classroomId: roomId,
+            classroomName: roomName,
+            teacherName: c.teacherName || 'ครูผู้สอน',
+          });
+        });
+      }
+    });
+
+    return mappings;
+  },
+
+  // สร้างกลุ่มเริ่มต้นโดยดึงสมาชิกจากทะเบียนห้องเรียนและหลักสูตรจริงอัตโนมัติ (Zero Mock Data)
   generateInitialGroups(): ChatGroup[] {
     const groups: ChatGroup[] = [];
 
-    // 1. กลุ่มทางการ & ข่าวสารโรงเรียน
+    // 1. กลุ่มทางการ & ข่าวสารโรงเรียน (Official Announcements)
     groups.push({
       id: 'grp-official-announcements',
       name: '📢 ข่าวสารและประกาศทางการ รร.กุดจับประชาสรรค์',
       type: 'OFFICIAL',
       typeLabel: 'ประกาศทางการ',
       description: 'ช่องทางสื่อสารข้อมูลข่าวสารและคำสั่งราชการสำหรับครู บุคลากร และนักเรียนทุกคน',
-      teacherName: 'ฝ่ายบริหารโรงเรียนกุดจับประชาสรรค์',
+      teacherName: 'ฝ่ายบริหารงานโรงเรียน',
       teacherRoleLabel: 'ผู้ดูแลระบบกลาง',
       autoManaged: true,
       unreadCount: 0,
@@ -225,47 +242,29 @@ export const messagingService = {
           joinedAt: 'ต้นภาคเรียน',
         },
       ],
-      messages: [
-        {
-          id: 'msg-off-1',
-          groupId: 'grp-official-announcements',
-          senderId: 'u-admin',
-          senderName: 'งานประชาสัมพันธ์',
-          senderRole: 'TEACHER',
-          content: 'ยินดีต้อนรับสู่ระบบจัดการชั้นเรียนและระบบข้อความอัตโนมัติ ภาคเรียนที่ 1/2569',
-          timestamp: '30 ก.ย. 08:30 น.',
-        },
-      ],
-      lastMessageText: 'ยินดีต้อนรับสู่ระบบจัดการชั้นเรียนและระบบข้อความอัตโนมัติ',
-      lastMessageTime: '30 ก.ย. 08:30 น.',
-    });
-
-    // 2. กลุ่มกลุ่มสาระการเรียนรู้
-    groups.push({
-      id: 'grp-dept-art',
-      name: '👥 กลุ่มสาระการเรียนรู้ศิลปะและภาษาต่างประเทศ',
-      type: 'DEPARTMENT',
-      typeLabel: 'กลุ่มสาระการเรียนรู้',
-      description: 'กลุ่มประสานงานภายในกลุ่มสาระการเรียนรู้ศิลปะ การจัดทำแผน และนิทรรศการ',
-      teacherName: 'ครูภาสภูมิ เรืองปราชญ์ (หัวหน้าหมวด)',
-      teacherRoleLabel: 'หัวหน้ากลุ่มสาระฯ',
-      autoManaged: false,
-      unreadCount: 0,
-      members: [
-        {
-          id: 't-pasporm',
-          code: 'KPS-T104',
-          name: 'ครูภาสภูมิ เรืองปราชญ์',
-          role: 'TEACHER',
-          joinedAt: 'ต้นภาคเรียน',
-        },
-      ],
       messages: [],
       lastMessageText: '',
       lastMessageTime: '',
     });
 
-    // 3. กลุ่มครูที่ปรึกษา (Homeroom Advisor Groups) - ดึงนักเรียนในห้องเข้าอัตโนมัติ
+    // 2. กลุ่มประสานงานครูและบุคลากรทางการศึกษา
+    groups.push({
+      id: 'grp-all-teachers',
+      name: '👥 กลุ่มประสานงานครูและบุคลากรทางการศึกษา',
+      type: 'DEPARTMENT',
+      typeLabel: 'กลุ่มครูและบุคลากร',
+      description: 'กลุ่มประสานงานภาระงานสอน วิชาการ และงานบริหารงานทั่วไปของโรงเรียน',
+      teacherName: 'ฝ่ายบริหารงานวิชาการ',
+      teacherRoleLabel: 'ผู้ดูแลกลุ่ม',
+      autoManaged: true,
+      unreadCount: 0,
+      members: [],
+      messages: [],
+      lastMessageText: '',
+      lastMessageTime: '',
+    });
+
+    // 3. กลุ่มครูที่ปรึกษา (Homeroom Advisor Groups) - ดึงนักเรียนในห้องเข้าอัตโนมัติตามทะเบียนห้องเรียนจริง
     const classrooms = classroomService.getClassroomsSync();
     const homeroomClasses = classrooms.map((cls) => ({
       id: cls.id,
@@ -274,7 +273,7 @@ export const messagingService = {
     }));
 
     homeroomClasses.forEach((cls) => {
-      // ดึงรายชื่อนักเรียนจาก studentService (Local Storage หรือ Mock)
+      // ดึงรายชื่อนักเรียนจาก studentService (ตามห้องเรียนจริง ไม่ใช้ Mock Data)
       const rawStudents = this.getStudentsForClassroom(cls.id);
       const studentMembers = rawStudents.map((s) => this.studentToChatMember(s));
 
@@ -301,34 +300,15 @@ export const messagingService = {
         autoManaged: true,
         members: groupMembers,
         unreadCount: 0,
-        messages: [
-          {
-            id: `msg-hr-${cls.id}-1`,
-            groupId: `grp-homeroom-${cls.id}`,
-            senderId: `advisor-${cls.id}`,
-            senderName: cls.adviser,
-            senderRole: 'TEACHER',
-            content: `สวัสดีนักเรียนห้อง ${cls.name} ทุกคน ยินดีต้อนรับสู่กลุ่มห้องเรียนประจำชั้นครับ`,
-            timestamp: 'ต้นสัปดาห์ 08:00 น.',
-          },
-          {
-            id: `msg-hr-${cls.id}-2`,
-            groupId: `grp-homeroom-${cls.id}`,
-            senderId: 'system',
-            senderName: 'ระบบจัดการชั้นเรียน',
-            senderRole: 'SYSTEM',
-            isSystemAudit: true,
-            content: `📢 สมาชิกในกลุ่มห้อง ${cls.name} ถูกซิงค์อัตโนมัติจากทะเบียนรายชื่อ (${studentMembers.length} คน)`,
-            timestamp: 'ต้นสัปดาห์ 08:01 น.',
-          },
-        ],
-        lastMessageText: `สมาชิกในกลุ่มห้อง ${cls.name} ถูกซิงค์อัตโนมัติจากทะเบียนรายชื่อ`,
-        lastMessageTime: 'ต้นสัปดาห์ 08:01 น.',
+        messages: [],
+        lastMessageText: '',
+        lastMessageTime: '',
       });
     });
 
-    // 4. กลุ่มประจำวิชา (Course Groups) - ดึงนักเรียนที่ลงทะเบียนเรียนในห้องนั้นเข้าอัตโนมัติ
-    DEFAULT_COURSE_MAPPINGS.forEach((mapping, idx) => {
+    // 4. กลุ่มประจำวิชา (Course Groups) - สร้างจากหลักสูตรรายวิชาจริง (จาก coursesCurriculumService)
+    const courseMappings = this.getCourseClassroomMappings();
+    courseMappings.forEach((mapping) => {
       const rawStudents = this.getStudentsForClassroom(mapping.classroomId);
       const studentMembers = rawStudents.map((s) => this.studentToChatMember(s));
 
@@ -356,56 +336,55 @@ export const messagingService = {
         teacherRoleLabel: 'ครูประจำวิชา',
         autoManaged: true,
         members: groupMembers,
-        unreadCount: idx === 0 ? 1 : 0,
-        messages: [
-          {
-            id: `msg-crs-${mapping.courseCode}-${idx}-1`,
-            groupId: `grp-course-${mapping.courseCode}-${mapping.classroomId}`,
-            senderId: teacherMember.id,
-            senderName: mapping.teacherName,
-            senderRole: 'TEACHER',
-            content: `สวัสดีนักเรียนทุกคน กลุ่มนี้เป็นกลุ่มเรียนวิชา ${mapping.courseCode} ${mapping.courseName} อย่าลืมติดตามกำหนดส่งงานในระบบนะครับ`,
-            timestamp: 'สัปดาห์ก่อน 09:15 น.',
-          },
-        ],
-        lastMessageText: `กลุ่มนี้เป็นกลุ่มเรียนวิชา ${mapping.courseCode} ${mapping.courseName}`,
-        lastMessageTime: 'สัปดาห์ก่อน 09:15 น.',
+        unreadCount: 0,
+        messages: [],
+        lastMessageText: '',
+        lastMessageTime: '',
       });
     });
 
     return groups;
   },
 
-  // Helper อ่านรายชื่อนักเรียนของห้องจาก LocalStorage หรือ Mock
+  // Helper อ่านรายชื่อนักเรียนของห้องจาก studentService จริง
   getStudentsForClassroom(classroomId: string): StudentRecord[] {
-    const list = studentService.getLocalStudents(classroomId);
+    const list = studentService.getStudents(classroomId);
     if (list && list.length > 0) return list;
-    if (classroomId === 'room-1-1' || classroomId === 'ม.1/1') {
-      return [
-        { id: 'stu-47001', no: 1, code: '47001', name: 'ด.ช. ชนะภัย ยอดสิงห์', attendance: '8/8', score: 85, status: 'NORMAL', gender: 'MALE' },
-        { id: 'stu-47002', no: 2, code: '47002', name: 'ด.ญ. ชลิตา มงคล', attendance: '8/8', score: 90, status: 'NORMAL', gender: 'FEMALE' },
-      ];
-    }
-    if (classroomId === 'room-2-1' || classroomId === 'ม.2/1') {
-      return [
-        { id: 'stu-46101', no: 1, code: '46101', name: 'ด.ช. ภาณุพงศ์ บุญยืน', attendance: '8/8', score: 88, status: 'NORMAL', gender: 'MALE' },
-        { id: 'stu-46102', no: 2, code: '46102', name: 'ด.ญ. สุภัสสรา อินทร', attendance: '8/8', score: 92, status: 'NORMAL', gender: 'FEMALE' },
-        { id: 'stu-46103', no: 3, code: '46103', name: 'ด.ช. ธีรภัทร ชาญชัย', attendance: '8/8', score: 80, status: 'NORMAL', gender: 'MALE' },
-      ];
-    }
     return [];
   },
 
-  // ดึงรายการกลุ่มแชททั้งหมด
+  // ดึงรายการกลุ่มแชททั้งหมด (พร้อมตัวตรวจจับและล้างข้อมูลจำลองเก่าที่หลงเหลือ)
   getGroups(): ChatGroup[] {
+    if (cleanSlateService.isCleanSlateActive()) {
+      return [];
+    }
+
     if (typeof localStorage !== 'undefined') {
       try {
         const raw = localStorage.getItem(STORAGE_KEY_CHAT_GROUPS);
         if (raw) {
           const parsed = JSON.parse(raw) as ChatGroup[];
           if (Array.isArray(parsed) && parsed.length > 0) {
-            _inMemoryGroupsCache = parsed;
-            return parsed;
+            // ตรวจจับและล้างข้อมูลจำลองเก่าที่หลงเหลือ (เช่น ข้อความทักทายจำลอง หรือกลุ่ม mock ศ23101 / ภาสภูมิ)
+            const hasLegacyMock = parsed.some(
+              (g) =>
+                g.id === 'grp-dept-art' ||
+                g.id.includes('grp-course-ศ23101') ||
+                g.name.includes('กลุ่มวิชา ศ23101 ศิลปะ') ||
+                g.messages.some(
+                  (m) =>
+                    m.content.includes('อย่าลืมติดตามกำหนดส่งงานในระบบนะครับ') ||
+                    m.timestamp === 'สัปดาห์ก่อน 09:15 น.'
+                )
+            );
+            if (!hasLegacyMock) {
+              _inMemoryGroupsCache = parsed;
+              return parsed;
+            } else {
+              localStorage.removeItem(STORAGE_KEY_CHAT_GROUPS);
+              localStorage.removeItem('kp_chat_groups_v3');
+              _inMemoryGroupsCache = null;
+            }
           }
         }
       } catch {
@@ -414,7 +393,21 @@ export const messagingService = {
     }
 
     if (_inMemoryGroupsCache && _inMemoryGroupsCache.length > 0) {
-      return _inMemoryGroupsCache;
+      const hasLegacyMock = _inMemoryGroupsCache.some(
+        (g) =>
+          g.id === 'grp-dept-art' ||
+          g.id.includes('grp-course-ศ23101') ||
+          g.name.includes('กลุ่มวิชา ศ23101 ศิลปะ') ||
+          g.messages.some(
+            (m) =>
+              m.content.includes('อย่าลืมติดตามกำหนดส่งงานในระบบนะครับ') ||
+              m.timestamp === 'สัปดาห์ก่อน 09:15 น.'
+          )
+      );
+      if (!hasLegacyMock) {
+        return _inMemoryGroupsCache;
+      }
+      _inMemoryGroupsCache = null;
     }
 
     const initial = this.generateInitialGroups();
@@ -977,7 +970,7 @@ export const messagingService = {
     }
 
     // ตรวจสอบและสร้างกลุ่มประจำวิชาปลายทางอัตโนมัติหากยังไม่มี
-    const toCourseMappings = DEFAULT_COURSE_MAPPINGS.filter(
+    const toCourseMappings = this.getCourseClassroomMappings().filter(
       (m) =>
         m.classroomId === toRoom.id ||
         m.classroomName === toRoom.roomNumber ||

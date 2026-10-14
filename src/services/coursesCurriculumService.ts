@@ -88,30 +88,43 @@ class CoursesCurriculumService {
 
   private load(): CourseCurriculumRecord[] {
     if (this.cache) return this.cache;
-    if (typeof window === 'undefined') return INITIAL_COURSES;
-
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        this.cache = JSON.parse(raw);
-        return this.cache!;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          this.cache = JSON.parse(raw);
+          return this.cache!;
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
     }
 
-    this.cache = [];
+    this.cache = [...INITIAL_COURSES];
     return this.cache;
   }
 
   private save(): void {
-    if (typeof window === 'undefined' || !this.cache) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.cache));
-      window.dispatchEvent(new CustomEvent('kp-courses-curriculum-updated'));
-    } catch {
-      // ignore
+    if (!this.cache) return;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.cache));
+      } catch {
+        // ignore
+      }
     }
+    if (typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(new CustomEvent('kp-courses-curriculum-updated'));
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  public saveCourses(courses: CourseCurriculumRecord[]): void {
+    this.cache = [...courses];
+    this.save();
   }
 
   public getCourses(academicYear?: string, term?: string): CourseCurriculumRecord[] {

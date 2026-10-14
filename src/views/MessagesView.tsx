@@ -32,6 +32,7 @@ import {
   type ChatMember,
 } from '../services/messagingService';
 import { classroomService } from '../services/classroomService';
+import { authService } from '../services/authService';
 import type { SchoolUserRole } from '../config/schoolRoles';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 
@@ -45,13 +46,10 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
   // ดึงรายการกลุ่มแชทจริงทั้งหมดจาก messagingService
   const [groups, setGroups] = useState<ChatGroup[]>(() => messagingService.getGroups());
   
-  // เลือกกลุ่มเริ่มต้น (เลือกกลุ่มที่ปรึกษา ม.3/1 หรือกลุ่มแรกที่มี)
+  // เลือกกลุ่มเริ่มต้น (เลือกกลุ่มแรกที่มี)
   const [selectedGroupId, setSelectedGroupId] = useState<string>(() => {
     const all = messagingService.getGroups();
-    const homeroom = all.find(
-      (g) => g.id === 'grp-homeroom-room-3-1' || g.classroomId === 'room-3-1'
-    );
-    return homeroom ? homeroom.id : all[0]?.id || '';
+    return all[0]?.id || '';
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -116,18 +114,20 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
     if (e) e.preventDefault();
     if (!inputText.trim() || !currentGroup) return;
 
+    const currentUser = authService.getCurrentUser();
     const teacherName =
-      activeRole === 'ACADEMIC_ADMIN'
-        ? 'นายสมชาย ใจดี (ผอ./แอดมิน)'
+      currentUser?.name ||
+      (activeRole === 'ACADEMIC_ADMIN'
+        ? 'ฝ่ายบริหารและงานสารบรรณ'
         : activeRole === 'STUDENT_AFFAIRS'
-        ? 'ครูวิภาดา สมบูรณ์'
-        : 'ครูภาสภูมิ เรืองปราชญ์';
+        ? 'ครูกิจการนักเรียน'
+        : 'ครูผู้สอน');
 
     messagingService.sendMessage(currentGroup.id, {
-      senderId: 'teacher-current',
+      senderId: currentUser?.id || 'teacher-current',
       senderName: teacherName,
       senderRole: 'TEACHER',
-      senderAvatar: '/images/teacher/teacher_avatar.png',
+      senderAvatar: currentUser?.avatarUrl || '/images/teacher/teacher_avatar.png',
       content: inputText.trim(),
     });
 
@@ -559,7 +559,18 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
 
               {/* Messages Feed */}
               <div className="py-4 space-y-4 max-h-[460px] overflow-y-auto pr-1">
-                {currentGroup.messages.map((msg) => {
+                {currentGroup.messages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center text-slate-400 animate-fade-in">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center mb-3 shadow-2xs">
+                      <MessageSquare className="w-6 h-6" />
+                    </div>
+                    <p className="text-xs sm:text-sm font-bold text-slate-700">ยังไม่มีข้อความในกลุ่มนี้</p>
+                    <p className="text-[11px] text-slate-400 mt-1 max-w-xs">
+                      เริ่มต้นการสนทนาโดยพิมพ์ข้อความในช่องด้านล่างเพื่อสื่อสารกับสมาชิกในกลุ่ม
+                    </p>
+                  </div>
+                ) : (
+                  currentGroup.messages.map((msg) => {
                   // ข้อความระบบแจ้งย้ายห้อง / ตรวจสอบความถูกต้อง
                   if (msg.isSystemAudit || msg.senderRole === 'SYSTEM') {
                     const isTransferIn = msg.transferAuditMeta?.action === 'TRANSFER_IN';
@@ -690,8 +701,9 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                       </div>
                     </div>
                   );
-                })}
-                <div ref={messagesEndRef} />
+                })
+              )}
+              <div ref={messagesEndRef} />
               </div>
             </div>
 
