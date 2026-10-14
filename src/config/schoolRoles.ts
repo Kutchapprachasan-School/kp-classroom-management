@@ -271,6 +271,15 @@ export async function fetchAndSyncSchoolSettingsFromSupabase(): Promise<SchoolBr
     if (error || !data) return null;
 
     const current = getSchoolSettings();
+    const hasChange =
+      (data.schoolName && data.schoolName !== current.nameTh) ||
+      (data.affiliation && data.affiliation !== current.affiliation) ||
+      (data.logoUrl && data.logoUrl !== current.logoUrl);
+
+    if (!hasChange) {
+      return current;
+    }
+
     const updated: SchoolBrandingSettings = {
       ...current,
       nameTh: data.schoolName || current.nameTh,

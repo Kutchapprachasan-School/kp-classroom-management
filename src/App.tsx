@@ -145,13 +145,18 @@ export const App: React.FC = () => {
 
   React.useEffect(() => {
     applySchoolBrandingAndTypography(schoolSettings);
-    // ซิงค์ข้อมูลโรงเรียนและโลโก้ล่าสุดจาก Supabase เพื่อให้ตรงกันทุกเครื่อง
+    // ซิงค์ข้อมูลโรงเรียนและโลโก้ล่าสุดจาก Supabase เพื่อให้ตรงกันทุกเครื่อง (รันครั้งเดียวเมื่อเริ่มต้นระบบ)
     fetchAndSyncSchoolSettingsFromSupabase().catch(() => {});
 
     const handleSettingsChange = () => {
       const next = getSchoolSettings();
-      setSchoolSettings(next);
-      applySchoolBrandingAndTypography(next);
+      setSchoolSettings((prev) => {
+        if (JSON.stringify(prev) === JSON.stringify(next)) {
+          return prev;
+        }
+        applySchoolBrandingAndTypography(next);
+        return next;
+      });
     };
     window.addEventListener('kps-school-settings-updated', handleSettingsChange);
     window.addEventListener('kps-cloud-synced', handleSettingsChange);
@@ -161,7 +166,7 @@ export const App: React.FC = () => {
       window.removeEventListener('kps-cloud-synced', handleSettingsChange);
       window.removeEventListener('kps-cloud-key-updated', handleSettingsChange);
     };
-  }, [schoolSettings]);
+  }, []);
 
   // Context-Aware Deep-Link Navigation States
   const [deepLinkClassTab, setDeepLinkClassTab] = useState<ClassSubTab>('attendance');

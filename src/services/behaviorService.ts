@@ -110,23 +110,27 @@ export const behaviorService = {
   // READ: List all behavior records
   async getAll(): Promise<BehaviorRecord[]> {
     if (isSupabaseConfigured) {
-      logDbOperation('SELECT * FROM BehaviorLog ORDER BY created_at DESC');
-      const { data, error } = await supabase
-        .from('BehaviorLog')
-        .select('*')
-        .order('created_at', { ascending: false });
+      try {
+        logDbOperation('SELECT * FROM BehaviorRecord ORDER BY createdAt DESC');
+        const { data, error } = await supabase
+          .from('BehaviorRecord')
+          .select('*')
+          .order('createdAt', { ascending: false });
 
-      if (!error && data && data.length > 0) {
-        return data.map((b) => ({
-          id: b.id,
-          studentName: b.student_name,
-          studentId: b.student_id,
-          type: b.type,
-          text: b.text,
-          points: b.points,
-          date: b.date,
-          author: b.author || 'ครูผู้สอน',
-        }));
+        if (!error && data && data.length > 0) {
+          return data.map((b: any) => ({
+            id: b.id,
+            studentName: b.studentName || b.student_name || 'นักเรียน',
+            studentId: b.studentId || b.student_id,
+            type: b.type === 'MERIT' ? 'POSITIVE' : 'NEGATIVE',
+            text: b.description || b.text || '',
+            points: b.points || 0,
+            date: b.businessDate || (b.createdAt ? new Date(b.createdAt).toLocaleDateString('th-TH') : ''),
+            author: b.reportedById || b.author || 'ครูผู้สอน',
+          }));
+        }
+      } catch (err) {
+        console.warn('[behaviorService] Query error:', err);
       }
     }
     return getLocalBehaviors();
@@ -150,16 +154,21 @@ export const behaviorService = {
     saveLocalBehaviors(updated);
 
     if (isSupabaseConfigured) {
-      logDbOperation('INSERT INTO BehaviorLog', newRecord);
-      await supabase.from('BehaviorLog').insert({
-        id: newRecord.id,
-        student_name: newRecord.studentName,
-        type: newRecord.type,
-        text: newRecord.text,
-        points: newRecord.points,
-        date: newRecord.date,
-        author: newRecord.author,
-      });
+      try {
+        logDbOperation('INSERT INTO BehaviorRecord', newRecord);
+        await supabase.from('BehaviorRecord').insert({
+          id: newRecord.id,
+          studentId: newRecord.studentId || undefined,
+          type: newRecord.type === 'POSITIVE' ? 'MERIT' : 'DEMERIT',
+          category: 'OTHER',
+          points: newRecord.points,
+          description: newRecord.text,
+          businessDate: new Date().toISOString().slice(0, 10),
+          createdAt: new Date().toISOString(),
+        });
+      } catch (err) {
+        console.warn('[behaviorService] Insert error:', err);
+      }
     }
 
     return newRecord;
@@ -172,8 +181,12 @@ export const behaviorService = {
     saveLocalBehaviors(updated);
 
     if (isSupabaseConfigured) {
-      logDbOperation(`DELETE FROM BehaviorLog WHERE id = ${id}`);
-      await supabase.from('BehaviorLog').delete().eq('id', id);
+      try {
+        logDbOperation(`DELETE FROM BehaviorRecord WHERE id = ${id}`);
+        await supabase.from('BehaviorRecord').delete().eq('id', id);
+      } catch (err) {
+        console.warn('[behaviorService] Delete error:', err);
+      }
     }
   },
 

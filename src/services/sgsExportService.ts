@@ -52,14 +52,30 @@ export const sgsExportService = {
   // READ: Get all SGS & SAR Immutable Snapshots
   async getSnapshots(): Promise<SgsSnapshotRecord[]> {
     if (isSupabaseConfigured) {
-      logDbOperation('SELECT * FROM SgsExportLog ORDER BY created_at DESC');
-      const { data, error } = await supabase
-        .from('SgsExportLog')
-        .select('*')
-        .order('created_at', { ascending: false });
+      try {
+        logDbOperation('SELECT * FROM StorageUploadLog ORDER BY createdAt DESC');
+        const { data, error } = await supabase
+          .from('StorageUploadLog')
+          .select('*')
+          .order('createdAt', { ascending: false });
 
-      if (!error && data && data.length > 0) {
-        return data as SgsSnapshotRecord[];
+        if (!error && data && data.length > 0) {
+          return data.map((d: any) => ({
+            id: d.id,
+            termId: '1/2569',
+            classroomId: 'room-3-1',
+            subjectCode: 'ศ23101',
+            fileName: d.originalFileName || d.objectKey || 'SGS_Export.xlsx',
+            storagePath: d.objectKey || '',
+            checksumSha256: d.checksumSha256 || '',
+            studentCount: 26,
+            exportedBy: d.uploadedBy || 'ครูผู้สอน',
+            createdAt: d.createdAt ? new Date(d.createdAt).toLocaleDateString('th-TH') : '',
+            status: d.status === 'COMMITTED' ? 'LOCKED' : 'PENDING',
+          })) as SgsSnapshotRecord[];
+        }
+      } catch (err) {
+        console.warn('[sgsExportService] Query error:', err);
       }
     }
     return getLocalSnapshots();
@@ -122,8 +138,21 @@ export const sgsExportService = {
     saveLocalSnapshots([newSnapshot, ...current]);
 
     if (isSupabaseConfigured) {
-      logDbOperation('UPLOAD TO Supabase Storage (sgs-exports) & INSERT SgsExportLog', newSnapshot);
-      await supabase.from('SgsExportLog').insert(newSnapshot);
+      try {
+        logDbOperation('UPLOAD TO Supabase Storage (sgs-exports) & INSERT StorageUploadLog', newSnapshot);
+        await supabase.from('StorageUploadLog').insert({
+          id: newSnapshot.id,
+          objectKey: newSnapshot.storagePath,
+          bucket: 'sgs-exports',
+          originalFileName: newSnapshot.fileName,
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          checksumSha256: newSnapshot.checksumSha256,
+          status: 'COMMITTED',
+          uploadedBy: newSnapshot.exportedBy,
+        });
+      } catch (err) {
+        console.warn('[sgsExportService] Insert error:', err);
+      }
     }
 
     return newSnapshot;

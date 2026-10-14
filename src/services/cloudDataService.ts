@@ -163,13 +163,19 @@ class CloudDataService {
       this.syncState.pendingSyncCount++;
       this.notifyStateChange();
 
-      const { error } = await supabase
+      const upsertPromise = supabase
         .from('kps_cloud_store')
         .upsert({
           key,
           data,
           updated_at: new Date().toISOString(),
         });
+
+      const timeoutPromise = new Promise<{ error: { message: string } }>((resolve) =>
+        setTimeout(() => resolve({ error: { message: 'Cloud sync timeout (10s)' } }), 10000)
+      );
+
+      const { error } = (await Promise.race([upsertPromise, timeoutPromise])) as any;
 
       if (error) {
         console.warn(`[CloudDataService] Cloud upsert error for '${key}':`, error.message);
@@ -355,6 +361,20 @@ class CloudDataService {
               if (newRecord && newRecord.key) {
                 const key = newRecord.key;
                 const data = newRecord.data;
+
+                // Suppress self-echo if local cache already has identical data
+                const cached = this.inMemoryCache.get(key);
+                if (cached !== undefined) {
+                  try {
+                    const cachedStr = typeof cached === 'string' ? cached : JSON.stringify(cached);
+                    const incomingStr = typeof data === 'string' ? data : JSON.stringify(data);
+                    if (cachedStr === incomingStr) {
+                      return;
+                    }
+                  } catch {
+                    // ignore
+                  }
+                }
 
                 // Update in-memory & localStorage without trigger loop
                 this.inMemoryCache.set(key, data);
