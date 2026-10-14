@@ -81,7 +81,7 @@ export const AdminExecutiveDashboardView: React.FC<
         onNavigateToView?.('readiness');
         break;
       case 'personnel-hr':
-        onNavigateToView?.('roster');
+        onNavigateToView?.('school-leave-dashboard');
         break;
       case 'system-settings':
         onNavigateToView?.('settings');

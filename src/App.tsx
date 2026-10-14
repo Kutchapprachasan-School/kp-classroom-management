@@ -154,8 +154,13 @@ export const App: React.FC = () => {
       applySchoolBrandingAndTypography(next);
     };
     window.addEventListener('kps-school-settings-updated', handleSettingsChange);
-    return () =>
+    window.addEventListener('kps-cloud-synced', handleSettingsChange);
+    window.addEventListener('kps-cloud-key-updated', handleSettingsChange);
+    return () => {
       window.removeEventListener('kps-school-settings-updated', handleSettingsChange);
+      window.removeEventListener('kps-cloud-synced', handleSettingsChange);
+      window.removeEventListener('kps-cloud-key-updated', handleSettingsChange);
+    };
   }, [schoolSettings]);
 
   // Context-Aware Deep-Link Navigation States

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BookOpen,
   Plus,
@@ -25,7 +25,6 @@ import {
   HelpCircle,
   FileCheck,
 } from 'lucide-react';
-import { cleanSlateService } from '../services/cleanSlateService';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 
 // ==========================================
@@ -411,10 +410,33 @@ export const LessonPlansView: React.FC = () => {
   const [isSemesterDropdownOpen, setIsSemesterDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Units list state
+  const LESSON_PLANS_STORAGE_KEY = 'cls_lesson_plans_v1';
+
+  // Units list state with localStorage persistence, defaulting to INITIAL_UNITS matching mockup 100%
   const [units, setUnits] = useState<UnitPlanItem[]>(() => {
-    return cleanSlateService.isCleanSlateActive() ? [] : INITIAL_UNITS;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const saved = window.localStorage.getItem(LESSON_PLANS_STORAGE_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        } catch (e) {
+          console.error('Failed to parse saved lesson plans', e);
+        }
+      }
+    }
+    return INITIAL_UNITS;
   });
+
+  // Sync units to localStorage whenever changed
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(LESSON_PLANS_STORAGE_KEY, JSON.stringify(units));
+    }
+  }, [units]);
+
   const [selectedUnitId, setSelectedUnitId] = useState<string>('unit-1');
   const [activeSubTab, setActiveSubTab] = useState<'info' | 'media' | 'worksheets' | 'reflection'>('info');
 
@@ -473,8 +495,10 @@ export const LessonPlansView: React.FC = () => {
     );
   });
 
-  // Calculate total evaluation weight
-  const totalWeight = currentUnit.evaluations.reduce((sum, item) => sum + item.weightPercent, 0);
+  // Calculate total evaluation weight safely
+  const totalWeight = currentUnit
+    ? currentUnit.evaluations.reduce((sum, item) => sum + item.weightPercent, 0)
+    : 0;
 
   // Synchronize edit form when currentUnit changes
   const handleSelectUnit = (unitId: string) => {
@@ -621,16 +645,14 @@ export const LessonPlansView: React.FC = () => {
       {/* 1. TOP HERO BANNER: Master PageHeroBanner Design       */}
       {/* ======================================================== */}
       <PageHeroBanner
-        title="แผนการสอนและบันทึกหลังสอน (Lesson Plans)"
+        title="แผนการสอน / จัดการแผนการสอน"
         subtitle="สร้างและจัดการแผนการสอนรายวิชา แบบหน่วยการเรียนรู้ พร้อมสื่อการสอนและประเมินผล"
         icon={<BookOpen className="w-6 h-6 text-white" />}
         iconBgClass="bg-blue-600 text-white"
-        badgeText="หลักสูตร 2569"
-        tagText="📚 16 สัปดาห์ • ไฟล์เอกสาร • สื่อกิจกรรม • บันทึกหลังสอน"
         quoteLines={[
           'การสอนที่ดี',
           'คือการเปิดโลกแห่งโอกาส',
-          'ให้กับนักเรียนทุกคน',
+          'ให้กับนักเรียน 💜',
         ]}
       />
 
@@ -881,7 +903,7 @@ export const LessonPlansView: React.FC = () => {
                       {/* Meta & Status Badge */}
                       <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-100">
                         <span className="text-[11px] text-slate-500 font-medium">
-                          {unit.periods} คาบ • {unit.indicatorsSummary}
+                          {unit.periods} คาบ | {unit.indicatorsSummary}
                         </span>
                         <span
                           className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${unit.statusBadgeClass}`}
@@ -950,9 +972,9 @@ export const LessonPlansView: React.FC = () => {
           {/* 4 Sub-Tabs */}
           <div className="flex items-center gap-2 sm:gap-4 border-b border-slate-200/80 pt-2 pb-0 overflow-x-auto no-scrollbar">
             {[
-              { key: 'info', label: 'ข้อมูลหน่วย', icon: BookOpen },
+              { key: 'info', label: 'ข้อมูลหน่วย', icon: ClipboardList },
               { key: 'media', label: 'สื่อการสอน / ไฟล์', icon: FolderOpen },
-              { key: 'worksheets', label: 'ใบงาน', icon: FileSpreadsheet },
+              { key: 'worksheets', label: 'ใบงาน', icon: FileText },
               { key: 'reflection', label: 'บันทึกหลังสอน', icon: FileCheck },
             ].map((tab) => {
               const TabIcon = tab.icon;
@@ -1451,7 +1473,7 @@ export const LessonPlansView: React.FC = () => {
       <section className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-2xs mt-5">
         <div className="flex items-center justify-between mb-3.5">
           <h3 className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-2">
-            <ClipboardList className="w-4 h-4 text-blue-600" />
+            <FileText className="w-4 h-4 text-emerald-500" />
             <span>รายการหน่วยการเรียนรู้ ({units.length} หน่วย)</span>
           </h3>
         </div>

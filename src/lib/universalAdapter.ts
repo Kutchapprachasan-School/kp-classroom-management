@@ -279,6 +279,25 @@ export function createUniversalAdapter<T>(config: UniversalAdapterConfig<T>): Un
             }
             return transformed;
           } else if (error) {
+            // Check fallback in Supabase kps_cloud_store table (Cross-Device Cloud Sync)
+            try {
+              const { data: cloudRec, error: cloudErr } = await client
+                .from('kps_cloud_store')
+                .select('data')
+                .eq('key', storageKey)
+                .maybeSingle();
+
+              if (!cloudErr && cloudRec && Array.isArray(cloudRec.data)) {
+                recordSuccess();
+                setLocalItems(cloudRec.data as T[]);
+                if (typeof filter === 'function') {
+                  return cloudRec.data.filter(filter);
+                }
+                return cloudRec.data as T[];
+              }
+            } catch {
+              // ignore
+            }
             recordFailure(error);
           }
         } catch (err) {
@@ -396,7 +415,17 @@ export function createUniversalAdapter<T>(config: UniversalAdapterConfig<T>): Un
               return remoteReturned;
             }
           } else {
-            recordFailure(error);
+            // Table doesn't exist as dedicated table; save array to Supabase kps_cloud_store!
+            try {
+              await client.from('kps_cloud_store').upsert({
+                key: storageKey,
+                data: all,
+                updated_at: new Date().toISOString(),
+              });
+              recordSuccess();
+            } catch {
+              recordFailure(error);
+            }
           }
         } catch (err) {
           recordFailure(err);
@@ -435,7 +464,16 @@ export function createUniversalAdapter<T>(config: UniversalAdapterConfig<T>): Un
           if (!error) {
             recordSuccess();
           } else {
-            recordFailure(error);
+            try {
+              await client.from('kps_cloud_store').upsert({
+                key: storageKey,
+                data: filtered,
+                updated_at: new Date().toISOString(),
+              });
+              recordSuccess();
+            } catch {
+              recordFailure(error);
+            }
           }
         } catch (err) {
           recordFailure(err);

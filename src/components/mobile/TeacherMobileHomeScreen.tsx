@@ -9,6 +9,7 @@ import {
   BarChart2,
   ClipboardList,
   ChevronRight,
+  Cloud,
 } from 'lucide-react';
 import type { TeacherViewKey } from '../layout/TeacherSidebar';
 import { getSchoolSettings } from '../../config/schoolRoles';
@@ -54,6 +55,15 @@ export const TeacherMobileHomeScreen: React.FC<TeacherMobileHomeScreenProps> = (
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {/* Cloud Sync Status Badge */}
+          <div
+            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-[10px] font-bold text-emerald-700 shadow-2xs"
+            title="เชื่อมต่อฐานข้อมูลคลาวด์ Supabase แล้ว (เปลี่ยนเครื่องข้อมูลไม่หาย)"
+          >
+            <Cloud className="w-3 h-3 text-emerald-600" />
+            <span className="hidden xs:inline">คลาวด์</span>
+          </div>
+
           {/* Notification Bell with Badge 3 */}
           <button
             type="button"

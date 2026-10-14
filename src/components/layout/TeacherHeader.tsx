@@ -15,7 +15,10 @@ import {
   Calendar,
   LogOut,
   Settings,
+  Cloud,
+  RefreshCw,
 } from 'lucide-react';
+import { cloudDataService, type CloudSyncState } from '../../services/cloudDataService';
 import {
   teacherCopilotService,
   type CrossViewNavigationPayload,
@@ -99,6 +102,17 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
   const [todayThaiDate, setTodayThaiDate] = useState<string>(() =>
     formatThaiDateFull(new Date())
   );
+
+  const [cloudState, setCloudState] = useState<CloudSyncState>(() =>
+    cloudDataService.getSyncState()
+  );
+
+  useEffect(() => {
+    const unsub = cloudDataService.onSyncStateChange((state) => {
+      setCloudState(state);
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     // Update live Bangkok date every 60 seconds
@@ -522,6 +536,28 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
 
         {/* Right: Date & Term Box, Search Box, Font, Bell, Profile Avatar matching Image 1 */}
         <div className="flex items-center gap-2 sm:gap-3 text-slate-600 shrink-0">
+          {/* Cloud Sync Status Indicator (Supabase PostgreSQL Backed) */}
+          <div
+            className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 text-emerald-800 text-[11px] font-bold shadow-2xs cursor-default select-none transition-all"
+            title={
+              cloudState.syncError
+                ? `แจ้งเตือนการเชื่อมต่อ: ${cloudState.syncError}`
+                : `ข้อมูลเชื่อมต่อคลาวด์ Supabase ล่าสุด: ${cloudState.lastSyncedAt || 'พร้อมใช้งาน'} (เปลี่ยนเครื่องข้อมูลไม่หาย)`
+            }
+          >
+            {cloudState.pendingSyncCount > 0 ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+                <span className="text-amber-700">กำลังซิงค์...</span>
+              </>
+            ) : (
+              <>
+                <Cloud className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span className="text-emerald-700">คลาวด์ออนไลน์</span>
+              </>
+            )}
+          </div>
+
           {/* 2.1 Date & Term Card matching Image 1 */}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-blue-100/90 bg-blue-50/50 shadow-2xs">
             <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
