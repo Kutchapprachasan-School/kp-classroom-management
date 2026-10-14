@@ -5,6 +5,8 @@
 // 2. นักเรียนย้ายเข้าใหม่ / ย้ายออกกลางเทอม ทำให้ลำดับรายชื่อไม่ตรงกับ SGS (บรรทัดเลื่อน)
 // ============================================================================
 
+import { cleanSlateService } from './cleanSlateService.ts';
+
 export type StudentTransferState = 'ACTIVE' | 'TRANSFERRED_IN' | 'TRANSFERRED_OUT';
 export type StudentGender = 'MALE' | 'FEMALE';
 export type SgsInsertPosition = 'AFTER_SAME_GENDER' | 'END_OF_CLASS' | 'CUSTOM_SEAT';
@@ -309,9 +311,9 @@ export const sgsRosterAndSubmissionService = {
   getSgsRoster(): SgsStudentRecord[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_SGS_ROSTER);
-      return raw ? JSON.parse(raw) : INITIAL_SGS_ROSTER;
+      return raw ? JSON.parse(raw) : [];
     } catch {
-      return INITIAL_SGS_ROSTER;
+      return [];
     }
   },
 
@@ -319,7 +321,7 @@ export const sgsRosterAndSubmissionService = {
     localStorage.setItem(STORAGE_KEY_SGS_ROSTER, JSON.stringify(roster));
     this.markCentralRosterSynced(
       actorLabel,
-      `ซิงค์ลำดับเลขที่ SGS ห้อง ม.3/1 (${roster.length} รายชื่อ • ชาย ➔ หญิง)`
+      `ซิงค์ลำดับเลขที่ SGS (${roster.length} รายชื่อ • ชาย ➔ หญิง)`
     );
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('kp-sgs-roster-updated'));
@@ -333,15 +335,15 @@ export const sgsRosterAndSubmissionService = {
       return raw
         ? JSON.parse(raw)
         : {
-            lastUpdatedBy: 'งานทะเบียนวัดผล & ครูที่ปรึกษา ม.3/1',
-            lastUpdatedAt: 'วันนี้ 08:30 น.',
-            syncNote: 'ซิงค์ลำดับเลขที่ SGS กลางกับทุกกลุ่มสาระวิชาเรียบร้อย (ชาย 1-5 ➔ หญิง 6-8)',
+            lastUpdatedBy: 'งานทะเบียนวัดผล & ครูที่ปรึกษา',
+            lastUpdatedAt: 'พร้อมใช้งาน',
+            syncNote: 'พร้อมสำหรับนำเข้ารายชื่อนักเรียน ปพ.5 จากระบบ SGS หรือ Excel',
           };
     } catch {
       return {
-        lastUpdatedBy: 'งานทะเบียนวัดผล & ครูที่ปรึกษา ม.3/1',
-        lastUpdatedAt: 'วันนี้ 08:30 น.',
-        syncNote: 'ซิงค์ลำดับเลขที่ SGS กลางกับทุกกลุ่มสาระวิชาเรียบร้อย',
+        lastUpdatedBy: 'งานทะเบียนวัดผล & ครูที่ปรึกษา',
+        lastUpdatedAt: 'พร้อมใช้งาน',
+        syncNote: 'พร้อมสำหรับนำเข้ารายชื่อนักเรียน ปพ.5 จากระบบ SGS หรือ Excel',
       };
     }
   },
@@ -526,9 +528,10 @@ export const sgsRosterAndSubmissionService = {
   getTermAssignments(): TermAssignmentItem[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_TERM_ASSIGNMENTS);
-      return raw ? JSON.parse(raw) : INITIAL_TERM_ASSIGNMENTS;
+      if (raw) return JSON.parse(raw);
+      return cleanSlateService.isCleanSlateActive() ? [] : INITIAL_TERM_ASSIGNMENTS;
     } catch {
-      return INITIAL_TERM_ASSIGNMENTS;
+      return [];
     }
   },
 
@@ -575,9 +578,9 @@ export const sgsRosterAndSubmissionService = {
   getSubmissions(): StudentWorkSubmission[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_WORK_SUBMISSIONS);
-      return raw ? JSON.parse(raw) : INITIAL_SUBMISSIONS;
+      return raw ? JSON.parse(raw) : [];
     } catch {
-      return INITIAL_SUBMISSIONS;
+      return [];
     }
   },
 
@@ -590,6 +593,14 @@ export const sgsRosterAndSubmissionService = {
   },
 
   resetDemoSubmissionsAndRoster(): void {
+    if (cleanSlateService.isCleanSlateActive()) {
+      localStorage.setItem(STORAGE_KEY_WORK_SUBMISSIONS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEY_SGS_ROSTER, JSON.stringify([]));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kp-copilot-updated'));
+      }
+      return;
+    }
     localStorage.setItem(
       STORAGE_KEY_WORK_SUBMISSIONS,
       JSON.stringify(INITIAL_SUBMISSIONS)
@@ -1050,7 +1061,7 @@ export const sgsRosterAndSubmissionService = {
       const raw = localStorage.getItem('kp_r2_course_storage_v1');
       const list: R2CourseStorageSummary[] = raw
         ? JSON.parse(raw)
-        : INITIAL_R2_COURSE_STORAGE;
+        : (cleanSlateService.isCleanSlateActive() ? [] : INITIAL_R2_COURSE_STORAGE);
 
       // ซิงก์ข้อมูลจริงของวิชา ศ23101 ม.3/1 เข้ากับรายการแรกเสมอ
       const liveStats = this.getR2StorageStats();
@@ -1071,7 +1082,7 @@ export const sgsRosterAndSubmissionService = {
         return item;
       });
     } catch {
-      return INITIAL_R2_COURSE_STORAGE;
+      return cleanSlateService.isCleanSlateActive() ? [] : INITIAL_R2_COURSE_STORAGE;
     }
   },
 

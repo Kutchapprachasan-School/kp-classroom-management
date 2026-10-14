@@ -26,6 +26,8 @@ import {
   FileCheck,
 } from 'lucide-react';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
+import { coursesCurriculumService, type CourseCurriculumRecord } from '../services/coursesCurriculumService';
+import { cleanSlateService } from '../services/cleanSlateService';
 
 // ==========================================
 // DATA TYPES
@@ -401,7 +403,20 @@ const INITIAL_UNITS: UnitPlanItem[] = [
 // ==========================================
 export const LessonPlansView: React.FC = () => {
   // Navigation & Selection States
-  const [courses] = useState<CourseFilterOption[]>(INITIAL_COURSES);
+  const [courses] = useState<CourseFilterOption[]>(() => {
+    try {
+      const curriculum = coursesCurriculumService.getCourses();
+      if (curriculum && curriculum.length > 0) {
+        return curriculum.map((c: CourseCurriculumRecord) => ({
+          code: c.code,
+          name: c.name,
+          classroom: c.assignedClassrooms?.[0] || 'ม.3/1',
+          semester: `ภาคเรียนที่ ${c.term}/${c.academicYear}`,
+        }));
+      }
+    } catch {}
+    return cleanSlateService.isCleanSlateActive() ? [] : INITIAL_COURSES;
+  });
   const [selectedCourseIndex, setSelectedCourseIndex] = useState(0);
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
   const [selectedClassroom, setSelectedClassroom] = useState('ม.3/1');
@@ -412,7 +427,7 @@ export const LessonPlansView: React.FC = () => {
 
   const LESSON_PLANS_STORAGE_KEY = 'cls_lesson_plans_v1';
 
-  // Units list state with localStorage persistence, defaulting to INITIAL_UNITS matching mockup 100%
+  // Units list state with localStorage persistence, default to empty array (Zero Mock Data)
   const [units, setUnits] = useState<UnitPlanItem[]>(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
       const saved = window.localStorage.getItem(LESSON_PLANS_STORAGE_KEY);
@@ -427,7 +442,7 @@ export const LessonPlansView: React.FC = () => {
         }
       }
     }
-    return INITIAL_UNITS;
+    return cleanSlateService.isCleanSlateActive() ? [] : INITIAL_UNITS;
   });
 
   // Sync units to localStorage whenever changed
@@ -481,7 +496,12 @@ export const LessonPlansView: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const currentCourse = courses[selectedCourseIndex] || courses[0];
+  const currentCourse = courses[selectedCourseIndex] || courses[0] || {
+    code: 'ยังไม่มีรายวิชา',
+    name: 'สร้างรายวิชาใหม่ในหลักสูตร',
+    classroom: '-',
+    semester: selectedSemester,
+  };
 
   // Filtered units based on search
   const filteredUnits = units.filter((u) => {

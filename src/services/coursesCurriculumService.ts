@@ -242,14 +242,7 @@ class CoursesCurriculumService {
       // ignore
     }
 
-    if (cleanSlateService.isCleanSlateActive()) {
-      this.cache = [];
-      this.save();
-      return this.cache;
-    }
-
-    this.cache = [...INITIAL_COURSES];
-    this.save();
+    this.cache = cleanSlateService.isCleanSlateActive() ? [] : INITIAL_COURSES;
     return this.cache;
   }
 

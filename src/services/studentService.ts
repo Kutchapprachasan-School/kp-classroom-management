@@ -167,12 +167,14 @@ export const studentService = {
       }
     }
 
-    // 3. Fallback ค้นหาจากห้องที่มีข้อมูล mock
-    for (const key of Object.keys(mockStudentsByRoom)) {
-      const list = getLocalStudents(key);
-      const match = list.find((s) => s.code === code || s.id === code);
-      if (match) {
-        return { student: match, classroomId: key };
+    // 3. Fallback ค้นหาจากห้องที่มีข้อมูล mock (เฉพาะกรณีไม่ได้เปิดใช้งาน Clean Slate)
+    if (!cleanSlateService.isCleanSlateActive()) {
+      for (const key of Object.keys(mockStudentsByRoom)) {
+        const list = getLocalStudents(key);
+        const match = list.find((s) => s.code === code || s.id === code);
+        if (match) {
+          return { student: match, classroomId: key };
+        }
       }
     }
     return null;

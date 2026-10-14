@@ -6,6 +6,7 @@ import {
   X,
 } from 'lucide-react';
 import type { TeacherViewKey } from '../layout/TeacherSidebar';
+import { cleanSlateService } from '../../services/cleanSlateService';
 
 export interface MobileGradingAssignmentItem {
   id: string;
@@ -93,7 +94,9 @@ export const TeacherMobileGradingListScreen: React.FC<
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState<'ALL' | 'PENDING' | 'DONE'>('ALL');
 
-  const filteredItems = INITIAL_MOBILE_ASSIGNMENTS.filter((item) => {
+  const sourceItems = cleanSlateService.isCleanSlateActive() ? [] : INITIAL_MOBILE_ASSIGNMENTS;
+
+  const filteredItems = sourceItems.filter((item) => {
     const matchesFilter =
       filterTab === 'ALL' ||
       (filterTab === 'PENDING' && item.status === 'PENDING') ||
@@ -200,51 +203,57 @@ export const TeacherMobileGradingListScreen: React.FC<
 
       {/* 4. Assignment Cards List matching Screen 2 */}
       <div className="space-y-2.5 pt-1">
-        {filteredItems.map((item) => (
-          <div
-            key={item.id}
-            onClick={() => handleCardClick(item)}
-            className="p-3.5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:border-blue-300 transition-all cursor-pointer group"
-          >
-            <div className="flex items-center gap-3">
-              {/* Subject Character Badge */}
-              <div
-                className={`w-10 h-10 rounded-xl ${item.iconBgClass} font-black text-sm flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform`}
-              >
-                {item.iconSymbol}
-              </div>
-
-              {/* Title & Unit details */}
-              <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-bold text-slate-500">
-                  {item.classroom}
-                </div>
-                <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 leading-snug truncate">
-                  {item.subjectCode} {item.subjectName}
-                </h3>
-                <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
-                  {item.unitTitle}
-                </p>
-
-                {/* Status and count */}
-                <div className="flex items-center gap-2.5 mt-2">
-                  <span
-                    className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${item.statusClass}`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                    <span>{item.statusLabel}</span>
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-medium">
-                    {item.submittedCount}/{item.totalCount} คน
-                  </span>
-                </div>
-              </div>
-
-              {/* Chevron */}
-              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all shrink-0" />
-            </div>
+        {filteredItems.length === 0 ? (
+          <div className="p-8 text-center text-slate-400 bg-white rounded-2xl border border-slate-100 font-medium text-xs">
+            ยังไม่มีรายการตรวจงานในขณะนี้
           </div>
-        ))}
+        ) : (
+          filteredItems.map((item) => (
+            <div
+              key={item.id}
+              onClick={() => handleCardClick(item)}
+              className="p-3.5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:border-blue-300 transition-all cursor-pointer group"
+            >
+              <div className="flex items-center gap-3">
+                {/* Subject Character Badge */}
+                <div
+                  className={`w-10 h-10 rounded-xl ${item.iconBgClass} font-black text-sm flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform`}
+                >
+                  {item.iconSymbol}
+                </div>
+
+                {/* Title & Unit details */}
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-bold text-slate-500">
+                    {item.classroom}
+                  </div>
+                  <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 leading-snug truncate">
+                    {item.subjectCode} {item.subjectName}
+                  </h3>
+                  <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
+                    {item.unitTitle}
+                  </p>
+
+                  {/* Status and count */}
+                  <div className="flex items-center gap-2.5 mt-2">
+                    <span
+                      className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${item.statusClass}`}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                      <span>{item.statusLabel}</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      {item.submittedCount}/{item.totalCount} คน
+                    </span>
+                  </div>
+                </div>
+
+                {/* Chevron */}
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

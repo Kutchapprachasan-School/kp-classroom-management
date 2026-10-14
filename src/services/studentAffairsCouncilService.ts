@@ -383,6 +383,14 @@ const INITIAL_SUGGESTIONS: StudentSuggestion[] = [
 export const studentAffairsCouncilService = {
   // 1. เช็คชื่อแถวหน้าเสาธง
   getAssemblyRecords(): AssemblyExceptionRecord[] {
+    if (cleanSlateService.isCleanSlateActive()) {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_ASSEMBLY);
+        return raw ? JSON.parse(raw) : [];
+      } catch {
+        return [];
+      }
+    }
     try {
       const raw = localStorage.getItem(STORAGE_KEY_ASSEMBLY);
       return raw ? JSON.parse(raw) : INITIAL_ASSEMBLY;
@@ -546,6 +554,14 @@ export const studentAffairsCouncilService = {
 
   // 4. เลือกตั้งสภานักเรียน E-Voting (รองรับ ไม่ประสงค์ลงคะแนน ABSTAIN)
   getCandidateParties(): CouncilCandidateParty[] {
+    if (cleanSlateService.isCleanSlateActive()) {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_PARTIES);
+        return raw ? JSON.parse(raw) : [];
+      } catch {
+        return [];
+      }
+    }
     try {
       const raw = localStorage.getItem(STORAGE_KEY_PARTIES);
       return raw ? JSON.parse(raw) : INITIAL_PARTIES;
@@ -609,6 +625,14 @@ export const studentAffairsCouncilService = {
 
   // 5. กิจกรรมสภานักเรียน & ตู้รับความคิดเห็น
   getActivities(): CouncilActivity[] {
+    if (cleanSlateService.isCleanSlateActive()) {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_ACTIVITIES);
+        return raw ? JSON.parse(raw) : [];
+      } catch {
+        return [];
+      }
+    }
     try {
       const raw = localStorage.getItem(STORAGE_KEY_ACTIVITIES);
       return raw ? JSON.parse(raw) : INITIAL_ACTIVITIES;

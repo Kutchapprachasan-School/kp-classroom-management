@@ -2,6 +2,8 @@
 // บริการจัดการข้อมูลการลาของครูและบุคลากร (Staff Leave Management & Substitute Teaching Service)
 // รองรับระบบบริหารจัดการโรงเรียนส่วนกลาง และ Executive Leave Dashboard
 
+import { cleanSlateService } from './cleanSlateService.ts';
+
 export type StaffLeaveType =
   | 'SICK' // ลาป่วย
   | 'PERSONAL' // ลากิจส่วนตัว
@@ -203,16 +205,19 @@ const INITIAL_STAFF_LEAVES: StaffLeaveRequest[] = [
 
 export const schoolStaffLeaveService = {
   getAllLeaves(): StaffLeaveRequest[] {
-    if (typeof window === 'undefined') return INITIAL_STAFF_LEAVES;
+    if (typeof window === 'undefined') return [];
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (!raw) {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_STAFF_LEAVES));
-        return INITIAL_STAFF_LEAVES;
+        if (!cleanSlateService.isCleanSlateActive()) {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_STAFF_LEAVES));
+          return INITIAL_STAFF_LEAVES;
+        }
+        return [];
       }
       return JSON.parse(raw) as StaffLeaveRequest[];
     } catch {
-      return INITIAL_STAFF_LEAVES;
+      return [];
     }
   },
 
@@ -308,9 +313,11 @@ export const schoolStaffLeaveService = {
 
   resetToDefault(): StaffLeaveRequest[] {
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_STAFF_LEAVES));
+      const resetItems = cleanSlateService.isCleanSlateActive() ? [] : INITIAL_STAFF_LEAVES;
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(resetItems));
       window.dispatchEvent(new Event(STAFF_LEAVE_EVENT));
+      return resetItems;
     }
-    return INITIAL_STAFF_LEAVES;
+    return [];
   },
 };

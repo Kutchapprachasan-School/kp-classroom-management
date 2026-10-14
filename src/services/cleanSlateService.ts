@@ -12,7 +12,7 @@ export interface CleanSlatePurgeResult {
 
 const CLEAN_SLATE_FLAG_KEY = 'kp_clean_slate_mvp_activated';
 
-// รายการ Key ข้อมูลจำลองประเภท Transaction (ข้อมูลคะแนน, บันทึกการเข้าเรียน, ข้อสอบ, แชท, การบ้าน)
+// รายการ Key ข้อมูลจำลองประเภท Transaction (ข้อมูลคะแนน, บันทึกการเข้าเรียน, ข้อสอบ, แชท, การบ้าน, สื่อการสอน)
 export const TRANSACTIONAL_STORAGE_KEYS = [
   'cls_scores_data',
   'kp_morning_assembly_records',
@@ -27,6 +27,7 @@ export const TRANSACTIONAL_STORAGE_KEYS = [
   'cls_student_quests',
   'cls_student_streak',
   'kp_home_visit_records_v2',
+  'cms_home_visit_nor01_cct_v2',
   'cms_affairs_student_leaves_v2',
   'cms_affairs_discipline_v1',
   'cms_council_suggestions_v1',
@@ -37,6 +38,21 @@ export const TRANSACTIONAL_STORAGE_KEYS = [
   'kp_assignment_bundle_v2',
   'kp_school_calendar_events_v2',
   'cls_lesson_plans_v1',
+  'kp_sgs_roster_v3',
+  'kp_term_assignments_v2',
+  'kp_work_submissions_v2',
+  'kp_sgs_roster_sync_meta_v1',
+  'kps_staff_leave_requests_v1',
+  'kp_teacher_todo_state_v1',
+  'kp_teacher_copilot_state_v1',
+  'kp_teacher_matrix_slots',
+  'cls_trash_data',
+  'kp_courses_curriculum',
+  'kp_curriculum_trash',
+  'kp_approved_school_activities',
+  'kp_approved_student_leaves',
+  'cms_affairs_leaves_v1',
+  'cms_affairs_assembly_v1',
 ];
 
 // รายการ Key โครงสร้างพื้นฐานของโรงเรียนที่ต้องเก็บรักษาไว้ (Preserved Infrastructure)
@@ -45,6 +61,7 @@ export const PRESERVED_INFRASTRUCTURE_KEYS = [
   'kp_school_bell_schedule',
   'kp_academic_calendar',
   'kp_school_branding',
+  'kps_school_branding_settings_v1',
   'kp_school_leave_settings',
   'cls_current_auth_user',
 ];
@@ -52,8 +69,7 @@ export const PRESERVED_INFRASTRUCTURE_KEYS = [
 class CleanSlateService {
   /**
    * ตรวจสอบว่าระบบอยู่ในสถานะ Clean Slate MVP หรือไม่
-   * - ในเบราว์เซอร์: เป็นค่าเริ่มต้น (true) เสมอ เพื่อให้เริ่มต้นด้วยหน้าว่างแบบ Zero Mock Data
-   *   ยกเว้นผู้ใช้กดปุ่มเลือกโหมดข้อมูลตัวอย่าง (Demo Mode) จะคืนค่า false
+   * - เป็นค่าเริ่มต้น (true) เสมอ เพื่อให้เริ่มต้นด้วยหน้าว่างแบบ Zero Mock Data สำหรับใช้งานจริง
    */
   isCleanSlateActive(): boolean {
     if (typeof window === 'undefined' || !window.localStorage) {
@@ -66,12 +82,11 @@ class CleanSlateService {
     if (val === 'true') {
       return true;
     }
-    // ในเบราว์เซอร์จริง (มี window.location) กำหนดให้ Clean Slate ทำงานเป็นค่าเริ่มต้น
+    // ในเบราว์เซอร์จริง (มี window.location) กำหนดให้ Clean Slate ทำงานเป็นค่าเริ่มต้น (Zero Mock Data สำหรับเริ่มใช้งานจริง)
     if (typeof window.location !== 'undefined') {
       return true;
     }
-    // ใน Node.js test environment หากไม่มีการเซ็ต flag ให้ fallback
-    return Boolean(localStorage.getItem('cls_current_auth_user'));
+    return false;
   }
 
   /**
@@ -90,11 +105,19 @@ class CleanSlateService {
         }
       });
 
-      // ล้าง keys นักเรียนแบบ dynamic (เช่น cls_student_streak_*, kp_student_quiz_*)
+      // ล้าง keys นักเรียนแบบ dynamic (เช่น cls_student_streak_*, kp_student_quiz_*, cls_students_*)
       const dynamicKeysToRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && (k.startsWith('cls_student_streak_') || k.startsWith('kp_student_quiz_'))) {
+        if (
+          k &&
+          (k.startsWith('cls_student_streak_') ||
+            k.startsWith('kp_student_quiz_') ||
+            k.startsWith('cls_students_') ||
+            k.startsWith('cls_student_') ||
+            k.startsWith('kp_period_') ||
+            k.startsWith('kp_morning_'))
+        ) {
           dynamicKeysToRemove.push(k);
         }
       }
@@ -105,6 +128,26 @@ class CleanSlateService {
 
       // ตั้งค่าสถานะ Clean Slate Active
       localStorage.setItem(CLEAN_SLATE_FLAG_KEY, 'true');
+
+      // ล้างข้อมูลบน Supabase PostgreSQL kps_cloud_store ด้วย
+      if (typeof window !== 'undefined') {
+        import('../lib/supabase').then(({ supabase, isSupabaseConfigured }) => {
+          if (isSupabaseConfigured) {
+            supabase
+              .from('kps_cloud_store')
+              .delete()
+              .in('key', [...TRANSACTIONAL_STORAGE_KEYS, ...dynamicKeysToRemove])
+              .then(
+                () => {
+                  console.log('[CleanSlate] Cloud store transactional keys purged from Supabase');
+                },
+                (err: unknown) => {
+                  console.warn('[CleanSlate] Cloud store purge error:', err);
+                }
+              );
+          }
+        }).catch(() => {});
+      }
 
       // แจ้งเตือน Reactive Event Bus
       try {

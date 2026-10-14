@@ -11,6 +11,7 @@ import {
 import { assignmentService } from '../services/assignmentService';
 import { scoreService } from '../services/scoreService';
 import { teacherCopilotService } from '../services/teacherCopilotService';
+import { cleanSlateService } from '../services/cleanSlateService';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 
 interface ReadinessTask {
@@ -74,23 +75,30 @@ export const EndTermReadinessView: React.FC<EndTermReadinessViewProps> = ({
       .getState()
       .resolvedItemIds.includes('urgent-sgs-readiness');
 
-  const [tasks, setTasks] = useState<ReadinessTask[]>(() =>
-    isSgsResolvedInCopilot()
+  const [tasks, setTasks] = useState<ReadinessTask[]>(() => {
+    if (cleanSlateService.isCleanSlateActive()) return [];
+    return isSgsResolvedInCopilot()
       ? INITIAL_READINESS_TASKS.map((t) => ({ ...t, emptyCount: 0 }))
-      : INITIAL_READINESS_TASKS
-  );
+      : INITIAL_READINESS_TASKS;
+  });
 
-  const [studentsList, setStudentsList] = useState(() =>
-    isSgsResolvedInCopilot()
+  const [studentsList, setStudentsList] = useState(() => {
+    if (cleanSlateService.isCleanSlateActive()) return [];
+    return isSgsResolvedInCopilot()
       ? INITIAL_READINESS_STUDENTS.map((s) => ({
           ...s,
           score: s.score === '' ? '3' : s.score,
         }))
-      : INITIAL_READINESS_STUDENTS
-  );
+      : INITIAL_READINESS_STUDENTS;
+  });
 
   useEffect(() => {
     const handler = () => {
+      if (cleanSlateService.isCleanSlateActive()) {
+        setTasks([]);
+        setStudentsList([]);
+        return;
+      }
       const resolved = isSgsResolvedInCopilot();
       setTasks(
         resolved

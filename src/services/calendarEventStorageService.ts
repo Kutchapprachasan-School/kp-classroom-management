@@ -434,7 +434,7 @@ export const calendarEventStorageService = {
   // อ่านกิจกรรมทั้งหมด: User-Defined + วันหยุดพิเศษ + วันเรียนพิเศษ
   loadAllEvents(): CalendarEventItem[] {
     if (typeof window === 'undefined') {
-      return INITIAL_OCTOBER_EVENTS;
+      return [];
     }
 
     let userEvents: CalendarEventItem[] = [];
@@ -450,7 +450,7 @@ export const calendarEventStorageService = {
       // ignore
     }
 
-    // หากยังไม่มีข้อมูลใน localStorage ให้บันทึกค่าเริ่มต้น (ไม่เป็น mock ว่างเปล่า)
+    // หากยังไม่มีข้อมูลใน localStorage ให้คงเป็นรายการว่าง ไม่ใส่ mock
     if (userEvents.length === 0 && !cleanSlateService.isCleanSlateActive()) {
       userEvents = INITIAL_OCTOBER_EVENTS;
       try {
@@ -503,7 +503,7 @@ export const calendarEventStorageService = {
   // อ่าน Matrix Slots ทั้งหมดจาก LocalStorage (ซิงค์ตรงกับหน้าตารางสอน TimetableView)
   loadMatrixSlots(): TimetableMatrixSlot[] {
     if (typeof window === 'undefined') {
-      return INITIAL_MATRIX_SLOTS;
+      return [];
     }
     try {
       const raw = localStorage.getItem(MATRIX_STORAGE_KEY);
@@ -514,7 +514,7 @@ export const calendarEventStorageService = {
         }
       }
     } catch {}
-    return INITIAL_MATRIX_SLOTS;
+    return cleanSlateService.isCleanSlateActive() ? [] : INITIAL_MATRIX_SLOTS;
   },
 
   // คำนวณจำนวนคาบสอนจริงของวันนี้จาก Matrix Slots (ตัดคาบว่าง, คาบพักเที่ยงออก)

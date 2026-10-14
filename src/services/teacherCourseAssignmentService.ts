@@ -50,30 +50,8 @@ export const getDynamicTeachingSubjects = (): TeachingSubjectInfo[] => {
     }));
   }
 
-  // หากไม่มีวิชาในหลักสูตรและเป็น Clean Slate ให้ส่งค่าว่าง [] เพื่อไม่ให้มี fake mock subjects
-  if (cleanSlateService.isCleanSlateActive()) {
-    return [];
-  }
-
-  // Fallback เฉพาะ 2 วิชาหลักที่เป็นจริง ไม่ใส่ fake วิชาดนตรี/อังกฤษที่ไม่ได้สอน
-  return [
-    {
-      code: 'ญ31201',
-      name: 'ภาษาญี่ปุ่น 1',
-      shortName: 'ภาษาญี่ปุ่น ม.3',
-      classrooms: ['ม.3/1', 'ม.3/2'],
-      credits: 1.5,
-      colorBadge: 'bg-rose-100 text-rose-800 border-rose-300',
-    },
-    {
-      code: 'ศ23101',
-      name: 'ศิลปะ 3 (ทัศนศิลป์)',
-      shortName: 'ศิลปะ ม.3',
-      classrooms: ['ม.3/1', 'ม.3/2'],
-      credits: 1.5,
-      colorBadge: 'bg-teal-100 text-teal-800 border-teal-300',
-    },
-  ];
+  // หากไม่มีวิชาในหลักสูตร ให้ส่งค่าว่าง [] เพื่อไม่ให้มี fake mock subjects
+  return [];
 };
 
 /**
@@ -495,10 +473,7 @@ export const teacherCourseAssignmentService = {
     } catch {
       // fallback
     }
-    if (cleanSlateService.isCleanSlateActive()) {
-      return [];
-    }
-    return INITIAL_QUEUE_ITEMS.sort((a, b) => a.submittedTimestamp - b.submittedTimestamp);
+    return cleanSlateService.isCleanSlateActive() ? [] : INITIAL_QUEUE_ITEMS;
   },
 
   saveGradingQueue(items: GradingQueueItem[]): GradingQueueItem[] {
@@ -546,21 +521,20 @@ export const teacherCourseAssignmentService = {
     } catch {
       // fallback
     }
-    if (cleanSlateService.isCleanSlateActive()) {
-      return {
-        id: 'bundle-clean-default',
-        subjectCode: 'ศ23101',
-        classroom: 'ม.3/1',
-        title: 'ชุดการบ้านและภาระงานสะสม',
-        description: 'ยังไม่มีชุดภาระงานสะสมในขณะนี้ สร้างภาระงานเพื่อเริ่มเก็บคะแนน',
-        targetSgsColumn: 'คะแนนเก็บระหว่างภาค',
-        maxScore: 10,
-        totalTasks: 10,
-        autoRoundUpHalf: true,
-        students: [],
-      };
-    }
-    return buildInitialBundle();
+    return cleanSlateService.isCleanSlateActive()
+      ? {
+          id: 'bundle-clean-default',
+          subjectCode: '',
+          classroom: '',
+          title: 'ชุดการบ้านและภาระงานสะสม',
+          description: 'ยังไม่มีชุดภาระงานสะสมในขณะนี้ สร้างภาระงานเพื่อเริ่มเก็บคะแนน',
+          targetSgsColumn: 'คะแนนเก็บระหว่างภาค',
+          maxScore: 10,
+          totalTasks: 10,
+          autoRoundUpHalf: true,
+          students: [],
+        }
+      : buildInitialBundle();
   },
 
   saveBundle(bundle: AssignmentBundleConfig): AssignmentBundleConfig {

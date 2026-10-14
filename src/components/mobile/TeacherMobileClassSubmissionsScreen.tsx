@@ -3,6 +3,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import type { TeacherViewKey } from '../layout/TeacherSidebar';
+import { cleanSlateService } from '../../services/cleanSlateService';
 
 export interface MobileStudentSubmissionItem {
   id: string;
@@ -82,6 +83,7 @@ export const TeacherMobileClassSubmissionsScreen: React.FC<
   TeacherMobileClassSubmissionsScreenProps
 > = ({ onBack, onNavigate, onSelectStudent }) => {
   const [activeTab, setActiveTab] = useState<'ROSTER' | 'ASSIGNMENTS' | 'SCORES'>('ROSTER');
+  const submissions = cleanSlateService.isCleanSlateActive() ? [] : INITIAL_STUDENT_SUBMISSIONS;
 
   const handleStudentClick = (student: MobileStudentSubmissionItem) => {
     if (onSelectStudent) {
@@ -188,55 +190,61 @@ export const TeacherMobileClassSubmissionsScreen: React.FC<
 
       {/* 4. Student Submission Rows matching Screen 3 */}
       <div className="space-y-2 pt-1">
-        {INITIAL_STUDENT_SUBMISSIONS.map((st) => (
-          <div
-            key={st.id}
-            onClick={() => handleStudentClick(st)}
-            className="p-3 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex items-center justify-between gap-3 hover:border-blue-300 transition-all cursor-pointer group"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="text-xs font-bold text-slate-400 w-4 text-center shrink-0">
-                {st.orderNumber}
-              </span>
-              <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-100 shrink-0 bg-blue-50">
-                <img
-                  src={st.avatarUrl}
-                  alt={st.name}
-                  className="w-full h-full object-cover"
-                />
+        {submissions.length === 0 ? (
+          <div className="p-8 text-center text-slate-400 bg-white rounded-2xl border border-slate-100 font-medium text-xs">
+            ยังไม่มีงานส่งของนักเรียนในห้องเรียนนี้
+          </div>
+        ) : (
+          submissions.map((st) => (
+            <div
+              key={st.id}
+              onClick={() => handleStudentClick(st)}
+              className="p-3 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex items-center justify-between gap-3 hover:border-blue-300 transition-all cursor-pointer group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="text-xs font-bold text-slate-400 w-4 text-center shrink-0">
+                  {st.orderNumber}
+                </span>
+                <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-100 shrink-0 bg-blue-50">
+                  <img
+                    src={st.avatarUrl}
+                    alt={st.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-xs font-bold text-slate-900 truncate">
+                    {st.name}
+                  </h4>
+                  {st.timeSubmitted && (
+                    <p className="text-[10px] text-slate-400 font-medium">
+                      {st.timeSubmitted}
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className="min-w-0">
-                <h4 className="text-xs font-bold text-slate-900 truncate">
-                  {st.name}
-                </h4>
-                {st.timeSubmitted && (
-                  <p className="text-[10px] text-slate-400 font-medium">
-                    {st.timeSubmitted}
-                  </p>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {st.status === 'GRADED' ? (
+                  <>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
+                      ตรวจแล้ว
+                    </span>
+                    {st.scoreText && (
+                      <span className="text-xs font-extrabold text-slate-800">
+                        {st.scoreText}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200">
+                    ยังไม่ตรวจ
+                  </span>
                 )}
               </div>
             </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              {st.status === 'GRADED' ? (
-                <>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
-                    ตรวจแล้ว
-                  </span>
-                  {st.scoreText && (
-                    <span className="text-xs font-extrabold text-slate-800">
-                      {st.scoreText}
-                    </span>
-                  )}
-                </>
-              ) : (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200">
-                  ยังไม่ตรวจ
-                </span>
-              )}
-            </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       {/* 5. Sticky Bottom Action Button matching Screen 3 */}

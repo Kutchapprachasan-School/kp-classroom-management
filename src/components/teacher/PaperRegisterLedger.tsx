@@ -15,6 +15,7 @@ import {
   type PeriodAttendanceRecord,
   type MorningAssemblyRecord,
 } from '../../services/attendanceCorrelationService';
+import { cleanSlateService } from '../../services/cleanSlateService';
 
 export type PaperLedgerMode =
   | 'MORNING_ASSEMBLY'
@@ -120,6 +121,9 @@ const INITIAL_STUDENT_NAMES = [
 ];
 
 function buildInitialRows(): StudentPaperRow[] {
+  if (cleanSlateService.isCleanSlateActive()) {
+    return [];
+  }
   return INITIAL_STUDENT_NAMES.map((st, idx) => {
     const isMissingSome = idx === 2 || idx === 6 || idx === 13;
     return {
@@ -217,7 +221,9 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [selectedRoom, setSelectedRoom] = useState<string>(defaultRoom);
   const [attendanceViewType, setAttendanceViewType] = useState<'MULTI_PERIOD' | 'TODAY_SINGLE'>('MULTI_PERIOD');
-  const [assignments, setAssignments] = useState<AssignmentColumnDef[]>(DEFAULT_ASSIGNMENTS);
+  const [assignments, setAssignments] = useState<AssignmentColumnDef[]>(() =>
+    cleanSlateService.isCleanSlateActive() ? [] : DEFAULT_ASSIGNMENTS
+  );
   const [morningSyncMode, setMorningSyncMode] = useState<'AUTO_PREFILL' | 'MANUAL_FRESH'>(() => {
     try {
       const raw = window.localStorage.getItem('kps_school_branding_settings_v1');
@@ -887,7 +893,14 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="py-12 text-center text-slate-400 font-medium">
+                    ยังไม่มีข้อมูลนักเรียนในห้องเรียนนี้
+                  </td>
+                </tr>
+              ) : (
+                rows.map((r) => {
                 const st = r.morningStatus;
                 const rowBg =
                   st === 'ABSENT'
@@ -938,7 +951,7 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
                     })}
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>
@@ -1001,7 +1014,14 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="py-12 text-center text-slate-400 font-medium">
+                    ยังไม่มีข้อมูลนักเรียนในห้องเรียนนี้
+                  </td>
+                </tr>
+              ) : (
+                rows.map((r) => {
                 const attendedPeriods = r.classPeriods.filter((p) => p === 'PRESENT').length;
                 const percent = Math.round((attendedPeriods / DEFAULT_PERIODS.length) * 100);
                 const isRiskMs = percent < 80;
@@ -1078,7 +1098,7 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
                     </td>
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>
@@ -1131,7 +1151,14 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="py-12 text-center text-slate-400 font-medium">
+                    ยังไม่มีข้อมูลนักเรียนในห้องเรียนนี้
+                  </td>
+                </tr>
+              ) : (
+                rows.map((r) => {
                 const st = r.classPeriods[4];
                 const rowBg =
                   st === 'ABSENT'
@@ -1183,7 +1210,7 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
                     })}
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>
@@ -1244,7 +1271,14 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, rowIdx) => {
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={Math.max(4, assignments.length + 3)} className="py-12 text-center text-slate-400 font-medium">
+                    ยังไม่มีข้อมูลนักเรียนในห้องเรียนนี้
+                  </td>
+                </tr>
+              ) : (
+                rows.map((r, rowIdx) => {
                 const submittedTotal = assignments.filter(
                   (hw) => r.homeworks[hw.id]?.submitted
                 ).length;
@@ -1382,7 +1416,7 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
                     </td>
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>
@@ -1433,7 +1467,14 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, rowIdx) => {
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={12} className="py-12 text-center text-slate-400 font-medium">
+                    ยังไม่มีข้อมูลนักเรียนในห้องเรียนนี้
+                  </td>
+                </tr>
+              ) : (
+                rows.map((r, rowIdx) => {
                 const accum = Math.round(
                   assignments.reduce((acc, hw) => {
                     const sc = r.homeworks[hw.id]?.score;
@@ -1550,7 +1591,7 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
                     </td>
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>
