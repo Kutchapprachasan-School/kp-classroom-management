@@ -76,7 +76,7 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
   const [period, setPeriod] = useState<number>(1);
   const [subjectCode, setSubjectCode] = useState<string>('');
   const [subjectName, setSubjectName] = useState<string>('');
-  const [classroom, setClassroom] = useState<string>('ม.3/1');
+  const [classroom, setClassroom] = useState<string>('');
   const [room, setRoom] = useState<string>('324');
   const [colorTheme, setColorTheme] = useState<TimetableColorTheme>('blue');
 
@@ -95,7 +95,10 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
       setPeriod(initialSlot.period || 1);
       setSubjectCode(initialSlot.subjectCode || '');
       setSubjectName(initialSlot.subjectName || '');
-      setClassroom(initialSlot.room?.startsWith('ม.') ? initialSlot.room.split('•')[0].trim() : 'ม.3/1');
+      const extractedClassroom = initialSlot.room
+        ? initialSlot.room.split('•')[0].trim()
+        : (list[0]?.assignedClassrooms?.[0] || '');
+      setClassroom(extractedClassroom);
       setRoom(initialSlot.room?.includes('ห้อง') ? initialSlot.room.replace(/.*ห้อง\s*/, '') : '324');
       setColorTheme(initialSlot.colorTheme || 'blue');
 
@@ -119,7 +122,7 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
       setPeriod(1);
       setSubjectCode('');
       setSubjectName('');
-      setClassroom('ม.3/1');
+      setClassroom(list[0]?.assignedClassrooms?.[0] || '');
       setRoom('324');
       setColorTheme('blue');
       setSelectedCatalogCourseId('');
@@ -247,8 +250,9 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
           </div>
 
           {/* Form Content */}
-          <form onSubmit={handleSave} className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1">
-            {/* Day & Period Selectors */}
+          <form onSubmit={handleSave} className="flex flex-col flex-1 min-h-0">
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1">
+              {/* Day & Period Selectors */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
@@ -531,49 +535,49 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
                 })}
               </div>
             </div>
+          </div>
 
-            {/* Submit / Action Buttons */}
-            <div className="pt-2 flex items-center justify-between gap-3">
-              {isEditing && onDeleteSlot ? (
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  className="px-3.5 py-2 rounded-xl text-rose-600 hover:bg-rose-50 border border-rose-200 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>ลบรายวิชา</span>
-                </button>
-              ) : (
-                <div />
-              )}
+          {/* Submit / Action Buttons */}
+          <div className="shrink-0 p-4 sm:p-5 border-t border-slate-100 bg-slate-50/90 flex items-center justify-between gap-3">
+            {isEditing && onDeleteSlot ? (
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="px-3.5 py-2 rounded-xl text-rose-600 hover:bg-rose-50 border border-rose-200 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>ลบรายวิชา</span>
+              </button>
+            ) : (
+              <div />
+            )}
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="submit"
-                  disabled={Boolean(quotaCheck && !quotaCheck.allowed)}
-                  className={`px-5 py-2 rounded-xl text-white text-xs sm:text-sm font-bold shadow-xs transition-all flex items-center gap-1.5 ${
-                    quotaCheck && !quotaCheck.allowed
-                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-70'
-                      : 'bg-blue-600 hover:bg-blue-700 cursor-pointer'
-                  }`}
-                  title={quotaCheck && !quotaCheck.allowed ? quotaCheck.reason : undefined}
-                >
-                  <Check className="w-4 h-4 stroke-[2.5]" />
-                  <span>{isEditing ? 'บันทึกการแก้ไข' : 'เพิ่มลงตารางสอน'}</span>
-                </button>
-
-              </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="submit"
+                disabled={Boolean(quotaCheck && !quotaCheck.allowed)}
+                className={`px-5 py-2 rounded-xl text-white text-xs sm:text-sm font-bold shadow-xs transition-all flex items-center gap-1.5 ${
+                  quotaCheck && !quotaCheck.allowed
+                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-70'
+                    : 'bg-blue-600 hover:bg-blue-700 cursor-pointer'
+                }`}
+                title={quotaCheck && !quotaCheck.allowed ? quotaCheck.reason : undefined}
+              >
+                <Check className="w-4 h-4 stroke-[2.5]" />
+                <span>{isEditing ? 'บันทึกการแก้ไข' : 'เพิ่มลงตารางสอน'}</span>
+              </button>
             </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
+    </div>
 
       {/* Sub-modal: Subject Icon Picker */}
       <SubjectIconPickerModal

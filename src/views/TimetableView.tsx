@@ -371,7 +371,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
             const period = parseInt(cols[1], 10);
             const subjectCode = cols[3];
             const subjectName = cols[4] || subjectCode;
-            const room = cols[5] || 'ม.3/1';
+            const room = cols[5] || '';
 
             if (day && !isNaN(period) && subjectCode) {
               const idx = newMatrix.findIndex((s) => s.day === day && s.period === period);
@@ -421,7 +421,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
     setEditingSlot({
       day: day as TimetableMatrixSlot['day'],
       period,
-      room: 'ม.3/1',
+      room: '',
       colorTheme: 'blue',
       isFreePeriod: false,
     });
@@ -588,7 +588,6 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
         subtitle="ตรวจสอบรายวิชาที่สอนในแต่ละวัน และจัดการคาบเรียนอย่างเป็นระบบ"
         icon={<Calendar className="w-6 h-6 text-white" />}
         iconBgClass="bg-blue-600 text-white"
-        badgeText="ม.3/1"
         quoteLines={[
           'การจัดสรรเวลาอย่างมีคุณค่า',
           'เพื่อการเรียนรู้ที่มีประสิทธิภาพ',

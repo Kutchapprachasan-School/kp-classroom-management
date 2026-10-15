@@ -972,9 +972,9 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
       {/* MODAL 1: เพิ่มรายวิชาใหม่                                           */}
       {/* ==================================================================== */}
       {isAddCourseModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-slide-up space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in font-sans">
+          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90dvh] flex flex-col shadow-2xl border border-slate-200 animate-slide-up overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 p-5 sm:p-6 pb-3 shrink-0">
               <div className="flex items-center gap-2">
                 <BookMarked className="w-5 h-5 text-blue-600" />
                 <h3 className="text-base font-extrabold text-slate-900">เพิ่มรายวิชาใหม่ในหลักสูตร</h3>
@@ -988,7 +988,8 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveAddCourse} className="space-y-3.5 text-xs">
+            <form onSubmit={handleSaveAddCourse} className="flex flex-col flex-1 min-h-0 text-xs">
+              <div className="p-5 sm:p-6 pt-3 space-y-3.5 overflow-y-auto flex-1">
               {/* Academic Year and Term Selector (วางแผนล่วงหน้าได้) */}
               <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/90 space-y-2">
                 <div className="flex items-center justify-between">
@@ -1225,34 +1226,35 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsAddCourseModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold transition-colors cursor-pointer"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold shadow-md transition-colors cursor-pointer"
-                >
-                  บันทึกรายวิชา
-                </button>
-              </div>
-            </form>
-          </div>
+            <div className="flex items-center justify-end gap-2 p-4 sm:px-6 bg-slate-50/90 border-t border-slate-100 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsAddCourseModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold transition-colors cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold shadow-md transition-colors cursor-pointer"
+              >
+                บันทึกรายวิชา
+              </button>
+            </div>
+          </form>
         </div>
+      </div>
       )}
 
       {/* ==================================================================== */}
       {/* MODAL 2: แก้ไขรายวิชา                                               */}
       {/* ==================================================================== */}
       {isEditCourseModalOpen && selectedCourse && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-slide-up space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in font-sans">
+          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90dvh] flex flex-col shadow-2xl border border-slate-200 animate-slide-up overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 p-5 sm:p-6 pb-3 shrink-0">
               <div className="flex items-center gap-2">
                 <Edit3 className="w-5 h-5 text-blue-600" />
                 <h3 className="text-base font-extrabold text-slate-900">แก้ไขข้อมูลรายวิชา {selectedCourse.code}</h3>
@@ -1266,7 +1268,8 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveEditCourse} className="space-y-3.5 text-xs">
+            <form onSubmit={handleSaveEditCourse} className="flex flex-col flex-1 min-h-0 text-xs">
+              <div className="p-5 sm:p-6 pt-3 space-y-3.5 overflow-y-auto flex-1">
               {/* Academic Year and Term Selector (แก้ไขภาคเรียน/ปีการศึกษา) */}
               <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/90 space-y-2">
                 <div className="flex items-center justify-between">
@@ -1451,34 +1454,35 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsEditCourseModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold transition-colors cursor-pointer"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold shadow-md transition-colors cursor-pointer"
-                >
-                  บันทึกการแก้ไข
-                </button>
-              </div>
-            </form>
-          </div>
+            <div className="flex items-center justify-end gap-2 p-4 sm:px-6 bg-slate-50/90 border-t border-slate-100 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsEditCourseModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold transition-colors cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold shadow-md transition-colors cursor-pointer"
+              >
+                บันทึกการแก้ไข
+              </button>
+            </div>
+          </form>
         </div>
+      </div>
       )}
 
       {/* ==================================================================== */}
       {/* MODAL 3: เพิ่มหน่วยการเรียนรู้                                         */}
       {/* ==================================================================== */}
       {isAddUnitModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-slide-up space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in font-sans">
+          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90dvh] flex flex-col shadow-2xl border border-slate-200 animate-slide-up overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 p-5 sm:p-6 pb-3 shrink-0">
               <div className="flex items-center gap-2">
                 <Layers className="w-5 h-5 text-blue-600" />
                 <h3 className="text-base font-extrabold text-slate-900">เพิ่มหน่วยการเรียนรู้ใหม่</h3>
@@ -1492,7 +1496,8 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveAddUnit} className="space-y-3.5 text-xs">
+            <form onSubmit={handleSaveAddUnit} className="flex flex-col flex-1 min-h-0 text-xs">
+              <div className="p-5 sm:p-6 pt-3 space-y-3.5 overflow-y-auto flex-1">
               <div>
                 <label className="font-bold text-slate-700 block mb-1">ชื่อหน่วยการเรียนรู้:</label>
                 <input
@@ -1565,34 +1570,35 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
                   />
                 </div>
               </div>
+            </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsAddUnitModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold transition-colors cursor-pointer"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold shadow-md transition-colors cursor-pointer"
-                >
-                  บันทึกหน่วยเรียนรู้
-                </button>
-              </div>
-            </form>
-          </div>
+            <div className="flex items-center justify-end gap-2 p-4 sm:px-6 bg-slate-50/90 border-t border-slate-100 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsAddUnitModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold transition-colors cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold shadow-md transition-colors cursor-pointer"
+              >
+                บันทึกหน่วยเรียนรู้
+              </button>
+            </div>
+          </form>
         </div>
+      </div>
       )}
 
       {/* ==================================================================== */}
       {/* MODAL 4: เพิ่มสื่อการสอน / ใบงาน / การสอบ                            */}
       {/* ==================================================================== */}
       {isAddMediaModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-slide-up space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in font-sans">
+          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90dvh] flex flex-col shadow-2xl border border-slate-200 animate-slide-up overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 p-5 sm:p-6 pb-3 shrink-0">
               <div className="flex items-center gap-2">
                 <UploadCloud className="w-5 h-5 text-blue-600" />
                 <h3 className="text-base font-extrabold text-slate-900">เพิ่มสื่อการสอนหรือใบงานประจำหน่วย</h3>
@@ -1606,7 +1612,8 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveAddMedia} className="space-y-3.5 text-xs">
+            <form onSubmit={handleSaveAddMedia} className="flex flex-col flex-1 min-h-0 text-xs">
+              <div className="p-5 sm:p-6 pt-3 space-y-3.5 overflow-y-auto flex-1">
               <div>
                 <label className="font-bold text-slate-700 block mb-1">ประเภทสื่อการสอน:</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -1681,34 +1688,35 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
                   เปิดให้นักเรียนในห้องที่สอนสามารถมองเห็นและดาวน์โหลดได้
                 </label>
               </div>
+            </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsAddMediaModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold transition-colors cursor-pointer"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold shadow-md transition-colors cursor-pointer"
-                >
-                  เพิ่มสื่อการสอน
-                </button>
-              </div>
-            </form>
-          </div>
+            <div className="flex items-center justify-end gap-2 p-4 sm:px-6 bg-slate-50/90 border-t border-slate-100 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsAddMediaModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold transition-colors cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold shadow-md transition-colors cursor-pointer"
+              >
+                เพิ่มสื่อการสอน
+              </button>
+            </div>
+          </form>
         </div>
+      </div>
       )}
 
       {/* ==================================================================== */}
       {/* MODAL 5: ใช้แผนการสอนเดิมเมื่อเปลี่ยนปีการศึกษา (Copy Curriculum)     */}
       {/* ==================================================================== */}
       {isCopyYearModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-slide-up space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in font-sans">
+          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90dvh] flex flex-col shadow-2xl border border-slate-200 animate-slide-up overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 p-5 sm:p-6 pb-3 shrink-0">
               <div className="flex items-center gap-2">
                 <Copy className="w-5 h-5 text-indigo-600" />
                 <h3 className="text-base font-extrabold text-slate-900">
@@ -1724,17 +1732,17 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
               </button>
             </div>
 
-            <div className="p-3.5 bg-indigo-50/70 border border-indigo-200 rounded-2xl text-xs text-indigo-900 space-y-1">
-              <span className="font-bold flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
-                <span>สะดวก รวดเร็ว ปรับแก้เพียงเล็กน้อยได้ทันที</span>
-              </span>
-              <p className="text-[11px] text-indigo-700 leading-relaxed">
-                คัดลอกจากเทอมเดิม (เช่น 1/2569) ไปเป็นเทอมใหม่ (เช่น 1/2570) โดยที่แผนเก่าและงานของนักเรียนรุ่นเดิมยังคงถูกเก็บรักษาไว้ 100% เพื่อให้นักเรียนกลับมาดู แก้งาน หรือส่งงานย้อนหลังได้ตลอดเวลา
-              </p>
-            </div>
-
-            <form onSubmit={handleExecuteCopyYear} className="space-y-4 text-xs">
+            <form onSubmit={handleExecuteCopyYear} className="flex flex-col flex-1 min-h-0 text-xs">
+              <div className="p-5 sm:p-6 pt-3 space-y-4 overflow-y-auto flex-1">
+                <div className="p-3.5 bg-indigo-50/70 border border-indigo-200 rounded-2xl text-xs text-indigo-900 space-y-1">
+                  <span className="font-bold flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <span>สะดวก รวดเร็ว ปรับแก้เพียงเล็กน้อยได้ทันที</span>
+                  </span>
+                  <p className="text-[11px] text-indigo-700 leading-relaxed">
+                    คัดลอกจากเทอมเดิม (เช่น 1/2569) ไปเป็นเทอมใหม่ (เช่น 1/2570) โดยที่แผนเก่าและงานของนักเรียนรุ่นเดิมยังคงถูกเก็บรักษาไว้ 100% เพื่อให้นักเรียนกลับมาดู แก้งาน หรือส่งงานย้อนหลังได้ตลอดเวลา
+                  </p>
+                </div>
               {/* Scope Selection */}
               <div>
                 <label className="font-bold text-slate-700 block mb-1.5">ขอบเขตที่ต้องการคัดลอก:</label>
@@ -1838,25 +1846,26 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
                   แผนการสอนเดิมของเทอม {copyYearForm.fromTerm}/{copyYearForm.fromYear} จะไม่ถูกลบหรือเขียนทับ นักเรียนรุ่นที่เคยเรียนยังคงสามารถเข้าถึงสื่อการสอนและส่งงานย้อนหลังได้ตามปกติ
                 </p>
               </div>
+            </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsCopyYearModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold transition-colors cursor-pointer"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold shadow-md transition-colors cursor-pointer"
-                >
-                  คัดลอกโครงสร้างแผนทันที
-                </button>
-              </div>
-            </form>
-          </div>
+            <div className="flex items-center justify-end gap-2 p-4 sm:px-6 bg-slate-50/90 border-t border-slate-100 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsCopyYearModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold transition-colors cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold shadow-md transition-colors cursor-pointer"
+              >
+                คัดลอกโครงสร้างแผนทันที
+              </button>
+            </div>
+          </form>
         </div>
+      </div>
       )}
 
       {/* ==================================================================== */}
@@ -1864,7 +1873,7 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
       {/* ==================================================================== */}
       {mediaToDelete && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in font-sans">
-          <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-slide-up space-y-4">
+          <div className="bg-white rounded-3xl max-w-md w-full max-h-[90dvh] overflow-y-auto p-5 sm:p-6 shadow-2xl border border-slate-200 animate-slide-up space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200">
                 <Trash2 className="w-5 h-5 text-rose-600" />
@@ -1908,8 +1917,8 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
       {/* ==================================================================== */}
       {isTrashModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in font-sans">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-slide-up space-y-4 max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90dvh] flex flex-col shadow-2xl border border-slate-200 animate-slide-up overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 p-5 sm:p-6 pb-3 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200">
                   <Archive className="w-5 h-5 text-rose-600" />
@@ -1933,7 +1942,7 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
             </div>
 
             {/* List */}
-            <div className="overflow-y-auto space-y-2.5 flex-1 pr-1">
+            <div className="overflow-y-auto space-y-2.5 flex-1 p-5 sm:p-6 pt-3">
               {trashItems.length === 0 ? (
                 <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200/80 text-xs text-slate-400 space-y-2">
                   <Archive className="w-8 h-8 text-slate-300 mx-auto" />
@@ -1987,7 +1996,7 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
             </div>
 
             {/* Bottom Actions */}
-            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+            <div className="flex items-center justify-between p-4 sm:px-6 bg-slate-50/90 border-t border-slate-100 shrink-0">
               {trashItems.length > 0 ? (
                 <button
                   type="button"
