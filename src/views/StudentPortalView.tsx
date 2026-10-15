@@ -32,6 +32,7 @@ import { authService, type AuthUser } from '../services/authService';
 import { getSchoolSettings, type SchoolSettingsConfig } from '../config/schoolSettings';
 import { type SchoolUserRole } from '../config/schoolRoles';
 import { calculateStudentExp, STUDENT_EXP_EVENT } from '../services/studentExpService';
+import { formatClassroomLabel } from '../services/studentService';
 
 interface StudentPortalViewProps {
   onExit: () => void;
@@ -55,7 +56,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
   const effectiveUser = currentUser || authService.getCurrentUser();
   const effectiveSettings = schoolSettings || getSchoolSettings();
   const studentName = effectiveUser?.name || 'นักเรียน';
-  const studentClassroom = effectiveUser?.classroomId || 'ม.3/1';
+  const studentClassroom = formatClassroomLabel(effectiveUser?.classroomId);
 
   const [activeTab, setActiveTab] = useState<StudentTabKey>('home');
   const [currentXp, setCurrentXp] = useState<number>(() =>

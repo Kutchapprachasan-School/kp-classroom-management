@@ -8,7 +8,6 @@ import {
   type SchoolBrandingSettings,
 } from '../config/schoolRoles';
 import { authService } from '../services/authService';
-import { cleanSlateService } from '../services/cleanSlateService';
 
 export type TeacherLoginChannel = 'E_LEAVE' | 'DIRECT_CLASSROOM';
 
@@ -73,7 +72,6 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
       // 1. ถ้ารหัสผู้ใช้เป็นตัวเลข 5 หลัก -> ตรวจสอบการเข้าสู่ระบบของนักเรียน
       if (/^\d{5}$/.test(cleanUser)) {
         const studentUser = await authService.loginStudentWithHashedPassword(cleanUser, cleanPass);
-        cleanSlateService.purgeTransactionalMockData();
         onEnterStudentPortal('STUDENT_GENERAL', {
           id: studentUser.id,
           smsId: studentUser.studentCode || cleanUser,
@@ -92,7 +90,6 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
 
       // 2. ถ้าเป็นครู / บุคลากร -> ตรวจสอบกับฐานข้อมูล Supabase ตาราง User & Account จริง
       const teacherUser = await authService.loginTeacher(cleanUser, cleanPass);
-      cleanSlateService.purgeTransactionalMockData();
       const appRole: SchoolUserRole =
         teacherUser.role === 'ADMIN'
           ? 'ACADEMIC_ADMIN'
@@ -127,7 +124,6 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
     try {
       if (provider === 'GOOGLE') {
         const teacherUser = await authService.loginTeacherGoogle();
-        cleanSlateService.purgeTransactionalMockData();
         const appRole: SchoolUserRole =
           teacherUser.role === 'ADMIN'
             ? 'ACADEMIC_ADMIN'

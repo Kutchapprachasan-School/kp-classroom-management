@@ -14,6 +14,7 @@ import { getSchoolSettings, type SchoolUserRole, type SchoolBrandingSettings } f
 import type { SchoolSettingsConfig } from '../../config/schoolSettings';
 import type { AuthUser } from '../../services/authService';
 import { formatThaiDateFull } from '../../utils/timetableDateUtils';
+import { formatClassroomLabel } from '../../services/studentService';
 
 import { calculateStudentExp } from '../../services/studentExpService';
 
@@ -96,7 +97,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
               {effectiveSettings?.districtProvince || 'ต.กุดจับ อ.กุดจับ จ.อุดรธานี'}
             </span>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-200 mt-0.5">
-              <span>🏠 {classroomName || 'ม.3/1'}</span>
+              <span>🏠 {formatClassroomLabel(classroomName)}</span>
             </span>
           </div>
         </div>
@@ -180,7 +181,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
               </h2>
               {classroomName && (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                  {classroomName}
+                  {formatClassroomLabel(classroomName)}
                 </span>
               )}
             </div>

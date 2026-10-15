@@ -40,7 +40,9 @@ import type { AuthUser } from '../services/authService';
 import type { SchoolSettingsConfig } from '../config/schoolSettings';
 import { getSchoolSettings } from '../config/schoolSettings';
 import { academicCalendarService } from '../services/academicCalendarService';
-import { cleanSlateService } from '../services/cleanSlateService';
+import { formatClassroomLabel } from '../services/studentService';
+import { coursesCurriculumService, type CourseCurriculumRecord } from '../services/coursesCurriculumService';
+import { getSubjectIcon } from '../config/subjectIcons';
 
 interface StudentGradebookViewProps {
   currentUser?: AuthUser | null;
@@ -70,14 +72,16 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
   currentUser,
   schoolSettings,
 }) => {
-  const isClean = cleanSlateService.isCleanSlateActive();
   const settings = schoolSettings || getSchoolSettings();
-  const studentName = currentUser?.name || 'ด.ช. กฤษณะ ศรีสมบูรณ์';
-  const studentRoom = currentUser?.classroomId || 'ม.3/1';
+  const studentName = currentUser?.name || 'นักเรียน';
+  const studentRoom = formatClassroomLabel(currentUser?.classroomId);
 
   // 1. Term / Academic Year Selector State
   const terms = academicCalendarService.getTerms();
-  const [selectedTermYear, setSelectedTermYear] = useState<string>('1/2569');
+  const activeTerm = academicCalendarService.getActiveTerm();
+  const [selectedTermYear, setSelectedTermYear] = useState<string>(() =>
+    activeTerm ? `${activeTerm.semesterNo}/${activeTerm.year}` : '1/2569'
+  );
 
   // 2. Radar Chart Mode State ('STRANDS' = ภาพ 2 | 'COMPETENCIES' = ภาพ 3)
   const [radarMode, setRadarMode] = useState<'STRANDS' | 'COMPETENCIES'>('STRANDS');
@@ -86,228 +90,135 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
   // 3. Teacher Evaluation Modal State
   const [evalModalTeacher, setEvalModalTeacher] = useState<SubjectGradeItem | null>(null);
 
-  // Term Data Matrix
-  const termData = useMemo(() => {
-    if (selectedTermYear === '2/2568') {
-      return {
-        gpa: '3.28',
-        gpaTrend: '+0.16 จากเทอมก่อน',
-        gpaAvg: '3.28',
-        gpaAccum: '3.20',
-        accumTrend: '+0.08 จากเทอมก่อน',
-        gradedCount: 8,
-        pendingReviewCount: 0,
-      };
-    }
-    if (selectedTermYear === '1/2568') {
-      return {
-        gpa: '3.12',
-        gpaTrend: 'เริ่มต้นปีการศึกษา',
-        gpaAvg: '3.12',
-        gpaAccum: '3.12',
-        accumTrend: 'ฐานแรกเข้า',
-        gradedCount: 8,
-        pendingReviewCount: 0,
-      };
-    }
-    // Default 1/2569 (Current Active Term)
-    return {
-      gpa: isClean ? '0.00' : '3.52',
-      gpaTrend: isClean ? '-' : '+0.18 จากเดือนก่อน',
-      gpaAvg: isClean ? '0.00' : '3.52',
-      gpaAccum: isClean ? '0.00' : '3.48',
-      accumTrend: isClean ? '-' : '+0.12 จากเดือนก่อน',
-      gradedCount: isClean ? 0 : 8,
-      pendingReviewCount: isClean ? 0 : 1,
-    };
-  }, [selectedTermYear, isClean]);
-
-  // 8 Subjects Matching Image 2
+  // Dynamic Subjects List (Zero Mock Data: checks coursesCurriculumService)
   const subjectsList: SubjectGradeItem[] = useMemo(() => {
-    if (isClean) return [];
-    return [
-      {
-        id: 'math',
-        strand: 'คณิตศาสตร์',
-        code: 'ค32101',
-        title: 'คณิตศาสตร์ (ค32101)',
-        symbol: '∑',
-        iconBg: 'bg-blue-500 text-white',
-        midtermScore: 78,
-        finalScore: 82,
-        totalScore: 80.0,
-        grade: 4,
-        teacherName: 'ครูสมชาย วงศ์คำ',
-        teacherDepartment: 'กลุ่มสาระฯ คณิตศาสตร์',
-        teacherAvatar: '👨‍🏫',
-        evalScore: 4.72,
-        evalStatus: 'ยอดเยี่ยม',
-      },
-      {
-        id: 'sci',
-        strand: 'วิทยาศาสตร์',
-        code: 'ว32101',
-        title: 'วิทยาศาสตร์ (ว32101)',
-        symbol: '🧪',
-        iconBg: 'bg-teal-500 text-white',
-        midtermScore: 85,
-        finalScore: 88,
-        totalScore: 86.5,
-        grade: 4,
-        teacherName: 'ครูจิราภรณ์ ใจดี',
-        teacherDepartment: 'กลุ่มสาระฯ วิทยาศาสตร์',
-        teacherAvatar: '👩‍🏫',
-        evalScore: 4.65,
-        evalStatus: 'ยอดเยี่ยม',
-      },
-      {
-        id: 'thai',
-        strand: 'ภาษาไทย',
-        code: 'ท32101',
-        title: 'ภาษาไทย (ท32101)',
-        symbol: 'ก',
-        iconBg: 'bg-rose-500 text-white',
-        midtermScore: 70,
-        finalScore: 75,
-        totalScore: 72.5,
-        grade: 3.5,
-        teacherName: 'ครูปรียานุช สอนดี',
-        teacherDepartment: 'กลุ่มสาระฯ ภาษาไทย',
-        teacherAvatar: '👩‍🏫',
-        evalScore: 4.5,
-        evalStatus: 'ยอดเยี่ยม',
-      },
-      {
-        id: 'soc',
-        strand: 'สังคมศึกษา',
-        code: 'ส32101',
-        title: 'สังคมศึกษา (ส32101)',
-        symbol: '🌍',
-        iconBg: 'bg-indigo-600 text-white',
-        midtermScore: 88,
-        finalScore: 92,
-        totalScore: 90.0,
-        grade: 4,
-        teacherName: 'ครูธนกร นานา',
-        teacherDepartment: 'กลุ่มสาระฯ สังคมศึกษา',
-        teacherAvatar: '👨‍🏫',
-        evalScore: 4.6,
-        evalStatus: 'ยอดเยี่ยม',
-      },
-      {
-        id: 'eng',
-        strand: 'ภาษาอังกฤษ',
-        code: 'อ32101',
-        title: 'ภาษาอังกฤษ (อ32101)',
-        symbol: 'EN',
-        iconBg: 'bg-purple-600 text-white',
-        midtermScore: 65,
-        finalScore: 78,
-        totalScore: 71.5,
-        grade: 3.5,
-        teacherName: 'ครูวิชรัชช แสงเดือน',
-        teacherDepartment: 'กลุ่มสาระฯ ภาษาต่างประเทศ',
-        teacherAvatar: '👨‍🏫',
-        evalScore: 4.32,
-        evalStatus: 'ดีมาก',
-      },
-      {
-        id: 'health',
-        strand: 'สุขศึกษา',
-        code: 'พ32101',
-        title: 'สุขศึกษา (พ32101)',
-        symbol: '⚽',
-        iconBg: 'bg-cyan-600 text-white',
-        midtermScore: 90,
-        finalScore: 95,
-        totalScore: 92.5,
-        grade: 4,
-        teacherName: 'ครูพงษ์ศักดิ์ ชัยชนะ',
-        teacherDepartment: 'กลุ่มสาระฯ สุขศึกษาและพลศึกษา',
-        teacherAvatar: '👨‍🏫',
-        evalScore: 4.8,
-        evalStatus: 'ยอดเยี่ยม',
-      },
-      {
-        id: 'art',
-        strand: 'ศิลปะ',
-        code: 'ศ32101',
-        title: 'ศิลปะ (ศ32101)',
-        symbol: '🎨',
-        iconBg: 'bg-emerald-600 text-white',
-        midtermScore: 88,
-        finalScore: 90,
-        totalScore: 89.0,
-        grade: 4,
-        teacherName: 'ครูปัญจพล เกษรัตน์',
-        teacherDepartment: 'กลุ่มสาระฯ ศิลปะ',
-        teacherAvatar: '👨‍🏫',
-        evalScore: 4.75,
-        evalStatus: 'ยอดเยี่ยม',
-      },
-      {
-        id: 'career',
-        strand: 'การงานอาชีพ',
-        code: 'ง32101',
-        title: 'การงานอาชีพ (ง32101)',
-        symbol: '🌱',
-        iconBg: 'bg-lime-600 text-white',
-        midtermScore: 85,
-        finalScore: 88,
-        totalScore: 86.5,
-        grade: 4,
-        teacherName: 'ครูกัลยา พรประเสริฐ',
-        teacherDepartment: 'กลุ่มสาระฯ การงานอาชีพ',
-        teacherAvatar: '👩‍🏫',
-        evalScore: 4.55,
-        evalStatus: 'ยอดเยี่ยม',
-      },
-    ];
-  }, [isClean]);
+    try {
+      const allCourses = coursesCurriculumService.getCourses();
+      const currentLevel = studentRoom.split('/')[0] || ''; // e.g. 'ม.1'
+      const matched = allCourses.filter((c: CourseCurriculumRecord) => {
+        const matchRoom = Array.isArray(c.assignedClassrooms) &&
+          c.assignedClassrooms.some((r: string) => r === studentRoom || formatClassroomLabel(r) === studentRoom);
+        const matchLevel = c.level === currentLevel;
+        return matchRoom || matchLevel;
+      });
 
-  // Radar Chart Data: 8 Strands (Image 2)
+      if (matched.length > 0) {
+        return matched.map((c: CourseCurriculumRecord) => {
+          const iconConfig = getSubjectIcon(c.code, c.name);
+          return {
+            id: c.id,
+            strand: c.strand || 'วิชาพื้นฐาน',
+            code: c.code,
+            title: `${c.name} (${c.code})`,
+            symbol: iconConfig.symbol || '📘',
+            iconBg: `${iconConfig.bgClass} ${iconConfig.textClass}`,
+            midtermScore: 0,
+            finalScore: 0,
+            totalScore: 0,
+            grade: 0,
+            teacherName: c.teacherName || 'ครูผู้สอน',
+            teacherDepartment: `กลุ่มสาระฯ ${c.strand || 'การเรียนรู้'}`,
+            teacherAvatar: '👨‍🏫',
+            evalScore: 5.0,
+            evalStatus: 'ยอดเยี่ยม' as const,
+          };
+        });
+      }
+    } catch {
+      // fallback
+    }
+    return [];
+  }, [studentRoom]);
+
+  // Term Data Matrix: Calculated Dynamically
+  const termData = useMemo(() => {
+    if (subjectsList.length === 0) {
+      return {
+        gpa: '0.00',
+        gpaTrend: '-',
+        gpaAvg: '0.00',
+        gpaAccum: '0.00',
+        accumTrend: '-',
+        gradedCount: 0,
+        pendingReviewCount: 0,
+      };
+    }
+    const totalPoints = subjectsList.reduce((acc, sub) => acc + (Number(sub.grade) || 0), 0);
+    const calculatedGpa = (totalPoints / subjectsList.length).toFixed(2);
+    return {
+      gpa: calculatedGpa,
+      gpaTrend: 'ภาคเรียนปัจจุบัน',
+      gpaAvg: calculatedGpa,
+      gpaAccum: calculatedGpa,
+      accumTrend: 'ภาคเรียนปัจจุบัน',
+      gradedCount: subjectsList.length,
+      pendingReviewCount: 0,
+    };
+  }, [subjectsList, selectedTermYear]);
+
+  // Radar Chart Data: 8 Strands
   const strandRadarData = useMemo(() => {
-    return [
-      { subject: 'คณิตศาสตร์', student: 80.0, fullMark: 100 },
-      { subject: 'วิทยาศาสตร์', student: 86.5, fullMark: 100 },
-      { subject: 'ภาษาไทย', student: 72.5, fullMark: 100 },
-      { subject: 'สังคมศึกษา', student: 90.0, fullMark: 100 },
-      { subject: 'ภาษาอังกฤษ', student: 71.5, fullMark: 100 },
-      { subject: 'สุขศึกษา', student: 92.5, fullMark: 100 },
-      { subject: 'ศิลปะ', student: 89.0, fullMark: 100 },
-      { subject: 'การงานอาชีพ', student: 86.5, fullMark: 100 },
-    ];
-  }, []);
+    if (subjectsList.length === 0) {
+      return [
+        { subject: 'คณิตศาสตร์', student: 0, fullMark: 100 },
+        { subject: 'วิทยาศาสตร์', student: 0, fullMark: 100 },
+        { subject: 'ภาษาไทย', student: 0, fullMark: 100 },
+        { subject: 'สังคมศึกษา', student: 0, fullMark: 100 },
+        { subject: 'ภาษาอังกฤษ', student: 0, fullMark: 100 },
+        { subject: 'สุขศึกษา', student: 0, fullMark: 100 },
+        { subject: 'ศิลปะ', student: 0, fullMark: 100 },
+        { subject: 'การงานอาชีพ', student: 0, fullMark: 100 },
+      ];
+    }
+    return subjectsList.map((s) => ({
+      subject: s.strand,
+      student: s.totalScore,
+      fullMark: 100,
+    }));
+  }, [subjectsList]);
 
-  // Radar Chart Data: 5 Competencies (Image 3)
+  // Radar Chart Data: 5 Competencies
   const competencyRadarData = useMemo(() => {
+    const hasData = subjectsList.length > 0;
     return [
-      { subject: 'คะแนนเก็บ', student: 85, fullMark: 100 },
-      { subject: 'คะแนนสอบ', student: 78, fullMark: 100 },
-      { subject: 'ส่งงานตรงเวลา', student: 90, fullMark: 100 },
-      { subject: 'เวลาเรียน', student: 96, fullMark: 100 },
-      { subject: 'พฤติกรรม', student: 100, fullMark: 100 },
+      { subject: 'คะแนนเก็บ', student: hasData ? Number(termData.gpa) * 25 : 0, fullMark: 100 },
+      { subject: 'คะแนนสอบ', student: hasData ? Number(termData.gpa) * 25 : 0, fullMark: 100 },
+      { subject: 'ส่งงานตรงเวลา', student: hasData ? 95 : 0, fullMark: 100 },
+      { subject: 'เวลาเรียน', student: hasData ? 100 : 0, fullMark: 100 },
+      { subject: 'พฤติกรรม', student: hasData ? 100 : 0, fullMark: 100 },
     ];
-  }, []);
+  }, [subjectsList, termData.gpa]);
 
-  // Donut Chart Data: Grade Distribution (Image 4)
+  // Donut Chart Data: Grade Distribution
   const gradeDistributionData = useMemo(() => {
+    if (subjectsList.length === 0) {
+      return [
+        { name: 'ดีเยี่ยม (เกรด 4)', count: 0, percent: 0.0, color: '#00A3FF' },
+        { name: 'ดีมาก (เกรด 3-3.5)', count: 0, percent: 0.0, color: '#10B981' },
+        { name: 'ผ่าน (เกรด 1-2.5)', count: 0, percent: 0.0, color: '#F97316' },
+        { name: 'ไม่ผ่าน (เกรด 0)', count: 0, percent: 0.0, color: '#EF4444' },
+      ];
+    }
+    const grade4 = subjectsList.filter((s) => Number(s.grade) === 4).length;
+    const grade3 = subjectsList.filter((s) => Number(s.grade) >= 3 && Number(s.grade) < 4).length;
+    const grade12 = subjectsList.filter((s) => Number(s.grade) >= 1 && Number(s.grade) < 3).length;
+    const grade0 = subjectsList.filter((s) => Number(s.grade) === 0).length;
+    const total = subjectsList.length;
     return [
-      { name: 'ดีเยี่ยม', count: 5, percent: 62.5, color: '#00A3FF' },
-      { name: 'ดี', count: 2, percent: 25.0, color: '#F97316' },
-      { name: 'ผ่าน', count: 1, percent: 12.5, color: '#A855F7' },
-      { name: 'ไม่ผ่าน', count: 0, percent: 0.0, color: '#EF4444' },
+      { name: 'ดีเยี่ยม (เกรด 4)', count: grade4, percent: (grade4 / total) * 100, color: '#00A3FF' },
+      { name: 'ดีมาก (เกรด 3-3.5)', count: grade3, percent: (grade3 / total) * 100, color: '#10B981' },
+      { name: 'ผ่าน (เกรด 1-2.5)', count: grade12, percent: (grade12 / total) * 100, color: '#F97316' },
+      { name: 'ไม่ผ่าน (เกรด 0)', count: grade0, percent: (grade0 / total) * 100, color: '#EF4444' },
     ];
-  }, []);
+  }, [subjectsList]);
 
-  // Line Chart Data: GPA Trend across terms (Image 4)
+  // Line Chart Data: GPA Trend across terms
   const gpaTrendData = useMemo(() => {
-    return [
-      { term: 'เทอม 1/2568', gpa: 3.12 },
-      { term: 'เทอม 2/2568', gpa: 3.28 },
-      { term: 'เทอม 1/2569', gpa: 3.52 },
-    ];
-  }, []);
+    return terms.map((t) => ({
+      term: `เทอม ${t.semesterNo}/${t.year}`,
+      gpa: `${t.semesterNo}/${t.year}` === selectedTermYear ? Number(termData.gpa) : 0,
+    }));
+  }, [terms, selectedTermYear, termData.gpa]);
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-16 animate-fade-in font-['Prompt',sans-serif] text-slate-800 select-none">
@@ -356,34 +267,15 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
           2. TOP 4 STAT KPI CARDS (ตามภาพที่ 2 media_1792044507234_3e60e1a8.jpg)
       ========================================================================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: ภาพรวมผลการเรียน (with Term Selector Dropdown) */}
+        {/* Card 1: ภาพรวมผลการเรียน */}
         <div className="bg-white rounded-2xl border border-[#E6EEF7] p-5 shadow-card hover:shadow-card-hover transition-all flex flex-col justify-between space-y-3 relative overflow-hidden group">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                <Users className="w-5 h-5" />
-              </div>
-              <span className="text-xs font-bold text-[#6B7C93]">
-                ภาพรวมผลการเรียน
-              </span>
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <Users className="w-5 h-5" />
             </div>
-
-            {/* Term Selector Dropdown inside Card 1 as requested */}
-            <div className="relative">
-              <select
-                value={selectedTermYear}
-                onChange={(e) => setSelectedTermYear(e.target.value)}
-                className="appearance-none pl-2.5 pr-6 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[11px] rounded-lg border border-blue-200 cursor-pointer focus:outline-none shadow-2xs transition-colors"
-                title="เลือกภาคเรียนที่ต้องการดูข้อมูล"
-              >
-                {terms.map((t) => (
-                  <option key={t.id} value={`${t.semesterNo}/${t.year}`}>
-                    เทอม {t.semesterNo}/{t.year} {t.isActive ? '(ปัจจุบัน)' : ''}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-3.5 h-3.5 text-blue-700 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
+            <span className="text-xs font-bold text-[#6B7C93] whitespace-nowrap">
+              ภาพรวมผลการเรียน
+            </span>
           </div>
 
           <div className="flex items-baseline gap-1.5">
@@ -405,7 +297,7 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
             <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
               <BookOpen className="w-5 h-5" />
             </div>
-            <span className="text-xs font-bold text-[#6B7C93]">ค่าเฉลี่ยรวม</span>
+            <span className="text-xs font-bold text-[#6B7C93] whitespace-nowrap">ค่าเฉลี่ยรวม</span>
           </div>
 
           <div className="flex items-baseline gap-1.5">
@@ -427,7 +319,7 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
             <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
               <Bookmark className="w-5 h-5" />
             </div>
-            <span className="text-xs font-bold text-[#6B7C93]">
+            <span className="text-xs font-bold text-[#6B7C93] whitespace-nowrap">
               เกรดเฉลี่ยสะสม
             </span>
           </div>
@@ -451,7 +343,7 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
             <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
               <ClipboardList className="w-5 h-5" />
             </div>
-            <span className="text-xs font-bold text-[#6B7C93]">
+            <span className="text-xs font-bold text-[#6B7C93] whitespace-nowrap">
               จำนวนวิชาที่ได้เกรด
             </span>
           </div>
@@ -498,10 +390,13 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
                 value={selectedTermYear}
                 onChange={(e) => setSelectedTermYear(e.target.value)}
                 className="appearance-none pl-3 pr-7 py-1.5 bg-[#F8FAFC] hover:bg-slate-100 border border-slate-200 text-[#163A66] text-xs font-bold rounded-xl cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400"
+                title="เลือกภาคเรียนที่ต้องการดูข้อมูล"
               >
-                <option value="1/2569">ภาคเรียนที่ 1/2569</option>
-                <option value="2/2568">ภาคเรียนที่ 2/2568</option>
-                <option value="1/2568">ภาคเรียนที่ 1/2568</option>
+                {terms.map((t) => (
+                  <option key={t.id} value={`${t.semesterNo}/${t.year}`}>
+                    ภาคเรียนที่ {t.semesterNo}/{t.year} {t.isActive ? '(ปัจจุบัน)' : ''}
+                  </option>
+                ))}
               </select>
               <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
@@ -520,7 +415,22 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100/70">
-                {subjectsList.map((sub) => (
+                {subjectsList.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center">
+                      <div className="flex flex-col items-center justify-center space-y-2 text-slate-400">
+                        <BookOpen className="w-8 h-8 text-slate-300" />
+                        <p className="text-xs font-bold text-slate-600">
+                          ยังไม่มีข้อมูลผลการเรียนที่บันทึกในภาคเรียนที่ {selectedTermYear}
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          ผลคะแนนสอบและการประเมินจะแสดงเมื่อคุณครูประจำวิชาได้บันทึกคะแนนเรียบร้อยแล้ว
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  subjectsList.map((sub) => (
                   <tr
                     key={sub.id}
                     className="hover:bg-blue-50/20 transition-colors"
@@ -575,8 +485,9 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
                       </span>
                     </td>
                   </tr>
-                ))}
-              </tbody>
+                ))
+              )}
+            </tbody>
             </table>
           </div>
 
@@ -898,8 +809,15 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100/70">
-              {subjectsList.slice(0, 3).map((sub) => (
-                <tr key={sub.id} className="hover:bg-slate-50/60 transition-colors">
+              {subjectsList.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-slate-400 text-xs font-medium">
+                    ยังไม่มีรายวิชาที่เปิดให้ประเมินการสอนในภาคเรียนนี้
+                  </td>
+                </tr>
+              ) : (
+                subjectsList.slice(0, 3).map((sub) => (
+                  <tr key={sub.id} className="hover:bg-slate-50/60 transition-colors">
                   {/* Subject */}
                   <td className="py-3 px-3">
                     <div className="flex items-center gap-2 min-w-[130px]">
@@ -968,8 +886,9 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
                     </button>
                   </td>
                 </tr>
-              ))}
-            </tbody>
+              ))
+            )}
+          </tbody>
           </table>
         </div>
       </div>

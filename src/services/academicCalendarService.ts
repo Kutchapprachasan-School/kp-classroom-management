@@ -56,6 +56,19 @@ export const ACADEMIC_CALENDAR_EVENT = 'kps-academic-calendar-updated';
 
 const DEFAULT_TERMS: AcademicTermRecord[] = [
   {
+    id: 't-2569-2',
+    year: 2569,
+    termName: 'ภาคเรียนที่ 2',
+    semesterNo: 2,
+    startDate: '1 พ.ย. 2569',
+    endDate: '15 มี.ค. 2570',
+    isActive: false,
+    isArchived: false,
+    studentCount: 525,
+    classCount: 12,
+    note: 'ภาคเรียนที่ 2 ปีการศึกษา 2569',
+  },
+  {
     id: 't-2569-1',
     year: 2569,
     termName: 'ภาคเรียนที่ 1',
@@ -197,8 +210,15 @@ export const academicCalendarService = {
       const raw = localStorage.getItem(STORAGE_KEY_CALENDAR_CONFIG);
       if (raw) {
         const parsed = JSON.parse(raw);
+        const loadedTerms: AcademicTermRecord[] = parsed.terms || DEFAULT_TERMS;
+        if (!loadedTerms.some((t) => t.year === 2569 && t.semesterNo === 2)) {
+          const t2 = DEFAULT_TERMS.find((t) => t.year === 2569 && t.semesterNo === 2);
+          if (t2) {
+            loadedTerms.unshift(t2);
+          }
+        }
         return {
-          terms: parsed.terms || DEFAULT_TERMS,
+          terms: loadedTerms,
           holidays: parsed.holidays || DEFAULT_HOLIDAYS,
           weekendMakeupDays: parsed.weekendMakeupDays || DEFAULT_WEEKEND_MAKEUP_DAYS,
           lastUpdatedBy: parsed.lastUpdatedBy || 'ฝ่ายบริหารวิชาการ',

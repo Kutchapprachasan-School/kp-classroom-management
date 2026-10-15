@@ -60,6 +60,7 @@ export const TRANSACTIONAL_STORAGE_KEYS = [
 // รายการ Key โครงสร้างพื้นฐานของโรงเรียนที่ต้องเก็บรักษาไว้ (Preserved Infrastructure)
 export const PRESERVED_INFRASTRUCTURE_KEYS = [
   'cls_classrooms_data',
+  'cls_students_',
   'kp_school_bell_schedule',
   'kp_academic_calendar',
   'kp_school_branding',
@@ -93,7 +94,7 @@ class CleanSlateService {
 
   /**
    * ล้างข้อมูลจำลอง (Transactional Mock Data) ทั้งหมด เพื่อเริ่มใช้งานจริง
-   * โดยคงโครงสร้างโรงเรียน, ห้องเรียน ม.1 - ม.6, ตารางเวลา และระบบการลาไว้อย่างสมบูรณ์
+   * โดยคงโครงสร้างโรงเรียน, ห้องเรียน ม.1 - ม.6, รายชื่อนักเรียน, ตารางเวลา และระบบการลาไว้อย่างสมบูรณ์
    */
   purgeTransactionalMockData(): CleanSlatePurgeResult {
     const purgedKeys: string[] = [];
@@ -107,7 +108,8 @@ class CleanSlateService {
         }
       });
 
-      // ล้าง keys นักเรียนแบบ dynamic (เช่น cls_student_streak_*, kp_student_quiz_*, cls_students_*)
+      // ล้าง keys กิจกรรมแบบ dynamic (เช่น cls_student_streak_*, kp_student_quiz_*, kp_period_*, kp_morning_*)
+      // ไม่ลบ cls_students_* เพื่อรักษาบัญชีรายชื่อนักเรียนจริงของโรงเรียน
       const dynamicKeysToRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
@@ -115,8 +117,6 @@ class CleanSlateService {
           k &&
           (k.startsWith('cls_student_streak_') ||
             k.startsWith('kp_student_quiz_') ||
-            k.startsWith('cls_students_') ||
-            k.startsWith('cls_student_') ||
             k.startsWith('kp_period_') ||
             k.startsWith('kp_morning_'))
         ) {

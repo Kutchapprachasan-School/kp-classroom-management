@@ -4,6 +4,7 @@ import {
   User,
   Presentation,
   BookOpen,
+  Calendar,
   CalendarDays,
   ClipboardList,
   FileText,
@@ -186,6 +187,18 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
 
   // Academic Calendar
   const [calendarConfig, setCalendarConfig] = useState(() => academicCalendarService.getConfig());
+  const activeTerm = useMemo(() => {
+    return calendarConfig.terms.find((t) => t.isActive) || calendarConfig.terms[0];
+  }, [calendarConfig.terms]);
+
+  const [isAddTermOpen, setIsAddTermOpen] = useState(false);
+  const [newTermForm, setNewTermForm] = useState({
+    year: 2569,
+    semesterNo: 2 as 1 | 2,
+    startDate: '1 พ.ย. 2569',
+    endDate: '15 มี.ค. 2570',
+    note: '',
+  });
 
   // Leave Settings
   const [leaveSettings, setLeaveSettings] = useState<SchoolLeaveSettings>(() =>
@@ -391,6 +404,34 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
   const handleSaveNotificationConfig = () => {
     schoolPoliciesService.saveNotificationConfig(notificationConfig);
     showToast('✓ บันทึกการตั้งค่าการแจ้งเตือน Line / SMS เรียบร้อย');
+  };
+
+  const handleSetActiveTerm = (termId: string) => {
+    const updated = academicCalendarService.setActiveTerm(termId);
+    if (updated) {
+      setCalendarConfig(academicCalendarService.getConfig());
+      setSchoolSettings(getSchoolSettings());
+      showToast(`✓ ตั้ง ${updated.termName}/${updated.year} เป็นภาคเรียนปัจจุบันเรียบร้อย`);
+    }
+  };
+
+  const handleCreateTerm = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTermForm.year || !newTermForm.startDate || !newTermForm.endDate) {
+      showToast('⚠️ กรุณากรอกข้อมูลปีการศึกษาและวันที่ให้ครบถ้วน');
+      return;
+    }
+    const created = academicCalendarService.createTerm(newTermForm);
+    setCalendarConfig(academicCalendarService.getConfig());
+    setIsAddTermOpen(false);
+    setNewTermForm({
+      year: 2570,
+      semesterNo: 1,
+      startDate: '16 พ.ค. 2570',
+      endDate: '10 ต.ค. 2570',
+      note: '',
+    });
+    showToast(`✓ เพิ่ม ${created.termName}/${created.year} สำเร็จเรียบร้อย`);
   };
 
   return (
@@ -684,19 +725,19 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
 
         {/* 4 Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {/* Card 2.1: ตารางสอน (มี Bell Schedule & Lunch Break อยู่ข้างใน) */}
+          {/* Card 2.1: ตารางสอน & ปีการศึกษา (มี Bell Schedule & Academic Terms อยู่ข้างใน) */}
           <SettingsCategoryCard
             id="timetable"
-            title="ตารางสอน"
-            subtitle="จัดการตารางสอนประจำสัปดาห์"
+            title="ตารางสอน & ปีการศึกษา"
+            subtitle="จัดการปีการศึกษา ภาคเรียน และตารางเวลาเรียน"
             icon={<CalendarDays className="w-5 h-5" />}
             iconBgClass="bg-amber-50"
             iconColorClass="text-amber-600"
             onClick={() => setActiveModalKey('timetable')}
             isExpanded={expandedCards['timetable']}
             onToggleExpand={(e) => toggleExpand('timetable', e)}
-            badge="โครงสร้างคาบ"
-            quickInfo={`เริ่ม ${bellSchedule.firstPeriodStart} น. • ${bellSchedule.totalPeriodsPerDay} คาบ/วัน`}
+            badge={activeTerm ? `ภาค ${activeTerm.semesterNo}/${activeTerm.year}` : 'โครงสร้างคาบ'}
+            quickInfo={`${activeTerm ? `ภาคเรียนที่ ${activeTerm.semesterNo}/${activeTerm.year}` : ''} • เริ่ม ${bellSchedule.firstPeriodStart} น. • ${bellSchedule.totalPeriodsPerDay} คาบ/วัน`}
           />
 
           {/* Card 2.2: งาน / แบบฝึกหัด */}
@@ -1481,15 +1522,34 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
 
           {/* Section 5: ปีการศึกษา & ภาคเรียนปัจจุบัน */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-            <h3 className="text-sm font-extrabold text-slate-900">ปีการศึกษา & ภาคเรียนปัจจุบัน</h3>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <h3 className="text-sm font-extrabold text-slate-900">ปีการศึกษา & ภาคเรียนปัจจุบัน</h3>
+              <button
+                type="button"
+                onClick={() => setActiveModalKey('timetable')}
+                className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+              >
+                จัดการภาคเรียน & เพิ่มปีการศึกษา →
+              </button>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="p-3 rounded-xl bg-blue-50/60 border border-blue-200">
                 <span className="text-[11px] font-bold text-blue-700 block">ปีการศึกษา:</span>
-                <span className="text-base font-extrabold text-blue-900">2569</span>
+                <span className="text-base font-extrabold text-blue-900">{activeTerm ? activeTerm.year : 2569}</span>
               </div>
               <div className="p-3 rounded-xl bg-blue-50/60 border border-blue-200">
-                <span className="text-[11px] font-bold text-blue-700 block">ภาคเรียนปัจจุบัน:</span>
-                <span className="text-base font-extrabold text-blue-900">ภาคเรียนที่ 1</span>
+                <span className="text-[11px] font-bold text-blue-700 block mb-1">สลับภาคเรียนปัจจุบัน:</span>
+                <select
+                  value={activeTerm ? activeTerm.id : ''}
+                  onChange={(e) => handleSetActiveTerm(e.target.value)}
+                  className="w-full text-xs font-extrabold text-blue-900 bg-white border border-blue-300 rounded-lg px-2 py-1.5 cursor-pointer focus:ring-1 focus:ring-blue-500"
+                >
+                  {calendarConfig.terms.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.termName} / {t.year} {t.isActive ? '(ปัจจุบัน)' : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="p-3 rounded-xl bg-blue-50/60 border border-blue-200">
                 <span className="text-[11px] font-bold text-blue-700 block">สถานะภาคเรียน:</span>
@@ -1732,6 +1792,180 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         saveButtonText="💾 บันทึกการตั้งค่าโครงสร้างเวลา"
       >
         <div className="space-y-5">
+          {/* Section 0: ปีการศึกษา & ภาคเรียน (Academic Terms & Calendar) */}
+          <div className="bg-white rounded-2xl border border-blue-200 p-4 sm:p-5 space-y-4 shadow-2xs">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-blue-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">
+                    ปีการศึกษา & ภาคเรียน (Academic Terms)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    กำหนดภาคเรียนที่กำลังเปิดสอน และจัดการประวัติภาคเรียนในระบบ
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAddTermOpen((prev) => !prev)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer self-start sm:self-auto"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{isAddTermOpen ? 'ปิดฟอร์ม' : '+ เพิ่มปีการศึกษา / ภาคเรียนใหม่'}</span>
+              </button>
+            </div>
+
+            {/* Form เพิ่มภาคเรียนใหม่ */}
+            {isAddTermOpen && (
+              <form onSubmit={handleCreateTerm} className="p-3.5 rounded-xl bg-blue-50/60 border border-blue-200 space-y-3">
+                <div className="font-bold text-xs text-blue-900 flex items-center gap-1.5">
+                  <Plus className="w-3.5 h-3.5 text-blue-600" />
+                  <span>เพิ่มปีการศึกษา / ภาคเรียนใหม่</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">ปีการศึกษา (พ.ศ.):</label>
+                    <input
+                      type="number"
+                      required
+                      min={2560}
+                      max={2600}
+                      value={newTermForm.year}
+                      onChange={(e) => setNewTermForm({ ...newTermForm, year: parseInt(e.target.value, 10) || 2569 })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-bold font-mono bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">ภาคเรียน:</label>
+                    <select
+                      value={newTermForm.semesterNo}
+                      onChange={(e) => setNewTermForm({ ...newTermForm, semesterNo: (parseInt(e.target.value, 10) === 2 ? 2 : 1) as 1 | 2 })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-bold bg-white"
+                    >
+                      <option value={1}>ภาคเรียนที่ 1</option>
+                      <option value={2}>ภาคเรียนที่ 2</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">วันเปิดภาคเรียน:</label>
+                    <input
+                      type="text"
+                      placeholder="เช่น 1 พ.ย. 2569"
+                      value={newTermForm.startDate}
+                      onChange={(e) => setNewTermForm({ ...newTermForm, startDate: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-medium bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">วันปิดภาคเรียน:</label>
+                    <input
+                      type="text"
+                      placeholder="เช่น 15 มี.ค. 2570"
+                      value={newTermForm.endDate}
+                      onChange={(e) => setNewTermForm({ ...newTermForm, endDate: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-medium bg-white"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">หมายเหตุ:</label>
+                  <input
+                    type="text"
+                    placeholder="เช่น ภาคเรียนที่ 2 ปีการศึกษา 2569 พร้อมเปิดการเรียนการสอน"
+                    value={newTermForm.note}
+                    onChange={(e) => setNewTermForm({ ...newTermForm, note: e.target.value })}
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-medium bg-white"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddTermOpen(false)}
+                    className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-2xs cursor-pointer"
+                  >
+                    💾 บันทึกภาคเรียนใหม่
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* List of Academic Terms */}
+            <div className="space-y-2">
+              {calendarConfig.terms.map((term) => (
+                <div
+                  key={term.id}
+                  className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                    term.isActive
+                      ? 'bg-blue-50/80 border-blue-300 shadow-2xs'
+                      : 'bg-white border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center font-extrabold text-sm shrink-0 ${
+                        term.isActive
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {term.semesterNo}/{term.year.toString().slice(-2)}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-xs sm:text-sm text-slate-900">
+                          {term.termName} ปีการศึกษา {term.year}
+                        </span>
+                        {term.isActive ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                            ภาคเรียนปัจจุบัน
+                          </span>
+                        ) : term.isArchived ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                            จัดเก็บแล้ว
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                            รอดำเนินการ
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium">
+                        📅 {term.startDate} – {term.endDate} • {term.note || 'ไม่มีหมายเหตุ'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {term.isActive ? (
+                      <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                        ✓ กำลังใช้งานอยู่
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleSetActiveTerm(term.id)}
+                        className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 hover:border-blue-300 text-xs font-bold shadow-2xs transition-all cursor-pointer"
+                      >
+                        ⚡ ตั้งเป็นภาคเรียนปัจจุบัน
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Section 1: เวลาเข้าแถวเคารพธงชาติ */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-3">
             <div className="flex items-center gap-2">

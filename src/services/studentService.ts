@@ -40,6 +40,23 @@ export function getAlternateRoomKey(classroomId: string): string | null {
   return null;
 }
 
+/**
+ * แปลงรหัสห้องเรียนหรือไอดี (เช่น room-1-1, room-3-1) เป็นชื่อห้องภาษาไทยที่สวยงาม (เช่น ม.1/1, ม.3/1)
+ */
+export function formatClassroomLabel(classroomId?: string): string {
+  if (!classroomId) return 'ม.1/1';
+  const trimmed = classroomId.trim();
+  const matchRoom = trimmed.match(/^room-(\d+)-(\d+)$/);
+  if (matchRoom) {
+    return `ม.${matchRoom[1]}/${matchRoom[2]}`;
+  }
+  const matchThai = trimmed.match(/^ม\.?\s*(\d+)\/(\d+)$/);
+  if (matchThai) {
+    return `ม.${matchThai[1]}/${matchThai[2]}`;
+  }
+  return trimmed;
+}
+
 const getLocalStudents = (classroomId: string): StudentRecord[] => {
   if (!classroomId) return [];
   if (typeof localStorage !== 'undefined') {

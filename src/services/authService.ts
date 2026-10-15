@@ -161,7 +161,7 @@ export const authService = {
     // 1. ค้นหานักเรียนใน studentService
     let found = studentService.findStudentByCode(trimmedCode);
     let student = found?.student;
-    let classroomId = found?.classroomId || 'room-3-1';
+    let classroomId = found?.classroomId || student?.classroomId || 'room-1-1';
 
     // 2. หากไม่พบใน LocalStorage ให้ตรวจสอบใน Supabase students / Student ทันที
     if (!student && isSupabaseConfigured) {
@@ -189,14 +189,14 @@ export const authService = {
               name: `${raw.title || ''} ${raw.firstName || ''} ${raw.lastName || ''}`.trim(),
               gender: raw.gender,
               status: raw.status,
-              classroom_id: 'room-3-1',
+              classroom_id: raw.classroomId || raw.classroom_id || 'room-1-1',
               seat_no: 1,
             };
           }
         }
 
         if (row) {
-          classroomId = row.classroom_id || 'room-3-1';
+          classroomId = row.classroom_id || row.classroomId || 'room-1-1';
           const syncedStudent = {
             id: row.id,
             no: row.seat_no || 1,
@@ -273,7 +273,7 @@ export const authService = {
         name: studentName,
         studentCode: trimmedCode,
         role: 'STUDENT',
-        classroomId: 'room-3-1',
+        classroomId: 'room-1-1',
       };
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(user));
