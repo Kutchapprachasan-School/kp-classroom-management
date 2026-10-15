@@ -8,7 +8,6 @@
 import { classroomService } from './classroomService.ts';
 import { studentService, type StudentRecord } from './studentService.ts';
 import { coursesCurriculumService } from './coursesCurriculumService.ts';
-import { cleanSlateService } from './cleanSlateService.ts';
 import { sgsRosterAndSubmissionService, type StudentWorkSubmission } from './sgsRosterAndSubmissionService.ts';
 import { indexedDbAdapter, type OutboxItem } from '../utils/indexedDbAdapter.ts';
 
@@ -355,10 +354,6 @@ export const messagingService = {
 
   // ดึงรายการกลุ่มแชททั้งหมด (พร้อมตัวตรวจจับและล้างข้อมูลจำลองเก่าที่หลงเหลือ)
   getGroups(): ChatGroup[] {
-    if (cleanSlateService.isCleanSlateActive()) {
-      return [];
-    }
-
     if (typeof localStorage !== 'undefined') {
       try {
         const raw = localStorage.getItem(STORAGE_KEY_CHAT_GROUPS);
