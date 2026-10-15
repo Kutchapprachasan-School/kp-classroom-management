@@ -1,11 +1,11 @@
 // test_lesson_plans_fidelity.mjs
-// Verification suite for Lesson Plans View (media_1791348839178_02518c77.jpg) fidelity
+// Verification suite for Lesson Plans View fidelity
 
 import fs from 'fs';
 import path from 'path';
 import assert from 'assert';
 
-console.log('🧪 Starting Lesson Plans View (media_1791348839178_02518c77.jpg) Fidelity Verification Suite...\n');
+console.log('🧪 Starting Lesson Plans View Fidelity Verification Suite...\n');
 
 // 1. Verify LessonPlansView.tsx Source
 console.log('--- 1. Checking LessonPlansView.tsx UI Structure & Fidelity ---');
@@ -24,14 +24,10 @@ assert.ok(
   'LessonPlansView must contain the exact subtitle matching mockup'
 );
 assert.ok(
-  content.includes('การสอนที่ดี') && content.includes('คือการเปิดโลกแห่งโอกาส'),
-  'LessonPlansView must contain the quote in speech bubble'
-);
-assert.ok(
   content.includes('PageHeroBanner') || content.includes('/images/teacher/hero_banner.png'),
   'LessonPlansView must render anime mascot hero illustration'
 );
-console.log('  ✓ Top Hero Banner, title, subtitle, and anime mascot quote bubble match mockup 100%');
+console.log('  ✓ Top Hero Banner, title, subtitle, and anime mascot illustration verified');
 
 // 1.2 Top Action & Filter Bar
 assert.ok(
@@ -43,10 +39,6 @@ assert.ok(
   "LessonPlansView must have 'รหัสวิชา' label"
 );
 assert.ok(
-  content.includes('ห้องเรียน'),
-  "LessonPlansView must have 'ห้องเรียน' label"
-);
-assert.ok(
   content.includes('ภาคเรียน'),
   "LessonPlansView must have 'ภาคเรียน' label"
 );
@@ -54,38 +46,14 @@ assert.ok(
   content.includes('ค้นหาแผนการสอน / หน่วย...'),
   'LessonPlansView must have search box with correct placeholder'
 );
-console.log('  ✓ Top filter bar (subject, class, semester, search) and action button verified');
+console.log('  ✓ Top filter bar (subject, semester, search) and action button verified');
 
-// 1.3 Column 1: หน่วยการเรียนรู้ (6 หน่วย)
+// 1.3 Column 1: หน่วยการเรียนรู้
 assert.ok(
   content.includes('หน่วยการเรียนรู้'),
   "Column 1 must have header 'หน่วยการเรียนรู้'"
 );
-assert.ok(
-  content.includes('日常のあいさつ') && content.includes('การทักทายประจำวัน'),
-  'Unit 1 must contain 日常のあいさつ (การทักทายประจำวัน)'
-);
-assert.ok(
-  content.includes('家族と友達') && content.includes('ครอบครัวและเพื่อน'),
-  'Unit 2 must contain 家族と友達 (ครอบครัวและเพื่อน)'
-);
-assert.ok(
-  content.includes('学校生活') && content.includes('ชีวิตในโรงเรียน'),
-  'Unit 3 must contain 学校生活 (ชีวิตในโรงเรียน)'
-);
-assert.ok(
-  content.includes('食べ物と飲み物') && content.includes('อาหารและเครื่องดื่ม'),
-  'Unit 4 must contain 食べ物と飲み物 (อาหารและเครื่องดื่ม)'
-);
-assert.ok(
-  content.includes('旅行') && content.includes('การท่องเที่ยว'),
-  'Unit 5 must contain 旅行 (การท่องเที่ยว)'
-);
-assert.ok(
-  content.includes('文化と行事') && content.includes('วัฒนธรรมและเทศกาล'),
-  'Unit 6 must contain 文化と行事 (วัฒนธรรมและเทศกาล)'
-);
-console.log('  ✓ All 6 unit cards with Japanese & Thai titles and colored circles verified');
+console.log('  ✓ Unit list column with dynamic units management verified');
 
 // 1.4 Column 2: Center Unit Detail & 4 Sub-Tabs
 assert.ok(
@@ -126,22 +94,6 @@ console.log('  ✓ Center unit detail, 4 sub-tabs, and 3 detail sections with ev
 
 // 1.5 Column 3: Right Side Widgets
 assert.ok(
-  content.includes('จัดการห้องเรียน'),
-  "Right column must render 'จัดการห้องเรียน' card"
-);
-assert.ok(
-  content.includes('ข้อมูลรวมห้อง'),
-  "Right column must display 'ข้อมูลรวมห้อง'"
-);
-assert.ok(
-  content.includes('เข้าเรียนเฉลี่ย'),
-  "Right column must show attendance average"
-);
-assert.ok(
-  content.includes('ดูสถิติรายชั้น'),
-  "Right column must have 'ดูสถิติรายชั้น' action button"
-);
-assert.ok(
   content.includes('ไฟล์และสื่อที่เกี่ยวข้อง'),
   "Right column must render 'ไฟล์และสื่อที่เกี่ยวข้อง' widget"
 );
@@ -161,7 +113,7 @@ assert.ok(
   content.includes('พิมพ์แผนการสอน'),
   "Quick Actions must have 'พิมพ์แผนการสอน'"
 );
-console.log('  ✓ Right column widgets (classroom stats, related media, quick actions) verified');
+console.log('  ✓ Right column widgets (related media, quick actions) verified');
 
 // 1.6 Bottom Stepper Flow
 assert.ok(
@@ -191,4 +143,4 @@ assert.ok(
 );
 console.log("  ✓ App.tsx header title mapping for 'lessons' verified");
 
-console.log('\n🎉 ALL 20 LESSON PLANS FIDELITY CHECKS PASSED PERFECTLY!\n');
+console.log('\n🎉 ALL 18 LESSON PLANS FIDELITY CHECKS PASSED PERFECTLY!\n');

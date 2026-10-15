@@ -1,9 +1,10 @@
-import React from 'react';
-import { MessageCircle, Mail, MapPin, User, Building, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { MessageCircle, Mail, MapPin, User, Building, ShieldCheck, Phone } from 'lucide-react';
 import type { AuthUser } from '../../services/authService';
 import type { SchoolSettingsConfig } from '../../config/schoolSettings';
 import { getSchoolSettings } from '../../config/schoolSettings';
 import { classroomService } from '../../services/classroomService';
+import { MessagesView } from '../../views/MessagesView';
 
 interface StudentContactTeacherViewProps {
   onBack: () => void;
@@ -16,6 +17,7 @@ export const StudentContactTeacherView: React.FC<StudentContactTeacherViewProps>
   currentUser,
   schoolSettings,
 }) => {
+  const [activeTab, setActiveTab] = useState<'CHAT' | 'DIRECTORY'>('CHAT');
   const settings = schoolSettings || getSchoolSettings();
   const studentRoom = currentUser?.classroomId || 'ม.3/1';
 
@@ -57,25 +59,66 @@ export const StudentContactTeacherView: React.FC<StudentContactTeacherViewProps>
   ];
 
   return (
-    <div className="font-['Prompt',sans-serif] space-y-5 animate-fade-in select-none">
-      <div>
-        <button
-          type="button"
-          onClick={onBack}
-          className="text-xs text-blue-600 hover:text-blue-800 font-semibold mb-1 flex items-center gap-1 cursor-pointer"
-        >
-          ← กลับหน้าหลัก
-        </button>
-        <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-          <MessageCircle className="w-5 h-5 text-blue-600" />
-          <span>ติดต่อครูที่ปรึกษา & กลุ่มงานโรงเรียน</span>
-        </h2>
-        <p className="text-xs text-slate-500">
-          ช่องทางการติดต่อและขอคำปรึกษาสำหรับนักเรียน {settings.nameTh}
-        </p>
+    <div className="font-['Prompt',sans-serif] space-y-4 animate-fade-in select-none">
+      {/* Top Header & Breadcrumb */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <button
+            type="button"
+            onClick={onBack}
+            className="text-xs text-blue-600 hover:text-blue-800 font-semibold mb-1 flex items-center gap-1 cursor-pointer"
+          >
+            ← กลับหน้าหลัก
+          </button>
+          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <MessageCircle className="w-5 h-5 text-blue-600" />
+            <span>ติดต่อครู & แชทกลุ่มห้องเรียน</span>
+          </h2>
+          <p className="text-xs text-slate-500">
+            ช่องทางการสื่อสารกับครูที่ปรึกษาและครูประจำวิชาสำหรับนักเรียน {settings.nameTh}
+          </p>
+        </div>
+
+        {/* Tab Switcher */}
+        <div className="flex items-center gap-1.5 bg-slate-100/90 p-1 rounded-2xl border border-slate-200/80 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setActiveTab('CHAT')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'CHAT'
+                ? 'bg-blue-600 text-white shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            }`}
+          >
+            <MessageCircle className="w-3.5 h-3.5" />
+            <span>แชทห้องเรียน & กลุ่มวิชา</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('DIRECTORY')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'DIRECTORY'
+                ? 'bg-blue-600 text-white shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            }`}
+          >
+            <Phone className="w-3.5 h-3.5" />
+            <span>ข้อมูลติดต่อฝ่ายต่างๆ</span>
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Tab 1: Live Classroom & Course Chat */}
+      {activeTab === 'CHAT' && (
+        <div className="animate-fade-in pt-1">
+          <MessagesView activeRole="STUDENT_GENERAL" embedded={true} />
+        </div>
+      )}
+
+      {/* Tab 2: Contact Directory */}
+      {activeTab === 'DIRECTORY' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in pt-1">
         {contacts.map((c, idx) => {
           const Icon = c.icon;
           return (
@@ -114,7 +157,8 @@ export const StudentContactTeacherView: React.FC<StudentContactTeacherViewProps>
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from 'lucide-react';
 import type { AuthUser } from '../../services/authService';
 import type { SchoolSettingsConfig } from '../../config/schoolSettings';
 import { getSchoolSettings } from '../../config/schoolSettings';
 import { classroomService } from '../../services/classroomService';
+import { gachaService, BUDDY_CHANGED_EVENT, type GachaBuddy } from '../../services/gachaService';
 
 interface StudentProfileViewProps {
   onBack: () => void;
@@ -20,6 +21,18 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
   const studentName = currentUser?.name || 'นักเรียน';
   const studentCode = currentUser?.studentCode || 'STD-001';
   const classroomId = currentUser?.classroomId || 'ม.3/1';
+
+  const [activeBuddy, setActiveBuddy] = useState<GachaBuddy>(() =>
+    gachaService.getActiveBuddy()
+  );
+
+  useEffect(() => {
+    const handleBuddyUpdate = () => {
+      setActiveBuddy(gachaService.getActiveBuddy());
+    };
+    window.addEventListener(BUDDY_CHANGED_EVENT, handleBuddyUpdate);
+    return () => window.removeEventListener(BUDDY_CHANGED_EVENT, handleBuddyUpdate);
+  }, []);
 
   // Find classroom details and advisor
   const rooms = classroomService.getClassroomsSync();
@@ -118,20 +131,26 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
             <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
               <div className="w-12 h-12 rounded-xl border border-slate-200 overflow-hidden bg-white shrink-0">
                 <img
-                  src="/images/buddies/buddy-l1.png"
-                  alt="โมจิ"
+                  src={`/images/buddies/${activeBuddy.id}.png`}
+                  alt={activeBuddy.name}
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLElement).setAttribute(
+                      'src',
+                      '/images/buddies/cat_mascot.png'
+                    );
+                  }}
                 />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-slate-900 text-sm">โมจิ</span>
-                  <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.2 rounded">
-                    STARTER
+                  <span className="font-bold text-slate-900 text-sm">{activeBuddy.name}</span>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${activeBuddy.badgeBg}`}>
+                    {activeBuddy.rarity}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500">
-                  คู่หูพร้อมร่วมเดินทางและให้กำลังใจในการเรียนรู้ทุกๆ วัน ✨
+                  {activeBuddy.title || activeBuddy.quote} (บัฟ: {activeBuddy.skillName}) ✨
                 </p>
               </div>
             </div>

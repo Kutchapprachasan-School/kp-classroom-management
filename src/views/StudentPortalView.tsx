@@ -24,11 +24,13 @@ import { StudentMobileCareView } from '../components/student/StudentMobileCareVi
 import { StudentAnimeAppView } from '../components/student/StudentAnimeAppView';
 import { StudentAffairsCouncilView } from './StudentAffairsCouncilView';
 
+import MenuRegular from '@mingcute/react/core-regular/menu';
 import { gamificationService } from '../services/gamificationService';
 import { studentBannerService } from '../services/studentBannerService';
 import { authService, type AuthUser } from '../services/authService';
 import { getSchoolSettings, type SchoolSettingsConfig } from '../config/schoolSettings';
 import { type SchoolUserRole } from '../config/schoolRoles';
+import { calculateStudentExp, STUDENT_EXP_EVENT } from '../services/studentExpService';
 
 interface StudentPortalViewProps {
   onExit: () => void;
@@ -55,7 +57,9 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
   const studentClassroom = effectiveUser?.classroomId || 'ม.3/1';
 
   const [activeTab, setActiveTab] = useState<StudentTabKey>('home');
-  const [currentXp, setCurrentXp] = useState<number>(0);
+  const [currentXp, setCurrentXp] = useState<number>(() =>
+    calculateStudentExp(effectiveUser?.id, effectiveUser?.studentCode).totalXp
+  );
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const saved = window.localStorage.getItem('kp_student_sidebar_open');
@@ -67,6 +71,21 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
   const [isAdminBannerModalOpen, setIsAdminBannerModalOpen] = useState(false);
 
   const isAdmin = studentBannerService.canManageBanners(activeRole);
+
+  // Sync EXP whenever student activities update
+  useEffect(() => {
+    const handleExpSync = () => {
+      setCurrentXp(
+        calculateStudentExp(effectiveUser?.id, effectiveUser?.studentCode).totalXp
+      );
+    };
+    window.addEventListener(STUDENT_EXP_EVENT, handleExpSync);
+    window.addEventListener('kp-copilot-updated', handleExpSync);
+    return () => {
+      window.removeEventListener(STUDENT_EXP_EVENT, handleExpSync);
+      window.removeEventListener('kp-copilot-updated', handleExpSync);
+    };
+  }, [effectiveUser?.id, effectiveUser?.studentCode]);
 
   // Toggle sidebar for both mobile drawer and desktop collapsible panel
   const handleToggleSidebar = React.useCallback(() => {
@@ -262,6 +281,19 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
           </div>
         </main>
       </div>
+
+      {/* Floating Reopen Button if sidebar collapsed on desktop */}
+      {!isDesktopSidebarOpen && (
+        <button
+          type="button"
+          onClick={handleToggleSidebar}
+          className="hidden lg:flex fixed bottom-6 left-6 z-40 bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2.5 rounded-2xl shadow-xl items-center gap-2 text-xs font-bold transition-all hover:scale-105 cursor-pointer border border-blue-400 animate-slide-up"
+          title="เปิดแถบเมนูข้าง (Ctrl+B)"
+        >
+          <MenuRegular className="w-4 h-4" />
+          <span>เปิดเมนูข้าง</span>
+        </button>
+      )}
 
       {/* Admin Banner Management Modal (เฉพาะเมื่อผู้ใช้เป็น Admin) */}
       <AdminBannerManageModal

@@ -11,8 +11,9 @@ import Settings3Regular from '@mingcute/react/core-regular/settings-3';
 import { studentBannerService } from '../../services/studentBannerService';
 import type { SchoolUserRole } from '../../config/schoolRoles';
 import type { AuthUser } from '../../services/authService';
-import { cleanSlateService } from '../../services/cleanSlateService';
 import { formatThaiDateFull } from '../../utils/timetableDateUtils';
+
+import { calculateStudentExp } from '../../services/studentExpService';
 
 interface StudentHeaderProps {
   onExit: () => void;
@@ -30,26 +31,47 @@ interface StudentHeaderProps {
 
 export const StudentHeader: React.FC<StudentHeaderProps> = ({
   onExit,
-  totalXp = cleanSlateService.isCleanSlateActive() ? 0 : 670,
+  totalXp,
   studentName = 'นักเรียน',
   classroomName,
   currentUser,
   activeRole,
   onOpenMobileMenu,
-  onToggleSidebar: _onToggleSidebar,
+  isSidebarOpen = true,
+  onToggleSidebar,
   onOpenAdminBannerModal,
 }) => {
   const isAdmin = studentBannerService.canManageBanners(activeRole);
+  const displayXp =
+    typeof totalXp === 'number'
+      ? totalXp
+      : calculateStudentExp(currentUser?.id, currentUser?.studentCode).totalXp;
 
   return (
     <header className="h-16 bg-white border-b border-slate-200/80 px-4 sm:px-6 flex items-center justify-between gap-4 sticky top-0 z-20 font-['Prompt',sans-serif] select-none">
-      {/* Left: Mobile Toggle + Student Greeting with Anime Avatar */}
+      {/* Left: Mobile/Desktop Toggle + Student Greeting with Anime Avatar */}
       <div className="flex items-center gap-3 min-w-0">
-        {onOpenMobileMenu && (
+        {/* Sidebar Toggle Button (Desktop & Mobile) */}
+        {onToggleSidebar && (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            className={`p-2 rounded-xl transition-all shrink-0 flex items-center justify-center cursor-pointer min-w-[44px] min-h-[44px] ${
+              !isSidebarOpen
+                ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 lg:hidden'
+            }`}
+            title={!isSidebarOpen ? 'เปิดแถบเมนูข้าง (Ctrl+B)' : 'พับแถบเมนูข้าง (Ctrl+B)'}
+            aria-label={!isSidebarOpen ? 'เปิดแถบเมนูข้าง' : 'พับแถบเมนูข้าง'}
+          >
+            <MenuRegular className="w-5 h-5" />
+          </button>
+        )}
+        {!onToggleSidebar && onOpenMobileMenu && (
           <button
             type="button"
             onClick={onOpenMobileMenu}
-            className="lg:hidden p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
+            className="lg:hidden p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center"
             title="เปิดเมนู"
             aria-label="เปิดเมนู"
           >
@@ -128,7 +150,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
         {/* XP Badge */}
         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 font-bold text-xs shadow-2xs">
           <SparklesRegular className="w-3.5 h-3.5 text-amber-500" />
-          <span>{totalXp} XP</span>
+          <span>{displayXp} XP</span>
         </div>
 
         {/* Logout Square Icon Button */}

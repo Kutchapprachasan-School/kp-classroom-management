@@ -18,15 +18,27 @@ import {
   Send,
   Megaphone,
   Sparkles,
+  X,
+  Check,
 } from 'lucide-react';
 import {
   studentBannerService,
   STUDENT_BANNERS_EVENT,
 } from '../../services/studentBannerService';
 import { gamificationService } from '../../services/gamificationService';
-import { cleanSlateService } from '../../services/cleanSlateService';
 import { bellScheduleService } from '../../services/bellScheduleService';
 import { TEACHER_SUBJECTS_LIST } from '../../services/teacherCourseAssignmentService';
+import {
+  gachaService,
+  BUDDY_CHANGED_EVENT,
+  ALL_BUDDIES,
+  type GachaBuddy,
+} from '../../services/gachaService';
+import {
+  calculateStudentExp,
+  STUDENT_EXP_EVENT,
+  type StudentExpCalculation,
+} from '../../services/studentExpService';
 import type { StudentTabKey } from './StudentSidebar';
 import type { AuthUser } from '../../services/authService';
 import type { SchoolSettingsConfig } from '../../config/schoolSettings';
@@ -44,7 +56,6 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
   onOpenAssignment,
   currentUser,
 }) => {
-  const isClean = cleanSlateService.isCleanSlateActive();
   const studentRoom = currentUser?.classroomId || 'ม.3/1';
   const bellConfig = bellScheduleService.getConfig();
 
@@ -55,6 +66,14 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
   const [bottomBannerUrl, setBottomBannerUrl] = useState<string>(() =>
     studentBannerService.getEffectiveBannerUrl('bottom')
   );
+
+  const [activeBuddy, setActiveBuddy] = useState<GachaBuddy>(() =>
+    gachaService.getActiveBuddy()
+  );
+  const [expInfo, setExpInfo] = useState<StudentExpCalculation>(() =>
+    calculateStudentExp(currentUser?.id, currentUser?.studentCode)
+  );
+  const [isBuddySelectorOpen, setIsBuddySelectorOpen] = useState(false);
 
   useEffect(() => {
     gamificationService.getQuests().then(setQuests);
@@ -68,6 +87,23 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
     window.addEventListener(STUDENT_BANNERS_EVENT, handleUpdate);
     return () => window.removeEventListener(STUDENT_BANNERS_EVENT, handleUpdate);
   }, []);
+
+  useEffect(() => {
+    const handleBuddyUpdate = () => {
+      setActiveBuddy(gachaService.getActiveBuddy());
+    };
+    const handleExpUpdate = () => {
+      setExpInfo(calculateStudentExp(currentUser?.id, currentUser?.studentCode));
+    };
+    window.addEventListener(BUDDY_CHANGED_EVENT, handleBuddyUpdate);
+    window.addEventListener(STUDENT_EXP_EVENT, handleExpUpdate);
+    window.addEventListener('kp-copilot-updated', handleExpUpdate);
+    return () => {
+      window.removeEventListener(BUDDY_CHANGED_EVENT, handleBuddyUpdate);
+      window.removeEventListener(STUDENT_EXP_EVENT, handleExpUpdate);
+      window.removeEventListener('kp-copilot-updated', handleExpUpdate);
+    };
+  }, [currentUser?.id, currentUser?.studentCode]);
 
   const pendingQuests = quests.filter((q) => q.status === 'PENDING');
   const enrolledSubjects = TEACHER_SUBJECTS_LIST.filter((s) =>
@@ -268,20 +304,37 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
           <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-4 sm:p-5 space-y-3.5">
             {/* Header */}
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-slate-900 text-xs sm:text-sm">
-                ระดับของฉัน
+              <h3 className="font-bold text-slate-900 text-xs sm:text-sm flex items-center gap-1.5">
+                <span>ระดับของฉัน</span>
+                <span className="text-[10px] text-slate-400 font-normal truncate max-w-[100px]">
+                  ({activeBuddy.name})
+                </span>
               </h3>
-              <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                {isClean ? 'Lv.1' : 'Lv.2'}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  Lv.{expInfo.level}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsBuddySelectorOpen(true)}
+                  className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md transition-colors cursor-pointer border border-blue-200/60"
+                  title="เปลี่ยนคู่หูบัดดี้"
+                >
+                  เปลี่ยนคู่หู
+                </button>
+              </div>
             </div>
 
             {/* Mascot Avatar & Details */}
             <div className="flex items-center gap-3">
-              <div className="w-16 h-16 rounded-2xl border border-slate-200 bg-amber-50/40 p-1 flex items-center justify-center relative shadow-2xs overflow-hidden shrink-0">
+              <div
+                onClick={() => setIsBuddySelectorOpen(true)}
+                className="w-16 h-16 rounded-2xl border border-slate-200 bg-amber-50/40 p-1 flex items-center justify-center relative shadow-2xs overflow-hidden shrink-0 cursor-pointer hover:border-amber-300 hover:scale-105 transition-all"
+                title={`คลิกเพื่อเปลี่ยนคู่หู (ปัจจุบัน: ${activeBuddy.name})`}
+              >
                 <img
-                  src="/images/buddies/buddy-l1.png"
-                  alt="โมจิ"
+                  src={`/images/buddies/${activeBuddy.id}.png`}
+                  alt={activeBuddy.name}
                   className="w-full h-full object-cover rounded-xl"
                   onError={(e) => {
                     (e.target as HTMLElement).setAttribute(
@@ -292,13 +345,19 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
                 />
                 <span className="absolute top-1 right-1 text-xs text-amber-400">⭐</span>
               </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <h4 className="font-bold text-slate-900 text-sm truncate">โมจิ</h4>
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h4 className="font-bold text-slate-900 text-sm truncate">{activeBuddy.name}</h4>
+                  <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${activeBuddy.badgeBg}`}>
+                    {activeBuddy.rarity}
+                  </span>
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                 </div>
-                <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                  {isClean ? 'เริ่มต้นการเรียนรู้และเติบโตไปด้วยกัน!' : 'วิ่งออกไป! เติบโตไปด้วยกัน!'}
+                <p className="text-[11px] text-slate-500 truncate mt-0.5" title={activeBuddy.title || activeBuddy.quote}>
+                  {activeBuddy.title || activeBuddy.quote}
+                </p>
+                <p className="text-[10px] text-blue-600 font-medium truncate mt-0.5">
+                  ⚡ บัฟ: {activeBuddy.skillName}
                 </p>
               </div>
             </div>
@@ -306,28 +365,39 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
             {/* Progress */}
             <div className="space-y-1.5 pt-1">
               <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
-                <span>{isClean ? 'เลเวล 1' : 'เลเวล 2'}</span>
-                <span className="text-slate-500">{isClean ? '0 / 100 XP' : '650 / 1000 XP'}</span>
+                <span>เลเวล {expInfo.level}</span>
+                <span className="text-slate-500 tabular-nums">
+                  {expInfo.currentLevelXp} / {expInfo.nextLevelXp} XP (รวม {expInfo.totalXp} XP)
+                </span>
               </div>
               <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
                 <div
                   className="bg-blue-600 h-full rounded-full transition-all duration-500"
-                  style={{ width: isClean ? '0%' : '65%' }}
+                  style={{ width: `${expInfo.progressPercent}%` }}
                 />
               </div>
               <div className="text-[11px] text-slate-400 text-center">
-                {isClean ? 'อีก 100 XP จะถึงเลเวล 2' : 'อีก 350 XP จะถึงเลเวล 3'}
+                อีก {expInfo.xpToNextLevel} XP จะถึงเลเวล {expInfo.level + 1}
               </div>
             </div>
 
-            {/* Trophy Details Button */}
-            <button
-              type="button"
-              onClick={() => onNavigate('trophy')}
-              className="w-full py-2.5 px-3 bg-emerald-50/90 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2 border border-emerald-200/60 cursor-pointer shadow-2xs"
-            >
-              <span>🏆 ดูรายละเอียดรางวัล</span>
-            </button>
+            {/* Trophy & Gacha Details Buttons */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => onNavigate('gacha')}
+                className="py-2 px-3 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 border border-purple-200/60 cursor-pointer shadow-2xs"
+              >
+                <span>🎲 สุ่มบัดดี้</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigate('trophy')}
+                className="py-2 px-3 bg-emerald-50/90 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 border border-emerald-200/60 cursor-pointer shadow-2xs"
+              >
+                <span>🏆 ตู้รางวัล</span>
+              </button>
+            </div>
           </div>
 
           {/* Card 2: สรุปการเรียนรู้ (Learning Summary) */}
@@ -502,6 +572,133 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* =========================================================================
+          MODAL: QUICK BUDDY SELECTOR (เลือกคู่หูบัดดี้ประจำตัว)
+      ========================================================================= */}
+      {isBuddySelectorOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-2xl w-full border border-slate-200 shadow-2xl p-5 sm:p-6 space-y-4 max-h-[85vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <span>เลือกคู่หูบัดดี้ประจำตัว</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-200">
+                    {ALL_BUDDIES.length} คน
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  เลือกคู่หูที่ต้องการให้อยู่เคียงข้างคุณเพื่อรับบัฟและช่วยเตือนการเรียนรู้
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBuddySelectorOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Buddies Grid */}
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {ALL_BUDDIES.map((buddy) => {
+                  const isActive = activeBuddy.id === buddy.id;
+                  return (
+                    <div
+                      key={buddy.id}
+                      onClick={() => {
+                        gachaService.setActiveBuddy(buddy.id);
+                        setActiveBuddy(buddy);
+                        setIsBuddySelectorOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center gap-3 relative ${
+                        isActive
+                          ? 'border-blue-500 bg-blue-50/50 shadow-xs ring-2 ring-blue-500/20'
+                          : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50/80 bg-white'
+                      }`}
+                    >
+                      <div className="w-14 h-14 rounded-xl border border-slate-200/80 bg-amber-50/40 p-1 flex items-center justify-center shrink-0 relative overflow-hidden">
+                        <img
+                          src={`/images/buddies/${buddy.id}.png`}
+                          alt={buddy.name}
+                          className="w-full h-full object-cover rounded-lg"
+                          onError={(e) => {
+                            (e.target as HTMLElement).setAttribute(
+                              'src',
+                              '/images/buddies/cat_mascot.png'
+                            );
+                          }}
+                        />
+                        {isActive && (
+                          <div className="absolute inset-0 bg-blue-600/30 flex items-center justify-center">
+                            <Check className="w-5 h-5 text-white stroke-[3]" />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h4 className="font-bold text-slate-900 text-sm truncate">
+                            {buddy.name}
+                          </h4>
+                          <span
+                            className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${buddy.badgeBg}`}
+                          >
+                            {buddy.rarity}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 truncate mt-0.5" title={buddy.title}>
+                          {buddy.title}
+                        </p>
+                        <p className="text-[10px] text-blue-600 font-semibold truncate mt-0.5">
+                          ⚡ {buddy.skillName}
+                        </p>
+                      </div>
+
+                      {isActive ? (
+                        <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-blue-600 text-white shrink-0">
+                          ใช้อยู่
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-600 transition-colors shrink-0 cursor-pointer"
+                        >
+                          เลือก
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsBuddySelectorOpen(false);
+                  onNavigate('gacha');
+                }}
+                className="px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>🎲 ไปที่ตู้สุ่มบัดดี้ (Gacha)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsBuddySelectorOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                ปิด
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

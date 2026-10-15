@@ -118,6 +118,48 @@ export interface CourseClassroomMapping {
 }
 
 let _inMemoryGroupsCache: ChatGroup[] | null = null;
+let chatBroadcastChannel: BroadcastChannel | null = null;
+
+if (typeof window !== 'undefined') {
+  if ('BroadcastChannel' in window) {
+    try {
+      chatBroadcastChannel = new BroadcastChannel('kp_chat_sync_channel');
+      chatBroadcastChannel.onmessage = (event) => {
+        if (event.data?.type === 'CHAT_GROUPS_UPDATED') {
+          _inMemoryGroupsCache = null;
+          const fresh = messagingService.getGroups();
+          window.dispatchEvent(new CustomEvent(CHAT_GROUPS_EVENT, { detail: fresh }));
+        }
+      };
+    } catch (e) {
+      console.warn('[messagingService] BroadcastChannel init warning:', e);
+    }
+  }
+
+  // Cross-tab storage event
+  window.addEventListener('storage', (e) => {
+    if (e.key === STORAGE_KEY_CHAT_GROUPS) {
+      _inMemoryGroupsCache = null;
+      const fresh = messagingService.getGroups();
+      window.dispatchEvent(new CustomEvent(CHAT_GROUPS_EVENT, { detail: fresh }));
+    }
+  });
+
+  // Supabase cloud data realtime update event
+  window.addEventListener('kps-cloud-key-updated', ((e: CustomEvent) => {
+    if (e.detail?.key === STORAGE_KEY_CHAT_GROUPS) {
+      _inMemoryGroupsCache = null;
+      const fresh = messagingService.getGroups();
+      window.dispatchEvent(new CustomEvent(CHAT_GROUPS_EVENT, { detail: fresh }));
+    }
+  }) as EventListener);
+
+  window.addEventListener('kps-cloud-synced', (() => {
+    _inMemoryGroupsCache = null;
+    const fresh = messagingService.getGroups();
+    window.dispatchEvent(new CustomEvent(CHAT_GROUPS_EVENT, { detail: fresh }));
+  }) as EventListener);
+}
 
 /**
  * ป้องกันการลบข้อมูลชิ้นงานนักเรียนเด็ดขาด (Anti-Accidental-Delete Assertion)
@@ -426,6 +468,12 @@ export const messagingService = {
       window.dispatchEvent(new CustomEvent(CHAT_GROUPS_EVENT, { detail: groups }));
     }
 
+    try {
+      chatBroadcastChannel?.postMessage({ type: 'CHAT_GROUPS_UPDATED', timestamp: Date.now() });
+    } catch {
+      // ignore
+    }
+
     // Mirror asynchronous write to high-capacity IndexedDB
     indexedDbAdapter.setItem('chat_groups', 'active_groups', groups).catch((err) => {
       console.warn('IndexedDB mirror error:', err);
@@ -660,6 +708,60 @@ export const messagingService = {
     if (group && (group.unreadCount || 0) > 0) {
       group.unreadCount = 0;
       this.saveGroups(groups);
+    }
+  },
+
+  // จำลองข้อความตอบกลับจากคู่สนทนา (Simulation Partner Reply for Easy Testing)
+  simulatePartnerReply(
+    groupId: string,
+    currentRole: 'TEACHER' | 'STUDENT'
+  ): ChatMessage | null {
+    const groups = this.getGroups();
+    const group = groups.find((g) => g.id === groupId);
+    if (!group) return null;
+
+    if (currentRole === 'TEACHER') {
+      // ผู้ส่งปัจจุบันคือครู -> ฝั่งตอบกลับคือนักเรียน
+      const studentMember = group.members.find((m) => m.role === 'STUDENT') || {
+        id: 'std-reply',
+        name: 'ด.ช. พงศกร มุ่งมั่น',
+        role: 'STUDENT',
+        avatarUrl: '/images/banners/student-avatar.png',
+      };
+
+      const replies = [
+        'รับทราบครับคุณครู จะรีบดำเนินการส่งงานให้เรียบร้อยครับ! ✨',
+        'สวัสดีครับคุณครู งานชิ้นนี้ส่งผ่านระบบพอร์ทัลแล้วนะครับ ขอบคุณครับ 🙏',
+        'เข้าใจเนื้อหาบทเรียนแล้วครับ ขอบคุณครูมากครับ 😊',
+        'คุณครูครับ แบบฝึกหัดข้อ 3 ส่งไฟล์ PDF หรือภาพถ่ายได้ไหมครับ?',
+      ];
+      const randomContent = replies[Math.floor(Math.random() * replies.length)];
+
+      return this.sendMessage(groupId, {
+        senderId: studentMember.id,
+        senderName: studentMember.name,
+        senderRole: 'STUDENT',
+        senderAvatar: studentMember.avatarUrl || '/images/banners/student-avatar.png',
+        content: randomContent,
+      });
+    } else {
+      // ผู้ส่งปัจจุบันคือนักเรียน -> ฝั่งตอบกลับคือครู
+      const teacherName = group.teacherName || 'ครูปัญจพล (ครูผู้สอน)';
+      const replies = [
+        'สวัสดีครับนักเรียน มีข้อสงสัยเรื่องบทเรียนสอบถามครูได้ตลอดเวลานะครับ 📚',
+        'ครูตรวจงานให้แล้วนะครับ ทำได้ดีมาก พัฒนาต่อไปนะ! ⭐',
+        'อย่าลืมตรวจสอบกำหนดส่งงานในสัปดาห์นี้นะครับ ขอให้ทุกคนตั้งใจเรียนนะ 😊',
+        'รับทราบครับ เดี๋ยวครูจะประสานงานและตรวจเช็คข้อมูลให้ทันทีครับ 👍',
+      ];
+      const randomContent = replies[Math.floor(Math.random() * replies.length)];
+
+      return this.sendMessage(groupId, {
+        senderId: `teacher-${group.id}`,
+        senderName: teacherName,
+        senderRole: 'TEACHER',
+        senderAvatar: '/images/teacher/teacher_avatar.png',
+        content: randomContent,
+      });
     }
   },
 

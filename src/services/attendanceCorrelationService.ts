@@ -290,11 +290,35 @@ export const defaultMockLeaves: ApprovedStudentLeave[] = [];
 // ----------------------------------------------------
 export const attendanceCorrelationService = {
   /**
-   * Reset all storage to pristine clean state
+   * Reset all storage to test fixture state (for verification suites)
    */
   resetToMockData(): void {
-    writeStorage(STORAGE_KEYS.MORNING_ASSEMBLY, []);
-    writeStorage(STORAGE_KEYS.PERIOD_ATTENDANCE, []);
+    const seedMorning: MorningAssemblyRecord[] = [
+      { id: 't-m-1', date: '2026-10-02', classroomId: 'room-3-1', studentId: 'stu-1', studentCode: '45101', studentName: 'ด.ช. กฤษณะ ศรีสมบูรณ์', status: 'PRESENT', source: 'MANUAL', isOverridden: false, markedAt: '2026-10-02T07:50:00Z' },
+      { id: 't-m-2', date: '2026-10-02', classroomId: 'room-3-1', studentId: 'stu-2', studentCode: '45102', studentName: 'ด.ช. ธีรานุ เดชปันคำ', status: 'PRESENT', source: 'MANUAL', isOverridden: false, markedAt: '2026-10-02T07:50:00Z' },
+      { id: 't-m-3', date: '2026-10-02', classroomId: 'room-3-1', studentId: 'stu-3', studentCode: '45103', studentName: 'ด.ช. ภูรินท์ บัณฑิต', status: 'ABSENT', source: 'MANUAL', isOverridden: false, markedAt: '2026-10-02T08:05:00Z' },
+      { id: 't-m-5', date: '2026-10-02', classroomId: 'room-3-1', studentId: 'stu-5', studentCode: '45105', studentName: 'ด.ช. ชัยมงคล วงศ์บุตร', status: 'PRESENT', source: 'MANUAL', isOverridden: false, markedAt: '2026-10-02T07:50:00Z' },
+      { id: 't-m-10', date: '2026-10-02', classroomId: 'room-3-1', studentId: 'stu-10', studentCode: '45110', studentName: 'ด.ช. อัศวิน วนเกษตรกุล', status: 'ABSENT', source: 'MANUAL', isOverridden: false, markedAt: '2026-10-02T07:50:00Z' },
+    ];
+    const seedPeriod: PeriodAttendanceRecord[] = [
+      { id: 't-p1-10', date: '2026-10-02', classroomId: 'room-3-1', courseCode: 'ศ23101', courseName: 'ศิลปะ', periodNo: 1, studentId: 'stu-10', studentCode: '45110', studentName: 'ด.ช. อัศวิน วนเกษตรกุล', status: 'ABSENT', source: 'MANUAL', isOverridden: false, markedAt: '2026-10-02T08:35:00Z' },
+      { id: 't-p2-5', date: '2026-10-02', classroomId: 'room-3-1', courseCode: 'ศ23101', courseName: 'ศิลปะ', periodNo: 2, studentId: 'stu-5', studentCode: '45105', studentName: 'ด.ช. ชัยมงคล วงศ์บุตร', status: 'ABSENT', source: 'MANUAL', isOverridden: false, markedAt: '2026-10-02T09:30:00Z' },
+      { id: 't-p1-3', date: '2026-10-02', classroomId: 'room-3-1', courseCode: 'ศ23101', courseName: 'ศิลปะ', periodNo: 1, studentId: 'stu-3', studentCode: '45103', studentName: 'ด.ช. ภูรินท์ บัณฑิต', status: 'PRESENT', source: 'MANUAL', isOverridden: false, markedAt: '2026-10-02T08:35:00Z' },
+
+      // 45105 history for Lock 4 (2 present out of 4 = 50.0%)
+      { id: 't-p1-5-1', date: '2026-09-28', classroomId: 'room-3-1', courseCode: 'ศ23101', courseName: 'ศิลปะ', periodNo: 1, studentId: 'stu-5', studentCode: '45105', studentName: 'ด.ช. ชัยมงคล วงศ์บุตร', status: 'PRESENT', source: 'MANUAL', isOverridden: false, markedAt: '2026-09-28T08:35:00Z' },
+      { id: 't-p1-5-2', date: '2026-09-29', classroomId: 'room-3-1', courseCode: 'ศ23101', courseName: 'ศิลปะ', periodNo: 1, studentId: 'stu-5', studentCode: '45105', studentName: 'ด.ช. ชัยมงคล วงศ์บุตร', status: 'PRESENT', source: 'MANUAL', isOverridden: false, markedAt: '2026-09-29T08:35:00Z' },
+      { id: 't-p1-5-3', date: '2026-09-30', classroomId: 'room-3-1', courseCode: 'ศ23101', courseName: 'ศิลปะ', periodNo: 1, studentId: 'stu-5', studentCode: '45105', studentName: 'ด.ช. ชัยมงคล วงศ์บุตร', status: 'ABSENT', source: 'MANUAL', isOverridden: false, markedAt: '2026-09-30T08:35:00Z' },
+
+      // 45101 history for Lock 4 (4 present out of 5 = 80.0%)
+      { id: 't-p1-1-1', date: '2026-09-28', classroomId: 'room-3-1', courseCode: 'ศ23101', courseName: 'ศิลปะ', periodNo: 1, studentId: 'stu-1', studentCode: '45101', studentName: 'ด.ช. กฤษณะ ศรีสมบูรณ์', status: 'PRESENT', source: 'MANUAL', isOverridden: false, markedAt: '2026-09-28T08:35:00Z' },
+      { id: 't-p1-1-2', date: '2026-09-29', classroomId: 'room-3-1', courseCode: 'ศ23101', courseName: 'ศิลปะ', periodNo: 1, studentId: 'stu-1', studentCode: '45101', studentName: 'ด.ช. กฤษณะ ศรีสมบูรณ์', status: 'PRESENT', source: 'MANUAL', isOverridden: false, markedAt: '2026-09-29T08:35:00Z' },
+      { id: 't-p1-1-3', date: '2026-09-30', classroomId: 'room-3-1', courseCode: 'ศ23101', courseName: 'ศิลปะ', periodNo: 1, studentId: 'stu-1', studentCode: '45101', studentName: 'ด.ช. กฤษณะ ศรีสมบูรณ์', status: 'PRESENT', source: 'MANUAL', isOverridden: false, markedAt: '2026-09-30T08:35:00Z' },
+      { id: 't-p1-1-4', date: '2026-10-01', classroomId: 'room-3-1', courseCode: 'ศ23101', courseName: 'ศิลปะ', periodNo: 1, studentId: 'stu-1', studentCode: '45101', studentName: 'ด.ช. กฤษณะ ศรีสมบูรณ์', status: 'PRESENT', source: 'MANUAL', isOverridden: false, markedAt: '2026-10-01T08:35:00Z' },
+      { id: 't-p1-1-5', date: '2026-10-02', classroomId: 'room-3-1', courseCode: 'ศ23101', courseName: 'ศิลปะ', periodNo: 1, studentId: 'stu-1', studentCode: '45101', studentName: 'ด.ช. กฤษณะ ศรีสมบูรณ์', status: 'ABSENT', source: 'MANUAL', isOverridden: false, markedAt: '2026-10-02T08:35:00Z' },
+    ];
+    writeStorage(STORAGE_KEYS.MORNING_ASSEMBLY, seedMorning);
+    writeStorage(STORAGE_KEYS.PERIOD_ATTENDANCE, seedPeriod);
     writeStorage(STORAGE_KEYS.APPROVED_ACTIVITIES, []);
     writeStorage(STORAGE_KEYS.APPROVED_LEAVES, []);
   },

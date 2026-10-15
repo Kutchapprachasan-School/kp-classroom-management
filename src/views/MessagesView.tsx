@@ -38,11 +38,20 @@ import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 
 interface MessagesViewProps {
   activeRole?: SchoolUserRole;
+  embedded?: boolean;
 }
 
 export const MessagesView: React.FC<MessagesViewProps> = ({
   activeRole = 'TEACHER_GENERAL',
+  embedded = false,
 }) => {
+  // ตรวจจับบทบาทของผู้ใช้งานว่าเป็นนักเรียนหรือไม่
+  const currentUser = authService.getCurrentUser();
+  const isStudentUser =
+    activeRole === 'STUDENT_GENERAL' ||
+    activeRole === 'STUDENT_COUNCIL' ||
+    currentUser?.role === 'STUDENT';
+
   // ดึงรายการกลุ่มแชทจริงทั้งหมดจาก messagingService
   const [groups, setGroups] = useState<ChatGroup[]>(() => messagingService.getGroups());
   
@@ -78,16 +87,22 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
   // ดึงห้องเรียนทั้งหมดในระบบสำหรับเป็นตัวเลือกย้ายห้อง
   const allClassrooms = classroomService.getClassroomsSync();
 
-  // ซิงค์กลุ่มแชทแบบ Real-time เมื่อมีข้อความใหม่ หรือมีการย้ายห้องเรียน
+  // ซิงค์กลุ่มแชทแบบ Real-time ข้ามแท็บและข้ามอุปกรณ์ (Multi-Tab & Cross-Device Cloud Sync)
   useEffect(() => {
     const handleSync = () => {
       setGroups(messagingService.getGroups());
     };
     window.addEventListener(CHAT_GROUPS_EVENT, handleSync);
     window.addEventListener(STUDENT_TRANSFERRED_EVENT, handleSync);
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('kps-cloud-key-updated', handleSync);
+    window.addEventListener('kps-cloud-synced', handleSync);
     return () => {
       window.removeEventListener(CHAT_GROUPS_EVENT, handleSync);
       window.removeEventListener(STUDENT_TRANSFERRED_EVENT, handleSync);
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('kps-cloud-key-updated', handleSync);
+      window.removeEventListener('kps-cloud-synced', handleSync);
     };
   }, []);
 
@@ -114,26 +129,133 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
     if (e) e.preventDefault();
     if (!inputText.trim() || !currentGroup) return;
 
-    const currentUser = authService.getCurrentUser();
-    const teacherName =
-      currentUser?.name ||
-      (activeRole === 'ACADEMIC_ADMIN'
-        ? 'ฝ่ายบริหารและงานสารบรรณ'
-        : activeRole === 'STUDENT_AFFAIRS'
-        ? 'ครูกิจการนักเรียน'
-        : 'ครูผู้สอน');
+    const senderId = isStudentUser
+      ? (currentUser?.id || currentUser?.studentCode || 'student-me')
+      : (currentUser?.id || 'teacher-current');
+    const senderName = isStudentUser
+      ? (currentUser?.name || 'ด.ช. นักเรียน')
+      : (currentUser?.name ||
+         (activeRole === 'ACADEMIC_ADMIN'
+           ? 'ฝ่ายบริหารและงานสารบรรณ'
+           : activeRole === 'STUDENT_AFFAIRS'
+           ? 'ครูกิจการนักเรียน'
+           : 'ครูผู้สอน'));
+    const senderRole = isStudentUser ? 'STUDENT' : 'TEACHER';
+    const senderAvatar =
+      currentUser?.avatarUrl ||
+      (isStudentUser ? '/images/banners/student-avatar.png' : '/images/teacher/teacher_avatar.png');
 
     messagingService.sendMessage(currentGroup.id, {
-      senderId: currentUser?.id || 'teacher-current',
-      senderName: teacherName,
-      senderRole: 'TEACHER',
-      senderAvatar: currentUser?.avatarUrl || '/images/teacher/teacher_avatar.png',
+      senderId,
+      senderName,
+      senderRole,
+      senderAvatar,
       content: inputText.trim(),
     });
 
     setGroups(messagingService.getGroups());
     setInputText('');
     setIsPlusMenuOpen(false);
+  };
+
+  // จำลองข้อความตอบกลับจากคู่สนทนาสำหรับการทดสอบ (Partner Simulation Reply)
+  const handleSimulatePartnerReply = () => {
+    if (!currentGroup) return;
+    const currentRole = isStudentUser ? 'STUDENT' : 'TEACHER';
+    const reply = messagingService.simulatePartnerReply(currentGroup.id, currentRole);
+    if (reply) {
+      setGroups(messagingService.getGroups());
+      showToast(`ข้อความตอบกลับจาก ${reply.senderName} ส่งเข้ามาแล้ว ✨`);
+    }
+  };
+
+  // Helper สำหรับแสดงไฟล์แนบของข้อความแชท
+  const renderAttachment = (attachment: any, isMe: boolean) => {
+    if (attachment.isExpired) {
+      return (
+        <div
+          className={`mt-2 p-2.5 rounded-xl text-xs flex items-center gap-2 border ${
+            isMe
+              ? 'bg-blue-700/80 border-blue-500 text-blue-100'
+              : 'bg-slate-50/90 border-slate-200/90 text-slate-500'
+          }`}
+        >
+          <span className="text-lg shrink-0">🖼️</span>
+          <div>
+            <p className="font-bold">รูปภาพหมดอายุตามนโยบาย 7 วัน</p>
+            <p className={`text-[10px] mt-0.5 ${isMe ? 'text-blue-200' : 'text-slate-400'}`}>
+              ข้อความและบันทึกประวัติการส่งยังคงอยู่ถาวร 100%
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    const isImage =
+      attachment.mimeType?.startsWith('image/') ||
+      attachment.fileName?.match(/\.(jpg|jpeg|png|webp|gif)$/i);
+
+    if (isImage) {
+      return (
+        <div className="mt-2">
+          {attachment.url ? (
+            <img
+              src={attachment.url}
+              alt={attachment.fileName || 'รูปภาพ'}
+              className="max-w-xs max-h-56 rounded-xl object-cover border border-slate-200/50 shadow-2xs"
+            />
+          ) : (
+            <div
+              className={`p-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border ${
+                isMe
+                  ? 'bg-blue-700/80 border-blue-500 text-white'
+                  : 'bg-blue-50 border-blue-200 text-blue-800'
+              }`}
+            >
+              <span>🖼️</span>
+              <span>{attachment.fileName || 'รูปภาพที่แนบ'}</span>
+            </div>
+          )}
+          <div
+            className={`text-[10px] mt-1 flex items-center gap-1.5 ${
+              isMe ? 'text-blue-100' : 'text-slate-400'
+            }`}
+          >
+            <span>📁 {attachment.fileName || 'image.jpg'}</span>
+            {attachment.fileSizeKb && <span>({attachment.fileSizeKb} KB)</span>}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        className={`mt-2 p-2.5 rounded-xl flex items-center justify-between gap-3 text-xs border ${
+          isMe
+            ? 'bg-blue-700/80 border-blue-500 text-white'
+            : 'bg-blue-50/60 border-blue-200 text-blue-900'
+        }`}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <FileText className={`w-4 h-4 shrink-0 ${isMe ? 'text-white' : 'text-blue-600'}`} />
+          <span className="font-bold truncate">{attachment.fileName || 'เอกสารแนบ'}</span>
+        </div>
+        {attachment.url && (
+          <a
+            href={attachment.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`px-2.5 py-1 rounded-lg font-bold text-[11px] shrink-0 transition-colors ${
+              isMe
+                ? 'bg-white text-blue-700 hover:bg-blue-50'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+          >
+            ดาวน์โหลด
+          </a>
+        )}
+      </div>
+    );
   };
 
   // ดำเนินการย้ายห้องเรียนอัตโนมัติ (Student Transfer Sync)
@@ -202,33 +324,35 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
         </div>
       )}
 
-      {/* 1. Master PageHeroBanner Design */}
-      <PageHeroBanner
-        title="ระบบข้อความ & แชทกลุ่มอัตโนมัติ"
-        subtitle="กลุ่มครูที่ปรึกษาและกลุ่มประจำวิชาดึงสมาชิกเข้าอัตโนมัติ ย้ายห้องเรียนระบบจะย้ายกลุ่มและโอนงาน/คะแนนเดิมติดตัวไปด้วย"
-        icon={<MessageSquare className="w-6 h-6 text-white" />}
-        iconBgClass="bg-blue-600 text-white"
-        badgeText="Auto Sync"
-        tagText="💬 กลุ่มที่ปรึกษา • กลุ่มประจำวิชา • ซิงค์สมาชิกอัตโนมัติ • โอนย้ายคะแนน 100%"
-        quoteLines={[
-          'สื่อสารสะดวกรวดเร็ว',
-          'เชื่อมโยงครูและนักเรียน',
-          'สร้างสรรค์ชุมชนการเรียนรู้',
-        ]}
-        actions={
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleResyncAll}
-              className="bg-[#EFF6FF] border border-[#BFDBFE] hover:bg-[#DBEAFE] text-blue-700 rounded-xl px-3.5 py-2 flex items-center gap-2 text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
-              title="ซิงค์สมาชิกกลุ่มแชทให้ตรงกับทะเบียนห้องเรียนล่าสุด"
-            >
-              <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
-              <span>ซิงค์ทะเบียนห้องเรียน</span>
-            </button>
-          </div>
-        }
-      />
+      {/* 1. Master PageHeroBanner Design (ซ่อนเมื่อแสดงแบบ Embedded) */}
+      {!embedded && (
+        <PageHeroBanner
+          title="ระบบข้อความ & แชทกลุ่มอัตโนมัติ"
+          subtitle="กลุ่มครูที่ปรึกษาและกลุ่มประจำวิชาดึงสมาชิกเข้าอัตโนมัติ ย้ายห้องเรียนระบบจะย้ายกลุ่มและโอนงาน/คะแนนเดิมติดตัวไปด้วย"
+          icon={<MessageSquare className="w-6 h-6 text-white" />}
+          iconBgClass="bg-blue-600 text-white"
+          badgeText="Auto Sync"
+          tagText="💬 กลุ่มที่ปรึกษา • กลุ่มประจำวิชา • ซิงค์สมาชิกอัตโนมัติ • โอนย้ายคะแนน 100%"
+          quoteLines={[
+            'สื่อสารสะดวกรวดเร็ว',
+            'เชื่อมโยงครูและนักเรียน',
+            'สร้างสรรค์ชุมชนการเรียนรู้',
+          ]}
+          actions={
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleResyncAll}
+                className="bg-[#EFF6FF] border border-[#BFDBFE] hover:bg-[#DBEAFE] text-blue-700 rounded-xl px-3.5 py-2 flex items-center gap-2 text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                title="ซิงค์สมาชิกกลุ่มแชทให้ตรงกับทะเบียนห้องเรียนล่าสุด"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
+                <span>ซิงค์ทะเบียนห้องเรียน</span>
+              </button>
+            </div>
+          }
+        />
+      )}
 
       {/* 2. Main Interface: Left Groups List + Right Chat Box */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
@@ -536,7 +660,21 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  {/* Simulation Reply Button for instant 2-party chat verification */}
+                  <button
+                    type="button"
+                    onClick={handleSimulatePartnerReply}
+                    title={isStudentUser ? 'ทดสอบให้ครูส่งข้อความตอบกลับ' : 'ทดสอบให้นักเรียนส่งข้อความตอบกลับ'}
+                    className="rounded-full border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-blue-700 px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-95"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
+                    <span className="hidden sm:inline">
+                      {isStudentUser ? '💬 จำลองครูตอบ' : '💬 จำลองนักเรียนตอบ'}
+                    </span>
+                    <span className="sm:hidden">💬 จำลองตอบ</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setShowMembersDrawer(true)}
@@ -571,139 +709,142 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                   </div>
                 ) : (
                   currentGroup.messages.map((msg) => {
-                  // ข้อความระบบแจ้งย้ายห้อง / ตรวจสอบความถูกต้อง
-                  if (msg.isSystemAudit || msg.senderRole === 'SYSTEM') {
-                    const isTransferIn = msg.transferAuditMeta?.action === 'TRANSFER_IN';
-                    const isTransferOut = msg.transferAuditMeta?.action === 'TRANSFER_OUT';
+                    // ข้อความระบบแจ้งย้ายห้อง / ตรวจสอบความถูกต้อง
+                    if (msg.isSystemAudit || msg.senderRole === 'SYSTEM') {
+                      const isTransferIn = msg.transferAuditMeta?.action === 'TRANSFER_IN';
+                      const isTransferOut = msg.transferAuditMeta?.action === 'TRANSFER_OUT';
 
-                    return (
-                      <div key={msg.id} className="flex justify-center my-4 animate-fade-in">
-                        <div
-                          className={`rounded-2xl p-4 text-center max-w-xl mx-auto shadow-2xs border ${
-                            isTransferIn
-                              ? 'bg-emerald-50/90 border-emerald-200 text-emerald-950'
-                              : isTransferOut
-                              ? 'bg-amber-50/90 border-amber-200 text-amber-950'
-                              : 'bg-[#F0F7FF] border-[#D0E6FF] text-[#1E40AF]'
-                          }`}
-                        >
-                          <div className="flex items-center justify-center gap-2 text-xs sm:text-sm font-bold">
-                            {isTransferIn || isTransferOut ? (
-                              <ArrowRightLeft className="w-4 h-4 text-emerald-600 shrink-0" />
-                            ) : (
-                              <Megaphone className="w-4 h-4 text-[#1D75D8] shrink-0" />
+                      return (
+                        <div key={msg.id} className="flex justify-center my-4 animate-fade-in">
+                          <div
+                            className={`rounded-2xl p-4 text-center max-w-xl mx-auto shadow-2xs border ${
+                              isTransferIn
+                                ? 'bg-emerald-50/90 border-emerald-200 text-emerald-950'
+                                : isTransferOut
+                                ? 'bg-amber-50/90 border-amber-200 text-amber-950'
+                                : 'bg-[#F0F7FF] border-[#D0E6FF] text-[#1E40AF]'
+                            }`}
+                          >
+                            <div className="flex items-center justify-center gap-2 text-xs sm:text-sm font-bold">
+                              {isTransferIn || isTransferOut ? (
+                                <ArrowRightLeft className="w-4 h-4 text-emerald-600 shrink-0" />
+                              ) : (
+                                <Megaphone className="w-4 h-4 text-[#1D75D8] shrink-0" />
+                              )}
+                              <span>{msg.content}</span>
+                            </div>
+
+                            {/* รายละเอียดการรักษาคะแนนและงานที่โอนย้าย */}
+                            {msg.transferAuditMeta && (
+                              <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-center gap-2 flex-wrap text-[11px] font-medium">
+                                <span className="px-2 py-0.5 rounded-full bg-white/80 border border-slate-200 text-slate-700">
+                                  📦 งานที่รักษาไว้: {msg.transferAuditMeta.preservedAssignmentsCount} รายการ
+                                </span>
+                                <span className="px-2 py-0.5 rounded-full bg-white/80 border border-slate-200 text-slate-700">
+                                  ⭐ คะแนนสะสมคงเดิม: {msg.transferAuditMeta.preservedScore} คะแนน
+                                </span>
+                              </div>
                             )}
-                            <span>{msg.content}</span>
-                          </div>
 
-                          {/* รายละเอียดการรักษาคะแนนและงานที่โอนย้าย */}
-                          {msg.transferAuditMeta && (
-                            <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-center gap-2 flex-wrap text-[11px] font-medium">
-                              <span className="px-2 py-0.5 rounded-full bg-white/80 border border-slate-200 text-slate-700">
-                                📦 งานที่รักษาไว้: {msg.transferAuditMeta.preservedAssignmentsCount} รายการ
-                              </span>
-                              <span className="px-2 py-0.5 rounded-full bg-white/80 border border-slate-200 text-slate-700">
-                                ⭐ คะแนนสะสมคงเดิม: {msg.transferAuditMeta.preservedScore} คะแนน
+                            <span className="text-[11px] text-[#64748B] mt-1.5 block">
+                              {msg.timestamp}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // คำนวณผู้ส่งว่าเป็นตัวเรา (isMe) หรือไม่
+                    const currentUserId =
+                      currentUser?.id || (isStudentUser ? 'student-me' : 'teacher-current');
+                    const currentUserName = currentUser?.name || (isStudentUser ? 'นักเรียน' : 'ครู');
+                    const isMe =
+                      msg.senderId === currentUserId ||
+                      (currentUser?.studentCode && msg.senderId === currentUser.studentCode) ||
+                      (isStudentUser &&
+                        msg.senderRole === 'STUDENT' &&
+                        (msg.senderId === currentUserId || msg.senderName === currentUserName)) ||
+                      (!isStudentUser &&
+                        msg.senderRole === 'TEACHER' &&
+                        (msg.senderId === currentUserId ||
+                          msg.senderName === currentUserName ||
+                          msg.senderName === 'ครูปัญจพล (ครูผู้สอน)'));
+
+                    // กรณีที่ 1: ข้อความของตัวเราเอง -> ชิดขวา สีฟ้า Primary (#3B82F6)
+                    if (isMe) {
+                      return (
+                        <div
+                          key={msg.id}
+                          className="flex justify-end items-end gap-2.5 animate-fade-in group"
+                        >
+                          <div className="flex flex-col items-end max-w-md sm:max-w-xl space-y-1">
+                            <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                              {msg.syncStatus === 'PENDING_SYNC' && (
+                                <span className="text-amber-500 font-semibold flex items-center gap-0.5">
+                                  ⏳ กำลังส่ง...
+                                </span>
+                              )}
+                              <span>{msg.timestamp}</span>
+                              <span className="font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.2 rounded-full">
+                                คุณ
                               </span>
                             </div>
-                          )}
+                            <div className="bg-blue-600 text-white rounded-2xl rounded-br-xs px-4 py-2.5 text-xs sm:text-sm shadow-2xs leading-relaxed inline-block break-words">
+                              {msg.content}
+                              {msg.attachment && renderAttachment(msg.attachment, true)}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
 
-                          <span className="text-[11px] text-[#64748B] mt-1.5 block">
-                            {msg.timestamp}
-                          </span>
+                    // กรณีที่ 2: ข้อความของคู่สนทนาหรือสมาชิกคนอื่น -> ชิดซ้าย มีรูป Avatar และป้ายระบุบทบาทชัดเจน
+                    return (
+                      <div
+                        key={msg.id}
+                        className="flex justify-start items-start gap-2.5 animate-fade-in group"
+                      >
+                        <img
+                          src={
+                            msg.senderAvatar ||
+                            (msg.senderRole === 'STUDENT'
+                              ? '/images/banners/student-avatar.png'
+                              : '/images/teacher/teacher_avatar.png')
+                          }
+                          alt={msg.senderName}
+                          className="w-9 h-9 rounded-full border border-slate-200 object-cover shrink-0 mt-0.5 shadow-2xs bg-white"
+                        />
+                        <div className="flex flex-col items-start max-w-md sm:max-w-xl space-y-1">
+                          <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                            <span>{msg.senderName}</span>
+                            <span
+                              className={`text-[10px] font-semibold px-2 py-0.2 rounded-full ${
+                                msg.senderRole === 'TEACHER'
+                                  ? 'bg-blue-100 text-blue-700'
+                                  : 'bg-emerald-100 text-emerald-700'
+                              }`}
+                            >
+                              {msg.senderRole === 'TEACHER' ? 'ครู' : 'นักเรียน'}
+                            </span>
+                            <span className="text-[10px] font-normal text-slate-400">
+                              {msg.timestamp}
+                            </span>
+                            {msg.syncStatus === 'PENDING_SYNC' && (
+                              <span className="text-[10px] font-semibold text-amber-500 flex items-center gap-0.5">
+                                ⏳ กำลังส่ง...
+                              </span>
+                            )}
+                          </div>
+                          <div className="bg-white border border-[#E2E8F0] rounded-2xl rounded-tl-xs px-4 py-2.5 text-xs sm:text-sm text-[#163A66] shadow-2xs leading-relaxed inline-block break-words">
+                            {msg.content}
+                            {msg.attachment && renderAttachment(msg.attachment, false)}
+                          </div>
                         </div>
                       </div>
                     );
-                  }
-
-                  return (
-                    <div key={msg.id} className="flex items-start gap-3 animate-fade-in">
-                      <img
-                        src={msg.senderAvatar || '/images/teacher/teacher_avatar.png'}
-                        alt={msg.senderName}
-                        className="w-10 h-10 rounded-full border border-sky-200 object-cover shrink-0 mt-0.5 shadow-2xs bg-sky-50"
-                      />
-                      <div className="max-w-xl space-y-1">
-                        <div className="text-xs font-bold text-[#6B7C93] flex items-center gap-2">
-                          <span>{msg.senderName}</span>
-                          <span className="text-[10px] font-normal text-slate-400">
-                            {msg.timestamp}
-                          </span>
-                          {msg.syncStatus === 'PENDING_SYNC' && (
-                            <span className="text-[10px] font-semibold text-amber-500 flex items-center gap-0.5">
-                              ⏳ กำลังส่ง...
-                            </span>
-                          )}
-                        </div>
-                        <div className="bg-white border border-[#E2E8F0] rounded-2xl rounded-tl-sm px-4 py-2.5 text-xs sm:text-sm text-[#163A66] shadow-2xs leading-relaxed inline-block">
-                          {msg.content}
-
-                          {/* Chat Attachment: 7-Day Expired Media vs Active Media */}
-                          {msg.attachment && (
-                            <div className="mt-2 pt-2 border-t border-slate-100">
-                              {msg.attachment.isExpired ? (
-                                <div className="p-3 bg-slate-50/90 border border-slate-200/90 rounded-xl text-xs text-slate-500 flex items-center gap-2.5 shadow-2xs">
-                                  <span className="text-xl shrink-0">🖼️</span>
-                                  <div>
-                                    <p className="font-bold text-slate-600">
-                                      รูปภาพหมดอายุการจัดเก็บตามนโยบาย 7 วัน (Expired)
-                                    </p>
-                                    <p className="text-[10px] text-slate-400 mt-0.5">
-                                      ข้อความและบันทึกประวัติการส่งยังคงอยู่ถาวร 100%
-                                    </p>
-                                  </div>
-                                </div>
-                              ) : msg.attachment.mimeType?.startsWith('image/') ||
-                                msg.attachment.fileName?.match(/\.(jpg|jpeg|png|webp|gif)$/i) ? (
-                                <div>
-                                  {msg.attachment.url ? (
-                                    <img
-                                      src={msg.attachment.url}
-                                      alt={msg.attachment.fileName || 'รูปภาพ'}
-                                      className="max-w-xs max-h-56 rounded-xl object-cover border border-slate-200 shadow-2xs"
-                                    />
-                                  ) : (
-                                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs font-bold text-blue-800 flex items-center gap-2">
-                                      <span>🖼️</span>
-                                      <span>{msg.attachment.fileName || 'รูปภาพที่แนบ'}</span>
-                                    </div>
-                                  )}
-                                  <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1.5">
-                                    <span>📁 {msg.attachment.fileName || 'image.jpg'}</span>
-                                    {msg.attachment.fileSizeKb && (
-                                      <span>({msg.attachment.fileSizeKb} KB)</span>
-                                    )}
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="p-2.5 bg-blue-50/60 border border-blue-200 rounded-xl flex items-center justify-between gap-3 text-xs">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <FileText className="w-4 h-4 text-blue-600 shrink-0" />
-                                    <span className="font-bold text-blue-900 truncate">
-                                      {msg.attachment.fileName || 'เอกสารแนบ'}
-                                    </span>
-                                  </div>
-                                  {msg.attachment.url && (
-                                    <a
-                                      href={msg.attachment.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold text-[11px] hover:bg-blue-700 shrink-0"
-                                    >
-                                      ดาวน์โหลด
-                                    </a>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-              <div ref={messagesEndRef} />
+                  })
+                )}
+                <div ref={messagesEndRef} />
               </div>
             </div>
 

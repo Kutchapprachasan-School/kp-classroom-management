@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Award,
   Sparkles,
@@ -13,7 +13,12 @@ import {
   Zap,
   Dices,
 } from 'lucide-react';
-import { gachaService } from '../services/gachaService';
+import { gachaService, BUDDY_CHANGED_EVENT } from '../services/gachaService';
+import {
+  calculateStudentExp,
+  STUDENT_EXP_EVENT,
+  type StudentExpCalculation,
+} from '../services/studentExpService';
 import { ChibiBuddyAvatar } from '../components/student/ChibiBuddyAvatar';
 import { cleanSlateService } from '../services/cleanSlateService';
 import type { AuthUser } from '../services/authService';
@@ -81,9 +86,12 @@ interface StudentTrophyViewProps {
 export const StudentTrophyView: React.FC<StudentTrophyViewProps> = ({
   onNavigateToGacha,
   onNavigateToMissions,
-  currentUser: _currentUser,
+  currentUser,
 }) => {
-  const currentBuddy = gachaService.getActiveBuddy();
+  const [currentBuddy, setCurrentBuddy] = useState(() => gachaService.getActiveBuddy());
+  const [expInfo, setExpInfo] = useState<StudentExpCalculation>(() =>
+    calculateStudentExp(currentUser?.id, currentUser?.studentCode)
+  );
   const [buddyCustomName, setBuddyCustomName] = useState(currentBuddy.name);
   const [isEditingName, setIsEditingName] = useState(false);
   const [buddyMorale, setBuddyMorale] = useState(100);
@@ -94,6 +102,25 @@ export const StudentTrophyView: React.FC<StudentTrophyViewProps> = ({
   });
   const [isBuddyJumping, setIsBuddyJumping] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleBuddyUpdate = () => {
+      const b = gachaService.getActiveBuddy();
+      setCurrentBuddy(b);
+      setBuddyCustomName(b.name);
+    };
+    const handleExpUpdate = () => {
+      setExpInfo(calculateStudentExp(currentUser?.id, currentUser?.studentCode));
+    };
+    window.addEventListener(BUDDY_CHANGED_EVENT, handleBuddyUpdate);
+    window.addEventListener(STUDENT_EXP_EVENT, handleExpUpdate);
+    window.addEventListener('kp-copilot-updated', handleExpUpdate);
+    return () => {
+      window.removeEventListener(BUDDY_CHANGED_EVENT, handleBuddyUpdate);
+      window.removeEventListener(STUDENT_EXP_EVENT, handleExpUpdate);
+      window.removeEventListener('kp-copilot-updated', handleExpUpdate);
+    };
+  }, [currentUser?.id, currentUser?.studentCode]);
 
   const handleBuddyAction = () => {
     setIsBuddyJumping(true);
@@ -229,14 +256,19 @@ export const StudentTrophyView: React.FC<StudentTrophyViewProps> = ({
               {/* Level & XP Progress */}
               <div className="space-y-1.5 pt-1 w-64 sm:w-80">
                 <div className="flex justify-between text-xs font-bold text-slate-700">
-                  <span className="text-emerald-700 font-extrabold">เลเวล 2</span>
-                  <span className="tabular-nums">650 / 1,000 XP (65%)</span>
+                  <span className="text-emerald-700 font-extrabold">เลเวล {expInfo.level}</span>
+                  <span className="tabular-nums">
+                    {expInfo.currentLevelXp} / {expInfo.nextLevelXp} XP ({expInfo.progressPercent}%)
+                  </span>
                 </div>
                 <div className="w-full bg-slate-200/80 h-3 rounded-full overflow-hidden p-0.5">
                   <div
                     className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full rounded-full transition-all duration-700 shadow-2xs"
-                    style={{ width: '65%' }}
+                    style={{ width: `${expInfo.progressPercent}%` }}
                   />
+                </div>
+                <div className="text-[10px] text-slate-400 text-center">
+                  รวม {expInfo.totalXp} XP • อีก {expInfo.xpToNextLevel} XP จะถึงเลเวล {expInfo.level + 1}
                 </div>
               </div>
 

@@ -59,6 +59,7 @@ export interface GachaState {
 }
 
 const STORAGE_KEY = 'cls_buddy_gacha_v1';
+export const BUDDY_CHANGED_EVENT = 'kp_buddy_changed';
 
 export const GACHA_RATES: Record<GachaRarity, number> = {
   COMMON: 0.40,     // 40.0%
@@ -473,7 +474,12 @@ export const gachaService = {
   },
 
   saveState(state: GachaState): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(BUDDY_CHANGED_EVENT, { detail: state }));
+    }
   },
 
   getAllBuddies(): GachaBuddy[] {
@@ -492,8 +498,13 @@ export const gachaService = {
   },
 
   setActiveBuddy(buddyId: string): boolean {
+    const buddy = ALL_BUDDIES.find((b) => b.id === buddyId);
+    if (!buddy) return false;
+
     const state = this.getState();
-    if (!state.unlockedBuddyIds.includes(buddyId)) return false;
+    if (!state.unlockedBuddyIds.includes(buddyId)) {
+      state.unlockedBuddyIds.push(buddyId);
+    }
     state.activeBuddyId = buddyId;
     this.saveState(state);
     return true;
