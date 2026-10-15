@@ -30,3 +30,27 @@ All UI development, information architecture, mobile layouts, and components in 
 13. **Accessibility**: Contrast ratio WCAG AA, keyboard navigation, smooth skeleton loading.
 14. **Anti-patterns**: No pure black dark themes, no neon crypto gradients, no sharp square cards, no bloated top text, no horizontal scroll tables on mobile.
 15. **Implementation for AI**: Always verify hierarchy (Importance-driven), tokens, MingCute icons, mobile card conversion, and Thai readability before finishing.
+
+## Token Optimization & Anti-Context Explosion Rules (6 Pillars)
+To prevent Quadratic Context Explosion and eliminate wasteful token consumption (90%+ lost to repeated context re-reading in long sessions), all AI agents and developers must strictly adhere to the following 6 pillars:
+
+1. ✂️ **Targeted View vs Full View**:
+   - **Strict Prohibition**: Never call `view_file` without specifying `StartLine` and `EndLine` on large files.
+   - **Targeted Slicing**: Check [`docs/CODEBASE_INDEX.md`](docs/CODEBASE_INDEX.md) to locate exact line numbers, and view only small slices (30-80 lines maximum).
+2. 🔄 **Milestone Handoff / Compact Cadence**:
+   - Conclude each development milestone (code change + test verification) with a concise status digest.
+   - Proactively recommend or execute `/compact` to clear tool call histories and large logs before switching tasks.
+3. 🧠 **Smart Model Routing**:
+   - Route tasks by complexity: use light/fast models (`flash` / `flash_lite`) for simple lookups, file indexing, and regex scans.
+   - Reserve high-tier models (`inherit` / `pro`) strictly for complex reasoning, architectural refactoring, and multi-file logic.
+4. 🗄️ **Scratchpad Output Redirect**:
+   - Never dump massive command logs (e.g. `npm test`, large directory trees) directly into chat context.
+   - Pipe or redirect verbose outputs to scratch files (e.g. `npm test > scratch/test.log 2>&1`), and read only exit codes or compact failure summaries.
+5. 🐝 **Ephemeral Subagent Swarm**:
+   - Offload broad explorations and code audits to subagents running in isolated contexts.
+   - Subagents must return only concise summaries, dissolving immediately without polluting parent conversation history.
+6. 📑 **Living Codebase Index Maintenance**:
+   - Maintain [`docs/CODEBASE_INDEX.md`](docs/CODEBASE_INDEX.md) as the single source of truth for file paths and key symbol line numbers.
+   - **Mandatory**: Run `node scripts/index_codebase.mjs` every time files are added, removed, or majorly refactored so line references stay synchronized.
+
+Detailed rule specification: [`.agent/rules/token-efficiency.md`](.agent/rules/token-efficiency.md) / [`.agents/rules/token-efficiency.md`](.agents/rules/token-efficiency.md)
