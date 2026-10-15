@@ -91,45 +91,81 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
     }
   };
 
-  const navItems = [
-    { key: 'home' as StudentTabKey, label: 'หน้าหลัก', icon: Home1Regular, badge: null },
-    { key: 'courses' as StudentTabKey, label: 'รายวิชาของฉัน', icon: Book2Regular, badge: null },
-    {
-      key: 'missions' as StudentTabKey,
-      label: 'งานที่ได้รับมอบหมาย',
-      icon: ClipboardRegular,
-      badge: cleanSlateService.isCleanSlateActive() ? null : 3,
-    },
-    { key: 'gradebook' as StudentTabKey, label: 'ผลการเรียน', icon: ChartBarRegular, badge: null },
-    { key: 'timetable' as StudentTabKey, label: 'ตารางเรียน', icon: Calendar2Regular, badge: null },
-    { key: 'announcements' as StudentTabKey, label: 'กิจกรรม / ประกาศ', icon: AnnouncementRegular, badge: null },
-    { key: 'profile' as StudentTabKey, label: 'ข้อมูลส่วนตัว', icon: User3Regular, badge: null },
-    { key: 'contact' as StudentTabKey, label: 'ติดต่อครู', icon: Chat2Regular, badge: null },
-  ];
-
   const schoolSettings = getSchoolSettings();
+
+  const studentNavCategories = [
+    {
+      title: 'การเรียน & ภารกิจ',
+      items: [
+        { key: 'home' as StudentTabKey, label: 'หน้าหลัก', icon: Home1Regular, badge: null },
+        { key: 'courses' as StudentTabKey, label: 'รายวิชาของฉัน', icon: Book2Regular, badge: null },
+        {
+          key: 'missions' as StudentTabKey,
+          label: 'งานที่ได้รับมอบหมาย',
+          icon: ClipboardRegular,
+          badge: cleanSlateService.isCleanSlateActive() ? null : 3,
+        },
+        { key: 'timetable' as StudentTabKey, label: 'ตารางเรียน', icon: Calendar2Regular, badge: null },
+      ],
+    },
+    {
+      title: 'ผลการเรียน & สถิติ',
+      items: [
+        { key: 'gradebook' as StudentTabKey, label: 'ผลการเรียน', icon: ChartBarRegular, badge: null },
+        { key: 'announcements' as StudentTabKey, label: 'กิจกรรม / ประกาศ', icon: AnnouncementRegular, badge: null },
+      ],
+    },
+    {
+      title: 'การสื่อสาร & บัญชี',
+      items: [
+        { key: 'profile' as StudentTabKey, label: 'ข้อมูลส่วนตัว', icon: User3Regular, badge: null },
+        { key: 'contact' as StudentTabKey, label: 'ติดต่อครู', icon: Chat2Regular, badge: null },
+      ],
+    },
+    {
+      title: 'กิจกรรม & บัดดี้',
+      items: [
+        { key: 'gacha' as StudentTabKey, label: 'สุ่มคู่หู (Gacha)', icon: SparklesRegular, badge: 'Lv.2' },
+        { key: 'mobile-care' as StudentTabKey, label: 'ดูแลนักเรียน 9 หน้า', icon: CellphoneRegular, badge: null },
+        ...(studentRole === 'STUDENT_COUNCIL'
+          ? [
+              {
+                key: 'council-affairs' as StudentTabKey,
+                label: 'ตรวจแถวเช้าสภาฯ',
+                icon: SafeShieldRegular,
+                badge: 'สภา',
+              },
+            ]
+          : []),
+      ],
+    },
+  ];
 
   const sidebarContent = (
     <div className="h-full flex flex-col justify-between font-['Prompt',sans-serif] bg-white border-r border-slate-200/90 text-slate-700">
-      {/* Top Header: Logo + School Name */}
-      <div className="p-4 border-b border-slate-100 shrink-0">
+      {/* Top Header: Logo + School Name matching Image 1 */}
+      <div className="p-3.5 sm:p-4 border-b border-slate-100 shrink-0">
         <div className="flex items-center justify-between gap-2.5">
           <div className="flex items-center gap-2.5 min-w-0">
-            <img
-              src="/images/banners/school-logo.png"
-              alt={schoolSettings.nameTh}
-              className="w-10 h-10 object-contain shrink-0"
-              onError={(e) => {
-                // fallback to svg logo
-                (e.target as HTMLElement).setAttribute('src', schoolSettings.logoUrl || KUTCHAP_SCHOOL_INFO.logoUrl);
-              }}
-            />
+            <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 flex items-center justify-center shadow-2xs bg-white border border-slate-100 p-0.5">
+              <img
+                src={schoolSettings.logoUrl || '/images/banners/school-logo.png'}
+                alt={schoolSettings.nameTh}
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  (e.target as HTMLElement).setAttribute(
+                    'src',
+                    KUTCHAP_SCHOOL_INFO.logoUrl || '/images/teacher/school_logo.png'
+                  );
+                }}
+              />
+            </div>
             <div className="min-w-0">
-              <h1 className="font-bold text-slate-900 text-xs sm:text-sm tracking-tight truncate leading-tight">
+              <h1 className="font-extrabold text-slate-900 text-xs sm:text-sm tracking-tight truncate leading-tight">
                 {schoolSettings.nameTh}
               </h1>
-              <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium truncate mt-0.5">
-                {schoolSettings.districtProvince}
+              <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                {schoolSettings.districtProvince || 'อ.กุดจับ จ.อุดรธานี'}
               </p>
             </div>
           </div>
@@ -146,7 +182,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
                   onClose?.();
                 }
               }}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0 flex items-center justify-center cursor-pointer"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0 flex items-center justify-center cursor-pointer"
               title="พับเก็บเมนูข้าง"
             >
               <LayoutLeftbarCloseRegular className="w-4 h-4 hidden lg:block" />
@@ -156,100 +192,58 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
         </div>
       </div>
 
-      {/* Navigation Links */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1 select-none">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.key;
-          return (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => handleTabClick(item.key)}
-              className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                isActive
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
-              }`}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <Icon
-                  className={`w-4 h-4 shrink-0 transition-colors ${
-                    isActive ? 'text-white' : 'text-slate-500'
-                  }`}
-                />
-                <span className="truncate">{item.label}</span>
-              </div>
+      {/* Navigation Links Grouped by Category */}
+      <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-3 select-none">
+        {studentNavCategories.map((cat, catIdx) => (
+          <div key={cat.title} className={catIdx > 0 ? 'pt-2 border-t border-slate-100/80' : ''}>
+            <div className="px-3 pb-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              {cat.title}
+            </div>
+            <div className="space-y-1">
+              {cat.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => handleTabClick(item.key)}
+                    className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Icon
+                        className={`w-4 h-4 shrink-0 transition-colors ${
+                          isActive ? 'text-white' : 'text-slate-500'
+                        }`}
+                      />
+                      <span className="truncate">{item.label}</span>
+                    </div>
 
-              {item.badge !== null && (
-                <span
-                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
-                    isActive
-                      ? 'bg-white text-blue-700 shadow-2xs'
-                      : 'bg-red-500 text-white shadow-2xs'
-                  }`}
-                >
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-
-        {/* Student Council Special Tab if Active */}
-        {studentRole === 'STUDENT_COUNCIL' && (
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={() => handleTabClick('council-affairs')}
-              className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
-                activeTab === 'council-affairs'
-                  ? 'bg-purple-600 text-white shadow-xs'
-                  : 'bg-purple-50 text-purple-900 hover:bg-purple-100 border border-purple-200'
-              }`}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <SafeShieldRegular className="w-4 h-4 shrink-0 text-purple-600" />
-                <span className="truncate">ตรวจแถวเช้าสภาฯ</span>
-              </div>
-              <span className="px-1.5 py-0.2 rounded bg-purple-200 text-purple-800 text-[9px] font-bold">
-                สภา
-              </span>
-            </button>
+                    {item.badge !== null && item.badge !== undefined && (
+                      <span
+                        className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
+                          isActive
+                            ? 'bg-white text-blue-700 shadow-2xs'
+                            : item.badge === 'สภา'
+                            ? 'bg-purple-100 text-purple-800'
+                            : item.badge === 'Lv.2'
+                            ? 'bg-purple-50 text-purple-700'
+                            : 'bg-red-500 text-white shadow-2xs'
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        )}
-
-        {/* Prototype Tools Sub-links */}
-        <div className="pt-3 border-t border-slate-100 space-y-1">
-          <div className="px-3 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-            ฟีเจอร์สนุกๆ
-          </div>
-          <button
-            type="button"
-            onClick={() => handleTabClick('gacha')}
-            className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors ${
-              activeTab === 'gacha' ? 'bg-purple-50 text-purple-700 font-bold' : ''
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <SparklesRegular className="w-3.5 h-3.5 text-purple-500" />
-              <span>สุ่มคู่หู (Gacha)</span>
-            </span>
-            <span className="text-[10px] bg-purple-100 text-purple-700 px-1 rounded">Lv.2</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleTabClick('mobile-care')}
-            className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors ${
-              activeTab === 'mobile-care' ? 'bg-teal-50 text-teal-800 font-bold' : ''
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <CellphoneRegular className="w-3.5 h-3.5 text-teal-600" />
-              <span>ดูแลนักเรียน 9 หน้า</span>
-            </span>
-          </button>
-        </div>
+        ))}
       </div>
 
       {/* Bottom Area: BANNER 1 (Sidebar Banner) + Logout Button */}

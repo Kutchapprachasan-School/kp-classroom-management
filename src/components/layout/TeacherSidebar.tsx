@@ -180,109 +180,129 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     };
   }, []);
 
-  // เมนูหลักของครูตามแบบ Pastel Anime Education Dashboard
-  const menuItems: NavMenuItem[] = [
+  // เมนูหลักของครูจัดหมวดหมู่ตามมาตรฐาน Pastel Anime Education Dashboard
+  const menuCategories: { title: string; items: NavMenuItem[] }[] = [
     {
-      key: 'home',
-      label: 'หน้าหลัก',
-      icon: Home,
+      title: 'ประจำวัน & เช็คชื่อ',
+      items: [
+        {
+          key: 'home',
+          label: 'หน้าหลัก',
+          icon: Home,
+        },
+        {
+          key: 'timetable',
+          label: 'ตารางสอน/วันนี้',
+          icon: Calendar,
+        },
+        {
+          key: 'morning-assembly',
+          label: 'เช็คแถวเช้า',
+          icon: UserCheck,
+          ...(isAssemblyPending
+            ? {
+                badge: '1',
+                badgeStyle: 'bg-rose-500 text-white font-extrabold',
+              }
+            : {}),
+        },
+        {
+          key: 'classroom-attendance',
+          label: 'เช็คชื่อนักเรียน',
+          icon: ClipboardCheck,
+        },
+      ],
     },
     {
-      key: 'timetable',
-      label: 'ตารางสอน/วันนี้',
-      icon: Calendar,
+      title: 'การสอน & วัดผล',
+      items: [
+        {
+          key: 'assignments',
+          label: 'ภาระงาน / สอน',
+          icon: BookOpen,
+          ...(pendingAssignmentsCount > 0
+            ? {
+                badge: String(pendingAssignmentsCount),
+                badgeStyle: 'bg-rose-500 text-white font-extrabold',
+              }
+            : {}),
+        },
+        {
+          key: 'class-overview',
+          label: 'คะแนนนักเรียน (ปพ.5)',
+          icon: Award,
+        },
+        {
+          key: 'sar',
+          label: 'ผลการเรียน SAR',
+          icon: BarChart2,
+        },
+        {
+          key: 'lessons',
+          label: 'แผนการสอน',
+          icon: BookOpen,
+        },
+        {
+          key: 'exams',
+          label: 'จัดการสอบ/เก็บคะแนน',
+          icon: ClipboardList,
+        },
+      ],
     },
     {
-      key: 'morning-assembly',
-      label: 'เช็คแถวเช้า',
-      icon: UserCheck,
-      ...(isAssemblyPending
-        ? {
-            badge: '1',
-            badgeStyle: 'bg-rose-500 text-white font-extrabold',
-          }
-        : {}),
+      title: 'ข้อมูลนักเรียน & ชั้นเรียน',
+      items: [
+        {
+          key: 'classrooms',
+          label: 'ห้องเรียน',
+          icon: Layers,
+        },
+        {
+          key: 'roster',
+          label: 'นักเรียน',
+          icon: Users,
+        },
+        {
+          key: 'courses',
+          label: 'หลักสูตร',
+          icon: BookMarked,
+        },
+        ...(activeRole === 'STUDENT_AFFAIRS'
+          ? [
+              {
+                key: 'student-affairs' as TeacherViewKey,
+                label: 'กิจการนักเรียน',
+                icon: Users,
+              },
+            ]
+          : []),
+      ],
     },
     {
-      key: 'classroom-attendance',
-      label: 'เช็คชื่อนักเรียน',
-      icon: ClipboardCheck,
-    },
-    {
-      key: 'assignments',
-      label: 'ภาระงาน / สอน',
-      icon: BookOpen,
-      ...(pendingAssignmentsCount > 0
-        ? {
-            badge: String(pendingAssignmentsCount),
-            badgeStyle: 'bg-rose-500 text-white font-extrabold',
-          }
-        : {}),
-    },
-    {
-      key: 'class-overview',
-      label: 'คะแนนนักเรียน (ปพ.5)',
-      icon: Award,
-    },
-    {
-      key: 'classrooms',
-      label: 'ห้องเรียน',
-      icon: Layers,
-    },
-    {
-      key: 'roster',
-      label: 'นักเรียน',
-      icon: Users,
-    },
-    {
-      key: 'sar',
-      label: 'ผลการเรียน',
-      icon: BarChart2,
-    },
-    {
-      key: 'courses',
-      label: 'หลักสูตร',
-      icon: BookMarked,
-    },
-    {
-      key: 'lessons',
-      label: 'แผนการสอน',
-      icon: BookOpen,
-    },
-    {
-      key: 'exams',
-      label: 'จัดการสอบ/เก็บคะแนน',
-      icon: ClipboardList,
-    },
-    {
-      key: 'academic-year',
-      label: 'ปฏิทินกิจกรรม',
-      icon: CalendarDays,
-    },
-    {
-      key: 'messages',
-      label: 'ข้อความ & แชท',
-      icon: MessageSquare,
-      ...(unreadMessagesCount > 0
-        ? {
-            badge: String(unreadMessagesCount),
-            badgeStyle: 'bg-blue-500 text-white font-extrabold',
-          }
-        : {}),
-    },
-    ...(activeRole === 'STUDENT_AFFAIRS'
-      ? [
-          {
-            key: 'student-affairs' as TeacherViewKey,
-            label: 'กิจการนักเรียน',
-            icon: Users,
-          },
-        ]
-      : []),
-    {
-      key: 'settings',
-      label: 'ตั้งค่า',
-      icon: Settings,
+      title: 'การสื่อสาร & ระบบ',
+      items: [
+        {
+          key: 'academic-year',
+          label: 'ปฏิทินกิจกรรม',
+          icon: CalendarDays,
+        },
+        {
+          key: 'messages',
+          label: 'ข้อความ & แชท',
+          icon: MessageSquare,
+          ...(unreadMessagesCount > 0
+            ? {
+                badge: String(unreadMessagesCount),
+                badgeStyle: 'bg-blue-500 text-white font-extrabold',
+              }
+            : {}),
+        },
+        {
+          key: 'settings',
+          label: 'ตั้งค่า',
+          icon: Settings,
+        },
+      ],
     },
   ];
 
@@ -331,49 +351,57 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
         )}
       </div>
 
-      {/* 2. Navigation Items & Mascot Banner directly beneath Settings */}
-      <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-1">
-        {menuItems.map((item) => {
-          const IconComp = item.icon;
-          const isActive =
-            currentView === item.key ||
-            (item.key === 'timetable' && currentView === 'timetable') ||
-            (item.key === 'morning-assembly' && currentView === 'morning-assembly') ||
-            (item.key === 'classroom-attendance' && currentView === 'classroom-attendance') ||
-            (item.key === 'settings' &&
-              ['settings', 'accounts', 'trash'].includes(currentView));
+      {/* 2. Navigation Items Grouped by Category & Mascot Banner */}
+      <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-3">
+        {menuCategories.map((cat, catIdx) => (
+          <div key={cat.title} className={catIdx > 0 ? 'pt-2 border-t border-slate-100/80' : ''}>
+            <div className="px-3 pb-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              {cat.title}
+            </div>
+            <div className="space-y-1">
+              {cat.items.map((item) => {
+                const IconComp = item.icon;
+                const isActive =
+                  currentView === item.key ||
+                  (item.key === 'timetable' && currentView === 'timetable') ||
+                  (item.key === 'morning-assembly' && currentView === 'morning-assembly') ||
+                  (item.key === 'classroom-attendance' && currentView === 'classroom-attendance') ||
+                  (item.key === 'settings' &&
+                    ['settings', 'accounts', 'trash'].includes(currentView));
 
-          return (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => handleSelect(item.key)}
-              className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs transition-all cursor-pointer ${
-                isActive
-                  ? 'bg-blue-600 text-white font-bold shadow-xs'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
-              }`}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <IconComp
-                  className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`}
-                />
-                <span className="truncate">{item.label}</span>
-              </div>
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => handleSelect(item.key)}
+                    className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-blue-600 text-white font-bold shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <IconComp
+                        className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`}
+                      />
+                      <span className="truncate">{item.label}</span>
+                    </div>
 
-              {item.badge && (
-                <span
-                  className={`min-w-4 h-4 px-1 rounded-full text-[10px] flex items-center justify-center shrink-0 ${
-                    isActive ? 'bg-white text-blue-600 font-black' : item.badgeStyle
-                  }`}
-                >
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-
+                    {item.badge && (
+                      <span
+                        className={`min-w-4 h-4 px-1 rounded-full text-[10px] flex items-center justify-center shrink-0 ${
+                          isActive ? 'bg-white text-blue-600 font-black' : item.badgeStyle
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
         {/* 3. Mascot Banner placed directly below Settings */}
         <div className="pt-2 px-0.5">
           <div className="relative rounded-2xl overflow-hidden border border-blue-100 shadow-2xs group bg-gradient-to-b from-sky-50 to-blue-50">
