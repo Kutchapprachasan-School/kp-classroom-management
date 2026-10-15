@@ -6,7 +6,7 @@
 //    - โอนย้ายงานที่ทำอยู่ คะแนนสะสม ผลการส่งงาน และประวัติทั้งหมดติดตัวนักเรียนไปด้วย 100%
 
 import { classroomService } from './classroomService.ts';
-import { studentService, type StudentRecord } from './studentService.ts';
+import { studentService, getAlternateRoomKey, type StudentRecord } from './studentService.ts';
 import { coursesCurriculumService } from './coursesCurriculumService.ts';
 import { sgsRosterAndSubmissionService, type StudentWorkSubmission } from './sgsRosterAndSubmissionService.ts';
 import { indexedDbAdapter, type OutboxItem } from '../utils/indexedDbAdapter.ts';
@@ -288,7 +288,32 @@ export const messagingService = {
       lastMessageTime: '',
     });
 
-    // 2. กลุ่มประสานงานครูและบุคลากรทางการศึกษา
+    // 2. กลุ่มข่าวสารและประกาศงานวิชาการ (Academic Affairs Announcements)
+    groups.push({
+      id: 'grp-academic-announcements',
+      name: '📚 ข่าวสารและประกาศงานวิชาการ',
+      type: 'OFFICIAL',
+      typeLabel: 'ประกาศงานวิชาการ',
+      description: 'ช่องทางสื่อสารข้อมูลฝ่ายวิชาการ กำหนดการสอบ ปฏิทินวิชาการ และงานวัดผลการเรียนสำหรับนักเรียนและบุคลากรทุกคน',
+      teacherName: 'ฝ่ายบริหารงานวิชาการ',
+      teacherRoleLabel: 'ผู้ดูแลกลุ่มวิชาการ',
+      autoManaged: true,
+      unreadCount: 0,
+      members: [
+        {
+          id: 'u-academic',
+          code: 'ACADEMIC-01',
+          name: 'ฝ่ายบริหารงานวิชาการ',
+          role: 'TEACHER',
+          joinedAt: 'ต้นภาคเรียน',
+        },
+      ],
+      messages: [],
+      lastMessageText: '',
+      lastMessageTime: '',
+    });
+
+    // 3. กลุ่มประสานงานครูและบุคลากรทางการศึกษา
     groups.push({
       id: 'grp-all-teachers',
       name: '👥 กลุ่มประสานงานครูและบุคลากรทางการศึกษา',
@@ -415,6 +440,32 @@ export const messagingService = {
                 )
             );
             if (!hasLegacyMock) {
+              if (!parsed.some((g) => g.id === 'grp-academic-announcements')) {
+                parsed.splice(1, 0, {
+                  id: 'grp-academic-announcements',
+                  name: '📚 ข่าวสารและประกาศงานวิชาการ',
+                  type: 'OFFICIAL',
+                  typeLabel: 'ประกาศงานวิชาการ',
+                  description: 'ช่องทางสื่อสารข้อมูลฝ่ายวิชาการ กำหนดการสอบ ปฏิทินวิชาการ และงานวัดผลการเรียนสำหรับนักเรียนและบุคลากรทุกคน',
+                  teacherName: 'ฝ่ายบริหารงานวิชาการ',
+                  teacherRoleLabel: 'ผู้ดูแลกลุ่มวิชาการ',
+                  autoManaged: true,
+                  unreadCount: 0,
+                  members: [
+                    {
+                      id: 'u-academic',
+                      code: 'ACADEMIC-01',
+                      name: 'ฝ่ายบริหารงานวิชาการ',
+                      role: 'TEACHER',
+                      joinedAt: 'ต้นภาคเรียน',
+                    },
+                  ],
+                  messages: [],
+                  lastMessageText: '',
+                  lastMessageTime: '',
+                });
+                this.saveGroups(parsed);
+              }
               _inMemoryGroupsCache = parsed;
               return parsed;
             } else {
@@ -442,6 +493,32 @@ export const messagingService = {
           )
       );
       if (!hasLegacyMock) {
+        if (!_inMemoryGroupsCache.some((g) => g.id === 'grp-academic-announcements')) {
+          _inMemoryGroupsCache.splice(1, 0, {
+            id: 'grp-academic-announcements',
+            name: '📚 ข่าวสารและประกาศงานวิชาการ',
+            type: 'OFFICIAL',
+            typeLabel: 'ประกาศงานวิชาการ',
+            description: 'ช่องทางสื่อสารข้อมูลฝ่ายวิชาการ กำหนดการสอบ ปฏิทินวิชาการ และงานวัดผลการเรียนสำหรับนักเรียนและบุคลากรทุกคน',
+            teacherName: 'ฝ่ายบริหารงานวิชาการ',
+            teacherRoleLabel: 'ผู้ดูแลกลุ่มวิชาการ',
+            autoManaged: true,
+            unreadCount: 0,
+            members: [
+              {
+                id: 'u-academic',
+                code: 'ACADEMIC-01',
+                name: 'ฝ่ายบริหารงานวิชาการ',
+                role: 'TEACHER',
+                joinedAt: 'ต้นภาคเรียน',
+              },
+            ],
+            messages: [],
+            lastMessageText: '',
+            lastMessageTime: '',
+          });
+          this.saveGroups(_inMemoryGroupsCache);
+        }
         return _inMemoryGroupsCache;
       }
       _inMemoryGroupsCache = null;
@@ -450,6 +527,120 @@ export const messagingService = {
     const initial = this.generateInitialGroups();
     this.saveGroups(initial);
     return initial;
+  },
+
+  // ดึงรายการกลุ่มแชทเฉพาะที่นักเรียนมีสิทธิ์เข้าถึง (Student Chat Scope Guard)
+  // - กลุ่มห้องประจำชั้น: เฉพาะห้องตนเองเท่านั้น
+  // - กลุ่มรายวิชาเรียน: เฉพาะวิชาของห้องตนเองเท่านั้น
+  // - กลุ่มรวมทั้งโรงเรียน และวิชาการ (OFFICIAL): มองเห็นได้ทุกคน
+  // - กลุ่มแชทห้องอื่นๆ และกลุ่มบุคลากร (DEPARTMENT): ไม่แสดงเด็ดขาด
+  getGroupsForStudent(studentCodeOrId?: string, classroomIdOrName?: string): ChatGroup[] {
+    const allGroups = this.getGroups();
+
+    // 1. ระบุห้องเรียนและรหัสนักเรียน
+    let resolvedClassroomId = classroomIdOrName;
+    let resolvedStudentCode = studentCodeOrId;
+
+    if (resolvedStudentCode && !resolvedClassroomId) {
+      const found = studentService.findStudentByCode(resolvedStudentCode);
+      if (found) {
+        resolvedClassroomId = found.classroomId;
+      }
+    }
+
+    // หากไม่มีห้องเรียนระบุ ให้ดึงจาก AuthUser ปัจจุบันใน LocalStorage
+    if (!resolvedClassroomId && typeof localStorage !== 'undefined') {
+      try {
+        const rawUser = localStorage.getItem('cls_current_auth_user');
+        if (rawUser) {
+          const u = JSON.parse(rawUser);
+          if (u.role === 'STUDENT') {
+            resolvedClassroomId = u.classroomId;
+            if (!resolvedStudentCode) resolvedStudentCode = u.studentCode || u.id;
+          }
+        }
+      } catch {
+        // fallback
+      }
+    }
+
+    // หากยังไม่มี ให้ลองค้นหาห้องแรกที่นักเรียนผู้นี้เป็นสมาชิกในกลุ่มแชท
+    if (!resolvedClassroomId && resolvedStudentCode) {
+      const memberGroup = allGroups.find(
+        (g) =>
+          (g.type === 'HOMEROOM' || g.type === 'COURSE') &&
+          g.members.some((m) => m.code === resolvedStudentCode || m.id === resolvedStudentCode)
+      );
+      if (memberGroup) {
+        resolvedClassroomId = memberGroup.classroomId || memberGroup.classroomName;
+      }
+    }
+
+    // Fallback เป็น room-3-1 หากไม่พบข้อมูลเพื่อความปลอดภัยในโหมดพรีวิว
+    if (!resolvedClassroomId) {
+      resolvedClassroomId = 'room-3-1';
+    }
+
+    // รวบรวมชุดคีย์ระบุห้องเรียนที่ตรงกัน (เช่น 'room-3-1', 'ม.3/1', '3/1')
+    const allowedRoomKeys = new Set<string>();
+    if (resolvedClassroomId) {
+      const cleanKey = resolvedClassroomId.trim();
+      allowedRoomKeys.add(cleanKey);
+
+      const alt = getAlternateRoomKey(cleanKey);
+      if (alt) allowedRoomKeys.add(alt);
+
+      const allCls = classroomService.getClassroomsSync();
+      const matched = allCls.find(
+        (c) => c.id === cleanKey || c.roomNumber === cleanKey || c.name === cleanKey
+      );
+      if (matched) {
+        if (matched.id) allowedRoomKeys.add(matched.id);
+        if (matched.roomNumber) allowedRoomKeys.add(matched.roomNumber);
+        if (matched.name) allowedRoomKeys.add(matched.name);
+      }
+    }
+
+    return allGroups.filter((g) => {
+      // 1. กลุ่มรวมทั้งโรงเรียน และวิชาการ (OFFICIAL) -> นักเรียนทุกคนมองเห็นได้
+      if (g.type === 'OFFICIAL') {
+        return true;
+      }
+
+      // 2. กลุ่มประสานงานบุคลากร/ครู (DEPARTMENT) -> นักเรียนต้องไม่เห็นเด็ดขาด
+      if (g.type === 'DEPARTMENT') {
+        return false;
+      }
+
+      // 3. ตรวจสอบว่านักเรียนอยู่ในสมาชิกกลุ่มนี้หรือไม่
+      const isExplicitMember = Boolean(
+        resolvedStudentCode &&
+        g.members.some(
+          (m) =>
+            m.code === resolvedStudentCode ||
+            m.id === resolvedStudentCode ||
+            (m.role === 'STUDENT' && (m.name.includes(resolvedStudentCode) || m.id.includes(resolvedStudentCode)))
+        )
+      );
+
+      // 4. ตรวจสอบว่ากลุ่มผูกกับห้องประจำชั้นของนักเรียนหรือไม่
+      const isRoomMatch = Boolean(
+        (g.classroomId && allowedRoomKeys.has(g.classroomId)) ||
+        (g.classroomName && allowedRoomKeys.has(g.classroomName))
+      );
+
+      // สำหรับกลุ่มห้องประจำชั้น (HOMEROOM): ต้องเป็นห้องของตนเองเท่านั้น
+      if (g.type === 'HOMEROOM') {
+        return isExplicitMember || isRoomMatch;
+      }
+
+      // สำหรับกลุ่มรายวิชาเรียน (COURSE): ต้องเป็นวิชาของห้องตนเองเท่านั้น
+      if (g.type === 'COURSE') {
+        return isExplicitMember || isRoomMatch;
+      }
+
+      return false;
+    });
   },
 
   // บันทึกรายการกลุ่มแชท (พร้อม Sync Async ลง IndexedDB ป้องกัน LocalStorage เต็ม)

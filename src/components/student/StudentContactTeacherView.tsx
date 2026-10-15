@@ -112,7 +112,7 @@ export const StudentContactTeacherView: React.FC<StudentContactTeacherViewProps>
       {/* Tab 1: Live Classroom & Course Chat */}
       {activeTab === 'CHAT' && (
         <div className="animate-fade-in pt-1">
-          <MessagesView activeRole="STUDENT_GENERAL" embedded={true} />
+          <MessagesView activeRole="STUDENT_GENERAL" embedded={true} currentUser={currentUser} />
         </div>
       )}
 

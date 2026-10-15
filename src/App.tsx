@@ -748,7 +748,7 @@ export const App: React.FC = () => {
               )}
 
               {currentView === 'messages' && (
-                <MessagesView activeRole={activeRole} />
+                <MessagesView activeRole={activeRole} currentUser={currentAuthUser} />
               )}
 
               {currentView === 'settings' && (

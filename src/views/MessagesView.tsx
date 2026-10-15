@@ -6,7 +6,7 @@
 // - งานที่ทำอยู่ คะแนนสะสม และประวัติทุกอย่างติดตัวนักเรียนไปด้วยครบถ้วน 100%
 // - เชื่อมต่อข้อมูลจริงผ่าน messagingService และ LocalStorage ไม่ใช้ Mock Data ปลอม
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   MessageSquare,
   Search,
@@ -32,32 +32,45 @@ import {
   type ChatMember,
 } from '../services/messagingService';
 import { classroomService } from '../services/classroomService';
-import { authService } from '../services/authService';
+import { authService, type AuthUser } from '../services/authService';
 import type { SchoolUserRole } from '../config/schoolRoles';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 
 interface MessagesViewProps {
   activeRole?: SchoolUserRole;
   embedded?: boolean;
+  currentUser?: AuthUser | null;
 }
 
 export const MessagesView: React.FC<MessagesViewProps> = ({
   activeRole = 'TEACHER_GENERAL',
   embedded = false,
+  currentUser: propCurrentUser,
 }) => {
   // ตรวจจับบทบาทของผู้ใช้งานว่าเป็นนักเรียนหรือไม่
-  const currentUser = authService.getCurrentUser();
+  const currentUser = propCurrentUser !== undefined ? propCurrentUser : authService.getCurrentUser();
   const isStudentUser =
     activeRole === 'STUDENT_GENERAL' ||
     activeRole === 'STUDENT_COUNCIL' ||
     currentUser?.role === 'STUDENT';
 
-  // ดึงรายการกลุ่มแชทจริงทั้งหมดจาก messagingService
-  const [groups, setGroups] = useState<ChatGroup[]>(() => messagingService.getGroups());
+  // ฟังก์ชันดึงกลุ่มแชทที่ผู้ใช้มีสิทธิ์เข้าถึง (ป้องกันนักเรียนมองเห็นห้องอื่นหรือกลุ่มฝ่ายบุคลากร)
+  const getVisibleGroups = useCallback((): ChatGroup[] => {
+    if (isStudentUser) {
+      return messagingService.getGroupsForStudent(
+        currentUser?.studentCode || currentUser?.id,
+        currentUser?.classroomId
+      );
+    }
+    return messagingService.getGroups();
+  }, [isStudentUser, currentUser?.studentCode, currentUser?.id, currentUser?.classroomId]);
+
+  // ดึงรายการกลุ่มแชทตามสิทธิ์ผู้ใช้งาน
+  const [groups, setGroups] = useState<ChatGroup[]>(() => getVisibleGroups());
   
-  // เลือกกลุ่มเริ่มต้น (เลือกกลุ่มแรกที่มี)
+  // เลือกกลุ่มเริ่มต้น (เลือกกลุ่มแรกที่มีสิทธิ์เข้าถึง)
   const [selectedGroupId, setSelectedGroupId] = useState<string>(() => {
-    const all = messagingService.getGroups();
+    const all = getVisibleGroups();
     return all[0]?.id || '';
   });
 
@@ -90,7 +103,14 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
   // ซิงค์กลุ่มแชทแบบ Real-time ข้ามแท็บและข้ามอุปกรณ์ (Multi-Tab & Cross-Device Cloud Sync)
   useEffect(() => {
     const handleSync = () => {
-      setGroups(messagingService.getGroups());
+      const updated = getVisibleGroups();
+      setGroups(updated);
+      setSelectedGroupId((prev) => {
+        if (prev && updated.some((g) => g.id === prev)) {
+          return prev;
+        }
+        return updated[0]?.id || '';
+      });
     };
     window.addEventListener(CHAT_GROUPS_EVENT, handleSync);
     window.addEventListener(STUDENT_TRANSFERRED_EVENT, handleSync);
@@ -104,7 +124,19 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
       window.removeEventListener('kps-cloud-key-updated', handleSync);
       window.removeEventListener('kps-cloud-synced', handleSync);
     };
-  }, []);
+  }, [getVisibleGroups]);
+
+  // อัปเดตรายการกลุ่มเมื่อบริบทผู้ใช้เปลี่ยน
+  useEffect(() => {
+    const updated = getVisibleGroups();
+    setGroups(updated);
+    setSelectedGroupId((prev) => {
+      if (prev && updated.some((g) => g.id === prev)) {
+        return prev;
+      }
+      return updated[0]?.id || '';
+    });
+  }, [getVisibleGroups]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -153,7 +185,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
       content: inputText.trim(),
     });
 
-    setGroups(messagingService.getGroups());
+    setGroups(getVisibleGroups());
     setInputText('');
     setIsPlusMenuOpen(false);
   };
@@ -164,7 +196,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
     const currentRole = isStudentUser ? 'STUDENT' : 'TEACHER';
     const reply = messagingService.simulatePartnerReply(currentGroup.id, currentRole);
     if (reply) {
-      setGroups(messagingService.getGroups());
+      setGroups(getVisibleGroups());
       showToast(`ข้อความตอบกลับจาก ${reply.senderName} ส่งเข้ามาแล้ว ✨`);
     }
   };
@@ -275,7 +307,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
       showToast(res.message);
       setIsTransferModalOpen(false);
       setTransferStudent(null);
-      setGroups(messagingService.getGroups());
+      setGroups(getVisibleGroups());
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการย้ายห้องเรียน';
       alert(msg);
@@ -284,8 +316,8 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
 
   // ซิงค์สมาชิกทุกกลุ่มกลับเข้าหาทะเบียนห้องเรียน
   const handleResyncAll = () => {
-    const updated = messagingService.resyncAllGroupMembers();
-    setGroups(updated);
+    messagingService.resyncAllGroupMembers();
+    setGroups(getVisibleGroups());
     showToast('ซิงค์สมาชิกทุกกลุ่มแชทตรงกับทะเบียนห้องเรียนล่าสุดเรียบร้อยแล้ว');
   };
 
@@ -339,17 +371,27 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
             'สร้างสรรค์ชุมชนการเรียนรู้',
           ]}
           actions={
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleResyncAll}
-                className="bg-[#EFF6FF] border border-[#BFDBFE] hover:bg-[#DBEAFE] text-blue-700 rounded-xl px-3.5 py-2 flex items-center gap-2 text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
-                title="ซิงค์สมาชิกกลุ่มแชทให้ตรงกับทะเบียนห้องเรียนล่าสุด"
-              >
-                <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
-                <span>ซิงค์ทะเบียนห้องเรียน</span>
-              </button>
-            </div>
+            !isStudentUser ? (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleResyncAll}
+                  className="bg-[#EFF6FF] border border-[#BFDBFE] hover:bg-[#DBEAFE] text-blue-700 rounded-xl px-3.5 py-2 flex items-center gap-2 text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                  title="ซิงค์สมาชิกกลุ่มแชทให้ตรงกับทะเบียนห้องเรียนล่าสุด"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
+                  <span>ซิงค์ทะเบียนห้องเรียน</span>
+                </button>
+              </div>
+            ) : (
+              currentUser?.classroomId ? (
+                <div className="flex items-center gap-2">
+                  <span className="bg-[#EFF6FF] border border-[#BFDBFE] text-blue-700 rounded-xl px-3.5 py-2 text-xs font-bold shadow-2xs">
+                    🏫 ห้องประจำชั้น: {currentUser.classroomId}
+                  </span>
+                </div>
+              ) : undefined
+            )
           }
         />
       )}
@@ -380,7 +422,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                   : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
               }`}
             >
-              กลุ่มที่ปรึกษา
+              {isStudentUser ? 'ห้องประจำชั้น' : 'กลุ่มที่ปรึกษา'}
             </button>
             <button
               type="button"
@@ -391,7 +433,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                   : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
               }`}
             >
-              กลุ่มประจำวิชา
+              {isStudentUser ? 'รายวิชาเรียน' : 'กลุ่มประจำวิชา'}
             </button>
             <button
               type="button"
@@ -402,7 +444,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                   : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
               }`}
             >
-              ประกาศทางการ
+              {isStudentUser ? 'ประกาศ & วิชาการ' : 'ประกาศทางการ'}
             </button>
           </div>
 
@@ -428,7 +470,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                       <Users className="w-3.5 h-3.5" />
                     </div>
                     <span className="font-bold text-xs sm:text-sm text-[#163A66]">
-                      กลุ่มครูที่ปรึกษา
+                      {isStudentUser ? 'กลุ่มห้องประจำชั้น' : 'กลุ่มครูที่ปรึกษา'}
                     </span>
                   </div>
                   <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -499,7 +541,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                       <BookOpen className="w-3.5 h-3.5" />
                     </div>
                     <span className="font-bold text-xs sm:text-sm text-[#163A66]">
-                      กลุ่มประจำวิชา (Course Groups)
+                      {isStudentUser ? 'กลุ่มรายวิชาเรียน' : 'กลุ่มประจำวิชา (Course Groups)'}
                     </span>
                   </div>
                   <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
@@ -570,7 +612,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                       <Megaphone className="w-3.5 h-3.5" />
                     </div>
                     <span className="font-bold text-xs sm:text-sm text-[#163A66]">
-                      ประกาศทางการ & ส่วนกลาง
+                      {isStudentUser ? 'ประกาศทางการ & งานวิชาการ' : 'ประกาศทางการ & ส่วนกลาง'}
                     </span>
                   </div>
                   <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
@@ -865,17 +907,19 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                     <span>แนบไฟล์เอกสาร / แผนการสอน</span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsPlusMenuOpen(false);
-                      handleResyncAll();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-[#F1F5F9] text-slate-700 transition-colors text-left cursor-pointer"
-                  >
-                    <RefreshCw className="w-4 h-4 text-emerald-600" />
-                    <span>ซิงค์รายชื่อนักเรียนกับทะเบียนห้อง</span>
-                  </button>
+                  {!isStudentUser && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPlusMenuOpen(false);
+                        handleResyncAll();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-[#F1F5F9] text-slate-700 transition-colors text-left cursor-pointer"
+                    >
+                      <RefreshCw className="w-4 h-4 text-emerald-600" />
+                      <span>ซิงค์รายชื่อนักเรียนกับทะเบียนห้อง</span>
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -1031,8 +1075,8 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                         </div>
                       </div>
 
-                      {/* ปุ่มย้ายห้องเรียน (สำหรับนักเรียน) เพื่อทดสอบฟีเจอร์ซิงค์อัตโนมัติ */}
-                      {!isTeacher && currentGroup.classroomId && (
+                      {/* ปุ่มย้ายห้องเรียน (สำหรับคุณครู/แอดมิน เพื่อทดสอบฟีเจอร์ซิงค์อัตโนมัติ) */}
+                      {!isStudentUser && !isTeacher && currentGroup.classroomId && (
                         <button
                           type="button"
                           onClick={() => {
