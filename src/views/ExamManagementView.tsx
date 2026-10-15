@@ -84,8 +84,6 @@ export interface ExtendedExamItem extends ExamItem {
   badgeColor?: string;
 }
 
-export const DEFAULT_MOCKUP_EXAMS: ExtendedExamItem[] = [];
-
 export const ExamManagementView: React.FC = () => {
   // 1. Exams State initialized from localStorage or empty array (Zero Mock Data)
   const [exams, setExams] = useState<ExtendedExamItem[]>(() => {

@@ -26,9 +26,6 @@ import {
 } from '../../config/feedbackStickersCatalog';
 import type { FeedbackStrandId } from '../../config/feedbackStickersCatalog';
 
-// Legacy compatibility export
-export const FEEDBACK_STAMPS = FEEDBACK_STRAND_CATALOG[0].defaultStickers;
-
 interface GradingWorkspaceModalProps {
   isOpen: boolean;
   onClose: () => void;

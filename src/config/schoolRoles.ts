@@ -406,7 +406,7 @@ export const DEFAULT_SMS_USERS: SmsUserAccount[] = [
     passwordOrPin: '123456',
     fullName: 'นายสมชาย ใจดี',
     role: 'ACADEMIC_ADMIN',
-    departmentOrClass: 'ฝ่ายบริหารโรงเรียนคำยางพิทยา',
+    departmentOrClass: 'ฝ่ายบริหารโรงเรียนกุดจับประชาสรรค์',
     positionTitle: 'ผู้อำนวยการโรงเรียน • ผู้บริหารและผู้ดูแลระบบ',
     smsGroup: 'PERSONNEL',
     smsSynced: true,
