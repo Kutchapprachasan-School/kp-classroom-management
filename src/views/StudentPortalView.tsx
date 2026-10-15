@@ -23,6 +23,7 @@ import { StudentGachaView } from './StudentGachaView';
 import { StudentMobileCareView } from '../components/student/StudentMobileCareView';
 import { StudentAnimeAppView } from '../components/student/StudentAnimeAppView';
 import { StudentAffairsCouncilView } from './StudentAffairsCouncilView';
+import { StudentMobileBottomNav } from '../components/student/StudentMobileBottomNav';
 
 import MenuRegular from '@mingcute/react/core-regular/menu';
 import { gamificationService } from '../services/gamificationService';
@@ -154,6 +155,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
           currentUser={effectiveUser}
           studentRole={studentRole}
           activeRole={activeRole}
+          schoolSettings={effectiveSettings}
           onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
           isSidebarOpen={isDesktopSidebarOpen}
           onToggleSidebar={handleToggleSidebar}
@@ -281,6 +283,13 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
           </div>
         </main>
       </div>
+
+      {/* Mobile Bottom Navigation Bar (ตรงตาม Mockup Image media_1792039984527_e4e6c262.png) */}
+      <StudentMobileBottomNav
+        activeTab={activeTab}
+        onSelectTab={(tab) => setActiveTab(tab)}
+        onOpenMoreMenu={() => setIsMobileSidebarOpen(true)}
+      />
 
       {/* Floating Reopen Button if sidebar collapsed on desktop */}
       {!isDesktopSidebarOpen && (
