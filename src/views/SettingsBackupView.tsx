@@ -37,6 +37,7 @@ import {
   UserCheck,
   Layers,
   Settings,
+  Pencil,
 } from 'lucide-react';
 
 import { TeacherMobileSchoolInfoScreen } from '../components/mobile/TeacherMobileSchoolInfoScreen';
@@ -81,6 +82,7 @@ export {
 import {
   academicCalendarService,
   ACADEMIC_CALENDAR_EVENT,
+  type AcademicTermRecord,
   type SpecialHolidayRecord,
   type WeekendMakeupDayRecord,
 } from '../services/academicCalendarService';
@@ -197,6 +199,15 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
     semesterNo: 2 as 1 | 2,
     startDate: '1 พ.ย. 2569',
     endDate: '15 มี.ค. 2570',
+    note: '',
+  });
+
+  const [editingTermId, setEditingTermId] = useState<string | null>(null);
+  const [editTermForm, setEditTermForm] = useState({
+    year: 2569,
+    semesterNo: 1 as 1 | 2,
+    startDate: '',
+    endDate: '',
     note: '',
   });
 
@@ -432,6 +443,57 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
       note: '',
     });
     showToast(`✓ เพิ่ม ${created.termName}/${created.year} สำเร็จเรียบร้อย`);
+  };
+
+  const handleStartEditTerm = (term: AcademicTermRecord) => {
+    setEditingTermId(term.id);
+    setEditTermForm({
+      year: term.year,
+      semesterNo: term.semesterNo,
+      startDate: term.startDate,
+      endDate: term.endDate,
+      note: term.note || '',
+    });
+  };
+
+  const handleSaveEditTerm = (termId: string) => {
+    if (!editTermForm.year || !editTermForm.startDate.trim() || !editTermForm.endDate.trim()) {
+      showToast('⚠️ กรุณากรอกปีการศึกษา วันเริ่มเรียน และวันปิดเรียนให้ครบถ้วน');
+      return;
+    }
+    const updated = academicCalendarService.updateTerm(termId, {
+      year: editTermForm.year,
+      semesterNo: editTermForm.semesterNo,
+      termName: `ภาคเรียนที่ ${editTermForm.semesterNo}`,
+      startDate: editTermForm.startDate.trim(),
+      endDate: editTermForm.endDate.trim(),
+      note: editTermForm.note.trim(),
+    });
+    if (updated) {
+      setCalendarConfig(academicCalendarService.getConfig());
+      setSchoolSettings(getSchoolSettings());
+      setEditingTermId(null);
+      showToast(`✓ บันทึกแก้ไข ${updated.termName}/${updated.year} สำเร็จ`);
+    }
+  };
+
+  const handleDeleteTerm = (term: AcademicTermRecord) => {
+    if (term.isActive) {
+      showToast('⚠️ ไม่สามารถลบภาคเรียนที่กำลังเปิดสอนอยู่ได้');
+      return;
+    }
+    const confirmDelete = window.confirm(
+      `คุณแน่ใจหรือไม่ว่าต้องการลบ ${term.termName} ปีการศึกษา ${term.year}?`
+    );
+    if (!confirmDelete) return;
+
+    const success = academicCalendarService.deleteTerm(term.id);
+    if (success) {
+      setCalendarConfig(academicCalendarService.getConfig());
+      showToast(`✓ ลบ ${term.termName}/${term.year} เรียบร้อยแล้ว`);
+    } else {
+      showToast('❌ ไม่สามารถลบภาคเรียนนี้ได้');
+    }
   };
 
   return (
@@ -1556,6 +1618,29 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                 <span className="text-base font-extrabold text-emerald-700">กำลังเปิดภาคเรียน</span>
               </div>
             </div>
+
+            {/* กำหนดการวันเริ่มเรียน - วันปิดเรียนของภาคเรียนปัจจุบัน */}
+            {activeTerm && (
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                <div>
+                  <span className="font-bold text-slate-700">กำหนดวันเรียน ({activeTerm.termName}/{activeTerm.year}):</span>{' '}
+                  <span className="font-medium text-slate-900">
+                    📅 เริ่ม {activeTerm.startDate} – ปิด {activeTerm.endDate}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveModalKey('timetable');
+                    handleStartEditTerm(activeTerm);
+                  }}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer self-start sm:self-auto"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>แก้ไขวันเริ่มเรียน - วันปิดเรียน</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </SettingsSubModal>
@@ -1900,69 +1985,196 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
             )}
 
             {/* List of Academic Terms */}
-            <div className="space-y-2">
-              {calendarConfig.terms.map((term) => (
-                <div
-                  key={term.id}
-                  className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                    term.isActive
-                      ? 'bg-blue-50/80 border-blue-300 shadow-2xs'
-                      : 'bg-white border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center font-extrabold text-sm shrink-0 ${
-                        term.isActive
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-100 text-slate-600'
-                      }`}
-                    >
-                      {term.semesterNo}/{term.year.toString().slice(-2)}
-                    </div>
-                    <div>
+            <div className="space-y-2.5">
+              {calendarConfig.terms.map((term) =>
+                editingTermId === term.id ? (
+                  <div
+                    key={term.id}
+                    className="p-4 rounded-xl border border-blue-400 bg-blue-50/70 shadow-xs space-y-3 animate-fade-in"
+                  >
+                    <div className="flex items-center justify-between border-b border-blue-200/70 pb-2">
                       <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-xs sm:text-sm text-slate-900">
-                          {term.termName} ปีการศึกษา {term.year}
+                        <Pencil className="w-4 h-4 text-blue-600" />
+                        <span className="font-extrabold text-xs sm:text-sm text-blue-950">
+                          แก้ไขวันเริ่มเรียน - วันปิดเรียน ({term.termName} ปีการศึกษา {term.year})
                         </span>
-                        {term.isActive ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                        {term.isActive && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
                             ภาคเรียนปัจจุบัน
-                          </span>
-                        ) : term.isArchived ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                            จัดเก็บแล้ว
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                            รอดำเนินการ
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-slate-500 font-medium">
-                        📅 {term.startDate} – {term.endDate} • {term.note || 'ไม่มีหมายเหตุ'}
-                      </p>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    {term.isActive ? (
-                      <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
-                        ✓ กำลังใช้งานอยู่
-                      </span>
-                    ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                          ปีการศึกษา (พ.ศ.):
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          min={2560}
+                          max={2600}
+                          value={editTermForm.year}
+                          onChange={(e) => setEditTermForm({ ...editTermForm, year: parseInt(e.target.value, 10) || term.year })}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-bold font-mono bg-white focus:outline-blue-500 shadow-2xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                          ภาคเรียน:
+                        </label>
+                        <select
+                          value={editTermForm.semesterNo}
+                          onChange={(e) => setEditTermForm({ ...editTermForm, semesterNo: (parseInt(e.target.value, 10) === 2 ? 2 : 1) as 1 | 2 })}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-bold bg-white focus:outline-blue-500 shadow-2xs"
+                        >
+                          <option value={1}>ภาคเรียนที่ 1</option>
+                          <option value={2}>ภาคเรียนที่ 2</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                          วันเริ่มเรียน (วันเปิดภาคเรียน):
+                        </label>
+                        <input
+                          type="text"
+                          value={editTermForm.startDate}
+                          onChange={(e) => setEditTermForm({ ...editTermForm, startDate: e.target.value })}
+                          placeholder="เช่น 1 พ.ย. 2569"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold bg-white focus:outline-blue-500 shadow-2xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                          วันปิดเรียน (วันสิ้นสุดภาคเรียน):
+                        </label>
+                        <input
+                          type="text"
+                          value={editTermForm.endDate}
+                          onChange={(e) => setEditTermForm({ ...editTermForm, endDate: e.target.value })}
+                          placeholder="เช่น 15 มี.ค. 2570"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold bg-white focus:outline-blue-500 shadow-2xs"
+                        />
+                      </div>
+                      <div className="sm:col-span-4">
+                        <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                          หมายเหตุภาคเรียน:
+                        </label>
+                        <input
+                          type="text"
+                          value={editTermForm.note}
+                          onChange={(e) => setEditTermForm({ ...editTermForm, note: e.target.value })}
+                          placeholder="เช่น ภาคเรียนที่ 2 ปีการศึกษา 2569"
+                          className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-medium text-slate-800 bg-white focus:outline-blue-500 shadow-2xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-1 border-t border-blue-200/60">
                       <button
                         type="button"
-                        onClick={() => handleSetActiveTerm(term.id)}
-                        className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 hover:border-blue-300 text-xs font-bold shadow-2xs transition-all cursor-pointer"
+                        onClick={() => setEditingTermId(null)}
+                        className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer transition-all"
                       >
-                        ⚡ ตั้งเป็นภาคเรียนปัจจุบัน
+                        ยกเลิก
                       </button>
-                    )}
+                      <button
+                        type="button"
+                        onClick={() => handleSaveEditTerm(term.id)}
+                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-2xs cursor-pointer transition-all"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>💾 บันทึกการแก้ไข</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ) : (
+                  <div
+                    key={term.id}
+                    className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                      term.isActive
+                        ? 'bg-blue-50/80 border-blue-300 shadow-2xs'
+                        : 'bg-white border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center font-extrabold text-sm shrink-0 ${
+                          term.isActive
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {term.semesterNo}/{term.year.toString().slice(-2)}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-extrabold text-xs sm:text-sm text-slate-900">
+                            {term.termName} ปีการศึกษา {term.year}
+                          </span>
+                          {term.isActive ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                              ภาคเรียนปัจจุบัน
+                            </span>
+                          ) : term.isArchived ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                              จัดเก็บแล้ว
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                              รอดำเนินการ
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                          📅 เริ่มเรียน: <span className="font-bold text-slate-800">{term.startDate}</span> – ปิดเรียน: <span className="font-bold text-slate-800">{term.endDate}</span> • {term.note || 'ไม่มีหมายเหตุ'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditTerm(term)}
+                        className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 text-xs font-bold shadow-2xs transition-all cursor-pointer flex items-center gap-1.5"
+                        title="แก้ไขข้อมูลปีการศึกษา ภาคเรียน และวันเรียน"
+                      >
+                        <Pencil className="w-3.5 h-3.5 text-blue-600" />
+                        <span>แก้ไข</span>
+                      </button>
+
+                      {!term.isActive && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTerm(term)}
+                          className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-slate-200 hover:border-rose-200 text-xs font-bold shadow-2xs transition-all cursor-pointer flex items-center gap-1"
+                          title={`ลบ ${term.termName}/${term.year}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>ลบ</span>
+                        </button>
+                      )}
+
+                      {term.isActive ? (
+                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                          ✓ กำลังใช้งานอยู่
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleSetActiveTerm(term.id)}
+                          className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 hover:border-blue-300 text-xs font-bold shadow-2xs transition-all cursor-pointer"
+                        >
+                          ⚡ ตั้งเป็นภาคเรียนปัจจุบัน
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              )}
             </div>
           </div>
 
