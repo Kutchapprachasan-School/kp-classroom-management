@@ -197,20 +197,17 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
       });
     }
 
-    if (allClassrooms && allClassrooms.length > 0) {
-      return allClassrooms.map((c) => ({
-        id: c.id,
-        label: `${c.name || c.roomNumber}${c.adviser?.includes('ปัญจพล') ? ' (ห้องประจำชั้น)' : ''}`,
-      }));
-    }
-
     return [];
   }, [selectedCourse, curriculumCourses, allClassrooms]);
 
   // Keep selected classroom valid when course changes
   useEffect(() => {
-    if (availableClassroomOptions.length > 0 && !availableClassroomOptions.some((r) => r.id === selectedClassroom)) {
-      setSelectedClassroom(availableClassroomOptions[0].id);
+    if (availableClassroomOptions.length > 0) {
+      if (!selectedClassroom || !availableClassroomOptions.some((r) => r.id === selectedClassroom)) {
+        setSelectedClassroom(availableClassroomOptions[0].id);
+      }
+    } else {
+      setSelectedClassroom('');
     }
   }, [availableClassroomOptions, selectedClassroom]);
 
@@ -598,13 +595,18 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
               <select
                 value={selectedClassroom}
                 onChange={(e) => handleClassroomChange(e.target.value)}
-                className="w-full bg-transparent text-xs sm:text-sm font-bold text-slate-900 focus:outline-hidden cursor-pointer truncate"
+                disabled={availableClassroomOptions.length === 0}
+                className="w-full bg-transparent text-xs sm:text-sm font-bold text-slate-900 focus:outline-hidden cursor-pointer truncate disabled:text-slate-400 disabled:cursor-not-allowed"
               >
-                {availableClassroomOptions.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.label}
-                  </option>
-                ))}
+                {availableClassroomOptions.length === 0 ? (
+                  <option value="">(ยังไม่ได้กำหนดห้องเรียน)</option>
+                ) : (
+                  availableClassroomOptions.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.label}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
           </div>
@@ -809,7 +811,31 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
-                  {filteredRecords.length === 0 ? (
+                  {availableClassroomOptions.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-12 px-4 text-center">
+                        <div className="max-w-sm mx-auto flex flex-col items-center justify-center text-center">
+                          <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center mb-3">
+                            <AlertTriangle className="w-7 h-7" />
+                          </div>
+                          <h3 className="text-base font-bold text-slate-800 mb-1">
+                            ยังไม่ได้กำหนดห้องเรียนสำหรับวิชานี้
+                          </h3>
+                          <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                            กรุณากำหนดห้องเรียนที่สอนในเมนู 'หลักสูตร / รายวิชา' ก่อนทำการเช็คชื่อ
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => onDeepNavigate?.({ view: 'settings' })}
+                            className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+                          >
+                            <BookOpen className="w-4 h-4" />
+                            <span>ไปกำหนดห้องเรียนในหลักสูตร</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : filteredRecords.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="py-12 px-4 text-center">
                         <div className="max-w-sm mx-auto flex flex-col items-center justify-center text-center">
@@ -973,7 +999,11 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
 
             {/* Mobile Cards View (แปลงตารางเป็น Card บนมือถือ) */}
             <div className="sm:hidden divide-y divide-slate-100 p-3 space-y-3">
-              {filteredRecords.length === 0 ? (
+              {availableClassroomOptions.length === 0 ? (
+                <div className="text-center py-8 text-xs text-amber-700 font-medium">
+                  ยังไม่ได้กำหนดห้องเรียนสำหรับวิชานี้ (กรุณากำหนดในหลักสูตร)
+                </div>
+              ) : filteredRecords.length === 0 ? (
                 <div className="text-center py-8 text-xs text-slate-500 font-medium">
                   ไม่พบรายชื่อนักเรียนในห้องนี้
                 </div>

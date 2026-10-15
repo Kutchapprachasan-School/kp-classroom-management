@@ -243,11 +243,8 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
   // Handlers for Course CRUD
   const handleOpenAddCourse = () => {
     const defaultLevel = 'ม.3';
-    const defaultRooms = allClassrooms
-      .filter((c) => c.name.startsWith('ม.3'))
-      .map((c) => c.name);
-    const initialRooms = defaultRooms.length > 0 ? defaultRooms.slice(0, 2) : ['ม.3/1', 'ม.3/2'];
-    const { periodsPerRoom } = calculatePeriodsPerWeek(1.5, initialRooms.length);
+    const initialRooms: string[] = [];
+    const { periodsPerRoom } = calculatePeriodsPerWeek(1.5, 1);
     let defaultTerm = '1';
     let defaultYear = '2569';
     if (termFilter !== 'ALL' && termFilter.includes('/')) {
@@ -1053,7 +1050,11 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
                   <label className="font-bold text-slate-700 block mb-1">ระดับชั้น:</label>
                   <select
                     value={courseForm.level}
-                    onChange={(e) => setCourseForm({ ...courseForm, level: e.target.value })}
+                    onChange={(e) => {
+                      const nextLevel = e.target.value;
+                      setCourseForm({ ...courseForm, level: nextLevel });
+                      setRoomFilterTab(nextLevel);
+                    }}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 font-semibold focus:border-blue-500 focus:outline-none"
                   >
                     <option value="ม.1">มัธยมศึกษาปีที่ 1</option>

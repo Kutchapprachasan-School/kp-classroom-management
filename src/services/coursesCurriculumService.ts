@@ -92,8 +92,25 @@ class CoursesCurriculumService {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
-          this.cache = JSON.parse(raw);
-          return this.cache!;
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            // Auto-heal any courses that have leftover default 'ม.3/1' or 'ม.3/2' when their level is different (e.g. ม.1)
+            let modified = false;
+            parsed.forEach((c: CourseCurriculumRecord) => {
+              if (c.level && c.level !== 'ม.3' && Array.isArray(c.assignedClassrooms) && c.assignedClassrooms.length > 1) {
+                const levelMatching = c.assignedClassrooms.filter((r) => r.startsWith(c.level));
+                if (levelMatching.length > 0 && levelMatching.length < c.assignedClassrooms.length) {
+                  c.assignedClassrooms = levelMatching;
+                  modified = true;
+                }
+              }
+            });
+            this.cache = parsed;
+            if (modified) {
+              this.save();
+            }
+            return this.cache!;
+          }
         }
       } catch {
         // ignore

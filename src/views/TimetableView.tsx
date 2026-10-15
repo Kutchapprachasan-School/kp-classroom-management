@@ -23,7 +23,6 @@ import {
   ChevronRight,
   X,
   BarChart2,
-  ChevronDown,
   Download,
   Upload,
   ArrowRightLeft,
@@ -42,6 +41,10 @@ import {
   type SchoolBellScheduleConfig,
 } from '../services/bellScheduleService';
 import { coursesCurriculumService } from '../services/coursesCurriculumService';
+import { cleanSlateService } from '../services/cleanSlateService';
+import { teacherCourseAssignmentService } from '../services/teacherCourseAssignmentService';
+import { studentService } from '../services/studentService';
+import { classroomService } from '../services/classroomService';
 
 import {
   type TimetableColorTheme,
@@ -51,6 +54,7 @@ import {
   type WeekDayInfo,
   type ComputedWeekInfo,
   computeWeekInfo,
+  getBangkokDayName,
   PERIOD_DEFINITIONS,
   INITIAL_MATRIX_SLOTS,
 } from '../utils/timetableDateUtils';
@@ -87,6 +91,9 @@ const loadSavedMatrixSlots = (): TimetableMatrixSlot[] => {
     } catch {
       // ignore
     }
+  }
+  if (cleanSlateService.isCleanSlateActive()) {
+    return [];
   }
   return coursesCurriculumService.sanitizeMatrixSlotsWithCurriculum(INITIAL_MATRIX_SLOTS);
 };
@@ -196,45 +203,69 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
     Array<{ no: number; name: string; leaveReason: string; chosenStatus: string }>
   >([]);
 
-  // Student Roll-Call State inside Modal
-  const studentsList = [
-    { no: 1, code: '45101', name: 'ด.ช. กฤษณะ ศรีสมบูรณ์' },
-    { no: 2, code: '45102', name: 'ด.ช. ทัตธน คำฝั้น' },
-    { no: 3, code: '45105', name: 'ด.ญ. กมลชนก เลิศวิไล' },
-    { no: 4, code: '45109', name: 'ด.ช. ณัฐวุฒิ สายทอง' },
-    { no: 5, code: '45112', name: 'ด.ญ. พิมพ์ชนก วงศ์สวัสดิ์' },
-    { no: 6, code: '45115', name: 'ด.ช. อัศวิน วนเกษตรกุล' },
-    { no: 7, code: '45118', name: 'ด.ญ. อคิราห์ วิรากร' },
-  ];
-
-  const buildInitialAttendance = (): Record<number, 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE'> => {
-    const initial: Record<number, 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE'> = {};
-    for (const stu of studentsList) {
-      const morning = studentAffairsCouncilService.getMorningStatusForStudent(stu.name, stu.code);
-      initial[stu.no] = morning.hasApprovedLeave ? 'LEAVE' : 'PRESENT';
+  // Dynamic Student Roll-Call State inside Modal from studentService
+  const studentsList = useMemo(() => {
+    if (!selectedSlot?.room) return [];
+    const cleanRoom = selectedSlot.room.split('•')[0].replace(/ห้อง/g, '').trim();
+    const allRooms = classroomService.getClassroomsSync();
+    const matched = allRooms.find(
+      (r) => r.name === cleanRoom || r.roomNumber === cleanRoom || r.id === cleanRoom
+    );
+    const roomId = matched?.id || (cleanRoom ? `room-${cleanRoom.replace(/[^0-9-]/g, '')}` : '');
+    const loaded = studentService.getStudents(roomId);
+    if (loaded && loaded.length > 0) {
+      return loaded.map((s, idx) => ({
+        no: s.no || idx + 1,
+        code: s.code,
+        name: s.name,
+      }));
     }
-    return initial;
-  };
+    return [];
+  }, [selectedSlot]);
 
   const [attendanceRecords, setAttendanceRecords] = useState<
     Record<number, 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE'>
-  >(buildInitialAttendance);
+  >({});
+
+  useEffect(() => {
+    if (studentsList.length > 0) {
+      const initial: Record<number, 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE'> = {};
+      for (const stu of studentsList) {
+        const morning = studentAffairsCouncilService.getMorningStatusForStudent(stu.name, stu.code);
+        initial[stu.no] = morning.hasApprovedLeave ? 'LEAVE' : 'PRESENT';
+      }
+      setAttendanceRecords(initial);
+    } else {
+      setAttendanceRecords({});
+    }
+  }, [studentsList]);
 
   void onDeepNavigate;
 
   const weekInfo = useMemo(() => computeWeekInfo(weekOffset), [weekOffset]);
 
-  const todayDayKey = 'พฤหัสบดี';
-  const todaySlots = useMemo(() => {
-    return matrixSlots.filter((s) => s.day === todayDayKey && !s.isFreePeriod && s.subjectCode);
-  }, [matrixSlots]);
+  const todayDayKey = getBangkokDayName();
+  const todayTeachingSlots = useMemo(() => {
+    return matrixSlots.filter(
+      (s) => s.day === todayDayKey && !s.isFreePeriod && !s.isLunchSlot && s.subjectCode && s.subjectCode.trim() !== ''
+    );
+  }, [matrixSlots, todayDayKey]);
 
-  const todayTotalPeriods = 6;
+  const todayTotalPeriods = todayTeachingSlots.length;
   const todayCheckedCount = useMemo(() => {
-    return todaySlots.filter((s) => s.status === 'CHECKED' || s.isConducted).length;
-  }, [todaySlots]);
+    return todayTeachingSlots.filter((s) => s.status === 'CHECKED' || s.isConducted).length;
+  }, [todayTeachingSlots]);
   const todayUncheckedCount = Math.max(0, todayTotalPeriods - todayCheckedCount);
-  const pendingAssignmentsCount = 8;
+  const checkedPercent = todayTotalPeriods > 0 ? Math.round((todayCheckedCount / todayTotalPeriods) * 100) : 0;
+  const uncheckedPercent = todayTotalPeriods > 0 ? Math.round((todayUncheckedCount / todayTotalPeriods) * 100) : 0;
+
+  const pendingAssignmentsCount = useMemo(() => {
+    try {
+      return teacherCourseAssignmentService.getGradingQueue().filter((q) => q.status === 'PENDING_REVIEW').length;
+    } catch {
+      return 0;
+    }
+  }, []);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -382,7 +413,6 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
     if (slot.isFreePeriod || slot.category === 'free' || slot.status === 'LUNCH') {
       return;
     }
-    setAttendanceRecords(buildInitialAttendance());
     setOverrideConfirmConflicts([]);
     setSelectedSlot(slot);
   };
@@ -595,7 +625,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
             </div>
           </div>
           <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-emerald-100 text-emerald-700 flex items-center gap-0.5">
-            50% <ChevronDown className="w-3 h-3 stroke-[3]" />
+            {checkedPercent}%
           </span>
         </div>
 
@@ -612,7 +642,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
             </div>
           </div>
           <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-rose-100 text-rose-700 flex items-center gap-0.5">
-            50% <ChevronRight className="w-3 h-3 stroke-[3]" />
+            {uncheckedPercent}%
           </span>
         </div>
 
@@ -947,17 +977,17 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                     เวลา / วัน
                   </th>
                   {weekInfo.days.map((dayObj) => {
-                    const isThursday = dayObj.key === 'พฤหัสบดี';
+                    const isToday = dayObj.key === todayDayKey;
                     return (
                       <th
                         key={dayObj.key}
                         className={`py-3 px-2 min-w-[130px] ${
-                          isThursday ? 'bg-blue-50/40 text-blue-900 font-black' : 'text-slate-700 font-bold'
+                          isToday ? 'bg-blue-50/40 text-blue-900 font-black' : 'text-slate-700 font-bold'
                         }`}
                       >
                         <div className="flex flex-col items-center">
                           <span>{dayObj.key}</span>
-                          {isThursday && (
+                          {isToday && (
                             <span className="text-[10px] bg-blue-600 text-white px-2 py-0.2 rounded-full font-bold mt-0.5">
                               วันนี้
                             </span>
@@ -996,8 +1026,8 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                         /* Mon - Fri Period Slots */
                         weekInfo.days.map((dayObj) => {
                           const slot = getSlot(dayObj.key, periodDef.period);
-                          const isThursday = dayObj.key === 'พฤหัสบดี';
-                          const colBg = isThursday ? 'bg-blue-50/20' : '';
+                          const isToday = dayObj.key === todayDayKey;
+                          const colBg = isToday ? 'bg-blue-50/20' : '';
 
                           if (!slot || slot.isFreePeriod || !slot.subjectCode) {
                             return (
@@ -1326,45 +1356,51 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
 
             {/* Students List with Status Radio */}
             <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-              {studentsList.map((stu) => {
-                const currentStatus = attendanceRecords[stu.no] || 'PRESENT';
-                return (
-                  <div
-                    key={stu.no}
-                    className="p-2.5 rounded-2xl border border-slate-100 bg-slate-50/50 flex items-center justify-between text-xs"
-                  >
-                    <div>
-                      <span className="font-bold text-slate-900">{stu.no}. {stu.name}</span>
-                      <span className="text-slate-400 text-[11px] ml-1.5">({stu.code})</span>
-                    </div>
+              {studentsList.length === 0 ? (
+                <div className="text-center py-6 text-xs text-slate-500 font-medium">
+                  ยังไม่มีรายชื่อนักเรียนในห้องนี้ (สามารถเพิ่มนักเรียนได้ที่เมนู 'นักเรียน')
+                </div>
+              ) : (
+                studentsList.map((stu) => {
+                  const currentStatus = attendanceRecords[stu.no] || 'PRESENT';
+                  return (
+                    <div
+                      key={stu.no}
+                      className="p-2.5 rounded-2xl border border-slate-100 bg-slate-50/50 flex items-center justify-between text-xs"
+                    >
+                      <div>
+                        <span className="font-bold text-slate-900">{stu.no}. {stu.name}</span>
+                        <span className="text-slate-400 text-[11px] ml-1.5">({stu.code})</span>
+                      </div>
 
-                    <div className="flex items-center gap-1 font-bold text-[11px]">
-                      {(['PRESENT', 'LATE', 'LEAVE', 'ABSENT'] as const).map((st) => (
-                        <button
-                          key={st}
-                          type="button"
-                          onClick={() =>
-                            setAttendanceRecords((prev) => ({ ...prev, [stu.no]: st }))
-                          }
-                          className={`px-2 py-0.5 rounded-lg transition-colors cursor-pointer ${
-                            currentStatus === st
-                              ? st === 'PRESENT'
-                                ? 'bg-emerald-600 text-white'
-                                : st === 'LATE'
-                                ? 'bg-amber-500 text-white'
-                                : st === 'LEAVE'
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-rose-600 text-white'
-                              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-                          }`}
-                        >
-                          {st === 'PRESENT' ? 'มา' : st === 'LATE' ? 'สาย' : st === 'LEAVE' ? 'ลา' : 'ขาด'}
-                        </button>
-                      ))}
+                      <div className="flex items-center gap-1 font-bold text-[11px]">
+                        {(['PRESENT', 'LATE', 'LEAVE', 'ABSENT'] as const).map((st) => (
+                          <button
+                            key={st}
+                            type="button"
+                            onClick={() =>
+                              setAttendanceRecords((prev) => ({ ...prev, [stu.no]: st }))
+                            }
+                            className={`px-2 py-0.5 rounded-lg transition-colors cursor-pointer ${
+                              currentStatus === st
+                                ? st === 'PRESENT'
+                                  ? 'bg-emerald-600 text-white'
+                                  : st === 'LATE'
+                                  ? 'bg-amber-500 text-white'
+                                  : st === 'LEAVE'
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-rose-600 text-white'
+                                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            {st === 'PRESENT' ? 'มา' : st === 'LATE' ? 'สาย' : st === 'LEAVE' ? 'ลา' : 'ขาด'}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
 
             {/* Action Save Button */}
