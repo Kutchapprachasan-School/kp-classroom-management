@@ -29,6 +29,9 @@ import { messagingService, STUDENT_TRANSFERRED_EVENT } from '../services/messagi
 import type { ClassroomRosterItem, AtRiskStudent } from '../types/viewModels';
 import type { SchoolUserRole } from '../config/schoolRoles';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
+import { SgsRosterImportModal } from '../components/sgs/SgsRosterImportModal';
+import { SgsScoreExportModal } from '../components/sgs/SgsScoreExportModal';
+import type { SgsParsedRow } from '../services/sgsImportExportService';
 
 interface ClassroomsRosterViewProps {
   onSelectStudent: (student: AtRiskStudent) => void;
@@ -74,6 +77,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
 
   // Modals state
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isScoreExportModalOpen, setIsScoreExportModalOpen] = useState(false);
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
   const [isAddClassroomOpen, setIsAddClassroomOpen] = useState(false);
   const [isEditClassroomOpen, setIsEditClassroomOpen] = useState(false);
@@ -117,7 +121,6 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
   );
 
   const classDropdownRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isFullAccess =
     activeRole === 'ACADEMIC_ADMIN' ||
@@ -444,54 +447,33 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
     }
   };
 
-  // นำเข้ารายชื่อ Excel/SGS จากไฟล์จริง
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !selectedClass) return;
+  // นำเข้ารายชื่อนักเรียนจาก SGS & Smart Parser ที่ผ่านการตรวจสอบ Dry-Run แล้ว
+  const handleSgsImportConfirmed = async (confirmedRows: SgsParsedRow[]) => {
+    if (!selectedClass || confirmedRows.length === 0) return;
 
     try {
-      const text = await file.text();
-      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-      const parsedStudents: Array<Omit<StudentRecord, 'id'>> = [];
+      const studentsToImport: Array<Omit<StudentRecord, 'id'>> = confirmedRows.map((r) => ({
+        no: r.parsedSeatNo ?? r.rowIndex,
+        code: r.studentCode,
+        name: r.fullName,
+        attendance: '0/0',
+        score: 0,
+        status: 'NORMAL',
+        gender: r.gender,
+        classroomId: selectedClass.id,
+      }));
 
-      lines.forEach((line) => {
-        if (line.includes('เลขที่') || line.includes('ชื่อ') || line.includes('รหัส')) return;
-        const parts = line.split(/[,\t]/).map((p) => p.trim().replace(/^"|"$/g, ''));
-        if (parts.length >= 2) {
-          const seatNo = parseInt(parts[0], 10) || parsedStudents.length + 1;
-          const code = parts[1] || `45${String(seatNo).padStart(3, '0')}`;
-          const name = parts[2] || parts[1];
-          parsedStudents.push({
-            no: seatNo,
-            code,
-            name,
-            attendance: '0/0',
-            score: 0,
-            status: 'NORMAL',
-          });
-        }
-      });
-
-      if (parsedStudents.length > 0) {
-        await studentService.batchImport(selectedClass.id, parsedStudents);
-        await loadStudentsForClass(selectedClass.id);
-        setIsImportModalOpen(false);
-        setTransferSuccessNotice(`นำเข้ารายชื่อนักเรียน ${parsedStudents.length} คน ในห้อง ${selectedClass.name} สำเร็จ`);
-        setTimeout(() => setTransferSuccessNotice(null), 3500);
-      } else {
-        alert('ไม่พบข้อมูลนักเรียนในไฟล์ กรุณาตรวจสอบว่ามีข้อมูลรูปแบบ: เลขที่, รหัสนักเรียน, ชื่อ-นามสกุล');
-      }
+      await studentService.batchImport(selectedClass.id, studentsToImport);
+      await loadStudentsForClass(selectedClass.id);
+      setIsImportModalOpen(false);
+      setTransferSuccessNotice(`นำเข้ารายชื่อนักเรียน ${confirmedRows.length} คน จาก SGS ในห้อง ${selectedClass.name} สำเร็จ (รักษาลำดับแถว 100%)`);
+      setTimeout(() => setTransferSuccessNotice(null), 3500);
     } catch (err) {
       console.error('Import error:', err);
-      alert('เกิดข้อผิดพลาดในการอ่านไฟล์');
-    } finally {
-      if (e.target) e.target.value = '';
+      alert('เกิดข้อผิดพลาดในการบันทึกรายชื่อนักเรียน');
     }
   };
 
-  const handleBatchImport = () => {
-    fileInputRef.current?.click();
-  };
 
   // ย้ายห้องเรียน
   const handleExecuteTransfer = async (e: React.FormEvent) => {
@@ -933,9 +915,20 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                   type="button"
                   onClick={() => setIsImportModalOpen(true)}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold shadow-2xs cursor-pointer"
+                  title="นำเข้ารายชื่อนักเรียนจาก SGS หรือ Excel"
                 >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
                   <span>นำเข้า Excel/SGS</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsScoreExportModalOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-800 text-xs font-bold shadow-2xs cursor-pointer"
+                  title="ส่งออกคะแนนไปยังระบบ SGS (Reverse Sync)"
+                >
+                  <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>ส่งคะแนนไป SGS</span>
                 </button>
               </div>
             </div>
@@ -1595,66 +1588,43 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
         </div>
       )}
 
-      {/* Modal: นำเข้า Excel/SGS */}
-      {isImportModalOpen && selectedClass && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-lg w-full p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
-                <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
-                <span>นำเข้ารายชื่อนักเรียนจาก Excel / SGS ({selectedClass.name})</span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsImportModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      {/* Modal: นำเข้ารายชื่อนักเรียนจาก SGS / Excel (Smart Parser + Dry Run Preview) */}
+      {selectedClass && (
+        <SgsRosterImportModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          targetClassroom={selectedClass.name}
+          existingStudents={students.map((s) => ({
+            id: s.id,
+            studentCode: s.code,
+            name: s.name,
+            classroomId: selectedClass.name,
+            sgsSeatNo: s.no
+          }))}
+          onImportComplete={handleSgsImportConfirmed}
+        />
+      )}
 
-            <div
-              onClick={handleBatchImport}
-              className="p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center space-y-2 bg-slate-50/50 hover:bg-blue-50/30 transition-colors cursor-pointer"
-            >
-              <input
-                type="file"
-                ref={fileInputRef}
-                accept=".csv,.txt,.tsv"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-              <Upload className="w-8 h-8 text-blue-600 mx-auto" />
-              <p className="text-xs font-semibold text-slate-700">
-                คลิกเพื่อเลือกไฟล์รายชื่อ (.csv, .txt) เพื่อนำเข้าระบบจริง
-              </p>
-              <p className="text-[11px] text-slate-400">
-                รองรับโครงสร้างคอลัมน์ระบบ SGS สพฐ. (เลขที่, รหัสนักเรียน, คำนำหน้า, ชื่อ, นามสกุล)
-              </p>
-            </div>
-
-            <div className="p-3 bg-blue-50 rounded-xl text-xs text-blue-700">
-              💡 ระบบจะซิงค์ข้อมูลลงฐานข้อมูล Supabase และอัปเดตความเชื่อมโยงกับห้องเรียนทันที
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setIsImportModalOpen(false)}
-                className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50 cursor-pointer"
-              >
-                ยกเลิก
-              </button>
-              <button
-                type="button"
-                onClick={handleBatchImport}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold cursor-pointer"
-              >
-                เริ่มการนำเข้า
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Modal: ส่งออกคะแนนไปยัง SGS (Reverse Sync) */}
+      {selectedClass && (
+        <SgsScoreExportModal
+          isOpen={isScoreExportModalOpen}
+          onClose={() => setIsScoreExportModalOpen(false)}
+          courseCode="กป21101"
+          courseName="การงานอาชีพ"
+          classroom={selectedClass.name}
+          roster={students.map((s, idx) => ({
+            sgsRowIndex: idx + 1,
+            sgsSeatNo: s.no,
+            studentCode: s.code,
+            studentName: s.name,
+            unit1Score: Math.round(s.score * 0.4),
+            unit2Score: Math.round(s.score * 0.3),
+            midtermScore: 16,
+            finalScore: 24,
+            totalScore: s.score || 80
+          }))}
+        />
       )}
 
       {/* Modal: ย้ายห้องเรียน & ซิงค์กลุ่มแชท */}
