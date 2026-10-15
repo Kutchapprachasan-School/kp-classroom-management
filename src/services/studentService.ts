@@ -22,33 +22,77 @@ const STORAGE_PREFIX = 'cls_students_';
 
 export const defaultStudents: StudentRecord[] = [];
 
-
 export const mockStudentsByRoom: Record<string, StudentRecord[]> = {};
 
 const inMemoryStudentCache: Record<string, StudentRecord[]> = {};
 
+export function getAlternateRoomKey(classroomId: string): string | null {
+  if (!classroomId) return null;
+  const trimmed = classroomId.trim();
+  const matchRoom = trimmed.match(/^room-(\d+)-(\d+)$/);
+  if (matchRoom) {
+    return `ม.${matchRoom[1]}/${matchRoom[2]}`;
+  }
+  const matchThai = trimmed.match(/^ม\.?\s*(\d+)\/(\d+)$/);
+  if (matchThai) {
+    return `room-${matchThai[1]}-${matchThai[2]}`;
+  }
+  return null;
+}
+
 const getLocalStudents = (classroomId: string): StudentRecord[] => {
+  if (!classroomId) return [];
   if (typeof localStorage !== 'undefined') {
     const raw = localStorage.getItem(`${STORAGE_PREFIX}${classroomId}`);
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch {
         // fallback
       }
     }
+    const altKey = getAlternateRoomKey(classroomId);
+    if (altKey) {
+      const altRaw = localStorage.getItem(`${STORAGE_PREFIX}${altKey}`);
+      if (altRaw) {
+        try {
+          const parsed = JSON.parse(altRaw);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch {
+          // fallback
+        }
+      }
+    }
   }
-  if (inMemoryStudentCache[classroomId]) {
+  if (inMemoryStudentCache[classroomId] && inMemoryStudentCache[classroomId].length > 0) {
     return inMemoryStudentCache[classroomId];
+  }
+  const alt = getAlternateRoomKey(classroomId);
+  if (alt && inMemoryStudentCache[alt] && inMemoryStudentCache[alt].length > 0) {
+    return inMemoryStudentCache[alt];
   }
   return [];
 };
 
 const saveLocalStudents = (classroomId: string, items: StudentRecord[]) => {
+  if (!classroomId) return;
   inMemoryStudentCache[classroomId] = items;
+  const altKey = getAlternateRoomKey(classroomId);
+  if (altKey) {
+    inMemoryStudentCache[altKey] = items;
+  }
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(`${STORAGE_PREFIX}${classroomId}`, JSON.stringify(items));
+    if (altKey) {
+      localStorage.setItem(`${STORAGE_PREFIX}${altKey}`, JSON.stringify(items));
+    }
+    try {
+      window.dispatchEvent(new CustomEvent('kps-students-updated', { detail: { classroomId } }));
+      window.dispatchEvent(new CustomEvent('kps-data-sync-event', { detail: { type: 'students', classroomId } }));
+    } catch {
+      // ignore
+    }
   }
 };
 
@@ -102,6 +146,11 @@ export const studentService = {
 
   getStudentsByClassroom(classroomId: string): StudentRecord[] {
     return getLocalStudents(classroomId);
+  },
+
+  // ดึงจำนวนนักเรียนในห้องเรียน
+  countStudents(classroomId: string): number {
+    return getLocalStudents(classroomId).length;
   },
 
   // ค้นหานักเรียนและห้องเรียนปัจจุบันจากรหัส

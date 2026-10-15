@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase.ts';
 import type { ClassroomRosterItem } from '../types/viewModels';
 import { ClassroomCreateSchema, type ClassroomCreateInput } from './types.ts';
+import { studentService } from './studentService.ts';
 
 const STORAGE_KEY = 'cls_classrooms_data';
 const DELETED_ROOMS_KEY = 'cls_deleted_classrooms_set';
@@ -55,9 +56,21 @@ export const getLocalClassrooms = (): ClassroomRosterItem[] => {
     .filter((c) => !deletedSet.has(c.id) && !deletedSet.has(c.name))
     .map((c) => {
       const advisers = c.advisers || [c.adviser, c.coAdviser, c.thirdAdviser].filter(Boolean) as string[];
+      let studentCount = c.studentCount || 0;
+      try {
+        const byId = studentService.getStudents(c.id).length;
+        const byName = studentService.getStudents(c.name).length;
+        const realCount = Math.max(byId, byName);
+        if (realCount > 0 || typeof localStorage !== 'undefined') {
+          studentCount = realCount;
+        }
+      } catch {
+        // ignore
+      }
       return {
         ...c,
         advisers,
+        studentCount,
       };
     });
 };
@@ -162,6 +175,17 @@ export const classroomService = {
               const coAdviser = item.co_adviser || item.coAdviser || undefined;
               const thirdAdviser = item.third_adviser || item.thirdAdviser || undefined;
               const advisers = [adviser, coAdviser, thirdAdviser].filter(Boolean) as string[];
+              let studentCount = Number(item.student_count || 0);
+              try {
+                const byId = studentService.getStudents(item.id).length;
+                const byName = studentService.getStudents(item.name).length;
+                const realCount = Math.max(byId, byName);
+                if (realCount > 0 || typeof localStorage !== 'undefined') {
+                  studentCount = realCount;
+                }
+              } catch {
+                // ignore
+              }
               return {
                 id: item.id,
                 name: item.name,
@@ -171,7 +195,7 @@ export const classroomService = {
                 coAdviser,
                 thirdAdviser,
                 advisers,
-                studentCount: Number(item.student_count || 0),
+                studentCount,
               };
             });
           saveLocalClassrooms(mapped);
@@ -198,6 +222,14 @@ export const classroomService = {
               const coAdviser = item.coAdviser || undefined;
               const thirdAdviser = item.thirdAdviser || undefined;
               const advisers = [adviser, coAdviser, thirdAdviser].filter(Boolean) as string[];
+              let studentCount = 0;
+              try {
+                const byId = studentService.getStudents(item.id).length;
+                const byName = studentService.getStudents(item.name).length;
+                studentCount = Math.max(byId, byName);
+              } catch {
+                // ignore
+              }
               return {
                 id: item.id,
                 name: item.name,
@@ -207,7 +239,7 @@ export const classroomService = {
                 coAdviser,
                 thirdAdviser,
                 advisers,
-                studentCount: 0,
+                studentCount,
               };
             });
           saveLocalClassrooms(mapped);

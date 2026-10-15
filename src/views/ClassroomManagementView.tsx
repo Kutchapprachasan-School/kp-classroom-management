@@ -25,6 +25,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { classroomService, type TeacherAccountItem } from '../services/classroomService';
+import { studentService } from '../services/studentService';
 import type { ClassroomRosterItem } from '../types/viewModels';
 import type { SchoolUserRole } from '../config/schoolRoles';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
@@ -115,8 +116,32 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
     }
   };
 
+  // Helper to obtain actual enrolled student count for a room
+  const getRoomStudentCount = (room: ClassroomRosterItem): number => {
+    try {
+      const byId = studentService.getStudents(room.id);
+      if (byId && byId.length > 0) return byId.length;
+      const byName = studentService.getStudents(room.name);
+      if (byName && byName.length > 0) return byName.length;
+    } catch {
+      // ignore
+    }
+    return room.studentCount || 0;
+  };
+
   useEffect(() => {
     loadData();
+    const handleStudentsUpdated = () => {
+      loadData();
+    };
+    window.addEventListener('kps-students-updated', handleStudentsUpdated);
+    window.addEventListener('kps-data-sync-event', handleStudentsUpdated);
+    window.addEventListener('storage', handleStudentsUpdated);
+    return () => {
+      window.removeEventListener('kps-students-updated', handleStudentsUpdated);
+      window.removeEventListener('kps-data-sync-event', handleStudentsUpdated);
+      window.removeEventListener('storage', handleStudentsUpdated);
+    };
   }, []);
 
   // Filtered teacher accounts for select dropdown
@@ -133,7 +158,7 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
 
   // Statistics
   const totalStudents = useMemo(() => {
-    return classrooms.reduce((acc, c) => acc + (c.studentCount || 0), 0);
+    return classrooms.reduce((acc, c) => acc + getRoomStudentCount(c), 0);
   }, [classrooms]);
 
   const assignedAdvisersCount = useMemo(() => {
@@ -293,7 +318,7 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
       `"${c.adviser || ''}"`,
       `"${c.coAdviser || ''}"`,
       `"${c.thirdAdviser || ''}"`,
-      c.studentCount || 0,
+      getRoomStudentCount(c),
     ]);
 
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
@@ -718,7 +743,7 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
                       {/* 5. จำนวนนักเรียน */}
                       <td className="py-3.5 px-4 text-center">
                         <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-bold text-xs">
-                          {room.studentCount || 0} คน
+                          {getRoomStudentCount(room)} คน
                         </span>
                       </td>
 
@@ -796,7 +821,7 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
                         {theme.shortLabel}
                       </span>
                       <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-xs">
-                        {room.studentCount || 0} คน
+                        {getRoomStudentCount(room)} คน
                       </span>
                     </div>
                   </div>

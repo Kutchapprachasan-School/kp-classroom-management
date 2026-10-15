@@ -6,9 +6,6 @@ import {
   ChevronDown,
   ChevronRight,
   Edit3,
-  Users,
-  CheckCircle2,
-  AlertTriangle,
   FileText,
   FileSpreadsheet,
   Video,
@@ -27,9 +24,6 @@ import {
 } from 'lucide-react';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 import { coursesCurriculumService, type CourseCurriculumRecord } from '../services/coursesCurriculumService';
-import { classroomService } from '../services/classroomService';
-import { studentService } from '../services/studentService';
-import { attendanceCorrelationService } from '../services/attendanceCorrelationService';
 
 // ==========================================
 // DATA TYPES
@@ -60,7 +54,7 @@ export interface UnitPlanItem {
   indicatorsSummary: string;
   courseCode: string;
   courseName: string;
-  classroom: string;
+  classroom?: string;
   objectives: string[];
   evaluations: EvaluationItem[];
   files: {
@@ -91,7 +85,6 @@ export interface UnitPlanItem {
 export interface CourseFilterOption {
   code: string;
   name: string;
-  classroom: string;
   semester: string;
 }
 
@@ -107,7 +100,6 @@ export const LessonPlansView: React.FC = () => {
         return curriculum.map((c: CourseCurriculumRecord) => ({
           code: c.code,
           name: c.name,
-          classroom: c.assignedClassrooms?.[0] || 'ม.3/1',
           semester: `ภาคเรียนที่ ${c.term}/${c.academicYear}`,
         }));
       }
@@ -116,70 +108,9 @@ export const LessonPlansView: React.FC = () => {
   });
   const [selectedCourseIndex, setSelectedCourseIndex] = useState(0);
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
-  const [classroomsList, setClassroomsList] = useState<string[]>([]);
-  const [selectedClassroom, setSelectedClassroom] = useState('');
-  const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
   const [selectedSemester, setSelectedSemester] = useState('ภาคเรียนที่ 1/2569');
   const [isSemesterDropdownOpen, setIsSemesterDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Real classroom statistics
-  const [classStudentCount, setClassStudentCount] = useState(0);
-  const [classAttendanceRate, setClassAttendanceRate] = useState(0);
-  const [classAbsentCount, setClassAbsentCount] = useState(0);
-  const [classLeaveCount, setClassLeaveCount] = useState(0);
-
-  // Load classrooms dynamically from classroomService
-  useEffect(() => {
-    let mounted = true;
-    classroomService.getAll().then((rooms) => {
-      if (!mounted) return;
-      const names = rooms.map((r) => r.name || r.roomNumber).filter(Boolean);
-      setClassroomsList(names);
-      if (names.length > 0) {
-        setSelectedClassroom((prev) => (prev && names.includes(prev) ? prev : names[0]));
-      } else {
-        setSelectedClassroom('');
-      }
-    }).catch(() => {});
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  // Sync real classroom statistics from studentService and attendanceCorrelationService
-  useEffect(() => {
-    if (!selectedClassroom) {
-      setClassStudentCount(0);
-      setClassAttendanceRate(0);
-      setClassAbsentCount(0);
-      setClassLeaveCount(0);
-      return;
-    }
-    let mounted = true;
-    studentService.getByClassroom(selectedClassroom).then((stus) => {
-      if (!mounted) return;
-      setClassStudentCount(stus.length);
-    }).catch(() => {});
-
-    try {
-      const stats = attendanceCorrelationService.getClassroomCumulativeStats(selectedClassroom);
-      if (mounted) {
-        setClassAttendanceRate(stats.overallAttendanceRate || 0);
-        setClassAbsentCount(stats.totalAbsentDays || 0);
-        setClassLeaveCount(stats.totalLeaveDays || 0);
-      }
-    } catch {
-      if (mounted) {
-        setClassAttendanceRate(0);
-        setClassAbsentCount(0);
-        setClassLeaveCount(0);
-      }
-    }
-    return () => {
-      mounted = false;
-    };
-  }, [selectedClassroom]);
 
   const LESSON_PLANS_STORAGE_KEY = 'cls_lesson_plans_v1';
 
@@ -222,7 +153,6 @@ export const LessonPlansView: React.FC = () => {
   const [isViewAllModalOpen, setIsViewAllModalOpen] = useState(false);
   const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [isClassStatsModalOpen, setIsClassStatsModalOpen] = useState(false);
   const [isRelatedFilesModalOpen, setIsRelatedFilesModalOpen] = useState(false);
 
   // Forms State for Create Modal
@@ -255,7 +185,6 @@ export const LessonPlansView: React.FC = () => {
   const currentCourse = courses[selectedCourseIndex] || courses[0] || {
     code: 'ยังไม่มีรายวิชา',
     name: 'สร้างรายวิชาใหม่ในหลักสูตร',
-    classroom: '-',
     semester: selectedSemester,
   };
 
@@ -355,7 +284,7 @@ export const LessonPlansView: React.FC = () => {
       indicatorsSummary: '1.1 ตัวชี้วัด',
       courseCode: currentCourse.code,
       courseName: currentCourse.name,
-      classroom: selectedClassroom,
+      classroom: '',
       objectives: [
         `1. เข้าใจเนื้อหาและคำศัพท์ประจำหน่วยที่ ${newUnitNumber} ได้อย่างถูกต้อง`,
         '2. สามารถนำไปประยุกต์ใช้ในการสื่อสารได้',
@@ -487,46 +416,7 @@ export const LessonPlansView: React.FC = () => {
               )}
             </div>
 
-            {/* Dropdown 2: ห้องเรียน */}
-            <div className="relative">
-              <div className="text-[10px] text-slate-400 font-semibold px-1 mb-0.5">ห้องเรียน</div>
-              <button
-                type="button"
-                onClick={() => setIsClassDropdownOpen((prev) => !prev)}
-                className="flex items-center justify-between gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 min-w-[95px] transition-all cursor-pointer"
-              >
-                <span>{selectedClassroom || (classroomsList.length > 0 ? classroomsList[0] : 'ยังไม่มีห้องเรียน')}</span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
-              </button>
-
-              {isClassDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1.5 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-30 py-1.5 animate-fade-in">
-                  {classroomsList.length === 0 ? (
-                    <div className="px-3.5 py-2 text-xs text-slate-400">
-                      ยังไม่ได้สร้างห้องเรียนในระบบ
-                    </div>
-                  ) : (
-                    classroomsList.map((rm) => (
-                      <button
-                        key={rm}
-                        type="button"
-                        onClick={() => {
-                          setSelectedClassroom(rm);
-                          setIsClassDropdownOpen(false);
-                        }}
-                        className={`w-full text-left px-3.5 py-2 text-xs font-semibold hover:bg-blue-50 ${
-                          selectedClassroom === rm ? 'text-blue-600 bg-blue-50/60 font-bold' : 'text-slate-700'
-                        }`}
-                      >
-                        {rm}
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Dropdown 3: ภาคเรียน */}
+            {/* Dropdown 2: ภาคเรียน */}
             <div className="relative">
               <div className="text-[10px] text-slate-400 font-semibold px-1 mb-0.5">ภาคเรียน</div>
               <button
@@ -618,7 +508,7 @@ export const LessonPlansView: React.FC = () => {
               : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
-          📊 ข้อมูลห้อง & สื่อ
+          📁 สื่อและเครื่องมือ
         </button>
       </div>
 
@@ -814,8 +704,8 @@ export const LessonPlansView: React.FC = () => {
                     <div className="font-bold text-slate-800 mt-0.5">{currentUnit.courseName}</div>
                   </div>
                   <div>
-                    <span className="text-slate-400 font-medium">ห้องเรียน:</span>
-                    <div className="font-bold text-slate-800 mt-0.5">{currentUnit.classroom}</div>
+                    <span className="text-slate-400 font-medium">ภาคเรียน:</span>
+                    <div className="font-bold text-slate-800 mt-0.5">{selectedSemester}</div>
                   </div>
                   <div>
                     <span className="text-slate-400 font-medium">หน่วยที่:</span>
@@ -1070,83 +960,46 @@ export const LessonPlansView: React.FC = () => {
             mobileTab === 'widgets' ? 'block' : 'hidden lg:block'
           }`}
         >
-          {/* Widget 1: จัดการห้องเรียน (Matching Mockup 100%) */}
+          {/* Widget 1: สรุปภาพรวมรายวิชา */}
           <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs">
             <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
-              <h3 className="text-xs sm:text-sm font-bold text-slate-900">จัดการห้องเรียน</h3>
-              <button
-                type="button"
-                onClick={() => setIsClassStatsModalOpen(true)}
-                className="text-[11px] font-semibold text-blue-600 hover:underline cursor-pointer"
-              >
-                ดูข้อมูลห้องทั้งหมด &gt;
-              </button>
+              <h3 className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-blue-600" />
+                <span>ภาพรวมรายวิชา</span>
+              </h3>
+              <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200">
+                {currentCourse.code}
+              </span>
             </div>
 
-            {/* Room Selector Dropdown */}
-            <div className="mt-2.5 mb-3">
-              <button
-                type="button"
-                onClick={() => setIsClassDropdownOpen((prev) => !prev)}
-                className="w-full flex items-center justify-between px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 cursor-pointer"
-              >
-                <span>{selectedClassroom || (classroomsList.length > 0 ? classroomsList[0] : 'ยังไม่มีห้องเรียน')}</span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
-              </button>
-            </div>
+            <div className="mt-3 space-y-2 text-xs">
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="text-[10px] font-bold text-slate-500 mb-0.5">ชื่อรายวิชา</div>
+                <div className="font-extrabold text-slate-900">{currentCourse.name}</div>
+              </div>
 
-            {/* ข้อมูลรวมห้อง */}
-            <div className="text-xs">
-              <div className="text-[11px] font-bold text-slate-500 mb-2">ข้อมูลรวมห้อง</div>
-              <div className="space-y-2 font-medium">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <Users className="w-4 h-4 text-blue-500" />
-                    <span>นักเรียนทั้งหมด</span>
+              <div className="grid grid-cols-2 gap-2 font-medium">
+                <div className="p-2.5 rounded-xl bg-blue-50/60 border border-blue-100">
+                  <span className="text-slate-500 text-[11px]">หน่วยการเรียนรู้</span>
+                  <div className="text-base font-extrabold text-blue-700 mt-0.5">
+                    {units.length} หน่วย
                   </div>
-                  <span className="font-extrabold text-slate-900">
-                    {classStudentCount > 0 ? `${classStudentCount} คน` : '0 คน'}
-                  </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                    <span>เข้าเรียนเฉลี่ย</span>
+                <div className="p-2.5 rounded-xl bg-purple-50/60 border border-purple-100">
+                  <span className="text-slate-500 text-[11px]">เวลาเรียนรวม</span>
+                  <div className="text-base font-extrabold text-purple-700 mt-0.5">
+                    {units.reduce((acc, u) => acc + (u.periods || 0), 0)} คาบ
                   </div>
-                  <span className="font-extrabold text-emerald-600">
-                    {classAttendanceRate > 0 ? `${classAttendanceRate.toFixed(1)}%` : '0%'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <AlertTriangle className="w-4 h-4 text-amber-500" />
-                    <span>ขาดเรียน</span>
-                  </div>
-                  <span className="font-extrabold text-amber-600">
-                    {classAbsentCount} คน
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <FileText className="w-4 h-4 text-rose-500" />
-                    <span>ลากิจ/ลาป่วย</span>
-                  </div>
-                  <span className="font-extrabold text-rose-600">
-                    {classLeaveCount} คน
-                  </span>
                 </div>
               </div>
-            </div>
 
-            {/* Action: ดูสถิติรายชั้น */}
-            <button
-              type="button"
-              onClick={() => setIsClassStatsModalOpen(true)}
-              className="mt-4 w-full py-2.5 rounded-xl bg-blue-50/80 hover:bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center gap-2 border border-blue-200/80 transition-all cursor-pointer"
-            >
-              <Users className="w-3.5 h-3.5" />
-              <span>ดูสถิติรายชั้น</span>
-            </button>
+              <div className="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-100 flex items-center justify-between">
+                <span className="text-emerald-800 font-semibold text-[11px]">หน่วยที่ดำเนินการแล้ว</span>
+                <span className="text-xs font-black text-emerald-700">
+                  {units.filter((u) => u.status === 'DONE').length} / {units.length} หน่วย
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Widget 2: ไฟล์และสื่อที่เกี่ยวข้อง (Matching Mockup 100%) */}
@@ -1682,7 +1535,7 @@ export const LessonPlansView: React.FC = () => {
                   <span>ภาพรวมแผนการสอนรายวิชา {currentCourse.code} ({units.length} หน่วย)</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  ห้อง {selectedClassroom} • {selectedSemester}
+                  {currentCourse.name} • {selectedSemester}
                 </p>
               </div>
               <button
@@ -1860,63 +1713,7 @@ export const LessonPlansView: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL 8: ดูสถิติรายชั้น */}
-      {isClassStatsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-2xs p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-scale-up">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Users className="w-5 h-5 text-blue-600" />
-                <span>สถิติชั้นเรียน ห้อง {selectedClassroom}</span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsClassStatsModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
-              <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-xl">
-                <span className="text-slate-500 font-medium">นักเรียนทั้งหมด</span>
-                <div className="text-lg font-extrabold text-blue-700 mt-1">
-                  {classStudentCount > 0 ? `${classStudentCount} คน` : '0 คน'}
-                </div>
-              </div>
-              <div className="p-3 bg-emerald-50/70 border border-emerald-100 rounded-xl">
-                <span className="text-slate-500 font-medium">เข้าเรียนเฉลี่ย</span>
-                <div className="text-lg font-extrabold text-emerald-700 mt-1">
-                  {classAttendanceRate > 0 ? `${classAttendanceRate.toFixed(1)}%` : '0%'}
-                </div>
-              </div>
-              <div className="p-3 bg-amber-50/70 border border-amber-100 rounded-xl">
-                <span className="text-slate-500 font-medium">ขาดเรียนสะสม</span>
-                <div className="text-lg font-extrabold text-amber-700 mt-1">
-                  {classAbsentCount} คน
-                </div>
-              </div>
-              <div className="p-3 bg-rose-50/70 border border-rose-100 rounded-xl">
-                <span className="text-slate-500 font-medium">ลากิจ/ลาป่วย</span>
-                <div className="text-lg font-extrabold text-rose-700 mt-1">
-                  {classLeaveCount} คน
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 flex items-center justify-end pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setIsClassStatsModalOpen(false)}
-                className="px-5 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold"
-              >
-                ปิด
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* MODAL 9: ดูไฟล์และสื่อทั้งหมด */}
       {isRelatedFilesModalOpen && (
