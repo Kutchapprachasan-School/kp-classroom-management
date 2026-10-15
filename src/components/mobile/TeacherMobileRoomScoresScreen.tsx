@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ArrowLeft,
   ChevronDown,
@@ -9,6 +9,8 @@ import {
   Users,
 } from 'lucide-react';
 import type { TeacherViewKey } from '../layout/TeacherSidebar';
+import { getLocalClassrooms } from '../../services/classroomService';
+import { academicCalendarService } from '../../services/academicCalendarService';
 
 interface SubjectRoomScore {
   code: string;
@@ -40,6 +42,26 @@ export const TeacherMobileRoomScoresScreen: React.FC<TeacherMobileRoomScoresScre
 
   const roomOptions = ['ม.3/1', 'ม.3/2', 'ม.1/1', 'ม.6/1'];
   const termOptions = ['ภาคเรียนที่ 1/2569', 'ภาคเรียนที่ 2/2568'];
+
+  const availableRooms = useMemo(() => {
+    try {
+      const loaded = getLocalClassrooms();
+      const names = loaded.map((r) => r.name || r.roomNumber).filter(Boolean);
+      return Array.from(new Set([...roomOptions, ...names]));
+    } catch {
+      return roomOptions;
+    }
+  }, []);
+
+  const availableTerms = useMemo(() => {
+    try {
+      const loaded = academicCalendarService.getTerms();
+      const names = loaded.map((t) => `${t.termName}/${t.year}`).filter(Boolean);
+      return Array.from(new Set([...termOptions, ...names]));
+    } catch {
+      return termOptions;
+    }
+  }, []);
 
   const subjectScores: SubjectRoomScore[] = [
     {
@@ -161,7 +183,7 @@ export const TeacherMobileRoomScoresScreen: React.FC<TeacherMobileRoomScoresScre
 
           {isRoomDropdownOpen && (
             <div className="absolute left-0 mt-1.5 w-36 bg-white border border-slate-100 rounded-xl shadow-lg p-1 space-y-0.5 z-30 animate-in fade-in zoom-in-95">
-              {roomOptions.map((room) => (
+              {availableRooms.map((room) => (
                 <button
                   key={room}
                   type="button"
@@ -199,7 +221,7 @@ export const TeacherMobileRoomScoresScreen: React.FC<TeacherMobileRoomScoresScre
 
           {isTermDropdownOpen && (
             <div className="absolute right-0 mt-1.5 w-44 bg-white border border-slate-100 rounded-xl shadow-lg p-1 space-y-0.5 z-30 animate-in fade-in zoom-in-95">
-              {termOptions.map((term) => (
+              {availableTerms.map((term) => (
                 <button
                   key={term}
                   type="button"

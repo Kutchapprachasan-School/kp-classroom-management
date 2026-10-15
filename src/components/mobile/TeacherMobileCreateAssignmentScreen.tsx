@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ArrowLeft,
   ChevronDown,
@@ -9,6 +9,8 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import type { TeacherViewKey } from '../layout/TeacherSidebar';
+import { getLocalClassrooms } from '../../services/classroomService';
+import { assignmentService } from '../../services/assignmentService';
 
 interface TeacherMobileCreateAssignmentScreenProps {
   onBack?: () => void;
@@ -29,10 +31,31 @@ export const TeacherMobileCreateAssignmentScreen: React.FC<
   const [selectedRoom, setSelectedRoom] = useState('ม.3/1');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  const handleAssign = () => {
+  const classrooms = useMemo(() => {
+    try {
+      const list = getLocalClassrooms();
+      const names = list.map((c) => c.name || c.roomNumber).filter(Boolean);
+      return Array.from(new Set(['ม.3/1', 'ม.3/2', 'ม.6/1', 'ม.1/1', ...names]));
+    } catch {
+      return ['ม.3/1', 'ม.3/2', 'ม.6/1', 'ม.1/1'];
+    }
+  }, []);
+
+  const handleAssign = async () => {
     if (!title.trim()) {
       alert('กรุณาระบุหัวข้องาน');
       return;
+    }
+    try {
+      await assignmentService.create(selectedRoom, {
+        title,
+        category: assignmentType === 'QUIZ' ? 'แบบทดสอบ' : assignmentType === 'HOMEWORK' ? 'การบ้าน' : 'ใบงาน',
+        sgsUnit: selectedUnit,
+        maxScore: 20,
+        dueDate,
+      });
+    } catch (err) {
+      console.warn('Persist assignment notice:', err);
     }
     setToastMsg('✓ มอบหมายงานใหม่เรียบร้อยแล้ว!');
     setTimeout(() => {
@@ -206,10 +229,11 @@ export const TeacherMobileCreateAssignmentScreen: React.FC<
               onChange={(e) => setSelectedRoom(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
             >
-              <option value="ม.3/1">ม.3/1</option>
-              <option value="ม.3/2">ม.3/2</option>
-              <option value="ม.6/1">ม.6/1</option>
-              <option value="ม.1/1">ม.1/1</option>
+              {classrooms.map((room) => (
+                <option key={room} value={room}>
+                  {room}
+                </option>
+              ))}
             </select>
             <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>

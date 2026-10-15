@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ArrowLeft,
   Search,
@@ -94,9 +94,41 @@ export const TeacherMobileGradingListScreen: React.FC<
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState<'ALL' | 'PENDING' | 'DONE'>('ALL');
 
-  const sourceItems = cleanSlateService.isCleanSlateActive() ? [] : INITIAL_MOBILE_ASSIGNMENTS;
+  const dynamicItems: MobileGradingAssignmentItem[] = useMemo(() => {
+    if (typeof localStorage === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem('cls_assignments_data');
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.map((a: any) => ({
+        id: a.id,
+        classroom: a.classroomId || 'ม.3/1',
+        subjectCode: a.subjectCode || 'ญ31201',
+        subjectName: a.subjectName || 'ภาษาญี่ปุ่น',
+        unitTitle: a.title || 'ใบงานใหม่',
+        status: 'PENDING' as const,
+        statusLabel: 'ยังไม่ตรวจ',
+        statusClass: 'text-rose-500 bg-rose-50 border-rose-200',
+        submittedCount: a.submittedCount ?? 0,
+        totalCount: a.totalStudents ?? 20,
+        iconBgClass: 'bg-blue-100 text-blue-700',
+        iconSymbol: 'あ',
+      }));
+    } catch {
+      return [];
+    }
+  }, []);
 
-  const filteredItems = sourceItems.filter((item) => {
+  const sourceItems = useMemo(() => {
+    if (cleanSlateService.isCleanSlateActive()) return [];
+    const map = new Map<string, MobileGradingAssignmentItem>();
+    INITIAL_MOBILE_ASSIGNMENTS.forEach((item) => map.set(item.id, item));
+    dynamicItems.forEach((item) => map.set(item.id, item));
+    return Array.from(map.values());
+  }, [dynamicItems]);
+
+  const filteredItems = sourceItems.filter((item: MobileGradingAssignmentItem) => {
     const matchesFilter =
       filterTab === 'ALL' ||
       (filterTab === 'PENDING' && item.status === 'PENDING') ||
@@ -208,7 +240,7 @@ export const TeacherMobileGradingListScreen: React.FC<
             ยังไม่มีรายการตรวจงานในขณะนี้
           </div>
         ) : (
-          filteredItems.map((item) => (
+          filteredItems.map((item: MobileGradingAssignmentItem) => (
             <div
               key={item.id}
               onClick={() => handleCardClick(item)}

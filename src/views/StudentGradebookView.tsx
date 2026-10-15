@@ -239,7 +239,7 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
         finalScore: 90,
         totalScore: 89.0,
         grade: 4,
-        teacherName: 'ครูปัญจพล แสงทอง',
+        teacherName: 'ครูปัญจพล เกษรัตน์',
         teacherDepartment: 'กลุ่มสาระฯ ศิลปะ',
         teacherAvatar: '👨‍🏫',
         evalScore: 4.75,
