@@ -1,13 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   ArrowLeft,
   School,
   FileEdit,
   X,
   Check,
+  Upload,
+  RefreshCw,
+  Link2,
+  MapPin,
+  Building2,
 } from 'lucide-react';
 import type { TeacherViewKey } from '../layout/TeacherSidebar';
-import { getSchoolSettings, saveSchoolSettings } from '../../config/schoolRoles';
+import {
+  getSchoolSettings,
+  saveSchoolSettings,
+  saveSchoolSettingsAsync,
+  DEFAULT_KUTCHAP_LOGO_SVG,
+} from '../../config/schoolRoles';
+import { compressSchoolLogoImage } from '../../utils/imageCompressor';
 
 interface TeacherMobileSchoolInfoScreenProps {
   onNavigate: (view: TeacherViewKey) => void;
@@ -20,127 +31,279 @@ export const TeacherMobileSchoolInfoScreen: React.FC<TeacherMobileSchoolInfoScre
 }) => {
   const [schoolSettings, setSchoolSettings] = useState(() => getSchoolSettings());
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [showSavedToast, setShowSavedToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('บันทึกข้อมูลโรงเรียนสำเร็จแล้ว');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [editFormData, setEditFormData] = useState({
     nameTh: schoolSettings.nameTh || 'โรงเรียนคำยางพิทยา',
+    shortName: schoolSettings.shortName || schoolSettings.shortCode || 'คำยางพิทยา',
     districtProvince: schoolSettings.districtProvince || 'ต.ผาสุก อ.วังสามหมอ จ.อุดรธานี',
-    size: 'ขนาดกลาง',
-    studentCount: '190',
-    staffCount: '17',
-    locationDetail: 'ใกล้จุดชายแดน จ.กาฬสินธุ์ และ จ.สกลนคร',
-    communityContext: 'ปัญหายาเสพติดในชุมชน (อดีตและปัจจุบัน)',
+    affiliation: schoolSettings.affiliation || 'สำนักงานเขตพื้นที่การศึกษาประถมศึกษาอุดรธานี เขต 1',
   });
-  const [showSavedToast, setShowSavedToast] = useState(false);
 
-  const handleSave = () => {
-    saveSchoolSettings({
-      ...schoolSettings,
-      nameTh: editFormData.nameTh,
-      districtProvince: editFormData.districtProvince,
-    });
-    setSchoolSettings(getSchoolSettings());
-    setIsEditModalOpen(false);
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
     setShowSavedToast(true);
     setTimeout(() => setShowSavedToast(false), 3000);
   };
 
-  return (
-    <div className="w-full max-w-md mx-auto space-y-5 pb-24 font-sans select-none text-slate-800">
-      {/* 1. TOP HEADER */}
-      <div className="flex items-center gap-3 pt-1 pb-1">
-        <button
-          type="button"
-          onClick={() => {
-            if (onBack) onBack();
-            else onNavigate('mobile-more');
-          }}
-          className="w-8 h-8 rounded-full bg-white border border-slate-200/80 flex items-center justify-center text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
-          aria-label="ย้อนกลับ"
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </button>
-        <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-          ข้อมูลโรงเรียน
-        </h1>
-      </div>
+  const handleSave = async () => {
+    const updated = {
+      ...schoolSettings,
+      nameTh: editFormData.nameTh,
+      shortName: editFormData.shortName,
+      shortCode: editFormData.shortName,
+      districtProvince: editFormData.districtProvince,
+      affiliation: editFormData.affiliation,
+    };
+    saveSchoolSettings(updated);
+    await saveSchoolSettingsAsync(updated);
+    setSchoolSettings(getSchoolSettings());
+    setIsEditModalOpen(false);
+    showToast('✓ บันทึกข้อมูลโรงเรียนสำเร็จแล้ว');
+  };
 
-      {/* 2. SCHOOL EMBLEM & IDENTITY HERO */}
-      <div className="flex flex-col items-center text-center pt-2 pb-1 space-y-2">
-        <div className="w-20 h-20 rounded-2xl bg-white border border-slate-200/80 p-2 shadow-sm flex items-center justify-center">
-          <img
-            src={schoolSettings.logoUrl || '/images/teacher/school_logo.png'}
-            alt="ตราสัญลักษณ์โรงเรียน"
-            className="w-full h-full object-contain"
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).src = '/images/teacher/school_logo.png';
-            }}
-          />
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      showToast('⏳ กำลังประมวลผลและบันทึกตราสัญลักษณ์...');
+      let finalDataUrl = '';
+      const isSvg = file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg');
+      if (isSvg) {
+        finalDataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error('ไม่สามารถอ่านไฟล์ SVG ได้'));
+          reader.readAsDataURL(file);
+        });
+      } else {
+        const compressed = await compressSchoolLogoImage(file);
+        finalDataUrl = compressed.dataUrl;
+      }
+
+      if (finalDataUrl) {
+        const updated = { ...schoolSettings, logoUrl: finalDataUrl };
+        saveSchoolSettings(updated);
+        await saveSchoolSettingsAsync({ logoUrl: finalDataUrl });
+        setSchoolSettings(getSchoolSettings());
+        showToast('✓ บันทึกตราโรงเรียนสำเร็จแล้ว');
+      }
+    } catch (err) {
+      console.error('Logo upload error:', err);
+      showToast('❌ ไม่สามารถอัปโหลดตราโรงเรียนได้');
+    } finally {
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleResetLogo = async () => {
+    const updated = { ...schoolSettings, logoUrl: DEFAULT_KUTCHAP_LOGO_SVG };
+    saveSchoolSettings(updated);
+    await saveSchoolSettingsAsync({ logoUrl: DEFAULT_KUTCHAP_LOGO_SVG });
+    setSchoolSettings(getSchoolSettings());
+    showToast('🔄 คืนค่าตราโรงเรียนมาตรฐานเรียบร้อย');
+  };
+
+  return (
+    <div className="w-full max-w-md mx-auto space-y-4 pb-28 font-sans select-none text-slate-800">
+      {/* 1. TOP NAVIGATION BACK LINK (ตรงตามรูป Mockup ด้านขวา: <- กลับไปหน้ารวมการตั้งค่า) */}
+      <button
+        type="button"
+        onClick={() => {
+          if (onBack) onBack();
+          else onNavigate('settings');
+        }}
+        className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors cursor-pointer py-1 hover:underline"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        <span>กลับไปหน้ารวมการตั้งค่า</span>
+      </button>
+
+      {/* 2. SECTION HEADER & SUPABASE BADGE */}
+      <div className="flex items-start gap-3">
+        <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 p-2.5 shadow-2xs">
+          <School className="w-6 h-6 stroke-[2.2]" />
         </div>
-        <div>
-          <h2 className="text-lg font-black text-slate-900 tracking-tight">
-            {editFormData.nameTh}
-          </h2>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">
-            {editFormData.districtProvince}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-xl font-black text-[#163A66] tracking-tight">
+              ข้อมูลโรงเรียนและอัตลักษณ์
+            </h1>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-300">
+              <Link2 className="w-3 h-3" />
+              <span>Supabase Linked</span>
+            </span>
+          </div>
+          <p className="text-xs text-[#6B7C93] font-medium mt-1 leading-snug">
+            จัดการข้อมูลโรงเรียน ตราสัญลักษณ์ และข้อมูลพื้นฐานทางการศึกษา
           </p>
         </div>
       </div>
 
-      {/* 3. INFO TABLE / METRICS CARD */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
-        <div className="divide-y divide-slate-100 text-xs">
-          {/* Row 1: ขนาดโรงเรียน */}
-          <div className="flex items-center justify-between p-3.5 hover:bg-slate-50/50 transition-colors">
-            <span className="font-semibold text-slate-500">ขนาดโรงเรียน</span>
-            <span className="font-bold text-slate-900">{editFormData.size}</span>
+      {/* 3. CARD 1: ตราสัญลักษณ์โรงเรียน (ตรงตามรูป Mockup) */}
+      <div className="space-y-2 pt-1">
+        <h2 className="text-base font-black text-[#163A66]">
+          ตราสัญลักษณ์โรงเรียน
+        </h2>
+        <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs space-y-3">
+          <div className="border border-blue-100 bg-blue-50/20 rounded-2xl p-3.5 flex items-center gap-3.5">
+            {/* Preview Box */}
+            <div className="w-24 h-24 sm:w-28 sm:h-28 bg-white border border-slate-200/80 rounded-2xl p-2 flex items-center justify-center shrink-0 shadow-2xs">
+              <img
+                src={schoolSettings.logoUrl || DEFAULT_KUTCHAP_LOGO_SVG}
+                alt="ตัวอย่างตราโรงเรียน"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = DEFAULT_KUTCHAP_LOGO_SVG;
+                }}
+              />
+            </div>
+
+            {/* Controls */}
+            <div className="flex-1 min-w-0 space-y-2">
+              <div>
+                <h4 className="text-xs font-bold text-slate-800">
+                  ตัวอย่างตราโรงเรียน
+                </h4>
+                <p className="text-[11px] text-slate-400 font-medium leading-tight whitespace-pre-line mt-1">
+                  ไฟล์ที่แนะนำ: PNG (พื้นหลังโปร่งใส){'\n'}
+                  ขนาดไม่เกิน 2 MB
+                </p>
+              </div>
+
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                onChange={handleLogoUpload}
+                className="hidden"
+              />
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>อัปโหลดตราโรงเรียน</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResetLogo}
+                className="w-full py-1.5 px-3 rounded-xl bg-white hover:bg-blue-50/50 active:scale-98 text-blue-700 border border-blue-200 font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>คืนค่าตราโรงเรียนมาตรฐาน</span>
+              </button>
+            </div>
           </div>
 
-          {/* Row 2: จำนวนนักเรียน */}
-          <div className="flex items-center justify-between p-3.5 hover:bg-slate-50/50 transition-colors">
-            <span className="font-semibold text-slate-500">จำนวนนักเรียน</span>
-            <span className="font-bold text-slate-900">{editFormData.studentCount} คน</span>
-          </div>
-
-          {/* Row 3: จำนวนครูและบุคลากร */}
-          <div className="flex items-center justify-between p-3.5 hover:bg-slate-50/50 transition-colors">
-            <span className="font-semibold text-slate-500">จำนวนครูและบุคลากร</span>
-            <span className="font-bold text-slate-900">{editFormData.staffCount} คน</span>
-          </div>
-
-          {/* Row 4: ที่ตั้ง */}
-          <div className="flex items-start justify-between p-3.5 gap-4 hover:bg-slate-50/50 transition-colors">
-            <span className="font-semibold text-slate-500 shrink-0">ที่ตั้ง</span>
-            <span className="font-bold text-slate-900 text-right">
-              {editFormData.locationDetail}
-            </span>
-          </div>
-
-          {/* Row 5: บริบท */}
-          <div className="flex items-start justify-between p-3.5 gap-4 hover:bg-slate-50/50 transition-colors">
-            <span className="font-semibold text-slate-500 shrink-0">บริบท</span>
-            <span className="font-bold text-slate-900 text-right">
-              {editFormData.communityContext}
-            </span>
-          </div>
+          <p className="text-[11px] text-slate-400 font-medium pl-1">
+            รองรับไฟล์: PNG, JPG, JPEG, WebP
+          </p>
         </div>
       </div>
 
-      {/* 4. EDIT BUTTON */}
-      <div className="pt-2">
-        <button
-          type="button"
-          onClick={() => setIsEditModalOpen(true)}
-          className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold text-sm shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2"
-        >
-          <FileEdit className="w-4 h-4" />
-          <span>แก้ไขข้อมูลโรงเรียน</span>
-        </button>
+      {/* 4. CARD 2: ข้อมูลโรงเรียน (ตรงตามรูป Mockup) */}
+      <div className="space-y-2 pt-1">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-black text-[#163A66]">
+            ข้อมูลโรงเรียน
+          </h2>
+          <button
+            type="button"
+            onClick={() => setIsEditModalOpen(true)}
+            className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
+          >
+            <FileEdit className="w-3.5 h-3.5" />
+            <span>แก้ไขข้อมูลโรงเรียน</span>
+          </button>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200/90 p-3 shadow-xs space-y-2">
+          {/* Row 1: ชื่อโรงเรียน */}
+          <div
+            onClick={() => setIsEditModalOpen(true)}
+            className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-blue-50/40 transition-colors cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <School className="w-5 h-5 stroke-[2.2]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-[11px] text-slate-400 font-medium block">
+                ชื่อโรงเรียน
+              </span>
+              <span className="text-sm font-bold text-slate-800 truncate block">
+                {schoolSettings.nameTh || 'โรงเรียนคำยางพิทยา'}
+              </span>
+            </div>
+          </div>
+
+          {/* Row 2: ชื่อย่อโรงเรียน */}
+          <div
+            onClick={() => setIsEditModalOpen(true)}
+            className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-blue-50/40 transition-colors cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 font-black text-sm">
+              Abc
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-[11px] text-slate-400 font-medium block">
+                ชื่อย่อโรงเรียน
+              </span>
+              <span className="text-sm font-bold text-slate-800 truncate block">
+                {schoolSettings.shortName || schoolSettings.shortCode || 'คำยางพิทยา'}
+              </span>
+            </div>
+          </div>
+
+          {/* Row 3: อำเภอ / จังหวัด */}
+          <div
+            onClick={() => setIsEditModalOpen(true)}
+            className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-blue-50/40 transition-colors cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <MapPin className="w-5 h-5 stroke-[2.2]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-[11px] text-slate-400 font-medium block">
+                อำเภอ / จังหวัด
+              </span>
+              <span className="text-sm font-bold text-slate-800 truncate block">
+                {schoolSettings.districtProvince || 'ต.ผาสุก อ.วังสามหมอ จ.อุดรธานี'}
+              </span>
+            </div>
+          </div>
+
+          {/* Row 4: สังกัดสำนักงานเขตพื้นที่การศึกษา */}
+          <div
+            onClick={() => setIsEditModalOpen(true)}
+            className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-blue-50/40 transition-colors cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <Building2 className="w-5 h-5 stroke-[2.2]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-[11px] text-slate-400 font-medium block">
+                สังกัดสำนักงานเขตพื้นที่การศึกษา
+              </span>
+              <span className="text-sm font-bold text-slate-800 truncate block">
+                {schoolSettings.affiliation || 'สำนักงานเขตพื้นที่การศึกษาประถมศึกษาอุดรธานี เขต 1'}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* 5. SUCCESS TOAST */}
       {showSavedToast && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
           <Check className="w-4 h-4 text-emerald-200" />
-          <span>บันทึกข้อมูลโรงเรียนสำเร็จแล้ว</span>
+          <span>{toastMessage}</span>
         </div>
       )}
 
@@ -181,6 +344,20 @@ export const TeacherMobileSchoolInfoScreen: React.FC<TeacherMobileSchoolInfoScre
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
+                  ชื่อย่อโรงเรียน
+                </label>
+                <input
+                  type="text"
+                  value={editFormData.shortName}
+                  onChange={(e) =>
+                    setEditFormData((prev) => ({ ...prev, shortName: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
                   ตำบล อำเภอ จังหวัด
                 </label>
                 <input
@@ -196,72 +373,20 @@ export const TeacherMobileSchoolInfoScreen: React.FC<TeacherMobileSchoolInfoScre
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    จำนวนนักเรียน
-                  </label>
-                  <input
-                    type="text"
-                    value={editFormData.studentCount}
-                    onChange={(e) =>
-                      setEditFormData((prev) => ({
-                        ...prev,
-                        studentCount: e.target.value,
-                      }))
-                    }
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    จำนวนครูและบุคลากร
-                  </label>
-                  <input
-                    type="text"
-                    value={editFormData.staffCount}
-                    onChange={(e) =>
-                      setEditFormData((prev) => ({
-                        ...prev,
-                        staffCount: e.target.value,
-                      }))
-                    }
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-blue-500"
-                  />
-                </div>
-              </div>
-
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
-                  ที่ตั้ง / รายละเอียด
+                  สังกัดสำนักงานเขตพื้นที่การศึกษา
                 </label>
                 <input
                   type="text"
-                  value={editFormData.locationDetail}
+                  value={editFormData.affiliation}
                   onChange={(e) =>
                     setEditFormData((prev) => ({
                       ...prev,
-                      locationDetail: e.target.value,
+                      affiliation: e.target.value,
                     }))
                   }
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  บริบทชุมชน
-                </label>
-                <textarea
-                  rows={2}
-                  value={editFormData.communityContext}
-                  onChange={(e) =>
-                    setEditFormData((prev) => ({
-                      ...prev,
-                      communityContext: e.target.value,
-                    }))
-                  }
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-blue-500 resize-none"
                 />
               </div>
             </div>

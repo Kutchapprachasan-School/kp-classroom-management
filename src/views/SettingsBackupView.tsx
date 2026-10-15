@@ -31,7 +31,14 @@ import {
   RefreshCw,
   Sparkles,
   Database,
+  ChevronRight,
+  Building2,
+  UserCheck,
+  Layers,
+  Settings,
 } from 'lucide-react';
+
+import { TeacherMobileSchoolInfoScreen } from '../components/mobile/TeacherMobileSchoolInfoScreen';
 
 import {
   getSchoolSettings,
@@ -145,6 +152,11 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
     if (initialTab === 'BRANDING' || initialTab === 'LEAVE_SYSTEM') return 'school_info';
     if (initialTab === 'STORAGE') return 'backup';
     if (initialTab === 'BANNERS') return 'theme';
+    return null;
+  });
+
+  const [mobileActiveSubScreen, setMobileActiveSubScreen] = useState<'school_info' | null>(() => {
+    if (initialTab === 'BRANDING' || initialTab === 'LEAVE_SYSTEM') return 'school_info';
     return null;
   });
 
@@ -269,10 +281,16 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
 
   // Sync initial tab when changed by caller
   useEffect(() => {
-    if (initialTab === 'CALENDAR') setActiveModalKey('timetable');
-    else if (initialTab === 'BRANDING' || initialTab === 'LEAVE_SYSTEM') setActiveModalKey('school_info');
-    else if (initialTab === 'STORAGE') setActiveModalKey('backup');
-    else if (initialTab === 'BANNERS') setActiveModalKey('theme');
+    if (initialTab === 'CALENDAR') {
+      setActiveModalKey('timetable');
+    } else if (initialTab === 'BRANDING' || initialTab === 'LEAVE_SYSTEM') {
+      setActiveModalKey('school_info');
+      setMobileActiveSubScreen('school_info');
+    } else if (initialTab === 'STORAGE') {
+      setActiveModalKey('backup');
+    } else if (initialTab === 'BANNERS') {
+      setActiveModalKey('theme');
+    }
   }, [initialTab]);
 
   const toggleExpand = (id: string, e: React.MouseEvent) => {
@@ -386,10 +404,183 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
       )}
 
       {/* ==================================================================== */}
-      {/* RENDER MODE A: OVERVIEW DASHBOARD (NO POPUPS) */}
+      {/* MOBILE VIEW (< lg) - Directly Matching Reference Image media_1792038351636_1276a162.jpg */}
+      {/* ==================================================================== */}
+      <div className="lg:hidden">
+        {mobileActiveSubScreen === 'school_info' ? (
+          <TeacherMobileSchoolInfoScreen
+            onNavigate={() => {}}
+            onBack={() => setMobileActiveSubScreen(null)}
+          />
+        ) : activeModalKey === null && (
+          <div className="w-full max-w-md mx-auto space-y-4 pb-24 font-sans select-none text-slate-800">
+            {/* Top Header Section */}
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Settings className="w-6 h-6 stroke-[2.2]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-xl font-black text-[#163A66] tracking-tight">
+                    ตั้งค่าระบบ
+                  </h1>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                    <span>System Settings</span>
+                  </span>
+                </div>
+                <p className="text-xs text-[#6B7C93] font-medium mt-1 leading-snug">
+                  จัดการข้อมูลพื้นฐานของโรงเรียน ผู้ใช้งาน และระบบต่างๆ
+                </p>
+              </div>
+            </div>
+
+            {/* Category Section: ข้อมูลพื้นฐาน */}
+            <div className="space-y-2.5 pt-1">
+              <div>
+                <h2 className="text-sm font-black text-[#163A66]">
+                  ข้อมูลพื้นฐาน
+                </h2>
+                <p className="text-xs text-[#6B7C93] font-medium">
+                  ข้อมูลสำคัญของโรงเรียนและการตั้งค่าระบบหลัก
+                </p>
+              </div>
+
+              {/* 4 Category Cards Stacked */}
+              <div className="space-y-3">
+                {/* Card 1: ข้อมูลโรงเรียน */}
+                <div
+                  onClick={() => setMobileActiveSubScreen('school_info')}
+                  className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer active:scale-[0.99]"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                        <Building2 className="w-5 h-5 stroke-[2.2]" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-bold text-slate-900 truncate">
+                          ข้อมูลโรงเรียน
+                        </h3>
+                        <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
+                          จัดการข้อมูลโรงเรียนและสังกัด
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-blue-600 flex items-center shrink-0">
+                      จัดการ <ChevronRight className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 font-medium">
+                    <span className="inline-flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border border-emerald-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      เชื่อมต่อ Supabase แล้ว
+                    </span>
+                  </div>
+                </div>
+
+                {/* Card 2: ผู้ใช้งานและสิทธิ์ */}
+                <div
+                  onClick={() => setActiveModalKey('users')}
+                  className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer active:scale-[0.99]"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+                        <UserCheck className="w-5 h-5 stroke-[2.2]" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-bold text-slate-900 truncate">
+                          ผู้ใช้งานและสิทธิ์
+                        </h3>
+                        <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
+                          จัดการบัญชีผู้ใช้และสิทธิ์การใช้งาน
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-blue-600 flex items-center shrink-0">
+                      จัดการ <ChevronRight className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 font-medium">
+                    <span className="inline-flex items-center gap-1.5 text-slate-600 bg-slate-50 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border border-slate-200">
+                      <Users className="w-3.5 h-3.5 text-slate-500" />
+                      ผู้ใช้งานทั้งหมด 12 คน
+                    </span>
+                  </div>
+                </div>
+
+                {/* Card 3: ห้องเรียน / ชั้น */}
+                <div
+                  onClick={() => setActiveModalKey('classrooms')}
+                  className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer active:scale-[0.99]"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                        <Layers className="w-5 h-5 stroke-[2.2]" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-bold text-slate-900 truncate">
+                          ห้องเรียน / ชั้น
+                        </h3>
+                        <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
+                          จัดการข้อมูลห้องเรียนและระดับชั้น
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-blue-600 flex items-center shrink-0">
+                      จัดการ <ChevronRight className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 font-medium">
+                    <span className="inline-flex items-center gap-1.5 text-slate-600 bg-slate-50 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border border-slate-200">
+                      <Layers className="w-3.5 h-3.5 text-slate-500" />
+                      ห้องเรียนทั้งหมด 18 ห้อง • 8 ระดับชั้น
+                    </span>
+                  </div>
+                </div>
+
+                {/* Card 4: รายวิชา / โครงสร้างเวลาเรียน */}
+                <div
+                  onClick={() => setActiveModalKey('courses')}
+                  className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer active:scale-[0.99]"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                        <BookOpen className="w-5 h-5 stroke-[2.2]" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-bold text-slate-900 truncate">
+                          รายวิชา / โครงสร้างเวลาเรียน
+                        </h3>
+                        <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
+                          จัดการรายวิชาและกลุ่มสาระการเรียนรู้
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-blue-600 flex items-center shrink-0">
+                      จัดการ <ChevronRight className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 font-medium">
+                    <span className="inline-flex items-center gap-1.5 text-slate-600 bg-slate-50 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border border-slate-200">
+                      <BookOpen className="w-3.5 h-3.5 text-slate-500" />
+                      รายวิชาทั้งหมด 8 กลุ่มสาระ
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ==================================================================== */}
+      {/* DESKTOP VIEW (>= lg) - Full Overview Dashboard (NO POPUPS) */}
       {/* ==================================================================== */}
       {activeModalKey === null && (
-        <>
+        <div className="hidden lg:block space-y-6">
           {/* 1. TOP HERO BANNER (ตรงตาม Mockup: การตั้งค่าที่ถูกต้อง ช่วยให้การทำงานง่ายขึ้นนะคะ ♡) */}
           <SettingsHeroBanner schoolName={schoolSettings.nameTh} />
 
@@ -912,7 +1103,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
               ))}
             </div>
           </section>
-        </>
+        </div>
       )}
 
       {/* ==================================================================== */}

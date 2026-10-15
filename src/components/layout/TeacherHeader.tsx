@@ -586,7 +586,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
             </button>
           )}
 
-          <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 flex items-center justify-center shadow-2xs">
+          <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0 flex items-center justify-center shadow-2xs bg-white">
             <img
               src={schoolSettings.logoUrl || DEFAULT_KUTCHAP_LOGO_SVG}
               alt={schoolSettings.nameTh}
@@ -598,8 +598,11 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
           </div>
 
           <div className="min-w-0">
-            <span className="font-extrabold text-slate-900 text-xs sm:text-sm leading-tight block truncate">
+            <span className="font-extrabold text-[#163A66] text-xs sm:text-sm leading-tight block truncate">
               {schoolSettings.nameTh}
+            </span>
+            <span className="text-[10px] text-[#6B7C93] font-medium leading-tight block truncate mt-0.5">
+              {schoolSettings.districtProvince || 'ต.ผาสุก อ.วังสามหมอ จ.อุดรธานี'}
             </span>
           </div>
         </div>
@@ -639,18 +642,21 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
             {bellDropdownContent}
           </div>
 
-          <div className="relative" ref={profileRef}>
+          <div className="relative flex items-center" ref={profileRef}>
             <button
               type="button"
               onClick={() => setIsProfileOpen((prev) => !prev)}
-              className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-slate-200 shadow-2xs cursor-pointer"
+              className="flex items-center gap-1 cursor-pointer"
               title="โปรไฟล์และสลับบทบาท"
             >
-              <img
-                src="/images/teacher/teacher_avatar.png"
-                alt="ครูปัญจพล"
-                className="w-full h-full object-cover"
-              />
+              <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-slate-200 shadow-2xs">
+                <img
+                  src={effectiveAvatar}
+                  alt={currentUser?.name || "ครูปัญจพล"}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
             </button>
             {profileDropdownContent}
           </div>

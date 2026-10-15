@@ -35,6 +35,7 @@ export interface SchoolBrandingSettings {
   nameTh: string;
   nameEn: string;
   shortCode: string;
+  shortName?: string;
   districtProvince: string;
   affiliation: string;
   domain: string;
