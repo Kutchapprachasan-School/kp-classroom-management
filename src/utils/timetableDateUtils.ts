@@ -28,6 +28,7 @@ export interface TimetableMatrixSlot {
   credits?: string;
   totalPeriods?: string;
   subType?: string;
+  subjectIcon?: string;
 }
 
 export interface TaskWidgetItem {

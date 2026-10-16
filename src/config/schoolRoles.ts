@@ -195,6 +195,22 @@ export function applySchoolBrandingAndTypography(settings?: SchoolBrandingSettin
   );
   document.documentElement.style.setProperty('--kps-base-font-size', `${clampedPx}px`);
   document.title = `${current.classroomSystemTitle} — ${current.nameTh}`;
+
+  // Dynamically update favicon and apple-touch-icon to match uploaded school logo
+  if (current.logoUrl) {
+    const updateIcon = (rel: string) => {
+      let link = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = rel;
+        document.head.appendChild(link);
+      }
+      link.href = current.logoUrl;
+    };
+    updateIcon('icon');
+    updateIcon('shortcut icon');
+    updateIcon('apple-touch-icon');
+  }
 }
 
 export function getSchoolSettings(): SchoolBrandingSettings {

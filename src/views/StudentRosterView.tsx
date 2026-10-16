@@ -188,14 +188,17 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
   }, [initialClassroomId]);
 
   // 2. Load Students for selected classroom
-  const loadStudents = async (classroomId: string) => {
+  const loadStudents = async (classroomId: string, fallbackName?: string) => {
     setIsLoading(true);
     try {
-      const list = await studentService.getByClassroom(classroomId);
-      setStudents(list);
-      setOriginalStudentsOrder(list);
+      let list = await studentService.getByClassroom(classroomId);
+      if ((!list || list.length === 0) && fallbackName && fallbackName !== classroomId) {
+        list = await studentService.getByClassroom(fallbackName);
+      }
+      setStudents(list || []);
+      setOriginalStudentsOrder(list || []);
       setHasUnsavedReorder(false);
-      setNewStudentNo(list.length + 1);
+      setNewStudentNo((list?.length || 0) + 1);
       setCurrentPage(1);
     } finally {
       setIsLoading(false);
@@ -204,9 +207,9 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
 
   useEffect(() => {
     if (selectedClass) {
-      loadStudents(selectedClass.id);
+      loadStudents(selectedClass.id, selectedClass.name || selectedClass.roomNumber);
     }
-  }, [selectedClass?.id]);
+  }, [selectedClass?.id, selectedClass?.name]);
 
   // Sync when student transferred event fires
   useEffect(() => {

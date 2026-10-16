@@ -100,60 +100,6 @@ export function formatClassroomLabel(classroomId?: string): string {
   return trimmed;
 }
 
-export function generateDefaultStudentsForRoom(classroomId: string): StudentRecord[] {
-  const label = formatClassroomLabel(classroomId);
-  const match = label.match(/ม\.?\s*(\d+)\/(\d+)/);
-  if (!match) {
-    return [];
-  }
-  const grade = Number(match[1]);
-  const roomNo = Number(match[2]);
-  const baseCodeNum = 40000 + (grade * 1000) + (roomNo * 100);
-
-  const maleFirstNames = ['กฤษณะ', 'ทัตธน', 'ภานุวัฒน์', 'อภิสิทธิ์', 'ณัฐวุฒิ', 'ธนพล', 'ชนะภัย', 'เกียรติศักดิ์', 'ภาณุพงศ์', 'ธีรภัทร', 'ปวริศร์', 'ธนกร'];
-  const femaleFirstNames = ['ชนากานต์', 'ธันยพร', 'กมลชนก', 'สุพรรษา', 'ชลิตา', 'กัญญารัตน์', 'สุภัสสรา', 'กานต์พิชชา', 'นภัสสร', 'รินรดา', 'อรอุมา', 'พิมพ์พิชชา'];
-  const lastNames = ['ศรีสมบูรณ์', 'คำฝั้น', 'สิทธิชัย', 'เจริญสุข', 'เลิศวิไล', 'วงศ์ษา', 'แก้วคำ', 'พัฒนกุล', 'สายทอง', 'มณีโชติ', 'ยอดสิงห์', 'มงคล', 'บุญยืน', 'อินทร', 'ชาญชัย', 'สุขเกษม'];
-
-  const results: StudentRecord[] = [];
-  // 5 males (เลขที่ 1-5)
-  for (let i = 1; i <= 5; i++) {
-    const code = String(baseCodeNum + i);
-    const firstName = maleFirstNames[(i - 1 + roomNo * 2) % maleFirstNames.length];
-    const lastName = lastNames[(i - 1 + grade + roomNo) % lastNames.length];
-    const title = grade >= 4 ? 'นาย' : 'ด.ช.';
-    results.push({
-      id: `stu-${code}`,
-      no: i,
-      code,
-      name: `${title} ${firstName} ${lastName}`,
-      attendance: '8/8',
-      score: 80 + (i % 15),
-      status: 'NORMAL',
-      gender: 'MALE',
-      classroomId: classroomId,
-    });
-  }
-  // 5 females (เลขที่ 6-10)
-  for (let i = 6; i <= 10; i++) {
-    const code = String(baseCodeNum + i);
-    const firstName = femaleFirstNames[(i - 6 + roomNo * 2) % femaleFirstNames.length];
-    const lastName = lastNames[(i - 1 + grade * 2 + roomNo) % lastNames.length];
-    const title = grade >= 4 ? 'น.ส.' : 'ด.ญ.';
-    results.push({
-      id: `stu-${code}`,
-      no: i,
-      code,
-      name: `${title} ${firstName} ${lastName}`,
-      attendance: '8/8',
-      score: 82 + (i % 14),
-      status: 'NORMAL',
-      gender: 'FEMALE',
-      classroomId: classroomId,
-    });
-  }
-  return results;
-}
-
 const getLocalStudents = (classroomId: string): StudentRecord[] => {
   if (!classroomId) return [];
   if (typeof localStorage !== 'undefined') {
@@ -192,13 +138,7 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
   if (alt && mockStudentsByRoom[alt] && mockStudentsByRoom[alt].length > 0) {
     return mockStudentsByRoom[alt];
   }
-  // Fallback: generate default students for any room so rosters are never empty
-  const generated = generateDefaultStudentsForRoom(classroomId);
-  inMemoryStudentCache[classroomId] = generated;
-  if (alt) {
-    inMemoryStudentCache[alt] = generated;
-  }
-  return generated;
+  return [];
 };
 
 const saveLocalStudents = (classroomId: string, items: StudentRecord[]) => {

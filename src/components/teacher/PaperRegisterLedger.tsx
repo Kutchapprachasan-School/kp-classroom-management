@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   X,
   Eye,
+  FileSpreadsheet,
 } from 'lucide-react';
 import {
   attendanceCorrelationService,
@@ -580,46 +581,54 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
   }, [rows, mode]);
 
   return (
-    <div ref={containerRef} className="bg-[#FDFDFB] border border-slate-300 rounded-xl shadow-xs overflow-hidden select-none font-sans">
-      {/* แถบหัวสมุด ปพ.5 แบบกระดาษ (บรรทัดเดียว กระชับ ไม่รก) */}
-      <div className="bg-[#D9F7FA] border-b border-slate-300 px-3 py-2 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs sm:text-sm font-extrabold text-slate-900">
-            สมุด ปพ.5 • ชั้น {selectedRoom} ({rows.length} คน)
-          </span>
-          <div className="inline-flex rounded-lg bg-white/90 p-0.5 border border-cyan-300">
-            {(availableRooms && availableRooms.length > 0 ? availableRooms : selectedRoom ? [selectedRoom] : []).map((rm) => (
-              <button
-                key={rm}
-                type="button"
-                onClick={() => setSelectedRoom(rm)}
-                className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-colors cursor-pointer ${
-                  selectedRoom === rm
-                    ? 'bg-[#1967D2] text-white'
-                    : 'text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                {rm}
-              </button>
-            ))}
+    <div ref={containerRef} className="bg-white border border-[#E6EEF7] rounded-[18px] shadow-[0_4px_16px_rgba(40,90,140,0.06)] overflow-hidden select-none font-sans">
+      {/* แถบหัวสมุด ปพ.5 สไตล์ Pastel Anime Education Dashboard */}
+      <div className="bg-linear-to-r from-blue-50/70 via-white to-indigo-50/50 border-b border-[#E6EEF7] px-3.5 py-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-200/80 flex items-center justify-center text-blue-600 shadow-2xs shrink-0">
+            <FileSpreadsheet className="w-4 h-4" />
           </div>
-          <span className="text-xs font-bold text-slate-700 hidden sm:inline">
-            • {mode === 'MORNING_ASSEMBLY' ? 'กิจกรรมหน้าเสาธง 07:45 น.' : subjectLabel}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs sm:text-sm font-extrabold text-[#163A66]">
+              สมุด ปพ.5 • ชั้น {selectedRoom}
+            </span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
+              {rows.length} คน
+            </span>
+            <div className="inline-flex rounded-xl bg-slate-100/90 p-0.5 border border-slate-200/80 shadow-2xs">
+              {(availableRooms && availableRooms.length > 0 ? availableRooms : selectedRoom ? [selectedRoom] : []).map((rm) => (
+                <button
+                  key={rm}
+                  type="button"
+                  onClick={() => setSelectedRoom(rm)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    selectedRoom === rm
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  }`}
+                >
+                  {rm}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs font-semibold text-slate-500 hidden sm:inline">
+              • {mode === 'MORNING_ASSEMBLY' ? 'กิจกรรมหน้าเสาธง 07:45 น.' : subjectLabel}
+            </span>
+          </div>
         </div>
 
         {/* ปุ่มสลับหน้ากระดาษ (งานของครู) */}
         {!hideModeSwitcher && (
           <div className="flex flex-wrap items-center gap-1.5">
-            <div className="flex flex-wrap items-center gap-1 bg-white/90 p-0.5 rounded-xl border border-cyan-300">
+            <div className="inline-flex flex-wrap items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 shadow-2xs">
               {!hideMorningAssembly && (
                 <button
                   type="button"
                   onClick={() => switchMode('MORNING_ASSEMBLY')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     mode === 'MORNING_ASSEMBLY'
-                      ? 'bg-slate-900 text-white'
-                      : 'text-slate-700 hover:bg-slate-100'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                   }`}
                 >
                   1. เช็คแถวเช้า
@@ -628,10 +637,10 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
               <button
                 type="button"
                 onClick={() => switchMode('CLASS_ATTENDANCE')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   mode === 'CLASS_ATTENDANCE'
-                    ? 'bg-slate-900 text-white'
-                    : 'text-slate-700 hover:bg-slate-100'
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                 }`}
               >
                 {hideMorningAssembly ? '1. เช็คชื่อเรียน (รายคาบ)' : '2. เช็คชื่อเรียน'}
@@ -639,10 +648,10 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
               <button
                 type="button"
                 onClick={() => switchMode('HOMEWORK_CHECK')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   mode === 'HOMEWORK_CHECK'
-                    ? 'bg-slate-900 text-white'
-                    : 'text-slate-700 hover:bg-slate-100'
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                 }`}
               >
                 {hideMorningAssembly ? '2. ตรวจงาน (1–4)' : '3. ตรวจงาน (1–4)'}
@@ -650,10 +659,10 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
               <button
                 type="button"
                 onClick={() => switchMode('SCORE_GRADEBOOK')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   mode === 'SCORE_GRADEBOOK'
-                    ? 'bg-slate-900 text-white'
-                    : 'text-slate-700 hover:bg-slate-100'
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                 }`}
               >
                 {hideMorningAssembly ? '3. คะแนน ปพ.5 (100)' : '4. คะแนน ปพ.5 (100)'}
@@ -671,7 +680,7 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
                     switchMode('MORNING_ASSEMBLY');
                   }
                 }}
-                className="px-2.5 py-1 rounded-xl bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
+                className="px-2.5 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
                 title="สลับไปหน้าเช็คแถวเช้า 07:45 น. (ห้องที่ปรึกษา)"
               >
                 <span>☀️ ไปเช็คแถวเช้า (ห้องที่ปรึกษา) ↗</span>
@@ -680,20 +689,20 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
           </div>
         )}
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           {mode === 'CLASS_ATTENDANCE' && (
             <>
-              <div className="inline-flex rounded-lg bg-white border border-slate-300 p-0.5 text-[11px]">
+              <div className="inline-flex rounded-xl bg-slate-100/90 p-0.5 border border-slate-200/80 text-xs shadow-2xs">
                 <button
                   type="button"
                   onClick={() => {
                     applyMorningSyncModeToRows('AUTO_PREFILL');
                     triggerToast('ดึงสถานะเช็คชื่อแถวเช้ามาใส่คาบเรียนให้อัตโนมัติ (แก้ทับได้)');
                   }}
-                  className={`px-2 py-0.5 rounded font-bold cursor-pointer transition-colors ${
+                  className={`px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all ${
                     morningSyncMode === 'AUTO_PREFILL'
-                      ? 'bg-[#1967D2] text-white'
-                      : 'text-slate-700 hover:bg-slate-100'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   ดึงแถวเช้า
@@ -704,24 +713,24 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
                     applyMorningSyncModeToRows('MANUAL_FRESH');
                     triggerToast('ตั้งค่าเป็นกรอกเช็คชื่อใหม่ในคาบเรียน');
                   }}
-                  className={`px-2 py-0.5 rounded font-bold cursor-pointer transition-colors ${
+                  className={`px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all ${
                     morningSyncMode === 'MANUAL_FRESH'
-                      ? 'bg-[#1967D2] text-white'
-                      : 'text-slate-700 hover:bg-slate-100'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   กรอกใหม่
                 </button>
               </div>
 
-              <div className="inline-flex rounded-lg bg-white border border-slate-300 p-0.5 text-[11px]">
+              <div className="inline-flex rounded-xl bg-slate-100/90 p-0.5 border border-slate-200/80 text-xs shadow-2xs">
                 <button
                   type="button"
                   onClick={() => switchAttendanceViewType('MULTI_PERIOD')}
-                  className={`px-2 py-0.5 rounded font-bold cursor-pointer transition-colors ${
+                  className={`px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all ${
                     attendanceViewType === 'MULTI_PERIOD'
-                      ? 'bg-teal-700 text-white'
-                      : 'text-slate-700 hover:bg-slate-100'
+                      ? 'bg-indigo-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   รวมหลายคาบ
@@ -729,10 +738,10 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
                 <button
                   type="button"
                   onClick={() => switchAttendanceViewType('TODAY_SINGLE')}
-                  className={`px-2 py-0.5 rounded font-bold cursor-pointer transition-colors ${
+                  className={`px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all ${
                     attendanceViewType === 'TODAY_SINGLE'
-                      ? 'bg-teal-700 text-white'
-                      : 'text-slate-700 hover:bg-slate-100'
+                      ? 'bg-indigo-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   เฉพาะวันนี้
@@ -745,9 +754,9 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
             <button
               type="button"
               onClick={() => setIsNewHwOpen((v) => !v)}
-              className="px-2.5 py-1 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 text-xs font-bold inline-flex items-center gap-1 cursor-pointer"
+              className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs cursor-pointer transition-colors"
             >
-              <Plus className="w-3.5 h-3.5 text-teal-700" />
+              <Plus className="w-3.5 h-3.5 text-blue-600" />
               <span>สั่งงานเพิ่ม</span>
             </button>
           )}
@@ -755,9 +764,9 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
           <button
             type="button"
             onClick={() => triggerToast('บันทึกข้อมูลลงสมุด ปพ.5 เรียบร้อยแล้ว')}
-            className="px-3 py-1 rounded-lg bg-[#1967D2] hover:bg-blue-700 text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
           >
-            <Save className="w-3.5 h-3.5" />
+            <Save className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>บันทึก</span>
           </button>
         </div>

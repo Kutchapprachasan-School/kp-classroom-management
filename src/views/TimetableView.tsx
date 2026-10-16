@@ -33,6 +33,11 @@ import type { CrossViewNavigationPayload } from '../services/teacherCopilotServi
 import { studentAffairsCouncilService } from '../services/studentAffairsCouncilService';
 import { AddEditTimetableSlotModal } from '../components/timetable/AddEditTimetableSlotModal';
 import { AssignWaitingSlotModal } from '../components/timetable/AssignWaitingSlotModal';
+import {
+  getSubjectIcon,
+  renderSubjectIconBadge,
+  type SubjectIconConfig,
+} from '../config/subjectIcons';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 import type { SchoolUserRole } from '../config/schoolRoles';
 import {
@@ -551,12 +556,19 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
     setSelectedSlot(null);
   };
 
-  // กำหนดคาบจาก Waiting Pool ลงตาราง
-  const handleAssignWaitingSlot = (waitingSlot: TimetableMatrixSlot, targetDay: string, targetPeriod: number) => {
+  // กำหนดคาบจาก Waiting Pool ลงตาราง พร้อมห้องเรียนและโลโก้ที่ปรับแต่ง
+  const handleAssignWaitingSlot = (
+    waitingSlot: TimetableMatrixSlot,
+    targetDay: string,
+    targetPeriod: number,
+    targetRoom?: string,
+    targetIcon?: SubjectIconConfig
+  ) => {
+    const finalRoom = targetRoom?.trim() || waitingSlot.room;
     const quotaCheck = coursesCurriculumService.canAssignPeriod(
       matrixSlots,
       waitingSlot.subjectCode,
-      waitingSlot.room,
+      finalRoom,
       undefined,
       activeTerm ? String(activeTerm.year) : undefined,
       activeTerm ? String(activeTerm.semesterNo) : undefined
@@ -571,6 +583,8 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
       id: `slot-${targetDay}-${targetPeriod}`,
       day: targetDay as any,
       period: targetPeriod,
+      room: finalRoom,
+      subjectIcon: targetIcon?.id || waitingSlot.subjectIcon,
       isFreePeriod: false,
     };
     handleSaveSlot(updatedSlot);
@@ -929,15 +943,23 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                   className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between min-h-[120px] ${boxStyle}`}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="text-xs opacity-80 font-bold">
-                        คาบที่ {slot.period} ({periodDef.timeRange})
+                    <div className="flex items-start gap-2.5">
+                      <div className="shrink-0 mt-0.5">
+                        {renderSubjectIconBadge(
+                          getSubjectIcon(slot.subjectIcon || slot.subjectCode, slot.subjectName),
+                          'sm'
+                        )}
                       </div>
-                      <div className="text-base font-black truncate mt-1">
-                        {slot.subjectCode} {slot.subjectName && `• ${slot.subjectName}`}
-                      </div>
-                      <div className="text-xs opacity-90 font-semibold mt-0.5">
-                        {slot.room}
+                      <div>
+                        <div className="text-xs opacity-80 font-bold">
+                          คาบที่ {slot.period} ({periodDef.timeRange})
+                        </div>
+                        <div className="text-base font-black truncate mt-0.5">
+                          {slot.subjectCode} {slot.subjectName && `• ${slot.subjectName}`}
+                        </div>
+                        <div className="text-xs opacity-90 font-semibold mt-0.5">
+                          {slot.room}
+                        </div>
                       </div>
                     </div>
 
@@ -1091,8 +1113,16 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                               >
                                 {/* Top: Code & Room */}
                                 <div>
-                                  <div className="font-black text-sm tracking-tight truncate">
-                                    {slot.subjectCode}
+                                  <div className="flex items-center gap-1.5">
+                                    <div className="shrink-0 scale-75 origin-left">
+                                      {renderSubjectIconBadge(
+                                        getSubjectIcon(slot.subjectIcon || slot.subjectCode, slot.subjectName),
+                                        'sm'
+                                      )}
+                                    </div>
+                                    <div className="font-black text-sm tracking-tight truncate">
+                                      {slot.subjectCode}
+                                    </div>
                                   </div>
                                   <div className="text-[11px] font-semibold opacity-90 truncate">
                                     {slot.room}
@@ -1286,18 +1316,26 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                 key={slot.id}
                 className="p-3 bg-white rounded-2xl border border-amber-200 shadow-2xs flex items-center justify-between text-xs"
               >
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-black text-slate-900">{slot.subjectCode}</span>
-                    <span className="text-[10px] px-2 py-0.2 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-200">
-                      {slot.room}
-                    </span>
+                <div className="flex items-center gap-2.5">
+                  <div className="shrink-0 scale-90">
+                    {renderSubjectIconBadge(
+                      getSubjectIcon(slot.subjectIcon || slot.subjectCode, slot.subjectName),
+                      'sm'
+                    )}
                   </div>
-                  <div className="text-[11px] text-slate-600 font-medium truncate max-w-[170px] mt-0.5">
-                    {slot.subjectName || slot.room}
-                  </div>
-                  <div className="text-[10px] text-amber-800 font-bold mt-0.5">
-                    {slot.totalPeriods || `${slot.credits} หน่วยกิต`}
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-black text-slate-900">{slot.subjectCode}</span>
+                      <span className="text-[10px] px-2 py-0.2 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-200">
+                        {slot.room}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-600 font-medium truncate max-w-[170px] mt-0.5">
+                      {slot.subjectName || slot.room}
+                    </div>
+                    <div className="text-[10px] text-amber-800 font-bold mt-0.5">
+                      {slot.totalPeriods || `${slot.credits} หน่วยกิต`}
+                    </div>
                   </div>
                 </div>
 

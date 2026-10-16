@@ -593,6 +593,7 @@ class CoursesCurriculumService {
     category: 'subject';
     isFreePeriod: boolean;
     status: 'UNCHECKED';
+    subjectIcon?: string;
   }> {
     const activeTerm = academicCalendarService.getActiveTerm();
     const targetYear = academicYear || (activeTerm ? String(activeTerm.year) : '2569');
