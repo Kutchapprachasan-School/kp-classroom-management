@@ -1,7 +1,9 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase';
 import type { SoftDeletedItem } from '../types/viewModels';
+import { classroomService } from './classroomService';
 
 const STORAGE_KEY_TRASH = 'cls_trash_data';
+export const TRASH_SYNC_EVENT = 'kps-trash-updated';
 
 const getLocalTrash = (): SoftDeletedItem[] => {
   if (typeof localStorage === 'undefined') return [];
@@ -83,12 +85,19 @@ export const trashService = {
       });
     }
 
+    try {
+      window.dispatchEvent(new CustomEvent(TRASH_SYNC_EVENT, { detail: { action: 'MOVE_TO_TRASH', item: newItem } }));
+    } catch {
+      // safe SSR
+    }
+
     return newItem;
   },
 
   // RESTORE: Restore item back to active
   async restore(id: string): Promise<void> {
     const current = getLocalTrash();
+    const target = current.find((i) => i.id === id);
     const updated = current.filter((i) => i.id !== id);
     saveLocalTrash(updated);
 
@@ -96,17 +105,38 @@ export const trashService = {
       logDbOperation(`RESTORE Trash item id = ${id}`);
       await supabase.from('TrashLog').delete().eq('id', id);
     }
+
+    if (target && target.entityType === 'ชั้นเรียน') {
+      try {
+        await classroomService.restore(target.name || target.id);
+      } catch (err) {
+        console.warn('Failed to restore classroom via classroomService:', err);
+      }
+    }
+
+    try {
+      window.dispatchEvent(new CustomEvent(TRASH_SYNC_EVENT, { detail: { action: 'RESTORE', item: target } }));
+    } catch {
+      // safe SSR
+    }
   },
 
   // PERMANENT DELETE: Remove irrevocably
   async permanentDelete(id: string): Promise<void> {
     const current = getLocalTrash();
+    const target = current.find((i) => i.id === id);
     const updated = current.filter((i) => i.id !== id);
     saveLocalTrash(updated);
 
     if (isSupabaseConfigured) {
       logDbOperation(`PERMANENT DELETE FROM TrashLog WHERE id = ${id}`);
       await supabase.from('TrashLog').delete().eq('id', id);
+    }
+
+    try {
+      window.dispatchEvent(new CustomEvent(TRASH_SYNC_EVENT, { detail: { action: 'PERMANENT_DELETE', item: target } }));
+    } catch {
+      // safe SSR
     }
   },
 
@@ -117,6 +147,12 @@ export const trashService = {
     if (isSupabaseConfigured) {
       logDbOperation('EMPTY TRASH (DELETE FROM TrashLog)');
       await supabase.from('TrashLog').delete().neq('id', 'null');
+    }
+
+    try {
+      window.dispatchEvent(new CustomEvent(TRASH_SYNC_EVENT, { detail: { action: 'EMPTY' } }));
+    } catch {
+      // safe SSR
     }
   },
 };

@@ -23,6 +23,8 @@ import {
   Check,
   Sparkles,
   RefreshCw,
+  RotateCcw,
+  AlertTriangle,
 } from 'lucide-react';
 import { classroomService, type TeacherAccountItem } from '../services/classroomService';
 import { studentService } from '../services/studentService';
@@ -910,6 +912,37 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
             )}
 
             <form onSubmit={handleCreateClassroom} className="space-y-4 text-xs">
+              {formName.trim().length > 0 && classroomService.isClassroomDeleted(formName.trim()) && (
+                <div className="p-3 bg-amber-50 border border-amber-200/90 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-amber-900 animate-fade-in">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>
+                      ⚠️ ห้องเรียน <strong>"{formName.trim()}"</strong> เคยถูกลบและอยู่ในถังขยะ
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setIsSubmitting(true);
+                      try {
+                        await classroomService.restore(formName.trim());
+                        setIsAddModalOpen(false);
+                        setToastMessage(`กู้คืนห้องเรียน ${formName.trim()} กลับสู่ระบบเรียบร้อยแล้ว`);
+                        await loadData();
+                      } catch (err: any) {
+                        setFormError(err.message || 'ไม่สามารถกู้คืนได้');
+                      } finally {
+                        setIsSubmitting(false);
+                      }
+                    }}
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs shadow-2xs cursor-pointer active:scale-95 whitespace-nowrap self-start sm:self-auto"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>กู้คืนห้องเรียนนี้ทันที</span>
+                  </button>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-700 font-bold mb-1">

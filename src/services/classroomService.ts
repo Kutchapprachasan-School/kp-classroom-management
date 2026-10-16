@@ -287,15 +287,153 @@ export const classroomService = {
   },
 
   // CREATE: Add new classroom in Supabase
+  // Check if a classroom is in the deleted/trash state
+  isClassroomDeleted(nameOrId: string): boolean {
+    if (!nameOrId || !nameOrId.trim()) return false;
+    const clean = nameOrId.trim();
+    const deletedSet = getDeletedRoomsSet();
+    if (deletedSet.has(clean)) return true;
+    const seedMatch = INITIAL_SEED_CLASSROOMS.find((s) => s.name === clean || s.id === clean);
+    if (seedMatch && (deletedSet.has(seedMatch.id) || deletedSet.has(seedMatch.name))) return true;
+    const altRoomId = `room-${clean.replace('ม.', '').replace('/', '-')}`;
+    if (deletedSet.has(altRoomId)) return true;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const trashKey = 'cls_trash_data';
+        const trash = JSON.parse(localStorage.getItem(trashKey) || '[]');
+        if (Array.isArray(trash) && trash.some((t: any) => (t.name === clean || t.id === clean) && t.entityType === 'ชั้นเรียน')) {
+          return true;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return false;
+  },
+
+  // RESTORE: Restore classroom from trash / deleted state
+  async restore(nameOrId: string): Promise<ClassroomRosterItem | null> {
+    const deletedSet = getDeletedRoomsSet();
+    let targetName = nameOrId.trim();
+    deletedSet.delete(nameOrId);
+    deletedSet.delete(targetName);
+
+    const seedMatch = INITIAL_SEED_CLASSROOMS.find((s) => s.id === nameOrId || s.name === targetName);
+    if (seedMatch) {
+      targetName = seedMatch.name;
+      deletedSet.delete(seedMatch.id);
+      deletedSet.delete(seedMatch.name);
+    }
+    const altRoomId = `room-${targetName.replace('ม.', '').replace('/', '-')}`;
+    deletedSet.delete(altRoomId);
+    saveDeletedRoomsSet(deletedSet);
+
+    // Remove from cls_trash_data
+    let originalData: ClassroomRosterItem | null = null;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const trashKey = 'cls_trash_data';
+        const trash = JSON.parse(localStorage.getItem(trashKey) || '[]');
+        if (Array.isArray(trash)) {
+          const found = trash.find((t: any) => (t.name === targetName || t.id === nameOrId) && t.entityType === 'ชั้นเรียน');
+          if (found && found.originalData) {
+            originalData = found.originalData;
+          }
+          const filtered = trash.filter((t: any) => t.name !== targetName && t.id !== nameOrId);
+          localStorage.setItem(trashKey, JSON.stringify(filtered));
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    let restoredRoom: ClassroomRosterItem;
+    if (originalData) {
+      restoredRoom = originalData;
+    } else if (seedMatch) {
+      restoredRoom = { ...seedMatch };
+    } else {
+      const levelMatch = targetName.match(/ม\.?\s*(\d+)/);
+      const level = levelMatch ? `ม.${levelMatch[1]}` : 'ม.1';
+      restoredRoom = {
+        id: altRoomId,
+        name: targetName,
+        level,
+        roomNumber: targetName,
+        adviser: 'ยังไม่ได้กำหนด',
+        studentCount: 0,
+      };
+    }
+
+    const current = getLocalClassrooms();
+    const existingIndex = current.findIndex((c) => c.id === restoredRoom.id || c.name === restoredRoom.name);
+    if (existingIndex !== -1) {
+      current[existingIndex] = restoredRoom;
+      saveLocalClassrooms(current);
+    } else {
+      saveLocalClassrooms([...current, restoredRoom]);
+    }
+
+    if (isSupabaseConfigured) {
+      try {
+        await supabase
+          .from('ClassRoom')
+          .update({ status: 'ACTIVE', updatedAt: new Date().toISOString() })
+          .or(`id.eq.${restoredRoom.id},name.eq.${restoredRoom.name}`);
+      } catch (err) {
+        console.warn('Failed to reactivate ClassRoom in Supabase:', err);
+      }
+    }
+
+    try {
+      window.dispatchEvent(new CustomEvent('kps-data-sync-event', {
+        detail: { type: 'CLASSROOM_RESTORED', classroom: restoredRoom }
+      }));
+    } catch {
+      // safe SSR
+    }
+
+    return restoredRoom;
+  },
+
+  // CREATE: Add new classroom (or reactivate if previously deleted)
   async create(input: ClassroomCreateInput): Promise<ClassroomRosterItem> {
     const validated = ClassroomCreateSchema.parse(input);
     const newId = `room-${Date.now()}`;
 
-    // If room was previously in deleted set, remove it
+    // Comprehensively remove from deleted blacklist (name, altId, and seedId)
     const deletedSet = getDeletedRoomsSet();
+    let modified = false;
     if (deletedSet.has(validated.name)) {
       deletedSet.delete(validated.name);
+      modified = true;
+    }
+    const seedMatch = INITIAL_SEED_CLASSROOMS.find((s) => s.name === validated.name);
+    if (seedMatch && deletedSet.has(seedMatch.id)) {
+      deletedSet.delete(seedMatch.id);
+      modified = true;
+    }
+    const altRoomId = `room-${validated.name.replace('ม.', '').replace('/', '-')}`;
+    if (deletedSet.has(altRoomId)) {
+      deletedSet.delete(altRoomId);
+      modified = true;
+    }
+    if (modified) {
       saveDeletedRoomsSet(deletedSet);
+    }
+
+    // Clean up trash data
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const trashKey = 'cls_trash_data';
+        const trash = JSON.parse(localStorage.getItem(trashKey) || '[]');
+        if (Array.isArray(trash)) {
+          const filtered = trash.filter((t: any) => t.name !== validated.name || t.entityType !== 'ชั้นเรียน');
+          localStorage.setItem(trashKey, JSON.stringify(filtered));
+        }
+      } catch {
+        // ignore
+      }
     }
 
     // Extract grade level and room number from name (e.g. "ม.1/3" -> grade 1, room 3)
@@ -316,7 +454,7 @@ export const classroomService = {
     const advisers = [adviser, coAdviser, thirdAdviser].filter(Boolean) as string[];
 
     const newClassroom: ClassroomRosterItem = {
-      id: newId,
+      id: seedMatch ? seedMatch.id : newId,
       name: validated.name,
       level: validated.level,
       roomNumber: validated.name,
@@ -328,25 +466,50 @@ export const classroomService = {
     };
 
     if (isSupabaseConfigured) {
-      logDbOperation('INSERT INTO ClassRoom', newClassroom);
+      logDbOperation('UPSERT INTO ClassRoom', newClassroom);
       try {
-        await supabase.from('ClassRoom').insert({
-          id: newClassroom.id,
-          name: newClassroom.name,
-          gradeLevel,
-          roomNumber,
-          adviser: newClassroom.adviser,
-          status: 'ACTIVE',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
+        // Check if room with this name already exists in Supabase (even INACTIVE)
+        const { data: existingRoom } = await supabase
+          .from('ClassRoom')
+          .select('id, name')
+          .eq('name', newClassroom.name)
+          .maybeSingle();
+
+        if (existingRoom) {
+          await supabase.from('ClassRoom').update({
+            gradeLevel,
+            roomNumber,
+            adviser: newClassroom.adviser,
+            status: 'ACTIVE',
+            updatedAt: new Date().toISOString(),
+          }).eq('id', existingRoom.id);
+          newClassroom.id = existingRoom.id;
+        } else {
+          await supabase.from('ClassRoom').insert({
+            id: newClassroom.id,
+            name: newClassroom.name,
+            gradeLevel,
+            roomNumber,
+            adviser: newClassroom.adviser,
+            status: 'ACTIVE',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
       } catch (err) {
-        console.error('Failed to insert ClassRoom in Supabase:', err);
+        console.error('Failed to create/reactivate ClassRoom in Supabase:', err);
       }
     }
 
     const current = getLocalClassrooms();
-    const updated = [...current, newClassroom];
+    const existingIndex = current.findIndex((c) => c.id === newClassroom.id || c.name === newClassroom.name);
+    let updated: ClassroomRosterItem[];
+    if (existingIndex !== -1) {
+      current[existingIndex] = newClassroom;
+      updated = [...current];
+    } else {
+      updated = [...current, newClassroom];
+    }
     saveLocalClassrooms(updated);
 
     try {

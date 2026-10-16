@@ -42,6 +42,7 @@ import { SgsRosterImportModal } from '../components/sgs/SgsRosterImportModal';
 import { SgsScoreExportModal } from '../components/sgs/SgsScoreExportModal';
 import type { SgsParsedRow } from '../services/sgsImportExportService';
 import { getM1SgsStudentInfo, isGrade1SgsStudentCode } from '../config/m1SgsLookup';
+import { Pagination, type PageSizeOption } from '../components/common/Pagination';
 
 interface StudentRosterViewProps {
   initialClassroomId?: string;
@@ -88,9 +89,9 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
   // Checkbox selection
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
 
-  // Pagination state (6 items per page according to mockup)
+  // Pagination state (รองรับ 10, 20, 30, 50, ทั้งหมด)
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const [pageSize, setPageSize] = useState<PageSizeOption>(10);
 
   // Modals state
   const [gradeModalStudent, setGradeModalStudent] = useState<StudentRecord | null>(null);
@@ -289,11 +290,12 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
   }, [students, searchTerm, genderFilter, statusFilter, studyGroupFilter, sortOption, studentAttendanceMap, selectedClass]);
 
   // Paginated Students
-  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage) || 1;
+  const effectivePageSize = pageSize === 'ALL' ? filteredStudents.length || 1 : (pageSize as number);
   const paginatedStudents = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredStudents.slice(start, start + itemsPerPage);
-  }, [filteredStudents, currentPage]);
+    if (pageSize === 'ALL') return filteredStudents;
+    const start = (currentPage - 1) * effectivePageSize;
+    return filteredStudents.slice(start, start + effectivePageSize);
+  }, [filteredStudents, currentPage, pageSize, effectivePageSize]);
 
   // Checkbox handlers
   const handleSelectAll = (checked: boolean) => {
@@ -312,7 +314,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
 
   // Reordering handlers
   const handleMoveStudentUp = (indexInPaginated: number) => {
-    const actualIndex = (currentPage - 1) * itemsPerPage + indexInPaginated;
+    const actualIndex = (currentPage - 1) * effectivePageSize + indexInPaginated;
     if (actualIndex <= 0) return;
     const reordered = [...students];
     const temp = reordered[actualIndex - 1];
@@ -324,7 +326,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
   };
 
   const handleMoveStudentDown = (indexInPaginated: number) => {
-    const actualIndex = (currentPage - 1) * itemsPerPage + indexInPaginated;
+    const actualIndex = (currentPage - 1) * effectivePageSize + indexInPaginated;
     if (actualIndex >= students.length - 1) return;
     const reordered = [...students];
     const temp = reordered[actualIndex + 1];
@@ -1255,7 +1257,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
 
                     {/* ลำดับ */}
                     <td className="py-3 px-4 text-center font-mono text-slate-500 font-semibold">
-                      {(currentPage - 1) * itemsPerPage + index + 1}
+                      {(currentPage - 1) * effectivePageSize + index + 1}
                     </td>
 
                     {/* ชื่อ-นามสกุล + Avatar */}
@@ -1576,50 +1578,17 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
       </div>
 
       {/* ========================================================
-          5. PAGINATION (ตามภาพ Mockup แถวล่างสุด)
+          5. PAGINATION (UI การแบ่งหน้ารองรับขนาดต่อหน้า & Smart Ellipsis)
          ======================================================== */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-3 sm:p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-        <p className="text-slate-500 font-medium">
-          แสดง {(currentPage - 1) * itemsPerPage + 1} -{' '}
-          {Math.min(currentPage * itemsPerPage, filteredStudents.length)} จาก{' '}
-          {filteredStudents.length} คน
-        </p>
-
-        {totalPages > 1 && (
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              disabled={currentPage <= 1}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="w-8 h-8 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
-            >
-              ‹
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <button
-                key={page}
-                type="button"
-                onClick={() => setCurrentPage(page)}
-                className={`w-8 h-8 rounded-xl font-bold transition-all cursor-pointer ${
-                  currentPage === page
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'border border-slate-200 hover:bg-slate-50 text-slate-700'
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-            <button
-              type="button"
-              disabled={currentPage >= totalPages}
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              className="w-8 h-8 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
-            >
-              ›
-            </button>
-          </div>
-        )}
-      </div>
+      <Pagination
+        currentPage={currentPage}
+        totalItems={filteredStudents.length}
+        pageSize={pageSize}
+        pageSizeOptions={[10, 20, 30, 50, 'ALL']}
+        onPageChange={(page) => setCurrentPage(page)}
+        onPageSizeChange={(size) => setPageSize(size)}
+        itemUnit="คน"
+      />
 
       {/* ========================================================
           6. MOBILE STICKY BOTTOM ACTION BAR (ตามภาพ Mockup ขวา)

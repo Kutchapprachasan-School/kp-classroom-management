@@ -22,6 +22,7 @@ import {
   Award,
   Layers,
   BookMarked,
+  Trash2,
 } from 'lucide-react';
 import {
   getSchoolSettings,
@@ -38,6 +39,7 @@ import { messagingService, CHAT_GROUPS_EVENT } from '../../services/messagingSer
 import { AdminTeacherBannerModal } from '../teacher/AdminTeacherBannerModal';
 import { attendanceCorrelationService } from '../../services/attendanceCorrelationService';
 import { sgsRosterAndSubmissionService } from '../../services/sgsRosterAndSubmissionService';
+import { TRASH_SYNC_EVENT } from '../../services/trashService';
 import { getBangkokTodayString } from '../../utils/timetableDateUtils';
 
 export type TeacherViewKey =
@@ -156,6 +158,21 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       .filter((s) => s.status === 'SUBMITTED_PENDING').length;
   };
 
+  const getTrashCount = () => {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('cls_trash_data');
+        if (stored) {
+          const arr = JSON.parse(stored);
+          if (Array.isArray(arr)) return arr.length;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return 0;
+  };
+
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(() =>
     messagingService.getTotalUnreadCount()
   );
@@ -163,20 +180,26 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
   const [pendingAssignmentsCount, setPendingAssignmentsCount] = useState<number>(() =>
     getPendingAssignmentsCount()
   );
+  const [trashCount, setTrashCount] = useState<number>(() => getTrashCount());
 
   useEffect(() => {
     const handleSync = () => {
       setUnreadMessagesCount(messagingService.getTotalUnreadCount());
       setIsAssemblyPending(checkAssemblyPending());
       setPendingAssignmentsCount(getPendingAssignmentsCount());
+      setTrashCount(getTrashCount());
     };
     window.addEventListener(CHAT_GROUPS_EVENT, handleSync);
     window.addEventListener('kp-copilot-updated', handleSync);
     window.addEventListener('kps-attendance-synced', handleSync);
+    window.addEventListener(TRASH_SYNC_EVENT, handleSync);
+    window.addEventListener('kps-data-sync-event', handleSync);
     return () => {
       window.removeEventListener(CHAT_GROUPS_EVENT, handleSync);
       window.removeEventListener('kp-copilot-updated', handleSync);
       window.removeEventListener('kps-attendance-synced', handleSync);
+      window.removeEventListener(TRASH_SYNC_EVENT, handleSync);
+      window.removeEventListener('kps-data-sync-event', handleSync);
     };
   }, []);
 
@@ -294,6 +317,17 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             ? {
                 badge: String(unreadMessagesCount),
                 badgeStyle: 'bg-blue-500 text-white font-extrabold',
+              }
+            : {}),
+        },
+        {
+          key: 'trash',
+          label: 'ถังขยะ',
+          icon: Trash2,
+          ...(trashCount > 0
+            ? {
+                badge: String(trashCount),
+                badgeStyle: 'bg-rose-50 text-rose-600 font-bold border border-rose-200',
               }
             : {}),
         },

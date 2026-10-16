@@ -35,6 +35,7 @@ import { SgsRosterImportModal } from '../components/sgs/SgsRosterImportModal';
 import { SgsScoreExportModal } from '../components/sgs/SgsScoreExportModal';
 import type { SgsParsedRow } from '../services/sgsImportExportService';
 import { getM1SgsStudentInfo, isGrade1SgsStudentCode } from '../config/m1SgsLookup';
+import { Pagination, type PageSizeOption } from '../components/common/Pagination';
 
 interface ClassroomsRosterViewProps {
   onSelectStudent: (student: AtRiskStudent) => void;
@@ -122,6 +123,10 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
   const [newAdviser, setNewAdviser] = useState(
     () => authService.getCurrentUser()?.name || 'ครูประจำชั้น'
   );
+
+  // Pagination state สำหรับรายชื่อนักเรียน
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSizeOption>(20);
 
   const classDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -647,10 +652,21 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
           return a.no - b.no;
         }
         if (sortOption === 'score-desc') return b.score - a.score;
-        if (sortOption === 'name-asc') return a.name.localeCompare(b.name, 'th');
         return a.no - b.no;
       });
   }, [students, searchTerm, filterStatus, genderFilter, sortOption]);
+
+  // Paginated Students
+  const effectivePageSize = pageSize === 'ALL' ? filteredStudents.length || 1 : (pageSize as number);
+  const paginatedStudents = useMemo(() => {
+    if (pageSize === 'ALL') return filteredStudents;
+    const start = (currentPage - 1) * effectivePageSize;
+    return filteredStudents.slice(start, start + effectivePageSize);
+  }, [filteredStudents, currentPage, pageSize, effectivePageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedClass?.id, searchTerm, filterStatus, genderFilter, sortOption]);
 
   // กรองห้องเรียน
   const filteredClassrooms = useMemo(() => {
@@ -1131,17 +1147,19 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                       </td>
                     </tr>
                   ) : (
-                    filteredStudents.map((stu, index) => (
+                    paginatedStudents.map((stu, index) => {
+                      const trueIndex = pageSize === 'ALL' ? index : (currentPage - 1) * (pageSize as number) + index;
+                      return (
                       <tr key={stu.id} className="hover:bg-blue-50/20 transition-colors">
                         {/* Up / Down Controls (สลับเลขที่ ป้องกันการเผลอกดผิด) */}
                         <td className="py-2.5 px-4 text-center">
                           <div className="flex items-center justify-center gap-1">
                             <button
                               type="button"
-                              onClick={() => handleMoveStudentUp(index)}
-                              disabled={index === 0}
+                              onClick={() => handleMoveStudentUp(trueIndex)}
+                              disabled={trueIndex === 0}
                               className={`p-1 rounded-lg border text-xs transition-colors cursor-pointer ${
-                                index === 0
+                                trueIndex === 0
                                   ? 'opacity-30 border-slate-200 text-slate-400 cursor-not-allowed'
                                   : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-700 hover:text-blue-600 active:scale-95'
                               }`}
@@ -1151,10 +1169,10 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleMoveStudentDown(index)}
-                              disabled={index === filteredStudents.length - 1}
+                              onClick={() => handleMoveStudentDown(trueIndex)}
+                              disabled={trueIndex === students.length - 1}
                               className={`p-1 rounded-lg border text-xs transition-colors cursor-pointer ${
-                                index === filteredStudents.length - 1
+                                trueIndex === students.length - 1
                                   ? 'opacity-30 border-slate-200 text-slate-400 cursor-not-allowed'
                                   : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-700 hover:text-blue-600 active:scale-95'
                               }`}
@@ -1279,12 +1297,26 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                           </div>
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
+
+          {/* Pagination Controls */}
+          <div className="p-4 border-t border-slate-100 bg-slate-50/40">
+            <Pagination
+              currentPage={currentPage}
+              totalItems={filteredStudents.length}
+              pageSize={pageSize}
+              pageSizeOptions={[10, 20, 30, 50, 'ALL']}
+              onPageChange={(page) => setCurrentPage(page)}
+              onPageSizeChange={(size) => setPageSize(size)}
+              itemUnit="คน"
+            />
+          </div>
+        </div>
         </div>
       )}
 
@@ -1551,6 +1583,42 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
             </div>
 
             <div className="space-y-3 text-xs">
+              {newClassName.trim().length > 0 && classroomService.isClassroomDeleted(newClassName.trim()) && (
+                <div className="p-3 bg-amber-50 border border-amber-200/90 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-amber-900 animate-fade-in">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>
+                      ⚠️ ห้องเรียน <strong>"{newClassName.trim()}"</strong> เคยถูกลบและอยู่ในถังขยะ
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const restored = await classroomService.restore(newClassName.trim());
+                        if (!restored) return;
+                        setAllClassrooms((prev) => {
+                          const exists = prev.some((c) => c.id === restored.id || c.name === restored.name);
+                          return exists ? prev.map((c) => (c.id === restored.id ? restored : c)) : [...prev, restored];
+                        });
+                        setSelectedClass(restored);
+                        setIsAddClassroomOpen(false);
+                        setNewClassName('');
+                        setTransferSuccessNotice(`กู้คืนห้องเรียน "${restored.name}" สำเร็จ`);
+                        setTimeout(() => setTransferSuccessNotice(null), 3500);
+                      } catch (err) {
+                        console.error('Error restoring classroom:', err);
+                        alert('ไม่สามารถกู้คืนห้องเรียนได้');
+                      }
+                    }}
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs shadow-2xs cursor-pointer active:scale-95 whitespace-nowrap self-start sm:self-auto"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>กู้คืนห้องเรียนนี้ทันที</span>
+                  </button>
+                </div>
+              )}
+
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">ชื่อห้องเรียน</label>
                 <input
