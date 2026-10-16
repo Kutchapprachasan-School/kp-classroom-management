@@ -1,0 +1,24 @@
+{
+  "name": "ระบบจัดการชั้นเรียน — โรงเรียนกุดจับประชาสรรค์",
+  "short_name": "จัดการชั้นเรียน",
+  "description": "ระบบบริหารจัดการชั้นเรียน & การศึกษาดิจิทัล โรงเรียนกุดจับประชาสรรค์",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7FAFF",
+  "theme_color": "#3B82F6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/images/teacher/school_logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/banners/school-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

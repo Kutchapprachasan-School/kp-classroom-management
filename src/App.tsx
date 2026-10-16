@@ -77,9 +77,18 @@ import {
   academicCalendarService,
   ACADEMIC_CALENDAR_EVENT,
 } from './services/academicCalendarService';
+import { AppLoadingScreen } from './components/common/AppLoadingScreen';
 
 export const App: React.FC = () => {
+  const [isAppReady, setIsAppReady] = useState(false);
   const [schoolSettings, setSchoolSettings] = useState(() => getSchoolSettings());
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsAppReady(true);
+    }, 450);
+    return () => clearTimeout(timer);
+  }, []);
   const [activeAcademicTerm, setActiveAcademicTerm] = useState(() =>
     academicCalendarService.getActiveTerm()
   );
@@ -359,6 +368,10 @@ export const App: React.FC = () => {
       setCurrentView('home');
     }
   };
+
+  if (!isAppReady) {
+    return <AppLoadingScreen />;
+  }
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans overflow-x-hidden">
