@@ -1350,6 +1350,90 @@ export const attendanceCorrelationService = {
       return this.compute80RuleFromRecords(code, records[0]?.courseCode || 'วิชาเรียน', records);
     });
   },
+
+  /**
+   * ลบประวัติการเช็คชื่อทั้งหมดของนักเรียนคนเดียว (ทั้งคาบเรียนและแถวเช้า)
+   */
+  deleteStudentAttendance(
+    studentCodeOrId: string,
+    classroomId?: string
+  ): { deletedPeriodCount: number; deletedMorningCount: number } {
+    const clean = studentCodeOrId.trim();
+    const targetRoom = classroomId ? normalizeClassroomId(classroomId) : null;
+
+    const allPeriod = readStorage<PeriodAttendanceRecord[]>(STORAGE_KEYS.PERIOD_ATTENDANCE, []);
+    const filteredPeriod = allPeriod.filter((r) => {
+      const match = r.studentCode === clean || r.studentId === clean || (r.studentName && r.studentName.trim() === clean);
+      if (!match) return true;
+      if (targetRoom && normalizeClassroomId(r.classroomId) !== targetRoom) return true;
+      return false; // delete this record
+    });
+    writeStorage(STORAGE_KEYS.PERIOD_ATTENDANCE, filteredPeriod);
+
+    const allMorning = readStorage<MorningAssemblyRecord[]>(STORAGE_KEYS.MORNING_ASSEMBLY, []);
+    const filteredMorning = allMorning.filter((r) => {
+      const match = r.studentCode === clean || r.studentId === clean || (r.studentName && r.studentName.trim() === clean);
+      if (!match) return true;
+      if (targetRoom && normalizeClassroomId(r.classroomId) !== targetRoom) return true;
+      return false; // delete this record
+    });
+    writeStorage(STORAGE_KEYS.MORNING_ASSEMBLY, filteredMorning);
+
+    return {
+      deletedPeriodCount: allPeriod.length - filteredPeriod.length,
+      deletedMorningCount: allMorning.length - filteredMorning.length,
+    };
+  },
+
+  /**
+   * ลบประวัติเช็คชื่อทั้งหมดของห้องเรียนที่ระบุ (เช่น เมื่อลบห้องเรียนทิ้งอย่างถาวร)
+   */
+  purgeClassroomAttendance(classroomId: string): { removedPeriod: number; removedMorning: number } {
+    const targetRoom = normalizeClassroomId(classroomId);
+
+    const allPeriod = readStorage<PeriodAttendanceRecord[]>(STORAGE_KEYS.PERIOD_ATTENDANCE, []);
+    const filteredPeriod = allPeriod.filter((r) => normalizeClassroomId(r.classroomId) !== targetRoom);
+    writeStorage(STORAGE_KEYS.PERIOD_ATTENDANCE, filteredPeriod);
+
+    const allMorning = readStorage<MorningAssemblyRecord[]>(STORAGE_KEYS.MORNING_ASSEMBLY, []);
+    const filteredMorning = allMorning.filter((r) => normalizeClassroomId(r.classroomId) !== targetRoom);
+    writeStorage(STORAGE_KEYS.MORNING_ASSEMBLY, filteredMorning);
+
+    return {
+      removedPeriod: allPeriod.length - filteredPeriod.length,
+      removedMorning: allMorning.length - filteredMorning.length,
+    };
+  },
+
+  /**
+   * กวาดล้างรายชื่อนักเรียนตกค้างในห้อง (Orphan Records) ให้ตรงกับรายชื่อจริงปัจจุบัน
+   */
+  purgeOrphanClassroomRecords(
+    classroomId: string,
+    validStudentCodes: string[]
+  ): { removedPeriod: number; removedMorning: number } {
+    const targetRoom = normalizeClassroomId(classroomId);
+    const validSet = new Set(validStudentCodes.map((c) => c.trim()));
+
+    const allPeriod = readStorage<PeriodAttendanceRecord[]>(STORAGE_KEYS.PERIOD_ATTENDANCE, []);
+    const filteredPeriod = allPeriod.filter((r) => {
+      if (normalizeClassroomId(r.classroomId) !== targetRoom) return true;
+      return validSet.has(r.studentCode.trim());
+    });
+    writeStorage(STORAGE_KEYS.PERIOD_ATTENDANCE, filteredPeriod);
+
+    const allMorning = readStorage<MorningAssemblyRecord[]>(STORAGE_KEYS.MORNING_ASSEMBLY, []);
+    const filteredMorning = allMorning.filter((r) => {
+      if (normalizeClassroomId(r.classroomId) !== targetRoom) return true;
+      return validSet.has(r.studentCode.trim());
+    });
+    writeStorage(STORAGE_KEYS.MORNING_ASSEMBLY, filteredMorning);
+
+    return {
+      removedPeriod: allPeriod.length - filteredPeriod.length,
+      removedMorning: allMorning.length - filteredMorning.length,
+    };
+  },
 };
 
 // Export shorthand alias

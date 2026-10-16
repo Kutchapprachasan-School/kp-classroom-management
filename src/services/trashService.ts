@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase';
 import type { SoftDeletedItem } from '../types/viewModels';
 import { classroomService } from './classroomService';
+import { attendanceCorrelationService } from './attendanceCorrelationService';
 
 const STORAGE_KEY_TRASH = 'cls_trash_data';
 export const TRASH_SYNC_EVENT = 'kps-trash-updated';
@@ -128,6 +129,24 @@ export const trashService = {
     const updated = current.filter((i) => i.id !== id);
     saveLocalTrash(updated);
 
+    if (target) {
+      if (target.entityType === 'ชั้นเรียน') {
+        try {
+          attendanceCorrelationService.purgeClassroomAttendance(target.name || target.id);
+          localStorage.removeItem(`cls_students_${target.id}`);
+          localStorage.removeItem(`cls_students_${target.name}`);
+        } catch (err) {
+          console.warn('Failed to purge classroom attendance/students on permanent delete:', err);
+        }
+      } else if (target.entityType === 'นักเรียน') {
+        try {
+          attendanceCorrelationService.deleteStudentAttendance(target.name || target.id);
+        } catch (err) {
+          console.warn('Failed to delete student attendance on permanent delete:', err);
+        }
+      }
+    }
+
     if (isSupabaseConfigured) {
       logDbOperation(`PERMANENT DELETE FROM TrashLog WHERE id = ${id}`);
       await supabase.from('TrashLog').delete().eq('id', id);
@@ -142,6 +161,25 @@ export const trashService = {
 
   // EMPTY TRASH: Purge everything in trash
   async emptyTrash(): Promise<void> {
+    const current = getLocalTrash();
+    for (const target of current) {
+      if (target.entityType === 'ชั้นเรียน') {
+        try {
+          attendanceCorrelationService.purgeClassroomAttendance(target.name || target.id);
+          localStorage.removeItem(`cls_students_${target.id}`);
+          localStorage.removeItem(`cls_students_${target.name}`);
+        } catch (err) {
+          console.warn('Failed to purge classroom attendance/students on empty trash:', err);
+        }
+      } else if (target.entityType === 'นักเรียน') {
+        try {
+          attendanceCorrelationService.deleteStudentAttendance(target.name || target.id);
+        } catch (err) {
+          console.warn('Failed to delete student attendance on empty trash:', err);
+        }
+      }
+    }
+
     saveLocalTrash([]);
 
     if (isSupabaseConfigured) {

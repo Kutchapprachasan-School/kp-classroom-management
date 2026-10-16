@@ -30,6 +30,8 @@ import {
   Flame,
   CheckCheck,
   ClipboardCheck,
+  Trash2,
+  RefreshCw,
 } from 'lucide-react';
 import {
   attendanceCorrelationService,
@@ -419,6 +421,79 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
     }
   };
 
+  // ลบนักเรียนคนเดียวออกจากระบบและการเช็คชื่อ
+  const handleDeleteStudent = async (student: PeriodAttendanceRecord) => {
+    const confirmDelete = window.confirm(
+      `คุณต้องการลบข้อมูลของ "${student.studentName}" (รหัส ${student.studentCode}) ออกจากระบบและประวัติการเช็คชื่อทั้งหมดใช่หรือไม่?\n\nข้อมูลนักเรียนคนนี้จะถูกลบออกจากห้องเรียนและการเช็คชื่ออย่างสมบูรณ์`
+    );
+    if (!confirmDelete) return;
+
+    // 1. ล้างประวัติการเช็คชื่อทั้งหมด (ทั้งคาบเรียนและแถวเช้า)
+    attendanceCorrelationService.deleteStudentAttendance(
+      student.studentCode || student.studentId,
+      selectedClassroom
+    );
+
+    // 2. ลบออกจากบัญชีรายชื่อนักเรียน
+    try {
+      await studentService.delete(selectedClassroom, student.studentId || student.studentCode);
+    } catch (err) {
+      console.warn('Could not delete from studentService:', err);
+    }
+
+    // 3. อัปเดต state และบันทึก
+    const updated = periodRecords.filter((r) => r.studentCode !== student.studentCode);
+    setPeriodRecords(updated);
+    attendanceCorrelationService.savePeriodRecords(updated);
+    showToast(`🗑️ ลบข้อมูล "${student.studentName}" ออกจากระบบและประวัติการเช็คชื่อเรียบร้อยแล้ว`);
+  };
+
+  // ซิงค์รายชื่อปัจจุบันและกวาดล้างข้อมูลตกค้าง (Orphan Records)
+  const handleSyncEnrolledRoster = () => {
+    const enrolled = studentService.getStudents(selectedClassroom);
+    if (!enrolled || enrolled.length === 0) {
+      showToast('⚠️ ไม่พบรายชื่อนักเรียนที่ลงทะเบียนในห้องนี้');
+      return;
+    }
+
+    const validCodes = enrolled.map((s) => s.code);
+    const purged = attendanceCorrelationService.purgeOrphanClassroomRecords(selectedClassroom, validCodes);
+
+    const enrolledMap = new Map(enrolled.map((s) => [s.code, s]));
+    const updatedRecords: PeriodAttendanceRecord[] = [];
+
+    // คงรายการที่มีอยู่จริงในห้อง
+    for (const r of periodRecords) {
+      if (enrolledMap.has(r.studentCode)) {
+        updatedRecords.push(r);
+        enrolledMap.delete(r.studentCode);
+      }
+    }
+
+    // เพิ่มนักเรียนใหม่ที่ยังไม่มีในรายการ
+    for (const [code, stu] of enrolledMap.entries()) {
+      updatedRecords.push({
+        id: `per-${selectedDate.replace(/-/g, '')}-${selectedCourse}-${code}`,
+        date: selectedDate,
+        classroomId: selectedClassroom,
+        courseCode: selectedCourse,
+        courseName: currentCourse?.shortSubject || 'รายวิชา',
+        periodNo: selectedPeriod,
+        studentId: stu.id,
+        studentCode: stu.code,
+        studentName: stu.name,
+        status: 'PRESENT',
+        source: 'MANUAL',
+        isOverridden: false,
+        markedAt: `${selectedDate}T08:30:00.000Z`,
+      });
+    }
+
+    attendanceCorrelationService.savePeriodRecords(updatedRecords);
+    setPeriodRecords(updatedRecords);
+    showToast(`🔄 ซิงค์รายชื่อปัจจุบันสำเร็จ (ล้างข้อมูลตกค้าง ${purged.removedPeriod} รายการ)`);
+  };
+
   // Stats computation for header cards
   const stats = useMemo(() => {
     const total = periodRecords.length;
@@ -749,6 +824,16 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                     <Award className="w-3.5 h-3.5 text-slate-500" />
                     <span>ดูสถิติรวม</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSyncEnrolledRoster}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-bold text-slate-700 transition-all cursor-pointer"
+                    title="ซิงค์รายชื่อปัจจุบันและล้างข้อมูลนักเรียนที่ถูกลบไปแล้ว (Orphan Records)"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
+                    <span>ซิงค์รายชื่อปัจจุบัน</span>
+                  </button>
                 </div>
               </div>
 
@@ -804,12 +889,13 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                     <th className="py-3 px-3 w-20 text-center">คำนำหน้า</th>
                     <th className="py-3 px-4">ชื่อ - สกุลนักเรียน</th>
                     <th className="py-3 px-4 text-center">การเช็คชื่อ (แตะเพื่อบันทึก)</th>
+                    <th className="py-3 px-2 w-12 text-center">จัดการ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {availableClassroomOptions.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-12 px-4 text-center">
+                      <td colSpan={6} className="py-12 px-4 text-center">
                         <div className="max-w-sm mx-auto flex flex-col items-center justify-center text-center">
                           <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center mb-3">
                             <AlertTriangle className="w-7 h-7" />
@@ -833,7 +919,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                     </tr>
                   ) : filteredRecords.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-12 px-4 text-center">
+                      <td colSpan={6} className="py-12 px-4 text-center">
                         <div className="max-w-sm mx-auto flex flex-col items-center justify-center text-center">
                           <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center mb-3">
                             <Users className="w-7 h-7" />
@@ -985,6 +1071,18 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                               </button>
                             </div>
                           </td>
+
+                          {/* จัดการ: ลบนักเรียนคนเดียว */}
+                          <td className="py-3 px-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteStudent(stu)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              title="ลบนักเรียนคนนี้ออกจากระบบ/การเช็คชื่อ"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
                         </tr>
                       );
                     })
@@ -1032,9 +1130,19 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                             {title} {name}
                           </button>
                         </div>
-                        <span className="text-[11px] font-mono text-slate-400">
-                          {stu.studentCode}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-mono text-slate-400">
+                            {stu.studentCode}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteStudent(stu)}
+                            className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="ลบนักเรียนคนนี้ออกจากระบบ/การเช็คชื่อ"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
 
                       {/* 6 Rapid Buttons Grid on Mobile */}

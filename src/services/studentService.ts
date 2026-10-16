@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase.ts';
 import { StudentCreateSchema, type StudentCreateInput } from './types.ts';
 import { cleanSlateService } from './cleanSlateService.ts';
+import { attendanceCorrelationService } from './attendanceCorrelationService.ts';
 
 export interface StudentRecord {
   id: string;
@@ -535,6 +536,16 @@ export const studentService = {
 
     const filtered = current.filter((s) => s.id !== id);
     saveLocalStudents(classroomId, filtered);
+
+    // ล้างประวัติการเช็คชื่อของนักเรียนคนนี้ออกจากระบบเช็คชื่อด้วย
+    try {
+      attendanceCorrelationService.deleteStudentAttendance(
+        target.code || target.studentCode || target.id,
+        classroomId
+      );
+    } catch (err) {
+      console.warn('Failed to delete student attendance records:', err);
+    }
 
     if (isSupabaseConfigured) {
       logDbOperation(`SOFT DELETE Student/StudentEnrollment: ${id}`);

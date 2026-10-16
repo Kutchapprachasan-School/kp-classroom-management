@@ -28,6 +28,7 @@ import {
   QrCode,
   Save,
   Flame,
+  Trash2,
 } from 'lucide-react';
 import {
   attendanceCorrelationService,
@@ -272,6 +273,76 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
     attendanceCorrelationService.saveMorningRecords(selectedClassroom, selectedDate, records);
     setHasUnsavedChanges(false);
     showToast(`💾 บันทึกผลการเช็คแถว ${selectedClassroomName || 'ห้องเรียน'} ประจำวันที่ ${selectedDate} เรียบร้อยแล้ว`);
+  };
+
+  // ลบนักเรียนคนเดียวออกจากระบบและการเช็คชื่อ
+  const handleDeleteStudent = async (student: MorningAssemblyRecord) => {
+    const confirmDelete = window.confirm(
+      `คุณต้องการลบข้อมูลของ "${student.studentName}" (รหัส ${student.studentCode}) ออกจากระบบและประวัติการเช็คชื่อทั้งหมดใช่หรือไม่?\n\nข้อมูลนักเรียนคนนี้จะถูกลบออกจากห้องเรียนและการเช็คชื่ออย่างสมบูรณ์`
+    );
+    if (!confirmDelete) return;
+
+    // 1. ล้างประวัติการเช็คชื่อทั้งหมด (ทั้งแถวเช้าและคาบเรียน)
+    attendanceCorrelationService.deleteStudentAttendance(
+      student.studentCode || student.studentId,
+      selectedClassroom
+    );
+
+    // 2. ลบออกจากบัญชีรายชื่อนักเรียน
+    try {
+      await studentService.delete(selectedClassroom, student.studentId || student.studentCode);
+    } catch (err) {
+      console.warn('Could not delete from studentService:', err);
+    }
+
+    // 3. อัปเดต state และบันทึก
+    const updated = records.filter((r) => r.studentCode !== student.studentCode);
+    setRecords(updated);
+    attendanceCorrelationService.saveMorningRecords(selectedClassroom, selectedDate, updated);
+    showToast(`🗑️ ลบข้อมูล "${student.studentName}" ออกจากระบบและประวัติการเช็คชื่อเรียบร้อยแล้ว`);
+  };
+
+  // ซิงค์รายชื่อปัจจุบันและกวาดล้างข้อมูลตกค้าง (Orphan Records)
+  const handleSyncEnrolledRoster = () => {
+    const enrolled = studentService.getStudents(selectedClassroom);
+    if (!enrolled || enrolled.length === 0) {
+      showToast('⚠️ ไม่พบรายชื่อนักเรียนที่ลงทะเบียนในห้องนี้');
+      return;
+    }
+
+    const validCodes = enrolled.map((s: any) => s.code);
+    const purged = attendanceCorrelationService.purgeOrphanClassroomRecords(selectedClassroom, validCodes);
+
+    const enrolledMap = new Map(enrolled.map((s: any) => [s.code, s]));
+    const updatedRecords: MorningAssemblyRecord[] = [];
+
+    // คงรายการที่มีอยู่จริงในห้อง
+    for (const r of records) {
+      if (enrolledMap.has(r.studentCode)) {
+        updatedRecords.push(r);
+        enrolledMap.delete(r.studentCode);
+      }
+    }
+
+    // เพิ่มนักเรียนใหม่ที่ยังไม่มีในรายการ
+    for (const [code, stu] of enrolledMap.entries()) {
+      updatedRecords.push({
+        id: `morning-${selectedDate}-${code}`,
+        date: selectedDate,
+        classroomId: selectedClassroom,
+        studentId: (stu as any).id,
+        studentCode: (stu as any).code,
+        studentName: (stu as any).name,
+        status: 'PRESENT',
+        source: 'MANUAL',
+        isOverridden: false,
+        markedAt: `${selectedDate}T07:55:00.000Z`,
+      });
+    }
+
+    attendanceCorrelationService.saveMorningRecords(selectedClassroom, selectedDate, updatedRecords);
+    setRecords(updatedRecords);
+    showToast(`🔄 ซิงค์รายชื่อปัจจุบันสำเร็จ (ล้างข้อมูลตกค้าง ${purged.removedMorning} รายการ)`);
   };
 
   // Open Classroom Stats Modal
@@ -737,6 +808,17 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
               <span>ดูสถิติห้อง</span>
             </button>
 
+            {/* Button 4.5: ซิงค์รายชื่อปัจจุบัน */}
+            <button
+              type="button"
+              onClick={handleSyncEnrolledRoster}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold shadow-2xs cursor-pointer transition-all"
+              title="ซิงค์รายชื่อนักเรียนให้ตรงกับห้องปัจจุบัน และล้างข้อมูลนักเรียนที่ถูกลบไปแล้ว (Orphan Records)"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
+              <span>ซิงค์รายชื่อ</span>
+            </button>
+
             {/* Button 5: Refresh */}
             <button
               type="button"
@@ -786,6 +868,7 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
                     <th className="py-3 px-4">ชื่อ - นามสกุล (คลิกเพื่อดูสถิติส่วนตัว)</th>
                     <th className="py-3 px-4 text-center w-72">สถานะการเข้าแถว</th>
                     <th className="py-3 px-4 text-center w-20">บัตร QR</th>
+                    <th className="py-3 px-2 text-center w-14">จัดการ</th>
                   </tr>
                 </thead>
 
@@ -861,6 +944,18 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
                             <QrCode className="w-4 h-4" />
                           </button>
                         </td>
+
+                        {/* จัดการ: ลบนักเรียนคนเดียว */}
+                        <td className="py-3 px-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteStudent(record)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="ลบนักเรียนคนนี้ออกจากระบบ/การเช็คแถว"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -887,9 +982,19 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
                     >
                       {index + 1}. {record.studentName}
                     </button>
-                    <span className="font-mono text-xs text-slate-400 font-bold">
-                      {record.studentCode}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-xs text-slate-400 font-bold">
+                        {record.studentCode}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteStudent(record)}
+                        className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                        title="ลบนักเรียนคนนี้ออกจากระบบ/การเช็คแถว"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-5 gap-1 pt-2 text-[11px] font-bold">
