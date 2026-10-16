@@ -38,14 +38,14 @@ import {
   type AssemblyCalendarDayInfo,
 } from '../services/attendanceCorrelationService';
 import { studentService } from '../services/studentService';
-import { academicCalendarService } from '../services/academicCalendarService';
+import { academicCalendarService, parseThaiDateToIso } from '../services/academicCalendarService';
 import type { CrossViewNavigationPayload } from '../services/teacherCopilotService';
 import { DynamicQrAttendanceModal } from '../components/attendance/DynamicQrAttendanceModal';
 import { StudentQrScannerModal } from '../components/attendance/StudentQrScannerModal';
 import { StudentIdCardModal } from '../components/attendance/StudentIdCardModal';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 import { getBangkokNow, getBangkokTodayString } from '../utils/timetableDateUtils';
-import { classroomService } from '../services/classroomService';
+import { classroomService, getLocalClassrooms } from '../services/classroomService';
 import type { ClassroomRosterItem } from '../types/viewModels';
 import { authService } from '../services/authService';
 
@@ -60,14 +60,40 @@ const THAI_MONTH_NAMES = [
 
 const DEFAULT_TODAY = getBangkokTodayString();
 
+const getInitialMorningClassroom = (): { id: string; name: string; isAdvisor: boolean } => {
+  const rooms = getLocalClassrooms();
+  const currentUser = authService.getCurrentUser();
+  const teacherName = currentUser?.name || currentUser?.username;
+
+  if (currentUser?.classroomId) {
+    const match = rooms.find((r) => r.id === currentUser.classroomId || r.name === currentUser.classroomId);
+    if (match) return { id: match.id, name: match.name, isAdvisor: true };
+  }
+
+  if (teacherName) {
+    const myRoom = rooms.find((r) => {
+      const advList = [r.adviser, r.coAdviser, r.thirdAdviser, ...(r.advisers || [])].filter(Boolean) as string[];
+      return advList.some((name) => name && (name === teacherName || name.includes(teacherName) || teacherName.includes(name)));
+    });
+    if (myRoom) return { id: myRoom.id, name: myRoom.name, isAdvisor: true };
+  }
+
+  if (rooms.length > 0) {
+    return { id: rooms[0].id, name: rooms[0].name, isAdvisor: false };
+  }
+
+  return { id: '', name: '', isAdvisor: false };
+};
+
 export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeepNavigate }) => {
   // ----------------------------------------------------
   // Core States
   // ----------------------------------------------------
-  const [allClassrooms, setAllClassrooms] = useState<ClassroomRosterItem[]>([]);
-  const [selectedClassroom, setSelectedClassroom] = useState<string>('room-3-1');
-  const [selectedClassroomName, setSelectedClassroomName] = useState<string>('ม.3/1');
-  const [isTeacherAdvisor, setIsTeacherAdvisor] = useState<boolean>(true);
+  const initialClassroom = useMemo(() => getInitialMorningClassroom(), []);
+  const [allClassrooms, setAllClassrooms] = useState<ClassroomRosterItem[]>(() => getLocalClassrooms());
+  const [selectedClassroom, setSelectedClassroom] = useState<string>(() => initialClassroom.id);
+  const [selectedClassroomName, setSelectedClassroomName] = useState<string>(() => initialClassroom.name);
+  const [isTeacherAdvisor, setIsTeacherAdvisor] = useState<boolean>(() => initialClassroom.isAdvisor);
   const [selectedDate, setSelectedDate] = useState<string>(() => getBangkokTodayString());
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -102,35 +128,30 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
     classroomService.getAll().then((rooms) => {
       if (!isMounted) return;
       setAllClassrooms(rooms);
+      const match = rooms.find((r) => r.id === selectedClassroom || r.name === selectedClassroom);
       const currentUser = authService.getCurrentUser();
-      const teacherName = currentUser?.name || currentUser?.username;
-
-      let myRoom = rooms.find((r) => {
-        const advList = [r.adviser, r.coAdviser, r.thirdAdviser, ...(r.advisers || [])].filter(Boolean) as string[];
-        return advList.some((name) => name && teacherName && (name === teacherName || name.includes(teacherName) || teacherName.includes(name)));
-      });
-
-      if (!myRoom && currentUser?.classroomId) {
-        myRoom = rooms.find((r) => r.id === currentUser.classroomId || r.name === currentUser.classroomId);
-      }
-
-      if (myRoom) {
-        setSelectedClassroom(myRoom.id);
-        setSelectedClassroomName(myRoom.name);
-        setIsTeacherAdvisor(true);
-      } else {
-        // ครูผู้สอนยังไม่ได้เป็นครูที่ปรึกษาประจำห้องใดๆ
-        setIsTeacherAdvisor(false);
-        if (rooms.length > 0) {
-          setSelectedClassroom(rooms[0].id);
-          setSelectedClassroomName(rooms[0].name);
-        }
+      const currentTeacherName = currentUser?.name || 'นายปัญจพล';
+      if (match) {
+        setSelectedClassroomName(match.name);
+        const advisers = match.advisers || [match.adviser, match.coAdviser, match.thirdAdviser].filter(Boolean) as string[];
+        const isAdvisor = advisers.some((adv) => adv.includes(currentTeacherName) || currentTeacherName.includes(adv)) ||
+          currentUser?.classroomId === match.id ||
+          currentUser?.classroomId === match.name;
+        setIsTeacherAdvisor(isAdvisor);
+      } else if (!selectedClassroom && rooms.length > 0) {
+        setSelectedClassroom(rooms[0].id);
+        setSelectedClassroomName(rooms[0].name);
+        const advisers = rooms[0].advisers || [rooms[0].adviser, rooms[0].coAdviser, rooms[0].thirdAdviser].filter(Boolean) as string[];
+        const isAdvisor = advisers.some((adv) => adv.includes(currentTeacherName) || currentTeacherName.includes(adv)) ||
+          currentUser?.classroomId === rooms[0].id ||
+          currentUser?.classroomId === rooms[0].name;
+        setIsTeacherAdvisor(isAdvisor);
       }
     });
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [selectedClassroom]);
 
   // ----------------------------------------------------
   // Data Loading & Roster Normalization
@@ -250,7 +271,7 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
     if (records.length === 0) return;
     attendanceCorrelationService.saveMorningRecords(selectedClassroom, selectedDate, records);
     setHasUnsavedChanges(false);
-    showToast(`💾 บันทึกผลการเช็คแถว ม.3/1 ประจำวันที่ ${selectedDate} เรียบร้อยแล้ว`);
+    showToast(`💾 บันทึกผลการเช็คแถว ${selectedClassroomName || 'ห้องเรียน'} ประจำวันที่ ${selectedDate} เรียบร้อยแล้ว`);
   };
 
   // Open Classroom Stats Modal
@@ -274,30 +295,36 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
 
   // Mini-Calendar Days computation bounded strictly by active term
   const calendarDays = useMemo(() => {
-    const activeTerm = academicCalendarService.getActiveTerm();
-    const holidays = academicCalendarService.getHolidays().map((h) => h.date);
+    const holidays = academicCalendarService.getHolidays().filter((h) => h.isActive);
+    const makeupDays = academicCalendarService.getWeekendMakeupDays().filter((m) => m.isActive);
 
     // Days in current calendar month
     const totalDays = new Date(calendarYear, calendarMonth, 0).getDate();
-    const days: AssemblyCalendarDayInfo[] = [];
+    const days: (AssemblyCalendarDayInfo & {
+      isWeekendDay: boolean;
+      isHolidayDay: boolean;
+      isTermBreak: boolean;
+      statusType: 'CHECKED' | 'UNCHECKED' | 'WEEKEND' | 'HOLIDAY' | 'TERM_BREAK';
+      statusTooltip: string;
+    })[] = [];
 
     for (let day = 1; day <= totalDays; day++) {
       const dateStr = `${calendarYear}-${String(calendarMonth).padStart(2, '0')}-${String(
         day
       ).padStart(2, '0')}`;
       const dayOfWeek = new Date(calendarYear, calendarMonth - 1, day).getDay(); // 0 = อา, 6 = ส
-      const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
+      const isWeekendDay = dayOfWeek === 0 || dayOfWeek === 6;
       const isPastOrToday = dateStr <= DEFAULT_TODAY;
 
       // ตรวจสอบว่าอยู่ในช่วงเปิดเทอมของภาคเรียนจริงหรือไม่
-      const isWithinTerm = activeTerm
-        ? dateStr >= activeTerm.startDate && dateStr <= activeTerm.endDate
-        : (calendarMonth > 5 && calendarMonth < 10) ||
-          (calendarMonth === 5 && day >= 15) ||
-          (calendarMonth === 10 && day <= 10);
+      const isWithinTerm = academicCalendarService.isDateInActiveTerm(dateStr);
 
-      const isHoliday = holidays.some((h) => h.includes(`${day} ต.ค.`));
-      const isEligibleSchoolday = isWeekday && isWithinTerm && !isHoliday;
+      const holidayMatch = holidays.find((h) => parseThaiDateToIso(h.date) === dateStr);
+      const isHolidayDay = !!holidayMatch;
+      const isMakeupDay = makeupDays.some((m) => parseThaiDateToIso(m.date) === dateStr);
+
+      // วันที่มีการเรียนการสอนจริง
+      const isInstructional = isWithinTerm && !isHolidayDay && (!isWeekendDay || isMakeupDay);
 
       const dayRecords = attendanceCorrelationService.getMorningRecords(selectedClassroom, dateStr);
       const isChecked = dayRecords.length > 0;
@@ -306,11 +333,34 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
       const absentCount = dayRecords.filter((r) => r.status === 'ABSENT').length;
       const leaveCount = dayRecords.filter((r) => r.status === 'LEAVE').length;
 
+      let statusType: 'CHECKED' | 'UNCHECKED' | 'WEEKEND' | 'HOLIDAY' | 'TERM_BREAK' = 'TERM_BREAK';
+      let statusTooltip = 'ปิดภาคเรียน / นอกภาคเรียน';
+
+      if (!isWithinTerm) {
+        statusType = 'TERM_BREAK';
+        statusTooltip = 'ปิดภาคเรียน';
+      } else if (isHolidayDay) {
+        statusType = 'HOLIDAY';
+        statusTooltip = `วันหยุดนักขัตฤกษ์: ${holidayMatch?.name || 'วันหยุด'}`;
+      } else if (isWeekendDay && !isMakeupDay) {
+        statusType = 'WEEKEND';
+        statusTooltip = 'วันหยุดสุดสัปดาห์ (ไม่มีเรียน)';
+      } else if (isChecked) {
+        statusType = 'CHECKED';
+        statusTooltip = `เช็คแล้ว (มา ${presentCount}, สาย ${lateCount}, ขาด ${absentCount}, ลา ${leaveCount})`;
+      } else if (isPastOrToday) {
+        statusType = 'UNCHECKED';
+        statusTooltip = 'ยังไม่เช็ค (วันเรียน)';
+      } else {
+        statusType = 'UNCHECKED';
+        statusTooltip = 'ยังไม่ถึงกำหนด (วันเรียนล่วงหน้า)';
+      }
+
       days.push({
         date: dateStr,
         dayOfMonth: day,
         dayOfWeek,
-        isWeekday: isEligibleSchoolday,
+        isWeekday: isInstructional,
         isPastOrToday,
         isToday: dateStr === DEFAULT_TODAY,
         isChecked,
@@ -320,6 +370,11 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
         absentCount,
         leaveCount,
         recordsCount: dayRecords.length,
+        isWeekendDay,
+        isHolidayDay,
+        isTermBreak: !isWithinTerm,
+        statusType,
+        statusTooltip,
       });
     }
 
@@ -377,7 +432,16 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
               onChange={(e) => {
                 const r = allClassrooms.find((c) => c.id === e.target.value);
                 setSelectedClassroom(e.target.value);
-                if (r) setSelectedClassroomName(r.name);
+                if (r) {
+                  setSelectedClassroomName(r.name);
+                  const currentUser = authService.getCurrentUser();
+                  const currentTeacherName = currentUser?.name || 'นายปัญจพล';
+                  const advisers = r.advisers || [r.adviser, r.coAdviser, r.thirdAdviser].filter(Boolean) as string[];
+                  const isAdvisor = advisers.some((adv) => adv.includes(currentTeacherName) || currentTeacherName.includes(adv)) ||
+                    currentUser?.classroomId === r.id ||
+                    currentUser?.classroomId === r.name;
+                  setIsTeacherAdvisor(isAdvisor);
+                }
               }}
               className="bg-transparent font-bold text-slate-800 text-xs outline-none cursor-pointer pr-1"
             >
@@ -424,22 +488,22 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
               </button>
             )}
 
-            {/* Mini-Calendar Popover (จำกัดเฉพาะวันเปิดเรียน ภาคเรียนที่ 1/2569) */}
+            {/* Mini-Calendar Popover (แสดงสถานะรายวัน สีเขียว=เช็คแล้ว, สีแดง=ยังไม่เช็ค, สีเทา/Slate=เสาร์-อาทิตย์, สีส้ม=วันหยุด) */}
             {isCalendarOpen && (
-              <div className="absolute left-0 mt-2 z-40 bg-white rounded-2xl border border-slate-200 shadow-2xl p-4 w-76 animate-fade-in text-slate-800">
-                <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+              <div className="absolute left-0 mt-2 z-40 bg-white rounded-2xl border border-slate-200/90 shadow-2xl p-4 w-84 sm:w-88 animate-fade-in text-slate-800">
+                <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-100">
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() =>
                         setCalendarMonth((prev) => (prev === 1 ? 12 : prev - 1))
                       }
-                      className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 cursor-pointer"
+                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
                       title="เดือนก่อนหน้า"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </button>
-                    <span className="text-xs font-extrabold text-slate-900">
+                    <span className="text-xs sm:text-sm font-extrabold text-slate-900 min-w-[130px] text-center">
                       {THAI_MONTH_NAMES[calendarMonth - 1]} {calendarYear + 543}
                     </span>
                     <button
@@ -447,7 +511,7 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
                       onClick={() =>
                         setCalendarMonth((prev) => (prev === 12 ? 1 : prev + 1))
                       }
-                      className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 cursor-pointer"
+                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
                       title="เดือนถัดไป"
                     >
                       <ChevronRight className="w-4 h-4" />
@@ -458,55 +522,64 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
                     type="button"
                     onClick={() => {
                       setSelectedDate(DEFAULT_TODAY);
-                      setCalendarMonth(10);
-                      setCalendarYear(2026);
+                      setCalendarMonth(getBangkokNow().getMonth() + 1);
+                      setCalendarYear(getBangkokNow().getFullYear());
                       setIsCalendarOpen(false);
                     }}
-                    className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg cursor-pointer"
+                    className="text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
                   >
                     วันนี้
                   </button>
                 </div>
 
                 {/* Day Headers */}
-                <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 mb-1">
-                  <span>อา</span>
+                <div className="grid grid-cols-7 gap-1.5 text-center text-[11px] font-extrabold text-slate-400 mb-2">
+                  <span className="text-rose-500">อา</span>
                   <span>จ</span>
                   <span>อ</span>
                   <span>พ</span>
                   <span>พฤ</span>
                   <span>ศ</span>
-                  <span>ส</span>
+                  <span className="text-rose-500">ส</span>
                 </div>
 
                 {/* Days Grid */}
-                <div className="grid grid-cols-7 gap-1">
+                <div className="grid grid-cols-7 gap-1.5">
                   {Array.from({
                     length: new Date(calendarYear, calendarMonth - 1, 1).getDay(),
                   }).map((_, i) => (
-                    <div key={`empty-${i}`} className="h-8" />
+                    <div key={`empty-${i}`} className="h-9" />
                   ))}
 
                   {calendarDays.map((d) => {
                     const isSelected = d.date === selectedDate;
 
-                    let cellBg = 'text-slate-400 select-none cursor-not-allowed';
-                    let dotColor = null;
+                    let cellBg = 'bg-slate-50 text-slate-400 border border-slate-100 cursor-not-allowed select-none';
+                    let dotColor: string | null = null;
+                    const canSelect = d.isWeekday && d.isPastOrToday;
 
-                    if (d.isWeekday) {
-                      if (d.isChecked) {
-                        cellBg = 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 cursor-pointer';
-                        dotColor = 'bg-emerald-500';
-                      } else if (d.isPastOrToday) {
-                        cellBg = 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100 font-bold cursor-pointer';
-                        dotColor = 'bg-rose-500';
-                      } else {
-                        cellBg = 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-100 cursor-pointer';
-                      }
+                    if (d.statusType === 'CHECKED') {
+                      cellBg =
+                        'bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 font-bold cursor-pointer shadow-2xs';
+                      dotColor = 'bg-emerald-500';
+                    } else if (d.statusType === 'UNCHECKED') {
+                      cellBg =
+                        'bg-rose-50 text-rose-800 border border-rose-300 hover:bg-rose-100 font-bold cursor-pointer shadow-2xs';
+                      dotColor = 'bg-rose-500';
+                    } else if (d.statusType === 'WEEKEND') {
+                      cellBg =
+                        'bg-slate-100 text-slate-400 border border-slate-200/70 select-none cursor-default opacity-85';
+                    } else if (d.statusType === 'HOLIDAY') {
+                      cellBg =
+                        'bg-amber-50 text-amber-800 border border-amber-200 select-none cursor-default font-semibold';
+                      dotColor = 'bg-amber-400';
+                    } else if (d.statusType === 'TERM_BREAK') {
+                      cellBg =
+                        'bg-slate-50 text-slate-300 border border-slate-100/60 select-none cursor-default';
                     }
 
                     if (isSelected) {
-                      cellBg += ' ring-2 ring-blue-600 font-black';
+                      cellBg += ' ring-2 ring-blue-600 font-black shadow-xs';
                     }
 
                     return (
@@ -514,15 +587,15 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
                         key={d.date}
                         type="button"
                         onClick={() => {
-                          if (d.isWeekday && d.isPastOrToday) {
+                          if (canSelect) {
                             setSelectedDate(d.date);
                             setIsCalendarOpen(false);
                             showToast(`เลือกวันที่ ${d.dayOfMonth} ${THAI_MONTH_NAMES[calendarMonth - 1]} ${calendarYear + 543}`);
                           }
                         }}
-                        disabled={!d.isWeekday || !d.isPastOrToday}
-                        className={`h-8 rounded-lg text-xs font-semibold flex flex-col items-center justify-center relative transition-all ${cellBg}`}
-                        title={d.isWeekday ? (d.isChecked ? 'เช็คแล้ว' : 'ยังไม่เช็ค') : 'วันหยุด / นอกภาคเรียน'}
+                        disabled={!canSelect}
+                        className={`h-9 rounded-xl text-xs flex flex-col items-center justify-center relative transition-all ${cellBg}`}
+                        title={d.statusTooltip}
                       >
                         <span className="leading-none">{d.dayOfMonth}</span>
                         {dotColor && (
@@ -533,18 +606,19 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
                   })}
                 </div>
 
-                <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500 font-bold">
-                  <div className="flex items-center gap-1">
+                {/* Legend */}
+                <div className="mt-3.5 pt-2.5 border-t border-slate-100 grid grid-cols-3 gap-1.5 text-[10px] text-slate-600 font-bold text-center">
+                  <div className="flex items-center justify-center gap-1.5 bg-emerald-50/80 px-1.5 py-1 rounded-lg border border-emerald-100 text-emerald-800">
                     <span className="w-2 h-2 rounded-full bg-emerald-500" />
                     <span>เช็คแล้ว</span>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center justify-center gap-1.5 bg-rose-50/80 px-1.5 py-1 rounded-lg border border-rose-100 text-rose-800">
                     <span className="w-2 h-2 rounded-full bg-rose-500" />
                     <span>ยังไม่เช็ค</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-slate-300" />
-                    <span>นอกภาคเรียน</span>
+                  <div className="flex items-center justify-center gap-1.5 bg-slate-100 px-1.5 py-1 rounded-lg border border-slate-200/70 text-slate-500">
+                    <span className="w-2 h-2 rounded-full bg-slate-400" />
+                    <span>วันหยุด/เสาร์-อาทิตย์</span>
                   </div>
                 </div>
               </div>

@@ -633,9 +633,7 @@ export const App: React.FC = () => {
               {currentView === 'class-overview' && (
                 <TeacherOverviewView
                   onSelectStudent={handleSelectStudent}
-                  onViewFullTable={() =>
-                    alert('เปิดตารางคะแนนเต็มของวิชา ศ23101 ศิลปะ ม.3/1 รร.กุดจับประชาสรรค์')
-                  }
+                  onViewFullTable={() => setCurrentView('sar')}
                   onSwitchToAdventure={() => setCurrentView('student-portal')}
                   initialTab={deepLinkClassTab}
                   initialGradesFilter={deepLinkGradesFilter}

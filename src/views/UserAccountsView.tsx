@@ -180,7 +180,7 @@ export const UserAccountsView: React.FC<UserAccountsViewProps> = ({
             className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold shadow-xs transition-colors"
           >
             <Plus className="w-4 h-4" />
-            <span>+ เพิ่มบัญชีผู้ใช้ใหม่</span>
+            <span>เพิ่มบัญชีผู้ใช้ใหม่</span>
           </button>
         </div>
       </div>

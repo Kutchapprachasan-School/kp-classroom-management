@@ -393,20 +393,13 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
       .getSgsRoster()
       .filter((s) => s.transferState !== 'TRANSFERRED_OUT')
       .map((s) => {
-        const hasApprovedLeave = s.studentCode === '45109';
-        const assemblyLabel =
-          s.studentCode === '45109'
-            ? 'ลาป่วย (อนุมัติแล้ว)'
-            : s.studentCode === '45104'
-            ? 'สายเสาธง (08:12)'
-            : s.studentCode === '45107'
-            ? 'ขาดเข้าแถวเสาธง'
-            : 'เข้าแถวปกติ';
+        const hasApprovedLeave = s.morningStatusLabel?.includes('ลา') || false;
+        const assemblyLabel = s.morningStatusLabel || 'เข้าแถวปกติ';
         return {
           no: s.sgsSeatNo,
           code: s.studentCode,
           name: s.studentName,
-          status: hasApprovedLeave ? 'LEAVE' : s.studentCode === '45107' ? 'ABSENT' : 'PRESENT',
+          status: hasApprovedLeave ? 'LEAVE' : 'PRESENT',
           hasApprovedLeave,
           assemblyLabel,
         };
@@ -2369,7 +2362,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                   if (realClassroomStudents.length > 0) {
                     await scoreService.batchUpsertScores(
                       'asg-1',
-                      selectedClassroom || 'room-3-1',
+                      selectedClassroom || currentSubject?.classrooms?.[0] || 'room-1-1',
                       10,
                       realClassroomStudents.map((stu) => ({
                         enrollmentId: stu.id || `stu-${stu.no}`,

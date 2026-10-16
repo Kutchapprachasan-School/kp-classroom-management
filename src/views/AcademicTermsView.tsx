@@ -1166,7 +1166,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-2xs transition-colors cursor-pointer"
               >
                 <AddRegular className="w-4 h-4" />
-                <span>+ เพิ่มกิจกรรมวันนี้</span>
+                <span>เพิ่มกิจกรรมวันนี้</span>
               </button>
             </div>
 
@@ -1361,7 +1361,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
             className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm shadow-xs transition-colors cursor-pointer"
           >
             <AddRegular className="w-4 h-4" />
-            <span>+ เพิ่มกิจกรรม</span>
+            <span>เพิ่มกิจกรรม</span>
           </button>
         </div>
       </div>

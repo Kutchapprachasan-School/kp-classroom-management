@@ -592,13 +592,15 @@ D) ผู้อำนวยการ
 
     async function loadDataForExam() {
       try {
-        let roomId = currentExam.classroom || currentExam.roomName || 'room-3-1';
+        let roomId = currentExam.classroom || currentExam.roomName || '';
         const allRooms = await classroomService.getAll();
         const matched = allRooms.find(
           (r) => r.name === roomId || r.roomNumber === roomId || r.id === roomId
         );
         if (matched) {
           roomId = matched.id;
+        } else if (!roomId && allRooms.length > 0) {
+          roomId = allRooms[0].id;
         }
 
         const realStudents = await studentService.getByClassroom(roomId);
@@ -2670,7 +2672,7 @@ D) ผู้อำนวยการ
           examId={playerExam.id}
           studentCode="45101"
           studentName="ด.ช. กฤษณะ ศรีสมบูรณ์"
-          classroomId={playerExam.roomName || 'room-3-1'}
+          classroomId={playerExam.roomName || (classroomService.getClassroomsSync()[0]?.id || 'room-1-1')}
           onGraded={(score, isPassed) => {
             showToast(
               isPassed

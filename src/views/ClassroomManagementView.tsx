@@ -498,7 +498,7 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
                   className="flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-blue-900/20 transition-all cursor-pointer active:scale-95 whitespace-nowrap"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>+ เพิ่มห้องเรียน</span>
+                  <span>เพิ่มห้องเรียน</span>
                 </button>
               </>
             )}

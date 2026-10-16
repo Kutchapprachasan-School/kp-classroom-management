@@ -442,7 +442,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                             className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-95"
                           >
                             <Edit3 className="w-4 h-4" />
-                            <span>+ สร้างภาระงานใหม่</span>
+                            <span>สร้างภาระงานใหม่</span>
                           </button>
                         </div>
                       </td>
@@ -637,7 +637,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                     className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center gap-2 cursor-pointer active:scale-95"
                   >
                     <Edit3 className="w-4 h-4" />
-                    <span>+ สร้างภาระงานใหม่</span>
+                    <span>สร้างภาระงานใหม่</span>
                   </button>
                 </div>
               ) : (

@@ -584,7 +584,7 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
             className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-blue-900/20 transition-all cursor-pointer active:scale-95 whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
-            <span>+ สร้างรายวิชาใหม่</span>
+            <span>สร้างรายวิชาใหม่</span>
           </button>
 
           <button
@@ -752,7 +752,7 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
                   className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>+ เพิ่มหน่วยการเรียนรู้</span>
+                  <span>เพิ่มหน่วยการเรียนรู้</span>
                 </button>
               </div>
             </div>

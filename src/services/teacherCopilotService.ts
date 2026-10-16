@@ -11,6 +11,7 @@ import {
   type Attendance80Summary,
 } from './attendanceCorrelationService';
 import { getBangkokTodayString } from '../utils/timetableDateUtils';
+import { authService } from './authService';
 
 export type TimeOfDayScenario =
   | 'MORNING_0745'
@@ -593,13 +594,14 @@ export const teacherCopilotService = {
       )
     );
 
-    const morningRecords = attendanceCorrelationService.getMorningRecords('room-3-1', todayStr);
+    const homeroomId = authService.getCurrentUser()?.classroomId || 'room-1-1';
+    const morningRecords = attendanceCorrelationService.getMorningRecords(homeroomId, todayStr);
     const morningDone = st.morningAssemblyDone || morningRecords.length > 0 || isHoliday || isWeekend;
 
-    const period7Records = attendanceCorrelationService.getPeriodRecords('ก23901', 'room-3-1', todayStr, 7);
+    const period7Records = attendanceCorrelationService.getPeriodRecords('ก23901', homeroomId, todayStr, 7);
     const period7Done = st.period7Done || period7Records.length > 0 || isHoliday || isWeekend;
 
-    const summaries = attendanceCorrelationService.calculate80Rule('room-3-1');
+    const summaries = attendanceCorrelationService.calculate80Rule(homeroomId);
     const atRiskList = summaries.filter((s: Attendance80Summary) => !s.isEligibleForExam);
     const atRiskStudent = atRiskList[0];
 

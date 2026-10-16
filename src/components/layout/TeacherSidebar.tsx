@@ -39,6 +39,9 @@ import { messagingService, CHAT_GROUPS_EVENT } from '../../services/messagingSer
 import { AdminTeacherBannerModal } from '../teacher/AdminTeacherBannerModal';
 import { attendanceCorrelationService } from '../../services/attendanceCorrelationService';
 import { sgsRosterAndSubmissionService } from '../../services/sgsRosterAndSubmissionService';
+import { academicCalendarService, ACADEMIC_CALENDAR_EVENT } from '../../services/academicCalendarService';
+import { getLocalClassrooms } from '../../services/classroomService';
+import { authService } from '../../services/authService';
 import { TRASH_SYNC_EVENT } from '../../services/trashService';
 import { getBangkokTodayString } from '../../utils/timetableDateUtils';
 
@@ -143,13 +146,52 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     return () => window.removeEventListener('kps-school-settings-updated', handleSettingsUpdate);
   }, []);
 
-  const checkAssemblyPending = () => {
+  const getTeacherHomeroomClassroomId = (): string => {
+    const currentUser = authService.getCurrentUser();
+    if (currentUser?.classroomId) return currentUser.classroomId;
+    const rooms = getLocalClassrooms();
+    const teacherName = currentUser?.name || currentUser?.username;
+    if (teacherName) {
+      const myRoom = rooms.find((r) => {
+        const advList = [r.adviser, r.coAdviser, r.thirdAdviser, ...(r.advisers || [])].filter(Boolean) as string[];
+        return advList.some((name) => name && (name === teacherName || name.includes(teacherName) || teacherName.includes(name)));
+      });
+      if (myRoom) return myRoom.id;
+    }
+    return rooms[0]?.id || '';
+  };
+
+  const getAssemblyPendingCount = (): number => {
     const todayStr = getBangkokTodayString();
-    const isHoliday = attendanceCorrelationService.isHoliday(todayStr);
-    const isWeekend = attendanceCorrelationService.isWeekend(todayStr);
-    if (isHoliday || isWeekend) return false;
-    const records = attendanceCorrelationService.getMorningRecords('room-3-1', todayStr);
-    return records.length === 0;
+    // 1. ถ้ายังไม่ถึงช่วงเปิดเทอม หรืออยู่ในช่วงปิดเทอม ไม่ต้องแจ้งเตือน
+    if (!academicCalendarService.isDateInActiveTerm(todayStr)) {
+      return 0;
+    }
+
+    const homeroomId = getTeacherHomeroomClassroomId();
+    if (!homeroomId) return 0;
+
+    // 2. คำนวณวันที่มีเรียนและยังไม่ได้เช็คชื่อ (วันที่มีการเรียนการสอนย้อนหลังในเทอมปัจจุบัน จนถึงวันนี้)
+    let uncheckedDays = 0;
+    const todayDate = new Date();
+    for (let offset = 0; offset < 14; offset++) {
+      const d = new Date(todayDate);
+      d.setDate(todayDate.getDate() - offset);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+      // ถ้าวันนั้นอยู่นอกเทอม หยุดการตรวจ
+      if (!academicCalendarService.isDateInActiveTerm(iso)) break;
+
+      // ถ้าเป็นวันที่มีการเรียนการสอน (ไม่ใช่วันหยุด และไม่ใช่วันเสาร์-อาทิตย์เว้นแต่วันเรียนชดเชย)
+      if (academicCalendarService.isInstructionalDay(iso)) {
+        const records = attendanceCorrelationService.getMorningRecords(homeroomId, iso);
+        if (records.length === 0) {
+          uncheckedDays++;
+        }
+      }
+    }
+
+    return uncheckedDays;
   };
 
   const getPendingAssignmentsCount = () => {
@@ -176,7 +218,9 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(() =>
     messagingService.getTotalUnreadCount()
   );
-  const [isAssemblyPending, setIsAssemblyPending] = useState<boolean>(() => checkAssemblyPending());
+  const [assemblyPendingCount, setAssemblyPendingCount] = useState<number>(() =>
+    getAssemblyPendingCount()
+  );
   const [pendingAssignmentsCount, setPendingAssignmentsCount] = useState<number>(() =>
     getPendingAssignmentsCount()
   );
@@ -185,19 +229,21 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
   useEffect(() => {
     const handleSync = () => {
       setUnreadMessagesCount(messagingService.getTotalUnreadCount());
-      setIsAssemblyPending(checkAssemblyPending());
+      setAssemblyPendingCount(getAssemblyPendingCount());
       setPendingAssignmentsCount(getPendingAssignmentsCount());
       setTrashCount(getTrashCount());
     };
     window.addEventListener(CHAT_GROUPS_EVENT, handleSync);
     window.addEventListener('kp-copilot-updated', handleSync);
     window.addEventListener('kps-attendance-synced', handleSync);
+    window.addEventListener(ACADEMIC_CALENDAR_EVENT, handleSync);
     window.addEventListener(TRASH_SYNC_EVENT, handleSync);
     window.addEventListener('kps-data-sync-event', handleSync);
     return () => {
       window.removeEventListener(CHAT_GROUPS_EVENT, handleSync);
       window.removeEventListener('kp-copilot-updated', handleSync);
       window.removeEventListener('kps-attendance-synced', handleSync);
+      window.removeEventListener(ACADEMIC_CALENDAR_EVENT, handleSync);
       window.removeEventListener(TRASH_SYNC_EVENT, handleSync);
       window.removeEventListener('kps-data-sync-event', handleSync);
     };
@@ -222,9 +268,9 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
           key: 'morning-assembly',
           label: 'เช็คแถวเช้า',
           icon: UserCheck,
-          ...(isAssemblyPending
+          ...(assemblyPendingCount > 0
             ? {
-                badge: '1',
+                badge: String(assemblyPendingCount),
                 badgeStyle: 'bg-rose-500 text-white font-extrabold',
               }
             : {}),
@@ -401,7 +447,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
                   (item.key === 'morning-assembly' && currentView === 'morning-assembly') ||
                   (item.key === 'classroom-attendance' && currentView === 'classroom-attendance') ||
                   (item.key === 'settings' &&
-                    ['settings', 'accounts', 'trash'].includes(currentView));
+                    ['settings', 'accounts'].includes(currentView));
 
                 return (
                   <button

@@ -49,7 +49,7 @@ export const StudentNotesCard: React.FC = () => {
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
         >
           {isAdding ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-          <span>{isAdding ? 'ยกเลิก' : '+ เพิ่มบันทึก'}</span>
+          <span>{isAdding ? 'ยกเลิก' : 'เพิ่มบันทึก'}</span>
         </button>
       </div>
 

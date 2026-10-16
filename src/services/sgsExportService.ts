@@ -100,7 +100,7 @@ export const sgsExportService = {
 
   // CREATE SNAPSHOT: Generate Server-side Immutable Snapshot & Store in Cloud Storage (ADR-003)
   async generateSnapshot(
-    classroomId = 'room-3-1',
+    classroomId = 'room-1-1',
     subjectCode = 'ศ23101',
     exportedBy = 'ครูภาสภูมิ เรืองปราชญ์'
   ): Promise<SgsSnapshotRecord> {

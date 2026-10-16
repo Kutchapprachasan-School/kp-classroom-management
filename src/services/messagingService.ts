@@ -576,9 +576,9 @@ export const messagingService = {
       }
     }
 
-    // Fallback เป็น room-3-1 หากไม่พบข้อมูลเพื่อความปลอดภัยในโหมดพรีวิว
+    // Fallback หากไม่พบข้อมูลเพื่อความปลอดภัยในโหมดพรีวิว
     if (!resolvedClassroomId) {
-      resolvedClassroomId = 'room-3-1';
+      resolvedClassroomId = classroomService.getClassroomsSync()[0]?.id || 'room-1-1';
     }
 
     // รวบรวมชุดคีย์ระบุห้องเรียนที่ตรงกัน (เช่น 'room-3-1', 'ม.3/1', '3/1')

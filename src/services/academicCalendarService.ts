@@ -54,6 +54,39 @@ export interface AcademicCalendarConfig {
 const STORAGE_KEY_CALENDAR_CONFIG = 'kp_academic_calendar_settings_v2';
 export const ACADEMIC_CALENDAR_EVENT = 'kps-academic-calendar-updated';
 
+export const THAI_MONTH_SHORT_MAP: Record<string, string> = {
+  'ม.ค.': '01',
+  'ก.พ.': '02',
+  'มี.ค.': '03',
+  'เม.ย.': '04',
+  'พ.ค.': '05',
+  'มิ.ย.': '06',
+  'ก.ค.': '07',
+  'ส.ค.': '08',
+  'ก.ย.': '09',
+  'ต.ค.': '10',
+  'พ.ย.': '11',
+  'ธ.ค.': '12',
+};
+
+/**
+ * แปลงสตริงวันที่ภาษาไทย (เช่น '15 พ.ค. 2569') เป็น ISO Date string ('2026-05-15')
+ */
+export function parseThaiDateToIso(str: string): string {
+  if (!str) return '';
+  const trimmed = str.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const parts = trimmed.split(/\s+/);
+  if (parts.length >= 3) {
+    const day = parts[0].padStart(2, '0');
+    const month = THAI_MONTH_SHORT_MAP[parts[1]] || '01';
+    const yearRaw = parseInt(parts[2], 10);
+    const year = String(yearRaw > 2400 ? yearRaw - 543 : yearRaw);
+    return `${year}-${month}-${day}`;
+  }
+  return trimmed;
+}
+
 const DEFAULT_TERMS: AcademicTermRecord[] = [
   {
     id: 't-2569-2',
@@ -277,6 +310,46 @@ export const academicCalendarService = {
   getActiveTerm(): AcademicTermRecord {
     const terms = this.getTerms();
     return terms.find((t) => t.isActive) || terms[0] || DEFAULT_TERMS[0];
+  },
+
+  /**
+   * ตรวจสอบว่าวันที่ที่ระบุ (ISO 'YYYY-MM-DD' หรือ Thai format) อยู่ในช่วงเปิดภาคเรียนของภาคเรียนปัจจุบันหรือไม่
+   */
+  isDateInActiveTerm(dateIsoOrThai: string): boolean {
+    const activeTerm = this.getActiveTerm();
+    if (!activeTerm) return false;
+    const dateIso = parseThaiDateToIso(dateIsoOrThai);
+    const startIso = parseThaiDateToIso(activeTerm.startDate);
+    const endIso = parseThaiDateToIso(activeTerm.endDate);
+    if (!dateIso || !startIso || !endIso) return false;
+    return dateIso >= startIso && dateIso <= endIso;
+  },
+
+  /**
+   * ตรวจสอบว่าวันที่ที่ระบุเป็นวันที่มีการเรียนการสอนจริงหรือไม่ (อยู่ในเทอม ไม่ใช่วันหยุด และไม่ใช่วันหยุดสุดสัปดาห์เว้นแต่วันเรียนชดเชย)
+   */
+  isInstructionalDay(dateIsoOrThai: string): boolean {
+    const dateIso = parseThaiDateToIso(dateIsoOrThai);
+    if (!this.isDateInActiveTerm(dateIso)) return false;
+
+    // ตรวจสอบวันหยุดพิเศษ/นักขัตฤกษ์
+    const holidays = this.getHolidays().filter((h) => h.isActive);
+    const isHoliday = holidays.some((h) => parseThaiDateToIso(h.date) === dateIso);
+    if (isHoliday) return false;
+
+    // ตรวจสอบวันหยุดเสาร์-อาทิตย์
+    const parts = dateIso.split('-');
+    if (parts.length < 3) return false;
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    const dayOfWeek = d.getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+    if (isWeekend) {
+      const makeupDays = this.getWeekendMakeupDays().filter((m) => m.isActive);
+      return makeupDays.some((m) => parseThaiDateToIso(m.date) === dateIso);
+    }
+
+    return true;
   },
 
   // สลับภาคเรียนปัจจุบัน (Sync ไปยัง School Branding Settings ด้วย)

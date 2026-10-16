@@ -1197,16 +1197,7 @@ export const attendanceCorrelationService = {
       }
 
       const dayRecords = allRecords.filter((r) => r.date === dateStr);
-      let isChecked = dayRecords.length > 0;
-
-      // For past school instructional weekdays up to referenceDate when storage has no explicit records yet:
-      // Weekends and holidays are NEVER checked. Future days (> referenceDate) are NEVER checked.
-      if (!isChecked && allRecords.length === 0 && year === 2026 && month === 10) {
-        const pastInstructionalDays = [1, 2, 5, 6, 7, 8, 9, 12, 14];
-        if (pastInstructionalDays.includes(day) && dateStr <= referenceDate) {
-          isChecked = true;
-        }
-      }
+      const isChecked = dayRecords.length > 0;
 
       let presentCount = 0;
       let lateCount = 0;
@@ -1231,11 +1222,11 @@ export const attendanceCorrelationService = {
         isChecked,
         isToday,
         isPastOrToday,
-        totalStudents: isChecked ? (dayRecords.length > 0 ? dayRecords.length : 28) : 0,
-        presentCount: isChecked ? (presentCount || 24) : 0,
-        lateCount: isChecked ? (lateCount || 2) : 0,
-        absentCount: isChecked ? (absentCount || 1) : 0,
-        leaveCount: isChecked ? (leaveCount || 1) : 0,
+        totalStudents: dayRecords.length,
+        presentCount,
+        lateCount,
+        absentCount,
+        leaveCount,
       });
     }
 
@@ -1347,16 +1338,16 @@ export const attendanceCorrelationService = {
     return dayOfWeek === 0 || dayOfWeek === 6;
   },
 
-  calculate80Rule(classroomId: string = 'room-3-1'): Attendance80Summary[] {
-    const targetRoom = normalizeClassroomId(classroomId);
-    const allPeriodRecords = this.getAllPeriodRecords().filter(
-      (r) => normalizeClassroomId(r.classroomId) === targetRoom
+  calculate80Rule(classroomId: string = ''): Attendance80Summary[] {
+    const targetRoom = classroomId ? normalizeClassroomId(classroomId) : '';
+    const allPeriodRecords = this.getAllPeriodRecords().filter((r) =>
+      targetRoom ? normalizeClassroomId(r.classroomId) === targetRoom : true
     );
     const studentCodes = Array.from(new Set(allPeriodRecords.map((r) => r.studentCode)));
     
     return studentCodes.map((code) => {
       const records = allPeriodRecords.filter((r) => r.studentCode === code);
-      return this.compute80RuleFromRecords(code, records[0]?.courseCode || 'ศ23101', records);
+      return this.compute80RuleFromRecords(code, records[0]?.courseCode || 'วิชาเรียน', records);
     });
   },
 };

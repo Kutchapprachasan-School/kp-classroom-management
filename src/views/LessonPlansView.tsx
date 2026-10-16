@@ -622,7 +622,7 @@ export const LessonPlansView: React.FC = () => {
                 className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-95"
               >
                 <Plus className="w-4 h-4" />
-                <span>+ สร้างแผนการสอน</span>
+                <span>สร้างแผนการสอน</span>
               </button>
             </div>
           ) : (

@@ -343,7 +343,7 @@ class OnlineQuizService {
 
     // 4. ซิงค์คะแนนตรงเข้า scoreService (Grade Ledger)
     try {
-      const classroomId = params.classroomId || quiz.roomName || 'room-3-1';
+      const classroomId = params.classroomId || quiz.roomName || 'room-1-1';
       await scoreService.upsertScore({
         scoreId: `score-exam-${params.examId}-${params.studentCode}`,
         assignmentId: params.examId,
