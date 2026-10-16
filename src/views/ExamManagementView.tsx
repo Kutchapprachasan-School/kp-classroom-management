@@ -1779,7 +1779,7 @@ D) ผู้อำนวยการ
                           <button
                             type="button"
                             onClick={() => setManageExamModalExam(exam)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-blue-700 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 transition-colors cursor-pointer"
+                            className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer"
                             title="ตัวเลือกและการจัดการเพิ่มเติม"
                           >
                             <MoreVertical className="w-4 h-4" />
@@ -1868,28 +1868,28 @@ D) ผู้อำนวยการ
                 <button
                   type="button"
                   onClick={() => applyPreset('MIDTERM')}
-                  className="px-2.5 py-1 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer"
+                  className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer"
                 >
                   สอบกลางภาค (20 คะแนน)
                 </button>
                 <button
                   type="button"
                   onClick={() => applyPreset('FINAL')}
-                  className="px-2.5 py-1 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer"
+                  className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer"
                 >
                   สอบปลายภาค (30 คะแนน)
                 </button>
                 <button
                   type="button"
                   onClick={() => applyPreset('PRACTICAL')}
-                  className="px-2.5 py-1 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer"
+                  className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer"
                 >
                   สอบปฏิบัติ (15 คะแนน)
                 </button>
                 <button
                   type="button"
                   onClick={() => applyPreset('QUIZ')}
-                  className="px-2.5 py-1 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer"
+                  className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer"
                 >
                   เก็บคะแนนย่อย (10 คะแนน)
                 </button>
@@ -2346,7 +2346,7 @@ D) ผู้อำนวยการ
                   <button
                     type="button"
                     onClick={handleClearAllScores}
-                    className="px-2 py-1 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 text-[11px] transition-colors cursor-pointer"
+                    className="px-2 py-1 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-50 text-[11px] font-medium transition-colors cursor-pointer"
                   >
                     ล้างคะแนน
                   </button>

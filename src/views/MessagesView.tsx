@@ -1084,10 +1084,10 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                             if (nextRoom) setTargetRoomId(nextRoom.id);
                             setIsTransferModalOpen(true);
                           }}
-                          className="px-2 py-1 rounded-lg border border-slate-200 hover:border-blue-300 bg-white hover:bg-blue-50 text-slate-600 hover:text-blue-700 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                          className="px-2 py-1 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
                           title="ย้ายห้องเรียน (ทดสอบระบบซิงค์แชทและโอนคะแนนอัตโนมัติ)"
                         >
-                          <ArrowRightLeft className="w-3 h-3 text-blue-600" />
+                          <ArrowRightLeft className="w-3 h-3 text-slate-600" />
                           <span>ย้ายห้อง</span>
                         </button>
                       )}

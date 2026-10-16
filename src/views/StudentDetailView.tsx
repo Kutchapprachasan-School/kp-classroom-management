@@ -161,9 +161,9 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ studentCod
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-200 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
           >
-            <ArrowLeft className="w-4 h-4 text-slate-500" />
+            <ArrowLeft className="w-4 h-4 text-slate-600" />
             <span>กลับไปหน้ารายชื่อนักเรียน</span>
           </button>
         </div>

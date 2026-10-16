@@ -813,7 +813,7 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
                                 e.stopPropagation();
                                 toggleCollapseUnit(unit.id);
                               }}
-                              className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 text-slate-600 hover:text-blue-600 transition-colors"
+                              className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors"
                               title={isCollapsed ? 'คลิกเพื่อขยาย' : 'คลิกเพื่อพับเก็บ'}
                             >
                               <ChevronDown
@@ -864,7 +864,7 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
                           <button
                             type="button"
                             onClick={() => handleDeleteUnit(unit.id, unit.title)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-slate-100 transition-colors cursor-pointer"
                             title="ลบหน่วยนี้"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -938,7 +938,7 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
                                         href={media.fileUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                        className="p-1 rounded text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
                                         title="เปิดดูไฟล์"
                                       >
                                         <ExternalLink className="w-3.5 h-3.5" />
@@ -947,7 +947,7 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
                                     <button
                                       type="button"
                                       onClick={() => handleRequestDeleteMedia(unit.id, media.id, media.title)}
-                                      className="p-1 rounded text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                      className="p-1 rounded text-slate-500 hover:text-rose-600 hover:bg-slate-100 transition-colors cursor-pointer"
                                       title="ย้ายสื่อนี้ไปถังขยะ"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
@@ -1984,7 +1984,7 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
                       <button
                         type="button"
                         onClick={() => handlePermanentDeleteMedia(item.id, item.title)}
-                        className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 font-bold border border-slate-200 transition-colors cursor-pointer"
+                        className="px-2.5 py-1.5 rounded-xl bg-rose-50/50 hover:bg-rose-50 text-rose-600 hover:text-rose-700 font-bold border border-rose-200 transition-colors cursor-pointer"
                         title="ลบถาวร"
                       >
                         <Trash2 className="w-3.5 h-3.5" />

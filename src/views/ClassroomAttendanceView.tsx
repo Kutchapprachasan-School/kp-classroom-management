@@ -867,7 +867,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                           key={stu.studentCode}
                           className={`transition-colors group ${
                             isAlert
-                              ? 'bg-rose-50/50 hover:bg-rose-50 border-l-4 border-l-rose-500'
+                              ? 'bg-rose-50/70 hover:bg-rose-50 border-b border-rose-100 ring-1 ring-inset ring-rose-200/60'
                               : 'hover:bg-blue-50/30'
                           }`}
                         >
@@ -923,7 +923,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                                 className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                   stu.status === 'PRESENT'
                                     ? 'bg-emerald-600 text-white shadow-xs scale-105'
-                                    : 'text-slate-600 hover:text-emerald-700 hover:bg-emerald-50'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                                 }`}
                               >
                                 มา
@@ -934,7 +934,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                                 className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                   stu.status === 'LATE'
                                     ? 'bg-amber-500 text-white shadow-xs scale-105'
-                                    : 'text-slate-600 hover:text-amber-700 hover:bg-amber-50'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                                 }`}
                               >
                                 สาย
@@ -945,7 +945,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                                 className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                   stu.status === 'ABSENT'
                                     ? 'bg-rose-600 text-white shadow-xs scale-105'
-                                    : 'text-slate-600 hover:text-rose-700 hover:bg-rose-50'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                                 }`}
                               >
                                 ขาด
@@ -956,7 +956,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                                 className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                   stu.status === 'LEAVE'
                                     ? 'bg-purple-600 text-white shadow-xs scale-105'
-                                    : 'text-slate-600 hover:text-purple-700 hover:bg-purple-50'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                                 }`}
                               >
                                 ลา
@@ -967,7 +967,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                                 className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                   stu.status === 'ACTIVITY'
                                     ? 'bg-sky-600 text-white shadow-xs scale-105'
-                                    : 'text-slate-600 hover:text-sky-700 hover:bg-sky-50'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                                 }`}
                               >
                                 กิจกรรม
@@ -978,7 +978,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                                 className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                   stu.status === 'TRUANCY'
                                     ? 'bg-red-800 text-white shadow-xs scale-105'
-                                    : 'text-slate-600 hover:text-red-900 hover:bg-red-50'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                                 }`}
                               >
                                 โดดเรียน

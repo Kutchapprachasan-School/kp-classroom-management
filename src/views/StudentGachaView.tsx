@@ -713,7 +713,7 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                     <div className="relative mb-2">
                       <ChibiBuddyAvatar buddy={b} size="md" showName={false} isUnlocked={true} showLock={false} />
                       {res.isNew && (
-                        <span className="absolute -top-1 -right-2 px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[9px] font-black shadow-xs animate-bounce">
+                        <span className="absolute -top-1 -right-2 px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[9px] font-black shadow-xs animate-pulse">
                           NEW!
                         </span>
                       )}

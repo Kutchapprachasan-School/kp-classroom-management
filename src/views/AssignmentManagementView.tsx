@@ -327,7 +327,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
             type="button"
             onClick={handleStartFirstPending}
             disabled={stats.pending === 0}
-            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-extrabold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 whitespace-nowrap"
+            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 whitespace-nowrap"
           >
             <Play className="w-4 h-4 fill-white" />
             <span>เริ่มตรวจงานทันที ({stats.pending} งานรอตรวจ)</span>
@@ -342,7 +342,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
           <button
             type="button"
             onClick={() => setIsSgsMatrixOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 text-slate-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 hover:bg-slate-100 hover:border-slate-300 text-slate-700 hover:text-slate-900 text-xs font-bold transition-all cursor-pointer shadow-2xs"
             title="ดูคะแนนรายชั้น และสมุด ปพ.5"
           >
             <FileSpreadsheet className="w-4 h-4 text-blue-600" />
@@ -352,20 +352,20 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
           <button
             type="button"
             onClick={() => setIs3ColorMatrixOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 hover:bg-teal-50 hover:border-teal-200 hover:text-teal-700 text-slate-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 hover:bg-slate-100 hover:border-slate-300 text-slate-700 hover:text-slate-900 text-xs font-bold transition-all cursor-pointer shadow-2xs"
             title="ตารางเช็คส่งงาน 3 สี เขียว-ส้ม-แดง"
           >
-            <CheckSquare className="w-4 h-4 text-teal-600" />
+            <CheckSquare className="w-4 h-4 text-emerald-600" />
             <span>ตารางส่งงาน 3 สี</span>
           </button>
 
           <button
             type="button"
             onClick={() => setIsBundlesModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700 text-slate-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 hover:bg-slate-100 hover:border-slate-300 text-slate-700 hover:text-slate-900 text-xs font-bold transition-all cursor-pointer shadow-2xs"
             title="ตั้งค่าหมวดหมู่งานรวมและปัดเศษทศนิยม 0.5"
           >
-            <Layers className="w-4 h-4 text-indigo-600" />
+            <Layers className="w-4 h-4 text-blue-600" />
             <span>งานรวมเฉลี่ย</span>
           </button>
         </div>

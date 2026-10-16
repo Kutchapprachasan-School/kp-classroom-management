@@ -2488,7 +2488,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                       setCalendarConfig(academicCalendarService.getConfig());
                       showToast(`ลบวันหยุด "${h.name}" เรียบร้อยแล้ว`);
                     }}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 cursor-pointer"
+                    className="p-1.5 text-slate-500 hover:text-rose-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -2532,7 +2532,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                       setCalendarConfig(academicCalendarService.getConfig());
                       showToast(`ลบวันมาเรียนพิเศษ "${w.title}" เรียบร้อยแล้ว`);
                     }}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 cursor-pointer"
+                    className="p-1.5 text-slate-500 hover:text-rose-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

@@ -633,7 +633,7 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
                       handleExportCsv();
                       setIsCsvDropdownOpen(false);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-blue-50 text-slate-700 hover:text-blue-800 font-semibold transition-colors cursor-pointer"
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-slate-100 text-slate-700 hover:text-slate-900 font-semibold transition-colors cursor-pointer"
                   >
                     <Download className="w-4 h-4 text-blue-600 shrink-0" />
                     <span>ส่งออกข้อมูลห้องเรียน (CSV)</span>
@@ -648,7 +648,7 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
                         setImportPreviewRows([]);
                         setIsCsvDropdownOpen(false);
                       }}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 font-semibold transition-colors cursor-pointer"
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-slate-100 text-slate-700 hover:text-slate-900 font-semibold transition-colors cursor-pointer"
                     >
                       <Upload className="w-4 h-4 text-emerald-600 shrink-0" />
                       <span>นำเข้าข้อมูลห้องเรียน (CSV)</span>
@@ -793,7 +793,7 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
                               <button
                                 type="button"
                                 onClick={() => handleOpenEditModal(room)}
-                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors cursor-pointer"
+                                className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                                 title="แก้ไขข้อมูลห้องเรียนและครูที่ปรึกษา"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
@@ -801,7 +801,7 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
                               <button
                                 type="button"
                                 onClick={() => handleOpenDeleteModal(room)}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+                                className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                                 title="ลบห้องเรียน"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -895,7 +895,7 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
                         <button
                           type="button"
                           onClick={() => handleOpenEditModal(room)}
-                          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 rounded-xl transition-colors cursor-pointer"
+                          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 rounded-xl transition-colors cursor-pointer"
                           title="แก้ไขห้องเรียน"
                         >
                           <Edit2 className="w-4 h-4" />
@@ -903,7 +903,7 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
                         <button
                           type="button"
                           onClick={() => handleOpenDeleteModal(room)}
-                          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 rounded-xl transition-colors cursor-pointer"
+                          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-600 hover:text-rose-600 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 rounded-xl transition-colors cursor-pointer"
                           title="ลบห้องเรียน"
                         >
                           <Trash2 className="w-4 h-4" />

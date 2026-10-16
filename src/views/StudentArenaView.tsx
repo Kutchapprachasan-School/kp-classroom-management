@@ -357,15 +357,15 @@ export const StudentArenaView: React.FC<StudentArenaViewProps> = ({ currentUser 
           </div>
 
           {/* Buff / Booster Card */}
-          <div className="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 rounded-3xl p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-500 text-white flex items-center justify-center shrink-0 shadow-md">
+          <div className="bg-gradient-to-br from-blue-50 to-sky-50 border border-blue-100 rounded-3xl p-5 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md">
               <Zap className="w-6 h-6 fill-white" />
             </div>
             <div className="space-y-0.5">
-              <h4 className="text-xs font-bold text-indigo-950 uppercase tracking-wide">
+              <h4 className="text-xs font-bold text-blue-950 uppercase tracking-wide">
                 Active Buff: สมองแล่น (XP Multiplier 1.2x)
               </h4>
-              <p className="text-xs text-indigo-700 leading-relaxed">
+              <p className="text-xs text-blue-700 leading-relaxed">
                 คุณเข้าเรียนตรงเวลาครบ 5 คาบล่าสุด ระบบเพิ่มอัตราการคูณ XP ชาเลนจ์ 20% อัตโนมัติ!
               </p>
             </div>

@@ -409,7 +409,7 @@ export const TrashManagementView: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleHardDelete(item.id, item.name)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-slate-200 hover:border-rose-300 hover:bg-rose-50 text-slate-500 hover:text-rose-600 rounded-xl font-bold text-xs transition-all cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-rose-200 hover:border-rose-300 bg-rose-50/50 hover:bg-rose-50 text-rose-600 hover:text-rose-700 rounded-xl font-bold text-xs transition-all cursor-pointer"
                             title="ลบถาวรโดยไม่สามารถกู้คืนได้"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -458,7 +458,7 @@ export const TrashManagementView: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => handleHardDelete(item.id, item.name)}
-                      className="inline-flex items-center justify-center gap-1 px-3 py-2 border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl font-bold text-xs cursor-pointer"
+                      className="inline-flex items-center justify-center gap-1 px-3 py-2 border border-rose-200 bg-rose-50/50 hover:bg-rose-50 text-rose-600 hover:text-rose-700 rounded-xl font-bold text-xs cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       <span>ลบ</span>

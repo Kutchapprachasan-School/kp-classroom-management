@@ -1108,7 +1108,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                       <button
                         type="button"
                         onClick={() => openAddEventForDay(dayNumber)}
-                        className="mt-2 w-full py-1 text-center rounded-md border border-dashed border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-[11px] font-bold text-slate-500 hover:text-blue-600 transition-colors cursor-pointer"
+                        className="mt-2 w-full py-1 text-center rounded-md border border-dashed border-blue-200 hover:border-blue-300 hover:bg-blue-50 text-[11px] font-bold text-blue-600 hover:text-blue-700 transition-colors cursor-pointer"
                       >
                         + เพิ่มกิจกรรม
                       </button>
@@ -1642,7 +1642,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                       const isInRange = isMultiDay && d > newEventDay && d < newEventEndDay;
                       const isSingleSelected = !isMultiDay && isStart;
 
-                      let btnClass = 'text-slate-700 hover:bg-blue-50';
+                      let btnClass = 'text-slate-700 hover:text-slate-900 hover:bg-slate-100';
                       if (isSingleSelected || isStart || isEnd) {
                         btnClass = 'bg-blue-600 text-white font-black shadow-xs';
                       } else if (isInRange) {

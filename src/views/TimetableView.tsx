@@ -602,7 +602,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
     <div className="space-y-5 max-w-7xl mx-auto pb-16 animate-fade-in font-sans text-slate-800 select-none">
       {/* Toast Alert */}
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 text-xs font-bold animate-bounce border border-slate-700">
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 text-xs font-bold animate-in fade-in slide-in-from-bottom-2 duration-200 border border-slate-700">
           <Sparkles className="w-4 h-4 text-emerald-400" />
           <span>{toastMsg}</span>
         </div>

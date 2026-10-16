@@ -168,7 +168,7 @@ export const StudentTrophyView: React.FC<StudentTrophyViewProps> = ({
             <button
               type="button"
               onClick={onNavigateToGacha}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-md shadow-purple-500/20 transition-all cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-md shadow-blue-500/20 transition-all cursor-pointer"
             >
               <Dices className="w-4 h-4" />
               <span>สุ่มคู่หู (Gacha) 🎲</span>
@@ -227,7 +227,7 @@ export const StudentTrophyView: React.FC<StudentTrophyViewProps> = ({
                     onChange={(e) => setBuddyCustomName(e.target.value)}
                     onBlur={() => setIsEditingName(false)}
                     onKeyDown={(e) => e.key === 'Enter' && setIsEditingName(false)}
-                    className="text-lg font-black text-slate-900 border-b-2 border-emerald-500 bg-white px-2 py-0.5 rounded focus:outline-none"
+                    className="text-lg font-black text-slate-900 border border-emerald-500 bg-white px-2 py-0.5 rounded-lg focus:outline-none"
                     autoFocus
                   />
                 ) : (
@@ -238,7 +238,7 @@ export const StudentTrophyView: React.FC<StudentTrophyViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsEditingName(!isEditingName)}
-                  className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-emerald-100 rounded-lg transition-colors cursor-pointer"
+                  className="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                   title="แก้ไขชื่อเรียกคู่หูบัดดี้"
                 >
                   <Edit3 className="w-4 h-4" />

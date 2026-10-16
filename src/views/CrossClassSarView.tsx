@@ -547,12 +547,12 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
       { grade: '3.5', count: counts.g3_5, label: 'เกรด 3.5 (ดีมาก)', color: 'from-teal-500 to-teal-400', badgeColor: 'text-teal-700 bg-teal-50 border-teal-200' },
       { grade: '3', count: counts.g3, label: 'เกรด 3 (ดี)', color: 'from-blue-500 to-blue-400', badgeColor: 'text-blue-700 bg-blue-50 border-blue-200' },
       { grade: '2.5', count: counts.g2_5, label: 'เกรด 2.5 (ค่อนข้างดี)', color: 'from-sky-500 to-sky-400', badgeColor: 'text-sky-700 bg-sky-50 border-sky-200' },
-      { grade: '2', count: counts.g2, label: 'เกรด 2 (ปานกลาง)', color: 'from-indigo-500 to-indigo-400', badgeColor: 'text-indigo-700 bg-indigo-50 border-indigo-200' },
+      { grade: '2', count: counts.g2, label: 'เกรด 2 (ปานกลาง)', color: 'from-blue-600 to-blue-500', badgeColor: 'text-blue-700 bg-blue-50 border-blue-200' },
       { grade: '1.5', count: counts.g1_5, label: 'เกรด 1.5 (พอใช้)', color: 'from-amber-500 to-amber-400', badgeColor: 'text-amber-700 bg-amber-50 border-amber-200' },
       { grade: '1', count: counts.g1, label: 'เกรด 1 (ผ่านเกณฑ์)', color: 'from-orange-500 to-orange-400', badgeColor: 'text-orange-700 bg-orange-50 border-orange-200' },
       { grade: '0', count: counts.g0, label: 'เกรด 0 (ไม่ผ่านเกณฑ์)', color: 'from-rose-500 to-rose-400', badgeColor: 'text-rose-700 bg-rose-50 border-rose-200' },
       { grade: 'ร', count: counts.ro, label: 'ติด "ร" (รอตัดสินผล)', color: 'from-amber-600 to-amber-500', badgeColor: 'text-amber-800 bg-amber-50 border-amber-300' },
-      { grade: 'มส', count: counts.ms, label: 'ติด "มส" (เวลาเรียนไม่ถึง)', color: 'from-purple-600 to-purple-500', badgeColor: 'text-purple-800 bg-purple-50 border-purple-200' },
+      { grade: 'มส', count: counts.ms, label: 'ติด "มส" (เวลาเรียนไม่ถึง)', color: 'from-slate-600 to-slate-500', badgeColor: 'text-slate-800 bg-slate-100 border-slate-300' },
     ].map((item) => ({
       ...item,
       percent: total > 0 ? Number(((item.count / total) * 100).toFixed(1)) : 0,
@@ -1008,7 +1008,7 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
                     handleExportCsv();
                     setIsExportDropdownOpen(false);
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 font-semibold transition-colors cursor-pointer"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-slate-100 text-slate-700 hover:text-slate-900 font-semibold transition-colors cursor-pointer"
                 >
                   <FileDown className="w-4 h-4 text-emerald-600 shrink-0" />
                   <span>ส่งออกคะแนน Excel (CSV)</span>
@@ -1019,7 +1019,7 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
                     handleExportPdf();
                     setIsExportDropdownOpen(false);
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-blue-50 text-slate-700 hover:text-blue-800 font-semibold transition-colors cursor-pointer"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-slate-100 text-slate-700 hover:text-slate-900 font-semibold transition-colors cursor-pointer"
                 >
                   <Printer className="w-4 h-4 text-blue-600 shrink-0" />
                   <span>พิมพ์รายงานสรุป (PDF)</span>
@@ -1610,7 +1610,7 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
                 {stats.totalStudents > 0 ? ((remedialBreakdown.ms / stats.totalStudents) * 100).toFixed(1) : 0}%
               </span>
             </div>
-            <div className="text-2xl font-black text-purple-900">
+            <div className="text-2xl font-black text-slate-900">
               {remedialBreakdown.ms} <span className="text-xs font-semibold text-purple-700">คน</span>
             </div>
             <div className="w-full h-2 bg-purple-100 rounded-full overflow-hidden">

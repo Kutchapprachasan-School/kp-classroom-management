@@ -1237,7 +1237,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
                             type="button"
                             onClick={() => handleMoveStudentUp(index)}
                             disabled={currentPage === 1 && index === 0}
-                            className="p-1 rounded-md border border-slate-200 hover:bg-blue-50 text-slate-600 hover:text-blue-600 disabled:opacity-30 cursor-pointer"
+                            className="p-1 rounded-md border border-slate-200 hover:bg-slate-100 text-slate-600 hover:text-slate-900 disabled:opacity-30 cursor-pointer"
                             title="เลื่อนขึ้น"
                           >
                             <ArrowUp className="w-3 h-3" />
@@ -1246,7 +1246,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
                             type="button"
                             onClick={() => handleMoveStudentDown(index)}
                             disabled={index === paginatedStudents.length - 1}
-                            className="p-1 rounded-md border border-slate-200 hover:bg-blue-50 text-slate-600 hover:text-blue-600 disabled:opacity-30 cursor-pointer"
+                            className="p-1 rounded-md border border-slate-200 hover:bg-slate-100 text-slate-600 hover:text-slate-900 disabled:opacity-30 cursor-pointer"
                             title="เลื่อนลง"
                           >
                             <ArrowDown className="w-3 h-3" />
@@ -1390,7 +1390,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => handleOpenEditStudentModal(stu)}
-                                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-left cursor-pointer font-medium"
+                                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-left cursor-pointer font-medium"
                                 >
                                   <Edit2 className="w-3.5 h-3.5" />
                                   <span>แก้ไขข้อมูลส่วนตัว</span>
@@ -1399,7 +1399,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
                               <button
                                 type="button"
                                 onClick={() => handleOpenTransferModal(stu)}
-                                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-purple-50 text-slate-700 hover:text-purple-700 text-left cursor-pointer font-medium"
+                                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-left cursor-pointer font-medium"
                               >
                                 <ArrowRightLeft className="w-3.5 h-3.5" />
                                 <span>ย้ายห้องเรียน</span>
@@ -1539,7 +1539,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
                           <button
                             type="button"
                             onClick={() => handleOpenEditStudentModal(stu)}
-                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-left cursor-pointer font-medium"
+                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-left cursor-pointer font-medium"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                             <span>แก้ไขข้อมูลส่วนตัว</span>
@@ -1548,7 +1548,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
                         <button
                           type="button"
                           onClick={() => handleOpenTransferModal(stu)}
-                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-purple-50 text-slate-700 hover:text-purple-700 text-left cursor-pointer font-medium"
+                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-left cursor-pointer font-medium"
                         >
                           <ArrowRightLeft className="w-3.5 h-3.5" />
                           <span>ย้ายห้องเรียน</span>

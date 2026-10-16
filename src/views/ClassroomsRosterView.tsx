@@ -884,7 +884,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                                     setDeletingClassroom(room);
                                     setIsDeleteClassroomOpen(true);
                                   }}
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                  className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-slate-100 transition-colors"
                                   title="ลบห้องเรียน"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -910,7 +910,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
         <div className="space-y-5">
           {/* Unsaved Reorder Alert Banner (สำคัญมาก: ป้องกันการเผลอกดสลับเลขที่) */}
           {hasUnsavedReorder && (
-            <div className="sticky top-2 z-30 bg-amber-50 border-2 border-amber-300 text-amber-900 p-4 rounded-2xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-bounce-subtle">
+            <div className="sticky top-2 z-30 bg-amber-50 border-2 border-amber-300 text-amber-900 p-4 rounded-2xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
               <div className="flex items-center gap-3">
                 <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
                 <div>
@@ -1082,7 +1082,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                           setIsImportModalOpen(true);
                           setIsSgsDropdownOpen(false);
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-blue-50 text-slate-700 hover:text-blue-800 font-semibold transition-colors cursor-pointer"
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-slate-100 text-slate-700 hover:text-slate-900 font-semibold transition-colors cursor-pointer"
                       >
                         <FileSpreadsheet className="w-4 h-4 text-blue-600 shrink-0" />
                         <span>นำเข้ารายชื่อนักเรียน (Excel/SGS)</span>
@@ -1094,7 +1094,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                           setIsScoreExportModalOpen(true);
                           setIsSgsDropdownOpen(false);
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 font-semibold transition-colors cursor-pointer"
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-slate-100 text-slate-700 hover:text-slate-900 font-semibold transition-colors cursor-pointer"
                       >
                         <Upload className="w-4 h-4 text-emerald-600 shrink-0" />
                         <span>ส่งคะแนนไปยัง SGS (Reverse Sync)</span>
@@ -1191,7 +1191,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                               className={`p-1 rounded-lg border text-xs transition-colors cursor-pointer ${
                                 trueIndex === 0
                                   ? 'opacity-30 border-slate-200 text-slate-400 cursor-not-allowed'
-                                  : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-700 hover:text-blue-600 active:scale-95'
+                                  : 'border-slate-200 hover:border-slate-300 hover:bg-slate-100 text-slate-700 hover:text-slate-900 active:scale-95'
                               }`}
                               title="เลื่อนขึ้น 1 ลำดับ"
                             >
@@ -1204,7 +1204,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                               className={`p-1 rounded-lg border text-xs transition-colors cursor-pointer ${
                                 trueIndex === students.length - 1
                                   ? 'opacity-30 border-slate-200 text-slate-400 cursor-not-allowed'
-                                  : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-700 hover:text-blue-600 active:scale-95'
+                                  : 'border-slate-200 hover:border-slate-300 hover:bg-slate-100 text-slate-700 hover:text-slate-900 active:scale-95'
                               }`}
                               title="เลื่อนลง 1 ลำดับ"
                             >
@@ -1296,7 +1296,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                             <button
                               type="button"
                               onClick={() => handleOpenEditStudent(stu)}
-                              className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-200 transition-colors"
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-transparent hover:border-slate-200 transition-colors"
                               title="แก้ไขข้อมูลส่วนตัว (ชื่อ-สกุล/รหัส)"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
@@ -1308,7 +1308,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                                 setTargetRoomId(allClassrooms.find((c) => c.id !== selectedClass.id)?.id || '');
                                 setIsTransferModalOpen(true);
                               }}
-                              className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 border border-transparent hover:border-indigo-200 transition-colors"
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-transparent hover:border-slate-200 transition-colors"
                               title="ย้ายห้องเรียน (ซิงค์กลุ่มแชท)"
                             >
                               <ArrowRightLeft className="w-3.5 h-3.5" />
@@ -1319,7 +1319,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                                 setDeletingStudent(stu);
                                 setIsDeleteStudentOpen(true);
                               }}
-                              className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors"
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-slate-100 border border-transparent hover:border-slate-200 transition-colors"
                               title="ลบออกจากห้อง (ระงับสถานะ)"
                             >
                               <Trash2 className="w-3.5 h-3.5" />

@@ -325,7 +325,7 @@ export const EndTermReadinessView: React.FC<EndTermReadinessViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsOverviewModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 bg-white hover:bg-blue-50 text-slate-700 text-xs font-semibold rounded-xl shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-xs font-semibold rounded-xl shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
                 <span>ดูตารางสรุปคะแนน</span>
