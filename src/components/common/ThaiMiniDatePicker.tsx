@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Calendar2Regular from '@mingcute/react/core-regular/calendar-2';
 import LeftSmallRegular from '@mingcute/react/core-regular/left-small';
 import RightSmallRegular from '@mingcute/react/core-regular/right-small';
-import CheckRegular from '@mingcute/react/core-regular/check';
 
 export interface ThaiMiniDatePickerProps {
   label?: string;
