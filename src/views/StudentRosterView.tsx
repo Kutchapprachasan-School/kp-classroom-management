@@ -1019,11 +1019,15 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
           4. STUDENT LIST (DESKTOP TABLE & MOBILE STACKED CARDS)
          ======================================================== */}
       {/* DESKTOP TABLE VIEW */}
-      <div className="hidden md:block bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+      <div
+        className={`hidden md:block bg-white rounded-2xl border border-slate-200/90 shadow-xs relative transition-all ${
+          openActionMenuId ? 'z-30 overflow-visible' : 'overflow-visible'
+        } min-h-[240px]`}
+      >
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="bg-slate-50/80 text-slate-500 border-b border-slate-200/80 font-bold uppercase tracking-wider">
-              <th className="py-3.5 px-4 w-10 text-center">
+              <th className="py-3.5 px-4 w-10 text-center rounded-tl-2xl">
                 <input
                   type="checkbox"
                   checked={
@@ -1040,7 +1044,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
               <th className="py-3.5 px-4 w-28">ชั้น/ห้อง</th>
               <th className="py-3.5 px-4 w-20 text-center">เลขที่</th>
               <th className="py-3.5 px-4 w-32">สถานะ</th>
-              <th className="py-3.5 px-4 w-56 text-right">การดำเนินการ</th>
+              <th className="py-3.5 px-4 w-56 text-right rounded-tr-2xl">การดำเนินการ</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -1054,13 +1058,15 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
               paginatedStudents.map((stu, index) => {
                 const attStatus = studentAttendanceMap.get(stu.id) || 'NORMAL';
                 const isSelected = selectedStudentIds.includes(stu.id);
+                const isDropup =
+                  paginatedStudents.length >= 4 && index >= paginatedStudents.length - 2;
 
                 return (
                   <tr
                     key={stu.id}
                     className={`hover:bg-slate-50/80 transition-colors ${
                       isSelected ? 'bg-blue-50/30' : ''
-                    }`}
+                    } relative ${openActionMenuId === stu.id ? 'z-40' : 'z-0'}`}
                   >
                     {/* Checkbox */}
                     <td className="py-3 px-4 text-center">
@@ -1213,14 +1219,22 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
                                 prev === stu.id ? null : stu.id
                               )
                             }
-                            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                            className={`p-1.5 rounded-xl transition-all cursor-pointer ${
+                              openActionMenuId === stu.id
+                                ? 'bg-blue-100 text-blue-700 shadow-2xs'
+                                : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                            }`}
                             title="ตัวเลือกเพิ่มเติม"
                           >
                             <MoreHorizontal className="w-4 h-4" />
                           </button>
 
                           {openActionMenuId === stu.id && (
-                            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-1.5 space-y-1 text-xs animate-scale-up">
+                            <div
+                              className={`absolute right-0 ${
+                                isDropup ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
+                              } w-52 bg-white rounded-2xl border border-slate-200/90 shadow-2xl z-[70] p-1.5 space-y-1 text-xs animate-scale-up ring-1 ring-slate-900/5`}
+                            >
                               {isFullAccess && (
                                 <button
                                   type="button"
@@ -1278,7 +1292,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
             return (
               <div
                 key={stu.id}
-                className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs space-y-3"
+                className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs space-y-3 relative"
               >
                 {/* Top: Avatar + Name + Status */}
                 <div className="flex items-center justify-between gap-3">
@@ -1350,14 +1364,61 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
                     <span>ผลการเรียน</span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => handleOpenTransferModal(stu)}
-                    className="p-2 bg-slate-50 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-100"
-                    title="ย้ายห้องเรียน"
-                  >
-                    <MoreHorizontal className="w-4 h-4" />
-                  </button>
+                  <div className="relative action-menu-container">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setOpenActionMenuId((prev) =>
+                          prev === stu.id ? null : stu.id
+                        )
+                      }
+                      className={`p-2 border rounded-xl transition-all cursor-pointer ${
+                        openActionMenuId === stu.id
+                          ? 'bg-blue-100 text-blue-700 border-blue-200 shadow-2xs'
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                      }`}
+                      title="ตัวเลือกเพิ่มเติม"
+                    >
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+
+                    {openActionMenuId === stu.id && (
+                      <div className="absolute right-0 bottom-full mb-1.5 w-52 bg-white rounded-2xl border border-slate-200/90 shadow-2xl z-[70] p-1.5 space-y-1 text-xs animate-scale-up ring-1 ring-slate-900/5">
+                        {isFullAccess && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditStudentModal(stu)}
+                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-left cursor-pointer font-medium"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                            <span>แก้ไขข้อมูลส่วนตัว</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenTransferModal(stu)}
+                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-purple-50 text-slate-700 hover:text-purple-700 text-left cursor-pointer font-medium"
+                        >
+                          <ArrowRightLeft className="w-3.5 h-3.5" />
+                          <span>ย้ายห้องเรียน</span>
+                        </button>
+                        {isFullAccess && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDeletingStudent(stu);
+                              setIsDeleteStudentOpen(true);
+                              setOpenActionMenuId(null);
+                            }}
+                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-rose-50 text-rose-600 text-left cursor-pointer font-medium"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>ลบออกจากห้อง</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );
