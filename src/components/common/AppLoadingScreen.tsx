@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import SparklesRegular from '@mingcute/react/core-regular/sparkles';
-import { getSchoolSettings, DEFAULT_KUTCHAP_LOGO_SVG } from '../../config/schoolRoles';
+import { getSchoolSettings } from '../../config/schoolRoles';
 
 interface AppLoadingScreenProps {
   message?: string;
@@ -12,39 +12,60 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
   subMessage = 'โรงเรียนกุดจับประชาสรรค์ • ระบบบริหารจัดการชั้นเรียน',
 }) => {
   const schoolSettings = getSchoolSettings();
-  const logoSrc = schoolSettings.logoUrl || DEFAULT_KUTCHAP_LOGO_SVG;
+  const [isLogoLoaded, setIsLogoLoaded] = useState(false);
+  const [hasLogoError, setHasLogoError] = useState(false);
+
+  // ดึงโลโก้ทางการจากข้อมูลโรงเรียน (ถ้ายังไม่โหลด หรือโหลดไม่ติด จะไม่แสดงขึ้นมาเด็ดขาด)
+  const logoUrl = schoolSettings.logoUrl?.trim() || '';
+  const canShowLogo = Boolean(logoUrl) && !hasLogoError;
 
   return (
     <div
       role="status"
       aria-label="กำลังโหลดระบบ"
-      className="fixed inset-0 z-9999 flex flex-col items-center justify-center bg-[#F7FAFF] overflow-hidden select-none font-sans px-4"
+      className="fixed inset-0 z-99999 flex flex-col items-center justify-center bg-[#F7FAFF] overflow-hidden select-none font-sans px-4 animate-fade-in"
     >
       {/* Decorative Soft Pastel Glow Blobs (Anime Aesthetic) */}
       <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-blue-100/50 blur-3xl pointer-events-none animate-pulse" />
-      <div className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-purple-100/40 blur-3xl pointer-events-none animate-pulse" style={{ animationDelay: '1s' }} />
+      <div
+        className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-purple-100/40 blur-3xl pointer-events-none animate-pulse"
+        style={{ animationDelay: '1s' }}
+      />
 
       {/* Main Glassmorphic Pastel Card */}
-      <div className="relative z-10 flex flex-col items-center w-full max-w-[360px] p-6 sm:p-8 rounded-3xl bg-white/90 backdrop-blur-md border border-[#E6EEF7] shadow-[0_8px_32px_rgba(40,90,140,0.08)] text-center transition-all">
-        {/* Soft Glowing Aura around School Emblem */}
-        <div className="relative mb-5 flex items-center justify-center">
-          <div className="absolute inset-0 rounded-2xl bg-blue-400/20 blur-md animate-ping" style={{ animationDuration: '3s' }} />
-          <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-b from-white to-blue-50/50 border border-blue-100/80 p-2 shadow-[0_4px_16px_rgba(59,130,246,0.12)] flex items-center justify-center overflow-hidden">
-            <img
-              src={logoSrc}
-              alt={schoolSettings.nameTh}
-              className="w-full h-full object-contain drop-shadow-xs transition-transform duration-700 hover:scale-105"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src = DEFAULT_KUTCHAP_LOGO_SVG;
-              }}
+      <div className="relative z-10 flex flex-col items-center w-full max-w-[360px] p-6 sm:p-8 rounded-3xl bg-white/95 backdrop-blur-md border border-[#E6EEF7] shadow-[0_8px_32px_rgba(40,90,140,0.08)] text-center transition-all duration-300">
+        {/* แสดงเฉพาะเมื่อโลโก้โรงเรียนโหลดเสร็จสมบูรณ์แล้วเท่านั้น (ถ้ายังไม่โหลด ไม่เอาขึ้น) */}
+        {canShowLogo && (
+          <div
+            className={`relative mb-5 flex items-center justify-center transition-all duration-500 ease-out ${
+              isLogoLoaded
+                ? 'opacity-100 scale-100 max-h-32'
+                : 'opacity-0 scale-90 max-h-0 pointer-events-none overflow-hidden mb-0'
+            }`}
+          >
+            <div
+              className="absolute inset-0 rounded-2xl bg-blue-400/20 blur-md animate-ping"
+              style={{ animationDuration: '3s' }}
             />
+            <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-b from-white to-blue-50/50 border border-blue-100/80 p-2 shadow-[0_4px_16px_rgba(59,130,246,0.12)] flex items-center justify-center overflow-hidden">
+              <img
+                src={logoUrl}
+                alt={schoolSettings.nameTh}
+                className="w-full h-full object-contain drop-shadow-xs"
+                onLoad={() => setIsLogoLoaded(true)}
+                onError={() => {
+                  setHasLogoError(true);
+                  setIsLogoLoaded(false);
+                }}
+              />
+            </div>
+            {/* Cute anime sparkles pill */}
+            <span className="absolute -bottom-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-bold shadow-xs">
+              <SparklesRegular className="w-3 h-3 text-amber-300" />
+              <span>KPS</span>
+            </span>
           </div>
-          {/* Cute anime sparkles pill */}
-          <span className="absolute -bottom-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-bold shadow-xs">
-            <SparklesRegular className="w-3 h-3 text-amber-300" />
-            <span>KPS</span>
-          </span>
-        </div>
+        )}
 
         {/* School Name & System Title */}
         <h1 className="text-lg sm:text-xl font-bold text-[#163A66] tracking-tight">

@@ -12,16 +12,12 @@
     <meta name="apple-mobile-web-app-title" content="จัดการชั้นเรียน" />
     <link rel="manifest" href="/manifest.json" />
 
-    <!-- Favicon & Touch Icons -->
-    <link rel="icon" type="image/png" href="/images/teacher/school_logo.png" />
-    <link rel="apple-touch-icon" href="/images/teacher/school_logo.png" />
-
     <!-- Google Fonts: Prompt & Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Prompt:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 
-    <!-- Instant Preloader Styles (Zero-Flicker First Paint) -->
+    <!-- Instant Preloader Styles (Zero-Flicker First Paint, No Mock Logo) -->
     <style>
       #kps-preloader {
         position: fixed;
@@ -67,43 +63,12 @@
         background: rgba(255, 255, 255, 0.95);
         border: 1px solid #E6EEF7;
         border-radius: 24px;
-        padding: 32px 24px;
+        padding: 36px 24px 30px;
         text-align: center;
         box-shadow: 0 10px 30px rgba(40, 90, 140, 0.08);
       }
-      .kps-logo-container {
-        position: relative;
-        width: 88px;
-        height: 88px;
-        margin: 0 auto 16px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: linear-gradient(180deg, #FFFFFF 0%, #EFF6FF 100%);
-        border: 1.5px solid #BFDBFE;
-        border-radius: 20px;
-        box-shadow: 0 6px 18px rgba(59, 130, 246, 0.12);
-        animation: kpsFloat 3s ease-in-out infinite;
-      }
-      .kps-logo-img {
-        width: 68px;
-        height: 68px;
-        object-fit: contain;
-      }
-      .kps-badge {
-        position: absolute;
-        bottom: -6px;
-        right: -6px;
-        background: #3B82F6;
-        color: #FFFFFF;
-        font-size: 10px;
-        font-weight: 700;
-        padding: 2px 7px;
-        border-radius: 9999px;
-        box-shadow: 0 2px 6px rgba(59, 130, 246, 0.35);
-      }
       .kps-title {
-        font-size: 18px;
+        font-size: 19px;
         font-weight: 700;
         color: #163A66;
         margin: 0;
@@ -113,7 +78,7 @@
         font-size: 13px;
         font-weight: 600;
         color: #3B82F6;
-        margin: 4px 0 0;
+        margin: 6px 0 0;
       }
       .kps-bar-track {
         width: 100%;
@@ -121,7 +86,7 @@
         background: #E2E8F0;
         border-radius: 9999px;
         overflow: hidden;
-        margin: 22px 0 12px;
+        margin: 24px 0 12px;
         position: relative;
       }
       .kps-bar-fill {
@@ -159,10 +124,6 @@
         color: #94A3B8;
         text-align: center;
       }
-      @keyframes kpsFloat {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-5px); }
-      }
       @keyframes kpsShimmer {
         0% { background-position: 200% 0; }
         100% { background-position: -200% 0; }
@@ -175,15 +136,11 @@
   </head>
   <body class="bg-[#F8FAFC] text-slate-800 antialiased selection:bg-blue-100 selection:text-blue-900 font-sans">
     <div id="root">
-      <!-- Instant First-Paint Loading Screen -->
+      <!-- Instant First-Paint Preloader (No mock or unverified logo) -->
       <div id="kps-preloader">
         <div class="kps-preloader-blob-1"></div>
         <div class="kps-preloader-blob-2"></div>
         <div class="kps-preloader-card">
-          <div class="kps-logo-container">
-            <img src="/images/teacher/school_logo.png" alt="ตราโรงเรียนกุดจับประชาสรรค์" class="kps-logo-img" onerror="this.onerror=null; this.src='/images/banners/school-logo.png';" />
-            <span class="kps-badge">KPS</span>
-          </div>
           <h1 class="kps-title">โรงเรียนกุดจับประชาสรรค์</h1>
           <p class="kps-subtitle">ระบบบริหารจัดการชั้นเรียน & การศึกษาดิจิทัล</p>
           <div class="kps-bar-track">

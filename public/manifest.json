@@ -9,13 +9,13 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/images/teacher/school_logo.png",
+      "src": "/images/admin/school_logo_crest.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/images/banners/school-logo.png",
+      "src": "/images/admin/school_logo_crest.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

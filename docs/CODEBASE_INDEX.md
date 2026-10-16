@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 16/10/2569 22:21:04 | รวมทั้งหมด 177 ไฟล์*
+*อัปเดตล่าสุด: 16/10/2569 22:32:55 | รวมทั้งหมด 177 ไฟล์*
 
 ---
 
@@ -117,7 +117,7 @@
 | [src/components/attendance/DynamicQrAttendanceModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/attendance/DynamicQrAttendanceModal.tsx) | 621 | `DynamicQrAttendanceModalProps` (L29), `DynamicQrAttendanceModal` (L43) |
 | [src/components/attendance/StudentIdCardModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/attendance/StudentIdCardModal.tsx) | 126 | `StudentIdCardModalProps` (L9), `StudentIdCardModal` (L18) |
 | [src/components/attendance/StudentQrScannerModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/attendance/StudentQrScannerModal.tsx) | 222 | `StudentQrScannerModalProps` (L18), `StudentQrScannerModal` (L29) |
-| [src/components/common/AppLoadingScreen.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/common/AppLoadingScreen.tsx) | 94 | `AppLoadingScreen` (L10) |
+| [src/components/common/AppLoadingScreen.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/common/AppLoadingScreen.tsx) | 115 | `AppLoadingScreen` (L10) |
 | [src/components/common/Pagination.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/common/Pagination.tsx) | 182 | `PageSizeOption` (L8), `PaginationProps` (L10), `Pagination` (L21) |
 | [src/components/common/PixelPet.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/common/PixelPet.tsx) | 69 | `PixelPet` (L8) |
 | [src/components/common/QuickSearchModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/common/QuickSearchModal.tsx) | 135 | `QuickSearchModal` (L15) |
@@ -230,7 +230,7 @@
 
 | ไฟล์ (File Path) | จำนวนบรรทัด | สัญลักษณ์หลัก & ช่วงบรรทัด (Key Exports & Line Numbers) |
 | :--- | :---: | :--- |
-| [src/App.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/App.tsx) | 885 | `App` (L82) |
+| [src/App.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/App.tsx) | 886 | `App` (L82) |
 | [src/lib/supabase.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/lib/supabase.ts) | 33 | `isSupabaseConfigured` (L16), `supabase` (L20), `logDbOperation` (L28) |
 | [src/lib/universalAdapter.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/lib/universalAdapter.ts) | 567 | `RealtimePayload` (L16), `StorageDriver` (L22), `UniversalAdapterConfig` (L29), `UniversalAdapter` (L43), `getStorageDriver` (L61), `clearMemoryStore` (L87), `getMemoryStore` (L88), `readStorage` (L90), `writeStorage` (L101), `removeStorage` (L110) *(+3 รายการ)* |
 | [src/main.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/main.tsx) | 28 | *(Internal / Default Export)* |

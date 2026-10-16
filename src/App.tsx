@@ -84,9 +84,10 @@ export const App: React.FC = () => {
   const [schoolSettings, setSchoolSettings] = useState(() => getSchoolSettings());
 
   useEffect(() => {
+    // ค้างหน้าโหลดไว้ 1 วินาทีเต็ม (1000ms) เพื่อแสดงตราโรงเรียนอย่างสวยงาม
     const timer = setTimeout(() => {
       setIsAppReady(true);
-    }, 450);
+    }, 1000);
     return () => clearTimeout(timer);
   }, []);
   const [activeAcademicTerm, setActiveAcademicTerm] = useState(() =>
