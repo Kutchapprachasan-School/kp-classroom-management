@@ -110,9 +110,12 @@ export const TeacherMoreAccountMobileView: React.FC<TeacherMoreAccountMobileView
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-11 h-11 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center p-1.5 shrink-0">
             <img
-              src={schoolSettings.logoUrl}
+              src={schoolSettings.logoUrl || '/school-logo.png'}
               alt={schoolSettings.nameTh}
               className="w-full h-full object-contain"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = '/school-logo.png';
+              }}
             />
           </div>
           <div className="min-w-0">

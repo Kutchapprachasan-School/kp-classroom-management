@@ -85,44 +85,9 @@ export interface SmsUserAccount {
   smsSynced: boolean;
 }
 
-// โลโก้ตราประจำโรงเรียนกุดจับประชาสรรค์ (คบเพลิงเปลวไฟสีแดง รัศมีสีทอง อักษรย่อ กป และริบบิ้นสีฟ้า)
-export const DEFAULT_KUTCHAP_LOGO_SVG = `data:image/svg+xml;utf8,${encodeURIComponent(`
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" fill="none">
-  <defs>
-    <linearGradient id="rayGold" x1="30" y1="15" x2="130" y2="125" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#FDE047"/>
-      <stop offset="55%" stop-color="#F59E0B"/>
-      <stop offset="100%" stop-color="#D97706"/>
-    </linearGradient>
-    <linearGradient id="flameRed" x1="80" y1="22" x2="80" y2="68" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#EF4444"/>
-      <stop offset="60%" stop-color="#DC2626"/>
-      <stop offset="100%" stop-color="#991B1B"/>
-    </linearGradient>
-    <linearGradient id="ribbonBlue" x1="25" y1="115" x2="135" y2="140" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#0284C7"/>
-      <stop offset="50%" stop-color="#0369A1"/>
-      <stop offset="100%" stop-color="#0284C7"/>
-    </linearGradient>
-  </defs>
-  <!-- รัศมีสีทองรอบคบเพลิง -->
-  <path d="M80 14 L84 32 L93 17 L91 35 L105 23 L97 40 L114 33 L102 47 L120 46 L104 56 L121 60 L104 65 L118 75 L100 75 L110 89 L94 83 L40 89 L50 89 L60 75 L42 75 L56 65 L39 60 L56 56 L40 46 L58 47 L46 33 L63 40 L55 23 L69 35 L67 17 L76 32 Z" fill="url(#rayGold)"/>
-  <!-- เปลวเพลิงสีแดงตรงกลาง -->
-  <path d="M80 24 C90 36 93 48 86 58 C83 62 77 62 74 58 C67 48 70 36 80 24 Z" fill="url(#flameRed)"/>
-  <path d="M80 34 C85 42 86 50 82 56 C80 58 78 56 80 34 Z" fill="#FCA5A5" opacity="0.6"/>
-  <!-- ด้ามคบเพลิงและวงกลมตรา กป -->
-  <path d="M75 58 L85 58 L83 74 L77 74 Z" fill="#B45309"/>
-  <circle cx="80" cy="96" r="24" fill="#FEFCE8" stroke="url(#rayGold)" stroke-width="4.5"/>
-  <circle cx="80" cy="96" r="19" fill="#FFFFFF" stroke="#FDE047" stroke-width="1.2"/>
-  <!-- อักษร กป สีน้ำเงินเข้ม -->
-  <text x="80" y="103" text-anchor="middle" fill="#1E293B" font-family="sans-serif" font-weight="900" font-size="18" letter-spacing="-0.5">กป</text>
-  <!-- ริบบิ้นสีฟ้าด้านล่าง -->
-  <path d="M26 118 L44 112 L48 126 L32 132 Z" fill="#0EA5E9"/>
-  <path d="M134 118 L116 112 L112 126 L128 132 Z" fill="#0EA5E9"/>
-  <path d="M38 116 C58 126 102 126 122 116 L126 130 C102 140 58 140 34 130 Z" fill="url(#ribbonBlue)" stroke="#FFFFFF" stroke-width="1.5"/>
-  <text x="80" y="130" text-anchor="middle" fill="#FFFFFF" font-family="sans-serif" font-weight="700" font-size="8.5">โรงเรียนกุดจับประชาสรรค์</text>
-</svg>
-`)}`;
+// โลโก้ตราประจำโรงเรียนกุดจับประชาสรรค์อย่างเป็นทางการ (Official School Emblem จากภาพที่ 2)
+export const DEFAULT_KUTCHAP_LOGO = '/school-logo.png';
+export const DEFAULT_KUTCHAP_LOGO_SVG = '/school-logo.png';
 
 export const KUTCHAP_SCHOOL_INFO: SchoolBrandingSettings = {
   classroomSystemTitle: 'ระบบจัดการชั้นเรียน',
@@ -133,7 +98,7 @@ export const KUTCHAP_SCHOOL_INFO: SchoolBrandingSettings = {
   affiliation: 'สำนักงานเขตพื้นที่การศึกษามัธยมศึกษาอุดรธานี',
   domain: 'kutchap.ac.th',
   academicTerm: 'ภาคเรียนที่ 1/2569',
-  logoUrl: DEFAULT_KUTCHAP_LOGO_SVG,
+  logoUrl: '/school-logo.png',
   smsSystemName: 'School Management System',
   smsApiUrl: 'https://sms.kutchap.ac.th/api/v1/auth-sync',
   smsLastSyncedAt: '30 ก.ย. 2569 • 11:05 น.',
@@ -219,10 +184,22 @@ export function getSchoolSettings(): SchoolBrandingSettings {
     const raw = window.localStorage.getItem(SCHOOL_SETTINGS_STORAGE_KEY);
     if (!raw) return KUTCHAP_SCHOOL_INFO;
     const parsed = JSON.parse(raw) as Partial<SchoolBrandingSettings>;
+    // Normalize any legacy mock logos or old SVG strings to the official Image 2 logo
+    let activeLogo = parsed.logoUrl?.trim();
+    if (
+      !activeLogo ||
+      activeLogo.includes('rayGold') ||
+      activeLogo.includes('data:image/svg+xml') ||
+      activeLogo.includes('school_logo.png') ||
+      activeLogo.includes('school-logo.svg')
+    ) {
+      activeLogo = '/school-logo.png';
+    }
+
     return {
       ...KUTCHAP_SCHOOL_INFO,
       ...parsed,
-      logoUrl: parsed.logoUrl?.trim() ? parsed.logoUrl : DEFAULT_KUTCHAP_LOGO_SVG,
+      logoUrl: activeLogo,
       baseFontSizePx: clampFontSize11To20(parsed.baseFontSizePx),
       fontFamily: parsed.fontFamily || 'Prompt',
       morningToClassSyncMode: parsed.morningToClassSyncMode || 'AUTO_PREFILL',

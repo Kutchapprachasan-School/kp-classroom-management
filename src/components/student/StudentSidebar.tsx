@@ -17,10 +17,7 @@ import LayoutLeftbarCloseRegular from '@mingcute/react/core-regular/layout-leftb
 import SparklesRegular from '@mingcute/react/core-regular/sparkles';
 import CellphoneRegular from '@mingcute/react/core-regular/cellphone';
 import SafeShieldRegular from '@mingcute/react/core-regular/safe-shield';
-import {
-  KUTCHAP_SCHOOL_INFO,
-  type SchoolUserRole,
-} from '../../config/schoolRoles';
+import { type SchoolUserRole } from '../../config/schoolRoles';
 import { getSchoolSettings } from '../../config/schoolSettings';
 import { cleanSlateService } from '../../services/cleanSlateService';
 import {
@@ -149,13 +146,13 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 flex items-center justify-center shadow-2xs bg-white border border-slate-100 p-0.5">
               <img
-                src={schoolSettings.logoUrl || '/images/banners/school-logo.png'}
+                src={schoolSettings.logoUrl || '/school-logo.png'}
                 alt={schoolSettings.nameTh}
                 className="w-full h-full object-contain"
                 onError={(e) => {
                   (e.target as HTMLElement).setAttribute(
                     'src',
-                    KUTCHAP_SCHOOL_INFO.logoUrl || '/images/teacher/school_logo.png'
+                    '/school-logo.png'
                   );
                 }}
               />

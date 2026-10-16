@@ -30,7 +30,6 @@ import {
 } from 'lucide-react';
 import {
   getSchoolSettings,
-  DEFAULT_KUTCHAP_LOGO_SVG,
   type SchoolUserRole,
   type SchoolBrandingSettings,
 } from '../../config/schoolRoles';
@@ -397,11 +396,11 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 flex items-center justify-center shadow-2xs bg-white border border-slate-100 p-0.5">
             <img
-              src={schoolSettings.logoUrl || '/images/teacher/school_logo.png'}
+              src={schoolSettings.logoUrl || '/school-logo.png'}
               alt={schoolSettings.nameTh}
               className="w-full h-full object-contain"
               onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src = DEFAULT_KUTCHAP_LOGO_SVG;
+                (e.currentTarget as HTMLImageElement).src = '/school-logo.png';
               }}
             />
           </div>

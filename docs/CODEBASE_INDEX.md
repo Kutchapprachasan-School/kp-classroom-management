@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 17/10/2569 01:53:02 | รวมทั้งหมด 177 ไฟล์*
+*อัปเดตล่าสุด: 17/10/2569 06:39:33 | รวมทั้งหมด 177 ไฟล์*
 
 ---
 
@@ -27,7 +27,7 @@
 | [src/views/MessagesView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/MessagesView.tsx) | 1210 | `MessagesView` (L45) |
 | [src/views/MorningAssemblyView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/MorningAssemblyView.tsx) | 1288 | `MorningAssemblyViewProps` (L53), `MorningAssemblyView` (L89) |
 | [src/views/SchoolLeaveExecutiveDashboardView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/SchoolLeaveExecutiveDashboardView.tsx) | 292 | `SchoolLeaveExecutiveDashboardView` (L43) |
-| [src/views/SchoolPortalView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/SchoolPortalView.tsx) | 437 | `TeacherLoginChannel` (L12), `SchoolPortalView` (L27) |
+| [src/views/SchoolPortalView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/SchoolPortalView.tsx) | 440 | `TeacherLoginChannel` (L12), `SchoolPortalView` (L27) |
 | [src/views/SettingsBackupView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/SettingsBackupView.tsx) | 3513 | `SettingsKey` (L121), `SettingsBackupView` (L147) |
 | [src/views/StudentAffairsCouncilView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentAffairsCouncilView.tsx) | 859 | `StudentAffairsCouncilView` (L36) |
 | [src/views/StudentArenaView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentArenaView.tsx) | 447 | `StudentArenaView` (L45) |
@@ -52,7 +52,7 @@
 | :--- | :---: | :--- |
 | [src/components/layout/PageHeroBanner.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/layout/PageHeroBanner.tsx) | 196 | `PageHeroBannerProps` (L19), `PageHeroBanner` (L50) |
 | [src/components/layout/TeacherHeader.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/layout/TeacherHeader.tsx) | 932 | `TeacherHeader` (L74) |
-| [src/components/layout/TeacherSidebar.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/layout/TeacherSidebar.tsx) | 586 | `TeacherViewKey` (L52), `TeacherSidebar` (L111) |
+| [src/components/layout/TeacherSidebar.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/layout/TeacherSidebar.tsx) | 585 | `TeacherViewKey` (L51), `TeacherSidebar` (L110) |
 
 ## Dashboard Components
 
@@ -63,7 +63,7 @@
 | [src/components/dashboard/TeacherCalendarActivityWidget.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/dashboard/TeacherCalendarActivityWidget.tsx) | 555 | `TeacherCalendarActivityWidget` (L39) |
 | [src/components/dashboard/TeacherHeroBanner.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/dashboard/TeacherHeroBanner.tsx) | 79 | `TeacherHeroBanner` (L19) |
 | [src/components/dashboard/TeacherHomeHeroBanner.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/dashboard/TeacherHomeHeroBanner.tsx) | 131 | `TeacherHomeHeroBannerProps` (L15), `TeacherHomeHeroBanner` (L24) |
-| [src/components/dashboard/TeacherMoreAccountMobileView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/dashboard/TeacherMoreAccountMobileView.tsx) | 172 | `TeacherMoreAccountMobileView` (L23) |
+| [src/components/dashboard/TeacherMoreAccountMobileView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/dashboard/TeacherMoreAccountMobileView.tsx) | 175 | `TeacherMoreAccountMobileView` (L23) |
 | [src/components/dashboard/TeacherQuickShortcuts.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/dashboard/TeacherQuickShortcuts.tsx) | 119 | `TeacherQuickShortcuts` (L16) |
 | [src/components/dashboard/TeacherTaskDetailModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/dashboard/TeacherTaskDetailModal.tsx) | 228 | `TeacherTaskDetailModal` (L24) |
 | [src/components/dashboard/TeacherTodayTimetableCard.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/dashboard/TeacherTodayTimetableCard.tsx) | 566 | `TodayPeriodItem` (L32), `TeacherTodayTimetableCard` (L57) |
@@ -85,7 +85,7 @@
 | [src/components/student/StudentMobileBottomNav.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentMobileBottomNav.tsx) | 96 | `StudentMobileBottomNav` (L14) |
 | [src/components/student/StudentMobileCareView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentMobileCareView.tsx) | 1250 | `MobileScreenKey` (L33), `StudentMobileCareView` (L100) |
 | [src/components/student/StudentProfileView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentProfileView.tsx) | 163 | `StudentProfileView` (L15) |
-| [src/components/student/StudentSidebar.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentSidebar.tsx) | 313 | `StudentTabKey` (L31), `StudentSidebar` (L63) |
+| [src/components/student/StudentSidebar.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentSidebar.tsx) | 310 | `StudentTabKey` (L28), `StudentSidebar` (L60) |
 | [src/components/student/StudentTimetableView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentTimetableView.tsx) | 179 | `StudentTimetableView` (L15) |
 
 ## General Components
@@ -102,7 +102,7 @@
 | [src/components/admin/AdminHeader.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/admin/AdminHeader.tsx) | 375 | `AdminHeader` (L27) |
 | [src/components/admin/AdminHeroBanner.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/admin/AdminHeroBanner.tsx) | 57 | `AdminHeroBanner` (L10) |
 | [src/components/admin/AdminOperationalCards.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/admin/AdminOperationalCards.tsx) | 327 | `AdminOperationalCards` (L21) |
-| [src/components/admin/AdminSchoolLogo.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/admin/AdminSchoolLogo.tsx) | 134 | `AdminSchoolLogo` (L9) |
+| [src/components/admin/AdminSchoolLogo.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/admin/AdminSchoolLogo.tsx) | 31 | `AdminSchoolLogo` (L9) |
 | [src/components/admin/AdminSidebar.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/admin/AdminSidebar.tsx) | 253 | `AdminMenuKey` (L25), `AdminSidebar` (L60) |
 | [src/components/admin/AdminStaffEvaluationCard.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/admin/AdminStaffEvaluationCard.tsx) | 104 | `AdminStaffEvaluationCard` (L4) |
 | [src/components/admin/AdminStaffRecentTable.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/admin/AdminStaffRecentTable.tsx) | 160 | `AdminStaffRecentTable` (L19) |
@@ -205,7 +205,7 @@
 | :--- | :---: | :--- |
 | [src/config/feedbackStickersCatalog.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/config/feedbackStickersCatalog.ts) | 584 | `FeedbackStrandId` (L10), `FeedbackStrandCategory` (L21), `FEEDBACK_STRAND_CATALOG` (L32), `STORAGE_KEYS` (L202), `detectFeedbackStrand` (L214), `getCategoryById` (L342), `getTeacherPreferredStrand` (L350), `setTeacherPreferredStrand` (L367), `getCustomFeedbackStickers` (L381), `addCustomFeedbackSticker` (L405) *(+3 รายการ)* |
 | [src/config/m1SgsLookup.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/config/m1SgsLookup.ts) | 1253 | `M1SgsLookupEntry` (L5), `M1_SGS_STUDENT_LOOKUP` (L12), `getM1SgsStudentInfo` (L1239), `isGrade1SgsStudentCode` (L1244) |
-| [src/config/schoolRoles.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/config/schoolRoles.ts) | 657 | `SchoolUserRole` (L1), `SchoolRoleProfile` (L8), `SchoolFontFamily` (L24), `MorningToClassSyncMode` (L31), `SchoolBrandingSettings` (L33), `SmsUserAccount` (L74), `DEFAULT_KUTCHAP_LOGO_SVG` (L89), `KUTCHAP_SCHOOL_INFO` (L127), `clampFontSize11To20` (L170), `applySchoolBrandingAndTypography` (L175) *(+8 รายการ)* |
+| [src/config/schoolRoles.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/config/schoolRoles.ts) | 634 | `SchoolUserRole` (L1), `SchoolRoleProfile` (L8), `SchoolFontFamily` (L24), `MorningToClassSyncMode` (L31), `SchoolBrandingSettings` (L33), `SmsUserAccount` (L74), `DEFAULT_KUTCHAP_LOGO` (L89), `DEFAULT_KUTCHAP_LOGO_SVG` (L90), `KUTCHAP_SCHOOL_INFO` (L92), `clampFontSize11To20` (L135) *(+9 รายการ)* |
 | [src/config/schoolSettings.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/config/schoolSettings.ts) | 10 | *(Internal / Default Export)* |
 | [src/config/subjectIcons.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/config/subjectIcons.ts) | 642 | `SubjectIconConfig` (L7), `ALL_SUBJECT_ICONS` (L22), `DEFAULT_SUBJECT_ICON` (L360), `getSubjectIcon` (L387), `SubjectBadgeSize` (L562), `getSubjectBadgeClasses` (L564), `SubjectBadgeRenderProps` (L579), `getSubjectBadgeProps` (L590), `renderSubjectIconBadge` (L606), `SubjectIconBadge` (L624) |
 

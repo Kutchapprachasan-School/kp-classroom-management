@@ -182,9 +182,12 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
         <div className="flex flex-col items-center mb-6">
           <div className="w-20 h-20 rounded-2xl bg-white shadow-[0_6px_20px_rgba(0,0,0,0.08)] border border-slate-100 flex items-center justify-center p-1.5 mb-4 overflow-hidden">
             <img
-              src={schoolSettings.logoUrl}
+              src={schoolSettings.logoUrl || '/school-logo.png'}
               alt={schoolSettings.nameTh}
               className="w-full h-full object-contain"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = '/school-logo.png';
+              }}
             />
           </div>
           <h1 className="text-[22px] font-bold text-slate-900 text-center tracking-tight">
