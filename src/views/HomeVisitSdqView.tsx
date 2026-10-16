@@ -353,39 +353,9 @@ export const HomeVisitSdqView: React.FC = () => {
       <PageHeroBanner
         title="เยี่ยมบ้านนักเรียน (นร.01) & ทุน กสศ."
         subtitle="บันทึกข้อมูลเยี่ยมบ้าน นร.01 และคัดกรองทุนเสมอภาคเชื่อมโยงระบบ CCT กสศ."
-        icon={<Home className="w-6 h-6 text-white" />}
-        iconBgClass="bg-blue-600 text-white"
+        icon={<Home className="w-7 h-7 text-blue-600" />}
         badgeText="นร./กสศ.01"
-        tagText="🏠 เยี่ยมบ้าน • แบบประเมิน SDQ • คัดกรองทุน กสศ. CCT • พิกัด GPS & รูปถ่าย"
-        quoteLines={[
-          'เข้าใจชีวิตความเป็นอยู่',
-          'ร่วมเติมเต็มโอกาสทางการศึกษา',
-          'เพื่ออนาคตของนักเรียนทุกคน',
-        ]}
-        actions={
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <button
-              onClick={() => setIsLeavePolicyOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
-            >
-              <Settings2 className="w-3.5 h-3.5 text-slate-500" />
-              <span>กติกาเวลาเรียน</span>
-            </button>
-
-            <button
-              onClick={handleBatchSyncToCct}
-              disabled={isBatchSyncing}
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
-            >
-              <CloudUpload className="w-4 h-4" />
-              <span>
-                {isBatchSyncing
-                  ? 'กำลังส่งข้อมูลขึ้น กสศ....'
-                  : 'ส่งข้อมูลขึ้น กสศ. ทั้งห้อง'}
-              </span>
-            </button>
-          </div>
-        }
+        quoteText="เข้าใจชีวิตความเป็นอยู่ เพื่อร่วมเติมเต็มโอกาสทางการศึกษา"
       />
 
       {/* 2. Rule of Thirds (กฎสามส่วน): 3 Balanced Summary Cards */}
@@ -480,15 +450,38 @@ export const HomeVisitSdqView: React.FC = () => {
             ))}
           </div>
 
-          <div className="relative w-full md:w-64">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ค้นหาชื่อ หรือ รหัสนักเรียน..."
-              className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-teal-600"
-            />
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative w-full sm:w-60">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="ค้นหาชื่อ หรือ รหัสนักเรียน..."
+                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 bg-slate-50 focus:bg-white"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsLeavePolicyOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+            >
+              <Settings2 className="w-3.5 h-3.5 text-slate-500" />
+              <span>กติกาเวลาเรียน</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleBatchSyncToCct}
+              disabled={isBatchSyncing}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <CloudUpload className="w-3.5 h-3.5" />
+              <span>
+                {isBatchSyncing ? 'กำลังส่งข้อมูล...' : 'ส่งข้อมูล กสศ. ทั้งห้อง'}
+              </span>
+            </button>
           </div>
         </div>
 

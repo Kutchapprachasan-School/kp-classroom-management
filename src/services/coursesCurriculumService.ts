@@ -4,6 +4,8 @@
  * สอดคล้องกับมาตรฐาน Pastel Anime Education Dashboard
  */
 
+import { academicCalendarService } from './academicCalendarService';
+
 export type MediaType = 'DOCUMENT' | 'WORKSHEET' | 'EXAM_QUIZ' | 'VIDEO' | 'LINK';
 
 export interface UnitMediaItem {
@@ -498,8 +500,8 @@ class CoursesCurriculumService {
     courseCode: string,
     room: string,
     excludeSlotId?: string,
-    academicYear: string = '2569',
-    term: string = '1'
+    academicYear?: string,
+    term?: string
   ): {
     allowed: boolean;
     currentCount: number;
@@ -507,14 +509,26 @@ class CoursesCurriculumService {
     reason?: string;
     course?: CourseCurriculumRecord;
   } {
-    const allCourses = this.getCourses(academicYear, term);
-    const course = allCourses.find((c) => c.code.trim() === courseCode.trim());
+    const activeTerm = academicCalendarService.getActiveTerm();
+    const targetYear = academicYear || (activeTerm ? String(activeTerm.year) : '2569');
+    const targetTerm = term || (activeTerm ? String(activeTerm.semesterNo) : '1');
+
+    // 1. ค้นหารายวิชาในเทอมเป้าหมายก่อน
+    let course = this.getCourses(targetYear, targetTerm).find(
+      (c) => c.code.trim() === courseCode.trim()
+    );
+
+    // 2. หากไม่พบในเทอมเป้าหมาย ให้ค้นหาจากหลักสูตรทั้งหมดของโรงเรียน (รองรับวิชาที่บันทึกข้ามเทอม หรือจัดตารางล่วงหน้า)
+    if (!course) {
+      course = this.load().find((c) => c.code.trim() === courseCode.trim());
+    }
+
     if (!course) {
       return {
         allowed: false,
         currentCount: 0,
         maxPeriods: 0,
-        reason: `ไม่พบรายวิชารหัส "${courseCode}" ในหลักสูตรที่เลือกใช้ (ปีการศึกษา ${academicYear} ภาคเรียนที่ ${term})`,
+        reason: `ไม่พบรายวิชารหัส "${courseCode}" ในหลักสูตรที่เลือกใช้ (กรุณาเพิ่มวิชานี้ในเมนูหลักสูตรก่อน)`,
       };
     }
 
@@ -564,8 +578,8 @@ class CoursesCurriculumService {
       isLunchSlot?: boolean;
       status?: string;
     }>,
-    academicYear: string = '2569',
-    term: string = '1'
+    academicYear?: string,
+    term?: string
   ): Array<{
     id: string;
     day: 'จันทร์' | 'อังคาร' | 'พุธ' | 'พฤหัสบดี' | 'ศุกร์';
@@ -580,7 +594,14 @@ class CoursesCurriculumService {
     isFreePeriod: boolean;
     status: 'UNCHECKED';
   }> {
-    const courses = this.getCourses(academicYear, term);
+    const activeTerm = academicCalendarService.getActiveTerm();
+    const targetYear = academicYear || (activeTerm ? String(activeTerm.year) : '2569');
+    const targetTerm = term || (activeTerm ? String(activeTerm.semesterNo) : '1');
+
+    let courses = this.getCourses(targetYear, targetTerm);
+    if (courses.length === 0) {
+      courses = this.load();
+    }
     const waitingSlots: Array<any> = [];
 
     courses.forEach((course) => {
@@ -629,17 +650,17 @@ class CoursesCurriculumService {
 
   /**
    * คัดกรองและปรับแก้ Matrix Slots ให้สอดคล้องกับหลักสูตรที่เลือกใช้:
-   * 1. กำจัด mock data หรือวิชานอกหลักสูตร (คณิต, วิทย์, แนะแนว, ฯลฯ) ให้กลายเป็นคาบว่าง
+   * 1. กำจัด mock data หรือวิชานอกหลักสูตร ให้กลายเป็นคาบว่าง
    * 2. จำกัดจำนวนคาบไม่ให้เกินโควตาตามหน่วยกิต (เช่น 1.5 หน่วยกิต = สูงสุด 3 คาบ/ห้อง)
    */
   public sanitizeMatrixSlotsWithCurriculum(
     slots: Array<any>,
-    academicYear: string = '2569',
-    term: string = '1'
+    academicYear?: string,
+    term?: string
   ): Array<any> {
-    const courses = this.getCourses(academicYear, term);
     const courseMap = new Map<string, CourseCurriculumRecord>();
-    courses.forEach((c) => {
+    // เติมวิชาหลักสูตรทั้งหมด เพื่อป้องกันการลบวิชาต่างเทอมทิ้งโดยไม่ได้ตั้งใจ
+    this.load().forEach((c) => {
       courseMap.set(c.code.trim(), c);
     });
 

@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
-  BarChart2,
   Calendar,
   ChevronDown,
   Users,
@@ -10,7 +9,6 @@ import {
   BookOpen,
   ArrowRight,
   TrendingUp,
-  Lightbulb,
   Shield,
   Layers,
   Check,
@@ -22,6 +20,7 @@ import {
   Printer,
   BarChart3,
   School,
+  Download,
 } from 'lucide-react';
 import type { SchoolUserRole } from '../config/schoolRoles';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
@@ -138,12 +137,14 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
   const [isGradeLevelDropdownOpen, setIsGradeLevelDropdownOpen] = useState(false);
   const [isRoomDropdownOpen, setIsRoomDropdownOpen] = useState(false);
   const [isSubjectDropdownOpen, setIsSubjectDropdownOpen] = useState(false);
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
 
   const termDropdownRef = useRef<HTMLDivElement>(null);
   const teacherDropdownRef = useRef<HTMLDivElement>(null);
   const gradeLevelDropdownRef = useRef<HTMLDivElement>(null);
   const roomDropdownRef = useRef<HTMLDivElement>(null);
   const subjectDropdownRef = useRef<HTMLDivElement>(null);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
 
   // ปิด dropdown เมื่อคลิกข้างนอก
   useEffect(() => {
@@ -162,6 +163,9 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
       }
       if (subjectDropdownRef.current && !subjectDropdownRef.current.contains(e.target as Node)) {
         setIsSubjectDropdownOpen(false);
+      }
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target as Node)) {
+        setIsExportDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -699,71 +703,12 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
         </div>
       )}
 
-      {/* 1. Master PageHeroBanner (2-Line Strictly) */}
+      {/* 1. Master PageHeroBanner strictly matching Mockup Image 1 */}
       <PageHeroBanner
-        title="สรุปผลการเรียน (Academic Grades & SAR)"
-        subtitle="ภาพรวมผลการเรียนของนักเรียนในรายวิชาที่สอน และสรุปผลสัมฤทธิ์ตามเกณฑ์"
-        icon={<BarChart2 className="w-6 h-6 text-white" />}
-        iconBgClass="bg-blue-600 text-white"
-        badgeText="SAR Report"
-        actions={
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={handleExportCsv}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 text-xs sm:text-sm font-bold border border-slate-200 hover:border-emerald-300 shadow-2xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
-              title="ส่งออกผลการเรียนเป็นไฟล์ Excel (CSV)"
-            >
-              <FileDown className="w-4 h-4 text-emerald-600" />
-              <span>ส่งออก Excel</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleExportPdf}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-blue-50 text-slate-800 text-xs sm:text-sm font-bold border border-slate-200 shadow-2xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
-              title="พิมพ์ / ดาวน์โหลดรายงานสรุป PDF"
-            >
-              <Printer className="w-4 h-4 text-blue-600" />
-              <span>รายงาน PDF</span>
-            </button>
-
-            <div className="relative" ref={termDropdownRef}>
-              <button
-                type="button"
-                onClick={() => setIsTermDropdownOpen((prev) => !prev)}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-blue-50 text-slate-800 text-xs sm:text-sm font-bold border border-slate-200 shadow-2xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
-              >
-                <Calendar className="w-4 h-4 text-blue-600" />
-                <span>{selectedTerm}</span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-              </button>
-
-              {isTermDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-1.5 text-xs space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
-                  {['ภาคเรียนที่ 1/2569', 'ภาคเรียนที่ 2/2568', 'ภาคเรียนที่ 1/2568'].map((term) => (
-                    <button
-                      key={term}
-                      type="button"
-                      onClick={() => {
-                        setSelectedTerm(term);
-                        setIsTermDropdownOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
-                        selectedTerm === term
-                          ? 'bg-blue-50 text-blue-700 font-bold'
-                          : 'hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <span>{term}</span>
-                      {selectedTerm === term && <Check className="w-3.5 h-3.5 text-blue-600" />}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        }
+        title="สมุดคะแนนและสถิติการเรียนรู้"
+        subtitle="ผลการเรียนของนักเรียนในรายวิชาของคุณ (ข้อมูลอัปเดตล่าสุด)"
+        icon={<GraduationCap className="w-8 h-8 text-blue-600" />}
+        quoteText="การศึกษา คือการเปิดโลกให้กับนักเรียน"
       />
 
       {/* 2. Controls Filter Bar: Dropdown เลือกชั้น/ห้อง, เลือกรายวิชา, เลือกผู้สอน (ตามโจทย์ระบุชัดเจน) */}
@@ -785,6 +730,41 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
 
         {/* Right: Dropdowns Controls */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+          {/* 2.0 Dropdown เลือกภาคเรียน */}
+          <div className="relative" ref={termDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsTermDropdownOpen((prev) => !prev)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50/60 hover:bg-blue-100 text-blue-800 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+            >
+              <Calendar className="w-3.5 h-3.5 text-blue-600" />
+              <span>{selectedTerm}</span>
+              <ChevronDown className="w-3.5 h-3.5 text-blue-400" />
+            </button>
+
+            {isTermDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-1.5 text-xs space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
+                {['ภาคเรียนที่ 1/2569', 'ภาคเรียนที่ 2/2568', 'ภาคเรียนที่ 1/2568'].map((term) => (
+                  <button
+                    key={term}
+                    type="button"
+                    onClick={() => {
+                      setSelectedTerm(term);
+                      setIsTermDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
+                      selectedTerm === term
+                        ? 'bg-blue-50 text-blue-700 font-bold'
+                        : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <span>{term}</span>
+                    {selectedTerm === term && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {/* 2.1 Dropdown เลือกผู้สอน (สำหรับ ผอ./Admin โดยเฉพาะ) */}
           {isExecutiveOrAdmin && (
             <div className="relative" ref={teacherDropdownRef}>
@@ -1003,6 +983,47 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
                     )}
                   </button>
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* Dropdown ส่งออก / รายงาน */}
+          <div className="relative" ref={exportDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsExportDropdownOpen((prev) => !prev)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50/60 hover:bg-blue-100 text-blue-800 text-xs font-bold shadow-2xs transition-all cursor-pointer"
+              title="ดาวน์โหลดหรือพิมพ์รายงานผลการเรียน"
+            >
+              <Download className="w-3.5 h-3.5 text-blue-600" />
+              <span>ส่งออก / รายงาน</span>
+              <ChevronDown className="w-3.5 h-3.5 text-blue-400" />
+            </button>
+
+            {isExportDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-1.5 text-xs space-y-1 animate-in fade-in zoom-in-95 duration-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleExportCsv();
+                    setIsExportDropdownOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 font-semibold transition-colors cursor-pointer"
+                >
+                  <FileDown className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>ส่งออกคะแนน Excel (CSV)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleExportPdf();
+                    setIsExportDropdownOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-blue-50 text-slate-700 hover:text-blue-800 font-semibold transition-colors cursor-pointer"
+                >
+                  <Printer className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>พิมพ์รายงานสรุป (PDF)</span>
+                </button>
               </div>
             )}
           </div>
@@ -1600,32 +1621,6 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
         </div>
       </div>
 
-      {/* 6. Footer Card: คำคมแรงบันดาลใจ พร้อมภาพภูเขาไฟฟูจิและดอกซากุระ ตรงตาม Reference Image 2 */}
-      <div className="relative rounded-2xl overflow-hidden border border-sky-100 shadow-sm bg-gradient-to-r from-sky-50/90 via-blue-50/70 to-pink-50/40 p-4 sm:p-5 flex items-center justify-between gap-4">
-        {/* Background Mount Fuji Sakura Art */}
-        <div className="absolute right-0 top-0 bottom-0 h-full w-1/3 sm:w-1/2 pointer-events-none opacity-40 md:opacity-60 overflow-hidden flex justify-end">
-          <img
-            src="/images/teacher/bottom_banner.png"
-            alt="Fuji Sakura Banner"
-            className="h-full object-cover object-right"
-          />
-        </div>
-
-        {/* Quote Content */}
-        <div className="relative z-10 flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-2xl bg-blue-500 text-white flex items-center justify-center shadow-sm shadow-blue-500/20 shrink-0">
-            <Lightbulb className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <p className="text-xs sm:text-sm font-bold text-slate-800">
-              “ทุกคะแนน คือ ก้าวเล็กๆ สู่ความฝันของนักเรียน”
-            </p>
-            <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
-              สอนด้วยใจ ให้โอกาสทุกคนเติบโต
-            </p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

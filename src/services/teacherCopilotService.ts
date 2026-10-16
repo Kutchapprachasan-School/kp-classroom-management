@@ -12,6 +12,9 @@ import {
 } from './attendanceCorrelationService';
 import { getBangkokTodayString } from '../utils/timetableDateUtils';
 import { authService } from './authService';
+import { academicCalendarService } from './academicCalendarService';
+import { classroomService } from './classroomService';
+import { calendarEventStorageService } from './calendarEventStorageService';
 
 export type TimeOfDayScenario =
   | 'MORNING_0745'
@@ -426,7 +429,7 @@ export const teacherCopilotService = {
       this.completeMorningAssemblyOneClick();
       return {
         summaryMessage:
-          'เช็คชื่อแถวเช้า ม.3/1 และอนุมัติใบลาออนไลน์เรียบร้อยแล้ว (ซิงก์สถานะลาเข้าทุกคาบเรียนอัตโนมัติ ประหยัดเวลา 5 นาที)',
+          'เช็คชื่อแถวเช้าและอนุมัติใบลาออนไลน์เรียบร้อยแล้ว (ซิงก์สถานะลาเข้าทุกคาบเรียนอัตโนมัติ ประหยัดเวลา 5 นาที)',
       };
     }
 
@@ -449,15 +452,24 @@ export const teacherCopilotService = {
       }
       return {
         summaryMessage:
-          'ส่งแจ้งเตือนผู้ปกครอง ด.ช. อัศวิน วนเกษตรกุล (เวลาเรียน 78.5% เสี่ยง มส.) พร้อมนัดซ่อมเวลาเรียนเรียบร้อยแล้ว',
+          'ส่งแจ้งเตือนผู้ปกครองนักเรียนกลุ่มเสี่ยง มส. พร้อมนัดซ่อมเวลาเรียนเรียบร้อยแล้ว',
       };
     }
 
-    if (itemId === 'urgent-period-7') {
-      this.completePeriod7OneClick();
+    if (itemId === 'urgent-period-7' || itemId.startsWith('urgent-period-')) {
+      const parts = itemId.split('-');
+      const pNum = parseInt(parts[2], 10) || 1;
+      const todayDay = calendarEventStorageService.getTodayDayKey();
+      calendarEventStorageService.markMatrixSlotChecked(todayDay, pNum);
+      const st = loadState();
+      if (!st.resolvedItemIds.includes(itemId)) {
+        st.resolvedItemIds.push(itemId);
+        st.timeSavedMinutes += 4;
+        saveState(st);
+      }
       return {
         summaryMessage:
-          'เช็คชื่อคาบ 7 (แนะแนว ม.3/1) จากข้อมูลแถวเช้าเรียบร้อยแล้ว (มาครบ 22 คน · ลา 1 คน)',
+          `เช็คชื่อคาบ ${pNum} จากข้อมูลแถวเช้าเรียบร้อยแล้ว (ซิงก์สถานะสมบูรณ์)`,
       };
     }
 
@@ -489,8 +501,22 @@ export const teacherCopilotService = {
       pendingCount === 0 || st.resolvedItemIds.includes('urgent-pending-submissions');
     const isSgsReadyDone = st.resolvedItemIds.includes('urgent-sgs-readiness');
 
+    const currentUser = authService.getCurrentUser();
+    const allRooms = classroomService.getClassroomsSync();
+    const homeroomRoom =
+      allRooms.find(
+        (c) =>
+          c.id === currentUser?.classroomId ||
+          c.adviser === currentUser?.name ||
+          c.roomNumber === currentUser?.level
+      ) || allRooms[0];
+    const homeroomName = homeroomRoom?.roomNumber || homeroomRoom?.name || 'ม.1/1';
+
+    const todayTeachingSlots = calendarEventStorageService.getTodayTeachingSlots();
+    const nextSlot = todayTeachingSlots.find((s) => s.status !== 'CHECKED' && !s.isConducted);
+
     const step1Done = st.morningAssemblyDone;
-    const step2Done = st.period7Done;
+    const step2Done = st.period7Done || !nextSlot;
     const step3Done = isPendingAllDone;
     const step4Done = isSgsReadyDone;
 
@@ -509,10 +535,10 @@ export const teacherCopilotService = {
         stepNo: 1,
         id: 'urgent-morning-assembly',
         timeRange: '07:45–08:20 น.',
-        title: '1. เช็คชื่อแถวตอนเช้า ม.3/1 & อนุมัติใบลา',
+        title: `1. เช็คชื่อแถวตอนเช้า ${homeroomName} & อนุมัติใบลา`,
         shortDesc: step1Done
           ? 'เช็คหน้าเสาธงและซิงก์ใบลาออนไลน์เข้าทุกคาบเรียนแล้ว'
-          : `ด่านแรกก่อนเริ่มเรียน · มีใบลารออนุมัติ ${pendingLeaves.length || 1} รายการรอซิงก์เข้าคาบเรียน`,
+          : `ด่านแรกก่อนเริ่มเรียน · มีใบลารออนุมัติ ${pendingLeaves.length || 0} รายการรอซิงก์เข้าคาบเรียน`,
         isDone: step1Done,
         isCurrentNow: firstUndone === 1,
         oneClickLabel: '✓ ยืนยันเช็คแถวเช้า & ซิงก์ใบลา 1 คลิก',
@@ -523,15 +549,17 @@ export const teacherCopilotService = {
       },
       {
         stepNo: 2,
-        id: 'urgent-period-7',
+        id: nextSlot ? `urgent-period-${nextSlot.period}` : 'urgent-period-7',
         timeRange: '09:20–14:20 น.',
         title: '2. เข้าสอน & เช็คชื่อรายคาบ (ดึงจากแถวเช้า)',
         shortDesc: step2Done
           ? 'เช็คชื่อครบทุกคาบสอนของวันนี้แล้ว'
-          : 'คาบ 7 แนะแนว ม.3/1 รอเช็คชื่อ (กดดึงสถานะจากแถวเช้าได้ทันที)',
+          : nextSlot
+          ? `คาบ ${nextSlot.period} ${nextSlot.subjectName} (${nextSlot.room || homeroomName}) รอเช็คชื่อ (กดดึงสถานะจากแถวเช้าได้ทันที)`
+          : 'ไม่มีคาบสอนค้างเช็คชื่อในวันนี้',
         isDone: step2Done,
         isCurrentNow: firstUndone === 2,
-        oneClickLabel: '✓ ดึงชื่อจากแถวเช้าเข้าคาบ 7',
+        oneClickLabel: nextSlot ? `✓ ดึงชื่อเข้าคาบ ${nextSlot.period}` : '✓ ดึงชื่อจากแถวเช้า',
         targetPayload: {
           view: 'classroom-attendance',
           highlightBanner: 'ดึงข้อมูลเช็คชื่อแถวเช้าเข้าสู่คาบเรียนอัตโนมัติ พร้อมตรวจจับเด็กโดดเรียนระหว่างวัน',
@@ -576,97 +604,116 @@ export const teacherCopilotService = {
   getUrgentTriageQueue(): UrgentTriageItem[] {
     const st = loadState();
     const todayStr = getBangkokTodayString();
-    const isHoliday = attendanceCorrelationService.isHoliday(todayStr);
-    const isWeekend = attendanceCorrelationService.isWeekend(todayStr);
+    const inActiveTerm = academicCalendarService.isDateInActiveTerm(todayStr);
+    const isInstructional = academicCalendarService.isInstructionalDay(todayStr);
 
+    const currentUser = authService.getCurrentUser();
+    const allRooms = classroomService.getClassroomsSync();
+    const homeroomRoom =
+      allRooms.find(
+        (c) =>
+          c.id === currentUser?.classroomId ||
+          c.adviser === currentUser?.name ||
+          c.roomNumber === currentUser?.level
+      ) || allRooms[0];
+    const homeroomId = homeroomRoom?.id || currentUser?.classroomId || 'room-1-1';
+    const homeroomName = homeroomRoom?.roomNumber || homeroomRoom?.name || 'ม.1/1';
+
+    const items: UrgentTriageItem[] = [];
+
+    // 1. เช็คแถวเช้า (Morning Assembly)
+    // มีแจ้งเตือนเฉพาะเมื่อ:
+    // - อยู่ในช่วงเปิดภาคเรียน (inActiveTerm)
+    // - เป็นวันที่มีการเรียนการสอน (isInstructional)
+    // - ยังไม่ได้บันทึกเช็คแถวเช้าวันนี้
+    if (inActiveTerm && isInstructional) {
+      const morningRecords = attendanceCorrelationService.getMorningRecords(homeroomId, todayStr);
+      const leaves = studentAffairsCouncilService.getStudentLeaves();
+      const pendingLeaves = leaves.filter((l) => l.status === 'PENDING');
+      const morningDone = st.morningAssemblyDone || morningRecords.length > 0;
+
+      if (!morningDone || pendingLeaves.length > 0) {
+        const pendingLeaveDesc =
+          pendingLeaves.length > 0
+            ? `${pendingLeaves.map((l) => `${l.studentName} (${l.leaveType})`).join(', ')} ส่งใบลาออนไลน์ · กดยืนยันเพื่ออนุมัติและซิงก์เข้าทุกคาบเรียนวันนี้`
+            : 'ไม่มีใบลารอดำเนินการ — นักเรียนทุกคนมีสถานะเข้าเรียนปกติ';
+
+        items.push({
+          id: 'urgent-morning-assembly',
+          level: 'CRITICAL',
+          levelLabel: 'ด่วนที่สุด · 07:45 น.',
+          timeTag: '07:45 น. หน้าเสาธง',
+          title:
+            pendingLeaves.length > 0
+              ? `เช็คชื่อแถวตอนเช้า ${homeroomName} & อนุมัติใบลาออนไลน์ (${pendingLeaves.length} รายการ)`
+              : `เช็คชื่อแถวตอนเช้า ${homeroomName} (โฮมรูม)`,
+          subtitle: pendingLeaveDesc,
+          impactNote: 'ช่วยให้ครูประจำวิชาคาบ 1–8 ไม่ต้องเช็คชื่อผิดเป็นขาดเรียน',
+          quickActionLabel: '✓ ยืนยันเช็คแถวเช้า & ซิงก์ใบลา (1 คลิก)',
+          navigateLabel: 'เปิดหน้าเช็คชื่อเสาธง & ใบลา',
+          targetPayload: {
+            view: 'morning-assembly',
+            highlightBanner: `ลำดับที่ 1: เช็คชื่อแถวเช้า ${homeroomName} และอนุมัติใบลาออนไลน์ซิงก์เข้าทุกคาบ`,
+          },
+          isResolved: morningDone && pendingLeaves.length === 0,
+          resolvedMessage: 'บันทึกเช็คชื่อแถวเช้าและอนุมัติใบลาซิงก์เข้าทุกคาบเรียบร้อยแล้ว',
+        });
+      }
+    }
+
+    // 2. เช็คชื่อรายคาบ (Period Attendance)
+    // มีแจ้งเตือนเฉพาะเมื่อ:
+    // - อยู่ในช่วงเปิดภาคเรียน และเป็นวันเรียน
+    // - มีคาบสอนจริงในตารางวันนี้ที่ยังไม่ได้เช็คชื่อ
+    if (inActiveTerm && isInstructional) {
+      const todayTeachingSlots = calendarEventStorageService.getTodayTeachingSlots();
+      const uncheckedSlot = todayTeachingSlots.find(
+        (s) => s.status !== 'CHECKED' && !s.isConducted && !s.isFreePeriod && !s.isLunchSlot
+      );
+      if (uncheckedSlot && !st.period7Done) {
+        items.push({
+          id: `urgent-period-${uncheckedSlot.period}`,
+          level: 'IMPORTANT',
+          levelLabel: `คาบเรียนวันนี้ · ${uncheckedSlot.timeRange || 'ระหว่างวัน'}`,
+          timeTag: `คาบ ${uncheckedSlot.period} · ${uncheckedSlot.room || homeroomName}`,
+          title: `เช็คชื่อคาบ ${uncheckedSlot.period} วิชา${uncheckedSlot.subjectName} (${uncheckedSlot.subjectCode}) ชั้น ${uncheckedSlot.room || homeroomName}`,
+          subtitle: 'กดดึงข้อมูลจากแถวเช้ามาใช้ได้ทันที พร้อมตรวจจับเด็กโดดเรียนระหว่างวัน',
+          impactNote: 'ประหยัดเวลาสอนในห้องเรียนได้ 5–10 นาทีต่อคาบ',
+          quickActionLabel: `✓ ดึงชื่อจากแถวเช้า & บันทึกคาบ ${uncheckedSlot.period} ทันที`,
+          navigateLabel: 'เปิดหน้าเช็คชื่อรายคาบ',
+          targetPayload: {
+            view: 'classroom-attendance',
+            highlightBanner: `เช็คชื่อคาบเรียนที่ ${uncheckedSlot.period} วิชา${uncheckedSlot.subjectName} โดยอ้างอิงสถานะจากแถวตอนเช้าอัตโนมัติ`,
+          },
+          isResolved: false,
+          resolvedMessage: `บันทึกเช็คชื่อคาบ ${uncheckedSlot.period} เรียบร้อยแล้ว`,
+        });
+      }
+    }
+
+    // 3. งานรอตรวจปลด ร (Pending Submissions)
+    // แสดงเฉพาะเมื่อมีชิ้นงานที่นักเรียนส่งจริงและยังค้างตรวจ
     const submissions = sgsRosterAndSubmissionService.getSubmissions();
     const roster = sgsRosterAndSubmissionService.getSgsRoster();
-    const leaves = studentAffairsCouncilService.getStudentLeaves();
-    const pendingLeaves = leaves.filter((l) => l.status === 'PENDING');
-
     const pendingSubmissions = submissions.filter((s) => s.status === 'SUBMITTED_PENDING');
-    const pendingNames = Array.from(
-      new Set(
-        pendingSubmissions.map((p) => {
-          const stu = roster.find((r) => r.studentCode === p.studentCode);
-          return stu ? stu.studentName : p.studentCode;
-        })
-      )
-    );
+    if (pendingSubmissions.length > 0 && !st.resolvedItemIds.includes('urgent-pending-submissions')) {
+      const pendingNames = Array.from(
+        new Set(
+          pendingSubmissions.map((p) => {
+            const stu = roster.find((r) => r.studentCode === p.studentCode);
+            return stu ? stu.studentName : p.studentCode;
+          })
+        )
+      );
 
-    const homeroomId = authService.getCurrentUser()?.classroomId || 'room-1-1';
-    const morningRecords = attendanceCorrelationService.getMorningRecords(homeroomId, todayStr);
-    const morningDone = st.morningAssemblyDone || morningRecords.length > 0 || isHoliday || isWeekend;
-
-    const period7Records = attendanceCorrelationService.getPeriodRecords('ก23901', homeroomId, todayStr, 7);
-    const period7Done = st.period7Done || period7Records.length > 0 || isHoliday || isWeekend;
-
-    const summaries = attendanceCorrelationService.calculate80Rule(homeroomId);
-    const atRiskList = summaries.filter((s: Attendance80Summary) => !s.isEligibleForExam);
-    const atRiskStudent = atRiskList[0];
-
-    const pendingLeaveDesc =
-      pendingLeaves.length > 0
-        ? `${pendingLeaves.map((l) => `${l.studentName} (${l.leaveType})`).join(', ')} ส่งใบลาออนไลน์ · กดยืนยันเพื่ออนุมัติและซิงก์เข้าทุกคาบเรียนวันนี้`
-        : 'ไม่มีใบลารอดำเนินการ — นักเรียนทุกคนมีสถานะเข้าเรียนปกติ';
-
-    const items: UrgentTriageItem[] = [
-      {
-        id: 'urgent-morning-assembly',
-        level: 'CRITICAL',
-        levelLabel: 'ด่วนที่สุด · 07:45 น.',
-        timeTag: '07:45 น. หน้าเสาธง',
-        title:
-          pendingLeaves.length > 0
-            ? `เช็คชื่อแถวตอนเช้า ม.3/1 & อนุมัติใบลาออนไลน์ (${pendingLeaves.length} รายการ)`
-            : 'เช็คชื่อแถวตอนเช้า ม.3/1 (โฮมรูม)',
-        subtitle: pendingLeaveDesc,
-        impactNote: 'ช่วยให้ครูประจำวิชาคาบ 1–8 ไม่ต้องเช็คชื่อผิดเป็นขาดเรียน',
-        quickActionLabel: '✓ ยืนยันเช็คแถวเช้า & ซิงก์ใบลา (1 คลิก)',
-        navigateLabel: 'เปิดหน้าเช็คชื่อเสาธง & ใบลา',
-        targetPayload: {
-          view: 'morning-assembly',
-          highlightBanner: 'ลำดับที่ 1: เช็คชื่อแถวเช้า ม.3/1 และอนุมัติใบลาออนไลน์ซิงก์เข้าทุกคาบ',
-        },
-        isResolved: morningDone,
-        resolvedMessage: isHoliday || isWeekend
-          ? 'วันนี้เป็นวันหยุด ไม่มีภาระงานเช็คแถวตอนเช้า'
-          : 'บันทึกเช็คชื่อแถวเช้าและอนุมัติใบลาซิงก์เข้าทุกคาบเรียบร้อยแล้ว',
-      },
-      {
-        id: 'urgent-period-7',
-        level: 'IMPORTANT',
-        levelLabel: 'คาบเรียนวันนี้ · 13:30 น.',
-        timeTag: 'คาบ 7 · ห้อง 304',
-        title: 'เช็คชื่อคาบ 7 วิชาแนะแนว (ก23901) ชั้น ม.3/1',
-        subtitle:
-          'ไม่ต้องขานชื่อใหม่ทั้งห้อง — กดดึงข้อมูลจากแถวเช้ามาใช้ได้ทันที พร้อมตรวจจับเด็กโดดเรียนระหว่างวัน',
-        impactNote: 'ประหยัดเวลาสอนในห้องเรียนได้ 5–10 นาทีต่อคาบ',
-        quickActionLabel: '✓ ดึงชื่อจากแถวเช้า & บันทึกคาบ 7 ทันที',
-        navigateLabel: 'เปิดหน้าเช็คชื่อรายคาบ',
-        targetPayload: {
-          view: 'classroom-attendance',
-          highlightBanner: 'เช็คชื่อคาบเรียนโดยอ้างอิงสถานะจากแถวตอนเช้าอัตโนมัติ',
-        },
-        isResolved: period7Done,
-        resolvedMessage: isHoliday || isWeekend
-          ? 'วันนี้เป็นวันหยุด ไม่มีภาระงานสอนรายคาบ'
-          : 'บันทึกเช็คชื่อคาบ 7 เรียบร้อยแล้ว (ซิงก์สถานะสมบูรณ์)',
-      },
-      {
+      items.push({
         id: 'urgent-pending-submissions',
         level: 'URGENT',
         levelLabel: 'รีบทำ · รอครูตรวจปลด ร',
-        timeTag: pendingSubmissions.length > 0 ? `ส่งเข้ามาใหม่ ${pendingSubmissions.length} ชิ้น` : 'ไม่มีงานรอตรวจ',
-        title:
-          pendingSubmissions.length > 0
-            ? `นักเรียนส่งงานซ่อมตัวชี้วัดบังคับแล้ว (${pendingNames.join(', ')})`
-            : 'งานซ่อมตัวชี้วัดบังคับได้รับการตรวจและปลด ร ครบแล้ว',
-        subtitle:
-          pendingSubmissions.length > 0
-            ? 'อัปโหลดไฟล์ WebP บน Cloudflare R2 & ลิงก์ Canva เรียบร้อยแล้ว · รอครูกดอนุมัติคะแนนเพื่อปลด ร อัตโนมัติ'
-            : 'ไม่มีชิ้นงานค้างตรวจในระบบ นักเรียนส่งงานและตรวจครบถ้วนแล้ว',
-        impactNote: 'เมื่อตรวจผ่าน ระบบคำนวณคะแนนหน่วยที่ 2–3 และเปลี่ยนเกรดจาก "ร" เป็นเกรดปกติทันที',
+        timeTag: `ส่งเข้ามาใหม่ ${pendingSubmissions.length} ชิ้น`,
+        title: `นักเรียนส่งงานซ่อมตัวชี้วัดแล้ว (${pendingNames.slice(0, 3).join(', ')}${pendingNames.length > 3 ? ' และอื่นๆ' : ''})`,
+        subtitle: 'อัปโหลดงานเข้าสู่ระบบแล้ว · รอครูกดอนุมัติคะแนนเพื่อปลด ร อัตโนมัติ',
+        impactNote: 'เมื่อตรวจผ่าน ระบบคำนวณคะแนนและเปลี่ยนเกรดจาก "ร" เป็นเกรดปกติทันที',
         quickActionLabel: `⚡ ตรวจผ่านทั้งหมด (${pendingSubmissions.length} ชิ้น) & ปลด ร ทันที`,
         navigateLabel: 'เปิดดูไฟล์งานที่ส่ง (กรองรอตรวจ)',
         targetPayload: {
@@ -674,37 +721,43 @@ export const teacherCopilotService = {
           assignmentQuickFilter: 'PENDING_REVIEW',
           highlightBanner: 'แสดงเฉพาะงานที่นักเรียนส่งแล้วและรอครูตรวจเพื่อปลด ร',
         },
-        isResolved:
-          pendingSubmissions.length === 0 ||
-          st.resolvedItemIds.includes('urgent-pending-submissions'),
+        isResolved: false,
         resolvedMessage: 'ตรวจให้คะแนนงานที่รอตรวจและปลด ร อัตโนมัติเรียบร้อยแล้ว',
-      },
-      {
-        id: 'urgent-ms-risk',
-        level: 'CRITICAL',
-        levelLabel: 'เสี่ยง มส. · ต้องรีบแจ้งผู้ปกครอง',
-        timeTag: atRiskStudent ? `เวลาเรียน ${atRiskStudent.attendanceRate}% (< 80%)` : 'เวลาเรียนผ่านเกณฑ์ 100%',
-        title: atRiskStudent
-          ? `นักเรียนรหัส ${atRiskStudent.studentCode} (ม.3/1) เสี่ยงติด มส. และโดดเรียนคาบเรียน`
-          : 'นักเรียนทุกคนมีเวลาเรียนผ่านเกณฑ์ 80% (ไม่มีกลุ่มเสี่ยง มส.)',
-        subtitle: atRiskStudent
-          ? `เวลาเรียนปัจจุบัน ${atRiskStudent.attendanceRate}% ต่ำกว่าเกณฑ์ 80% มีสถิติขาด/โดดเรียน ต้องทำกิจกรรมซ่อมเสริม`
-          : 'สถิติการเข้าเรียนของนักเรียนทุกคนปกติ ไม่มีนักเรียนที่เสี่ยงหมดสิทธิ์สอบ',
-        impactNote: 'ต้องแจ้งผู้ปกครองและนัดทำกิจกรรมซ่อมเวลาเรียนก่อนปิดระบบ SGS ในอีก 10 วัน',
-        quickActionLabel: '📲 ส่ง LINE แจ้งผู้ปกครอง & นัดซ่อม (1 คลิก)',
-        navigateLabel: 'เปิดตารางตามงานคนติด ร/มส.',
-        targetPayload: {
-          view: 'assignments',
-          assignmentQuickFilter: 'MISSING_OR_R',
-          highlightBanner: 'กรองเฉพาะนักเรียนที่ค้างงานบังคับ (ติด ร) หรือเวลาเรียนไม่ถึงเกณฑ์ (มส.)',
-        },
-        isResolved: !atRiskStudent || st.resolvedItemIds.includes('urgent-ms-risk'),
-        resolvedMessage: 'ตรวจสอบเวลาเรียนเรียบร้อยแล้ว (ไม่มีนักเรียนเสี่ยงติด มส.)',
-        lineNotificationTemplate: atRiskStudent
-          ? `แจ้งผู้ปกครองนักเรียนรหัส ${atRiskStudent.studentCode} (ม.3/1): ปัจจุบันเวลาเรียนอยู่ที่ ${atRiskStudent.attendanceRate}% (เกณฑ์ต้องไม่ต่ำกว่า 80%) ขอความอนุเคราะห์ให้นักเรียนเข้าร่วมกิจกรรมชดเชยเวลาเรียนครับ`
-          : undefined,
-      },
-    ];
+      });
+    }
+
+    // 4. นักเรียนเสี่ยงติด มส. (At-Risk Attendance < 80%)
+    // แสดงเฉพาะเมื่อมีนักเรียนจริงในห้องที่มีสถิติเวลาเรียนต่ำกว่า 80%
+    if (inActiveTerm && !st.resolvedItemIds.includes('urgent-ms-risk')) {
+      const summaries = attendanceCorrelationService.calculate80Rule(homeroomId);
+      const atRiskList = summaries.filter(
+        (s: Attendance80Summary) => !s.isEligibleForExam && s.totalScheduledPeriods > 0
+      );
+      const atRiskStudent = atRiskList[0];
+      if (atRiskStudent) {
+        items.push({
+          id: 'urgent-ms-risk',
+          level: 'CRITICAL',
+          levelLabel: 'เสี่ยง มส. · ต้องรีบแจ้งผู้ปกครอง',
+          timeTag: `เวลาเรียน ${atRiskStudent.attendanceRate}% (< 80%)`,
+          title: `นักเรียนรหัส ${atRiskStudent.studentCode} (${homeroomName}) เสี่ยงติด มส.`,
+          subtitle: `เวลาเรียนปัจจุบัน ${atRiskStudent.attendanceRate}% ต่ำกว่าเกณฑ์ 80% มีสถิติขาดเรียน ต้องทำกิจกรรมซ่อมเสริม`,
+          impactNote: 'ต้องแจ้งผู้ปกครองและนัดทำกิจกรรมซ่อมเวลาเรียนก่อนปิดระบบ SGS',
+          quickActionLabel: '📲 ส่ง LINE แจ้งผู้ปกครอง & นัดซ่อม (1 คลิก)',
+          navigateLabel: 'เปิดตารางตามงานคนติด ร/มส.',
+          targetPayload: {
+            view: 'assignments',
+            assignmentQuickFilter: 'MISSING_OR_R',
+            highlightBanner: 'กรองเฉพาะนักเรียนที่ค้างงานบังคับ (ติด ร) หรือเวลาเรียนไม่ถึงเกณฑ์ (มส.)',
+          },
+          isResolved: false,
+          resolvedMessage: 'ตรวจสอบเวลาเรียนเรียบร้อยแล้ว',
+          lineNotificationTemplate: `แจ้งผู้ปกครองนักเรียนรหัส ${atRiskStudent.studentCode} (${homeroomName}): ปัจจุบันเวลาเรียนอยู่ที่ ${atRiskStudent.attendanceRate}% (เกณฑ์ต้องไม่ต่ำกว่า 80%) ขอความอนุเคราะห์ให้นักเรียนเข้าร่วมกิจกรรมชดเชยเวลาเรียนครับ`,
+        });
+      }
+    }
+
+    return items;
 
     // เรียงลำดับให้รายการที่ตรงกับขั้นตอนปัจจุบัน (currentFocusStep) ขึ้นเป็นอันดับ 1 เสมอ
     // เพื่อให้ป้าย ⚡ ต่อไป บน TeacherHeader ตรงกับ "สิ่งที่ควรทำตอนนี้" บนหน้าหลัก 100%

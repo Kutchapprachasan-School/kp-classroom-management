@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   Flame,
   CheckCheck,
+  ClipboardCheck,
 } from 'lucide-react';
 import {
   attendanceCorrelationService,
@@ -523,16 +524,11 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
       {/* ========================================================================= */}
       <PageHeroBanner
         badgeText={`คาบที่ ${selectedPeriod}`}
-        badgeClass="bg-emerald-600 text-white"
+        badgeClass="bg-blue-50 text-blue-700 border-blue-200"
         title="เช็คชื่อเข้าเรียน (Classroom Attendance)"
         subtitle={`บันทึกการเข้าเรียนรายคาบ วิชา ${currentCourse.name} ห้อง ${currentCourse.roomLabel}`}
-        actions={
-          <div className="flex items-center gap-2">
-            <span className="hidden sm:inline-flex px-3 py-1 rounded-full text-xs font-bold bg-white/10 text-white border border-white/20">
-              คาบที่ {selectedPeriod}
-            </span>
-          </div>
-        }
+        icon={<ClipboardCheck className="w-7 h-7 text-blue-600" />}
+        quoteText="การตรงต่อเวลา คือระเบียบวินัยแรกสู่ความสำเร็จ"
       />
 
       {availableCourseOptions.length === 0 ? (

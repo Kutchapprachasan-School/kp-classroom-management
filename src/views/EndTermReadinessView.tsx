@@ -217,41 +217,14 @@ export const EndTermReadinessView: React.FC<EndTermReadinessViewProps> = ({
             ? '✓ ข้อมูลคะแนนและคุณลักษณะฯ ครบถ้วน 100% พร้อมส่งออกไฟล์ SGS ทันที'
             : `ตรวจพบงานค้าง: ${totalEmptyScores} ช่องคะแนนว่าง และรอประเมินคุณลักษณะฯ ${unratedTraitsCount} คน`
         }
-        icon={<Zap className="w-6 h-6 text-white" />}
-        iconBgClass="bg-blue-600 text-white"
+        icon={<Zap className="w-7 h-7 text-blue-600" />}
         badgeText={isAllReadyForSgs ? '100% READY' : 'PENDING'}
         badgeClass={
           isAllReadyForSgs
             ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
             : 'bg-amber-100 text-amber-800 border-amber-300'
         }
-        tagText="⚡ ตรวจช่องคะแนนว่าง • ประเมินคุณลักษณะฯ • สรุปผล ปพ.5 • ส่งออก SGS"
-        quoteLines={[
-          'เตรียมพร้อมทุกมิติ',
-          'ปิดเทอมอย่างมั่นใจ',
-          'ไม่มีงานค้างคาใจ',
-        ]}
-        actions={
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {!isAllReadyForSgs && (
-              <button
-                type="button"
-                onClick={handleOneClickFixAllBlockers}
-                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md transition-all inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-              >
-                <Zap className="w-3.5 h-3.5" />
-                <span>⚡ เคลียร์งานค้าง (1 คลิก)</span>
-              </button>
-            )}
-            <button
-              onClick={() => setIsOverviewModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-blue-50 text-slate-700 text-xs font-semibold rounded-xl shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
-              <span>ดูตารางสรุปคะแนน</span>
-            </button>
-          </div>
-        }
+        quoteText="เตรียมพร้อมทุกมิติ ปิดเทอมอย่างมั่นใจ ไร้งานค้าง"
       />
 
       {/* 2. Rule of Thirds (กฎสามส่วน): 3 Balanced Summary Zones */}
@@ -331,16 +304,33 @@ export const EndTermReadinessView: React.FC<EndTermReadinessViewProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Table 1: ตารางรายการชิ้นงานที่ยังมีช่องคะแนนว่าง */}
         <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+          <div className="px-5 py-3.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-teal-600" />
+              <FileText className="w-4 h-4 text-blue-600" />
               <h2 className="font-bold text-slate-900 text-sm">
                 ช่องคะแนนรายชิ้นงาน
               </h2>
             </div>
-            <span className="text-[11px] text-slate-400">
-              กด “ปิดรับงาน” เพื่อใส่ 0 คนไม่ส่ง
-            </span>
+            <div className="flex items-center gap-2">
+              {!isAllReadyForSgs && (
+                <button
+                  type="button"
+                  onClick={handleOneClickFixAllBlockers}
+                  className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>⚡ เคลียร์งานค้าง (1 คลิก)</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsOverviewModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 bg-white hover:bg-blue-50 text-slate-700 text-xs font-semibold rounded-xl shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
+                <span>ดูตารางสรุปคะแนน</span>
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">

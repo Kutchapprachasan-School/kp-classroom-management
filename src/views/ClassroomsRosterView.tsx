@@ -129,6 +129,8 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
   const [pageSize, setPageSize] = useState<PageSizeOption>(20);
 
   const classDropdownRef = useRef<HTMLDivElement>(null);
+  const [isSgsDropdownOpen, setIsSgsDropdownOpen] = useState(false);
+  const sgsDropdownRef = useRef<HTMLDivElement>(null);
 
   const isFullAccess =
     activeRole === 'ACADEMIC_ADMIN' ||
@@ -201,10 +203,17 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
       ) {
         setIsClassDropdownOpen(false);
       }
+      if (
+        isSgsDropdownOpen &&
+        sgsDropdownRef.current &&
+        !sgsDropdownRef.current.contains(e.target as HTMLElement)
+      ) {
+        setIsSgsDropdownOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [openActionMenuId, isClassDropdownOpen]);
+  }, [openActionMenuId, isClassDropdownOpen, isSgsDropdownOpen]);
 
   // Handler สลับเข้าสู่หน้ารายชื่อนักเรียนในห้องนั้น
   const handleDrilldownToClassroom = (classroom: ClassroomRosterItem) => {
@@ -691,7 +700,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in font-sans text-slate-800 select-none">
-      {/* 1. Page Hero Banner */}
+      {/* 1. Page Hero Banner matching Image 1 */}
       <PageHeroBanner
         title="ห้องเรียน / รายชื่อนักเรียน"
         subtitle={
@@ -699,42 +708,9 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
             ? 'การจัดการโครงสร้างห้องเรียน ครูที่ปรึกษา และบัญชีรายชื่อนักเรียน (ระบบฐานข้อมูลกลาง)'
             : `บัญชีรายชื่อนักเรียน ห้อง ${selectedClass?.name || 'ม.3/1'} (ครูที่ปรึกษา: ${selectedClass?.adviser || 'ยังไม่ได้กำหนด'})`
         }
-        icon={<GraduationCap className="w-6 h-6 text-white" />}
-        iconBgClass="bg-blue-600 text-white"
+        icon={<GraduationCap className="w-8 h-8 text-blue-600" />}
         badgeText={viewMode === 'CLASSROOMS_TABLE' ? `${allClassrooms.length} ห้องเรียน` : selectedClass?.name || 'ม.3/1'}
-        actions={
-          viewMode === 'CLASSROOMS_TABLE' ? (
-            isFullAccess && (
-              <button
-                type="button"
-                onClick={() => setIsAddClassroomOpen(true)}
-                className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-blue-900/20 transition-all cursor-pointer active:scale-95 whitespace-nowrap"
-              >
-                <Plus className="w-4 h-4" />
-                <span>+ เพิ่มห้องเรียน</span>
-              </button>
-            )
-          ) : (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleBackToClassroomsTable}
-                className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold shadow-2xs transition-all cursor-pointer whitespace-nowrap"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>หน้ารวมห้องเรียน</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsAddStudentOpen(true)}
-                className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-blue-900/20 transition-all cursor-pointer active:scale-95 whitespace-nowrap"
-              >
-                <UserPlus className="w-4 h-4" />
-                <span>+ เพิ่มนักเรียน</span>
-              </button>
-            </div>
-          )
-        }
+        quoteText="การศึกษา คือการเปิดโลกให้กับนักเรียน"
       />
 
       {/* Transfer / Action Notice Banner */}
@@ -807,16 +783,29 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                 </p>
               </div>
 
-              {/* Classroom search */}
-              <div className="relative w-full sm:w-72">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="ค้นหาห้องเรียน ระดับชั้น หรือครูที่ปรึกษา..."
-                  value={classroomSearchTerm}
-                  onChange={(e) => setClassroomSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200/90 rounded-xl text-xs focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
-                />
+              {/* Classroom search & add action */}
+              <div className="flex flex-wrap items-center gap-2.5">
+                <div className="relative w-full sm:w-72">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="ค้นหาห้องเรียน ระดับชั้น หรือครูที่ปรึกษา..."
+                    value={classroomSearchTerm}
+                    onChange={(e) => setClassroomSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200/90 rounded-xl text-xs focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                  />
+                </div>
+
+                {isFullAccess && (
+                  <button
+                    type="button"
+                    onClick={() => setIsAddClassroomOpen(true)}
+                    className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>เพิ่มห้องเรียน</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1055,23 +1044,64 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => setIsImportModalOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold shadow-2xs cursor-pointer"
-                  title="นำเข้ารายชื่อนักเรียนจาก SGS หรือ Excel"
+                  onClick={handleBackToClassroomsTable}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold shadow-2xs transition-all cursor-pointer whitespace-nowrap"
+                  title="กลับไปยังหน้ารวมห้องเรียนทั้งหมด"
                 >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
-                  <span>นำเข้า Excel/SGS</span>
+                  <ArrowLeft className="w-3.5 h-3.5 text-slate-600" />
+                  <span>หน้ารวมห้องเรียน</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setIsScoreExportModalOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-800 text-xs font-bold shadow-2xs cursor-pointer"
-                  title="ส่งออกคะแนนไปยังระบบ SGS (Reverse Sync)"
+                  onClick={() => setIsAddStudentOpen(true)}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
                 >
-                  <Upload className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>ส่งคะแนนไป SGS</span>
+                  <UserPlus className="w-4 h-4" />
+                  <span>เพิ่มนักเรียน</span>
                 </button>
+
+                {/* Consolidated SGS Dropdown */}
+                <div className="relative" ref={sgsDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsSgsDropdownOpen((prev) => !prev)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100 text-blue-800 text-xs font-bold shadow-2xs transition-all cursor-pointer"
+                    title="เครื่องมือนำเข้าและส่งออกข้อมูลกับระบบ SGS"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
+                    <span>จัดการข้อมูล SGS</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
+                  </button>
+
+                  {isSgsDropdownOpen && (
+                    <div className="absolute right-0 top-full mt-1.5 w-60 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-1.5 text-xs space-y-1 animate-in fade-in zoom-in-95 duration-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsImportModalOpen(true);
+                          setIsSgsDropdownOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-blue-50 text-slate-700 hover:text-blue-800 font-semibold transition-colors cursor-pointer"
+                      >
+                        <FileSpreadsheet className="w-4 h-4 text-blue-600 shrink-0" />
+                        <span>นำเข้ารายชื่อนักเรียน (Excel/SGS)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsScoreExportModalOpen(true);
+                          setIsSgsDropdownOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 font-semibold transition-colors cursor-pointer"
+                      >
+                        <Upload className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>ส่งคะแนนไปยัง SGS (Reverse Sync)</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 

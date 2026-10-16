@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Home,
   ClipboardList,
@@ -7,6 +7,7 @@ import {
   MoreHorizontal,
 } from 'lucide-react';
 import type { TeacherViewKey } from '../layout/TeacherSidebar';
+import { messagingService, CHAT_GROUPS_EVENT } from '../../services/messagingService';
 
 interface TeacherMobileBottomNavProps {
   currentView: TeacherViewKey;
@@ -17,6 +18,22 @@ export const TeacherMobileBottomNav: React.FC<TeacherMobileBottomNavProps> = ({
   currentView,
   onNavigate,
 }) => {
+  const [unreadCount, setUnreadCount] = useState<number>(() =>
+    messagingService.getTotalUnreadCount()
+  );
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setUnreadCount(messagingService.getTotalUnreadCount());
+    };
+    window.addEventListener(CHAT_GROUPS_EVENT, handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener(CHAT_GROUPS_EVENT, handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
   const isHomeActive = currentView === 'home';
   const isTasksActive =
     currentView === 'mobile-grading-list' ||
@@ -95,9 +112,11 @@ export const TeacherMobileBottomNav: React.FC<TeacherMobileBottomNavProps> = ({
                   isMessagesActive ? 'text-blue-600 stroke-[2.5]' : 'text-slate-500'
                 }`}
               />
-              <span className="absolute -top-1 -right-2 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center border-2 border-white">
-                3
-              </span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-2 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center border-2 border-white">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
             </div>
             <span>ข้อความ</span>
           </button>
@@ -196,9 +215,11 @@ export const TeacherMobileBottomNav: React.FC<TeacherMobileBottomNavProps> = ({
                 isMessagesActive ? 'text-blue-600 stroke-[2.5]' : 'text-slate-500'
               }`}
             />
-            <span className="absolute -top-1 -right-2 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center border-2 border-white">
-              3
-            </span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-2 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center border-2 border-white">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </div>
           <span>ข้อความ</span>
         </button>

@@ -1292,14 +1292,8 @@ D) ผู้อำนวยการ
       <PageHeroBanner
         title="จัดการสอบ / เก็บคะแนน"
         subtitle="ระบบสอบออนไลน์ เก็บคะแนนอัตโนมัติ รองรับการสอบทั้ง 3 ประเภท"
-        icon={<BookOpen className="w-6 h-6 text-white" />}
-        iconBgClass="bg-blue-600 text-white"
-        tagText="สอบเก็บคะแนน • สอบกลางภาค • สอบปลายภาค"
-        quoteLines={[
-          'ประเมินได้แม่นยำ',
-          'ลดความผิดพลาด',
-          'บริหารจัดการง่าย',
-        ]}
+        icon={<BookOpen className="w-7 h-7 text-blue-600" />}
+        quoteText="ประเมินได้แม่นยำ ลดความผิดพลาด บริหารจัดการง่าย"
       />
 
       {/* 2. Row 1 - Category Summary Cards & Teacher Shortcuts (Updated to Student Completion & Remedial KPIs) */}

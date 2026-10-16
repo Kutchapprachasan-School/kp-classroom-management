@@ -658,43 +658,9 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
       <PageHeroBanner
         title="ปฏิทินกิจกรรม"
         subtitle="ติดตามกิจกรรม กำหนดการ และงานสำคัญของโรงเรียน"
-        icon={<Calendar2Regular className="w-6 h-6 text-white" />}
-        iconBgClass="bg-blue-600 text-white"
+        icon={<Calendar2Regular className="w-8 h-8 text-blue-600" />}
         badgeText={roleFilter === 'TEACHER' ? 'มุมมองครู' : 'มุมมองนักเรียน'}
-        tagText="📅 ปฏิทินรายเดือน • กำหนดส่งคะแนน • กิจกรรมวิชาการ • วันหยุดราชการ"
-        quoteLines={[
-          'ร่วมสร้างโอกาส',
-          'พัฒนาผู้เรียน',
-          'สู่อนาคตที่ดีกว่า',
-        ]}
-        actions={
-          <div className="inline-flex bg-white/95 backdrop-blur-xs p-1 rounded-full border border-blue-200 shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setRoleFilter('TEACHER')}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                roleFilter === 'TEACHER'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <span>👤</span>
-              <span>ครู</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setRoleFilter('STUDENT')}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                roleFilter === 'STUDENT'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <span>👥</span>
-              <span>นักเรียน</span>
-            </button>
-          </div>
-        }
+        quoteText="ร่วมสร้างโอกาส พัฒนาผู้เรียน สู่อนาคตที่ดีกว่า"
       />
 
       {/* 2. Interactive Monthly Calendar Grid Card (Matching media_1791415925768_dac3bff6.png exactly) */}
@@ -734,7 +700,33 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
           </div>
 
           {/* Right: View Toggles & วันนี้ Button */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Role Filter Segmented Control */}
+            <div className="inline-flex items-center bg-slate-50/90 p-1 rounded-xl border border-slate-200/80">
+              <button
+                type="button"
+                onClick={() => setRoleFilter('TEACHER')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  roleFilter === 'TEACHER'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 font-medium'
+                }`}
+              >
+                <span>👤 ครู</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRoleFilter('STUDENT')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  roleFilter === 'STUDENT'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 font-medium'
+                }`}
+              >
+                <span>👥 นักเรียน</span>
+              </button>
+            </div>
+
             {/* View Mode Segmented Control */}
             <div className="inline-flex items-center bg-slate-50/90 p-1 rounded-xl border border-slate-200/80">
               <button

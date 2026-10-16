@@ -40,6 +40,11 @@ import {
   BELL_SCHEDULE_UPDATED_EVENT,
   type SchoolBellScheduleConfig,
 } from '../services/bellScheduleService';
+import {
+  academicCalendarService,
+  ACADEMIC_CALENDAR_EVENT,
+  type AcademicTermRecord,
+} from '../services/academicCalendarService';
 import { coursesCurriculumService } from '../services/coursesCurriculumService';
 import { cleanSlateService } from '../services/cleanSlateService';
 import { teacherCourseAssignmentService } from '../services/teacherCourseAssignmentService';
@@ -115,10 +120,28 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
   const [weekOffset, setWeekOffset] = useState<number>(0);
   const [matrixSlots, setMatrixSlots] = useState<TimetableMatrixSlot[]>(loadSavedMatrixSlots);
 
+  const [activeTerm, setActiveTerm] = useState<AcademicTermRecord | null>(() =>
+    academicCalendarService.getActiveTerm()
+  );
+
+  useEffect(() => {
+    const handleCalendarUpdate = () => {
+      setActiveTerm(academicCalendarService.getActiveTerm());
+    };
+    window.addEventListener(ACADEMIC_CALENDAR_EVENT, handleCalendarUpdate);
+    return () => {
+      window.removeEventListener(ACADEMIC_CALENDAR_EVENT, handleCalendarUpdate);
+    };
+  }, []);
+
   // คำนวณ Waiting Pool โดยตรงจากหลักสูตรที่เลือกใช้ หักลบด้วยจำนวนคาบที่ลงตารางแล้ว (โควตาตามหน่วยกิต)
   const unassignedSlots = useMemo(() => {
-    return coursesCurriculumService.getCurriculumWaitingPoolSlots(matrixSlots);
-  }, [matrixSlots]);
+    return coursesCurriculumService.getCurriculumWaitingPoolSlots(
+      matrixSlots,
+      activeTerm ? String(activeTerm.year) : undefined,
+      activeTerm ? String(activeTerm.semesterNo) : undefined
+    );
+  }, [matrixSlots, activeTerm]);
 
   const [selectedSlot, setSelectedSlot] = useState<TimetableMatrixSlot | null>(null);
   const [assignWaitingSlotTarget, setAssignWaitingSlotTarget] = useState<TimetableMatrixSlot | null>(null);
@@ -435,7 +458,9 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
         matrixSlots,
         slotToSave.subjectCode,
         slotToSave.room,
-        slotToSave.id
+        slotToSave.id,
+        activeTerm ? String(activeTerm.year) : undefined,
+        activeTerm ? String(activeTerm.semesterNo) : undefined
       );
       if (!quotaCheck.allowed) {
         showToast(quotaCheck.reason || 'วิชานี้ลงครบโควตาตามหน่วยกิตแล้ว ไม่สามารถลงเกินได้');
@@ -531,7 +556,10 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
     const quotaCheck = coursesCurriculumService.canAssignPeriod(
       matrixSlots,
       waitingSlot.subjectCode,
-      waitingSlot.room
+      waitingSlot.room,
+      undefined,
+      activeTerm ? String(activeTerm.year) : undefined,
+      activeTerm ? String(activeTerm.semesterNo) : undefined
     );
     if (!quotaCheck.allowed) {
       showToast(quotaCheck.reason || 'วิชานี้ลงครบโควตาตามหน่วยกิตแล้ว ไม่สามารถลงเกินได้');
@@ -586,13 +614,8 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
       <PageHeroBanner
         title="ตารางสอน (Teacher Timetable)"
         subtitle="ตรวจสอบรายวิชาที่สอนในแต่ละวัน และจัดการคาบเรียนอย่างเป็นระบบ"
-        icon={<Calendar className="w-6 h-6 text-white" />}
-        iconBgClass="bg-blue-600 text-white"
-        quoteLines={[
-          'การจัดสรรเวลาอย่างมีคุณค่า',
-          'เพื่อการเรียนรู้ที่มีประสิทธิภาพ',
-          'สู่อนาคตที่มั่นคงของผู้เรียน',
-        ]}
+        icon={<Calendar className="w-7 h-7 text-blue-600" />}
+        quoteText="การจัดสรรเวลาอย่างมีคุณค่า เพื่อการเรียนรู้ที่มีประสิทธิภาพ"
       />
 
       {/* ========================================================
@@ -678,7 +701,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
           ======================================================== */}
       <div className="bg-white rounded-2xl sm:rounded-3xl border border-[#E6EEF7] p-3.5 sm:p-4 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-3">
         {/* Left: Week / Term Selector */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => weekInfo.canPrev && setWeekOffset((prev) => prev - 1)}
@@ -710,6 +733,17 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
             title="ถัดไป"
           >
             <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+          </button>
+
+          {/* Active Term Pill */}
+          <button
+            type="button"
+            onClick={() => onDeepNavigate ? onDeepNavigate({ view: 'settings' }) : undefined}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-xs font-bold text-emerald-800 transition-colors cursor-pointer"
+            title="คลิกเพื่อไปที่ตั้งค่าปีการศึกษา & ภาคเรียน"
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>ภาคเรียนที่ {activeTerm ? `${activeTerm.semesterNo}/${activeTerm.year}` : '1/2569'}</span>
           </button>
         </div>
 

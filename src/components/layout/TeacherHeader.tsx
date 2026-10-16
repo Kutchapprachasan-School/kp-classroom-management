@@ -3,8 +3,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Search,
-  Bell,
+  SearchRegular,
+  NotificationRegular,
+  CalendarMonthRegular,
+  ExitRegular,
+} from '@mingcute/react/core-regular';
+import {
   ChevronDown,
   PanelLeft,
   Check,
@@ -12,8 +16,6 @@ import {
   Plus,
   CheckCircle2,
   ArrowUpRight,
-  Calendar,
-  LogOut,
   Settings,
   Cloud,
   RefreshCw,
@@ -340,14 +342,14 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-              <Calendar className="w-4 h-4" />
+              <CalendarMonthRegular className="w-4 h-4" />
             </div>
             <div>
               <h3 className="text-sm font-extrabold text-slate-900">
                 ปรับเปลี่ยนภาคเรียนและปีการศึกษา
               </h3>
               <p className="text-[11px] text-slate-500">
-                สิทธิ์แอดมิน: สลับภาคเรียนที่เปิดสอนในระบบ
+                สลับภาคเรียนที่เปิดสอนและแสดงผลในระบบ
               </p>
             </div>
           </div>
@@ -558,7 +560,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
             }}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 font-bold transition-colors text-left cursor-pointer"
           >
-            <LogOut className="w-4 h-4 text-rose-500 shrink-0" />
+            <ExitRegular className="w-4 h-4 text-rose-500 shrink-0" />
             <span>ออกจากระบบ</span>
           </button>
         )}
@@ -615,7 +617,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
             className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-600 flex items-center justify-center cursor-pointer"
             title="ค้นหา"
           >
-            <Search className="w-3.5 h-3.5 text-blue-600" />
+            <SearchRegular className="w-3.5 h-3.5 text-blue-600" />
           </button>
 
           <div className="relative" ref={bellRef}>
@@ -632,7 +634,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
               }`}
               title="การแจ้งเตือน"
             >
-              <Bell className="w-3.5 h-3.5" />
+              <NotificationRegular className="w-3.5 h-3.5" />
               {unresolvedCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold shadow-xs">
                   {unresolvedCount}
@@ -731,23 +733,11 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
 
           {/* 2.1 Date & Term Card matching Image 1 */}
           <div
-            onClick={() => {
-              if (activeRole === 'ACADEMIC_ADMIN') {
-                setIsTermSwitcherOpen(true);
-              }
-            }}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border border-blue-100/90 bg-blue-50/50 shadow-2xs transition-all ${
-              activeRole === 'ACADEMIC_ADMIN'
-                ? 'cursor-pointer hover:bg-blue-100/80 hover:border-blue-300'
-                : ''
-            }`}
-            title={
-              activeRole === 'ACADEMIC_ADMIN'
-                ? 'คลิกเพื่อปรับเปลี่ยนภาคเรียนและปีการศึกษา (สิทธิ์แอดมิน)'
-                : undefined
-            }
+            onClick={() => setIsTermSwitcherOpen(true)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-blue-100/90 bg-blue-50/50 shadow-2xs transition-all cursor-pointer hover:bg-blue-100/80 hover:border-blue-300"
+            title="คลิกเพื่อปรับเปลี่ยนภาคเรียนและปีการศึกษา"
           >
-            <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
+            <CalendarMonthRegular className="w-4 h-4 text-blue-600 shrink-0" />
             <div className="flex flex-col text-left leading-tight">
               <span className="text-xs font-bold text-slate-800">
                 {todayThaiDate}
@@ -756,11 +746,9 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
                 <span className="text-[10px] text-slate-500 font-medium">
                   {termLabel}
                 </span>
-                {activeRole === 'ACADEMIC_ADMIN' && (
-                  <span className="text-[9px] px-1 py-0.2 rounded bg-blue-200/80 text-blue-800 font-bold">
-                    สลับ ▾
-                  </span>
-                )}
+                <span className="text-[9px] px-1 py-0.2 rounded bg-blue-200/80 text-blue-800 font-bold">
+                  สลับ ▾
+                </span>
               </div>
             </div>
           </div>
@@ -770,7 +758,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
             onClick={onOpenSearch}
             className="relative flex items-center cursor-pointer group"
           >
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 pointer-events-none group-hover:text-blue-600 transition-colors" />
+            <SearchRegular className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 pointer-events-none group-hover:text-blue-600 transition-colors" />
             <input
               type="text"
               readOnly
@@ -896,7 +884,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
               title="การแจ้งเตือนและงานด่วน"
               aria-label="การแจ้งเตือน"
             >
-              <Bell className="w-4 h-4" />
+              <NotificationRegular className="w-4 h-4" />
               {unresolvedCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold shadow-xs">
                   {unresolvedCount}

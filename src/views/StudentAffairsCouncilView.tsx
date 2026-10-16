@@ -170,15 +170,9 @@ export const StudentAffairsCouncilView: React.FC<
           <PageHeroBanner
             title="สภานักเรียน & เลือกตั้งออนไลน์ (E-Voting)"
             subtitle="ระบบลงคะแนนเลือกตั้งสภานักเรียนออนไลน์แบบเรียลไทม์ และรับฟังข้อเสนอแนะของนักเรียน"
-            icon={<Vote className="w-6 h-6 text-white" />}
-            iconBgClass="bg-blue-600 text-white"
+            icon={<Vote className="w-7 h-7 text-blue-600" />}
             badgeText="E-Voting 2569"
-            tagText="🗳️ ผู้ใช้สิทธิ์เรียลไทม์ • พรรคผู้สมัคร • กล่องข้อเสนอแนะนักเรียน"
-            quoteLines={[
-              'ประชาธิปไตยในโรงเรียน',
-              'สร้างผู้นำรุ่นใหม่',
-              'เพื่อสังคมที่ดีกว่า',
-            ]}
+            quoteText="ประชาธิปไตยในโรงเรียน สร้างผู้นำรุ่นใหม่เพื่อสังคมที่ดีกว่า"
           />
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -250,15 +244,9 @@ export const StudentAffairsCouncilView: React.FC<
           <PageHeroBanner
             title="กิจการนักเรียน & ใบลา (Student Affairs)"
             subtitle="ดูแลความประพฤติ พิจารณาคำขอลาออนไลน์ และกิจกรรมเสริมสร้างวินัยเชิงบวก"
-            icon={<ShieldAlert className="w-6 h-6 text-white" />}
-            iconBgClass="bg-blue-600 text-white"
+            icon={<ShieldAlert className="w-7 h-7 text-blue-600" />}
             badgeText="Student Affairs"
-            tagText="🛡️ พิจารณาใบลาออนไลน์ • บันทึกวินัยเชิงบวก • ตรวจสอบความสอดคล้อง"
-            quoteLines={[
-              'วินัยเชิงบวกสร้างคนดี',
-              'ดูแลด้วยความเข้าใจ',
-              'พัฒนาสู่อนาคตที่มั่นคง',
-            ]}
+            quoteText="วินัยเชิงบวกสร้างคนดี ดูแลด้วยความเข้าใจและเอื้ออาทร"
           />
 
           {/* แถบไอคอนสลับงาน 3 ปุ่มสั้นๆ เข้าใจทันที (เช็คแถวเช้า | ใบลา | ความประพฤติ) */}

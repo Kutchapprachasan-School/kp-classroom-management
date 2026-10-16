@@ -10,6 +10,9 @@ import { studentService, getAlternateRoomKey, type StudentRecord } from './stude
 import { coursesCurriculumService } from './coursesCurriculumService.ts';
 import { sgsRosterAndSubmissionService, type StudentWorkSubmission } from './sgsRosterAndSubmissionService.ts';
 import { indexedDbAdapter, type OutboxItem } from '../utils/indexedDbAdapter.ts';
+import { calendarEventStorageService } from './calendarEventStorageService.ts';
+import { authService, type AuthUser } from './authService.ts';
+import type { SchoolUserRole } from '../config/schoolRoles.ts';
 
 export type ChatGroupType = 'HOMEROOM' | 'COURSE' | 'OFFICIAL' | 'DEPARTMENT';
 
@@ -643,6 +646,100 @@ export const messagingService = {
     });
   },
 
+  /**
+   * ดึงรายการกลุ่มแชทสำหรับครูผู้สอนตามขอบเขตภาระงานจริง:
+   * - ห้องที่ปรึกษา (Homeroom): แสดงเฉพาะห้องที่ครูเป็นที่ปรึกษา
+   * - ห้องที่สอนตามรายวิชา (Courses): แสดงเฉพาะห้องและวิชาที่ครูท่านนี้สอน
+   * - แชทรวมทั้งโรงเรียนและประกาศวิชาการ (OFFICIAL): แสดงให้ครูทุกคน
+   * - กลุ่มสาระและประสานงานบุคลากร (DEPARTMENT): แสดงให้ครูทุกคน
+   * - แอดมิน / ผอ. (ACADEMIC_ADMIN): มองเห็นได้ทุกกลุ่ม
+   */
+  getGroupsForTeacher(teacherUser?: AuthUser | null, activeRole?: SchoolUserRole): ChatGroup[] {
+    const allGroups = this.getGroups();
+
+    // หากเป็นผู้บริหาร / แอดมิน (Admin / Director): มองเห็นได้ทั้งหมด
+    if (activeRole === 'ACADEMIC_ADMIN' || teacherUser?.role === 'ADMIN') {
+      return allGroups;
+    }
+
+    const currentTeacherName = teacherUser?.name || 'นายปัญจพล เกษรัตน์';
+    const allCls = classroomService.getClassroomsSync();
+
+    // 1. ระบุห้องที่ปรึกษาของครูท่านนี้ (Homeroom)
+    const homeroom =
+      allCls.find(
+        (c) =>
+          c.id === teacherUser?.classroomId ||
+          c.adviser === currentTeacherName ||
+          (teacherUser?.name && c.adviser.includes(teacherUser.name.split(' ')[0]))
+      ) ||
+      allCls.find((c) => c.id === 'room-1-1') ||
+      allCls[0];
+
+    const allowedHomeroomKeys = new Set<string>();
+    if (homeroom) {
+      if (homeroom.id) allowedHomeroomKeys.add(homeroom.id);
+      if (homeroom.name) allowedHomeroomKeys.add(homeroom.name);
+      if (homeroom.roomNumber) allowedHomeroomKeys.add(homeroom.roomNumber);
+    }
+    if (teacherUser?.classroomId) {
+      allowedHomeroomKeys.add(teacherUser.classroomId);
+    }
+
+    // 2. ระบุรายวิชาและห้องที่ครูสอน (จาก coursesCurriculumService และ timetable slots)
+    const curriculumCourses = coursesCurriculumService.getCourses();
+    const teacherCourses = curriculumCourses.filter(
+      (c) =>
+        !c.teacherName ||
+        c.teacherName === currentTeacherName ||
+        (teacherUser?.name && c.teacherName.includes(teacherUser.name.split(' ')[0]))
+    );
+    const teacherCourseCodes = new Set<string>(teacherCourses.map((c) => c.code.trim()));
+
+    // เพิ่มรหัสวิชาจากตารางสอน matrixSlots
+    const matrixSlots = calendarEventStorageService.loadMatrixSlots();
+    matrixSlots.forEach((s) => {
+      if (s.subjectCode && !s.isFreePeriod && !s.isLunchSlot) {
+        teacherCourseCodes.add(s.subjectCode.trim());
+      }
+    });
+
+    return allGroups.filter((g) => {
+      // 1. แชทรวมทั้งโรงเรียน (OFFICIAL) -> แสดงให้ครูทุกคน
+      if (g.type === 'OFFICIAL') {
+        return true;
+      }
+
+      // 2. กลุ่มสาระ & ประสานงานครูและบุคลากร (DEPARTMENT) -> แสดงให้ครูทุกคน
+      if (g.type === 'DEPARTMENT') {
+        return true;
+      }
+
+      // 3. ห้องที่ปรึกษา (HOMEROOM) -> แสดงเฉพาะห้องที่ครูเป็นที่ปรึกษา
+      if (g.type === 'HOMEROOM') {
+        const isRoomMatch = Boolean(
+          (g.classroomId && allowedHomeroomKeys.has(g.classroomId)) ||
+          (g.classroomName && allowedHomeroomKeys.has(g.classroomName)) ||
+          g.teacherName === currentTeacherName ||
+          (teacherUser?.name && g.teacherName.includes(teacherUser.name.split(' ')[0]))
+        );
+        return isRoomMatch;
+      }
+
+      // 4. ห้องที่สอนตามรายวิชา (COURSE) -> แสดงเฉพาะห้องและวิชาที่ครูท่านนี้สอน
+      if (g.type === 'COURSE') {
+        const isTeacherCourse = Boolean(
+          g.teacherName === currentTeacherName ||
+          (teacherUser?.name && g.teacherName.includes(teacherUser.name.split(' ')[0])) ||
+          (g.courseCode && teacherCourseCodes.has(g.courseCode.trim()))
+        );
+        return isTeacherCourse;
+      }
+
+      return false;
+    });
+  },
+
   // บันทึกรายการกลุ่มแชท (พร้อม Sync Async ลง IndexedDB ป้องกัน LocalStorage เต็ม)
   saveGroups(groups: ChatGroup[]): ChatGroup[] {
     _inMemoryGroupsCache = groups;
@@ -886,10 +983,28 @@ export const messagingService = {
     return newMsg;
   },
 
-  // คำนวณจำนวนข้อความที่ยังไม่ได้อ่านทั้งหมด (เฉพาะที่มีข้อความใหม่จริง)
-  getTotalUnreadCount(): number {
-    const groups = this.getGroups();
-    return groups.reduce((acc, g) => acc + (g.unreadCount || 0), 0);
+  // คำนวณจำนวนข้อความที่ยังไม่ได้อ่านทั้งหมด (เฉพาะกลุ่มที่ผู้ใช้มีสิทธิ์และมีข้อความใหม่จริง)
+  getTotalUnreadCount(user?: AuthUser | null, role?: SchoolUserRole): number {
+    const activeUser =
+      user !== undefined
+        ? user
+        : typeof localStorage !== 'undefined'
+        ? authService.getCurrentUser()
+        : null;
+    let visibleGroups: ChatGroup[];
+    if (
+      role === 'STUDENT_GENERAL' ||
+      role === 'STUDENT_COUNCIL' ||
+      activeUser?.role === 'STUDENT'
+    ) {
+      visibleGroups = this.getGroupsForStudent(
+        activeUser?.studentCode || activeUser?.id,
+        activeUser?.classroomId
+      );
+    } else {
+      visibleGroups = this.getGroupsForTeacher(activeUser, role);
+    }
+    return visibleGroups.reduce((acc, g) => acc + (g.unreadCount || 0), 0);
   },
 
   // ทำเครื่องหมายว่าอ่านข้อความในกลุ่มนี้แล้ว

@@ -619,7 +619,7 @@ console.log('  ✓ Sidebar menu ordering (timetable -> morning-assembly -> class
 // 5.3 Banner position: Banner placed directly below Settings within scroll container, LogOut alone at bottom
 const settingsKeyIdx = sidebarSource.indexOf("key: 'settings'");
 const bannerIdx = sidebarSource.indexOf("sidebarBanner.name");
-const logOutBtnIdx = sidebarSource.indexOf("<LogOut");
+const logOutBtnIdx = sidebarSource.indexOf("<LogOut") !== -1 ? sidebarSource.indexOf("<LogOut") : sidebarSource.indexOf("<ExitRegular");
 assert.ok(settingsKeyIdx < bannerIdx, 'Mascot banner must be placed below settings menu');
 assert.ok(bannerIdx < logOutBtnIdx, 'Mascot banner must precede logout button (logout alone in bottom section)');
 

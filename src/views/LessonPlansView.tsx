@@ -352,13 +352,8 @@ export const LessonPlansView: React.FC = () => {
       <PageHeroBanner
         title="แผนการสอน / จัดการแผนการสอน"
         subtitle="สร้างและจัดการแผนการสอนรายวิชา แบบหน่วยการเรียนรู้ พร้อมสื่อการสอนและประเมินผล"
-        icon={<BookOpen className="w-6 h-6 text-white" />}
-        iconBgClass="bg-blue-600 text-white"
-        quoteLines={[
-          'การสอนที่ดี',
-          'คือการเปิดโลกแห่งโอกาส',
-          'ให้กับนักเรียน 💜',
-        ]}
+        icon={<BookOpen className="w-7 h-7 text-blue-600" />}
+        quoteText="การสอนที่ดี คือการเปิดโลกแห่งโอกาสให้กับนักเรียน"
       />
 
       {/* ======================================================== */}

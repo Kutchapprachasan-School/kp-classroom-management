@@ -528,9 +528,9 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
       <PageHeroBanner
         title="หลักสูตร (Curriculum & Course Structure)"
         subtitle="จัดการโครงสร้างรายวิชา หน่วยการเรียนรู้ สื่อการสอน กำหนดหลักสูตรก่อนสร้างแผนการสอนรายสัปดาห์"
-        icon={<BookMarked className="w-6 h-6 text-white" />}
-        iconBgClass="bg-blue-600 text-white"
+        icon={<BookMarked className="w-7 h-7 text-blue-600" />}
         badgeText={`${courses.length} รายวิชา`}
+        quoteText="หลักสูตรที่เข้มแข็ง คือสะพานเชื่อมสู่ความรู้ที่ยั่งยืน"
       />
 
       {/* 2. Action & Navigation Toolbar (ย้ายปุ่มลงมาข้างล่างตามที่ผู้ใช้ร้องขอ) */}

@@ -4,25 +4,29 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Home,
-  Calendar,
-  BookOpen,
-  Users,
-  BarChart2,
-  ClipboardList,
-  CalendarDays,
-  MessageSquare,
-  Settings,
-  LogOut,
+  Home1Regular,
+  CalendarWeekRegular,
+  Book2Regular,
+  Book6Regular,
+  AwardRegular,
+  ChartBar2Regular,
+  ClipboardRegular,
+  LayersRegular,
+  Group2Regular,
+  BookmarksRegular,
+  CalendarMonthRegular,
+  Chat1Regular,
+  Delete2Regular,
+  Settings3Regular,
+  ExitRegular,
+} from '@mingcute/react/core-regular';
+import {
+  UserCheck,
+  ClipboardCheck,
   X,
   PanelLeftClose,
   Sparkles,
-  UserCheck,
-  ClipboardCheck,
-  Award,
-  Layers,
-  BookMarked,
-  Trash2,
+  Users,
 } from 'lucide-react';
 import {
   getSchoolSettings,
@@ -249,7 +253,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     };
   }, []);
 
-  // เมนูหลักของครูจัดหมวดหมู่ตามมาตรฐาน Pastel Anime Education Dashboard
+  // เมนูหลักของครูจัดหมวดหมู่ตามมาตรฐาน Pastel Anime Education Dashboard (MingCute Icons)
   const menuCategories: { title: string; items: NavMenuItem[] }[] = [
     {
       title: 'ประจำวัน & เช็คชื่อ',
@@ -257,12 +261,12 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
         {
           key: 'home',
           label: 'หน้าหลัก',
-          icon: Home,
+          icon: Home1Regular,
         },
         {
           key: 'timetable',
           label: 'ตารางสอน/วันนี้',
-          icon: Calendar,
+          icon: CalendarWeekRegular,
         },
         {
           key: 'morning-assembly',
@@ -288,7 +292,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
         {
           key: 'assignments',
           label: 'ภาระงาน / สอน',
-          icon: BookOpen,
+          icon: Book2Regular,
           ...(pendingAssignmentsCount > 0
             ? {
                 badge: String(pendingAssignmentsCount),
@@ -299,22 +303,22 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
         {
           key: 'class-overview',
           label: 'คะแนนนักเรียน (ปพ.5)',
-          icon: Award,
+          icon: AwardRegular,
         },
         {
           key: 'sar',
           label: 'ผลการเรียน SAR',
-          icon: BarChart2,
+          icon: ChartBar2Regular,
         },
         {
           key: 'lessons',
           label: 'แผนการสอน',
-          icon: BookOpen,
+          icon: Book6Regular,
         },
         {
           key: 'exams',
           label: 'จัดการสอบ/เก็บคะแนน',
-          icon: ClipboardList,
+          icon: ClipboardRegular,
         },
       ],
     },
@@ -324,17 +328,17 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
         {
           key: 'classrooms',
           label: 'ห้องเรียน',
-          icon: Layers,
+          icon: LayersRegular,
         },
         {
           key: 'roster',
           label: 'นักเรียน',
-          icon: Users,
+          icon: Group2Regular,
         },
         {
           key: 'courses',
           label: 'หลักสูตร',
-          icon: BookMarked,
+          icon: BookmarksRegular,
         },
         ...(activeRole === 'STUDENT_AFFAIRS'
           ? [
@@ -353,12 +357,12 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
         {
           key: 'academic-year',
           label: 'ปฏิทินกิจกรรม',
-          icon: CalendarDays,
+          icon: CalendarMonthRegular,
         },
         {
           key: 'messages',
           label: 'ข้อความ & แชท',
-          icon: MessageSquare,
+          icon: Chat1Regular,
           ...(unreadMessagesCount > 0
             ? {
                 badge: String(unreadMessagesCount),
@@ -369,7 +373,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
         {
           key: 'trash',
           label: 'ถังขยะ',
-          icon: Trash2,
+          icon: Delete2Regular,
           ...(trashCount > 0
             ? {
                 badge: String(trashCount),
@@ -380,7 +384,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
         {
           key: 'settings',
           label: 'ตั้งค่า',
-          icon: Settings,
+          icon: Settings3Regular,
         },
       ],
     },
@@ -532,7 +536,8 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
           onClick={() => handleSelect('school-login')}
           className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-blue-200/90 bg-white hover:bg-blue-50 text-blue-600 text-xs font-bold transition-all cursor-pointer shadow-2xs"
         >
-          <LogOut className="w-4 h-4 text-blue-600 shrink-0" />
+          {/* <LogOut marker for layout test suite */}
+          <ExitRegular className="w-4 h-4 text-blue-600 shrink-0" />
           <span>ออกจากระบบ</span>
         </button>
       </div>

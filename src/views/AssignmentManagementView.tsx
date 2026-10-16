@@ -208,9 +208,9 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       <PageHeroBanner
         title="ตรวจงาน & ให้คะแนน (Assignment Grading)"
         subtitle="ศูนย์รวมผลงานที่นักเรียนส่งเข้ามา ตรวจงานและบันทึกคะแนนสะดวกรวดเร็วตามลำดับเวลา"
-        icon={<BookOpen className="w-6 h-6 text-white" />}
-        iconBgClass="bg-blue-600 text-white"
+        icon={<BookOpen className="w-7 h-7 text-blue-600" />}
         badgeText="FIFO Queue"
+        quoteText="ตรวจงานด้วยความใส่ใจ ให้คำแนะนำเพื่อการเติบโต"
       />
 
 

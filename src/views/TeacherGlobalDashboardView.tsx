@@ -5,7 +5,6 @@ import React, { useState } from 'react';
 import type { CrossViewNavigationPayload } from '../services/teacherCopilotService';
 import type { SchoolUserRole } from '../config/schoolRoles';
 import { TeacherHeroBanner } from '../components/dashboard/TeacherHeroBanner';
-import { TeacherBottomBanner } from '../components/dashboard/TeacherBottomBanner';
 import { TeacherTodayTimetableCard } from '../components/dashboard/TeacherTodayTimetableCard';
 import { TeacherQuickShortcuts } from '../components/dashboard/TeacherQuickShortcuts';
 import { TeacherCalendarActivityWidget } from '../components/dashboard/TeacherCalendarActivityWidget';
@@ -72,12 +71,6 @@ export const TeacherGlobalDashboardView: React.FC<
             }}
             onDeepNavigate={onDeepNavigate}
             currentUser={currentUser}
-          />
-
-          {/* 2.3 Bottom Banner (ส่วนที่ 3 ของแบนเนอร์ครู แนวนอนด้านล่าง) */}
-          <TeacherBottomBanner
-            activeRole={activeRole}
-            onOpenAdminModal={() => handleOpenBannerModal('bottom')}
           />
         </div>
 

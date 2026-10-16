@@ -25,6 +25,7 @@ import {
   RefreshCw,
   RotateCcw,
   AlertTriangle,
+  ChevronDown,
 } from 'lucide-react';
 import { classroomService, type TeacherAccountItem } from '../services/classroomService';
 import { studentService } from '../services/studentService';
@@ -92,6 +93,10 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // CSV Dropdown state
+  const [isCsvDropdownOpen, setIsCsvDropdownOpen] = useState(false);
+  const csvDropdownRef = useRef<HTMLDivElement>(null);
+
   // Toast notice
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -144,6 +149,17 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
       window.removeEventListener('kps-data-sync-event', handleStudentsUpdated);
       window.removeEventListener('storage', handleStudentsUpdated);
     };
+  }, []);
+
+  // Close CSV dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (csvDropdownRef.current && !csvDropdownRef.current.contains(event.target as Node)) {
+        setIsCsvDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   // Filtered teacher accounts for select dropdown
@@ -461,49 +477,9 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
       <PageHeroBanner
         title="จัดการห้องเรียน"
         subtitle="โครงสร้างชั้นเรียน ระดับสายชั้น และกำหนดครูที่ปรึกษาประจำห้อง สูงสุด 3 คน (ระบบฐานข้อมูลกลาง)"
-        icon={<Building className="w-6 h-6 text-white" />}
-        iconBgClass="bg-blue-600 text-white"
+        icon={<Building className="w-7 h-7 text-blue-600" />}
         badgeText={`${classrooms.length} ห้องเรียน`}
-        actions={
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={handleExportCsv}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs sm:text-sm font-bold border border-slate-200 shadow-2xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
-              title="ส่งออกรายชื่อห้องเรียนและครูที่ปรึกษาเป็นไฟล์ CSV"
-            >
-              <Download className="w-4 h-4 text-blue-600" />
-              <span>ส่งออก CSV</span>
-            </button>
-
-            {isFullAccess && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsImportModalOpen(true);
-                    setImportRawText('');
-                    setImportPreviewRows([]);
-                  }}
-                  className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-emerald-50 text-emerald-700 rounded-xl text-xs sm:text-sm font-bold border border-slate-200 hover:border-emerald-300 shadow-2xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
-                  title="นำเข้ารายชื่อห้องเรียนและครูที่ปรึกษา พร้อมตรวจสอบชื่อในฐานข้อมูล"
-                >
-                  <Upload className="w-4 h-4 text-emerald-600" />
-                  <span>นำเข้า CSV</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleOpenAddModal}
-                  className="flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-blue-900/20 transition-all cursor-pointer active:scale-95 whitespace-nowrap"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>เพิ่มห้องเรียน</span>
-                </button>
-              </>
-            )}
-          </div>
-        }
+        quoteText="ห้องเรียนที่อบอุ่น คือจุดเริ่มต้นของแรงบันดาลใจในการเรียนรู้"
       />
 
       {/* Toast Alert */}
@@ -606,7 +582,7 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
       {/* 4. Classrooms Table Container */}
       <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
         {/* Table Top Toolbar */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3.5">
           <div>
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <span>ตารางการจัดการห้องเรียน</span>
@@ -623,16 +599,76 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
             </p>
           </div>
 
-          {/* Search Box */}
-          <div className="relative w-full sm:w-72">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="ค้นหาห้องเรียน ระดับชั้น ครูที่ปรึกษา..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200/90 rounded-xl text-xs focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
-            />
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Search Box */}
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="ค้นหาห้องเรียน ระดับชั้น ครู..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200/90 rounded-xl text-xs focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+              />
+            </div>
+
+            {/* Consolidated CSV Dropdown */}
+            <div className="relative" ref={csvDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setIsCsvDropdownOpen((prev) => !prev)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold shadow-2xs transition-all cursor-pointer whitespace-nowrap"
+                title="จัดการนำเข้า/ส่งออกข้อมูลไฟล์ CSV"
+              >
+                <Download className="w-3.5 h-3.5 text-blue-600" />
+                <span>จัดการข้อมูล CSV</span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+              </button>
+
+              {isCsvDropdownOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-1.5 text-xs space-y-1 animate-in fade-in zoom-in-95 duration-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleExportCsv();
+                      setIsCsvDropdownOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-blue-50 text-slate-700 hover:text-blue-800 font-semibold transition-colors cursor-pointer"
+                  >
+                    <Download className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span>ส่งออกข้อมูลห้องเรียน (CSV)</span>
+                  </button>
+
+                  {isFullAccess && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsImportModalOpen(true);
+                        setImportRawText('');
+                        setImportPreviewRows([]);
+                        setIsCsvDropdownOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 font-semibold transition-colors cursor-pointer"
+                    >
+                      <Upload className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>นำเข้าข้อมูลห้องเรียน (CSV)</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Primary Action Button */}
+            {isFullAccess && (
+              <button
+                type="button"
+                onClick={handleOpenAddModal}
+                className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-900/20 transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+              >
+                <Plus className="w-4 h-4" />
+                <span>เพิ่มห้องเรียน</span>
+              </button>
+            )}
           </div>
         </div>
 

@@ -54,7 +54,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
     activeRole === 'STUDENT_COUNCIL' ||
     currentUser?.role === 'STUDENT';
 
-  // ฟังก์ชันดึงกลุ่มแชทที่ผู้ใช้มีสิทธิ์เข้าถึง (ป้องกันนักเรียนมองเห็นห้องอื่นหรือกลุ่มฝ่ายบุคลากร)
+  // ฟังก์ชันดึงกลุ่มแชทที่ผู้ใช้มีสิทธิ์เข้าถึง (ป้องกันนักเรียนมองเห็นห้องอื่น และครูเห็นเฉพาะห้องที่ปรึกษา/วิชาที่สอน/กลุ่มทางการ)
   const getVisibleGroups = useCallback((): ChatGroup[] => {
     if (isStudentUser) {
       return messagingService.getGroupsForStudent(
@@ -62,8 +62,8 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
         currentUser?.classroomId
       );
     }
-    return messagingService.getGroups();
-  }, [isStudentUser, currentUser?.studentCode, currentUser?.id, currentUser?.classroomId]);
+    return messagingService.getGroupsForTeacher(currentUser, activeRole);
+  }, [isStudentUser, currentUser, activeRole]);
 
   // ดึงรายการกลุ่มแชทตามสิทธิ์ผู้ใช้งาน
   const [groups, setGroups] = useState<ChatGroup[]>(() => getVisibleGroups());
@@ -361,38 +361,9 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
         <PageHeroBanner
           title="ระบบข้อความ & แชทกลุ่มอัตโนมัติ"
           subtitle="กลุ่มครูที่ปรึกษาและกลุ่มประจำวิชาดึงสมาชิกเข้าอัตโนมัติ ย้ายห้องเรียนระบบจะย้ายกลุ่มและโอนงาน/คะแนนเดิมติดตัวไปด้วย"
-          icon={<MessageSquare className="w-6 h-6 text-white" />}
-          iconBgClass="bg-blue-600 text-white"
+          icon={<MessageSquare className="w-7 h-7 text-blue-600" />}
           badgeText="Auto Sync"
-          tagText="💬 กลุ่มที่ปรึกษา • กลุ่มประจำวิชา • ซิงค์สมาชิกอัตโนมัติ • โอนย้ายคะแนน 100%"
-          quoteLines={[
-            'สื่อสารสะดวกรวดเร็ว',
-            'เชื่อมโยงครูและนักเรียน',
-            'สร้างสรรค์ชุมชนการเรียนรู้',
-          ]}
-          actions={
-            !isStudentUser ? (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleResyncAll}
-                  className="bg-[#EFF6FF] border border-[#BFDBFE] hover:bg-[#DBEAFE] text-blue-700 rounded-xl px-3.5 py-2 flex items-center gap-2 text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
-                  title="ซิงค์สมาชิกกลุ่มแชทให้ตรงกับทะเบียนห้องเรียนล่าสุด"
-                >
-                  <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
-                  <span>ซิงค์ทะเบียนห้องเรียน</span>
-                </button>
-              </div>
-            ) : (
-              currentUser?.classroomId ? (
-                <div className="flex items-center gap-2">
-                  <span className="bg-[#EFF6FF] border border-[#BFDBFE] text-blue-700 rounded-xl px-3.5 py-2 text-xs font-bold shadow-2xs">
-                    🏫 ห้องประจำชั้น: {currentUser.classroomId}
-                  </span>
-                </div>
-              ) : undefined
-            )
-          }
+          quoteText="การสื่อสารที่รวดเร็ว เชื่อมโยงครูและนักเรียนอย่างอบอุ่น"
         />
       )}
 
@@ -400,6 +371,30 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* Left Column: Groups Navigation (4 Cols on large screen) */}
         <div className="lg:col-span-5 xl:col-span-4 bg-white rounded-2xl border border-[#E6EEF7] p-4 shadow-xs space-y-3.5">
+          {/* Header & Sync Action */}
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-bold text-[#163A66] flex items-center gap-1.5">
+              <span>รายการกลุ่มข้อความ</span>
+              <span className="text-[11px] font-semibold text-[#6B7C93]">({groups.length})</span>
+            </h2>
+            {!isStudentUser ? (
+              <button
+                type="button"
+                onClick={handleResyncAll}
+                className="bg-[#EFF6FF] border border-[#BFDBFE] hover:bg-[#DBEAFE] text-blue-700 rounded-xl px-2.5 py-1.5 flex items-center gap-1.5 text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                title="ซิงค์สมาชิกกลุ่มแชทให้ตรงกับทะเบียนห้องเรียนล่าสุด"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
+                <span>ซิงค์สมาชิก</span>
+              </button>
+            ) : (
+              currentUser?.classroomId && (
+                <span className="bg-[#EFF6FF] border border-[#BFDBFE] text-blue-700 rounded-xl px-2.5 py-1 text-[11px] font-bold">
+                  ห้อง {currentUser.classroomId}
+                </span>
+              )
+            )}
+          </div>
           {/* Quick Filter Tabs */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
             <button

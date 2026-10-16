@@ -28,3 +28,4 @@ dist-test*
 
 .vercel
 .env*
+scratch/

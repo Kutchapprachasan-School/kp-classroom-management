@@ -410,9 +410,9 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
       <PageHeroBanner
         title="เช็คแถวเช้า (Morning Assembly)"
         subtitle="บันทึกการเข้าแถวเคารพธงชาติและกิจกรรมโฮมรูม"
-        icon={<UserCheck className="w-6 h-6 text-white" />}
-        iconBgClass="bg-blue-600 text-white"
+        icon={<UserCheck className="w-7 h-7 text-blue-600" />}
         badgeText="โฮมรูม"
+        quoteText="เริ่มต้นเช้าวันใหม่ด้วยความพร้อมและรอยยิ้ม"
       />
 
       {/* ========================================================

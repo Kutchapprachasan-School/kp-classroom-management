@@ -548,8 +548,45 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                 </p>
               </div>
 
-              {/* 4 Category Cards Stacked */}
+              {/* Category Cards Stacked */}
               <div className="space-y-3">
+                {/* Card 0: ปีการศึกษา & ภาคเรียน (เปิด-ปิดเทอม / สลับเทอม) */}
+                <div
+                  onClick={() => setActiveModalKey('timetable')}
+                  className="bg-white rounded-2xl border border-blue-200 p-4 shadow-xs hover:border-blue-400 hover:shadow-sm transition-all cursor-pointer active:scale-[0.99]"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                        <CalendarDays className="w-5 h-5 stroke-[2.2]" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h3 className="text-sm font-bold text-slate-900 truncate">
+                            ปีการศึกษา & ภาคเรียน
+                          </h3>
+                          {activeTerm && (
+                            <span className="text-[10px] font-bold px-2 py-0.2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">
+                              ภาค {activeTerm.semesterNo}/{activeTerm.year}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
+                          ตั้งค่าเปิด-ปิดเทอม สลับภาคเรียน และวันหยุด
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-blue-600 flex items-center shrink-0">
+                      จัดการ <ChevronRight className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 font-medium">
+                    <span className="inline-flex items-center gap-1.5 text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border border-blue-200">
+                      📅 {activeTerm ? `${activeTerm.startDate} – ${activeTerm.endDate}` : 'ยังไม่ระบุ'}
+                    </span>
+                  </div>
+                </div>
+
                 {/* Card 1: ข้อมูลโรงเรียน */}
                 <div
                   onClick={() => setMobileActiveSubScreen('school_info')}
@@ -706,23 +743,38 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
           </div>
         </div>
 
-        {/* 4 Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {/* Card 1.1: ข้อมูลโรงเรียน */}
+        {/* Category 1 Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5">
+          {/* Card 1.1: ปีการศึกษา & ภาคเรียน (สลับเทอม / เปิด-ปิดเทอม) */}
+          <SettingsCategoryCard
+            id="academic_terms"
+            title="ปีการศึกษา & ภาคเรียน"
+            subtitle="ตั้งค่าเปิด-ปิดเทอม สลับภาคเรียนปัจจุบัน วันหยุดพิเศษ"
+            icon={<CalendarDays className="w-5 h-5" />}
+            iconBgClass="bg-blue-50"
+            iconColorClass="text-blue-600"
+            onClick={() => setActiveModalKey('timetable')}
+            isExpanded={expandedCards['academic_terms']}
+            onToggleExpand={(e) => toggleExpand('academic_terms', e)}
+            badge={activeTerm ? `ภาค ${activeTerm.semesterNo}/${activeTerm.year}` : 'เปิดเทอม'}
+            quickInfo={activeTerm ? `${activeTerm.startDate} – ${activeTerm.endDate}` : 'สลับภาคเรียน'}
+          />
+
+          {/* Card 1.2: ข้อมูลโรงเรียน */}
           <SettingsCategoryCard
             id="school_info"
             title="ข้อมูลโรงเรียน"
             subtitle="จัดการข้อมูลโรงเรียน"
             icon={<School className="w-5 h-5" />}
-            iconBgClass="bg-blue-50"
-            iconColorClass="text-blue-600"
+            iconBgClass="bg-indigo-50"
+            iconColorClass="text-indigo-600"
             onClick={() => setActiveModalKey('school_info')}
             isExpanded={expandedCards['school_info']}
             onToggleExpand={(e) => toggleExpand('school_info', e)}
             quickInfo={`${schoolSettings.nameTh} • ${schoolSettings.shortCode || schoolSettings.districtProvince}`}
           />
 
-          {/* Card 1.2: ผู้ใช้งาน */}
+          {/* Card 1.3: ผู้ใช้งาน */}
           <SettingsCategoryCard
             id="users"
             title="ผู้ใช้งาน"
@@ -736,21 +788,21 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
             quickInfo={`บทบาทปัจจุบัน: ${activeRole}`}
           />
 
-          {/* Card 1.3: ห้องเรียน / ชั้น */}
+          {/* Card 1.4: ห้องเรียน / ชั้น */}
           <SettingsCategoryCard
             id="classrooms"
             title="ห้องเรียน / ชั้น"
             subtitle="จัดการข้อมูลห้องเรียนและระดับชั้น"
             icon={<Presentation className="w-5 h-5" />}
-            iconBgClass="bg-indigo-50"
-            iconColorClass="text-indigo-600"
+            iconBgClass="bg-teal-50"
+            iconColorClass="text-teal-600"
             onClick={() => setActiveModalKey('classrooms')}
             isExpanded={expandedCards['classrooms']}
             onToggleExpand={(e) => toggleExpand('classrooms', e)}
             quickInfo="ม.1 ถึง ม.6 (รวม 8 ห้องเรียน)"
           />
 
-          {/* Card 1.4: รายวิชา */}
+          {/* Card 1.5: รายวิชา */}
           <SettingsCategoryCard
             id="courses"
             title="รายวิชา"
@@ -787,19 +839,19 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
 
         {/* 4 Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {/* Card 2.1: ตารางสอน & ปีการศึกษา (มี Bell Schedule & Academic Terms อยู่ข้างใน) */}
+          {/* Card 2.1: เวลาเข้าแถว & โครงสร้างคาบเรียน */}
           <SettingsCategoryCard
             id="timetable"
-            title="ตารางสอน & ปีการศึกษา"
-            subtitle="จัดการปีการศึกษา ภาคเรียน และตารางเวลาเรียน"
-            icon={<CalendarDays className="w-5 h-5" />}
+            title="เวลาเข้าแถว & โครงสร้างคาบเรียน"
+            subtitle="ตั้งค่าเวลาเข้าแถว เวลาเรียน เวลาพักเที่ยง และคาบเรียน"
+            icon={<Clock className="w-5 h-5" />}
             iconBgClass="bg-amber-50"
             iconColorClass="text-amber-600"
             onClick={() => setActiveModalKey('timetable')}
             isExpanded={expandedCards['timetable']}
             onToggleExpand={(e) => toggleExpand('timetable', e)}
-            badge={activeTerm ? `ภาค ${activeTerm.semesterNo}/${activeTerm.year}` : 'โครงสร้างคาบ'}
-            quickInfo={`${activeTerm ? `ภาคเรียนที่ ${activeTerm.semesterNo}/${activeTerm.year}` : ''} • เริ่ม ${bellSchedule.firstPeriodStart} น. • ${bellSchedule.totalPeriodsPerDay} คาบ/วัน`}
+            badge={`${bellSchedule.totalPeriodsPerDay} คาบ/วัน`}
+            quickInfo={`เข้าแถว ${bellSchedule.morningAssemblyStart} น. • เริ่มเรียน ${bellSchedule.firstPeriodStart} น.`}
           />
 
           {/* Card 2.2: งาน / แบบฝึกหัด */}

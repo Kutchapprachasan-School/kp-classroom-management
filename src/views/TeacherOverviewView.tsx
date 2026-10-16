@@ -9,10 +9,9 @@ import {
   Download,
   FileSpreadsheet,
   BookMarked,
-  BookOpen,
   X,
 } from 'lucide-react';
-import { PageHeroBanner } from '../components/layout/PageHeroBanner';
+import { TeacherHomeHeroBanner } from '../components/dashboard/TeacherHomeHeroBanner';
 import { AtRiskCard } from '../components/teacher/AtRiskCard';
 import { IncompleteGradingCard } from '../components/teacher/IncompleteGradingCard';
 import { LowestAssignmentsCard } from '../components/teacher/LowestAssignmentsCard';
@@ -707,23 +706,11 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
         </div>
       )}
 
-      {/* Master PageHeroBanner Design */}
-      <PageHeroBanner
-        title="ภาพรวมชั้นเรียน & การสอน"
-        subtitle={
-          currentSubject
-            ? `จัดการการเรียนการสอนรายวิชา ${selectedSubjectCode} ${currentSubject.name} ชั้น ${selectedClassroom}`
-            : 'จัดการการเรียนการสอนรายวิชาและคะแนน ปพ.5'
-        }
-        icon={<BookOpen className="w-6 h-6 text-white" />}
-        iconBgClass="bg-blue-600 text-white"
-        badgeText={selectedClassroom ? `ชั้น ${selectedClassroom}` : 'ห้องเรียน'}
-        tagText="✨ เช็คชื่อเข้าเรียน • คะแนน ปพ.5 • สั่งงาน/ตรวจงาน • ระบบติดตามกลุ่มเสี่ยง"
-        quoteLines={[
-          'มุ่งมั่นพัฒนาคุณภาพการเรียนรู้',
-          'ร่วมสร้างอนาคตที่สดใส',
-          'ให้แก่นักเรียนทุกคน',
-        ]}
+      {/* Dedicated Home Hero Banner */}
+      <TeacherHomeHeroBanner
+        currentSubjectName={currentSubject?.name}
+        selectedClassroom={selectedClassroom}
+        selectedSubjectCode={selectedSubjectCode}
       />
 
       {/* แถบเลือกรายวิชา & ห้องเรียน (รองรับครูสอนหลายวิชา หลายห้อง) */}
