@@ -3,14 +3,14 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { cloudDataService } from './services/cloudDataService'
-import { cleanSlateService } from './services/cleanSlateService'
 
-// Auto-purge legacy mock data for fresh real-world testing (Once per client)
-const CLEAN_SLATE_INIT_KEY = 'kp_clean_slate_v2_active';
+// Ensure clean slate does not suppress essential school rosters on client startup
 if (typeof window !== 'undefined' && window.localStorage) {
-  if (window.localStorage.getItem(CLEAN_SLATE_INIT_KEY) !== 'true') {
-    cleanSlateService.purgeTransactionalMockData();
-    window.localStorage.setItem(CLEAN_SLATE_INIT_KEY, 'true');
+  if (window.localStorage.getItem('kp_clean_slate_mvp_activated') === 'true') {
+    window.localStorage.removeItem('kp_clean_slate_mvp_activated');
+  }
+  if (window.localStorage.getItem('kp_clean_slate_v2_active') === 'true') {
+    window.localStorage.removeItem('kp_clean_slate_v2_active');
   }
 }
 

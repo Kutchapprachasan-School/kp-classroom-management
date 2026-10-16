@@ -26,11 +26,27 @@ export const defaultStudents: StudentRecord[] = [];
 export const mockStudentsByRoom: Record<string, StudentRecord[]> = {
   'room-1-1': [
     { id: 'stu-47001', no: 1, code: '47001', name: 'ด.ช. ชนะภัย ยอดสิงห์', attendance: '8/8', score: 85, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-1' },
-    { id: 'stu-47002', no: 2, code: '47002', name: 'ด.ญ. ชลิตา มงคล', attendance: '8/8', score: 90, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-1' },
+    { id: 'stu-47002', no: 2, code: '47002', name: 'ด.ช. ปวริศร์ สุขเกษม', attendance: '8/8', score: 82, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-1' },
+    { id: 'stu-47003', no: 3, code: '47003', name: 'ด.ช. ธนกร วิเศษศรี', attendance: '8/8', score: 88, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-1' },
+    { id: 'stu-47004', no: 4, code: '47004', name: 'ด.ช. ภูริพัฒน์ จันทร์ดี', attendance: '8/8', score: 79, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-1' },
+    { id: 'stu-47005', no: 5, code: '47005', name: 'ด.ช. นพดล สายทอง', attendance: '8/8', score: 84, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-1' },
+    { id: 'stu-47006', no: 6, code: '47006', name: 'ด.ญ. ชลิตา มงคล', attendance: '8/8', score: 90, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-1' },
+    { id: 'stu-47007', no: 7, code: '47007', name: 'ด.ญ. กานต์พิชชา บุญรอด', attendance: '8/8', score: 92, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-1' },
+    { id: 'stu-47008', no: 8, code: '47008', name: 'ด.ญ. นภัสสร แก้วคำ', attendance: '8/8', score: 88, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-1' },
+    { id: 'stu-47009', no: 9, code: '47009', name: 'ด.ญ. รินรดา พัฒนกุล', attendance: '8/8', score: 95, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-1' },
+    { id: 'stu-47010', no: 10, code: '47010', name: 'ด.ญ. อรอุมา พลหาญ', attendance: '8/8', score: 86, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-1' },
   ],
   'room-1-2': [
     { id: 'stu-47101', no: 1, code: '47101', name: 'ด.ช. เกียรติศักดิ์ พรหมมา', attendance: '8/8', score: 82, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-2' },
-    { id: 'stu-47102', no: 2, code: '47102', name: 'ด.ญ. กัญญารัตน์ วงศ์ษา', attendance: '8/8', score: 89, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-2' },
+    { id: 'stu-47102', no: 2, code: '47102', name: 'ด.ช. ธีรดนย์ ภูริภัทร', attendance: '8/8', score: 85, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-2' },
+    { id: 'stu-47103', no: 3, code: '47103', name: 'ด.ช. ปัญญาวุฒิ วรรณดี', attendance: '8/8', score: 80, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-2' },
+    { id: 'stu-47104', no: 4, code: '47104', name: 'ด.ช. พงศกร มิ่งขวัญ', attendance: '8/8', score: 78, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-2' },
+    { id: 'stu-47105', no: 5, code: '47105', name: 'ด.ช. วรเมธ ชาญชัย', attendance: '8/8', score: 87, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-2' },
+    { id: 'stu-47106', no: 6, code: '47106', name: 'ด.ญ. กัญญารัตน์ วงศ์ษา', attendance: '8/8', score: 89, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-2' },
+    { id: 'stu-47107', no: 7, code: '47107', name: 'ด.ญ. จิราพร สุขเกษม', attendance: '8/8', score: 91, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-2' },
+    { id: 'stu-47108', no: 8, code: '47108', name: 'ด.ญ. ชุติกาญจน์ เจริญศิลป์', attendance: '8/8', score: 84, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-2' },
+    { id: 'stu-47109', no: 9, code: '47109', name: 'ด.ญ. ณิชานันท์ บุญรอด', attendance: '8/8', score: 93, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-2' },
+    { id: 'stu-47110', no: 10, code: '47110', name: 'ด.ญ. ทิพวรรณ อินทร', attendance: '8/8', score: 86, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-2' },
   ],
   'room-2-1': [
     { id: 'stu-46101', no: 1, code: '46101', name: 'ด.ช. ภาณุพงศ์ บุญยืน', attendance: '8/8', score: 88, status: 'NORMAL', gender: 'MALE', classroomId: 'room-2-1' },
@@ -84,6 +100,60 @@ export function formatClassroomLabel(classroomId?: string): string {
   return trimmed;
 }
 
+export function generateDefaultStudentsForRoom(classroomId: string): StudentRecord[] {
+  const label = formatClassroomLabel(classroomId);
+  const match = label.match(/ม\.?\s*(\d+)\/(\d+)/);
+  if (!match) {
+    return [];
+  }
+  const grade = Number(match[1]);
+  const roomNo = Number(match[2]);
+  const baseCodeNum = 40000 + (grade * 1000) + (roomNo * 100);
+
+  const maleFirstNames = ['กฤษณะ', 'ทัตธน', 'ภานุวัฒน์', 'อภิสิทธิ์', 'ณัฐวุฒิ', 'ธนพล', 'ชนะภัย', 'เกียรติศักดิ์', 'ภาณุพงศ์', 'ธีรภัทร', 'ปวริศร์', 'ธนกร'];
+  const femaleFirstNames = ['ชนากานต์', 'ธันยพร', 'กมลชนก', 'สุพรรษา', 'ชลิตา', 'กัญญารัตน์', 'สุภัสสรา', 'กานต์พิชชา', 'นภัสสร', 'รินรดา', 'อรอุมา', 'พิมพ์พิชชา'];
+  const lastNames = ['ศรีสมบูรณ์', 'คำฝั้น', 'สิทธิชัย', 'เจริญสุข', 'เลิศวิไล', 'วงศ์ษา', 'แก้วคำ', 'พัฒนกุล', 'สายทอง', 'มณีโชติ', 'ยอดสิงห์', 'มงคล', 'บุญยืน', 'อินทร', 'ชาญชัย', 'สุขเกษม'];
+
+  const results: StudentRecord[] = [];
+  // 5 males (เลขที่ 1-5)
+  for (let i = 1; i <= 5; i++) {
+    const code = String(baseCodeNum + i);
+    const firstName = maleFirstNames[(i - 1 + roomNo * 2) % maleFirstNames.length];
+    const lastName = lastNames[(i - 1 + grade + roomNo) % lastNames.length];
+    const title = grade >= 4 ? 'นาย' : 'ด.ช.';
+    results.push({
+      id: `stu-${code}`,
+      no: i,
+      code,
+      name: `${title} ${firstName} ${lastName}`,
+      attendance: '8/8',
+      score: 80 + (i % 15),
+      status: 'NORMAL',
+      gender: 'MALE',
+      classroomId: classroomId,
+    });
+  }
+  // 5 females (เลขที่ 6-10)
+  for (let i = 6; i <= 10; i++) {
+    const code = String(baseCodeNum + i);
+    const firstName = femaleFirstNames[(i - 6 + roomNo * 2) % femaleFirstNames.length];
+    const lastName = lastNames[(i - 1 + grade * 2 + roomNo) % lastNames.length];
+    const title = grade >= 4 ? 'น.ส.' : 'ด.ญ.';
+    results.push({
+      id: `stu-${code}`,
+      no: i,
+      code,
+      name: `${title} ${firstName} ${lastName}`,
+      attendance: '8/8',
+      score: 82 + (i % 14),
+      status: 'NORMAL',
+      gender: 'FEMALE',
+      classroomId: classroomId,
+    });
+  }
+  return results;
+}
+
 const getLocalStudents = (classroomId: string): StudentRecord[] => {
   if (!classroomId) return [];
   if (typeof localStorage !== 'undefined') {
@@ -116,16 +186,19 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
   if (alt && alt in inMemoryStudentCache) {
     return inMemoryStudentCache[alt];
   }
-  if (cleanSlateService.isCleanSlateActive()) {
-    return [];
-  }
-  if (mockStudentsByRoom[classroomId]) {
+  if (mockStudentsByRoom[classroomId] && mockStudentsByRoom[classroomId].length > 0) {
     return mockStudentsByRoom[classroomId];
   }
-  if (alt && mockStudentsByRoom[alt]) {
+  if (alt && mockStudentsByRoom[alt] && mockStudentsByRoom[alt].length > 0) {
     return mockStudentsByRoom[alt];
   }
-  return [];
+  // Fallback: generate default students for any room so rosters are never empty
+  const generated = generateDefaultStudentsForRoom(classroomId);
+  inMemoryStudentCache[classroomId] = generated;
+  if (alt) {
+    inMemoryStudentCache[alt] = generated;
+  }
+  return generated;
 };
 
 const saveLocalStudents = (classroomId: string, items: StudentRecord[]) => {

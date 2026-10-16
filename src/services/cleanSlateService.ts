@@ -79,17 +79,7 @@ class CleanSlateService {
       return false;
     }
     const val = localStorage.getItem(CLEAN_SLATE_FLAG_KEY);
-    if (val === 'false') {
-      return false;
-    }
-    if (val === 'true') {
-      return true;
-    }
-    // ในเบราว์เซอร์จริง (มี window.location) กำหนดให้ Clean Slate ทำงานเป็นค่าเริ่มต้น (Zero Mock Data สำหรับเริ่มใช้งานจริง)
-    if (typeof window.location !== 'undefined') {
-      return true;
-    }
-    return false;
+    return val === 'true';
   }
 
   /**

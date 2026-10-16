@@ -299,7 +299,6 @@ export const sgsRosterAndSubmissionService = {
           return parsed;
         }
       }
-      if (cleanSlateService.isCleanSlateActive()) return [];
 
       const targetRoom = classroomId || 'room-3-1';
       const formatted = formatClassroomLabel(targetRoom);
@@ -324,9 +323,9 @@ export const sgsRosterAndSubmissionService = {
         }));
       }
 
-      return (!classroomId || classroomId === 'room-3-1' || formatted === 'ม.3/1') ? INITIAL_SGS_ROSTER : [];
+      return INITIAL_SGS_ROSTER;
     } catch {
-      return cleanSlateService.isCleanSlateActive() ? [] : INITIAL_SGS_ROSTER;
+      return INITIAL_SGS_ROSTER;
     }
   },
 

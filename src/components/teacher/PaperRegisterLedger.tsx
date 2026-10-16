@@ -17,6 +17,7 @@ import {
 } from '../../services/attendanceCorrelationService';
 import { cleanSlateService } from '../../services/cleanSlateService';
 import { studentService } from '../../services/studentService';
+import { sgsRosterAndSubmissionService } from '../../services/sgsRosterAndSubmissionService';
 
 export type PaperLedgerMode =
   | 'MORNING_ASSEMBLY'
@@ -70,11 +71,24 @@ const DEFAULT_PERIODS: PeriodDef[] = [
 const DEFAULT_ASSIGNMENTS: AssignmentColumnDef[] = [];
 
 function buildInitialRows(selectedRoom?: string): StudentPaperRow[] {
-  if (cleanSlateService.isCleanSlateActive() || !selectedRoom) {
+  if (!selectedRoom) {
     return [];
   }
   const students = studentService.getStudents(selectedRoom);
   if (!students || students.length === 0) {
+    const sgs = sgsRosterAndSubmissionService.getSgsRoster(selectedRoom);
+    if (sgs && sgs.length > 0) {
+      return sgs.map((st) => ({
+        no: st.sgsSeatNo,
+        studentId: st.studentCode,
+        fullName: st.studentName,
+        morningStatus: 'PRESENT',
+        classPeriods: ['PRESENT', 'PRESENT', 'PRESENT', 'PRESENT', 'PRESENT'],
+        homeworks: {},
+        midtermScore: typeof st.midtermScore === 'number' ? st.midtermScore : '',
+        finalScore: typeof st.finalScore === 'number' ? st.finalScore : '',
+      }));
+    }
     return [];
   }
   return students.map((st, idx) => ({
@@ -166,6 +180,24 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
 
   useEffect(() => {
     setRows(buildInitialRows(selectedRoom));
+  }, [selectedRoom]);
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setRows(buildInitialRows(selectedRoom));
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('kps-students-updated', handleUpdate);
+      window.addEventListener('kp-sgs-roster-updated', handleUpdate);
+      window.addEventListener('kps-data-sync-event', handleUpdate);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('kps-students-updated', handleUpdate);
+        window.removeEventListener('kp-sgs-roster-updated', handleUpdate);
+        window.removeEventListener('kps-data-sync-event', handleUpdate);
+      }
+    };
   }, [selectedRoom]);
   const [savedToast, setSavedToast] = useState<string | null>(null);
   const [previewAttachment, setPreviewAttachment] = useState<{
