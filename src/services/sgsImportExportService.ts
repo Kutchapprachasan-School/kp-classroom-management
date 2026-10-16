@@ -35,6 +35,11 @@ export interface SgsImportDryRunSummary {
   invalidCount: number;
   rows: SgsParsedRow[];
   hasBlockingErrors: boolean;
+  detectedGrade?: string;
+  detectedRooms: string[];
+  roomStudentCounts: Record<string, number>;
+  isMultiRoomFile: boolean;
+  targetClassroomMismatch: boolean;
 }
 
 export interface SgsScoreExportRow {
@@ -296,19 +301,33 @@ export function evaluateSgsImportDryRun(
     }
   });
 
+  const roomStudentCounts: Record<string, number> = {};
+  parsedRows.forEach((r) => {
+    const rm = r.classroom || targetClassroom;
+    if (rm) {
+      roomStudentCounts[rm] = (roomStudentCounts[rm] || 0) + 1;
+    }
+  });
+  const detectedRooms = Object.keys(roomStudentCounts).sort();
+  const isMultiRoomFile = detectedRooms.length > 1;
+  const targetClassroomMismatch =
+    detectedRooms.length > 0 && !detectedRooms.includes(targetClassroom);
+  const detectedGrade = detectedRooms[0]?.split('/')[0] || undefined;
+
   const evaluatedRows: SgsParsedRow[] = parsedRows.map((row) => {
     // If already marked INVALID by parser
     if (row.status === 'INVALID') {
       return { ...row, selectedAction: 'SKIP' };
     }
 
+    const studentRoom = row.classroom || targetClassroom;
     const existing = existingByCode.get(row.studentCode.trim());
 
     if (!existing) {
       // Brand new student
       return {
         ...row,
-        classroom: targetClassroom,
+        classroom: studentRoom,
         status: 'NEW',
         selectedAction: 'IMPORT'
       };
@@ -317,15 +336,15 @@ export function evaluateSgsImportDryRun(
     // Student exists in DB
     const isSameRoom =
       !existing.classroomId ||
-      existing.classroomId === targetClassroom ||
-      existing.classroomId === `room-${targetClassroom.replace('ม.', '').replace('/', '-')}`;
+      existing.classroomId === studentRoom ||
+      existing.classroomId === `room-${studentRoom.replace('ม.', '').replace('/', '-')}`;
 
     if (isSameRoom) {
       // Exists in this exact room
       return {
         ...row,
         existingStudentId: existing.id,
-        classroom: targetClassroom,
+        classroom: studentRoom,
         status: 'EXISTS',
         conflictReason: 'มีรายชื่ออยู่ในห้องเรียนนี้แล้ว (ข้ามอัตโนมัติ เพื่อรักษาคะแนนเดิม)',
         selectedAction: 'SKIP'
@@ -336,6 +355,7 @@ export function evaluateSgsImportDryRun(
     return {
       ...row,
       existingStudentId: existing.id,
+      classroom: studentRoom,
       status: 'CONFLICT',
       conflictReason: `รหัสนี้ลงทะเบียนอยู่ในห้อง ${existing.classroomId} แล้ว`,
       selectedAction: 'TRANSFER_ROOM' // Recommended action
@@ -354,7 +374,12 @@ export function evaluateSgsImportDryRun(
     conflictCount,
     invalidCount,
     rows: evaluatedRows,
-    hasBlockingErrors: invalidCount > 0 && evaluatedRows.every(r => r.status === 'INVALID')
+    hasBlockingErrors: invalidCount > 0 && evaluatedRows.every(r => r.status === 'INVALID'),
+    detectedGrade,
+    detectedRooms,
+    roomStudentCounts,
+    isMultiRoomFile,
+    targetClassroomMismatch
   };
 }
 

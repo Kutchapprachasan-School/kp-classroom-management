@@ -44,6 +44,7 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'NEW' | 'EXISTS' | 'CONFLICT' | 'INVALID'>('ALL');
   const [selectedRoomFilter, setSelectedRoomFilter] = useState<string>('ALL');
   const [isParsingFile, setIsParsingFile] = useState(false);
+  const [importMode, setImportMode] = useState<'MULTI_ROOM' | 'TARGET_ONLY'>('MULTI_ROOM');
 
   const handleReset = () => {
     setRawText('');
@@ -51,6 +52,7 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
     setSearchFilter('');
     setStatusFilter('ALL');
     setSelectedRoomFilter('ALL');
+    setImportMode('MULTI_ROOM');
     setActiveTab('clipboard');
   };
 
@@ -73,6 +75,11 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
     const parsed = parseSgsClipboardText(rawText, targetClassroom);
     const summary = evaluateSgsImportDryRun(parsed, targetClassroom, existingStudents);
     setDryRunSummary(summary);
+    if (summary.isMultiRoomFile) {
+      setImportMode('MULTI_ROOM');
+    } else {
+      setImportMode('TARGET_ONLY');
+    }
   };
 
   const handleLoadSample = () => {
@@ -102,9 +109,14 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
 
   const handleConfirmImport = () => {
     if (!dryRunSummary) return;
-    const confirmed = dryRunSummary.rows.filter(
-      r => r.selectedAction === 'IMPORT' || r.selectedAction === 'TRANSFER_ROOM'
-    );
+    const confirmed = dryRunSummary.rows
+      .filter(r => r.selectedAction === 'IMPORT' || r.selectedAction === 'TRANSFER_ROOM')
+      .map(r => {
+        if (importMode === 'TARGET_ONLY') {
+          return { ...r, classroom: targetClassroom };
+        }
+        return r;
+      });
     onImportComplete(confirmed);
     handleClose();
   };
@@ -294,6 +306,11 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
                     const parsed = parseSgsClipboardText(tsvText, targetClassroom);
                     const summary = evaluateSgsImportDryRun(parsed, targetClassroom, existingStudents);
                     setDryRunSummary(summary);
+                    if (summary.isMultiRoomFile) {
+                      setImportMode('MULTI_ROOM');
+                    } else {
+                      setImportMode('TARGET_ONLY');
+                    }
                     setActiveTab('clipboard');
                   } catch (err: any) {
                     console.error('File parsing error:', err);
@@ -343,6 +360,120 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
           {/* DRY-RUN SUMMARY KPI CARDS */}
           {dryRunSummary && (
             <div className="space-y-4 pt-2 border-t border-slate-100 animate-fadeIn">
+              {/* MULTI-ROOM / GRADE DETECTION BANNER */}
+              {(dryRunSummary.isMultiRoomFile || dryRunSummary.targetClassroomMismatch) && (
+                <div className="bg-gradient-to-r from-blue-50/90 via-sky-50/50 to-indigo-50/40 border border-blue-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start sm:items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20">
+                        <Sparkles className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold text-slate-900 text-sm">
+                            {dryRunSummary.isMultiRoomFile
+                              ? `ตรวจพบไฟล์ SGS รวม ${dryRunSummary.detectedRooms.length} ห้องเรียน (${dryRunSummary.detectedRooms.join(', ')})`
+                              : `ตรวจพบข้อมูลนักเรียน ${dryRunSummary.detectedRooms[0] || 'ห้องอื่น'}`}
+                          </span>
+                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                            รวม {dryRunSummary.totalRows} คน
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 mt-0.5">
+                          {dryRunSummary.targetClassroomMismatch
+                            ? `คุณกำลังดูห้อง ${targetClassroom} แต่ไฟล์นี้เป็นของ ${dryRunSummary.detectedGrade || 'ระดับชั้นอื่น'} (${dryRunSummary.detectedRooms.join(', ')})`
+                            : `ระบบแยกแยะห้องเรียนและลำดับเลขที่ของแต่ละห้องให้อัตโนมัติ 100%`}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Quick Room Filter Pills */}
+                    <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRoomFilter('ALL')}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          selectedRoomFilter === 'ALL'
+                            ? 'bg-blue-600 text-white shadow-2xs'
+                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        ทุกห้อง ({dryRunSummary.totalRows})
+                      </button>
+                      {dryRunSummary.detectedRooms.map((rm) => (
+                        <button
+                          key={rm}
+                          type="button"
+                          onClick={() => setSelectedRoomFilter(selectedRoomFilter === rm ? 'ALL' : rm)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            selectedRoomFilter === rm
+                              ? 'bg-blue-600 text-white shadow-2xs'
+                              : 'bg-white text-slate-700 border border-slate-200 hover:bg-blue-50/60'
+                          }`}
+                        >
+                          {rm} <span className="opacity-80">({dryRunSummary.roomStudentCounts[rm]} คน)</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Mode Selection Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    <label
+                      onClick={() => setImportMode('MULTI_ROOM')}
+                      className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+                        importMode === 'MULTI_ROOM'
+                          ? 'bg-white border-blue-500 ring-2 ring-blue-400/30 shadow-xs'
+                          : 'bg-white/70 border-slate-200 hover:bg-white'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="importMode"
+                        checked={importMode === 'MULTI_ROOM'}
+                        onChange={() => setImportMode('MULTI_ROOM')}
+                        className="mt-0.5 text-blue-600 focus:ring-blue-500"
+                      />
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                          <span>⚡ โหมดนำเข้าแยกห้องอัตโนมัติ (แนะนำ)</span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                            {dryRunSummary.detectedRooms.length} ห้อง
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                          จัดสรรนักเรียนเข้าห้องตามเอกสาร SGS โดยอัตโนมัติ (ห้องใดที่ยังไม่มีในระบบ จะถูกสร้างให้อัตโนมัติ)
+                        </p>
+                      </div>
+                    </label>
+
+                    <label
+                      onClick={() => setImportMode('TARGET_ONLY')}
+                      className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+                        importMode === 'TARGET_ONLY'
+                          ? 'bg-white border-blue-500 ring-2 ring-blue-400/30 shadow-xs'
+                          : 'bg-white/70 border-slate-200 hover:bg-white'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="importMode"
+                        checked={importMode === 'TARGET_ONLY'}
+                        onChange={() => setImportMode('TARGET_ONLY')}
+                        className="mt-0.5 text-blue-600 focus:ring-blue-500"
+                      />
+                      <div>
+                        <div className="text-xs font-bold text-slate-900">
+                          นำเข้าเฉพาะห้องปัจจุบัน ({targetClassroom})
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                          บังคับนำเข้าข้อมูลทั้งหมดเข้าสู่ห้อง {targetClassroom} เพียงห้องเดียว
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div
                   onClick={() => setStatusFilter(statusFilter === 'NEW' ? 'ALL' : 'NEW')}
@@ -578,10 +709,12 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
               type="button"
               onClick={handleConfirmImport}
               disabled={!dryRunSummary || importableCount === 0}
-              className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-500/20 transition-all cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4" />
-              ยืนยันการนำเข้า ({importableCount} คน)
+              {importMode === 'MULTI_ROOM' && dryRunSummary?.isMultiRoomFile
+                ? `⚡ นำเข้าแยก ${dryRunSummary.detectedRooms.length} ห้อง (${importableCount} คน)`
+                : `ยืนยันนำเข้าห้อง ${targetClassroom} (${importableCount} คน)`}
             </button>
           </div>
         </div>

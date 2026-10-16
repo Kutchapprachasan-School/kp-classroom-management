@@ -21,9 +21,11 @@ import {
   Edit2,
   ArrowLeft,
   GraduationCap,
+  Sparkles,
+  AlertTriangle,
 } from 'lucide-react';
 import { classroomService } from '../services/classroomService';
-import { studentService, type StudentRecord } from '../services/studentService';
+import { studentService, getAlternateRoomKey, type StudentRecord } from '../services/studentService';
 import { authService } from '../services/authService';
 import { messagingService, STUDENT_TRANSFERRED_EVENT } from '../services/messagingService';
 import type { ClassroomRosterItem, AtRiskStudent } from '../types/viewModels';
@@ -32,6 +34,7 @@ import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 import { SgsRosterImportModal } from '../components/sgs/SgsRosterImportModal';
 import { SgsScoreExportModal } from '../components/sgs/SgsScoreExportModal';
 import type { SgsParsedRow } from '../services/sgsImportExportService';
+import { getM1SgsStudentInfo, isGrade1SgsStudentCode } from '../config/m1SgsLookup';
 
 interface ClassroomsRosterViewProps {
   onSelectStudent: (student: AtRiskStudent) => void;
@@ -452,28 +455,137 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
     if (!selectedClass || confirmedRows.length === 0) return;
 
     try {
-      const studentsToImport: Array<Omit<StudentRecord, 'id'>> = confirmedRows.map((r) => ({
-        no: r.parsedSeatNo ?? r.rowIndex,
-        code: r.studentCode,
-        name: r.fullName,
-        attendance: '0/0',
-        score: 0,
-        status: 'NORMAL',
-        gender: r.gender,
-        classroomId: selectedClass.id,
-      }));
+      // Group confirmed rows by their actual detected classroom
+      const rowsByRoom = new Map<string, SgsParsedRow[]>();
+      for (const row of confirmedRows) {
+        const roomName = row.classroom || selectedClass.name || 'ม.1/1';
+        if (!rowsByRoom.has(roomName)) rowsByRoom.set(roomName, []);
+        rowsByRoom.get(roomName)!.push(row);
+      }
 
-      await studentService.batchImport(selectedClass.id, studentsToImport);
+      const allRooms = await classroomService.getAll();
+
+      for (const [roomName, rows] of rowsByRoom.entries()) {
+        let room = allRooms.find(
+          (c) => c.name === roomName || c.roomNumber === roomName || c.id === roomName
+        );
+        if (!room) {
+          const levelMatch = roomName.match(/ม\.?\s*(\d+)/);
+          const level = levelMatch ? `ม.${levelMatch[1]}` : 'ม.1';
+          room = await classroomService.create({
+            name: roomName,
+            level,
+            adviser: 'ยังไม่ได้กำหนด',
+          });
+        }
+
+        const targetRoomId = room.id;
+        const studentsToImport: Array<Omit<StudentRecord, 'id'>> = rows.map((r) => ({
+          no: r.parsedSeatNo ?? r.rowIndex,
+          code: r.studentCode,
+          name: r.fullName,
+          attendance: '0/0',
+          score: 0,
+          status: 'NORMAL',
+          gender: r.gender,
+          classroomId: targetRoomId,
+        }));
+
+        await studentService.batchImport(targetRoomId, studentsToImport);
+      }
+
+      await loadClassrooms();
       await loadStudentsForClass(selectedClass.id);
       setIsImportModalOpen(false);
-      setTransferSuccessNotice(`นำเข้ารายชื่อนักเรียน ${confirmedRows.length} คน จาก SGS ในห้อง ${selectedClass.name} สำเร็จ (รักษาลำดับแถว 100%)`);
-      setTimeout(() => setTransferSuccessNotice(null), 3500);
+
+      if (rowsByRoom.size > 1) {
+        setTransferSuccessNotice(
+          `✓ นำเข้ารายชื่อนักเรียน ${confirmedRows.length} คน แยกเข้า ${rowsByRoom.size} ห้อง (${Array.from(rowsByRoom.keys()).join(', ')}) สำเร็จเรียบร้อย (รักษาลำดับแถว 100%)`
+        );
+      } else {
+        const singleRoomName = Array.from(rowsByRoom.keys())[0];
+        setTransferSuccessNotice(
+          `นำเข้ารายชื่อนักเรียน ${confirmedRows.length} คน จาก SGS ในห้อง ${singleRoomName} สำเร็จ (รักษาลำดับแถว 100%)`
+        );
+      }
+      setTimeout(() => setTransferSuccessNotice(null), 4000);
     } catch (err) {
       console.error('Import error:', err);
       alert('เกิดข้อผิดพลาดในการบันทึกรายชื่อนักเรียน');
     }
   };
 
+  // ตรวจจับนักเรียนชั้น ม.1 ที่ค้างอยู่ในห้อง ม.3/1 จากการนำเข้าครั้งก่อน
+  const misplacedM1Students = useMemo(() => {
+    if (!selectedClass) return [];
+    const isRoom31 = selectedClass.id === 'room-3-1' || selectedClass.name === 'ม.3/1';
+    if (!isRoom31) return [];
+    return students.filter((s) => isGrade1SgsStudentCode(s.code));
+  }, [selectedClass, students]);
+
+  // ฟังก์ชันย้ายนักเรียน ม.1 ทั้งหมด 204 คน กลับเข้าห้อง ม.1/1 - ม.1/6 อัตโนมัติ (1 คลิก)
+  const handleFixMisplacedM1Students = async () => {
+    if (!selectedClass || misplacedM1Students.length === 0) return;
+    try {
+      const byRoom = new Map<string, Array<{ student: StudentRecord; seatNo: number; trueRoom: string }>>();
+      for (const st of misplacedM1Students) {
+        const info = getM1SgsStudentInfo(st.code);
+        const trueRoom = info?.room || 'ม.1/1';
+        const seatNo = info?.seatNo || st.no;
+        if (!byRoom.has(trueRoom)) byRoom.set(trueRoom, []);
+        byRoom.get(trueRoom)!.push({ student: st, seatNo, trueRoom });
+      }
+
+      const allRooms = await classroomService.getAll();
+      for (const [roomName, list] of byRoom.entries()) {
+        let room = allRooms.find(
+          (c) => c.name === roomName || c.roomNumber === roomName || c.id === roomName
+        );
+        if (!room) {
+          const levelMatch = roomName.match(/ม\.?\s*(\d+)/);
+          const level = levelMatch ? `ม.${levelMatch[1]}` : 'ม.1';
+          room = await classroomService.create({
+            name: roomName,
+            level,
+            adviser: 'ยังไม่ได้กำหนด',
+          });
+        }
+        const targetRoomId = room.id;
+        const studentsToSave: Array<Omit<StudentRecord, 'id'>> = list.map((item) => ({
+          no: item.seatNo,
+          code: item.student.code,
+          name: item.student.name,
+          attendance: item.student.attendance || '0/0',
+          score: item.student.score || 0,
+          status: item.student.status || 'NORMAL',
+          gender: item.student.gender,
+          classroomId: targetRoomId,
+        }));
+        await studentService.batchImport(targetRoomId, studentsToSave);
+      }
+
+      const misplacedIds = new Set(misplacedM1Students.map((s) => s.id));
+      const remainingStudents = students.filter((s) => !misplacedIds.has(s.id));
+
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(`cls_students_${selectedClass.id}`, JSON.stringify(remainingStudents));
+        const altKey = getAlternateRoomKey(selectedClass.id);
+        if (altKey) {
+          localStorage.setItem(`cls_students_${altKey}`, JSON.stringify(remainingStudents));
+        }
+      }
+
+      await loadClassrooms();
+      await loadStudentsForClass(selectedClass.id);
+      setTransferSuccessNotice(
+        `✓ แยกและย้ายนักเรียน ม.1 ทั้ง ${misplacedM1Students.length} คน เข้าห้อง ม.1/1 - ม.1/6 สำเร็จเรียบร้อย!`
+      );
+      setTimeout(() => setTransferSuccessNotice(null), 4500);
+    } catch (err: any) {
+      console.error('Error relocating M1 students:', err);
+      alert('เกิดข้อผิดพลาดในการย้ายนักเรียน: ' + (err.message || ''));
+    }
+  };
 
   // ย้ายห้องเรียน
   const handleExecuteTransfer = async (e: React.FormEvent) => {
@@ -825,6 +937,36 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                   <span>{isSavingReorder ? 'กำลังบันทึก...' : 'บันทึกการจัดลำดับเลขที่'}</span>
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* 1-Click Repair Banner for Misplaced Grade 1 Students */}
+          {misplacedM1Students.length > 0 && (
+            <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-100/60 border-2 border-amber-300 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 animate-fadeIn">
+              <div className="flex items-start sm:items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-amber-500/20">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-amber-950 text-sm sm:text-base flex items-center gap-2">
+                    ตรวจพบนักเรียนชั้น ม.1 จำนวน {misplacedM1Students.length} คน อยู่ในห้อง {selectedClass.name}
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-200/80 text-amber-900 border border-amber-300">
+                      จากการนำเข้าครั้งก่อน
+                    </span>
+                  </h4>
+                  <p className="text-xs text-amber-800 mt-1">
+                    ระบบตรวจพบข้อมูลห้องและเลขที่จริงจาก SGS (ม.1/1 - ม.1/6) พร้อมที่จะแยกนักเรียนเข้าห้องที่ถูกต้องให้ทันที
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleFixMisplacedM1Students}
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-amber-600/20 transition-all cursor-pointer whitespace-nowrap self-stretch md:self-auto"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>🚀 แยกนักเรียนเข้าห้อง ม.1/1 - ม.1/6 ทันที (1 คลิก)</span>
+              </button>
             </div>
           )}
 

@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 16/10/2569 10:52:43 | รวมทั้งหมด 172 ไฟล์*
+*อัปเดตล่าสุด: 16/10/2569 11:35:00 | รวมทั้งหมด 173 ไฟล์*
 
 ---
 
@@ -17,7 +17,7 @@
 | [src/views/AssignmentManagementView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/AssignmentManagementView.tsx) | 839 | `QuickFilterMode` (L31), `AssignmentManagementView` (L38) |
 | [src/views/ClassroomAttendanceView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomAttendanceView.tsx) | 1561 | `ClassroomAttendanceViewProps` (L51), `TeacherCourseOption` (L56), `TEACHER_COURSES` (L65), `TAUGHT_CLASSROOMS` (L100), `ClassroomAttendanceView` (L119) |
 | [src/views/ClassroomManagementView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomManagementView.tsx) | 1454 | `ImportPreviewRow` (L48), `ClassroomManagementView` (L60) |
-| [src/views/ClassroomsRosterView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomsRosterView.tsx) | 1709 | `ClassroomsRosterView` (L52) |
+| [src/views/ClassroomsRosterView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomsRosterView.tsx) | 1851 | `ClassroomsRosterView` (L55) |
 | [src/views/CoursesCurriculumView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/CoursesCurriculumView.tsx) | 2027 | `CoursesCurriculumViewProps` (L37), `CoursesCurriculumView` (L41) |
 | [src/views/CrossClassSarView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/CrossClassSarView.tsx) | 1632 | `CrossClassSarView` (L80) |
 | [src/views/EndTermReadinessView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/EndTermReadinessView.tsx) | 601 | `EndTermReadinessView` (L70) |
@@ -38,7 +38,7 @@
 | [src/views/StudentHomeVisitFormView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentHomeVisitFormView.tsx) | 555 | `StudentHomeVisitFormView` (L28) |
 | [src/views/StudentMissionsView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentMissionsView.tsx) | 843 | `StudentMissionsView` (L30) |
 | [src/views/StudentPortalView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentPortalView.tsx) | 317 | `StudentPortalView` (L47) |
-| [src/views/StudentRosterView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentRosterView.tsx) | 1917 | `StudentRosterView` (L56) |
+| [src/views/StudentRosterView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentRosterView.tsx) | 2066 | `StudentRosterView` (L58) |
 | [src/views/StudentTrophyView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentTrophyView.tsx) | 419 | `TrophyBadgeItem` (L26), `StudentTrophyView` (L86) |
 | [src/views/TeacherGlobalDashboardView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/TeacherGlobalDashboardView.tsx) | 125 | `TeacherGlobalDashboardView` (L32) |
 | [src/views/TeacherOverviewView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/TeacherOverviewView.tsx) | 2533 | `ClassSubTab` (L90), `TeacherOverviewView` (L100) |
@@ -134,7 +134,7 @@
 | [src/components/settings/SettingsCategoryCard.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/settings/SettingsCategoryCard.tsx) | 107 | `SettingsCategoryCardProps` (L4), `SettingsCategoryCard` (L18) |
 | [src/components/settings/SettingsHeroBanner.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/settings/SettingsHeroBanner.tsx) | 28 | `SettingsHeroBanner` (L9) |
 | [src/components/settings/SettingsSubModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/settings/SettingsSubModal.tsx) | 162 | `SettingsSubModalProps` (L4), `SettingsSubModal` (L20) |
-| [src/components/sgs/SgsRosterImportModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/sgs/SgsRosterImportModal.tsx) | 593 | `SgsRosterImportModal` (L33) |
+| [src/components/sgs/SgsRosterImportModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/sgs/SgsRosterImportModal.tsx) | 726 | `SgsRosterImportModal` (L33) |
 | [src/components/sgs/SgsScoreExportModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/sgs/SgsScoreExportModal.tsx) | 243 | `SgsScoreExportModal` (L36) |
 | [src/components/teacher/AdminTeacherBannerModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/teacher/AdminTeacherBannerModal.tsx) | 841 | `AdminTeacherBannerModal` (L39) |
 | [src/components/teacher/ArtworkPreviewModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/teacher/ArtworkPreviewModal.tsx) | 674 | `ArtworkPreviewModalProps` (L16), `ArtworkPreviewModal` (L30) |
@@ -182,7 +182,7 @@
 | [src/services/schoolStaffLeaveService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/schoolStaffLeaveService.ts) | 324 | `StaffLeaveType` (L7), `StaffLeaveStatus` (L15), `SubstituteAssignment` (L20), `StaffLeaveRequest` (L30), `StaffLeaveQuotaStats` (L53), `STAFF_LEAVE_EVENT` (L68), `schoolStaffLeaveService` (L206) |
 | [src/services/scoreService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/scoreService.ts) | 351 | `ScoreRecord` (L4), `ScoreAuditLogRecord` (L17), `scoreService` (L78) |
 | [src/services/sgsExportService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/sgsExportService.ts) | 161 | `SgsSnapshotRecord` (L3), `sgsExportService` (L51) |
-| [src/services/sgsImportExportService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/sgsImportExportService.ts) | 457 | `SgsImportRowStatus` (L11), `SgsParsedRow` (L13), `SgsImportDryRunSummary` (L30), `SgsScoreExportRow` (L40), `ExistingStudentLookup` (L53), `ParsedThaiName` (L73), `parseThaiFullName` (L81), `parseSgsClipboardText` (L148), `evaluateSgsImportDryRun` (L287), `generateSgsScoreExportRows` (L365) *(+2 รายการ)* |
+| [src/services/sgsImportExportService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/sgsImportExportService.ts) | 482 | `SgsImportRowStatus` (L11), `SgsParsedRow` (L13), `SgsImportDryRunSummary` (L30), `SgsScoreExportRow` (L45), `ExistingStudentLookup` (L58), `ParsedThaiName` (L78), `parseThaiFullName` (L86), `parseSgsClipboardText` (L153), `evaluateSgsImportDryRun` (L292), `generateSgsScoreExportRows` (L390) *(+2 รายการ)* |
 | [src/services/sgsRosterAndSubmissionService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/sgsRosterAndSubmissionService.ts) | 1075 | `StudentTransferState` (L10), `StudentGender` (L11), `SgsInsertPosition` (L12), `SgsStudentRecord` (L14), `TermAssignmentItem` (L38), `CentralRosterSyncMeta` (L51), `SubmissionCellStatus` (L57), `StudentWorkSubmission` (L63), `sgsRosterAndSubmissionService` (L150), `R2CourseStorageSummary` (L1053) |
 | [src/services/studentAffairsCouncilService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentAffairsCouncilService.ts) | 798 | `AssemblyExceptionRecord` (L9), `DisciplineRecord` (L18), `StudentLeaveRequest` (L31), `CouncilCandidateParty` (L46), `CouncilActivity` (L58), `StudentSuggestion` (L68), `AffairsTeacherRole` (L80), `AffairsRolePermission` (L82), `DEFAULT_ROLE_PERMISSIONS` (L103), `studentAffairsCouncilService` (L383) |
 | [src/services/studentBannerService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentBannerService.ts) | 258 | `StudentBannerKey` (L7), `StudentBannerItem` (L9), `STUDENT_BANNERS_EVENT` (L24), `DEFAULT_STUDENT_BANNERS` (L26), `studentBannerService` (L65) |
@@ -200,6 +200,7 @@
 | ไฟล์ (File Path) | จำนวนบรรทัด | สัญลักษณ์หลัก & ช่วงบรรทัด (Key Exports & Line Numbers) |
 | :--- | :---: | :--- |
 | [src/config/feedbackStickersCatalog.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/config/feedbackStickersCatalog.ts) | 584 | `FeedbackStrandId` (L10), `FeedbackStrandCategory` (L21), `FEEDBACK_STRAND_CATALOG` (L32), `STORAGE_KEYS` (L202), `detectFeedbackStrand` (L214), `getCategoryById` (L342), `getTeacherPreferredStrand` (L350), `setTeacherPreferredStrand` (L367), `getCustomFeedbackStickers` (L381), `addCustomFeedbackSticker` (L405) *(+3 รายการ)* |
+| [src/config/m1SgsLookup.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/config/m1SgsLookup.ts) | 1253 | `M1SgsLookupEntry` (L5), `M1_SGS_STUDENT_LOOKUP` (L12), `getM1SgsStudentInfo` (L1239), `isGrade1SgsStudentCode` (L1244) |
 | [src/config/schoolRoles.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/config/schoolRoles.ts) | 641 | `SchoolUserRole` (L1), `SchoolRoleProfile` (L8), `SchoolFontFamily` (L24), `MorningToClassSyncMode` (L31), `SchoolBrandingSettings` (L33), `SmsUserAccount` (L74), `DEFAULT_KUTCHAP_LOGO_SVG` (L89), `KUTCHAP_SCHOOL_INFO` (L127), `clampFontSize11To20` (L170), `applySchoolBrandingAndTypography` (L175) *(+8 รายการ)* |
 | [src/config/schoolSettings.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/config/schoolSettings.ts) | 10 | *(Internal / Default Export)* |
 | [src/config/subjectIcons.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/config/subjectIcons.ts) | 642 | `SubjectIconConfig` (L7), `ALL_SUBJECT_ICONS` (L22), `DEFAULT_SUBJECT_ICON` (L360), `getSubjectIcon` (L387), `SubjectBadgeSize` (L562), `getSubjectBadgeClasses` (L564), `SubjectBadgeRenderProps` (L579), `getSubjectBadgeProps` (L590), `renderSubjectIconBadge` (L606), `SubjectIconBadge` (L624) |
