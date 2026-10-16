@@ -4,7 +4,7 @@
  * สอดคล้องกับมาตรฐาน Pastel Anime Education Dashboard
  */
 
-import { academicCalendarService } from './academicCalendarService';
+import { academicCalendarService } from './academicCalendarService.ts';
 
 export type MediaType = 'DOCUMENT' | 'WORKSHEET' | 'EXAM_QUIZ' | 'VIDEO' | 'LINK';
 

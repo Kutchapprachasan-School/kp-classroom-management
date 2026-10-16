@@ -11,10 +11,10 @@ import {
   type Attendance80Summary,
 } from './attendanceCorrelationService';
 import { getBangkokTodayString } from '../utils/timetableDateUtils';
-import { authService } from './authService';
-import { academicCalendarService } from './academicCalendarService';
-import { classroomService } from './classroomService';
-import { calendarEventStorageService } from './calendarEventStorageService';
+import { authService } from './authService.ts';
+import { academicCalendarService } from './academicCalendarService.ts';
+import { classroomService } from './classroomService.ts';
+import { calendarEventStorageService } from './calendarEventStorageService.ts';
 
 export type TimeOfDayScenario =
   | 'MORNING_0745'

@@ -711,7 +711,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
     <div className="space-y-4 max-w-7xl mx-auto pb-12 animate-fade-in font-sans text-slate-800 select-none">
       {toastMessage && (
         <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 text-xs font-medium">
-          <span className="w-2 h-2 rounded-full bg-teal-400 shrink-0" />
+          <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -777,7 +777,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
               onClick={() => setActiveTab(t.key)}
               className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate ${
                 isActive
-                  ? 'bg-teal-600 text-white shadow-2xs font-extrabold'
+                  ? 'bg-blue-600 text-white shadow-2xs font-extrabold ring-1 ring-blue-700/20'
                   : 'text-slate-700 hover:bg-white hover:text-slate-900'
               }`}
             >
@@ -794,7 +794,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
             onClick={() => setIsCourseMenuOpen((v) => !v)}
             className={`px-3 py-2.5 rounded-xl font-bold text-xs transition-colors cursor-pointer ${
               ['attributes', 'overview', 'behavior', 'reflection'].includes(activeTab)
-                ? 'bg-teal-600 text-white'
+                ? 'bg-blue-600 text-white shadow-2xs'
                 : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
             }`}
             title="เมนูเสริม"
@@ -893,7 +893,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                   setSgsRoster(updated);
                   showToast('⚡ คำนวณระดับอ่านคิดวิเคราะห์ & คุณลักษณะฯ (0–3) จากเกรดวิชาครบทุกคนแล้ว');
                 }}
-                className="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-2xs transition-colors"
+                className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-2xs transition-colors"
               >
                 ⚡ คำนวณระดับ 0–3 จากเกรดวิชา (1-คลิก)
               </button>
@@ -948,7 +948,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                             className={`px-1.5 py-0.5 rounded font-bold text-[11px] ${
                               g.gradeLabel === 'ร' || g.gradeLabel === 'มส.'
                                 ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                                : 'bg-teal-50 text-teal-800 border border-teal-200'
+                                : 'bg-blue-50 text-blue-700 border border-blue-200'
                             }`}
                           >
                             เกรด {g.gradeLabel}
@@ -970,7 +970,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                                 }}
                                 className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${
                                   g.analyticalThinkingLevel === lvl
-                                    ? 'bg-teal-600 text-white shadow-2xs'
+                                    ? 'bg-blue-600 text-white shadow-2xs'
                                     : 'text-slate-600 hover:bg-white'
                                 }`}
                               >
@@ -1139,7 +1139,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
               />
               <button
                 type="submit"
-                className="px-3 py-1.5 rounded-md bg-teal-600 text-white font-semibold"
+                className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-2xs transition-colors"
               >
                 บันทึกคาบ
               </button>
@@ -1404,7 +1404,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsTransferInModalOpen(true)}
-                  className="flex items-center gap-1 px-2.5 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-md font-semibold"
+                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-2xs transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>เพิ่มนักเรียนย้ายเข้า</span>
@@ -1597,7 +1597,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                                       )
                                     );
                                   }}
-                                  className={`w-12 h-6 text-center font-bold rounded tabular-nums text-xs transition-colors focus:outline-none focus:ring-1 focus:ring-teal-500 ${
+                                  className={`w-12 h-6 text-center font-bold rounded tabular-nums text-xs transition-colors focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                                     g.isManualOverride
                                       ? 'bg-amber-50/80 text-amber-900 border border-amber-300'
                                       : 'bg-transparent hover:bg-white text-slate-900 border border-transparent hover:border-slate-200'
@@ -1932,7 +1932,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
               />
               <button
                 type="submit"
-                className="px-3 py-1.5 rounded-md bg-teal-600 text-white font-semibold"
+                className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-2xs transition-colors"
               >
                 บันทึก
               </button>
@@ -2060,7 +2060,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                     }))
                   )
                 }
-                className="px-2.5 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded font-semibold text-[11px]"
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-[11px] transition-colors shadow-2xs"
               >
                 มาครบทุกคน (คงสถานะคนลา)
               </button>

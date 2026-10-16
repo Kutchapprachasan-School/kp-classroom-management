@@ -98,9 +98,21 @@ export const ThaiMiniDatePicker: React.FC<ThaiMiniDatePickerProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   // แกะค่าวันที่ปัจจุบัน
   const parsedValue = useMemo(() => parseThaiDateString(value), [value]);
+
+  // วันนี้ในระบบ พ.ศ.
+  const todayInfo = useMemo(() => {
+    const now = new Date();
+    return {
+      day: now.getDate(),
+      month: now.getMonth() + 1,
+      yearCe: now.getFullYear(),
+      yearBe: now.getFullYear() + 543,
+    };
+  }, []);
 
   // สถานะมุมมองปฏิทิน (เดือน 1-12, ปี พ.ศ.)
   const [viewMonth, setViewMonth] = useState<number>(() => parsedValue?.month || defaultMonth);
@@ -114,18 +126,26 @@ export const ThaiMiniDatePicker: React.FC<ThaiMiniDatePickerProps> = ({
     }
   }, [value]);
 
-  // ปิดปฏิทินเมื่อคลิกด้านนอก
+  // ปิดปฏิทินเมื่อคลิกด้านนอก หรือกด Escape
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        setIsOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
     if (isOpen) {
       document.addEventListener('mousedown', handleOutsideClick);
+      document.addEventListener('keydown', handleKeyDown);
     }
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen]);
 
@@ -184,9 +204,20 @@ export const ThaiMiniDatePicker: React.FC<ThaiMiniDatePickerProps> = ({
       )}
 
       {/* Input Display Button */}
-      <div
+      <button
+        type="button"
+        ref={triggerRef}
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl border transition-all cursor-pointer select-none ${
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            setIsOpen((prev) => !prev);
+          }
+        }}
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        aria-label={label ? `${label}: ${value || placeholder}` : `เลือกวันที่: ${value || placeholder}`}
+        className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl border transition-all cursor-pointer select-none text-left focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
           isOpen
             ? 'border-blue-500 bg-blue-50/40 ring-2 ring-blue-100 shadow-2xs'
             : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-slate-50/60'
@@ -205,13 +236,17 @@ export const ThaiMiniDatePicker: React.FC<ThaiMiniDatePickerProps> = ({
         <span className="text-[10px] font-bold text-blue-600 px-1.5 py-0.5 rounded-md bg-blue-50 border border-blue-200/80 shrink-0">
           ปฏิทิน
         </span>
-      </div>
+      </button>
 
       {helperText && <p className="text-[10px] text-slate-400 mt-0.5">{helperText}</p>}
 
       {/* Mini Calendar Dropdown Popover */}
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1.5 z-50 w-72 bg-white rounded-2xl border border-slate-200 shadow-xl p-3.5 space-y-2.5 animate-in fade-in zoom-in-95 duration-100">
+        <div
+          role="dialog"
+          aria-label="ปฏิทินเลือกวันที่"
+          className="absolute left-0 max-sm:left-1/2 max-sm:-translate-x-1/2 top-full mt-1.5 z-50 w-72 max-w-[calc(100vw-2rem)] bg-white rounded-2xl border border-slate-200/90 shadow-[0_12px_32px_rgba(40,90,140,0.14)] p-3.5 space-y-2.5 animate-in fade-in zoom-in-95 duration-100"
+        >
           {/* Header: Month & Year Selector with Navigation */}
           <div className="flex items-center justify-between gap-1 pb-2 border-b border-slate-100">
             <button
@@ -287,19 +322,29 @@ export const ThaiMiniDatePicker: React.FC<ThaiMiniDatePickerProps> = ({
                 parsedValue.day === day &&
                 parsedValue.month === viewMonth &&
                 parsedValue.yearBe === viewYearBe;
+              const isToday =
+                todayInfo.day === day &&
+                todayInfo.month === viewMonth &&
+                todayInfo.yearBe === viewYearBe;
 
               return (
                 <button
                   key={day}
                   type="button"
                   onClick={() => handleSelectDay(day)}
-                  className={`h-7 w-full rounded-lg text-xs flex items-center justify-center transition-all cursor-pointer font-semibold ${
+                  aria-label={`${day} ${THAI_MONTHS_FULL[viewMonth - 1]} พ.ศ. ${viewYearBe}${isSelected ? ' (เลือกอยู่)' : ''}${isToday ? ' (วันนี้)' : ''}`}
+                  className={`relative h-7 w-full rounded-lg text-xs flex items-center justify-center transition-all cursor-pointer font-semibold ${
                     isSelected
                       ? 'bg-blue-600 text-white font-black shadow-xs ring-2 ring-blue-300'
+                      : isToday
+                      ? 'text-blue-700 font-bold bg-blue-50/70 hover:bg-blue-100 ring-1 ring-blue-300'
                       : 'text-slate-700 hover:bg-blue-50 hover:text-blue-700'
                   }`}
                 >
                   {day}
+                  {isToday && !isSelected && (
+                    <span className="absolute bottom-0.5 w-1 h-1 rounded-full bg-blue-600" />
+                  )}
                 </button>
               );
             })}
@@ -312,28 +357,28 @@ export const ThaiMiniDatePicker: React.FC<ThaiMiniDatePickerProps> = ({
               <button
                 type="button"
                 onClick={() => handleQuickPreset(15, 5, viewYearBe)}
-                className="px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold border border-blue-200 transition-colors cursor-pointer"
+                className="px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold border border-blue-200 transition-all active:scale-95 shadow-2xs cursor-pointer"
               >
                 เปิดเทอม 1 (15 พ.ค.)
               </button>
               <button
                 type="button"
                 onClick={() => handleQuickPreset(10, 10, viewYearBe)}
-                className="px-2 py-0.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-200 transition-colors cursor-pointer"
+                className="px-2 py-0.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-200 transition-all active:scale-95 shadow-2xs cursor-pointer"
               >
                 ปิดเทอม 1 (10 ต.ค.)
               </button>
               <button
                 type="button"
                 onClick={() => handleQuickPreset(1, 11, viewYearBe)}
-                className="px-2 py-0.5 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold border border-indigo-200 transition-colors cursor-pointer"
+                className="px-2 py-0.5 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold border border-indigo-200 transition-all active:scale-95 shadow-2xs cursor-pointer"
               >
                 เปิดเทอม 2 (1 พ.ย.)
               </button>
               <button
                 type="button"
                 onClick={() => handleQuickPreset(15, 3, viewYearBe + 1)}
-                className="px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200 transition-colors cursor-pointer"
+                className="px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200 transition-all active:scale-95 shadow-2xs cursor-pointer"
               >
                 ปิดเทอม 2 (15 มี.ค.)
               </button>

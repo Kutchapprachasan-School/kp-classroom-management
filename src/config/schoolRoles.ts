@@ -216,7 +216,7 @@ export function getSchoolSettings(): SchoolBrandingSettings {
   }
 }
 
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase.ts';
 
 export function saveSchoolSettings(next: Partial<SchoolBrandingSettings>): SchoolBrandingSettings {
   const merged: SchoolBrandingSettings = {

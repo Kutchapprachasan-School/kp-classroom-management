@@ -6,7 +6,7 @@ import {
   academicCalendarService,
   type SpecialHolidayRecord,
   type WeekendMakeupDayRecord,
-} from './academicCalendarService';
+} from './academicCalendarService.ts';
 import { cleanSlateService } from './cleanSlateService';
 import {
   INITIAL_MATRIX_SLOTS,

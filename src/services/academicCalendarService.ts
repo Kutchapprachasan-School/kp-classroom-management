@@ -2,7 +2,7 @@
 // บริการจัดการปีการศึกษา, ภาคเรียน, วันเปิด-ปิดเทอม, วันหยุดพิเศษ, และวันมาเรียนพิเศษ (เสาร์-อาทิตย์)
 // ข้อมูลถูกย้ายมาอยู่ที่ส่วน "ตั้งค่า" (Settings) ตามมาตรฐานโรงเรียน
 
-import { getSchoolSettings, saveSchoolSettings } from '../config/schoolRoles';
+import { getSchoolSettings, saveSchoolSettings } from '../config/schoolRoles.ts';
 
 export type HolidayType = 'GOVERNMENT' | 'SCHOOL_SPECIAL' | 'BRIDGE_DAY' | 'RELIGIOUS';
 export type DayOfWeek = 'SATURDAY' | 'SUNDAY';

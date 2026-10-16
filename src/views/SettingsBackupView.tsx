@@ -1989,8 +1989,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                     </select>
                   </div>
                   <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1">วันเปิดภาคเรียน:</label>
                     <ThaiMiniDatePicker
+                      label="วันเปิดภาคเรียน:"
                       value={newTermForm.startDate}
                       onChange={(thaiDate) => setNewTermForm({ ...newTermForm, startDate: thaiDate })}
                       placeholder="เช่น 1 พ.ย. 2569"
@@ -1999,8 +1999,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1">วันปิดภาคเรียน:</label>
                     <ThaiMiniDatePicker
+                      label="วันปิดภาคเรียน:"
                       value={newTermForm.endDate}
                       onChange={(thaiDate) => setNewTermForm({ ...newTermForm, endDate: thaiDate })}
                       placeholder="เช่น 15 มี.ค. 2570"
@@ -2088,10 +2088,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                         </select>
                       </div>
                       <div>
-                        <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                          วันเริ่มเรียน (วันเปิดภาคเรียน):
-                        </label>
                         <ThaiMiniDatePicker
+                          label="วันเริ่มเรียน (วันเปิดภาคเรียน):"
                           value={editTermForm.startDate}
                           onChange={(thaiDate) => setEditTermForm({ ...editTermForm, startDate: thaiDate })}
                           placeholder="เช่น 1 พ.ย. 2569"
@@ -2100,10 +2098,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                         />
                       </div>
                       <div>
-                        <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                          วันปิดเรียน (วันสิ้นสุดภาคเรียน):
-                        </label>
                         <ThaiMiniDatePicker
+                          label="วันปิดเรียน (วันสิ้นสุดภาคเรียน):"
                           value={editTermForm.endDate}
                           onChange={(thaiDate) => setEditTermForm({ ...editTermForm, endDate: thaiDate })}
                           placeholder="เช่น 15 มี.ค. 2570"
