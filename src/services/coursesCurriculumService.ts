@@ -655,8 +655,8 @@ class CoursesCurriculumService {
    */
   public sanitizeMatrixSlotsWithCurriculum(
     slots: Array<any>,
-    academicYear?: string,
-    term?: string
+    _academicYear?: string,
+    _term?: string
   ): Array<any> {
     const courseMap = new Map<string, CourseCurriculumRecord>();
     // เติมวิชาหลักสูตรทั้งหมด เพื่อป้องกันการลบวิชาต่างเทอมทิ้งโดยไม่ได้ตั้งใจ
