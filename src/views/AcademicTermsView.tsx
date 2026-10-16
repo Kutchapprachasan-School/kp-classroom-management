@@ -26,7 +26,9 @@ import BusRegular from '@mingcute/react/core-regular/bus';
 import SparklesRegular from '@mingcute/react/core-regular/sparkles';
 import ShieldRegular from '@mingcute/react/core-regular/shield';
 import Calendar2Regular from '@mingcute/react/core-regular/calendar-2';
+import CalendarMonthRegular from '@mingcute/react/core-regular/calendar-month';
 import CalendarDayRegular from '@mingcute/react/core-regular/calendar-day';
+import User2Regular from '@mingcute/react/core-regular/user-2';
 import LeftSmallRegular from '@mingcute/react/core-regular/left-small';
 import RightSmallRegular from '@mingcute/react/core-regular/right-small';
 import AddRegular from '@mingcute/react/core-regular/add';
@@ -679,7 +681,7 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
             </button>
 
             <div className="flex items-center gap-2.5">
-              <CalendarDayRegular className="w-6 h-6 text-blue-600 shrink-0" />
+              <CalendarMonthRegular className="w-6 h-6 text-blue-600 shrink-0" />
               <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
                 {selectedMonthOffset === -1
                   ? 'กันยายน 2569'
@@ -712,7 +714,8 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                     : 'text-slate-600 hover:text-slate-900 font-medium'
                 }`}
               >
-                <span>👤 ครู</span>
+                <User2Regular className="w-4 h-4 shrink-0" />
+                <span>ครู</span>
               </button>
               <button
                 type="button"
@@ -723,7 +726,8 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                     : 'text-slate-600 hover:text-slate-900 font-medium'
                 }`}
               >
-                <span>👥 นักเรียน</span>
+                <GroupRegular className="w-4 h-4 shrink-0" />
+                <span>นักเรียน</span>
               </button>
             </div>
 

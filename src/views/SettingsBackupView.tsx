@@ -116,6 +116,7 @@ import { SettingsHeroBanner } from '../components/settings/SettingsHeroBanner';
 import { SettingsCategoryCard } from '../components/settings/SettingsCategoryCard';
 import { SettingsSubModal } from '../components/settings/SettingsSubModal';
 import { AdminTeacherBannerModal } from '../components/teacher/AdminTeacherBannerModal';
+import { ThaiMiniDatePicker } from '../components/common/ThaiMiniDatePicker';
 
 export type SettingsKey =
   | 'school_info'
@@ -1989,22 +1990,22 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                   </div>
                   <div>
                     <label className="text-[11px] font-bold text-slate-700 block mb-1">วันเปิดภาคเรียน:</label>
-                    <input
-                      type="text"
-                      placeholder="เช่น 1 พ.ย. 2569"
+                    <ThaiMiniDatePicker
                       value={newTermForm.startDate}
-                      onChange={(e) => setNewTermForm({ ...newTermForm, startDate: e.target.value })}
-                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-medium bg-white"
+                      onChange={(thaiDate) => setNewTermForm({ ...newTermForm, startDate: thaiDate })}
+                      placeholder="เช่น 1 พ.ย. 2569"
+                      defaultYear={newTermForm.year || 2569}
+                      defaultMonth={newTermForm.semesterNo === 2 ? 11 : 5}
                     />
                   </div>
                   <div>
                     <label className="text-[11px] font-bold text-slate-700 block mb-1">วันปิดภาคเรียน:</label>
-                    <input
-                      type="text"
-                      placeholder="เช่น 15 มี.ค. 2570"
+                    <ThaiMiniDatePicker
                       value={newTermForm.endDate}
-                      onChange={(e) => setNewTermForm({ ...newTermForm, endDate: e.target.value })}
-                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-medium bg-white"
+                      onChange={(thaiDate) => setNewTermForm({ ...newTermForm, endDate: thaiDate })}
+                      placeholder="เช่น 15 มี.ค. 2570"
+                      defaultYear={newTermForm.year ? (newTermForm.semesterNo === 2 ? newTermForm.year + 1 : newTermForm.year) : 2569}
+                      defaultMonth={newTermForm.semesterNo === 2 ? 3 : 10}
                     />
                   </div>
                 </div>
@@ -2090,24 +2091,24 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                         <label className="text-[11px] font-bold text-slate-700 block mb-1">
                           วันเริ่มเรียน (วันเปิดภาคเรียน):
                         </label>
-                        <input
-                          type="text"
+                        <ThaiMiniDatePicker
                           value={editTermForm.startDate}
-                          onChange={(e) => setEditTermForm({ ...editTermForm, startDate: e.target.value })}
+                          onChange={(thaiDate) => setEditTermForm({ ...editTermForm, startDate: thaiDate })}
                           placeholder="เช่น 1 พ.ย. 2569"
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold bg-white focus:outline-blue-500 shadow-2xs"
+                          defaultYear={editTermForm.year || 2569}
+                          defaultMonth={editTermForm.semesterNo === 2 ? 11 : 5}
                         />
                       </div>
                       <div>
                         <label className="text-[11px] font-bold text-slate-700 block mb-1">
                           วันปิดเรียน (วันสิ้นสุดภาคเรียน):
                         </label>
-                        <input
-                          type="text"
+                        <ThaiMiniDatePicker
                           value={editTermForm.endDate}
-                          onChange={(e) => setEditTermForm({ ...editTermForm, endDate: e.target.value })}
+                          onChange={(thaiDate) => setEditTermForm({ ...editTermForm, endDate: thaiDate })}
                           placeholder="เช่น 15 มี.ค. 2570"
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold bg-white focus:outline-blue-500 shadow-2xs"
+                          defaultYear={editTermForm.year ? (editTermForm.semesterNo === 2 ? editTermForm.year + 1 : editTermForm.year) : 2569}
+                          defaultMonth={editTermForm.semesterNo === 2 ? 3 : 10}
                         />
                       </div>
                       <div className="sm:col-span-4">

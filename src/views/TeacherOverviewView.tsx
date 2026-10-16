@@ -108,8 +108,8 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
 }) => {
   // เริ่มต้นที่แท็บ "เช็คชื่อเข้าเรียน" เป็นอันดับแรกสุดก่อนเริ่มสอน หรือตาม Deep-Link ที่ส่งมา
   const [activeTab, setActiveTab] = useState<ClassSubTab>(initialTab);
-  const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>(() => TEACHER_SUBJECTS_LIST[0]?.code || '');
-  const [selectedClassroom, setSelectedClassroom] = useState<string>(() => TEACHER_SUBJECTS_LIST[0]?.classrooms?.[0] || '');
+  const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>(() => TEACHER_SUBJECTS_LIST[0]?.code || 'ศ23101');
+  const [selectedClassroom, setSelectedClassroom] = useState<string>(() => TEACHER_SUBJECTS_LIST[0]?.classrooms?.[0] || 'room-3-1');
 
   const currentSubject = useMemo(() => {
     return (
@@ -155,7 +155,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
 
   // SGS Roster Alignment State (แก้ปัญหารายชื่อไม่ตรง SGS เมื่อนักเรียนย้ายเข้า/ย้ายออก)
   const [sgsRoster, setSgsRoster] = useState<SgsStudentRecord[]>(() =>
-    sgsRosterAndSubmissionService.getSgsRoster()
+    sgsRosterAndSubmissionService.getSgsRoster(selectedClassroom || 'room-3-1')
   );
   const [keepTransferredOutRow, setKeepTransferredOutRow] = useState(true);
   const [isRosterEditMode, setIsRosterEditMode] = useState(false);
@@ -172,12 +172,22 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
   }, [initialGradesFilter]);
 
   useEffect(() => {
+    setSgsRoster(sgsRosterAndSubmissionService.getSgsRoster(selectedClassroom || 'room-3-1'));
+  }, [selectedClassroom]);
+
+  useEffect(() => {
     const handler = () => {
-      setSgsRoster([...sgsRosterAndSubmissionService.getSgsRoster()]);
+      setSgsRoster(sgsRosterAndSubmissionService.getSgsRoster(selectedClassroom || 'room-3-1'));
     };
     window.addEventListener('kp-copilot-updated', handler);
-    return () => window.removeEventListener('kp-copilot-updated', handler);
-  }, []);
+    window.addEventListener('kp-sgs-roster-updated', handler);
+    window.addEventListener('kps-students-updated', handler);
+    return () => {
+      window.removeEventListener('kp-copilot-updated', handler);
+      window.removeEventListener('kp-sgs-roster-updated', handler);
+      window.removeEventListener('kps-students-updated', handler);
+    };
+  }, [selectedClassroom]);
   const [isCourseMenuOpen, setIsCourseMenuOpen] = useState(false);
   const [isAddingPeriod, setIsAddingPeriod] = useState(false);
   const [newPeriodDate, setNewPeriodDate] = useState('พฤ. 8 ต.ค. 2569');
