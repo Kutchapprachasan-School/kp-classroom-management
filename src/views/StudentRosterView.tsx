@@ -1874,7 +1874,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
       )}
 
       {/* Modal: นำเข้ารายชื่อนักเรียนจาก SGS / Excel (Smart Parser + Dry Run Preview) */}
-      {selectedClass && (
+      {isImportModalOpen && selectedClass && (
         <SgsRosterImportModal
           isOpen={isImportModalOpen}
           onClose={() => setIsImportModalOpen(false)}

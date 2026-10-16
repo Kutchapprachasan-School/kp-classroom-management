@@ -155,13 +155,36 @@ export function parseSgsClipboardText(rawText: string, defaultClassroom?: string
 
   const parsedRows: SgsParsedRow[] = [];
   let physicalRowCounter = 1;
+  let currentRoom = defaultClassroom;
 
   for (const line of lines) {
-    // Skip potential header rows
+    // 1. Detect Room Section Headers in SGS files (e.g. ชั้น ม.1  ห้องที่ 1)
+    const fullRoomMatch = line.match(/ชั้น\s*(?:ม\.?)?\s*(\d+)\s*ห้องที่\s*(\d+)/i) ||
+                          line.match(/ห้อง\s*(?:ม\.?)?\s*(\d+)\s*\/\s*(\d+)/i);
+    if (fullRoomMatch) {
+      currentRoom = `ม.${fullRoomMatch[1]}/${fullRoomMatch[2]}`;
+      continue;
+    }
+
+    // 2. Detect Room Summary Footer (e.g. ห้องที่  1  รวม  35  คน -> Next room is ม.1/2)
+    const summaryRoomMatch = line.match(/ห้องที่\s*(\d+)\s*รวม\s*\d+\s*คน/i);
+    if (summaryRoomMatch) {
+      const finishedRoomNum = parseInt(summaryRoomMatch[1], 10);
+      const gradeLevel = (currentRoom || defaultClassroom || 'ม.1').split('/')[0] || 'ม.1';
+      currentRoom = `${gradeLevel}/${finishedRoomNum + 1}`;
+      continue;
+    }
+
+    // 3. Skip decorative headers and metadata rows
     if (
-      line.includes('เลขที่') && (line.includes('รหัส') || line.includes('ชื่อ')) ||
-      line.includes('ลำดับ') && line.includes('ชื่อ-สกุล') ||
-      line.startsWith('SGS') || line.startsWith('ตารางแสดง')
+      line.includes('โรงเรียน') ||
+      line.includes('วิชา') ||
+      line.includes('ครูที่ปรึกษา') ||
+      line.includes('ปีการศึกษา') ||
+      line.startsWith('SGS') ||
+      line.startsWith('ตารางแสดง') ||
+      (line.includes('เลขที่') && (line.includes('ชื่อ') || line.includes('รหัส') || line.includes('เลขประจำตัว'))) ||
+      (line.includes('ลำดับ') && line.includes('ชื่อ-สกุล'))
     ) {
       continue;
     }
@@ -187,9 +210,9 @@ export function parseSgsClipboardText(rawText: string, defaultClassroom?: string
     let parsedSeatNo: number | null = null;
     let studentCode = '';
     let rawNameTokens: string[] = [];
-    let detectedClassroom = defaultClassroom;
+    let detectedClassroom = currentRoom || defaultClassroom;
 
-    // 1. Find Student Code (usually 5 digits, but can be 4-7 digits string)
+    // Find Student Code (usually 5 digits, but can be 4-7 digits string)
     const codeIndex = tokens.findIndex(t => /^\d{4,7}$/.test(t) && t.length >= 4);
 
     if (codeIndex !== -1) {
@@ -208,7 +231,7 @@ export function parseSgsClipboardText(rawText: string, defaultClassroom?: string
       if (remainingTokens.length > 1) {
         const lastToken = remainingTokens[remainingTokens.length - 1];
         if (/^(?:ม\.?\s*)?\d+\/\d+$/.test(lastToken)) {
-          detectedClassroom = lastToken;
+          detectedClassroom = lastToken.startsWith('ม.') ? lastToken : `ม.${lastToken}`;
           rawNameTokens = remainingTokens.slice(0, remainingTokens.length - 1);
         } else {
           rawNameTokens = remainingTokens;
@@ -217,18 +240,21 @@ export function parseSgsClipboardText(rawText: string, defaultClassroom?: string
         rawNameTokens = remainingTokens;
       }
     } else {
-      // Fallback: No obvious code found, treat first token as seat if small number
-      if (/^\d{1,3}$/.test(tokens[0])) {
+      // If no valid student code was found, skip line if it looks like arbitrary non-student text
+      if (/^\d{1,3}$/.test(tokens[0]) && tokens.length >= 2) {
         rawSeatNo = tokens[0];
         parsedSeatNo = parseInt(tokens[0], 10);
         rawNameTokens = tokens.slice(1);
       } else {
-        rawNameTokens = tokens;
+        // Skip decorative / unparsable rows without a code
+        continue;
       }
     }
 
     // Name Parsing
     const rawFullName = rawNameTokens.join(' ');
+    if (!rawFullName.trim() && !studentCode) continue;
+
     const parsedName = parseThaiFullName(rawFullName);
 
     // Initial Status

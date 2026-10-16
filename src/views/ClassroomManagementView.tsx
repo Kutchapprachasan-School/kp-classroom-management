@@ -726,17 +726,6 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
                               </div>
                             )}
                           </div>
-
-                          {isFullAccess && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditModal(room)}
-                              className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-blue-600 rounded transition-opacity cursor-pointer shrink-0 mt-0.5"
-                              title="แก้ไขครูที่ปรึกษา"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
                         </div>
                       </td>
 
@@ -767,7 +756,7 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
                                 type="button"
                                 onClick={() => handleOpenEditModal(room)}
                                 className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors cursor-pointer"
-                                title="แก้ไขห้องเรียน"
+                                title="แก้ไขข้อมูลห้องเรียนและครูที่ปรึกษา"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   ClipboardPaste,
@@ -9,8 +9,11 @@ import {
   AlertCircle,
   Info,
   Sparkles,
-  Download
+  Download,
+  RotateCcw,
+  Loader2
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import {
   parseSgsClipboardText,
   evaluateSgsImportDryRun,
@@ -39,6 +42,29 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
   const [dryRunSummary, setDryRunSummary] = useState<SgsImportDryRunSummary | null>(null);
   const [searchFilter, setSearchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'NEW' | 'EXISTS' | 'CONFLICT' | 'INVALID'>('ALL');
+  const [selectedRoomFilter, setSelectedRoomFilter] = useState<string>('ALL');
+  const [isParsingFile, setIsParsingFile] = useState(false);
+
+  const handleReset = () => {
+    setRawText('');
+    setDryRunSummary(null);
+    setSearchFilter('');
+    setStatusFilter('ALL');
+    setSelectedRoomFilter('ALL');
+    setActiveTab('clipboard');
+  };
+
+  const handleClose = () => {
+    handleReset();
+    onClose();
+  };
+
+  // Reset all states whenever the modal opens or closes
+  useEffect(() => {
+    if (!isOpen) {
+      handleReset();
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -80,17 +106,22 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
       r => r.selectedAction === 'IMPORT' || r.selectedAction === 'TRANSFER_ROOM'
     );
     onImportComplete(confirmed);
-    onClose();
+    handleClose();
   };
+
+  const availableRooms = Array.from(
+    new Set(dryRunSummary?.rows.map(r => r.classroom).filter(Boolean) as string[])
+  ).sort();
 
   const filteredRows = dryRunSummary?.rows.filter(r => {
     const matchStatus = statusFilter === 'ALL' || r.status === statusFilter;
+    const matchRoom = selectedRoomFilter === 'ALL' || r.classroom === selectedRoomFilter;
     const matchSearch =
       !searchFilter ||
       r.studentCode.includes(searchFilter) ||
       r.fullName.includes(searchFilter) ||
       (r.rawSeatNo && r.rawSeatNo.includes(searchFilter));
-    return matchStatus && matchSearch;
+    return matchStatus && matchRoom && matchSearch;
   }) || [];
 
   const importableCount = dryRunSummary?.rows.filter(
@@ -120,8 +151,8 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
             </div>
           </div>
           <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            onClick={handleClose}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -190,7 +221,20 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
                 placeholder="วางข้อความที่นี่ (ระบบรองรับทั้ง Tab-delimited จากตาราง SGS, CSV, และข้อความเว้นวรรค โดยจะแยกเลขที่ รหัส คำนำหน้า และชื่อ-สกุลให้อัตโนมัติ)..."
                 className="w-full text-xs font-mono p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-hidden"
               />
-              <div className="flex justify-end">
+              <div className="flex items-center justify-between">
+                <div>
+                  {dryRunSummary && (
+                    <button
+                      type="button"
+                      onClick={handleReset}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                      title="ล้างข้อมูลและเริ่มต้นใหม่"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                      <span>ล้างข้อมูล / เริ่มใหม่</span>
+                    </button>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={handleParseClipboard}
@@ -206,42 +250,80 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
 
           {/* TAB 2: FILE UPLOAD */}
           {activeTab === 'file' && (
-            <div className="border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center bg-slate-50/50 hover:bg-blue-50/30 hover:border-blue-300 transition-all cursor-pointer">
+            <div className="border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center bg-slate-50/50 hover:bg-blue-50/30 hover:border-blue-300 transition-all">
               <FileSpreadsheet className="w-12 h-12 text-blue-500 mx-auto mb-2" />
-              <h4 className="text-sm font-bold text-slate-800">ลากและวางไฟล์ Excel (.xlsx, .xls) หรือ CSV</h4>
-              <p className="text-xs text-slate-500 mt-1">
-                ระบบจะอ่านหัวตารางและนำข้อมูลเข้าสู่ระบบตรวจสอบอัตโนมัติ
+              <h4 className="text-sm font-bold text-slate-800">
+                อัปโหลดไฟล์ Excel (.xlsx, .xls) หรือ CSV
+              </h4>
+              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                รองรับไฟล์สมุดคะแนนและรายชื่อนักเรียนจากระบบ SGS โดยตรง (ทั้งไฟล์ .xls และ .xlsx) ระบบจะแปลงข้อมูลแบบ Binary ป้องกันตัวอักษรเพี้ยน 100%
               </p>
               <input
                 type="file"
-                accept=".xlsx,.xls,.csv"
+                accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
                 className="hidden"
                 id="sgs-file-input"
-                onChange={(e) => {
+                disabled={isParsingFile}
+                onChange={async (e) => {
                   const file = e.target.files?.[0];
-                  if (file) {
-                    // Quick CSV reader fallback
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                      const text = event.target?.result as string;
-                      if (text) {
-                        setRawText(text);
-                        const parsed = parseSgsClipboardText(text, targetClassroom);
-                        const summary = evaluateSgsImportDryRun(parsed, targetClassroom, existingStudents);
-                        setDryRunSummary(summary);
-                        setActiveTab('clipboard');
+                  if (!file) return;
+
+                  setIsParsingFile(true);
+                  try {
+                    const fileName = file.name.toLowerCase();
+                    let tsvText = '';
+
+                    if (fileName.endsWith('.csv')) {
+                      tsvText = await file.text();
+                    } else {
+                      // Binary Excel parsing via SheetJS (xlsx)
+                      const arrayBuffer = await file.arrayBuffer();
+                      const wb = XLSX.read(arrayBuffer, { type: 'array' });
+                      if (!wb.SheetNames || wb.SheetNames.length === 0) {
+                        throw new Error('ไม่พบแผ่นงาน (Sheet) ในไฟล์ Excel นี้');
                       }
-                    };
-                    reader.readAsText(file);
+                      const sheet = wb.Sheets[wb.SheetNames[0]];
+                      tsvText = XLSX.utils.sheet_to_csv(sheet, { FS: '\t' });
+                    }
+
+                    if (!tsvText.trim()) {
+                      throw new Error('ไฟล์ว่างเปล่า ไม่มีข้อมูลนักเรียน');
+                    }
+
+                    setRawText(tsvText);
+                    const parsed = parseSgsClipboardText(tsvText, targetClassroom);
+                    const summary = evaluateSgsImportDryRun(parsed, targetClassroom, existingStudents);
+                    setDryRunSummary(summary);
+                    setActiveTab('clipboard');
+                  } catch (err: any) {
+                    console.error('File parsing error:', err);
+                    alert('เกิดข้อผิดพลาดในการอ่านไฟล์: ' + (err.message || 'โปรดตรวจสอบรูปแบบไฟล์'));
+                  } finally {
+                    setIsParsingFile(false);
+                    e.target.value = '';
                   }
                 }}
               />
-              <label
-                htmlFor="sgs-file-input"
-                className="mt-4 inline-block px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 cursor-pointer"
-              >
-                เลือกไฟล์จากเครื่อง
-              </label>
+              <div className="mt-4 flex items-center justify-center gap-2">
+                <label
+                  htmlFor="sgs-file-input"
+                  className={`inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all cursor-pointer ${
+                    isParsingFile ? 'opacity-50 pointer-events-none' : ''
+                  }`}
+                >
+                  {isParsingFile ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>กำลังประมวลผลไฟล์ Excel...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      <span>เลือกไฟล์ Excel/SGS จากเครื่อง</span>
+                    </>
+                  )}
+                </label>
+              </div>
             </div>
           )}
 
@@ -332,17 +414,44 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
               </div>
 
               {/* SEARCH & FILTER CONTROLS */}
-              <div className="flex items-center justify-between gap-3 text-xs">
-                <input
-                  type="text"
-                  placeholder="ค้นหารหัส หรือชื่อ-สกุล..."
-                  value={searchFilter}
-                  onChange={(e) => setSearchFilter(e.target.value)}
-                  className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white w-56 outline-hidden focus:border-blue-500"
-                />
-                <span className="text-slate-500 font-medium">
-                  แสดง {filteredRows.length} จาก {dryRunSummary.totalRows} รายการ
-                </span>
+              <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="ค้นหารหัส หรือชื่อ-สกุล..."
+                    value={searchFilter}
+                    onChange={(e) => setSearchFilter(e.target.value)}
+                    className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white w-52 outline-hidden focus:border-blue-500"
+                  />
+                  {availableRooms.length > 1 && (
+                    <select
+                      value={selectedRoomFilter}
+                      onChange={(e) => setSelectedRoomFilter(e.target.value)}
+                      className="px-2.5 py-1.5 border border-blue-200 rounded-lg bg-blue-50/70 text-blue-800 font-semibold text-xs outline-hidden focus:border-blue-500 cursor-pointer"
+                    >
+                      <option value="ALL">ทุกห้องเรียน ({availableRooms.length} ห้อง)</option>
+                      {availableRooms.map((room) => (
+                        <option key={room} value={room}>
+                          ห้อง {room}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500 font-medium">
+                    แสดง {filteredRows.length} จาก {dryRunSummary.totalRows} รายการ
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="flex items-center gap-1 px-2 py-1 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-rose-200 text-[11px] font-bold"
+                    title="ล้างข้อมูลการประมวลผลและนำเข้าใหม่"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>ล้างข้อมูล</span>
+                  </button>
+                </div>
               </div>
 
               {/* PREVIEW TABLE */}
@@ -460,7 +569,7 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
             >
               ยกเลิก

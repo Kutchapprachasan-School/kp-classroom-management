@@ -730,23 +730,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                           {room.level}
                         </td>
                         <td className="py-3 px-4 font-medium text-slate-800">
-                          <div className="flex items-center gap-2">
-                            <span>{room.adviser || 'ยังไม่ได้กำหนด'}</span>
-                            {isFullAccess && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingClassroom(room);
-                                  setIsEditClassroomOpen(true);
-                                }}
-                                className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-blue-600 rounded transition-opacity"
-                                title="แก้ไขครูที่ปรึกษา"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
+                          <span>{room.adviser || 'ยังไม่ได้กำหนด'}</span>
                         </td>
                         <td className="py-3 px-4 text-center">
                           <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-xs">
@@ -773,7 +757,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                                     setIsEditClassroomOpen(true);
                                   }}
                                   className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                                  title="แก้ไขห้องเรียน"
+                                  title="แก้ไขข้อมูลห้องเรียนและครูที่ปรึกษา"
                                 >
                                   <Edit2 className="w-4 h-4" />
                                 </button>
@@ -1589,7 +1573,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
       )}
 
       {/* Modal: นำเข้ารายชื่อนักเรียนจาก SGS / Excel (Smart Parser + Dry Run Preview) */}
-      {selectedClass && (
+      {isImportModalOpen && selectedClass && (
         <SgsRosterImportModal
           isOpen={isImportModalOpen}
           onClose={() => setIsImportModalOpen(false)}
