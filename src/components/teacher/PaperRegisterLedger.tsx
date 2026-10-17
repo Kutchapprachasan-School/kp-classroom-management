@@ -15,6 +15,7 @@ import {
   normalizeCourseCode,
   type PeriodAttendanceRecord,
   type MorningAssemblyRecord,
+  type AttendanceStatusCode,
 } from '../../services/attendanceCorrelationService';
 import { cleanSlateService } from '../../services/cleanSlateService';
 import { studentService } from '../../services/studentService';
@@ -26,7 +27,7 @@ export type PaperLedgerMode =
   | 'HOMEWORK_CHECK'
   | 'SCORE_GRADEBOOK';
 
-export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE';
+export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE' | '';
 
 interface HomeworkSubmissionCell {
   submitted: boolean;
@@ -41,7 +42,7 @@ interface StudentPaperRow {
   studentId: string;
   fullName: string;
   morningStatus: AttendanceStatus;
-  classPeriods: AttendanceStatus[]; // คาบที่ 1-5
+  classPeriods: AttendanceStatus[];
   homeworks: Record<string, HomeworkSubmissionCell>;
   midtermScore: number | '';
   finalScore: number | '';
@@ -59,49 +60,118 @@ interface PeriodDef {
   index: number;
   label: string;
   date: string;
+  isoDate?: string;
+  periodNo?: number;
 }
 
-const DEFAULT_PERIODS: PeriodDef[] = [
-  { index: 0, label: 'คาบ 1', date: '1 ก.ย.' },
-  { index: 1, label: 'คาบ 2', date: '8 ก.ย.' },
-  { index: 2, label: 'คาบ 3', date: '15 ก.ย.' },
-  { index: 3, label: 'คาบ 4', date: '22 ก.ย.' },
-  { index: 4, label: 'คาบ 5 (วันนี้)', date: '28 ก.ย.' },
+const THAI_MONTHS_SHORT = [
+  'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+  'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.',
 ];
+
+function formatDisplayDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return `${d.getDate()} ${THAI_MONTHS_SHORT[d.getMonth()]}`;
+  } catch {
+    return iso;
+  }
+}
+
+function computeDynamicPeriods(selectedRoom?: string, subjectLabel?: string): PeriodDef[] {
+  if (!selectedRoom) return [];
+  const normalizedRoom = normalizeClassroomId(selectedRoom);
+  const normalizedCourse = normalizeCourseCode(subjectLabel?.split(' ')[0] || '');
+
+  // Read actual saved records for this room & subject (filter out legacy test mock IDs)
+  const allRecords = attendanceCorrelationService
+    .getAllPeriodRecords()
+    .filter(
+      (r) =>
+        normalizeClassroomId(r.classroomId) === normalizedRoom &&
+        (!normalizedCourse || normalizeCourseCode(r.courseCode) === normalizedCourse) &&
+        !r.id.startsWith('t-p') &&
+        !['2026-09-28', '2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02'].includes(r.date)
+    );
+
+  const dateMap = new Map<string, number>();
+  allRecords.forEach((r) => {
+    dateMap.set(r.date, r.periodNo || 1);
+  });
+
+  const sortedDates = Array.from(dateMap.keys()).sort();
+  if (sortedDates.length > 0) {
+    return sortedDates.map((d, idx) => ({
+      index: idx,
+      label: `คาบ ${dateMap.get(d) || (idx + 1)}`,
+      date: formatDisplayDate(d),
+      isoDate: d,
+      periodNo: dateMap.get(d) || (idx + 1),
+    }));
+  }
+
+  // If no periods have been recorded yet, provide 1 blank slot for today
+  const today = new Date();
+  const todayIso = today.toISOString().split('T')[0];
+  return [
+    {
+      index: 0,
+      label: 'คาบ 1 (วันนี้)',
+      date: formatDisplayDate(todayIso),
+      isoDate: todayIso,
+      periodNo: 1,
+    },
+  ];
+}
 
 const DEFAULT_ASSIGNMENTS: AssignmentColumnDef[] = [];
 
-function buildInitialRows(selectedRoom?: string): StudentPaperRow[] {
+function buildInitialRows(selectedRoom?: string, periods: PeriodDef[] = []): StudentPaperRow[] {
   if (!selectedRoom) {
     return [];
   }
   const students = studentService.getStudents(selectedRoom);
-  if (!students || students.length === 0) {
-    const sgs = sgsRosterAndSubmissionService.getSgsRoster(selectedRoom);
-    if (sgs && sgs.length > 0) {
-      return sgs.map((st) => ({
-        no: st.sgsSeatNo,
-        studentId: st.studentCode,
-        fullName: st.studentName,
-        morningStatus: 'PRESENT',
-        classPeriods: ['PRESENT', 'PRESENT', 'PRESENT', 'PRESENT', 'PRESENT'],
-        homeworks: {},
-        midtermScore: typeof st.midtermScore === 'number' ? st.midtermScore : '',
-        finalScore: typeof st.finalScore === 'number' ? st.finalScore : '',
-      }));
-    }
-    return [];
-  }
-  return students.map((st, idx) => ({
-    no: st.no || idx + 1,
-    studentId: st.code || st.id,
-    fullName: st.name,
-    morningStatus: 'PRESENT',
-    classPeriods: ['PRESENT', 'PRESENT', 'PRESENT', 'PRESENT', 'PRESENT'],
-    homeworks: {},
-    midtermScore: '',
-    finalScore: '',
-  }));
+  const normalizedRoom = normalizeClassroomId(selectedRoom);
+  const allRecords = attendanceCorrelationService.getAllPeriodRecords();
+  const todayIso = new Date().toISOString().split('T')[0];
+  const morningRecords = attendanceCorrelationService.getMorningRecords(normalizedRoom, todayIso);
+
+  const baseList =
+    students && students.length > 0
+      ? students
+      : sgsRosterAndSubmissionService.getSgsRoster(selectedRoom);
+
+  return baseList.map((st: any, idx: number) => {
+    const studentCode = st.code || st.studentCode || st.id;
+    const mRec = morningRecords.find(
+      (m) => (m.studentCode === studentCode || m.studentId === st.id) && !m.id.startsWith('t-m')
+    );
+    const morningStatus: AttendanceStatus = (mRec ? mRec.status : '') as AttendanceStatus;
+
+    const classPeriods: AttendanceStatus[] = periods.map((p) => {
+      if (!p.isoDate) return '';
+      const pRec = allRecords.find(
+        (r) =>
+          r.studentCode === studentCode &&
+          r.date === p.isoDate &&
+          normalizeClassroomId(r.classroomId) === normalizedRoom &&
+          !r.id.startsWith('t-p')
+      );
+      return (pRec ? pRec.status : '') as AttendanceStatus;
+    });
+
+    return {
+      no: st.no || st.sgsSeatNo || idx + 1,
+      studentId: studentCode,
+      fullName: st.name || st.studentName,
+      morningStatus,
+      classPeriods,
+      homeworks: {},
+      midtermScore: typeof st.midtermScore === 'number' ? st.midtermScore : '',
+      finalScore: typeof st.finalScore === 'number' ? st.finalScore : '',
+    };
+  });
 }
 
 function computeThaiGrade(total: number, hasMissingWork: boolean): string {
@@ -116,11 +186,12 @@ function computeThaiGrade(total: number, hasMissingWork: boolean): string {
   return '0';
 }
 
-const NEXT_STATUS: Record<AttendanceStatus, AttendanceStatus> = {
+const NEXT_STATUS: Record<string, AttendanceStatus> = {
+  '': 'PRESENT',
   PRESENT: 'ABSENT',
   ABSENT: 'LATE',
   LATE: 'LEAVE',
-  LEAVE: 'PRESENT',
+  LEAVE: '',
 };
 
 interface PaperRegisterLedgerProps {
@@ -169,7 +240,14 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
     return 'AUTO_PREFILL';
   });
 
-  const [rows, setRows] = useState<StudentPaperRow[]>(() => buildInitialRows(defaultRoom || availableRooms[0] || ''));
+  const [periods, setPeriods] = useState<PeriodDef[]>(() =>
+    computeDynamicPeriods(defaultRoom || availableRooms[0] || '', subjectLabel)
+  );
+
+  const [rows, setRows] = useState<StudentPaperRow[]>(() => {
+    const initPeriods = computeDynamicPeriods(defaultRoom || availableRooms[0] || '', subjectLabel);
+    return buildInitialRows(defaultRoom || availableRooms[0] || '', initPeriods);
+  });
 
   useEffect(() => {
     if (defaultRoom) {
@@ -180,12 +258,16 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
   }, [defaultRoom, availableRooms]);
 
   useEffect(() => {
-    setRows(buildInitialRows(selectedRoom));
-  }, [selectedRoom]);
+    const nextPeriods = computeDynamicPeriods(selectedRoom, subjectLabel);
+    setPeriods(nextPeriods);
+    setRows(buildInitialRows(selectedRoom, nextPeriods));
+  }, [selectedRoom, subjectLabel]);
 
   useEffect(() => {
     const handleUpdate = () => {
-      setRows(buildInitialRows(selectedRoom));
+      const nextPeriods = computeDynamicPeriods(selectedRoom, subjectLabel);
+      setPeriods(nextPeriods);
+      setRows(buildInitialRows(selectedRoom, nextPeriods));
     };
     if (typeof window !== 'undefined') {
       window.addEventListener('kps-students-updated', handleUpdate);
@@ -199,7 +281,7 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
         window.removeEventListener('kps-data-sync-event', handleUpdate);
       }
     };
-  }, [selectedRoom]);
+  }, [selectedRoom, subjectLabel]);
   const [savedToast, setSavedToast] = useState<string | null>(null);
   const [previewAttachment, setPreviewAttachment] = useState<{
     studentName: string;
@@ -223,13 +305,6 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
     } catch {
       // ignore
     }
-    setRows((prev) =>
-      prev.map((r) => {
-        const updatedPeriods = [...r.classPeriods];
-        updatedPeriods[4] = nextSyncMode === 'AUTO_PREFILL' ? r.morningStatus : 'PRESENT';
-        return { ...r, classPeriods: updatedPeriods };
-      })
-    );
   };
 
   useEffect(() => {
@@ -257,15 +332,6 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
   const switchMode = (nextMode: PaperLedgerMode) => {
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
-    }
-    if (nextMode === 'CLASS_ATTENDANCE') {
-      setRows((prev) =>
-        prev.map((r) => {
-          const updatedPeriods = [...r.classPeriods];
-          updatedPeriods[4] = morningSyncMode === 'AUTO_PREFILL' ? r.morningStatus : 'PRESENT';
-          return { ...r, classPeriods: updatedPeriods };
-        })
-      );
     }
     setMode(nextMode);
     onModeChange?.(nextMode);
@@ -334,36 +400,40 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
       const todayIso = new Date().toISOString().split('T')[0];
 
       if (mode === 'MORNING_ASSEMBLY') {
-        const morningRecords: MorningAssemblyRecord[] = updatedRows.map((r) => ({
-          id: `morn-${todayIso.replace(/-/g, '')}-${r.studentId}`,
-          date: todayIso,
-          classroomId: normalizedRoom,
-          studentId: r.studentId,
-          studentCode: r.studentId.replace('stu-', '4510'),
-          studentName: r.fullName,
-          status: r.morningStatus,
-          source: 'MANUAL',
-          isOverridden: false,
-          markedAt: new Date().toISOString(),
-        }));
+        const morningRecords: MorningAssemblyRecord[] = updatedRows
+          .filter((r) => r.morningStatus)
+          .map((r) => ({
+            id: `morn-${todayIso.replace(/-/g, '')}-${r.studentId}`,
+            date: todayIso,
+            classroomId: normalizedRoom,
+            studentId: r.studentId,
+            studentCode: r.studentId.startsWith('stu-') ? r.studentId.replace('stu-', '4510') : r.studentId,
+            studentName: r.fullName,
+            status: r.morningStatus as AttendanceStatusCode,
+            source: 'MANUAL',
+            isOverridden: false,
+            markedAt: new Date().toISOString(),
+          }));
         attendanceCorrelationService.saveMorningRecords(morningRecords);
         attendanceCorrelationService.runCorrelation(normalizedRoom, todayIso);
       } else if (mode === 'CLASS_ATTENDANCE') {
-        const periodRecords: PeriodAttendanceRecord[] = updatedRows.map((r) => ({
-          id: `per-${todayIso.replace(/-/g, '')}-p1-${r.studentId}`,
-          date: todayIso,
-          classroomId: normalizedRoom,
-          courseCode: normalizeCourseCode(courseCode),
-          courseName: subjectLabel,
-          periodNo: 1,
-          studentId: r.studentId,
-          studentCode: r.studentId.replace('stu-', '4510'),
-          studentName: r.fullName,
-          status: r.classPeriods[4] || 'PRESENT',
-          source: 'MANUAL',
-          isOverridden: false,
-          markedAt: new Date().toISOString(),
-        }));
+        const periodRecords: PeriodAttendanceRecord[] = updatedRows
+          .filter((r) => r.classPeriods[0])
+          .map((r) => ({
+            id: `per-${todayIso.replace(/-/g, '')}-p1-${r.studentId}`,
+            date: todayIso,
+            classroomId: normalizedRoom,
+            courseCode: normalizeCourseCode(courseCode),
+            courseName: subjectLabel,
+            periodNo: 1,
+            studentId: r.studentId,
+            studentCode: r.studentId.startsWith('stu-') ? r.studentId.replace('stu-', '4510') : r.studentId,
+            studentName: r.fullName,
+            status: r.classPeriods[0] as AttendanceStatusCode,
+            source: 'MANUAL',
+            isOverridden: false,
+            markedAt: new Date().toISOString(),
+          }));
         attendanceCorrelationService.savePeriodRecords(periodRecords);
         attendanceCorrelationService.runCorrelation(normalizedRoom, todayIso);
       }
@@ -380,7 +450,11 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
           return { ...r, morningStatus: status };
         }
         const updatedPeriods = [...r.classPeriods];
-        updatedPeriods[4] = status;
+        if (updatedPeriods.length > 0) {
+          updatedPeriods[0] = status;
+        } else {
+          updatedPeriods.push(status);
+        }
         return { ...r, classPeriods: updatedPeriods };
       });
       syncAttendanceToCorrelation(next);
@@ -571,7 +645,7 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
 
   const attendanceCounts = useMemo(() => {
     const getStatus = (r: StudentPaperRow) =>
-      mode === 'MORNING_ASSEMBLY' ? r.morningStatus : r.classPeriods[4];
+      mode === 'MORNING_ASSEMBLY' ? r.morningStatus : (r.classPeriods[0] || '');
     return {
       present: rows.filter((r) => getStatus(r) === 'PRESENT').length,
       absent: rows.filter((r) => getStatus(r) === 'ABSENT').length,
@@ -944,7 +1018,7 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
                 <th className="py-2 px-3 border-r border-slate-300 text-left min-w-[190px] sticky left-10 bg-slate-100 z-10">
                   ชื่อ - สกุล
                 </th>
-                {DEFAULT_PERIODS.map((period) => {
+                {periods.map((period) => {
                   const presentCount = rows.filter(
                     (r) => r.classPeriods[period.index] === 'PRESENT'
                   ).length;
@@ -993,8 +1067,10 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
               ) : (
                 rows.map((r) => {
                 const attendedPeriods = r.classPeriods.filter((p) => p === 'PRESENT').length;
-                const percent = Math.round((attendedPeriods / DEFAULT_PERIODS.length) * 100);
-                const isRiskMs = percent < 80;
+                const markedPeriods = r.classPeriods.filter(Boolean).length;
+                const hasRecords = markedPeriods > 0;
+                const percent = hasRecords ? Math.round((attendedPeriods / markedPeriods) * 100) : 0;
+                const isRiskMs = hasRecords && percent < 80;
 
                 return (
                   <tr
@@ -1013,8 +1089,8 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
                       {r.fullName}
                     </td>
 
-                    {DEFAULT_PERIODS.map((period) => {
-                      const st = r.classPeriods[period.index] || 'PRESENT';
+                    {periods.map((period) => {
+                      const st = r.classPeriods[period.index] || '';
                       const badgeCls =
                         st === 'PRESENT'
                           ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
@@ -1022,7 +1098,9 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
                           ? 'bg-rose-100 text-rose-800 border-rose-300'
                           : st === 'LATE'
                           ? 'bg-amber-100 text-amber-900 border-amber-300'
-                          : 'bg-sky-100 text-sky-900 border-sky-300';
+                          : st === 'LEAVE'
+                          ? 'bg-sky-100 text-sky-900 border-sky-300'
+                          : 'bg-slate-50 text-slate-400 border-slate-200';
                       const label =
                         st === 'PRESENT'
                           ? '✓ มา'
@@ -1030,7 +1108,9 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
                           ? '✗ ขาด'
                           : st === 'LATE'
                           ? 'สาย'
-                          : 'ลา';
+                          : st === 'LEAVE'
+                          ? 'ลา'
+                          : '—';
 
                       return (
                         <td
@@ -1050,13 +1130,17 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
                     })}
 
                     <td className="py-1.5 px-2 border-r border-slate-200 text-center text-xs font-extrabold text-teal-900 bg-teal-50/30">
-                      {attendedPeriods}/{DEFAULT_PERIODS.length}
+                      {attendedPeriods}/{hasRecords ? periods.length : 0}
                     </td>
                     <td className="py-1.5 px-2 border-r border-slate-200 text-center text-xs font-extrabold text-slate-900">
-                      {percent}%
+                      {hasRecords ? `${percent}%` : '—'}
                     </td>
                     <td className="py-1.5 px-2 text-center text-xs font-bold">
-                      {isRiskMs ? (
+                      {!hasRecords ? (
+                        <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px]">
+                          —
+                        </span>
+                      ) : isRiskMs ? (
                         <span className="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[10px]">
                           เสี่ยง มส.
                         </span>
@@ -1090,7 +1174,7 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
                     { key: 'LEAVE', label: 'ลาป่วย', count: attendanceCounts.leave },
                   ] as const
                 ).map((col) => {
-                  const allChecked = rows.every((r) => r.classPeriods[4] === col.key);
+                  const allChecked = rows.every((r) => r.classPeriods[0] === col.key);
                   return (
                     <th
                       key={col.key}
@@ -1129,7 +1213,7 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
                 </tr>
               ) : (
                 rows.map((r) => {
-                const st = r.classPeriods[4];
+                const st = r.classPeriods[0] || '';
                 const rowBg =
                   st === 'ABSENT'
                     ? 'bg-[#FADADD]'
@@ -1154,16 +1238,18 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
                       return (
                         <td
                           key={statusKey}
-                          onClick={() =>
-                            setRows((prev) =>
-                              prev.map((item) => {
+                          onClick={() => {
+                            setRows((prev) => {
+                              const next = prev.map((item) => {
                                 if (item.no !== r.no) return item;
                                 const nextP = [...item.classPeriods];
-                                nextP[4] = statusKey;
+                                nextP[0] = statusKey;
                                 return { ...item, classPeriods: nextP };
-                              })
-                            )
-                          }
+                              });
+                              syncAttendanceToCorrelation(next);
+                              return next;
+                            });
+                          }}
                           className="py-2 px-1 border-r last:border-r-0 border-slate-200 text-center cursor-pointer"
                         >
                           <div className="flex items-center justify-center">

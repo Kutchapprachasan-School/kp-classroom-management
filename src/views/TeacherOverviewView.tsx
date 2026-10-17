@@ -242,77 +242,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
   const [selectedDateIso, setSelectedDateIso] = useState<string>(() => getBangkokTodayString());
 
   // Interactive Attendance Rows matching Image 4 and synced with attendanceCorrelationService
-  const [attendanceRows, setAttendanceRows] = useState(() => {
-    const todayIso = getBangkokTodayString();
-    return [
-      {
-        isoDate: todayIso,
-        date: formatThaiDate(todayIso),
-        period: 'คาบ 1-2',
-        topic: 'การประเมินผลงานและสรุปบทเรียน',
-        status: 'NORMAL' as const,
-        statusLabel: 'สอนปกติ',
-        checkStatus: 'CHECKED',
-        attendedCount: 10 as number | null,
-        leaveCount: 1 as number | null,
-      },
-    {
-      isoDate: '2026-10-01',
-      date: 'พฤ. 1 ต.ค. 2569',
-      period: 'คาบ 8-9',
-      topic: 'สอบปลายภาค',
-      status: 'CANCELED' as const,
-      statusLabel: 'งดสอน',
-      checkStatus: 'ยังไม่เช็คชื่อ',
-      attendedCount: null as number | null,
-      leaveCount: null as number | null,
-    },
-    {
-      isoDate: '2026-09-24',
-      date: 'พฤ. 24 ก.ย. 2569',
-      period: 'คาบ 8-9',
-      topic: 'การนำเสนอผลงานศิลปะร่วมสมัย',
-      status: 'NORMAL' as const,
-      statusLabel: 'สอนปกติ',
-      checkStatus: 'CHECKED',
-      attendedCount: 14 as number | null,
-      leaveCount: null as number | null,
-    },
-    {
-      isoDate: '2026-09-17',
-      date: 'พฤ. 17 ก.ย. 2569',
-      period: 'คาบ 8-9',
-      topic: 'เทคนิคการไล่น้ำหนักสีโปสเตอร์',
-      status: 'NORMAL' as const,
-      statusLabel: 'สอนปกติ',
-      checkStatus: 'CHECKED',
-      attendedCount: 14 as number | null,
-      leaveCount: 1 as number | null,
-    },
-    {
-      isoDate: '2026-09-10',
-      date: 'พฤ. 10 ก.ย. 2569',
-      period: 'คาบ 8-9',
-      topic: 'ทฤษฎีสีและวงจรสีสากล',
-      status: 'NORMAL' as const,
-      statusLabel: 'สอนปกติ',
-      checkStatus: 'CHECKED',
-      attendedCount: 14 as number | null,
-      leaveCount: 1 as number | null,
-    },
-    {
-      isoDate: '2026-09-03',
-      date: 'พฤ. 3 ก.ย. 2569',
-      period: 'คาบ 8-9',
-      topic: 'องค์ประกอบศิลป์เบื้องต้น',
-      status: 'NORMAL' as const,
-      statusLabel: 'สอนปกติ',
-      checkStatus: 'CHECKED',
-      attendedCount: 13 as number | null,
-      leaveCount: 2 as number | null,
-    },
-  ];
-});
+  const [attendanceRows, setAttendanceRows] = useState<any[]>([]);
 
   const loadAttendanceDataFromCorrelation = useCallback(() => {
     try {
@@ -324,7 +254,9 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
         .filter(
           (r) =>
             normalizeClassroomId(r.classroomId) === normalizedRoom &&
-            normalizeCourseCode(r.courseCode) === normalizedCourse
+            normalizeCourseCode(r.courseCode) === normalizedCourse &&
+            !r.id.startsWith('t-p') &&
+            !['2026-09-28', '2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02'].includes(r.date)
         );
 
       const recordsByDate = new Map<string, PeriodAttendanceRecord[]>();
@@ -335,25 +267,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
         recordsByDate.get(rec.date)!.push(rec);
       });
 
-      const plannedDates = [
-        '2026-10-02',
-        '2026-10-01',
-        '2026-09-24',
-        '2026-09-17',
-        '2026-09-10',
-        '2026-09-03',
-      ];
-
-      const allDates = Array.from(new Set([...recordsByDate.keys(), ...plannedDates])).sort().reverse();
-
-      const defaultTopics: Record<string, string> = {
-        '2026-10-02': 'การประเมินผลงานและสรุปบทเรียน',
-        '2026-10-01': 'สอบปลายภาค',
-        '2026-09-24': 'การนำเสนอผลงานศิลปะร่วมสมัย',
-        '2026-09-17': 'เทคนิคการไล่น้ำหนักสีโปสเตอร์',
-        '2026-09-10': 'ทฤษฎีสีและวงจรสีสากล',
-        '2026-09-03': 'องค์ประกอบศิลป์เบื้องต้น',
-      };
+      const allDates = Array.from(recordsByDate.keys()).sort().reverse();
 
       const rows = allDates.map((d) => {
         const dayRecords = recordsByDate.get(d) || [];
@@ -366,19 +280,17 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
         return {
           isoDate: d,
           date: formatThaiDate(d),
-          period: 'คาบ 8-9',
-          topic: defaultTopics[d] || 'คาบสอนเพิ่มเติม',
-          status: d === '2026-10-01' ? ('CANCELED' as const) : ('NORMAL' as const),
-          statusLabel: d === '2026-10-01' ? 'งดสอน' : 'สอนปกติ',
+          period: 'คาบ 1',
+          topic: 'บันทึกการสอน',
+          status: 'NORMAL' as const,
+          statusLabel: 'สอนปกติ',
           checkStatus: isChecked ? 'CHECKED' : 'ยังไม่เช็คชื่อ',
           attendedCount: isChecked ? presentCount : null,
           leaveCount: isChecked && leaveCount > 0 ? leaveCount : null,
         };
       });
 
-      if (rows.length > 0) {
-        setAttendanceRows(rows);
-      }
+      setAttendanceRows(rows);
     } catch {
       // ignore
     }
@@ -684,7 +596,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
         selectedClassroom
       );
       const atRiskFromCorrelation = stats.students
-        .filter((s) => s.attendanceRate < 80 || s.statusTag !== 'NORMAL')
+        .filter((s) => s.totalDays > 0 && (s.attendanceRate < 80 || s.statusTag !== 'NORMAL'))
         .map((s, idx) => ({
           enrollmentId: `stu-${idx + 1}`,
           studentNo: idx + 1,
@@ -1185,7 +1097,14 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredAttendance.map((row, idx) => (
+                {filteredAttendance.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-slate-400 font-medium">
+                      ยังไม่มีประวัติคาบสอนที่บันทึกไว้
+                    </td>
+                  </tr>
+                ) : (
+                  filteredAttendance.map((row, idx) => (
                   <tr key={idx} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3 px-3">
                       <input
@@ -1263,7 +1182,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                       </div>
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           </div>
@@ -1450,7 +1369,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                       return (
                         g.gradeLabel === 'ร' ||
                         g.gradeLabel === 'มส.' ||
-                        stu.attendancePercent < 80 ||
+                        (stu.attendancePercent > 0 && stu.attendancePercent < 80) ||
                         g.missingCount > 0
                       );
                     })
@@ -1540,12 +1459,12 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                             ) : (
                               <span
                                 className={
-                                  stu.attendancePercent < 80
+                                  stu.attendancePercent > 0 && stu.attendancePercent < 80
                                     ? 'text-rose-600 font-semibold'
                                     : 'text-slate-600'
                                 }
                               >
-                                {stu.attendancePercent}%
+                                {stu.attendancePercent > 0 ? `${stu.attendancePercent}%` : '—'}
                               </span>
                             )}
                           </td>
@@ -1555,12 +1474,12 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
                             ) : (
                               <span
                                 className={
-                                  g.missingCount === 0
-                                    ? 'text-slate-600'
-                                    : 'text-rose-600 font-semibold'
+                                  g.totalAssignedCount > 0 && g.missingCount > 0
+                                    ? 'text-rose-600 font-semibold'
+                                    : 'text-slate-600'
                                 }
                               >
-                                {g.submittedCount}/{g.totalAssignedCount}
+                                {g.totalAssignedCount > 0 ? `${g.submittedCount}/${g.totalAssignedCount}` : '—'}
                               </span>
                             )}
                           </td>

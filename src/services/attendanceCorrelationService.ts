@@ -1277,11 +1277,11 @@ export const attendanceCorrelationService = {
       // Elapsed conducted days strictly calculated from actual classes conducted to date
       // (NOT using a fixed 20-week term denominator so students know immediately if they are at risk)
       const conductedDaysToDate = presentDays + lateDays + absentDays + leaveDays + activityDays;
-      const totalDays = conductedDaysToDate > 0 ? conductedDaysToDate : (records.length > 0 ? records.length : 1);
+      const totalDays = conductedDaysToDate;
       const earnedDays = presentDays + lateDays + activityDays;
       const attendanceRate = totalDays > 0 ? Number(((earnedDays / totalDays) * 100).toFixed(1)) : 100.0;
       const statusTag: 'NORMAL' | 'WARNING' | 'CRITICAL' =
-        attendanceRate >= 85 ? 'NORMAL' : attendanceRate >= 80 ? 'WARNING' : 'CRITICAL';
+        totalDays === 0 || attendanceRate >= 85 ? 'NORMAL' : attendanceRate >= 80 ? 'WARNING' : 'CRITICAL';
 
       students.push({
         studentCode: code,

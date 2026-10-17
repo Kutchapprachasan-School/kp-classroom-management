@@ -76,10 +76,11 @@ class CleanSlateService {
    */
   isCleanSlateActive(): boolean {
     if (typeof window === 'undefined' || !window.localStorage) {
-      return false;
+      return true;
     }
     const val = localStorage.getItem(CLEAN_SLATE_FLAG_KEY);
-    return val === 'true';
+    // Active by default (Zero Mock Data for production classroom usage)
+    return val !== 'false';
   }
 
   /**

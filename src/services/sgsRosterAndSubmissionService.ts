@@ -94,10 +94,10 @@ const INITIAL_SGS_ROSTER: SgsStudentRecord[] = [
     gender: 'MALE',
     classroom: 'ม.3/1',
     transferState: 'ACTIVE',
-    attendancePercent: 96.5,
-    morningStatusLabel: 'มาเข้าแถวปกติ',
-    midtermScore: 17,
-    finalScore: 26,
+    attendancePercent: 0,
+    morningStatusLabel: '',
+    midtermScore: '' as any,
+    finalScore: '' as any,
   },
   {
     sgsSeatNo: 2,
@@ -106,184 +106,112 @@ const INITIAL_SGS_ROSTER: SgsStudentRecord[] = [
     gender: 'MALE',
     classroom: 'ม.3/1',
     transferState: 'ACTIVE',
-    attendancePercent: 95.0,
-    morningStatusLabel: 'มาเข้าแถวปกติ',
-    midtermScore: 18,
-    finalScore: 27,
+    attendancePercent: 0,
+    morningStatusLabel: '',
+    midtermScore: '' as any,
+    finalScore: '' as any,
   },
   {
     sgsSeatNo: 3,
-    studentCode: '45107',
-    studentName: 'ด.ช. ชัยมงคล วงศ์บุตร',
-    gender: 'MALE',
+    studentCode: '45103',
+    studentName: 'ด.ญ. ชนากานต์ สิทธิชัย',
+    gender: 'FEMALE',
     classroom: 'ม.3/1',
-    transferState: 'TRANSFERRED_OUT',
-    transferDate: '2026-08-10',
-    transferNote: 'ย้ายออก (คงเลขที่ 3 ไว้ในกลุ่มนักเรียนชายตาม SGS เพื่อไม่ให้บรรทัดเลื่อน)',
+    transferState: 'ACTIVE',
     attendancePercent: 0,
-    morningStatusLabel: 'ย้ายออกแล้ว',
-    midtermScore: 0,
-    finalScore: 0,
+    morningStatusLabel: '',
+    midtermScore: '' as any,
+    finalScore: '' as any,
   },
   {
     sgsSeatNo: 4,
-    studentCode: '45115',
-    studentName: 'ด.ช. อัศวิน วนเกษตรกุล',
-    gender: 'MALE',
+    studentCode: '45104',
+    studentName: 'ด.ญ. ธันยพร เจริญสุข',
+    gender: 'FEMALE',
     classroom: 'ม.3/1',
     transferState: 'ACTIVE',
-    attendancePercent: 78.5,
-    morningStatusLabel: 'มาเข้าแถวปกติ (เสี่ยง มส. < 80%)',
-    midtermScore: 12,
-    finalScore: 18,
+    attendancePercent: 0,
+    morningStatusLabel: '',
+    midtermScore: '' as any,
+    finalScore: '' as any,
   },
   {
     sgsSeatNo: 5,
-    studentCode: '45109',
-    studentName: 'ด.ช. ณัฐวุฒิ สายทอง',
-    gender: 'MALE',
-    classroom: 'ม.3/1',
-    transferState: 'TRANSFERRED_IN',
-    transferDate: '2026-07-01',
-    transferNote: 'ย้ายเข้าใหม่ (แทรกต่อท้ายกลุ่มนักเรียนชายที่เลขที่ 5 ตาม SGS • บางวิชาไม่มีเทียบโอน ครูกรอกคะแนนเก็บสุทธิเองได้)',
-    transferredBaseScore: undefined,
-    manualAccumulatedOverride: 36,
-    manualOverrideNote: 'ไม่มีคะแนนเทียบโอนวิชาศิลปะจาก รร.เดิม — ครูประเมินคะแนนเก็บสุทธิท้ายเทอม 36/50',
-    attendancePercent: 92.0,
-    morningStatusLabel: 'เข้าแถวสาย (รถโดยสารมาช้า)',
-    midtermScore: 15,
-    finalScore: 23,
-  },
-  {
-    sgsSeatNo: 6,
     studentCode: '45105',
     studentName: 'ด.ญ. กมลชนก เลิศวิไล',
     gender: 'FEMALE',
     classroom: 'ม.3/1',
     transferState: 'ACTIVE',
-    attendancePercent: 98.0,
-    morningStatusLabel: 'มาเข้าแถวปกติ',
-    midtermScore: 19,
-    finalScore: 28,
+    attendancePercent: 0,
+    morningStatusLabel: '',
+    midtermScore: '' as any,
+    finalScore: '' as any,
+  },
+  {
+    sgsSeatNo: 6,
+    studentCode: '45106',
+    studentName: 'ด.ช. ภานุวัฒน์ วงศ์ษา',
+    gender: 'MALE',
+    classroom: 'ม.3/1',
+    transferState: 'ACTIVE',
+    attendancePercent: 0,
+    morningStatusLabel: '',
+    midtermScore: '' as any,
+    finalScore: '' as any,
   },
   {
     sgsSeatNo: 7,
-    studentCode: '45112',
-    studentName: 'ด.ญ. พิมพ์ชนก วงศ์สวัสดิ์',
-    gender: 'FEMALE',
+    studentCode: '45107',
+    studentName: 'ด.ช. อภิสิทธิ์ แก้วคำ',
+    gender: 'MALE',
     classroom: 'ม.3/1',
     transferState: 'ACTIVE',
-    attendancePercent: 91.0,
-    morningStatusLabel: 'อนุมัติลาป่วยแล้ว',
-    midtermScore: 16,
-    finalScore: 25,
+    attendancePercent: 0,
+    morningStatusLabel: '',
+    midtermScore: '' as any,
+    finalScore: '' as any,
   },
   {
     sgsSeatNo: 8,
-    studentCode: '45118',
-    studentName: 'ด.ญ. อคิราห์ วิรากร',
+    studentCode: '45108',
+    studentName: 'ด.ญ. สุพรรษา พัฒนกุล',
     gender: 'FEMALE',
     classroom: 'ม.3/1',
     transferState: 'ACTIVE',
-    attendancePercent: 94.0,
-    morningStatusLabel: 'มาเข้าแถวปกติ',
-    midtermScore: 16,
-    finalScore: 24,
+    attendancePercent: 0,
+    morningStatusLabel: '',
+    midtermScore: '' as any,
+    finalScore: '' as any,
+  },
+  {
+    sgsSeatNo: 9,
+    studentCode: '45109',
+    studentName: 'ด.ช. ณัฐวุฒิ สายทอง',
+    gender: 'MALE',
+    classroom: 'ม.3/1',
+    transferState: 'ACTIVE',
+    attendancePercent: 0,
+    morningStatusLabel: '',
+    midtermScore: '' as any,
+    finalScore: '' as any,
+  },
+  {
+    sgsSeatNo: 10,
+    studentCode: '45110',
+    studentName: 'ด.ช. ธนพล มณีโชติ',
+    gender: 'MALE',
+    classroom: 'ม.3/1',
+    transferState: 'ACTIVE',
+    attendancePercent: 0,
+    morningStatusLabel: '',
+    midtermScore: '' as any,
+    finalScore: '' as any,
   },
 ];
 
-const INITIAL_TERM_ASSIGNMENTS: TermAssignmentItem[] = [
-  {
-    id: 'asg-1',
-    orderNo: 1,
-    title: 'ใบงานที่ 1: วงจรสีธรรมชาติ',
-    sgsUnit: 'u1',
-    sgsUnitLabel: 'หน่วยที่ 1 (15 คะแนน)',
-    maxScore: 10,
-    assignedDate: '18 พ.ค. 69',
-    dueDate: '25 พ.ค. 69',
-    isRequiredForPass: false,
-  },
-  {
-    id: 'asg-2',
-    orderNo: 2,
-    title: 'ชิ้นงานที่ 2: แรงเงาแสงเงาหุ่นนิ่ง',
-    sgsUnit: 'u1',
-    sgsUnitLabel: 'หน่วยที่ 1 (15 คะแนน)',
-    maxScore: 5,
-    assignedDate: '1 มิ.ย. 69',
-    dueDate: '8 มิ.ย. 69',
-    isRequiredForPass: false,
-  },
-  {
-    id: 'asg-3',
-    orderNo: 3,
-    title: 'ชิ้นงานที่ 3: ภาพพิมพ์วัสดุธรรมชาติ',
-    sgsUnit: 'u2',
-    sgsUnitLabel: 'หน่วยที่ 2 (20 คะแนน)',
-    maxScore: 10,
-    assignedDate: '10 ก.ค. 69',
-    dueDate: '20 ก.ค. 69',
-    isRequiredForPass: true, // ⭐ งานบังคับ / ตัวชี้วัดต้องรู้ (ไม่ส่งติด ร)
-  },
-  {
-    id: 'asg-4',
-    orderNo: 4,
-    title: 'ชิ้นงานที่ 4: โปสเตอร์รักษ์สิ่งแวดล้อม',
-    sgsUnit: 'u2',
-    sgsUnitLabel: 'หน่วยที่ 2 (20 คะแนน)',
-    maxScore: 10,
-    assignedDate: '5 ส.ค. 69',
-    dueDate: '15 ส.ค. 69',
-    isRequiredForPass: false,
-  },
-  {
-    id: 'asg-5',
-    orderNo: 5,
-    title: 'ชิ้นงานที่ 5: ศิลปะร่วมสมัยไทย',
-    sgsUnit: 'u3',
-    sgsUnitLabel: 'หน่วยที่ 3 (15 คะแนน)',
-    maxScore: 15,
-    assignedDate: '10 ก.ย. 69',
-    dueDate: '25 ก.ย. 69',
-    isRequiredForPass: true, // ⭐ งานบังคับ / ตัวชี้วัดต้องรู้ (ไม่ส่งติด ร)
-  },
-];
+export const INITIAL_TERM_ASSIGNMENTS: TermAssignmentItem[] = [];
 
-const INITIAL_SUBMISSIONS: StudentWorkSubmission[] = [
-  // เลขที่ 1 กฤษณะ (ส่งครบ ตรวจแล้ว 4 รอตรวจ 1)
-  { assignmentId: 'asg-1', studentCode: '45101', status: 'GRADED', score: 9, submittedAt: '24 พ.ค. 10:15', workTitle: 'ภาพวาดวงจรสี 12 สี.jpg' },
-  { assignmentId: 'asg-2', studentCode: '45101', status: 'GRADED', score: 5, submittedAt: '7 มิ.ย. 14:00', workTitle: 'แรงเงาแจกันและผลไม้.jpg' },
-  { assignmentId: 'asg-3', studentCode: '45101', status: 'GRADED', score: 9, submittedAt: '19 ก.ค. 09:20', workTitle: 'ภาพพิมพ์ใบไม้ก้านกล้วย.jpg' },
-  { assignmentId: 'asg-4', studentCode: '45101', status: 'GRADED', score: 9, submittedAt: '14 ส.ค. 11:10', workTitle: 'โปสเตอร์ลดโลกร้อน.png' },
-  { assignmentId: 'asg-5', studentCode: '45101', status: 'SUBMITTED_PENDING', score: null, submittedAt: '24 ก.ย. 15:30', workTitle: 'ลายไทยประยุกต์ร่วมสมัย.pdf' },
-
-  // เลขที่ 2 ทัตธน (ส่งครบ)
-  { assignmentId: 'asg-1', studentCode: '45102', status: 'GRADED', score: 10, submittedAt: '23 พ.ค. 09:00', workTitle: 'วงจรสีโปสเตอร์_ทัตธน.jpg' },
-  { assignmentId: 'asg-2', studentCode: '45102', status: 'GRADED', score: 5, submittedAt: '6 มิ.ย. 13:20', workTitle: 'หุ่นนิ่งดินสอEE.jpg' },
-  { assignmentId: 'asg-3', studentCode: '45102', status: 'GRADED', score: 9, submittedAt: '18 ก.ค. 16:00', workTitle: 'ภาพพิมพ์ธรรมชาติ.jpg' },
-  { assignmentId: 'asg-4', studentCode: '45102', status: 'GRADED', score: 10, submittedAt: '14 ส.ค. 10:40', workTitle: 'โปสเตอร์รักษ์ป่าไม้.png' },
-  { assignmentId: 'asg-5', studentCode: '45102', status: 'SUBMITTED_PENDING', score: null, submittedAt: '25 ก.ย. 08:15', workTitle: 'จิตรกรรมไทยร่วมสมัย_ทัตธน.jpg' },
-
-  // เลขที่ 6 กมลชนก (ส่งครบ ตรวจครบ)
-  { assignmentId: 'asg-1', studentCode: '45105', status: 'GRADED', score: 10, submittedAt: '22 พ.ค. 11:00', workTitle: 'วงจรสี_กมลชนก.jpg' },
-  { assignmentId: 'asg-2', studentCode: '45105', status: 'GRADED', score: 5, submittedAt: '5 มิ.ย. 15:10', workTitle: 'แสงเงาดินสอ_กมลชนก.jpg' },
-  { assignmentId: 'asg-3', studentCode: '45105', status: 'GRADED', score: 10, submittedAt: '17 ก.ค. 12:30', workTitle: 'ภาพพิมพ์ใบเฟิร์น.jpg' },
-  { assignmentId: 'asg-4', studentCode: '45105', status: 'GRADED', score: 10, submittedAt: '13 ส.ค. 14:20', workTitle: 'SaveEarth_Poster.png' },
-  { assignmentId: 'asg-5', studentCode: '45105', status: 'GRADED', score: 15, submittedAt: '22 ก.ย. 16:40', workTitle: 'ศิลปะไทยประยุกต์_กมลชนก.pdf' },
-
-  // เลขที่ 3 ชัยมงคล (ย้ายออกกลางเทอม - ล็อกแถวตาม SGS)
-  { assignmentId: 'asg-1', studentCode: '45107', status: 'EXEMPT_TRANSFERRED', score: null },
-  { assignmentId: 'asg-2', studentCode: '45107', status: 'EXEMPT_TRANSFERRED', score: null },
-  { assignmentId: 'asg-3', studentCode: '45107', status: 'EXEMPT_TRANSFERRED', score: null },
-  { assignmentId: 'asg-4', studentCode: '45107', status: 'EXEMPT_TRANSFERRED', score: null },
-  { assignmentId: 'asg-5', studentCode: '45107', status: 'EXEMPT_TRANSFERRED', score: null },
-
-  // เลขที่ 7 พิมพ์ชนก (ส่งแล้ว 5 รอตรวจ 2)
-  { assignmentId: 'asg-1', studentCode: '45112', status: 'GRADED', score: 9, submittedAt: '25 พ.ค. 08:50', workTitle: 'วงจรสี_พิมพ์ชนก.jpg' },
-  { assignmentId: 'asg-2', studentCode: '45112', status: 'GRADED', score: 4, submittedAt: '8 มิ.ย. 10:10', workTitle: 'แรงเงาหุ่นนิ่ง.jpg' },
-  { assignmentId: 'asg-3', studentCode: '45112', status: 'GRADED', score: 8, submittedAt: '20 ก.ค. 13:00', workTitle: 'ภาพพิมพ์ดอกไม้.jpg' },
-];
+export const INITIAL_SUBMISSIONS: StudentWorkSubmission[] = [];
 
 export const sgsRosterAndSubmissionService = {
   getSgsRoster(classroomId?: string): SgsStudentRecord[] {
@@ -316,10 +244,10 @@ export const sgsRosterAndSubmissionService = {
           gender: (stu.gender || (stu.name.includes('ด.ญ.') || stu.name.includes('นางสาว') ? 'FEMALE' : 'MALE')) as StudentGender,
           classroom: formatted,
           transferState: 'ACTIVE' as StudentTransferState,
-          attendancePercent: 95.0,
-          morningStatusLabel: 'มาเข้าแถวปกติ',
-          midtermScore: 16,
-          finalScore: 25,
+          attendancePercent: 0,
+          morningStatusLabel: '',
+          midtermScore: '' as any,
+          finalScore: '' as any,
         }));
       }
 
@@ -541,7 +469,7 @@ export const sgsRosterAndSubmissionService = {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_TERM_ASSIGNMENTS);
       if (raw) return JSON.parse(raw);
-      return cleanSlateService.isCleanSlateActive() ? [] : INITIAL_TERM_ASSIGNMENTS;
+      return [];
     } catch {
       return [];
     }
@@ -591,9 +519,9 @@ export const sgsRosterAndSubmissionService = {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_WORK_SUBMISSIONS);
       if (raw) return JSON.parse(raw);
-      return cleanSlateService.isCleanSlateActive() ? [] : INITIAL_SUBMISSIONS;
+      return [];
     } catch {
-      return cleanSlateService.isCleanSlateActive() ? [] : INITIAL_SUBMISSIONS;
+      return [];
     }
   },
 
@@ -787,18 +715,24 @@ export const sgsRosterAndSubmissionService = {
       ? (student.manualAccumulatedOverride as number)
       : calculatedAccumulated;
 
-    const total =
-      effectiveAccumulated + student.midtermScore + student.finalScore;
+    const midtermVal = typeof student.midtermScore === 'number' ? student.midtermScore : 0;
+    const finalVal = typeof student.finalScore === 'number' ? student.finalScore : 0;
+    const total = effectiveAccumulated + midtermVal + finalVal;
 
     let gradeLabel = '0';
     let rReasonLabel: string | undefined;
 
-    if (student.attendancePercent < 80) {
+    const hasRealAttendance = typeof student.attendancePercent === 'number' && student.attendancePercent > 0;
+    const hasAnyAssessment = assignments.length > 0 || typeof student.midtermScore === 'number' || typeof student.finalScore === 'number' || effectiveAccumulated > 0;
+
+    if (hasRealAttendance && student.attendancePercent < 80) {
       gradeLabel = 'มส.';
     } else if (missingMandatoryTitles.length > 0) {
       // Q3-A: ค้างส่งชิ้นงานบังคับ (ตัวชี้วัดต้องรู้) -> ติด "ร" อัตโนมัติแม้คะแนนรวมเกิน 50
       gradeLabel = 'ร';
       rReasonLabel = `ค้างงานบังคับ (${missingMandatoryTitles.join(', ')})`;
+    } else if (!hasAnyAssessment && total === 0) {
+      gradeLabel = '—';
     } else if (total >= 80) {
       gradeLabel = '4.0';
     } else if (total >= 75) {
