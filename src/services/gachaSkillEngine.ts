@@ -73,10 +73,9 @@ export const gachaSkillEngine = {
   },
 
   /**
-   * คำนวณ Buffs ของคู่หูที่สวมใส่อยู่จริงในปัจจุบัน
+   * คำนวณ Buffs ของคู่หูตัวที่ระบุ
    */
-  getActiveBuffs(): ActiveBuddyBuffs {
-    const buddy = gachaService.getActiveBuddy();
+  getBuffsForBuddy(buddy: GachaBuddy): ActiveBuddyBuffs {
     const state = this.getSkillState();
 
     let xpMultiplier = 1.0;
@@ -175,6 +174,13 @@ export const gachaSkillEngine = {
       homeworkGraceHours,
       activeEffectsLabels,
     };
+  },
+
+  /**
+   * คำนวณ Buffs ของคู่หูที่สวมใส่อยู่จริงในปัจจุบัน
+   */
+  getActiveBuffs(): ActiveBuddyBuffs {
+    return this.getBuffsForBuddy(gachaService.getActiveBuddy());
   },
 
   /**

@@ -92,4 +92,12 @@ describe('GachaSkillEngine Ecosystem', () => {
     expect(res.coinsGained).toBeGreaterThan(0);
     expect(res.quote).toBeDefined();
   });
+
+  it('computes buffs for any specified buddy using getBuffsForBuddy', () => {
+    const commonBuddy = ALL_BUDDIES.find((b) => b.rarity === 'COMMON') || ALL_BUDDIES[0];
+    const buffs = gachaSkillEngine.getBuffsForBuddy(commonBuddy);
+    expect(buffs.buddy.id).toBe(commonBuddy.id);
+    expect(buffs.xpMultiplier).toBe(1.05);
+    expect(buffs.activeEffectsLabels).toContain('⚡ XP โบนัส +5%');
+  });
 });

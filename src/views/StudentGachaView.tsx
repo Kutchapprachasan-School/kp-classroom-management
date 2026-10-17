@@ -15,6 +15,7 @@ import {
   type GachaPullResult,
   type GachaState,
 } from '../services/gachaService';
+import { gachaSkillEngine } from '../services/gachaSkillEngine';
 import { ChibiBuddyAvatar } from '../components/student/ChibiBuddyAvatar';
 
 interface StudentGachaViewProps {
@@ -803,14 +804,38 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
               </div>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 text-xs">
-              <div className="font-extrabold text-slate-800 flex items-center gap-1.5">
-                <Zap className="w-4 h-4 text-amber-500" />
-                <span>สกิลประจำตัว: {selectedBuddyDetail.skillName}</span>
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 text-xs">
+              <div className="font-extrabold text-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Zap className="w-4 h-4 text-amber-500" />
+                  <span>สกิลประจำตัว: {selectedBuddyDetail.skillName}</span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-bold">{selectedBuddyDetail.rarity}</span>
               </div>
               <p className="text-slate-600 leading-relaxed">
                 {selectedBuddyDetail.skillDesc}
               </p>
+              {/* Active Mechanical Effects */}
+              {(() => {
+                const buffs = gachaSkillEngine.getBuffsForBuddy(selectedBuddyDetail);
+                return buffs.activeEffectsLabels.length > 0 ? (
+                  <div className="pt-1.5 border-t border-slate-200/80 space-y-1.5">
+                    <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                      ผลลัพธ์ในระบบจริง (Active Mechanics):
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {buffs.activeEffectsLabels.map((label, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2.5 py-1 rounded-xl bg-sky-50 text-blue-700 border border-blue-200 text-[11px] font-bold inline-flex items-center gap-1"
+                        >
+                          {label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null;
+              })()}
             </div>
 
             <div className="p-3 rounded-2xl bg-indigo-50/60 border border-indigo-100 text-xs italic text-indigo-900">
