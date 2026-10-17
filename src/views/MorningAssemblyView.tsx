@@ -49,6 +49,7 @@ import { getBangkokNow, getBangkokTodayString } from '../utils/timetableDateUtil
 import { classroomService, getLocalClassrooms } from '../services/classroomService';
 import type { ClassroomRosterItem } from '../types/viewModels';
 import { authService } from '../services/authService';
+import { getSchoolSettings } from '../config/schoolRoles';
 
 export interface MorningAssemblyViewProps {
   onDeepNavigate?: (payload: CrossViewNavigationPayload) => void;
@@ -230,7 +231,7 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
               ...r,
               status: newStatus,
               isOverridden: true,
-              overrideBy: 'ครูปัญจพล เกษรัตน์',
+              overrideBy: authService.getCurrentUser()?.name || 'ครูที่ปรึกษา',
               overrideReason: `ครูปรับสถานะเป็น ${newStatus}`,
               markedAt: new Date().toISOString(),
             }
@@ -1129,36 +1130,46 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
               <span className="text-base font-black text-blue-700">14 วัน</span>
             </div>
 
-            {/* Recent 5 Days Activity History */}
+            {/* Recent Attendance History from Real Records */}
             <div className="space-y-1.5 text-xs">
-              <div className="font-bold text-slate-700">ประวัติการเข้าแถวย้อนหลัง 5 วัน:</div>
-              {[
-                { date: '2 ต.ค. 2569 (วันนี้)', status: personalStatsStudent.status },
-                { date: '1 ต.ค. 2569', status: 'PRESENT' },
-                { date: '30 ก.ย. 2569', status: 'PRESENT' },
-                { date: '29 ก.ย. 2569', status: 'PRESENT' },
-                { date: '26 ก.ย. 2569', status: 'PRESENT' },
-              ].map((h, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100 text-[11px]"
-                >
-                  <span className="text-slate-600 font-medium">{h.date}</span>
-                  <span
-                    className={`font-bold px-2 py-0.5 rounded-md ${
-                      h.status === 'PRESENT'
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : h.status === 'LATE'
-                        ? 'bg-amber-100 text-amber-700'
-                        : h.status === 'LEAVE'
-                        ? 'bg-purple-100 text-purple-700'
-                        : 'bg-rose-100 text-rose-700'
-                    }`}
+              <div className="font-bold text-slate-700">ประวัติการเข้าแถวย้อนหลัง:</div>
+              {(() => {
+                const history = attendanceCorrelationService
+                  .getAllMorningRecords()
+                  .filter((r) => r.studentCode === personalStatsStudent.studentCode && !r.id.startsWith('t-m'))
+                  .sort((a, b) => b.date.localeCompare(a.date))
+                  .slice(0, 5);
+
+                if (history.length === 0) {
+                  return (
+                    <div className="p-3 text-center text-slate-400 bg-slate-50 rounded-xl border border-slate-100 text-[11px]">
+                      ยังไม่มีประวัติการเช็คชื่อย้อนหลัง
+                    </div>
+                  );
+                }
+
+                return history.map((h, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100 text-[11px]"
                   >
-                    {h.status === 'PRESENT' ? '✓ มาทัน' : h.status === 'LATE' ? '⏰ สาย' : h.status === 'LEAVE' ? '📝 ลา' : '❌ ขาด'}
-                  </span>
-                </div>
-              ))}
+                    <span className="text-slate-600 font-medium">{h.date}</span>
+                    <span
+                      className={`font-bold px-2 py-0.5 rounded-md ${
+                        h.status === 'PRESENT'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : h.status === 'LATE'
+                          ? 'bg-amber-100 text-amber-700'
+                          : h.status === 'LEAVE'
+                          ? 'bg-purple-100 text-purple-700'
+                          : 'bg-rose-100 text-rose-700'
+                      }`}
+                    >
+                      {h.status === 'PRESENT' ? '✓ มาทัน' : h.status === 'LATE' ? '⏰ สาย' : h.status === 'LEAVE' ? '📝 ลา' : '❌ ขาด'}
+                    </span>
+                  </div>
+                ));
+              })()}
             </div>
 
             <div className="flex justify-end pt-2 border-t border-slate-100">
@@ -1186,7 +1197,7 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
                   สถิติเวลาเข้าแถวรวมทั้งภาคเรียน (ห้อง {selectedClassroomName})
                 </h3>
                 <p className="text-xs text-slate-500 font-medium">
-                  ภาคเรียนที่ 1/2569 • คำนวณร้อยละการเข้าร่วมกิจกรรมโฮมรูม
+                  {getSchoolSettings().academicTerm || 'ภาคเรียนที่ 1/2569'} • คำนวณร้อยละการเข้าร่วมกิจกรรมโฮมรูม
                 </p>
               </div>
               <button

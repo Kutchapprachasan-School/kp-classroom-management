@@ -21,13 +21,19 @@ import { sgsRosterAndSubmissionService } from '../services/sgsRosterAndSubmissio
 import { cleanSlateService } from '../services/cleanSlateService';
 import { validateGoogleDriveUrl, generateRecommendedFolderPath } from '../utils/googleDriveUtils';
 import type { StudentQuestItem, StudentLeaderboardEntry } from '../types/viewModels';
-import type { AuthUser } from '../services/authService';
+import { authService, type AuthUser } from '../services/authService';
+import { getSchoolSettings } from '../config/schoolRoles';
 
 interface StudentMissionsViewProps {
   currentUser?: AuthUser | null;
 }
 
-export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ currentUser }) => {
+export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ currentUser: propUser }) => {
+  const currentUser = propUser || authService.getCurrentUser();
+  const studentCode = currentUser?.studentCode || '45101';
+  const studentId = currentUser?.id || 'stu-1';
+  const schoolSettings = getSchoolSettings();
+  const academicYearTerm = schoolSettings.academicTerm || '1/2569';
   const isClean = cleanSlateService.isCleanSlateActive();
   const [quests, setQuests] = useState<StudentQuestItem[]>([]);
   const [leaderboard, setLeaderboard] = useState<StudentLeaderboardEntry[]>([]);
@@ -82,15 +88,15 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
 
     setIsSubmitting(true);
     try {
-      await gamificationService.submitQuest(selectedQuest.id, submitLink, 'stu-2');
+      await gamificationService.submitQuest(selectedQuest.id, submitLink, studentId);
 
       if (submissionType === 'GOOGLE_DRIVE') {
         sgsRosterAndSubmissionService.submitStudentWorkToR2({
-          assignmentId: 'asg-3',
-          studentCode: '45102',
+          assignmentId: selectedQuest.id || 'asg-3',
+          studentCode,
           workTitle: selectedQuest.title,
           externalLinkUrl: submitLink.trim(),
-          academicYearTerm: '1/2569',
+          academicYearTerm,
           originalSizeKb: 0,
           compressedSizeKb: 0,
         });
@@ -99,11 +105,11 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
         );
       } else if (submissionType === 'CANVA_VIDEO') {
         sgsRosterAndSubmissionService.submitStudentWorkToR2({
-          assignmentId: 'asg-3',
-          studentCode: '45102',
+          assignmentId: selectedQuest.id || 'asg-3',
+          studentCode,
           workTitle: selectedQuest.title,
           externalLinkUrl: submitLink.trim(),
-          academicYearTerm: '1/2569',
+          academicYearTerm,
           originalSizeKb: 0,
           compressedSizeKb: 0,
         });
@@ -112,13 +118,13 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
         );
       } else {
         sgsRosterAndSubmissionService.submitStudentWorkToR2({
-          assignmentId: 'asg-3',
-          studentCode: '45102',
+          assignmentId: selectedQuest.id || 'asg-3',
+          studentCode,
           workTitle: selectedQuest.title,
-          fileName: selectedFileName || 'student_work_45102.jpg',
+          fileName: selectedFileName || `student_work_${studentCode}.jpg`,
           originalSizeKb: 4250,
           compressedSizeKb: 148,
-          academicYearTerm: '1/2569',
+          academicYearTerm,
         });
         setToastMsg(
           `☁️ อัปโหลด "${selectedFileName.replace(/\.(jpg|jpeg|png)$/i, '.webp')}" (บีบอัดเหลือ 148 KB) เข้า Cloudflare R2 สำเร็จ! (+${selectedQuest.xpReward} XP)`

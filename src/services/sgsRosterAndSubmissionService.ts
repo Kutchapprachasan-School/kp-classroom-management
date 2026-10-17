@@ -85,129 +85,7 @@ const STORAGE_KEY_WORK_SUBMISSIONS = 'kp_work_submissions_v2';
 const STORAGE_KEY_ROSTER_SYNC_META = 'kp_sgs_roster_sync_meta_v1';
 
 // เรียงตามมาตรฐานทะเบียนโรงเรียนไทย: นักเรียนชาย (เลขที่ 1-5) -> นักเรียนหญิง (เลขที่ 6-8)
-// เมื่อ ด.ช. ณัฐวุฒิ ย้ายเข้าใหม่กลางเทอม จึงแทรกต่อท้ายกลุ่มผู้ชายที่ "เลขที่ 5" (ไม่ได้ไปอยู่เลขที่ 8 ท้ายสุด)
-const INITIAL_SGS_ROSTER: SgsStudentRecord[] = [
-  {
-    sgsSeatNo: 1,
-    studentCode: '45101',
-    studentName: 'ด.ช. กฤษณะ ศรีสมบูรณ์',
-    gender: 'MALE',
-    classroom: 'ม.3/1',
-    transferState: 'ACTIVE',
-    attendancePercent: 0,
-    morningStatusLabel: '',
-    midtermScore: '' as any,
-    finalScore: '' as any,
-  },
-  {
-    sgsSeatNo: 2,
-    studentCode: '45102',
-    studentName: 'ด.ช. ทัตธน คำฝั้น',
-    gender: 'MALE',
-    classroom: 'ม.3/1',
-    transferState: 'ACTIVE',
-    attendancePercent: 0,
-    morningStatusLabel: '',
-    midtermScore: '' as any,
-    finalScore: '' as any,
-  },
-  {
-    sgsSeatNo: 3,
-    studentCode: '45103',
-    studentName: 'ด.ญ. ชนากานต์ สิทธิชัย',
-    gender: 'FEMALE',
-    classroom: 'ม.3/1',
-    transferState: 'ACTIVE',
-    attendancePercent: 0,
-    morningStatusLabel: '',
-    midtermScore: '' as any,
-    finalScore: '' as any,
-  },
-  {
-    sgsSeatNo: 4,
-    studentCode: '45104',
-    studentName: 'ด.ญ. ธันยพร เจริญสุข',
-    gender: 'FEMALE',
-    classroom: 'ม.3/1',
-    transferState: 'ACTIVE',
-    attendancePercent: 0,
-    morningStatusLabel: '',
-    midtermScore: '' as any,
-    finalScore: '' as any,
-  },
-  {
-    sgsSeatNo: 5,
-    studentCode: '45105',
-    studentName: 'ด.ญ. กมลชนก เลิศวิไล',
-    gender: 'FEMALE',
-    classroom: 'ม.3/1',
-    transferState: 'ACTIVE',
-    attendancePercent: 0,
-    morningStatusLabel: '',
-    midtermScore: '' as any,
-    finalScore: '' as any,
-  },
-  {
-    sgsSeatNo: 6,
-    studentCode: '45106',
-    studentName: 'ด.ช. ภานุวัฒน์ วงศ์ษา',
-    gender: 'MALE',
-    classroom: 'ม.3/1',
-    transferState: 'ACTIVE',
-    attendancePercent: 0,
-    morningStatusLabel: '',
-    midtermScore: '' as any,
-    finalScore: '' as any,
-  },
-  {
-    sgsSeatNo: 7,
-    studentCode: '45107',
-    studentName: 'ด.ช. อภิสิทธิ์ แก้วคำ',
-    gender: 'MALE',
-    classroom: 'ม.3/1',
-    transferState: 'ACTIVE',
-    attendancePercent: 0,
-    morningStatusLabel: '',
-    midtermScore: '' as any,
-    finalScore: '' as any,
-  },
-  {
-    sgsSeatNo: 8,
-    studentCode: '45108',
-    studentName: 'ด.ญ. สุพรรษา พัฒนกุล',
-    gender: 'FEMALE',
-    classroom: 'ม.3/1',
-    transferState: 'ACTIVE',
-    attendancePercent: 0,
-    morningStatusLabel: '',
-    midtermScore: '' as any,
-    finalScore: '' as any,
-  },
-  {
-    sgsSeatNo: 9,
-    studentCode: '45109',
-    studentName: 'ด.ช. ณัฐวุฒิ สายทอง',
-    gender: 'MALE',
-    classroom: 'ม.3/1',
-    transferState: 'ACTIVE',
-    attendancePercent: 0,
-    morningStatusLabel: '',
-    midtermScore: '' as any,
-    finalScore: '' as any,
-  },
-  {
-    sgsSeatNo: 10,
-    studentCode: '45110',
-    studentName: 'ด.ช. ธนพล มณีโชติ',
-    gender: 'MALE',
-    classroom: 'ม.3/1',
-    transferState: 'ACTIVE',
-    attendancePercent: 0,
-    morningStatusLabel: '',
-    midtermScore: '' as any,
-    finalScore: '' as any,
-  },
-];
+const INITIAL_SGS_ROSTER: SgsStudentRecord[] = [];
 
 export const INITIAL_TERM_ASSIGNMENTS: TermAssignmentItem[] = [];
 
@@ -230,11 +108,8 @@ export const sgsRosterAndSubmissionService = {
 
       const targetRoom = classroomId || 'room-3-1';
       const formatted = formatClassroomLabel(targetRoom);
-      if (targetRoom === 'room-3-1' || formatted === 'ม.3/1') {
-        return INITIAL_SGS_ROSTER;
-      }
 
-      // Fallback: ดึงรายชื่อนักเรียนจาก studentService เพื่อให้นักเรียนในห้องเรียนต่างๆ ปรากฏใน ปพ.5 เสมอ
+      // ดึงรายชื่อนักเรียนจาก studentService เพื่อให้นักเรียนในห้องเรียนต่างๆ ปรากฏใน ปพ.5 เสมอ
       const students = studentService.getStudents(targetRoom);
       if (students && students.length > 0) {
         return students.map((stu, idx) => ({
@@ -251,9 +126,9 @@ export const sgsRosterAndSubmissionService = {
         }));
       }
 
-      return INITIAL_SGS_ROSTER;
+      return [];
     } catch {
-      return INITIAL_SGS_ROSTER;
+      return [];
     }
   },
 

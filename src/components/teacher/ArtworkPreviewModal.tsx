@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Sparkles,
 } from 'lucide-react';
+import { getSchoolSettings } from '../../config/schoolRoles';
 
 export interface ArtworkPreviewModalProps {
   isOpen: boolean;
@@ -401,7 +402,7 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                         กลุ่มสาระการเรียนรู้ศิลปะ (ศ23101)
                       </span>
                       <span className="text-[11px] text-slate-400">
-                        โรงเรียนกุดจับประชาสรรค์ จ.อุดรธานี
+                        {getSchoolSettings().nameTh}
                       </span>
                     </div>
                   </div>

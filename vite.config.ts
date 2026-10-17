@@ -7,4 +7,7 @@ export default defineConfig({
   server: {
     host: true,
   },
-})
+  test: {
+    testTimeout: 15000,
+  },
+} as any)

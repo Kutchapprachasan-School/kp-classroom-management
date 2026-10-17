@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Check, CheckCircle2 } from 'lucide-react';
+import { studentService } from '../../services/studentService';
 
 export type RollCallStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'SICK_LEAVE';
 
@@ -9,64 +10,7 @@ export interface RollCallStudentItem {
   fullName: string;
 }
 
-export const KUTCHAP_CLASS_ROSTERS: Record<string, RollCallStudentItem[]> = {
-  'ม.2/1': [
-    { no: 1, studentId: '21001', fullName: 'เด็กชายกันต์ริศย์ ทวีเศรษฐกร' },
-    { no: 2, studentId: '21002', fullName: 'เด็กชายกิตติรัตน์ แสนสะกุล' },
-    { no: 3, studentId: '21003', fullName: 'เด็กชายชนกานต์ ดอนหนองบัว' },
-    { no: 4, studentId: '21004', fullName: 'เด็กชายชนาภัทร ครุฑนิตย์' },
-    { no: 5, studentId: '21005', fullName: 'เด็กชายธนภัทร ไชยชนะ' },
-    { no: 6, studentId: '21006', fullName: 'เด็กชายธนวัฒน์ ฐานะ' },
-    { no: 7, studentId: '21007', fullName: 'เด็กชายธีรธร ไชยวงษา' },
-    { no: 8, studentId: '21008', fullName: 'เด็กชายปกรณ์ นาจรูญ' },
-    { no: 9, studentId: '21009', fullName: 'เด็กชายปรมินทร์ ลีกุล' },
-    { no: 10, studentId: '21010', fullName: 'เด็กชายพิชิต ประทุมลัย' },
-    { no: 11, studentId: '21011', fullName: 'เด็กชายพิธิวัฒน์ ประหยัดทรัพย์' },
-    { no: 12, studentId: '21012', fullName: 'เด็กชายภัคพงษ์ อดทน' },
-    { no: 13, studentId: '21013', fullName: 'เด็กชายภัทรพงษ์ สำแดงชัย' },
-    { no: 14, studentId: '21014', fullName: 'เด็กชายอัมรินทร์ ไชยนาน' },
-    { no: 15, studentId: '21015', fullName: 'เด็กหญิงกัญญาภัค แก้วสว่าง' },
-    { no: 16, studentId: '21016', fullName: 'เด็กหญิงจุฑามาศ มูลทอง' },
-    { no: 17, studentId: '21017', fullName: 'เด็กหญิงณัฐกานต์ ชินละวงษ์' },
-    { no: 18, studentId: '21018', fullName: 'เด็กหญิงธัญญารัตน์ ศรีสุวรรณ' },
-    { no: 19, studentId: '21019', fullName: 'เด็กหญิงนภัสสร พรมมา' },
-    { no: 20, studentId: '21020', fullName: 'เด็กหญิงปภาวรินท์ วงศ์ชมภู' },
-  ],
-  'ม.3/1': [
-    { no: 1, studentId: '45101', fullName: 'เด็กชายกฤษณะ ศรีสมบูรณ์' },
-    { no: 2, studentId: '45102', fullName: 'เด็กชายจิรายุ เดชปันคำ' },
-    { no: 3, studentId: '45103', fullName: 'เด็กชายชญานนท์ วงศ์สุวรรณ' },
-    { no: 4, studentId: '45104', fullName: 'เด็กชายณัฐพงศ์ พรมราช' },
-    { no: 5, studentId: '45105', fullName: 'เด็กชายธนกร พลเยี่ยม' },
-    { no: 6, studentId: '45106', fullName: 'เด็กชายธีรภัทร โคตรสมบัติ' },
-    { no: 7, studentId: '45107', fullName: 'เด็กชายนพดล แสนทวีสุข' },
-    { no: 8, studentId: '45108', fullName: 'เด็กชายปิยะพงษ์ จันทร์เพ็ญ' },
-    { no: 9, studentId: '45109', fullName: 'เด็กชายพงศกร แก้วมณี' },
-    { no: 10, studentId: '45110', fullName: 'เด็กชายภัทรพล ศรีบุญเรือง' },
-    { no: 11, studentId: '45111', fullName: 'เด็กชายศุภณัฐ อินทร์แปลง' },
-    { no: 12, studentId: '45112', fullName: 'เด็กชายสิรวิชญ์ ทองคำ' },
-    { no: 13, studentId: '45113', fullName: 'เด็กชายอนุชา บุญมา' },
-    { no: 14, studentId: '45114', fullName: 'เด็กชายอิทธิพล คำจันทร์' },
-    { no: 15, studentId: '45115', fullName: 'เด็กชายทัตธน คำฝั้น' },
-    { no: 16, studentId: '45116', fullName: 'เด็กหญิงกมลชนก สุขสวัสดิ์' },
-    { no: 17, studentId: '45117', fullName: 'เด็กหญิงขวัญข้าว พิมพ์เสน' },
-    { no: 18, studentId: '45118', fullName: 'เด็กหญิงชลธิชา วงศ์คำ' },
-    { no: 19, studentId: '45119', fullName: 'เด็กหญิงณัฐธิดา แสงทอง' },
-    { no: 20, studentId: '45120', fullName: 'เด็กหญิงปนัดดา ศรีวิไล' },
-  ],
-  'ม.1/8': [
-    { no: 1, studentId: '18001', fullName: 'เด็กชายกิตติภพ นามวงศ์' },
-    { no: 2, studentId: '18002', fullName: 'เด็กชายเจษฎา โพธิ์ศรี' },
-    { no: 3, studentId: '18003', fullName: 'เด็กชายชานนท์ ศรีอุดร' },
-    { no: 4, studentId: '18004', fullName: 'เด็กชายณัฐวุฒิ คำสิงห์' },
-    { no: 5, studentId: '18005', fullName: 'เด็กชายธนดล บุญช่วย' },
-    { no: 6, studentId: '18006', fullName: 'เด็กหญิงกัญญารัตน์ ใจดี' },
-    { no: 7, studentId: '18007', fullName: 'เด็กหญิงจิราพร วงศ์ษา' },
-    { no: 8, studentId: '18008', fullName: 'เด็กหญิงชนากานต์ ทองดี' },
-    { no: 9, studentId: '18009', fullName: 'เด็กหญิงณิชาภัทร แสนสุข' },
-    { no: 10, studentId: '18010', fullName: 'เด็กหญิงธัญชนก พลศรี' },
-  ],
-};
+export const KUTCHAP_CLASS_ROSTERS: Record<string, RollCallStudentItem[]> = {};
 
 interface MobileVerticalAttendanceSheetProps {
   defaultRoom?: string;
@@ -94,21 +38,32 @@ export const MobileVerticalAttendanceSheet: React.FC<
   onSaveSuccess,
 }) => {
   const [selectedRoom, setSelectedRoom] = useState<string>(defaultRoom);
-  const students = useMemo(
-    () => KUTCHAP_CLASS_ROSTERS[selectedRoom] || KUTCHAP_CLASS_ROSTERS['ม.2/1'],
-    [selectedRoom]
-  );
+  const students = useMemo<RollCallStudentItem[]>(() => {
+    const list = studentService.getStudents(selectedRoom);
+    return list.map((s, idx) => ({
+      no: s.no || idx + 1,
+      studentId: s.code || s.id,
+      fullName: s.name,
+    }));
+  }, [selectedRoom]);
 
   // สถานะรายคน
-  const [statusMap, setStatusMap] = useState<Record<string, RollCallStatus>>(() => {
-    const init: Record<string, RollCallStatus> = {};
-    Object.values(KUTCHAP_CLASS_ROSTERS)
-      .flat()
-      .forEach((s) => {
-        init[s.studentId] = defaultStatus;
+  const [statusMap, setStatusMap] = useState<Record<string, RollCallStatus>>({});
+
+  useEffect(() => {
+    if (students.length === 0) return;
+    setStatusMap((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      students.forEach((s) => {
+        if (!next[s.studentId]) {
+          next[s.studentId] = defaultStatus;
+          changed = true;
+        }
       });
-    return init;
-  });
+      return changed ? next : prev;
+    });
+  }, [students, defaultStatus]);
 
   const [savedToast, setSavedToast] = useState<string | null>(null);
 

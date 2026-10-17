@@ -29,64 +29,7 @@ interface TeacherMobileGradingListScreenProps {
   onSelectAssignment?: (assignment: MobileGradingAssignmentItem) => void;
 }
 
-export const INITIAL_MOBILE_ASSIGNMENTS: MobileGradingAssignmentItem[] = [
-  {
-    id: 'asg-m31',
-    classroom: 'ม.3/1',
-    subjectCode: 'ญ31201',
-    subjectName: 'ภาษาญี่ปุ่น',
-    unitTitle: 'หน่วยที่ 5: ศิลปะร่วมสมัยไทย (กิจกรรมสีฟ้า)',
-    status: 'PENDING',
-    statusLabel: 'ยังไม่ตรวจ',
-    statusClass: 'text-rose-500 bg-rose-50 border-rose-200',
-    submittedCount: 8,
-    totalCount: 20,
-    iconBgClass: 'bg-blue-100 text-blue-700',
-    iconSymbol: 'あ',
-  },
-  {
-    id: 'asg-m32',
-    classroom: 'ม.3/2',
-    subjectCode: 'ญ33201',
-    subjectName: 'ภาษาญี่ปุ่น',
-    unitTitle: 'หน่วยที่ 2: อาหารญี่ปุ่น',
-    status: 'PENDING',
-    statusLabel: 'ยังไม่ตรวจ',
-    statusClass: 'text-rose-500 bg-rose-50 border-rose-200',
-    submittedCount: 14,
-    totalCount: 20,
-    iconBgClass: 'bg-purple-100 text-purple-700',
-    iconSymbol: 'あ',
-  },
-  {
-    id: 'asg-m61',
-    classroom: 'ม.6/1',
-    subjectCode: 'ญ21202',
-    subjectName: 'ภาษาญี่ปุ่นพื้นฐาน',
-    unitTitle: 'บทที่ 1: การแนะนำตัวเอง',
-    status: 'DONE',
-    statusLabel: 'ตรวจแล้ว',
-    statusClass: 'text-emerald-600 bg-emerald-50 border-emerald-200',
-    submittedCount: 20,
-    totalCount: 20,
-    iconBgClass: 'bg-emerald-100 text-emerald-700',
-    iconSymbol: 'あ',
-  },
-  {
-    id: 'asg-m11',
-    classroom: 'ม.1/1',
-    subjectCode: 'ญ22201',
-    subjectName: 'ภาษาญี่ปุ่นพื้นฐาน',
-    unitTitle: 'บทที่ 3: ตัวเลข 0-100',
-    status: 'AWAITING_GRADE',
-    statusLabel: 'รอส่งคะแนน',
-    statusClass: 'text-amber-600 bg-amber-50 border-amber-200',
-    submittedCount: 18,
-    totalCount: 22,
-    iconBgClass: 'bg-amber-100 text-amber-700',
-    iconSymbol: 'あ',
-  },
-];
+export const INITIAL_MOBILE_ASSIGNMENTS: MobileGradingAssignmentItem[] = [];
 
 export const TeacherMobileGradingListScreen: React.FC<
   TeacherMobileGradingListScreenProps

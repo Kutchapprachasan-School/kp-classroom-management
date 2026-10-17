@@ -14,6 +14,8 @@ import { teacherCopilotService } from '../services/teacherCopilotService';
 import { cleanSlateService } from '../services/cleanSlateService';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 
+import { studentService } from '../services/studentService';
+
 interface ReadinessTask {
   id: string;
   title: string;
@@ -53,15 +55,15 @@ const INITIAL_READINESS_TASKS: ReadinessTask[] = [
   },
 ];
 
-const INITIAL_READINESS_STUDENTS = [
-  { no: 1, name: 'สุภคม -', score: '' },
-  { no: 2, name: 'ด.ช. ทัตธน คำฝั้น', score: '3' },
-  { no: 3, name: 'ด.ช. ทานต์ธีรา -', score: '' },
-  { no: 4, name: 'ด.ช. จตุภัทร โนแก้ว', score: '3' },
-  { no: 5, name: 'ด.ช. จิรโชติ มะนาว', score: '2' },
-  { no: 6, name: 'ด.ช. เด่นภูมิ แจ้งประเสริฐ', score: '3' },
-  { no: 7, name: 'ด.ช. ธนภัทร เขอหมือ', score: '' },
-];
+const getInitialReadinessStudents = (resolved: boolean) => {
+  if (cleanSlateService.isCleanSlateActive()) return [];
+  const real = studentService.getStudents('room-3-1');
+  return real.map((s, idx) => ({
+    no: s.no || idx + 1,
+    name: s.name,
+    score: resolved ? '3' : '',
+  }));
+};
 
 interface EndTermReadinessViewProps {
   onNavigateToAssignments?: () => void;
@@ -83,13 +85,7 @@ export const EndTermReadinessView: React.FC<EndTermReadinessViewProps> = ({
   });
 
   const [studentsList, setStudentsList] = useState(() => {
-    if (cleanSlateService.isCleanSlateActive()) return [];
-    return isSgsResolvedInCopilot()
-      ? INITIAL_READINESS_STUDENTS.map((s) => ({
-          ...s,
-          score: s.score === '' ? '3' : s.score,
-        }))
-      : INITIAL_READINESS_STUDENTS;
+    return getInitialReadinessStudents(isSgsResolvedInCopilot());
   });
 
   useEffect(() => {
@@ -105,14 +101,7 @@ export const EndTermReadinessView: React.FC<EndTermReadinessViewProps> = ({
           ? INITIAL_READINESS_TASKS.map((t) => ({ ...t, emptyCount: 0 }))
           : INITIAL_READINESS_TASKS
       );
-      setStudentsList(
-        resolved
-          ? INITIAL_READINESS_STUDENTS.map((s) => ({
-              ...s,
-              score: s.score === '' ? '3' : s.score,
-            }))
-          : INITIAL_READINESS_STUDENTS
-      );
+      setStudentsList(getInitialReadinessStudents(resolved));
     };
     window.addEventListener('kp-copilot-updated', handler);
     return () => window.removeEventListener('kp-copilot-updated', handler);

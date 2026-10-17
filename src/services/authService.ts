@@ -260,31 +260,6 @@ export const authService = {
       return user;
     }
 
-    // Fallback สำหรับกรณี mock code ที่ไม่ได้อยู่ใน roster
-    const nameMap: Record<string, string> = {
-      '45101': 'ด.ช. กฤษณะ ศรีสมบูรณ์',
-      '45102': 'ด.ช. ธีรานุ เดชปันคำ',
-      '45107': 'ด.ช. ภูรินท์ บัณฑิต',
-      '45110': 'ด.ช. อัศวิน วนเกษตรกุล',
-      '45115': 'ด.ช. ทัตธน คำฝั้น',
-      '45123': 'ด.ญ. ปริยาภรณ์ ชัยแก้ว',
-    };
-
-    if (nameMap[trimmedCode]) {
-      const studentName = nameMap[trimmedCode];
-      const user: AuthUser = {
-        id: `stu-${trimmedCode}`,
-        name: studentName,
-        studentCode: trimmedCode,
-        role: 'STUDENT',
-        classroomId: 'room-1-1',
-      };
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(user));
-      }
-      return user;
-    }
-
     throw new Error(`ไม่พบข้อมูลนักเรียนรหัส ${trimmedCode} ในระบบ กรุณาตรวจสอบรหัสประจำตัว หรือติดต่อคุณครูผู้สอน`);
   },
 

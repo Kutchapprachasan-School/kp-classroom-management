@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 import { coursesCurriculumService, type CourseCurriculumRecord } from '../services/coursesCurriculumService';
+import { getSchoolSettings } from '../config/schoolRoles';
 
 // ==========================================
 // DATA TYPES
@@ -108,7 +109,7 @@ export const LessonPlansView: React.FC = () => {
   });
   const [selectedCourseIndex, setSelectedCourseIndex] = useState(0);
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
-  const [selectedSemester, setSelectedSemester] = useState('ภาคเรียนที่ 1/2569');
+  const [selectedSemester, setSelectedSemester] = useState(() => getSchoolSettings().academicTerm || 'ภาคเรียนที่ 1/2569');
   const [isSemesterDropdownOpen, setIsSemesterDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 

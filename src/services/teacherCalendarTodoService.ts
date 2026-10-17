@@ -289,62 +289,29 @@ export const teacherCalendarTodoService = {
         ];
       } else if (isCurrentYearMonth && d < todayDateNum) {
         // Past school days
-        const isResolved = st.resolvedMissedDates.includes(dateString);
-        // Let's create an intentional missed day on 6th of October to demonstrate accountability
-        if (d === 6 && !isResolved) {
-          status = 'MISSED';
-          tasks = [
-            {
-              id: 't-past-6-1',
-              time: '07:45',
-              title: 'เช็คชื่อแถวเช้า ม.3/1',
-              classroom: 'ม.3/1',
-              subjectCode: 'แถวเช้า',
-              status: 'DONE',
-              statusLabel: 'บันทึกเรียบร้อย (มา 39 ขาด 1)',
-              targetPayload: { view: 'student-affairs', affairsSubTab: 'ASSEMBLY' },
-            },
-            {
-              id: 't-past-6-2',
-              time: '10:20',
-              title: 'เช็คชื่อคาบ 3 วิชา ศ23101 ม.3/1',
-              classroom: 'ม.3/1',
-              subjectCode: 'ศ23101',
-              status: 'MISSED',
-              statusLabel: '⚠️ ยังไม่ได้บันทึกการสอน/เช็คชื่อ',
-              note: 'คาบนี้ยังไม่มีข้อมูลบันทึกในสมุด ปพ.5',
-              targetPayload: {
-                view: 'class-overview',
-                classSubTab: 'attendance',
-                highlightBanner: 'บันทึกเช็คชื่อย้อนหลัง: 6 ต.ค. คาบ 3 (ศ23101 ม.3/1)',
-              },
-            },
-          ];
-        } else {
-          status = 'COMPLETED';
-          tasks = [
-            {
-              id: `t-past-${d}-1`,
-              time: '07:45',
-              title: 'เช็คแถวเช้า ม.3/1',
-              classroom: 'ม.3/1',
-              subjectCode: 'แถวเช้า',
-              status: 'DONE',
-              statusLabel: 'บันทึกเรียบร้อย',
-              targetPayload: { view: 'student-affairs', affairsSubTab: 'ASSEMBLY' },
-            },
-            {
-              id: `t-past-${d}-2`,
-              time: '09:20',
-              title: 'เช็คชื่อคาบสอน & ลงคะแนน',
-              classroom: 'ม.3/1',
-              subjectCode: 'ศ23101',
-              status: 'DONE',
-              statusLabel: 'บันทึกครบถ้วน',
-              targetPayload: { view: 'class-overview', classSubTab: 'attendance' },
-            },
-          ];
-        }
+        status = 'COMPLETED';
+        tasks = [
+          {
+            id: `t-past-${d}-1`,
+            time: '07:45',
+            title: 'เช็คแถวเช้า ม.3/1',
+            classroom: 'ม.3/1',
+            subjectCode: 'แถวเช้า',
+            status: 'DONE',
+            statusLabel: 'บันทึกเรียบร้อย',
+            targetPayload: { view: 'student-affairs', affairsSubTab: 'ASSEMBLY' },
+          },
+          {
+            id: `t-past-${d}-2`,
+            time: '09:20',
+            title: 'เช็คชื่อคาบสอน & ลงคะแนน',
+            classroom: 'ม.3/1',
+            subjectCode: 'ศ23101',
+            status: 'DONE',
+            statusLabel: 'บันทึกครบถ้วน',
+            targetPayload: { view: 'class-overview', classSubTab: 'attendance' },
+          },
+        ];
       } else {
         // Future days
         status = 'EMPTY';

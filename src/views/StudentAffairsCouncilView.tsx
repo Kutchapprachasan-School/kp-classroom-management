@@ -24,6 +24,8 @@ import {
 import { MobileVerticalAttendanceSheet } from '../components/teacher/MobileVerticalAttendanceSheet';
 import { PaperRegisterLedger } from '../components/teacher/PaperRegisterLedger';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
+import { studentService, type StudentRecord } from '../services/studentService';
+import { authService } from '../services/authService';
 
 interface StudentAffairsCouncilViewProps {
   initialSection?: 'AFFAIRS' | 'COUNCIL';
@@ -74,11 +76,22 @@ export const StudentAffairsCouncilView: React.FC<
       : leaveRequests.filter((l) => l.classroom === selectedLeaveRoom);
 
   // Form state for adding discipline point
-  const [newDiscStudent, setNewDiscStudent] = useState('ด.ช. ทัตธน คำฝั้น');
+  const [availableStudents, setAvailableStudents] = useState<StudentRecord[]>(() =>
+    studentService.getStudents('room-3-1')
+  );
+  const [newDiscStudent, setNewDiscStudent] = useState('');
   const [newDiscType, setNewDiscType] = useState<'BONUS' | 'DEDUCT'>('BONUS');
   const [newDiscPoints, setNewDiscPoints] = useState(5);
   const [newDiscReason, setNewDiscReason] = useState('');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    const list = studentService.getStudents('room-3-1');
+    setAvailableStudents(list);
+    if (list.length > 0 && !newDiscStudent) {
+      setNewDiscStudent(list[0].name);
+    }
+  }, []);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -88,14 +101,17 @@ export const StudentAffairsCouncilView: React.FC<
   const handleAddDiscipline = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDiscReason.trim()) return;
+    const stu = availableStudents.find((s) => s.name === newDiscStudent) || availableStudents[0];
+    if (!stu) return;
+
     const updated = studentAffairsCouncilService.addDisciplineLog({
-      studentCode: newDiscStudent.includes('ทัตธน') ? '45102' : '45105',
-      studentName: newDiscStudent,
-      classroom: 'ม.3/1',
+      studentCode: stu.code || stu.id,
+      studentName: stu.name,
+      classroom: stu.classroomId || 'ม.3/1',
       type: newDiscType,
       points: Number(newDiscPoints),
       reason: newDiscReason.trim(),
-      reporter: 'อ.ภาสภูมิ เรืองปราชญ์',
+      reporter: authService.getCurrentUser()?.name || 'ครูกิจการนักเรียน',
       parentNotified: true,
     });
     setDisciplineLogs(updated);
@@ -366,15 +382,15 @@ export const StudentAffairsCouncilView: React.FC<
                       onChange={(e) => setNewDiscStudent(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white"
                     >
-                      <option value="ด.ช. ทัตธน คำฝั้น">
-                        ด.ช. ทัตธน คำฝั้น (ม.3/1)
-                      </option>
-                      <option value="ด.ญ. กมลชนก เลิศวิไล">
-                        ด.ญ. กมลชนก เลิศวิไล (ม.3/1)
-                      </option>
-                      <option value="ด.ช. ณัฐวุฒิ สายทอง">
-                        ด.ช. ณัฐวุฒิ สายทอง (ม.3/1)
-                      </option>
+                      {availableStudents.length === 0 ? (
+                        <option value="">ไม่มีนักเรียนในห้องนี้</option>
+                      ) : (
+                        availableStudents.map((s) => (
+                          <option key={s.id} value={s.name}>
+                            {s.name} ({s.code || s.id})
+                          </option>
+                        ))
+                      )}
                     </select>
                   </div>
 

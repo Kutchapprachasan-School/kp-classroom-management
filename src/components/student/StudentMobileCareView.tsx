@@ -960,9 +960,9 @@ export const StudentMobileCareView: React.FC<StudentMobileCareViewProps> = ({
                     แจ้งเตือนพฤติกรรมเสี่ยง
                   </h4>
                   <p className="text-[11px] text-slate-600">
-                    ด.ช. กฤษณะ ศรีสมบูรณ์ ขาดเรียนติดต่อกัน 3 วัน
+                    ไม่มีการแจ้งเตือนพฤติกรรมเสี่ยง ข้อมูลการเข้าเรียนอยู่ในเกณฑ์ปกติ
                   </p>
-                  <span className="text-[10px] text-slate-400 block pt-0.5">2 ชม. ที่แล้ว</span>
+                  <span className="text-[10px] text-slate-400 block pt-0.5">ล่าสุดวันนี้</span>
                 </div>
               </div>
 
@@ -976,9 +976,9 @@ export const StudentMobileCareView: React.FC<StudentMobileCareViewProps> = ({
                     กิจกรรมโรงเรียน
                   </h4>
                   <p className="text-[11px] text-slate-600">
-                    เชิญร่วมกิจกรรมวันแม่แห่งชาติ ณ หอประชุมโรงเรียน
+                    ติดตามปฏิทินกิจกรรมและการเข้าแถวประจำสัปดาห์
                   </p>
-                  <span className="text-[10px] text-slate-400 block pt-0.5">5 ชม. ที่แล้ว</span>
+                  <span className="text-[10px] text-slate-400 block pt-0.5">วันนี้</span>
                 </div>
               </div>
 
@@ -989,12 +989,12 @@ export const StudentMobileCareView: React.FC<StudentMobileCareViewProps> = ({
                 </div>
                 <div className="space-y-0.5 flex-1 min-w-0">
                   <h4 className="text-xs font-bold text-slate-900">
-                    ได้รับรางวัล
+                    เหรียญตรา & รางวัล
                   </h4>
                   <p className="text-[11px] text-slate-600">
-                    ด.ญ. ปรียากานต์ ได้รับเหรียญตรา &ldquo;ความมีน้ำใจ&rdquo;
+                    สะสมเหรียญตราและคะแนนความดีอย่างต่อเนื่อง
                   </p>
-                  <span className="text-[10px] text-slate-400 block pt-0.5">1 วันที่แล้ว</span>
+                  <span className="text-[10px] text-slate-400 block pt-0.5">สัปดาห์นี้</span>
                 </div>
               </div>
 

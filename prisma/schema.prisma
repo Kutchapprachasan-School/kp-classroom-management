@@ -234,3 +234,65 @@ model kps_cloud_store {
   data       Json?
   updated_at DateTime? @default(now()) @db.Timestamptz(6)
 }
+
+model StudentEnrollment {
+  id           String    @id
+  studentId    String
+  academicYear Int
+  term         Int
+  classRoomId  String
+  gradeLevel   Int
+  roomNumber   Int
+  rollNumber   Int
+  status       String    @default("ENROLLED")
+  advisorId    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([studentId])
+  @@index([classRoomId])
+  @@index([academicYear, term])
+}
+
+model PromotionBatch {
+  id             String               @id
+  idempotencyKey String               @unique
+  fromYear       Int
+  fromTerm       Int
+  toYear         Int
+  toTerm         Int
+  status         String               @default("COMMITTED")
+  executedBy     String
+  executedAt     DateTime             @default(now())
+  rollbackAt     DateTime?
+  rollbackBy     String?
+  rollbackReason String?
+  summary        Json?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  items          PromotionBatchItem[]
+
+  @@index([status])
+}
+
+model PromotionBatchItem {
+  id                   String         @id
+  batchId              String
+  studentId            String
+  studentCode          String?
+  previousEnrollmentId String?
+  previousClassroomId  String?
+  action               String
+  newEnrollmentId      String?
+  newClassroomId       String?
+  graduationApproved   Boolean?       @default(false)
+  graduationApprovedBy String?
+  graduationApprovedAt DateTime?
+  notes                String?
+  createdAt            DateTime       @default(now())
+  batch                PromotionBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([studentId])
+}
+

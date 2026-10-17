@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, QrCode } from 'lucide-react';
 import { qrAttendanceService } from '../../services/qrAttendanceService';
+import { getSchoolSettings } from '../../config/schoolRoles';
 
 export interface StudentIdCardModalProps {
   isOpen: boolean;
@@ -66,7 +67,7 @@ export const StudentIdCardModal: React.FC<StudentIdCardModalProps> = ({
             {/* School Header */}
             <div className="text-center">
               <p className="text-[10px] font-extrabold uppercase tracking-widest text-blue-600">
-                โรงเรียนกุดจับประชาสรรค์
+                {getSchoolSettings().nameTh}
               </p>
               <p className="text-[9px] text-slate-400 font-semibold">
                 STUDENT IDENTIFICATION BADGE

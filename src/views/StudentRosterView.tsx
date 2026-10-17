@@ -223,9 +223,9 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
     return () => window.removeEventListener(STUDENT_TRANSFERRED_EVENT, handleTransferred);
   }, [selectedClass?.id]);
 
-  // Map each student to attendance state: 'NORMAL' (มาเรียนปกติ) | 'ABSENT' (ขาดเรียน) | 'LEAVE' (ลาเรียน)
+  // Map each student to attendance state: 'NORMAL' (มาเรียนปกติ) | 'ABSENT' (ขาดเรียน) | 'LEAVE' (ลาเรียน) | 'UNCHECKED' (ยังไม่เช็คชื่อ)
   const studentAttendanceMap = useMemo(() => {
-    const map = new Map<string, 'NORMAL' | 'ABSENT' | 'LEAVE'>();
+    const map = new Map<string, 'NORMAL' | 'ABSENT' | 'LEAVE' | 'UNCHECKED'>();
     const today = new Date().toISOString().split('T')[0];
     const morningRecords = selectedClass?.id
       ? attendanceCorrelationService.getMorningRecordsByDateAndRoom(today, selectedClass.id)
@@ -235,12 +235,14 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
     students.forEach((s) => {
       const code = s.code || s.studentCode || '';
       const morningStatus = morningMap.get(code);
-      if (morningStatus === 'ABSENT' || s.status === 'AT_RISK') {
+      if (morningStatus === 'ABSENT' || (s.status === 'AT_RISK' && morningStatus)) {
         map.set(s.id, 'ABSENT');
       } else if (morningStatus === 'LEAVE') {
         map.set(s.id, 'LEAVE');
-      } else {
+      } else if (morningStatus === 'PRESENT' || morningStatus === 'LATE' || morningStatus === 'ACTIVITY') {
         map.set(s.id, 'NORMAL');
+      } else {
+        map.set(s.id, 'UNCHECKED');
       }
     });
     return map;
@@ -375,8 +377,8 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
           type: stu.status === 'AT_RISK' ? 'danger' : 'info',
         },
       ],
-      attendanceRatio: stu.attendance || '8/8',
-      totalScore: stu.score || 80,
+      attendanceRatio: stu.attendance || '0/0',
+      totalScore: stu.score || 0,
     };
     onSelectStudent?.(atRiskItem);
   };
@@ -1337,6 +1339,12 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
                           <span>ลาเรียน</span>
                         </span>
                       )}
+                      {attStatus === 'UNCHECKED' && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 text-slate-500 border border-slate-200 font-medium text-[11px]">
+                          <Clock className="w-3 h-3 text-slate-400" />
+                          <span>ยังไม่เช็คชื่อ</span>
+                        </span>
+                      )}
                     </td>
 
                     {/* การดำเนินการ: [👤 โปรไฟล์], [📊 ผลการเรียน], [⋯] */}
@@ -1493,6 +1501,12 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-bold text-xs">
                         <Clock className="w-3 h-3" />
                         <span>ลาเรียน</span>
+                      </span>
+                    )}
+                    {attStatus === 'UNCHECKED' && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-50 text-slate-500 border border-slate-200 font-medium text-xs">
+                        <Clock className="w-3 h-3 text-slate-400" />
+                        <span>ยังไม่เช็ค</span>
                       </span>
                     )}
                   </div>

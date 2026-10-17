@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Settings,
   ChevronLeft,
@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { JiuMeowMascot, AnimeStudentHero } from './JiuMeowMascot';
 import { ALL_BUDDIES, type GachaBuddy } from '../../services/gachaService';
+import { onlineQuizService } from '../../services/onlineQuizService';
 
 export type AnimeAppScreen =
   | 'home'
@@ -60,6 +61,7 @@ export const StudentAnimeAppView: React.FC<StudentAnimeAppViewProps> = ({
 
   // Exercise Sub-tabs
   const [exerciseTab, setExerciseTab] = useState<'EXERCISE' | 'QUIZ' | 'EXAM'>('EXERCISE');
+  const quizzes = useMemo(() => onlineQuizService.getAllQuizzes(), []);
 
   // Mission Sub-tabs
   const [missionTab, setMissionTab] = useState<'DAILY' | 'WEEKLY' | 'SPECIAL'>('DAILY');
@@ -324,12 +326,12 @@ export const StudentAnimeAppView: React.FC<StudentAnimeAppViewProps> = ({
             {/* Vertical Stepper Timeline */}
             <div className="space-y-2.5 flex-1 overflow-y-auto pr-1">
               {[
-                { title: 'เข้าแถวตอนเช้า', desc: '+25% ความอิ่มสัตว์เลี้ยง', status: 'DONE' },
-                { title: 'คาบที่ 1 : คณิตศาสตร์', desc: '+10 XP', status: 'DONE' },
-                { title: 'คาบที่ 2 : วิทยาศาสตร์', desc: '+10 XP', status: 'DONE' },
-                { title: 'คาบที่ 3 : ภาษาไทย', desc: 'กำลังเรียน', status: 'ACTIVE' },
-                { title: 'คาบที่ 4 : ภาษาอังกฤษ', desc: 'ยังไม่เข้าเรียน', status: 'LOCKED' },
-                { title: 'คาบที่ 5 : สังคมศึกษา', desc: 'ยังไม่เข้าเรียน', status: 'LOCKED' },
+                { title: 'เข้าแถวเคารพธงชาติ & โฮมรูม', desc: '+25% ความอิ่มสัตว์เลี้ยง', status: 'DONE' },
+                { title: 'คาบที่ 1 (ช่วงเช้า)', desc: '+10 XP', status: 'DONE' },
+                { title: 'คาบที่ 2 (ช่วงเช้า)', desc: '+10 XP', status: 'DONE' },
+                { title: 'คาบที่ 3 (ช่วงเช้า)', desc: 'กำลังเรียน', status: 'ACTIVE' },
+                { title: 'คาบที่ 4 (ช่วงบ่าย)', desc: 'ยังไม่ถึงเวลาเรียน', status: 'LOCKED' },
+                { title: 'คาบที่ 5 (ช่วงบ่าย)', desc: 'ยังไม่ถึงเวลาเรียน', status: 'LOCKED' },
               ].map((step, idx) => (
                 <div
                   key={idx}
@@ -462,38 +464,40 @@ export const StudentAnimeAppView: React.FC<StudentAnimeAppViewProps> = ({
 
             {/* Exercise List */}
             <div className="space-y-2 flex-1 overflow-y-auto pr-1">
-              {[
-                { title: 'แบบฝึกหัดที่ 1', desc: 'เรื่อง สมการเชิงเส้นตัวแปรเดียว', locked: false },
-                { title: 'แบบฝึกหัดที่ 2', desc: 'โจทย์ปัญหาเกี่ยวกับสมการเชิงเส้น', locked: false },
-                { title: 'แบบฝึกหัดที่ 3', desc: 'สมการเชิงเส้นสองตัวแปร', locked: true },
-              ].map((ex, i) => (
-                <div
-                  key={i}
-                  className="bg-white rounded-2xl p-3 border border-slate-200 shadow-2xs flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                    <div>
-                      <h4 className="text-xs font-black text-slate-900">{ex.title}</h4>
-                      <p className="text-[10px] text-slate-500 mt-0.5">{ex.desc}</p>
-                    </div>
-                  </div>
-
-                  {ex.locked ? (
-                    <div className="p-1.5 rounded-xl bg-slate-100 text-slate-400">
-                      <Lock className="w-3.5 h-3.5" />
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => showToast(`เริ่มทำ ${ex.title}`)}
-                      className="px-3.5 py-1.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-black text-[11px] shadow-2xs transition-transform active:scale-95"
-                    >
-                      เริ่มทำ
-                    </button>
-                  )}
+              {quizzes.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-100 font-medium">
+                  ยังไม่มีแบบฝึกหัดหรือควิซในขณะนี้
                 </div>
-              ))}
+              ) : (
+                quizzes.map((q, i) => (
+                  <div
+                    key={q.id || i}
+                    className="bg-white rounded-2xl p-3 border border-slate-200 shadow-2xs flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-2.5 h-2.5 rounded-full ${q.isOpen ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                      <div>
+                        <h4 className="text-xs font-black text-slate-900">{q.title}</h4>
+                        <p className="text-[10px] text-slate-500 mt-0.5">{q.subjectCode} • เต็ม {q.maxScore} คะแนน</p>
+                      </div>
+                    </div>
+
+                    {!q.isOpen ? (
+                      <div className="p-1.5 rounded-xl bg-slate-100 text-slate-400">
+                        <Lock className="w-3.5 h-3.5" />
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => showToast(`เริ่มทำ ${q.title}`)}
+                        className="px-3.5 py-1.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-black text-[11px] shadow-2xs transition-transform active:scale-95"
+                      >
+                        เริ่มทำ
+                      </button>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
 
             {/* Bottom Reward Banner */}

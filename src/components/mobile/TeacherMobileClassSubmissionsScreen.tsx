@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ArrowLeft,
 } from 'lucide-react';
 import type { TeacherViewKey } from '../layout/TeacherSidebar';
 import { cleanSlateService } from '../../services/cleanSlateService';
+import { studentService } from '../../services/studentService';
 
 export interface MobileStudentSubmissionItem {
   id: string;
@@ -22,68 +23,32 @@ interface TeacherMobileClassSubmissionsScreenProps {
   onSelectStudent?: (student: MobileStudentSubmissionItem) => void;
 }
 
-export const INITIAL_STUDENT_SUBMISSIONS: MobileStudentSubmissionItem[] = [
-  {
-    id: 'sub-1',
-    orderNumber: 1,
-    name: 'ด.ญ.กมลวรรณ แก้วใส',
-    timeSubmitted: '10:24 น.',
-    status: 'GRADED',
-    statusLabel: 'ตรวจแล้ว',
-    scoreText: '18/20',
-    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=120',
-  },
-  {
-    id: 'sub-2',
-    orderNumber: 2,
-    name: 'ด.ช.ธนภัทร ศรีสุข',
-    timeSubmitted: '10:31 น.',
-    status: 'GRADED',
-    statusLabel: 'ตรวจแล้ว',
-    scoreText: '16/20',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=120',
-  },
-  {
-    id: 'sub-3',
-    orderNumber: 3,
-    name: 'ด.ญ.ณัฐริกา ใจดี',
-    status: 'UNCHECKED',
-    statusLabel: 'ยังไม่ตรวจ',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=120',
-  },
-  {
-    id: 'sub-4',
-    orderNumber: 4,
-    name: 'ด.ช.ชยพล พรหมมาศ',
-    status: 'UNCHECKED',
-    statusLabel: 'ยังไม่ตรวจ',
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=120',
-  },
-  {
-    id: 'sub-5',
-    orderNumber: 5,
-    name: 'ด.ญ.ปภาวรินทร์ จันทร์สว่าง',
-    timeSubmitted: '11:12 น.',
-    status: 'GRADED',
-    statusLabel: 'ตรวจแล้ว',
-    scoreText: '19/20',
-    avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=120',
-  },
-  {
-    id: 'sub-6',
-    orderNumber: 6,
-    name: 'ด.ช.กิตติพงษ์ ไชยวงศ์',
-    status: 'UNCHECKED',
-    statusLabel: 'ยังไม่ตรวจ',
-    avatarUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=120',
-  },
-];
+export const INITIAL_STUDENT_SUBMISSIONS: MobileStudentSubmissionItem[] = [];
 
 export const TeacherMobileClassSubmissionsScreen: React.FC<
   TeacherMobileClassSubmissionsScreenProps
 > = ({ onBack, onNavigate, onSelectStudent }) => {
   const [activeTab, setActiveTab] = useState<'ROSTER' | 'ASSIGNMENTS' | 'SCORES'>('ROSTER');
-  const submissions = cleanSlateService.isCleanSlateActive() ? [] : INITIAL_STUDENT_SUBMISSIONS;
+  
+  const realStudents = useMemo(() => {
+    if (cleanSlateService.isCleanSlateActive()) return [];
+    return studentService.getStudents('room-3-1');
+  }, []);
+
+  const submissions = useMemo<MobileStudentSubmissionItem[]>(() => {
+    return realStudents.map((st, idx) => ({
+      id: `sub-${st.id || idx + 1}`,
+      orderNumber: st.no || idx + 1,
+      name: st.name,
+      avatarUrl: st.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(st.name)}`,
+      status: 'UNCHECKED' as const,
+      statusLabel: 'ยังไม่ตรวจ',
+    }));
+  }, [realStudents]);
+
+  const gradedCount = useMemo(() => submissions.filter((s) => s.status === 'GRADED').length, [submissions]);
+  const uncheckedCount = useMemo(() => submissions.filter((s) => s.status === 'UNCHECKED').length, [submissions]);
+  const notSubmittedCount = useMemo(() => submissions.filter((s) => s.status === 'NOT_SUBMITTED').length, [submissions]);
 
   const handleStudentClick = (student: MobileStudentSubmissionItem) => {
     if (onSelectStudent) {
@@ -138,7 +103,7 @@ export const TeacherMobileClassSubmissionsScreen: React.FC<
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          รายชื่อนักเรียน (20)
+          รายชื่อนักเรียน ({submissions.length})
         </button>
         <button
           type="button"
@@ -169,21 +134,21 @@ export const TeacherMobileClassSubmissionsScreen: React.FC<
         <div className="p-2.5 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-between">
           <span className="text-[11px] font-bold text-emerald-800">ตรวจแล้ว</span>
           <span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-black flex items-center justify-center">
-            12
+            {gradedCount}
           </span>
         </div>
 
         <div className="p-2.5 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-between">
           <span className="text-[11px] font-bold text-rose-800">ยังไม่ตรวจ</span>
           <span className="w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center">
-            8
+            {uncheckedCount}
           </span>
         </div>
 
         <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
           <span className="text-[11px] font-bold text-slate-600">ขาดส่ง</span>
           <span className="w-5 h-5 rounded-full bg-slate-400 text-white text-[10px] font-black flex items-center justify-center">
-            0
+            {notSubmittedCount}
           </span>
         </div>
       </div>
@@ -252,15 +217,16 @@ export const TeacherMobileClassSubmissionsScreen: React.FC<
         <div className="max-w-md mx-auto">
           <button
             type="button"
+            disabled={submissions.length === 0}
             onClick={() => {
-              if (onSelectStudent) {
-                onSelectStudent(INITIAL_STUDENT_SUBMISSIONS[0]);
+              if (onSelectStudent && submissions.length > 0) {
+                onSelectStudent(submissions[0]);
               }
               onNavigate('mobile-submission-detail');
             }}
-            className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-blue-500/25 transition-all cursor-pointer flex items-center justify-center gap-2"
+            className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 active:scale-98 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-blue-500/25 transition-all cursor-pointer flex items-center justify-center gap-2"
           >
-            <span>ตรวจงานทั้งหมด (8 รายการ)</span>
+            <span>ตรวจงานทั้งหมด ({uncheckedCount} รายการ)</span>
           </button>
         </div>
       </div>

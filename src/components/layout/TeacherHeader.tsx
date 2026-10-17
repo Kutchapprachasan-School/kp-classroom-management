@@ -76,7 +76,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
   onOpenMobileMenu,
   isSidebarOpen = true,
   onToggleSidebar,
-  termLabel = 'ภาคเรียนที่ 1 / 2569',
+  termLabel = getSchoolSettings().academicTerm || 'ภาคเรียนที่ 1/2569',
   activeRole = 'TEACHER_GENERAL',
   onChangeRole,
   currentUser,
