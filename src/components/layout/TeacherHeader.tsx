@@ -20,6 +20,9 @@ import {
   Cloud,
   RefreshCw,
   X,
+  User,
+  Shield,
+  Type,
 } from 'lucide-react';
 import {
   academicCalendarService,
@@ -161,9 +164,15 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
     return () => window.removeEventListener(ACADEMIC_CALENDAR_EVENT, handleCalendarSync);
   }, []);
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const bellRef = useRef<HTMLDivElement>(null);
-  const profileRef = useRef<HTMLDivElement>(null);
+  const [isTeacherProfileModalOpen, setIsTeacherProfileModalOpen] = useState(false);
+  const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
+
+  const desktopDropdownRef = useRef<HTMLDivElement>(null);
+  const mobileDropdownRef = useRef<HTMLDivElement>(null);
+  const desktopBellRef = useRef<HTMLDivElement>(null);
+  const mobileBellRef = useRef<HTMLDivElement>(null);
+  const desktopProfileRef = useRef<HTMLDivElement>(null);
+  const mobileProfileRef = useRef<HTMLDivElement>(null);
 
   const unresolvedItems = urgentItems.filter((i) => !i.isResolved);
   const unresolvedCount = unresolvedItems.length;
@@ -198,16 +207,30 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+
+      const isInsideFont =
+        (desktopDropdownRef.current && desktopDropdownRef.current.contains(target)) ||
+        (mobileDropdownRef.current && mobileDropdownRef.current.contains(target));
+      if (!isInsideFont) {
         setIsFontDropdownOpen(false);
       }
-      if (bellRef.current && !bellRef.current.contains(e.target as Node)) {
+
+      const isInsideBell =
+        (desktopBellRef.current && desktopBellRef.current.contains(target)) ||
+        (mobileBellRef.current && mobileBellRef.current.contains(target));
+      if (!isInsideBell) {
         setIsBellOpen(false);
       }
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+
+      const isInsideProfile =
+        (desktopProfileRef.current && desktopProfileRef.current.contains(target)) ||
+        (mobileProfileRef.current && mobileProfileRef.current.contains(target));
+      if (!isInsideProfile) {
         setIsProfileOpen(false);
       }
-      if (termSwitcherRef.current && !termSwitcherRef.current.contains(e.target as Node)) {
+
+      if (termSwitcherRef.current && !termSwitcherRef.current.contains(target)) {
         setIsTermSwitcherOpen(false);
       }
     };
@@ -441,6 +464,131 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
     </div>
   );
 
+  // Teacher Profile & Advisory Modal
+  const teacherProfileModal = isTeacherProfileModalOpen && (
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-md p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+              <User className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                ข้อมูลส่วนตัว & ห้องที่ปรึกษา
+              </h2>
+              <p className="text-[11px] text-slate-500 font-medium">
+                รายละเอียดผู้ใช้งานและห้องเรียนที่รับผิดชอบ
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsTeacherProfileModalOpen(false)}
+            className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Identity Overview */}
+        <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50/70 via-indigo-50/30 to-white border border-blue-100/80 flex items-center gap-3.5">
+          <div className="relative">
+            <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-white shadow-md bg-white">
+              <img
+                src={effectiveAvatar}
+                alt={currentUser?.name || "ครูผู้สอน"}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-extrabold text-slate-800 truncate">
+                {currentUser?.name || 'นายปัญจพล เกษรัตน์'}
+              </h3>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                {activeRole === 'ACADEMIC_ADMIN' ? 'ผู้บริหาร/แอดมิน' : activeRole === 'STUDENT_AFFAIRS' ? 'ครูกิจการ' : 'ครูผู้สอน'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 font-medium mt-0.5 truncate">
+              {currentUser?.position || 'ครูชำนาญการพิเศษ'}
+            </p>
+            <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">
+              {currentUser?.email || 'panjapol.k@kutchap.ac.th'} • รหัส {currentUser?.id || 'KPS-T104'}
+            </p>
+          </div>
+        </div>
+
+        {/* Advisory Classroom & Subject Group */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              ห้องประจำชั้นที่ปรึกษา
+            </span>
+            <div className="text-xs font-extrabold text-blue-700 flex items-center gap-1">
+              <span>ม.3/1 (ที่ปรึกษา)</span>
+            </div>
+            <p className="text-[10px] text-slate-500">นักเรียนรวม 8 คน</p>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              กลุ่มสาระการเรียนรู้
+            </span>
+            <div className="text-xs font-extrabold text-slate-700 truncate">
+              {currentUser?.subjectGroup || 'ภาษาต่างประเทศ'}
+            </div>
+            <p className="text-[10px] text-slate-500">วิชาภาษาญี่ปุ่น</p>
+          </div>
+        </div>
+
+        {/* School Organization Info */}
+        <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 space-y-1 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500">สถานศึกษา:</span>
+            <span className="font-bold text-slate-800">{schoolSettings.nameTh}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500">สังกัด:</span>
+            <span className="font-semibold text-slate-700 text-[11px]">{schoolSettings.affiliation || 'สพม.อุดรธานี'}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500">ภาคเรียนปัจจุบัน:</span>
+            <span className="font-bold text-blue-600">{schoolSettings.academicTerm || 'ภาคเรียนที่ 1/2569'}</span>
+          </div>
+        </div>
+
+        {/* Quick Action Navigation */}
+        <div className="space-y-2 pt-1">
+          <button
+            type="button"
+            onClick={() => {
+              setIsTeacherProfileModalOpen(false);
+              onDeepNavigate?.({ view: 'roster' });
+            }}
+            className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <span>ดูบัญชีรายชื่อห้องที่ปรึกษา (ม.3/1)</span>
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsTeacherProfileModalOpen(false);
+              onDeepNavigate?.({ view: 'settings' });
+            }}
+            className="w-full py-2 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <Settings className="w-3.5 h-3.5 text-slate-500" />
+            <span>ไปที่การตั้งค่าระบบ & ปรับแต่งแบนเนอร์</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   const isFemaleTeacher =
     Boolean((currentUser as any)?.gender === 'FEMALE') ||
     Boolean(currentUser?.name?.includes('นาง') || currentUser?.name?.includes('น.ส.'));
@@ -451,16 +599,33 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
 
   const effectiveAvatar = currentUser?.avatarUrl || defaultTeacherAvatar;
 
+  // Cloud sync handler
+  const handleForceCloudSync = async () => {
+    try {
+      setSyncToastMessage('กำลังเชื่อมต่อและดึงข้อมูลล่าสุดจากคลาวด์...');
+      await cloudDataService.syncAllFromCloud();
+      setSyncToastMessage('ซิงค์ข้อมูลกับคลาวด์สำเร็จเรียบร้อยแล้ว');
+      setTimeout(() => setSyncToastMessage(null), 3000);
+    } catch {
+      setSyncToastMessage('เกิดข้อผิดพลาดในการเชื่อมต่อคลาวด์');
+      setTimeout(() => setSyncToastMessage(null), 3000);
+    }
+  };
+
   // Profile Dropdown Content
   const profileDropdownContent = isProfileOpen && (
-    <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl border border-slate-200 shadow-2xl p-3 z-50 space-y-2.5 text-xs text-slate-700">
+    <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl border border-slate-200 shadow-2xl p-3.5 z-50 space-y-3 text-xs text-slate-800 animate-in fade-in zoom-in-95 duration-150">
+      {/* 1. Header Profile Identity Card */}
       <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
-        <div className="w-11 h-11 rounded-full overflow-hidden border border-blue-200 shrink-0 bg-blue-50">
-          <img
-            src={effectiveAvatar}
-            alt={currentUser?.name || "ครูผู้สอน"}
-            className="w-full h-full object-cover"
-          />
+        <div className="relative">
+          <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-blue-100 shrink-0 bg-blue-50 shadow-2xs">
+            <img
+              src={effectiveAvatar}
+              alt={currentUser?.name || "ครูผู้สอน"}
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full" title="ออนไลน์" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-extrabold text-slate-900 text-sm truncate">
@@ -469,88 +634,159 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
           <div className="text-[11px] text-slate-500 truncate mt-0.5 font-medium">
             {currentUser?.subjectGroup
               ? `กลุ่มสาระฯ${currentUser.subjectGroup}`
-              : currentUser?.position || 'กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ'}
+              : currentUser?.position || 'ครูผู้สอน'}
           </div>
-          <div className="mt-1">
+          <div className="flex items-center gap-1.5 mt-1">
             <span
               className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
                 activeRole === 'ACADEMIC_ADMIN'
-                  ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
-                  : 'bg-blue-100 text-blue-800 border border-blue-200'
+                  ? 'bg-purple-50 text-purple-800 border border-purple-200'
+                  : activeRole === 'STUDENT_AFFAIRS'
+                  ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                  : 'bg-blue-50 text-blue-700 border border-blue-200'
               }`}
             >
               {activeRole === 'ACADEMIC_ADMIN'
-                ? '⭐ ผู้บริหาร / แอดมิน (Admin)'
-                : 'ครูผู้สอน (Teacher)'}
+                ? '⭐ ผอ. / ผู้ดูแลระบบ'
+                : activeRole === 'STUDENT_AFFAIRS'
+                ? '🛡️ ครูกิจการนักเรียน'
+                : '📘 ครูผู้สอน & ที่ปรึกษา'}
+            </span>
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600">
+              ม.3/1
             </span>
           </div>
         </div>
       </div>
 
-      {/* Role Switcher Option */}
-      <div className="p-2 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1.5">
-        <span className="text-[11px] font-bold text-slate-500 block">
-          สิทธิ์การใช้งาน (RBAC Mode)
-        </span>
-        <div className="grid grid-cols-3 gap-1.5">
-          <button
-            type="button"
-            onClick={() => {
-              onChangeRole?.('TEACHER_GENERAL');
-              setIsProfileOpen(false);
-            }}
-            className={`py-1.5 px-1 rounded-lg text-center font-bold text-[11px] transition-colors cursor-pointer ${
-              activeRole === 'TEACHER_GENERAL'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-            }`}
-          >
-            ครูทั่วไป
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              onChangeRole?.('STUDENT_AFFAIRS');
-              setIsProfileOpen(false);
-            }}
-            className={`py-1.5 px-1 rounded-lg text-center font-bold text-[11px] transition-colors cursor-pointer ${
-              activeRole === 'STUDENT_AFFAIRS'
-                ? 'bg-amber-600 text-white shadow-xs'
-                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-            }`}
-          >
-            ครูกิจการ
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              onChangeRole?.('ACADEMIC_ADMIN');
-              setIsProfileOpen(false);
-            }}
-            className={`py-1.5 px-1 rounded-lg text-center font-bold text-[11px] transition-colors cursor-pointer ${
-              activeRole === 'ACADEMIC_ADMIN'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-            }`}
-          >
-            ผอ./Admin
-          </button>
+      {/* Sync Status Toast inside dropdown */}
+      {syncToastMessage && (
+        <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-medium flex items-center gap-1.5">
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+          <span>{syncToastMessage}</span>
         </div>
-      </div>
+      )}
 
-      <div className="space-y-0.5 pt-1 border-t border-slate-100">
+      {/* 2. Core Feature Actions */}
+      <div className="space-y-1">
+        <button
+          type="button"
+          onClick={() => {
+            setIsProfileOpen(false);
+            setIsTeacherProfileModalOpen(true);
+          }}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-blue-600 font-semibold transition-all text-left cursor-pointer group"
+        >
+          <div className="flex items-center gap-2.5">
+            <User className="w-4 h-4 text-slate-400 group-hover:text-blue-500 transition-colors" />
+            <span>ข้อมูลส่วนตัว & ห้องที่ปรึกษา</span>
+          </div>
+          <span className="text-[11px] text-slate-400 group-hover:text-blue-500 font-bold">ดูข้อมูล →</span>
+        </button>
+
         <button
           type="button"
           onClick={() => {
             setIsProfileOpen(false);
             onDeepNavigate?.({ view: 'settings' });
           }}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 font-medium transition-colors text-left cursor-pointer"
+          className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-blue-600 font-semibold transition-all text-left cursor-pointer group"
         >
-          <Settings className="w-4 h-4 text-slate-500 shrink-0" />
-          <span>การตั้งค่าระบบและแบนเนอร์</span>
+          <div className="flex items-center gap-2.5">
+            <Settings className="w-4 h-4 text-slate-400 group-hover:text-blue-500 transition-colors" />
+            <span>ตั้งค่าระบบ & แบนเนอร์</span>
+          </div>
+          <span className="text-[11px] text-slate-400 group-hover:text-blue-500 font-bold">จัดการ →</span>
         </button>
 
+        <button
+          type="button"
+          onClick={handleForceCloudSync}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-emerald-700 font-semibold transition-all text-left cursor-pointer group"
+        >
+          <div className="flex items-center gap-2.5">
+            <RefreshCw className="w-4 h-4 text-slate-400 group-hover:text-emerald-600 transition-colors" />
+            <span>ซิงค์ข้อมูลกับคลาวด์</span>
+          </div>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">
+            ออนไลน์
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setIsProfileOpen(false);
+            setIsFontDropdownOpen(true);
+          }}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-blue-600 font-semibold transition-all text-left cursor-pointer group"
+        >
+          <div className="flex items-center gap-2.5">
+            <Type className="w-4 h-4 text-slate-400 group-hover:text-blue-500 transition-colors" />
+            <span>ปรับขนาดตัวอักษร</span>
+          </div>
+          <span className="text-[11px] text-blue-600 font-bold">{fontScale === 'custom' ? `${customFontPx}px` : fontScale}</span>
+        </button>
+      </div>
+
+      {/* 3. Role Switcher for Admin / Testing Mode */}
+      {(currentUser?.role === 'ADMIN' || activeRole === 'ACADEMIC_ADMIN') && (
+        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              สลับโหมดมุมมอง (RBAC Preview)
+            </span>
+            <span className="text-[10px] text-purple-600 font-bold">สิทธิ์แอดมิน</span>
+          </div>
+          <div className="grid grid-cols-3 gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                onChangeRole?.('TEACHER_GENERAL');
+                setIsProfileOpen(false);
+              }}
+              className={`py-1.5 px-1 rounded-lg text-center font-bold text-[11px] transition-colors cursor-pointer ${
+                activeRole === 'TEACHER_GENERAL'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              ครูทั่วไป
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onChangeRole?.('STUDENT_AFFAIRS');
+                setIsProfileOpen(false);
+              }}
+              className={`py-1.5 px-1 rounded-lg text-center font-bold text-[11px] transition-colors cursor-pointer ${
+                activeRole === 'STUDENT_AFFAIRS'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              ครูกิจการ
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onChangeRole?.('ACADEMIC_ADMIN');
+                setIsProfileOpen(false);
+              }}
+              className={`py-1.5 px-1 rounded-lg text-center font-bold text-[11px] transition-colors cursor-pointer ${
+                activeRole === 'ACADEMIC_ADMIN'
+                  ? 'bg-purple-600 text-white shadow-xs'
+                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              ผอ./Admin
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Logout Action */}
+      <div className="pt-2 border-t border-slate-100">
         {onLogout && (
           <button
             type="button"
@@ -558,10 +794,13 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
               setIsProfileOpen(false);
               onLogout();
             }}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 font-bold transition-colors text-left cursor-pointer"
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 font-bold transition-all text-left cursor-pointer"
           >
-            <ExitRegular className="w-4 h-4 text-rose-500 shrink-0" />
-            <span>ออกจากระบบ</span>
+            <div className="flex items-center gap-2.5">
+              <ExitRegular className="w-4 h-4 text-rose-500 shrink-0" />
+              <span>ออกจากระบบ</span>
+            </div>
+            <span className="text-[11px] text-rose-400 font-medium">Log out</span>
           </button>
         )}
       </div>
@@ -620,7 +859,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
             <SearchRegular className="w-3.5 h-3.5 text-blue-600" />
           </button>
 
-          <div className="relative" ref={bellRef}>
+          <div className="relative" ref={mobileBellRef}>
             <button
               type="button"
               onClick={() => {
@@ -644,7 +883,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
             {bellDropdownContent}
           </div>
 
-          <div className="relative flex items-center" ref={profileRef}>
+          <div className="relative flex items-center" ref={mobileProfileRef}>
             <button
               type="button"
               onClick={() => setIsProfileOpen((prev) => !prev)}
@@ -769,7 +1008,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
           </div>
 
           {/* 2.3 Font Scale Control Button (Discreet "T") */}
-          <div className="relative" ref={dropdownRef}>
+          <div className="relative" ref={desktopDropdownRef}>
             <button
               type="button"
               onClick={() => setIsFontDropdownOpen((prev) => !prev)}
@@ -869,7 +1108,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
           </div>
 
           {/* 2.4 Notification Bell with Red Badge "3" matching Image 1 */}
-          <div className="relative" ref={bellRef}>
+          <div className="relative" ref={desktopBellRef}>
             <button
               type="button"
               onClick={() => {
@@ -895,7 +1134,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
           </div>
 
           {/* 2.5 Profile Avatar Dropdown matching Image 1 ("ครูปัญจพล" + chevron) */}
-          <div className="relative" ref={profileRef}>
+          <div className="relative" ref={desktopProfileRef}>
             <button
               type="button"
               onClick={() => setIsProfileOpen((prev) => !prev)}
@@ -923,6 +1162,9 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Teacher Profile & Advisory Modal */}
+      {teacherProfileModal}
 
       {/* Admin Academic Term & Year Switcher Modal */}
       {termSwitcherModal}
