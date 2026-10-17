@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 17/10/2569 06:39:33 | รวมทั้งหมด 177 ไฟล์*
+*อัปเดตล่าสุด: 17/10/2569 07:28:26 | รวมทั้งหมด 178 ไฟล์*
 
 ---
 
@@ -218,6 +218,7 @@
 | [src/utils/gradeLevelTheme.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/gradeLevelTheme.ts) | 153 | `GradeLevelTheme` (L5), `GRADE_LEVEL_THEMES` (L21), `getGradeLevelTheme` (L133), `GRADE_LEVEL_LIST` (L152) |
 | [src/utils/imageCompressor.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/imageCompressor.ts) | 363 | `CompressionOptions` (L5), `CompressedImageResult` (L16), `DEFAULT_BANNER_COMPRESSION_OPTIONS` (L26), `estimateBase64SizeBytes` (L54), `dataUrlToBlob` (L84), `calculateAspectRatioDimensions` (L131), `calculateProportionalDimensions` (L155), `formatBytes` (L160), `isImageFile` (L172), `DEFAULT_LOGO_COMPRESSION_OPTIONS` (L338) |
 | [src/utils/indexedDbAdapter.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/indexedDbAdapter.ts) | 392 | `OutboxSyncStatus` (L9), `OutboxItem` (L11), `RetryPolicyConfig` (L23), `DEFAULT_RETRY_CONFIG` (L31), `computeNextBackoffMs` (L42), `canonicalJsonStringify` (L58), `indexedDbAdapter` (L391) |
+| [src/utils/promotionDryRunEngine.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/promotionDryRunEngine.ts) | 348 | `PromotionActionType` (L9), `GraduationApprovalStatus` (L17), `ClassroomMappingRule` (L23), `StudentDryRunInput` (L31), `StudentPromotionDecision` (L45), `PromotionDryRunConfig` (L57), `PromotionDryRunReport` (L64), `parseGradeLevelFromRoom` (L85), `generateDefaultClassroomMappings` (L102), `evaluateStudentPromotion` (L143) *(+1 รายการ)* |
 | [src/utils/timetableDateUtils.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/timetableDateUtils.ts) | 667 | `TimetableColorTheme` (L4), `TimetableMatrixSlot` (L13), `TaskWidgetItem` (L34), `CalendarEventItem` (L43), `THAI_MONTHS_SHORT` (L50), `WeekDayInfo` (L65), `ComputedWeekInfo` (L71), `BANGKOK_TIMEZONE` (L83), `getBangkokNow` (L85), `getBangkokTodayString` (L91) *(+6 รายการ)* |
 
 ## Type Definitions
