@@ -166,6 +166,12 @@ export class NeonQueryBuilder<T = any[]> implements PromiseLike<QueryResult<T>> 
         if (op === 'eq') {
           orConditions.push(`"${col}" = $PARAM`);
           orValues.push(rawVal);
+        } else if (op === 'ilike') {
+          orConditions.push(`"${col}" ILIKE $PARAM`);
+          orValues.push(rawVal);
+        } else if (op === 'like') {
+          orConditions.push(`"${col}" LIKE $PARAM`);
+          orValues.push(rawVal);
         }
       }
     }

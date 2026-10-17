@@ -228,3 +228,9 @@ model ExternalMapping {
   assignment     Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   @@unique([provider, externalId])
 }
+
+model kps_cloud_store {
+  key        String    @id
+  data       Json?
+  updated_at DateTime? @default(now()) @db.Timestamptz(6)
+}
