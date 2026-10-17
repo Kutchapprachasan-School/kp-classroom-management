@@ -72,18 +72,15 @@ export const authService = {
 
         if (!uErr && users && users.length > 0) {
           const user = users[0];
-          // ดึงข้อมูล Account ที่ผูกกับ User เพื่อตรวจรหัสผ่าน scrypt
+          // ดึงข้อมูล Account ที่ผูกกับ User เพื่อตรวจรหัสผ่าน scrypt จริงจากฐานข้อมูล Neon
           const { data: accounts, error: aErr } = await supabase
             .from('Account')
-            .select('password')
+            .select('password, providerId')
             .eq('userId', user.id);
 
-          if (!aErr && accounts && accounts.length > 0 && accounts[0].password) {
-            let isValid = await verifyScryptPassword(accounts[0].password, trimmedPass);
-            // รองรับรหัสผ่านตั้งต้นของโรงเรียน (12345678) สำหรับบัญชีครูทุกท่านในฐานข้อมูล
-            if (!isValid && trimmedPass === '12345678') {
-              isValid = true;
-            }
+          const credentialAccount = accounts?.find((a: any) => a.password);
+          if (!aErr && credentialAccount && credentialAccount.password) {
+            const isValid = await verifyScryptPassword(credentialAccount.password, trimmedPass);
             if (!isValid) {
               throw new Error('รหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบรหัสผ่านของคุณอีกครั้ง');
             }
@@ -104,7 +101,7 @@ export const authService = {
             }
             return authUser;
           } else {
-            throw new Error('ไม่พบข้อมูลการตั้งรหัสผ่านของบัญชีนี้');
+            throw new Error('ไม่พบข้อมูลการตั้งรหัสผ่านของบัญชีนี้ในฐานข้อมูล');
           }
         }
       } catch (err: any) {

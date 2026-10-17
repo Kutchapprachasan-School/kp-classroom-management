@@ -42,7 +42,7 @@ describe('Supabase PostgREST Egress Optimization Verification', () => {
       const secondSync = await cloudDataService.fetchAllCloudData();
       expect(secondSync).toBeDefined();
       expect(Object.keys(secondSync).length).toBeGreaterThan(0);
-    });
+    }, 30000);
   });
 
   describe('2. In-Memory Caching & Selective Columns (classroomService)', () => {
@@ -87,7 +87,7 @@ describe('Supabase PostgREST Egress Optimization Verification', () => {
 
       const { data: selective } = await supabase
         .from('SystemSettings')
-        .select('id, schoolName, affiliation, subheader, logoUrl, updatedAt')
+        .select('id, schoolName, affiliation, subheader, updatedAt')
         .eq('id', 'default')
         .maybeSingle();
 

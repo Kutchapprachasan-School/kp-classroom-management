@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   Lock,
 } from 'lucide-react';
-import { authService } from '../services/authService';
 import {
   getSchoolSettings,
   getSmsUsers,
@@ -92,15 +91,6 @@ export const UserAccountsView: React.FC<UserAccountsViewProps> = ({
 
     const isStudent =
       newRole === 'STUDENT_GENERAL' || newRole === 'STUDENT_COUNCIL';
-
-    if (!isStudent) {
-      await authService.loginTeacher(
-        newEmailOrCode,
-        newPasswordOrPin || 'password123'
-      );
-    } else {
-      await authService.loginStudent(newEmailOrCode, newPasswordOrPin || '2510');
-    }
 
     const generatedId = `u-${Date.now()}`;
     const generatedCode = !isStudent
