@@ -67,11 +67,12 @@ export const behaviorService = {
   async getAll(): Promise<BehaviorRecord[]> {
     if (isSupabaseConfigured) {
       try {
-        logDbOperation('SELECT * FROM BehaviorRecord ORDER BY createdAt DESC');
+        logDbOperation('SELECT selective FROM BehaviorRecord ORDER BY createdAt DESC LIMIT 100');
         const { data, error } = await supabase
           .from('BehaviorRecord')
-          .select('*')
-          .order('createdAt', { ascending: false });
+          .select('id, studentName, studentId, type, description, text, points, businessDate, createdAt, reportedById, author')
+          .order('createdAt', { ascending: false })
+          .limit(100);
 
         if (!error && data && data.length > 0) {
           return data.map((b: any) => ({
@@ -201,9 +202,10 @@ export const behaviorService = {
     if (isSupabaseConfigured) {
       const { data, error } = await supabase
         .from('XpTransaction')
-        .select('*')
+        .select('id, studentId, amount, reason, createdAt')
         .eq('studentId', studentId)
-        .order('createdAt', { ascending: false });
+        .order('createdAt', { ascending: false })
+        .limit(50);
 
       if (!error && data && data.length > 0) {
         return data as XpTransactionRecord[];

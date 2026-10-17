@@ -48,7 +48,7 @@ export const assignmentService = {
       logDbOperation(`SELECT * FROM Assignment WHERE classroomId = ${classroomId}`);
       const { data, error } = await supabase
         .from('Assignment')
-        .select('*, sgsUnit:SgsUnit(*)')
+        .select('id, classroomId, title, maxScore, sgsUnit:SgsUnit(name)')
         .eq('classroomId', classroomId);
 
       if (!error && data && data.length > 0) {

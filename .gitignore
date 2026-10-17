@@ -29,3 +29,5 @@ dist-test*
 .vercel
 .env*
 scratch/
+
+backups/

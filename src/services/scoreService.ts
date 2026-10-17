@@ -93,10 +93,10 @@ export const scoreService = {
   // READ: Get all scores for an assignment
   async getByAssignment(assignmentId: string): Promise<ScoreRecord[]> {
     if (isSupabaseConfigured) {
-      logDbOperation(`SELECT * FROM Score WHERE assignmentId = ${assignmentId}`);
+      logDbOperation(`SELECT selective FROM Score WHERE assignmentId = ${assignmentId}`);
       const { data, error } = await supabase
         .from('Score')
-        .select('*')
+        .select('id, assignmentId, enrollmentId, classroomId, value, maxScore, isExempt, state, updatedAt')
         .eq('assignmentId', assignmentId);
 
       if (!error && data && data.length > 0) {
@@ -120,10 +120,10 @@ export const scoreService = {
   // READ: Get all scores for a student
   async getByStudent(enrollmentId: string): Promise<ScoreRecord[]> {
     if (isSupabaseConfigured) {
-      logDbOperation(`SELECT * FROM Score WHERE enrollmentId = ${enrollmentId}`);
+      logDbOperation(`SELECT selective FROM Score WHERE enrollmentId = ${enrollmentId}`);
       const { data, error } = await supabase
         .from('Score')
-        .select('*')
+        .select('id, assignmentId, enrollmentId, classroomId, value, maxScore, isExempt, state, updatedAt')
         .eq('enrollmentId', enrollmentId);
 
       if (!error && data && data.length > 0) {
@@ -147,7 +147,11 @@ export const scoreService = {
   // READ: Get audit logs (optionally filtered by assignment or student)
   async getAuditLogs(assignmentId?: string, enrollmentId?: string): Promise<ScoreAuditLogRecord[]> {
     if (isSupabaseConfigured) {
-      let query = supabase.from('ScoreAuditLog').select('*').order('created_at', { ascending: false });
+      let query = supabase
+        .from('ScoreAuditLog')
+        .select('id, scoreId, assignmentId, enrollmentId, oldValue, newValue, reason, changedBy, created_at')
+        .order('created_at', { ascending: false })
+        .limit(100);
       if (assignmentId) query = query.eq('assignmentId', assignmentId);
       if (enrollmentId) query = query.eq('enrollmentId', enrollmentId);
 

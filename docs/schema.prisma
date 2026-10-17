@@ -1,0 +1,3229 @@
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../node_modules/.prisma/client"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                  String             @id @default(cuid())
+  name                String?
+  email               String             @unique
+  image               String?
+  role                String             @default("TEACHER")
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  emailVerified       Boolean            @default(false)
+  lineUserId          String?
+  position            String?
+  subjectGroup        String?
+  isApproved          Boolean            @default(false)
+  signatureUrl        String?
+  hasSignature        Boolean   @default(false)
+  username            String?            @unique
+  address             String?
+  phoneNumber         String?
+  level               String?
+  bypassAttendance    Boolean            @default(false)
+  faceConsent         Boolean            @default(false)
+  faceConsentAt       DateTime?
+  faceDescriptor      Json?
+  faceProfileUrl      String?
+  workShiftId         String?
+  amssCredentials     AMSSCredentials?
+  accounts            Account[]
+  createdAttendances  Attendance[]       @relation("AttendanceCreatedBy")
+  attendances         Attendance[]       @relation("UserAttendances")
+  nonces              AttendanceNonce[]
+  documentRecords     DocumentRecord[]
+  createdRoutings     DocumentRouting[]  @relation("RoutingAssigner")
+  assignedRoutings    DocumentRouting[]  @relation("RoutingAssignee")
+  templates           DocumentTemplate[]
+  createdIncomingDocs IncomingDocument[] @relation("IncomingDocCreator")
+  leaveRequests       LeaveRequest[]
+  uploadedPhotos      RepairPhoto[]      @relation("PhotoUploadedBy")
+  requestsAssigned    RepairRequest[]    @relation("RequestAssignedTo")
+  requestsCreated     RepairRequest[]    @relation("RequestCreatedBy")
+  sessions            Session[]
+  workShift           WorkShift?         @relation(fields: [workShiftId], references: [id])
+  receiptsConfirmed   BudgetReceipt[]    @relation("ReceiptConfirmedBy")
+  projectsLed         Project[]          @relation("ProjectLeader")
+  activitiesResponsible ProjectActivity[] @relation("ActivityResponsible")
+  expensesRequested   ActivityExpense[]  @relation("ExpenseRequestedBy")
+  expensesApproved    ActivityExpense[]  @relation("ExpenseApprovedBy")
+  reversalsCancelled  ExpenseReversal[]  @relation("ReversalCancelledBy")
+  reversalsApproved   ExpenseReversal[]  @relation("ReversalApprovedBy")
+  transfersRequested  BudgetTransfer[]   @relation("TransferRequestedBy")
+  transfersApproved   BudgetTransfer[]   @relation("TransferApprovedBy")
+  projectAttachmentsUploaded ProjectAttachment[] @relation("ProjectAttachmentUploadedBy")
+  expenseAttachmentsUploaded ExpenseAttachment[] @relation("ExpenseAttachmentUploadedBy")
+  driverProfile              DriverProfile?
+  facilityReservations       FacilityReservation[] @relation("FacilityReservationsCreated")
+  facilityApprovalSteps      FacilityApprovalStep[] @relation("FacilityApprovalApprover")
+  certificateTemplates       CertificateTemplate[]
+  deletedDocuments           DocumentRecord[]      @relation("DocDeletedByUser")
+  deletedLeaveRequests       LeaveRequest[]        @relation("LeaveDeletedByUser")
+  policyAcknowledgments      PolicyAcknowledgment[]
+  consentRecords             ConsentRecord[]
+  examPapersCreated          ExamPaper[]           @relation("ExamCreatedBy")
+  deletedExamPapers          ExamPaper[]           @relation("ExamDeletedByUser")
+  keyVersionsChanged         ExamAnswerKeyVersion[] @relation("KeyVersionChangedBy")
+  scannedSubmissions         ExamSubmission[]      @relation("ExamScannedBy")
+  regradeJobsCreated         ExamRegradeJob[]      @relation("ExamRegradeJobCreator")
+
+  // Forensic Student Affairs Reverse Relations
+  deletedStudents             Student[]                   @relation("StudentDeleter")
+  studentStatusHistories      StudentStatusHistory[]
+  advisedEnrollments          StudentEnrollment[]         @relation("AdvisorEnrollments")
+  behaviorRecords             BehaviorRecord[]
+  createdScheduledSessions    ScheduledClassSession[]     @relation("CreatedScheduledSessions")
+  morningAttendancesRecorded  StudentMorningAttendance[]
+  periodAttendancesRecorded   StudentPeriodAttendance[]
+  verifiedMedicalCertificates StudentMedicalCertificate[] @relation("MedicalCertVerifier")
+  homeVisits                  StudentHomeVisit[]
+  sdqEvaluations              StudentSdqEvaluation[]
+  assignedCases               StudentInterventionCase[]   @relation("CaseAssignee")
+  createdCases                StudentInterventionCase[]   @relation("CaseCreator")
+  interventionActivities      InterventionActivity[]
+  verifiedCctManifests        CctExportManifest[]         @relation("CctManifestVerifier")
+  createdCctManifests         CctExportManifest[]         @relation("CctManifestCreator")
+  reviewedNominations         StudentMeritNomination[]    @relation("NominationReviewer")
+  dutyAssignments             UserDutyAssignment[]        @relation("UserDutyAssignments")
+  dutiesAssigned              UserDutyAssignment[]        @relation("DutyAssignedByUser")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model LeaveRequest {
+  id             String    @id @default(cuid())
+  userId         String
+  type           String
+  startDate      DateTime
+  endDate        DateTime
+  reason         String
+  status         String    @default("PENDING")
+  documentUrl    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  execApproverId String?
+  headApproverId String?
+  rejectReason   String?
+  extraFields    String?
+  approvedSeq    Int?
+  fiscalYear     Int?
+  pendingSeq     Int?
+  execApprovedAt DateTime?
+  headApprovedAt DateTime?
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attachments    FileAttachment[]
+  isDeleted      Boolean          @default(false)
+  deletedAt      DateTime?
+  deletedById    String?
+  deletedBy      User?            @relation("LeaveDeletedByUser", fields: [deletedById], references: [id], onDelete: SetNull)
+  purgeAt        DateTime?
+  deleteReason   String?
+  inspectorSnapshot    Json?
+  headApproverSnapshot Json?
+
+  @@index([isDeleted, deletedAt])
+  @@index([isDeleted, purgeAt])
+}
+
+enum DutyType {
+  INSPECTOR
+  HR_HEAD
+  HR_STAFF
+  DIVISION_HEAD
+  DEPT_HEAD
+}
+
+enum ScopeDivision {
+  ACADEMIC
+  PERSONNEL
+  GENERAL
+  BUDGET
+}
+
+enum ScopeDepartment {
+  THAI
+  MATH
+  SCIENCE
+  FOREIGN_LANG
+  SOCIAL
+  HEALTH_PE
+  ART
+  CAREER
+  STUDENT_DEV
+}
+
+model UserDutyAssignment {
+  id              String           @id @default(cuid())
+  userId          String
+  dutyType        DutyType
+  divisionScope   ScopeDivision?
+  departmentScope ScopeDepartment?
+  assignedAt      DateTime         @default(now())
+  revokedAt       DateTime?
+  assignedById    String?
+  user            User             @relation("UserDutyAssignments", fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy      User?            @relation("DutyAssignedByUser", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@index([userId, dutyType, revokedAt])
+  @@index([dutyType, divisionScope, revokedAt])
+  @@index([dutyType, departmentScope, revokedAt])
+}
+
+model SystemSettings {
+  id                           String   @id @default("default")
+  schoolName                   String   @default("ชื่อโรงเรียน")
+  subheader                    String   @default("ระบบจัดการการลา")
+  logoUrl                      String?
+  footerText                   String   @default("© 2026 ระบบการลา")
+  developerSecret              String   @default("admin1234")
+  updatedAt                    DateTime @updatedAt
+  lineChannelAccessToken       String?
+  lineTargetGroupId            String?
+  leaveRules                   String   @default("การลากิจต้องยื่นคำขอล่วงหน้าอย่างน้อย 3 วันทำการ\nการลาป่วยติดต่อกันเกิน 3 วัน ต้องแนบใบรับรองแพทย์\nระบบจะส่งแจ้งเตือนให้หัวหน้าหมวดของท่านพิจารณาเป็นลำดับแรก")
+  requirePersonalAdvance       Boolean  @default(true)
+  memoThresholdDays            Int      @default(15)
+  memoThresholdTimes           Int      @default(6)
+  recycleBinRetentionDays      Int      @default(30)
+  defaultInspectorId           String?
+  affiliation                  String   @default("สำนักงานเขตพื้นที่การศึกษามัธยมศึกษาอุดรธานี")
+  actingDirectorTitle          String   @default("รักษาการในตำแหน่งผู้อำนวยการโรงเรียน")
+  finalApproverUserIds         String   @default("")
+  documentAdminUserIds         String   @default("")
+  showActingDirectorTitle      Boolean  @default(true)
+  enableLineNotify             Boolean  @default(true)
+  googleDriveFormat            String   @default("PDF")
+  pdfFont                      String   @default("Prompt")
+  lastLeaveMode                String   @default("SAME")
+  quotaExceededAction          String   @default("ALLOW_WITH_MEMO")
+  rolePermissions              String   @default("{\"calendar\":[\"ADMIN\",\"DIRECTOR\",\"HR\",\"INSPECTOR\",\"TEACHER\"],\"reports\":[\"ADMIN\",\"DIRECTOR\",\"HR\",\"INSPECTOR\"],\"approvals\":[\"ADMIN\",\"DIRECTOR\",\"HR\",\"INSPECTOR\"],\"logs\":[\"ADMIN\"],\"backups\":[\"ADMIN\"],\"users\":[\"ADMIN\"],\"settings\":[\"ADMIN\"]}")
+  attendanceLatitude           Float?
+  attendanceLongitude          Float?
+  attendanceRadius             Float?
+  enableAdvancedKPI            Boolean  @default(true)
+  enableAttendance             Boolean  @default(false)
+  faceMatchThreshold           Float    @default(0.65)
+  photoRetentionDays           Int?
+  requireFaceScan              Boolean  @default(false)
+  requireGeofence              Boolean  @default(false)
+  requireLivenessCheck         Boolean  @default(false)
+  enableDocument               Boolean  @default(false)
+  timezone                     String   @default("Asia/Bangkok")
+  iappApiKey                   String   @default("")
+  googleDriveFolderId          String?
+  googleDriveSecret            String?
+  googleDriveUploadUrl         String?
+  enableAutoPdfOnApproval      Boolean  @default(false)
+  googleAppsScriptId           String?
+  enableRepair                 Boolean  @default(false)
+  enableRepairLineNotify       Boolean  @default(true)
+  repairLineChannelAccessToken String?
+  repairLineTargetGroupId      String?
+  enableLeave                  Boolean  @default(true)
+  enableTimetable              Boolean  @default(true)
+  enableSubstitute             Boolean  @default(true)
+  enableSupervision            Boolean  @default(true)
+  enableExam                   Boolean  @default(true)
+  enableCompetency             Boolean  @default(true)
+  enableFacility               Boolean  @default(true)
+  enableAcademicSettings       Boolean  @default(true)
+  enableAmssSync               Boolean  @default(true)
+  enableCertificate            Boolean  @default(true)
+  enableBudget                 Boolean  @default(false)
+  budgetAdminUserIds           String   @default("")
+  enableStudentAffairs         Boolean  @default(false)
+  enableStudentCouncil         Boolean  @default(false)
+  enableAcademicPlanning       Boolean  @default(false)
+  academicPlanningAllowedUserIds String @default("")
+  documentManageMode           String   @default("DIRECT")
+  timetablePeriodsPerDay       Int      @default(8)
+  timetableStartTime           String   @default("08:30")
+  timetablePeriodDuration      Int      @default(50)
+  substitutePolicy             String   @default("DEPARTMENT")
+  substituteWorkloadPenalty    Int      @default(10)
+  enableSubstituteLineNotify   Boolean  @default(true)
+  supervisionMinPerTerm        Int      @default(2)
+  supervisionDirectorRatio     Int      @default(40)
+  supervisionDeptRatio         Int      @default(40)
+  supervisionSelfRatio         Int              @default(20)
+  attachments                  FileAttachment[]
+}
+
+model LeaveConfig {
+  id               String   @id @default(cuid())
+  type             String   @unique
+  name             String
+  maxDaysPerYear   Int      @default(0)
+  warningThreshold Int      @default(3)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  isActive         Boolean  @default(true)
+}
+
+model SystemLog {
+  id          String   @id @default(cuid())
+  actionType  String
+  subsystem   String   @default("LEAVE")
+  description String
+  userId      String
+  createdAt   DateTime @default(now())
+  metadata    Json?
+}
+
+model SystemLogArchive {
+  id          String   @id @default(cuid())
+  year        Int
+  month       Int
+  batchName   String
+  logCount    Int      @default(0)
+  logsData    Json
+  createdAt   DateTime @default(now())
+}
+
+model LeaveArchive {
+  id         String   @id @default(cuid())
+  cycleLabel String
+  cycleStart DateTime
+  cycleEnd   DateTime
+  data       String
+  totalStaff Int      @default(0)
+  totalDays  Int      @default(0)
+  archivedBy String
+  createdAt  DateTime @default(now())
+}
+
+model SystemBackup {
+  id        String   @id @default(cuid())
+  label     String
+  data      String
+  createdBy String
+  createdAt DateTime @default(now())
+}
+
+model MemoSection {
+  id                String             @id @default(cuid())
+  name              String
+  code              String             @unique
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  color             String             @default("#6366f1")
+  icon              String             @default("Folder")
+  sortOrder         Int                @default(0)
+  documentConfigs   DocumentConfig?
+  documentRecords   DocumentRecord[]
+  templates         DocumentTemplate[]
+  incomingDocuments IncomingDocument[]
+}
+
+model DocumentConfig {
+  id              String       @id @default(cuid())
+  docType         String
+  memoSectionId   String?      @unique
+  prefix          String       @default("")
+  useThaiNumerals Boolean      @default(true)
+  paddingDigits   Int          @default(1)
+  yearFormat      String       @default("TH_BE")
+  currentSeq      Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  memoSection     MemoSection? @relation(fields: [memoSectionId], references: [id], onDelete: Cascade)
+}
+
+model DocumentRecord {
+  id             String             @id @default(cuid())
+  docType        String
+  memoSectionId  String?
+  docNo          String?            @unique
+  seqNo          Int?
+  year           Int
+  title          String
+  to             String
+  origin         String
+  date           DateTime
+  content        String
+  signeeName     String
+  signeePosition String
+  enclosures     String?
+  references     String?
+  status         String             @default("DRAFT")
+  cancelReason   String?
+  isPinned       Boolean            @default(false)
+  createdById    String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  department     String?
+  requester      String?
+  idempotencyKey String?            @unique
+  attachmentName String?
+  attachmentUrl  String?
+  user           User               @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  memoSection    MemoSection?       @relation(fields: [memoSectionId], references: [id])
+  outgoingLinks  DocumentRelation[] @relation("FromDocument")
+  incomingLinks  DocumentRelation[] @relation("ToDocument")
+  attachments    FileAttachment[]
+  certificateItems CertificateIssuedItem[]
+  isDeleted      Boolean            @default(false)
+  deletedAt      DateTime?
+  deletedById    String?
+  deletedBy      User?              @relation("DocDeletedByUser", fields: [deletedById], references: [id], onDelete: SetNull)
+  purgeAt        DateTime?
+  deleteReason   String?
+
+  @@index([isDeleted, deletedAt])
+  @@index([isDeleted, purgeAt])
+}
+
+model CertificateIssuedItem {
+  id                String         @id @default(cuid())
+  batchRecordId     String
+  batchRecord       DocumentRecord @relation(fields: [batchRecordId], references: [id], onDelete: Cascade)
+  seqNo             Int
+  year              Int
+  certificateNumber String         @unique
+  roleTitle         String
+  recipientName     String?
+  verifyToken       String         @unique @default(cuid())
+  status            String         @default("ISSUED")
+  meritNomination   StudentMeritNomination?
+  createdAt         DateTime       @default(now())
+
+  @@unique([year, seqNo], map: "uk_cert_item_year_seq")
+  @@index([batchRecordId])
+  @@index([verifyToken])
+}
+
+model SigneePreset {
+  id        String   @id @default(cuid())
+  name      String
+  position  String
+  isCommon  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DocumentTemplate {
+  id             String       @id @default(cuid())
+  name           String
+  docType        String
+  memoSectionId  String?
+  title          String
+  to             String
+  origin         String
+  content        String
+  signeeName     String
+  signeePosition String
+  isPublic       Boolean      @default(true)
+  createdById    String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  user           User         @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  memoSection    MemoSection? @relation(fields: [memoSectionId], references: [id])
+}
+
+model DocumentRelation {
+  id        String         @id @default(cuid())
+  fromId    String
+  toId      String
+  createdAt DateTime       @default(now())
+  fromDoc   DocumentRecord @relation("FromDocument", fields: [fromId], references: [id], onDelete: Cascade)
+  toDoc     DocumentRecord @relation("ToDocument", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@unique([fromId, toId])
+}
+
+model WorkShift {
+  id                String       @id @default(cuid())
+  name              String
+  startTime         String
+  endTime           String
+  lateThreshold     Int
+  earlyOutThreshold Int
+  isOvernight       Boolean      @default(false)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  attendances       Attendance[]
+  users             User[]
+}
+
+model Attendance {
+  id             String            @id @default(cuid())
+  userId         String
+  attendanceDate DateTime
+  checkInTime    DateTime?
+  checkOutTime   DateTime?
+  status         AttendanceStatus
+  workShiftId    String?
+  createdById    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  createdBy      User?             @relation("AttendanceCreatedBy", fields: [createdById], references: [id])
+  user           User              @relation("UserAttendances", fields: [userId], references: [id], onDelete: Cascade)
+  workShift      WorkShift?        @relation(fields: [workShiftId], references: [id])
+  logs           AttendanceLog[]
+  photos         AttendancePhoto[]
+
+  @@unique([userId, attendanceDate])
+  @@index([userId])
+  @@index([attendanceDate])
+  @@index([status])
+}
+
+model AttendancePhoto {
+  id               String     @id @default(cuid())
+  attendanceId     String
+  photoUrl         String
+  faceMatchScore   Float?
+  isLivenessPassed Boolean    @default(false)
+  createdAt        DateTime   @default(now())
+  attendance       Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+
+  @@index([attendanceId])
+}
+
+model AttendanceLog {
+  id               String     @id @default(cuid())
+  attendanceId     String
+  action           String
+  timestamp        DateTime   @default(now())
+  latitude         Float?
+  longitude        Float?
+  deviceInfo       String?
+  verificationHash String?
+  createdAt        DateTime   @default(now())
+  attendance       Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+
+  @@index([attendanceId])
+}
+
+model AttendanceNonce {
+  id        String   @id @default(cuid())
+  userId    String
+  nonce     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model IncomingDocument {
+  id            String            @id @default(cuid())
+  receiveNo     String
+  receiveDate   DateTime          @default(now())
+  senderOrg     String
+  docRefNo      String?
+  title         String
+  urgencyLevel  String            @default("NORMAL")
+  amssLink      String?
+  attachmentUrl String?
+  memoSectionId String?
+  status        String            @default("PENDING")
+  note          String?
+  createdById   String
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  amssOriginId  String?           @unique
+  routingSteps  DocumentRouting[]
+  createdBy     User              @relation("IncomingDocCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  memoSection   MemoSection?      @relation(fields: [memoSectionId], references: [id])
+  attachments   FileAttachment[]
+}
+
+model DocumentRouting {
+  id                  String           @id @default(cuid())
+  incomingDocId       String
+  stepOrder           Int              @default(1)
+  assigneeId          String
+  assignedById        String
+  status              String           @default("PENDING")
+  resolution          String?
+  note                String?
+  deadline            DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  acknowledgedAt      DateTime?
+  actionAttachmentUrl String?
+  actionReport        String?
+  assigneeName        String?
+  directiveText       String?
+  dueDate             DateTime?
+  signatureUrl        String?
+  standardDirective   String?
+  assignedBy          User             @relation("RoutingAssigner", fields: [assignedById], references: [id], onDelete: Cascade)
+  assignee            User             @relation("RoutingAssignee", fields: [assigneeId], references: [id], onDelete: Cascade)
+  incomingDoc         IncomingDocument @relation(fields: [incomingDocId], references: [id], onDelete: Cascade)
+
+  @@index([incomingDocId])
+  @@index([assigneeId, status])
+}
+
+model Holiday {
+  id        String   @id @default(cuid())
+  startDate DateTime
+  endDate   DateTime
+  name      String
+  isCustom  Boolean  @default(false)
+  isWorkday Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([startDate, endDate])
+}
+
+model AMSSCredentials {
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  username         String
+  password         String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  url              String    @default("")
+  lastSyncAt       DateTime?
+  sessionCookie    String?
+  sessionExpiresAt DateTime?
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RunningNumber {
+  key     String @id
+  year    Int
+  current Int
+}
+
+model RepairRequest {
+  id               String         @id @default(cuid())
+  repairNo         String         @unique
+  title            String
+  description      String
+  location         String
+  urgency          RepairUrgency  @default(NORMAL)
+  category         RepairCategory @default(OTHER)
+  status           RepairStatus   @default(PENDING)
+  version          Int            @default(1)
+  requesterId      String
+  assigneeId       String?
+  resolutionNote   String?
+  cost             Decimal?       @db.Decimal(10, 2)
+  materialsUsed    String?
+  cancelReason     String?
+  expectedFinishAt DateTime?
+  actualFinishAt   DateTime?
+  slaStatus        SLAStatus?
+  assignedAt       DateTime?
+  finishedAt       DateTime?
+  deletedAt        DateTime?
+  deletedBy        String?
+  deleteReason     String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  ratedAt          DateTime?
+  rating           Int?
+  ratingComment    String?
+  photos           RepairPhoto[]
+  assignee         User?          @relation("RequestAssignedTo", fields: [assigneeId], references: [id])
+  requester        User           @relation("RequestCreatedBy", fields: [requesterId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([status, updatedAt])
+  @@index([assigneeId, status])
+  @@index([requesterId, status])
+  @@index([updatedAt])
+  @@index([id, version])
+}
+
+model RepairPhoto {
+  id           String          @id @default(cuid())
+  repairId     String
+  photoType    RepairPhotoType
+  mimeType     String
+  fileSize     Int
+  storageKey   String
+  createdAt    DateTime        @default(now())
+  uploadedById String
+  repair       RepairRequest   @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  uploadedBy   User            @relation("PhotoUploadedBy", fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  @@index([repairId])
+  @@index([repairId, photoType])
+}
+
+enum RepairUrgency {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum RepairCategory {
+  ELECTRICAL
+  PLUMBING
+  BUILDING
+  IT
+  FURNITURE
+  AIR_CONDITIONER
+  OTHER
+}
+
+enum RepairStatus {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  WAITING_PARTS
+  COMPLETED
+  CANCELLED
+}
+
+enum RepairPhotoType {
+  BEFORE
+  AFTER
+  ATTACHMENT
+}
+
+enum SLAStatus {
+  ON_TIME
+  OVERDUE
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  EARLY_OUT
+  ABSENT
+  ON_LEAVE
+  WORK_FROM_HOME
+}
+
+// ==========================================
+// Supervision & SROP Models
+// ==========================================
+
+enum SupervisionStatus {
+  SCHEDULED               // นัดหมายเรียบร้อย รอการนิเทศ
+  WAITING_TEACHER_ACK     // ผู้นิเทศประเมินแล้ว รอครูรับทราบ/สะท้อนคิด
+  WAITING_DIRECTOR_SIGN   // ครูรับทราบแล้ว รอ ผอ. ลงนามเห็นชอบ
+  COMPLETED               // ผอ. ลงนามเสร็จสมบูรณ์
+}
+
+enum SupervisionType {
+  ON_SITE        // นิเทศในห้องเรียนจริง
+  ONLINE_VIDEO   // นิเทศออนไลน์ผ่านลิงก์ภายนอก
+}
+
+model SupervisionSession {
+  id                  String             @id @default(cuid())
+  schoolId            String
+  academicYear        Int
+  term                Int
+  subjectCode         String
+  subjectName         String
+  gradeLevel          String
+  departmentGroup     String
+  dayOfWeek           Int
+  periodNumber        Int
+  scheduledDate       DateTime
+  teacherId           String
+  teacherName         String
+  supervisorId        String
+  supervisorName      String
+  type                SupervisionType    @default(ON_SITE)
+  lessonPlanUrl       String?
+  videoUrl            String?
+  rubricScores        Json?
+  totalScore          Float?
+  supervisorComment   String?            @db.Text
+  teacherReflection   String?            @db.Text
+  directorSignedBy    String?
+  directorSignedAt    DateTime?
+  directorComment     String?            @db.Text
+  status              SupervisionStatus  @default(SCHEDULED)
+  auditLogs           SupervisionAuditLog[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([schoolId, academicYear, term])
+  @@index([teacherId, status])
+  @@index([scheduledDate, dayOfWeek, periodNumber])
+}
+
+model SupervisionAuditLog {
+  id          String             @id @default(cuid())
+  sessionId   String
+  session     SupervisionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  actionBy    String
+  actionType  String
+  reason      String?            @db.Text
+  createdAt   DateTime           @default(now())
+
+  @@index([sessionId])
+}
+
+enum TimetableVersionStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum AssignmentPolicyType {
+  CENTRALIZED
+  DEPARTMENT
+  HYBRID
+}
+
+enum SubstituteWorkflowStatus {
+  ASSIGNED
+  ACKNOWLEDGED
+  REJECTED
+}
+
+model Department {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  name        String
+  teachers    Teacher[]
+  subjects    Subject[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Teacher {
+  id               String           @id @default(cuid())
+  employeeCode     String           @unique
+  prefix           String?
+  firstName        String
+  lastName         String
+  departmentId     String
+  department       Department       @relation(fields: [departmentId], references: [id])
+  maxWeeklyPeriods Int              @default(20)
+  offerings        SubjectOffering[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+}
+
+model Subject {
+  id           String            @id @default(cuid())
+  code         String            @unique
+  name         String
+  credits      Float             @default(1.0)
+  departmentId String
+  department   Department        @relation(fields: [departmentId], references: [id])
+  offerings    SubjectOffering[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+model ClassRoom {
+  id          String            @id @default(cuid())
+  gradeLevel  Int
+  roomNumber  Int
+  name        String
+  offerings   SubjectOffering[]
+  studentEnrollments StudentEnrollment[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([gradeLevel, roomNumber])
+}
+
+model Room {
+  id          String          @id @default(cuid())
+  code        String          @unique
+  name        String
+  building    String?
+  roomType    String          @default("REGULAR")
+  slots       TimetableSlot[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model SubjectOffering {
+  id           String          @id @default(cuid())
+  subjectId    String
+  subject      Subject         @relation(fields: [subjectId], references: [id])
+  teacherId    String
+  teacher      Teacher         @relation(fields: [teacherId], references: [id])
+  classRoomId  String
+  classRoom    ClassRoom       @relation(fields: [classRoomId], references: [id])
+  academicYear Int
+  term         Int
+  slots        TimetableSlot[]
+  scheduledSessions ScheduledClassSession[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@unique([subjectId, teacherId, classRoomId, academicYear, term])
+  @@index([academicYear, term])
+}
+
+model TimetableVersion {
+  id                 String                 @id @default(cuid())
+  schoolId           String
+  academicYear       Int
+  term               Int
+  versionName        String
+  status             TimetableVersionStatus @default(DRAFT)
+  isCurrentPublished Boolean                @default(false)
+  slots              TimetableSlot[]
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([schoolId, academicYear, term, status])
+}
+
+model TimetableSlot {
+  id                 String              @id @default(cuid())
+  timetableVersionId String
+  timetableVersion   TimetableVersion    @relation(fields: [timetableVersionId], references: [id], onDelete: Cascade)
+  offeringId         String
+  offering           SubjectOffering     @relation(fields: [offeringId], references: [id])
+  roomId             String
+  room               Room                @relation(fields: [roomId], references: [id])
+  dayOfWeek          Int
+  periodNumber       Int
+  recommendationRuns RecommendationRun[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@unique([timetableVersionId, offeringId, dayOfWeek, periodNumber])
+  @@unique([timetableVersionId, roomId, dayOfWeek, periodNumber])
+}
+
+model SchoolConfig {
+  id               String               @id @default(cuid())
+  schoolId         String               @unique
+  assignmentPolicy AssignmentPolicyType @default(DEPARTMENT)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+}
+
+model SubstituteWorkflow {
+  id                String                   @id @default(cuid())
+  leaveRequestId    String
+  timetableSlotId   String
+  date              DateTime
+  assignedTeacherId String
+  assignedBy        String
+  status            SubstituteWorkflowStatus @default(ASSIGNED)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  @@index([leaveRequestId, date])
+}
+
+model RecommendationRun {
+  id              String        @id @default(cuid())
+  leaveRequestId  String
+  timetableSlotId String
+  policy          String
+  candidatesJson  String
+  createdAt       DateTime      @default(now())
+  timetableSlot   TimetableSlot @relation(fields: [timetableSlotId], references: [id], onDelete: Cascade)
+
+  @@index([leaveRequestId])
+  @@index([timetableSlotId])
+}
+
+// ==========================================
+// ACADEMIC & GENERAL SUBSYSTEMS: FACILITIES & VEHICLE CATALOG
+// ==========================================
+
+enum ResourceType {
+  MEETING_ROOM
+  CLASSROOM
+  LABORATORY
+  VEHICLE
+  EQUIPMENT
+  OTHER
+}
+
+enum ResourceStatus {
+  AVAILABLE
+  UNDER_MAINTENANCE
+  OUT_OF_SERVICE
+  RETIRED
+}
+
+enum ReservationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  IN_USE
+  COMPLETED
+}
+
+enum AssignmentTargetType {
+  RESOURCE
+  DRIVER
+}
+
+enum ApprovalStepStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SKIPPED
+}
+
+enum RoomLayoutType {
+  THEATER
+  CLASSROOM
+  U_SHAPE
+  BANQUET
+  BOARDROOM
+  HOLLOW_SQUARE
+  CUSTOM
+}
+
+enum VehicleMissionType {
+  OFFICIAL_MEETING
+  STUDENT_COMPETITION
+  FIELD_TRIP
+  COMMUNITY_SERVICE
+  OTHER
+}
+
+model FacilityResource {
+  id             String                          @id @default(cuid())
+  code           String                          @unique
+  name           String
+  type           ResourceType
+  capacity       Int?
+  location       String?
+  description    String?                         @db.Text
+  status         ResourceStatus                  @default(AVAILABLE)
+  vehicleProfile VehicleProfile?
+  roomProfile    RoomProfile?
+  reservations   FacilityReservation[]
+  assignments    ReservationResourceAssignment[]
+  createdAt      DateTime                        @default(now())
+  updatedAt      DateTime                        @updatedAt
+
+  @@index([type, status])
+}
+
+model RoomProfile {
+  id                  String           @id @default(cuid())
+  resourceId          String           @unique
+  resource            FacilityResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  floor               String?
+  hasProjector        Boolean          @default(true)
+  hasSoundSystem      Boolean          @default(true)
+  hasVideoConference  Boolean          @default(false)
+  airConditionerCount Int              @default(2)
+}
+
+model VehicleProfile {
+  id              String           @id @default(cuid())
+  resourceId      String           @unique
+  resource        FacilityResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  licensePlate    String           @unique
+  brand           String?
+  model           String?
+  fuelType        String           @default("DIESEL")
+  seatCapacity    Int              @default(12)
+  currentOdometer Float            @default(0)
+}
+
+model DriverProfile {
+  id                 String                          @id @default(cuid())
+  userId             String                          @unique
+  user               User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  licenseNumber      String
+  licenseExpiry      DateTime?
+  phoneNumber        String
+  isActive           Boolean                         @default(true)
+  assignments        ReservationResourceAssignment[]
+  createdAt          DateTime                        @default(now())
+  updatedAt          DateTime                        @updatedAt
+
+  @@index([isActive])
+}
+
+model FacilityApprovalPolicy {
+  id                String       @id @default(cuid())
+  moduleType        ResourceType
+  stepNo            Int
+  roleRequired      String
+  title             String
+  slaHours          Int          @default(24)
+  bufferHoursBefore Int          @default(6)
+  isActive          Boolean      @default(true)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@unique([moduleType, stepNo])
+}
+
+model FacilityReservation {
+  id               String                          @id @default(cuid())
+  bookingNumber    String?                         @unique
+  resourceId       String
+  resource         FacilityResource                @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  reservedByUserId String
+  reservedByUser   User                            @relation("FacilityReservationsCreated", fields: [reservedByUserId], references: [id])
+  consumerModule   String                          @default("MANUAL")
+  title            String
+  purpose          String?                         @db.Text
+  startAt          DateTime
+  endAt            DateTime
+  expiresAt        DateTime?
+  attendeeCount    Int?
+  department       String?
+  contactPhone     String?
+  status           ReservationStatus               @default(PENDING)
+  currentStep      Int                             @default(1)
+  totalSteps       Int                             @default(2)
+  revisionNo       Int                             @default(1)
+  rejectionReason  String?
+  attachments      Json?
+  approvalSteps    FacilityApprovalStep[]
+  assignments      ReservationResourceAssignment[]
+  revisions        FacilityReservationRevision[]
+  postMissionReport FacilityPostMissionReport?
+  roomDetails      RoomReservationDetail?
+  vehicleDetails   VehicleReservationDetail?
+  createdAt              DateTime                        @default(now())
+  updatedAt              DateTime                        @updatedAt
+  idempotencyKey         String?                         @db.VarChar(128)
+  idempotencyPayloadHash String?                         @db.VarChar(64)
+
+  @@unique([reservedByUserId, idempotencyKey], map: "uq_facility_reservation_user_idempotency")
+  @@index([resourceId, status, startAt, endAt])
+  @@index([reservedByUserId, status])
+}
+
+model ReservationResourceAssignment {
+  id              String               @id @default(cuid())
+  reservationId   String
+  reservation     FacilityReservation  @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  targetType      AssignmentTargetType
+  resourceId      String?
+  resource        FacilityResource?    @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  driverProfileId String?
+  driverProfile   DriverProfile?       @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+  
+  // Qualification Snapshots
+  driverLicenseSnapshot           String?
+  driverLicenseExpirySnapshot     DateTime?
+  qualificationVerifiedAt         DateTime?
+  qualificationStatusAtAssignment String?   @default("VALID")
+  assignedByUserId                String?
+
+  startAt         DateTime
+  endAt           DateTime
+  status          ReservationStatus    @default(PENDING)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([resourceId, status, startAt, endAt])
+  @@index([driverProfileId, status, startAt, endAt])
+}
+
+model FacilityApprovalStep {
+  id             String              @id @default(cuid())
+  reservationId  String
+  reservation    FacilityReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  revisionNo     Int                 @default(1)
+  stepNo         Int
+  roleRequired   String
+  title          String
+  status         ApprovalStepStatus  @default(PENDING)
+  approverUserId String?
+  approver       User?               @relation("FacilityApprovalApprover", fields: [approverUserId], references: [id])
+  comment        String?             @db.Text
+  actedAt        DateTime?
+  idempotencyKey String?             @db.VarChar(128)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([reservationId, revisionNo, stepNo])
+  @@index([approverUserId, status])
+}
+
+model RoomReservationDetail {
+  id               String              @id @default(cuid())
+  reservationId    String              @unique
+  reservation      FacilityReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  layoutType       RoomLayoutType      @default(THEATER)
+  layoutNotes      String?             @db.Text
+  audioVisualNotes String?             @db.Text
+  cateringNotes    String?             @db.Text
+  requireAirCon    Boolean             @default(true)
+}
+
+model VehicleReservationDetail {
+  id                 String              @id @default(cuid())
+  reservationId      String              @unique
+  reservation        FacilityReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  missionType        VehicleMissionType  @default(OFFICIAL_MEETING)
+  origin             String              @default("โรงเรียนกุดจับประชาสรรค์")
+  destination        String
+  teacherCount       Int                 @default(1)
+  studentCount       Int                 @default(0)
+  passengerListNotes String?             @db.Text
+  driverAssignedAt   DateTime?
+  startMileage       Float?
+  endMileage         Float?
+  fuelCost           Float?
+  tripNotes          String?             @db.Text
+}
+
+model FacilityReservationRevision {
+  id                String              @id @default(cuid())
+  reservationId     String
+  reservation       FacilityReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  revisionNo        Int
+  snapshotPayload   Json
+  submittedByUserId String
+  submittedAt       DateTime            @default(now())
+  revisionReason    String?             @db.Text
+  createdAt         DateTime            @default(now())
+
+  @@unique([reservationId, revisionNo])
+  @@index([reservationId])
+}
+
+model FacilityPostMissionReport {
+  id                     String              @id @default(cuid())
+  reservationId          String              @unique
+  reservation            FacilityReservation @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  startMileage           Float?
+  endMileage             Float?
+  distanceKm             Float?
+  fuelCost               Decimal?            @db.Decimal(10, 2)
+  fuelReceiptKey         String?
+  incidentNotes          String?             @db.Text
+  vehicleConditionRating Int?
+  roomCleanlinessRating  Int?
+  reportedByUserId       String
+  reportedAt             DateTime            @default(now())
+  verifiedByUserId       String?
+  verifiedAt             DateTime?
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+}
+
+model FacilitySettings {
+  id                    String   @id @default("default")
+  guidelinesHtml        String?  @db.Text
+  hotlinePhone          String?  @default("042-261234")
+  buildingHotline       String?  @default("โทรภายใน 104")
+  vehicleHotline        String?  @default("โทรภายใน 105")
+  driverAssignerUserIds String   @default("")
+  driverPoolUserIds     String   @default("")
+  approverStep1UserIds  String   @default("")
+  approverStep2UserIds  String   @default("")
+  updatedAt             DateTime @updatedAt
+}
+
+model SignatureTokenLog {
+  jti        String    @id @unique
+  userId     String
+  docId      String
+  purpose    String
+  createdAt  DateTime  @default(now())
+  consumedAt DateTime?
+  expiresAt  DateTime
+
+  @@index([userId, docId])
+  @@index([expiresAt])
+}
+
+// ==========================================
+// ACADEMIC SUBSYSTEMS: EXAM SCHEDULING
+// ==========================================
+
+enum ExamTerm {
+  MIDTERM
+  FINAL
+  SPECIAL
+}
+
+model ExamPeriod {
+  id            String              @id @default(cuid())
+  academicYear  Int
+  term          Int                 // 1 or 2
+  examType      ExamTerm
+  title         String              // e.g., "การสอบกลางภาคเรียนที่ 1/2026"
+  startDate     DateTime
+  endDate       DateTime
+  desksPerRoom  Int                 @default(30)
+  isActive      Boolean             @default(true)
+  examSlots     ExamSubjectSlot[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+}
+
+model ExamSubjectSlot {
+  id            String                @id @default(cuid())
+  examPeriodId  String
+  examPeriod    ExamPeriod            @relation(fields: [examPeriodId], references: [id], onDelete: Cascade)
+  subjectCode   String
+  subjectName   String
+  gradeLevel    String                // e.g., "ม.1"
+  examDate      DateTime
+  startTime     String                // e.g., "08:30"
+  endTime       String                // e.g., "10:00"
+  durationMins  Int                   @default(90)
+  proctors      ExamProctorAssignment[]
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+}
+
+model ExamProctorAssignment {
+  id            String          @id @default(cuid())
+  slotId        String
+  slot          ExamSubjectSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  teacherId     String
+  teacherName   String
+  roomId        String
+  roomName      String
+  role          String          @default("MAIN_PROCTOR") // MAIN_PROCTOR, ASSISTANT
+  createdAt     DateTime        @default(now())
+
+  @@index([teacherId, slotId])
+}
+
+// ==========================================
+// ACADEMIC SUBSYSTEMS: PA & COMPETENCY
+// ==========================================
+
+model PaTargetConfig {
+  id                  String   @id @default(cuid())
+  academicYear        Int      @unique
+  targetPdHours       Int      @default(20) // เกณฑ์ชั่วโมง PD ขั้นต่ำต่อปี
+  competencyMaxScore  Int      @default(5)  // คะแนนเต็มแต่ละด้าน (1-5)
+  description         String?  @db.Text
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model PaAgreement {
+  id                  String                 @id @default(cuid())
+  academicYear        Int
+  teacherId           String
+  teacherName         String
+  departmentId        String
+  agreementTitle      String
+  status              String                 @default("SUBMITTED") // DRAFT, SUBMITTED, APPROVED
+  evaluations         CompetencyEvaluation[]
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  @@unique([academicYear, teacherId])
+}
+
+model PdHourLog {
+  id            String   @id @default(cuid())
+  teacherId     String
+  academicYear  Int
+  topic         String
+  organizer     String
+  hours         Float
+  completedDate DateTime
+  certificateUrl String?
+  isApproved    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
+
+model CompetencyEvaluation {
+  id              String      @id @default(cuid())
+  paAgreementId   String
+  paAgreement     PaAgreement @relation(fields: [paAgreementId], references: [id], onDelete: Cascade)
+  evaluatorId     String
+  evaluatorRole   String      // SUPERVISOR, DIRECTOR, PEER
+  dimension1Score Int         // การจัดการเรียนรู้
+  dimension2Score Int         // การบริหารจัดการชั้นเรียน
+  dimension3Score Int         // การพัฒนาตนเองและวิชาชีพ
+  dimension4Score Int         // การทำงานร่วมกับชุมชน
+  dimension5Score Int         // จริยธรรมและวิทยฐานะ
+  comments        String?     @db.Text
+  evaluatedAt     DateTime    @default(now())
+}
+
+// ==========================================
+// ACADEMIC PLANNING PLATFORM (CONTROL PLANE 100/100)
+// ==========================================
+
+enum PlanningStatus {
+  SETUP
+  IN_PLANNING
+  UNDER_REVIEW
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+model PlanningSession {
+  id                  String           @id @default(cuid())
+  name                String           // "การวางแผนวิชาการ ภาคเรียนที่ 1/2569"
+  academicYear        Int              // 2569
+  term                Int              // 1
+  curriculumVersionId String?
+  status              PlanningStatus   @default(SETUP)
+  readinessScore      Float            @default(0.0) // 0.00 - 100.00%
+  approvalSteps       ApprovalStep[]
+  createdById         String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@unique([academicYear, term])
+}
+
+model ApprovalStep {
+  id                String          @id @default(cuid())
+  planningSessionId String
+  planningSession   PlanningSession @relation(fields: [planningSessionId], references: [id], onDelete: Cascade)
+  stepOrder         Int             // 1: Dept Review, 2: Academic Review, 3: Director
+  roleRequired      String          // "HEAD_OF_DEPT", "ACADEMIC_DIRECTOR", "SCHOOL_DIRECTOR"
+  status            String          @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
+  comment           String?
+  approvedById      String?
+  approvedAt        DateTime?
+}
+
+model ReadinessIndicator {
+  id          String   @id @default(cuid())
+  code        String   @unique // e.g., "RULE_OFFERING_COVERAGE"
+  name        String   // "ความครอบคลุมการเปิดรายวิชาทุกห้องเรียน"
+  weight      Float    // e.g., 25.0 (%)
+  enabled     Boolean  @default(true)
+  expression  String   // e.g., "offeringPercent >= 100"
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ApprovalWorkflow {
+  id          String          @id @default(cuid())
+  name        String          @unique // e.g., "Standard 3-Stage Approval"
+  isDefault   Boolean         @default(true)
+  stages      ApprovalStage[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model ApprovalStage {
+  id          String           @id @default(cuid())
+  workflowId  String
+  workflow    ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  stageOrder  Int
+  stageName   String           // "หัวหน้ากลุ่มสาระการเรียนรู้", "รองผู้อำนวยการฝ่ายวิชาการ", "ผู้อำนวยการโรงเรียน"
+  roleName    String           // "HEAD_OF_DEPT", "ACADEMIC_DIRECTOR", "SCHOOL_DIRECTOR"
+  isMandatory Boolean          @default(true)
+}
+
+model AcademicCalendar {
+  id           String          @id @default(cuid())
+  academicYear Int             @unique
+  term         Int             @default(1)
+  title        String          // "ปฏิทินวิชาการ 2569"
+  events       AcademicEvent[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+model AcademicEvent {
+  id                 String           @id @default(cuid())
+  calendarId         String
+  calendar           AcademicCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  eventType          String           // "OPENING_DAY", "EXAM_WEEK", "HOLIDAY", "SCOUT_CAMP", "SPORTS_DAY", "PA_OBSERVATION"
+  title              String
+  startDate          DateTime
+  endDate            DateTime
+  locksTimetable     Boolean          @default(false)
+  locksSupervision   Boolean          @default(false)
+  description        String?
+  createdAt          DateTime         @default(now())
+}
+
+model ResourceItem {
+  id           String                @id @default(cuid())
+  code         String                @unique
+  name         String                // "ห้องปฏิบัติการเคมี 1", "หอประชุมใหญ่"
+  resourceType String                // "SCIENCE_LAB", "COMPUTER_LAB", "MUSIC_ROOM", "GYM", "STADIUM", "BUS", "AUDITORIUM"
+  capacity     Int                   @default(40)
+  location     String?
+  reservations ResourceReservation[]
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+}
+
+model ResourceReservation {
+  id           String       @id @default(cuid())
+  resourceId   String
+  resource     ResourceItem @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  reservedBy   String
+  reservedFor  String       // e.g., "ทดลองปฏิกิริยาเคมี ม.5/1"
+  startTime    DateTime
+  endTime      DateTime
+  status       String       @default("APPROVED") // PENDING, APPROVED, CANCELLED
+  createdAt    DateTime     @default(now())
+}
+
+model PlanningSandboxScenario {
+  id           String   @id @default(cuid())
+  name         String   // e.g., "Scenario A: เพิ่มคาบเน้นคณิต-วิทย์"
+  description  String?
+  academicYear Int
+  term         Int
+  isPublished  Boolean  @default(false)
+  payloadJson  Json     // Sandbox delta parameters
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model CourseWeightFactor {
+  id                String   @id @default(cuid())
+  subjectCode       String   @unique
+  preparationWeight Float    @default(1.0)
+  labWeight          Float    @default(1.1)
+  assessmentWeight Float    @default(1.0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// ==========================================
+// 🏛️ PROJECT PLANNING & BUDGET LEDGER SYSTEM
+// ==========================================
+
+model FiscalYear {
+  id            String           @id @default(cuid())
+  year          Int              @unique(map: "uk_fiscal_year_year") // e.g. 2569
+  title         String           // e.g. "ปีงบประมาณ พ.ศ. 2569"
+  startDate     DateTime         // 1 ต.ค.
+  endDate       DateTime         // 30 ก.ย.
+  status        String           @default("ACTIVE") // DRAFT, ACTIVE, CLOSED
+  isArchived    Boolean          @default(false)
+  budgetSources BudgetSource[]
+  projects      Project[]
+  transfers     BudgetTransfer[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+}
+
+model BudgetSource {
+  id                 String          @id @default(cuid())
+  fiscalYearId       String
+  fiscalYear         FiscalYear      @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  code               String          // e.g. "SUBSIDY_PER_HEAD", "OPERATING_FUND"
+  name               String          // e.g. "เงินอุดหนุนรายหัว", "เงินรายได้สถานศึกษา"
+  totalPlannedAmount Decimal         @default(0) @db.Decimal(19, 4)
+  tranches           BudgetTranche[]
+  projects           Project[]
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@unique([fiscalYearId, code], map: "uk_budget_source_fy_code")
+  @@index([fiscalYearId], map: "idx_budget_source_fy")
+}
+
+model BudgetTranche {
+  id                  String                      @id @default(cuid())
+  budgetSourceId      String
+  budgetSource        BudgetSource                @relation(fields: [budgetSourceId], references: [id], onDelete: Restrict)
+  trancheNo           Int                         // 1, 2, 3, 4
+  name                String                      // e.g. "ภาคเรียนที่ 1 (รอบ 70%)"
+  academicYear        Int                         // ปีการศึกษา e.g. 2569
+  semester            Int                         // ภาคเรียน 1 หรือ 2
+  expectedStartDate   DateTime?
+  expectedEndDate     DateTime?
+  plannedAmount       Decimal                     @default(0) @db.Decimal(19, 4)
+  isClosed            Boolean                     @default(false)
+  receipts            BudgetReceipt[]
+  activityAllocations ActivityTrancheAllocation[]
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+
+  @@unique([budgetSourceId, trancheNo], map: "uk_tranche_src_no")
+  @@index([budgetSourceId], map: "idx_tranche_src")
+}
+
+model BudgetReceipt {
+  id                String        @id @default(cuid())
+  idempotencyKey    String        @unique(map: "uk_receipt_idempotency")
+  budgetTrancheId   String
+  budgetTranche     BudgetTranche @relation(fields: [budgetTrancheId], references: [id], onDelete: Restrict)
+  amount            Decimal       @db.Decimal(19, 4)
+  receivedDate      DateTime
+  documentRef       String?       // เลขที่หนังสือแจ้งจัดสรร/ใบนำฝาก
+  bankStatement     String?       // เลขที่รายการเดินบัญชี
+  notes             String?
+  confirmedByUserId String
+  confirmedByUser   User          @relation("ReceiptConfirmedBy", fields: [confirmedByUserId], references: [id], onDelete: Restrict)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([budgetTrancheId], map: "idx_receipt_tranche")
+  @@index([confirmedByUserId], map: "idx_receipt_confirmed_by")
+  @@index([receivedDate], map: "idx_receipt_received_date")
+}
+
+model Project {
+  id                 String              @id @default(cuid())
+  fiscalYearId       String
+  fiscalYear         FiscalYear          @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  budgetSourceId     String
+  budgetSource       BudgetSource        @relation(fields: [budgetSourceId], references: [id], onDelete: Restrict)
+  departmentName     String?             // e.g. "ฝ่ายบริหารงานวิชาการ", "กลุ่มสาระการเรียนรู้วิทยาศาสตร์ฯ"
+  leaderUserId       String
+  leaderUser         User                @relation("ProjectLeader", fields: [leaderUserId], references: [id], onDelete: Restrict)
+  leaderName         String              @default("") // Immutable snapshot of User.name at creation time; leaderUserId is authoritative source of truth
+  code               String              // e.g. "PRJ-2569-001"
+  name               String              // ชื่อโครงการ
+  targetAcademicYear Int                 // ปีการศึกษาเป้าหมาย e.g. 2569
+  allocatedAmount    Decimal             @default(0) @db.Decimal(19, 4)
+  status             String              @default("APPROVED") // DRAFT, APPROVED, IN_PROGRESS, COMPLETED, CANCELLED
+  activities         ProjectActivity[]
+  attachments        ProjectAttachment[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@unique([fiscalYearId, code], map: "uk_project_fy_code")
+  @@index([fiscalYearId], map: "idx_project_fy")
+  @@index([budgetSourceId], map: "idx_project_budget_source")
+  @@index([leaderUserId], map: "idx_project_leader")
+  @@index([status], map: "idx_project_status")
+}
+
+model ProjectActivity {
+  id                 String                      @id @default(cuid())
+  projectId          String
+  project            Project                     @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  responsibleUserId  String
+  responsibleUser    User                        @relation("ActivityResponsible", fields: [responsibleUserId], references: [id], onDelete: Restrict)
+  activityNo         Int                         // 1, 2, 3...
+  name               String                      // ชื่อกิจกรรม
+  allocatedAmount    Decimal                     @default(0) @db.Decimal(19, 4)
+  plannedStartDate   DateTime?
+  plannedEndDate     DateTime?
+  status             String                      @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, COMPLETED, CANCELLED
+  trancheAllocations ActivityTrancheAllocation[]
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+
+  @@unique([projectId, activityNo], map: "uk_activity_project_no")
+  @@index([projectId, status], map: "idx_activity_project_status")
+  @@index([responsibleUserId], map: "idx_activity_responsible")
+}
+
+model ActivityTrancheAllocation {
+  id              String            @id @default(cuid())
+  activityId      String
+  activity        ProjectActivity   @relation(fields: [activityId], references: [id], onDelete: Restrict)
+  budgetTrancheId String
+  budgetTranche   BudgetTranche     @relation(fields: [budgetTrancheId], references: [id], onDelete: Restrict)
+  allocatedAmount Decimal           @db.Decimal(19, 4)
+  expenses        ActivityExpense[]
+  transfersFrom   BudgetTransfer[]  @relation("TransferFrom")
+  transfersTo     BudgetTransfer[]  @relation("TransferTo")
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([activityId, budgetTrancheId], map: "uk_alloc_activity_tranche")
+  @@index([budgetTrancheId], map: "idx_alloc_tranche")
+  @@index([activityId], map: "idx_alloc_activity")
+}
+
+model ActivityExpense {
+  id                String                    @id @default(cuid())
+  idempotencyKey    String                    @unique(map: "uk_expense_idempotency")
+  allocationId      String
+  allocation        ActivityTrancheAllocation @relation(fields: [allocationId], references: [id], onDelete: Restrict)
+  requestedByUserId String
+  requestedByUser   User                      @relation("ExpenseRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  approvedByUserId  String?
+  approvedByUser    User?                     @relation("ExpenseApprovedBy", fields: [approvedByUserId], references: [id], onDelete: Restrict)
+  expenseDate       DateTime
+  title             String
+  amount            Decimal                   @db.Decimal(19, 4)
+  receiptNo         String?
+  status            String                    @default("SUBMITTED") // DRAFT, SUBMITTED, APPROVED, REJECTED, REVERSED
+  rejectedReason    String?
+  submittedAt       DateTime?                 @default(now())
+  approvedAt        DateTime?
+  rejectedAt        DateTime?
+  attachments       ExpenseAttachment[]
+  reversal          ExpenseReversal?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  @@index([allocationId, status], map: "idx_expense_alloc_status")
+  @@index([expenseDate], map: "idx_expense_date")
+  @@index([requestedByUserId], map: "idx_expense_requested_by")
+  @@index([status], map: "idx_expense_status")
+}
+
+model ExpenseReversal {
+  id                String                    @id @default(cuid())
+  originalExpenseId String                    @unique(map: "uk_reversal_original_expense")
+  originalExpense   ActivityExpense           @relation(fields: [originalExpenseId], references: [id], onDelete: Restrict)
+  amount            Decimal                   @db.Decimal(19, 4)
+  reason            String
+  cancelledByUserId String
+  cancelledByUser   User                      @relation("ReversalCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: Restrict)
+  approvedByUserId  String?
+  approvedByUser    User?                     @relation("ReversalApprovedBy", fields: [approvedByUserId], references: [id], onDelete: Restrict)
+  status            String                    @default("APPROVED") // PENDING_APPROVAL, APPROVED, REJECTED
+  approvedAt        DateTime?                 @default(now())
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  @@index([cancelledByUserId], map: "idx_reversal_cancelled_by")
+}
+
+model BudgetTransfer {
+  id                String                    @id @default(cuid())
+  fiscalYearId      String
+  fiscalYear        FiscalYear                @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  fromAllocationId  String
+  fromAllocation    ActivityTrancheAllocation @relation("TransferFrom", fields: [fromAllocationId], references: [id], onDelete: Restrict)
+  toAllocationId    String
+  toAllocation      ActivityTrancheAllocation @relation("TransferTo", fields: [toAllocationId], references: [id], onDelete: Restrict)
+  amount            Decimal                   @db.Decimal(19, 4)
+  reason            String
+  requestedByUserId String
+  requestedByUser   User                      @relation("TransferRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  approvedByUserId  String?
+  approvedByUser    User?                     @relation("TransferApprovedBy", fields: [approvedByUserId], references: [id], onDelete: Restrict)
+  status            String                    @default("PENDING") // PENDING, APPROVED, REJECTED
+  approvedAt        DateTime?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  @@index([fiscalYearId], map: "idx_transfer_fiscal_year")
+  @@index([fromAllocationId], map: "idx_transfer_from_alloc")
+  @@index([toAllocationId], map: "idx_transfer_to_alloc")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  tableName String
+  recordId  String
+  action    String   // "CREATE", "UPDATE", "APPROVE", "REVERSE", "TRANSFER"
+  field     String?
+  oldValue  String?
+  newValue  String?
+  changedBy String   // userId
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([tableName, recordId], map: "idx_audit_table_record")
+  @@index([changedBy], map: "idx_audit_changed_by")
+  @@index([createdAt], map: "idx_audit_created_at")
+}
+
+model ProjectAttachment {
+  id               String   @id @default(cuid())
+  projectId        String
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  storageProvider  String   // "LOCAL", "SUPABASE_STORAGE", "GOOGLE_DRIVE_LINK"
+  objectKey        String   // file path or external URL
+  originalFileName String
+  mimeType         String?
+  fileSize         Int?
+  uploadedByUserId String
+  uploadedByUser   User     @relation("ProjectAttachmentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  createdAt        DateTime @default(now())
+
+  @@index([projectId], map: "idx_proj_attach_proj")
+  @@index([uploadedByUserId], map: "idx_proj_attach_user")
+}
+
+model ExpenseAttachment {
+  id               String          @id @default(cuid())
+  expenseId        String
+  expense          ActivityExpense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  storageProvider  String          // "LOCAL", "SUPABASE_STORAGE", "GOOGLE_DRIVE_LINK"
+  objectKey        String          // file path or external URL
+  originalFileName String
+  mimeType         String?
+  fileSize         Int?
+  uploadedByUserId String
+  uploadedByUser   User            @relation("ExpenseAttachmentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  createdAt        DateTime        @default(now())
+
+  @@index([expenseId], map: "idx_exp_attach_exp")
+  @@index([uploadedByUserId], map: "idx_exp_attach_user")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cloudflare R2 Universal Storage & Migration Models (Production-Grade)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum AccessLevel {
+  PRIVATE
+  PUBLIC
+}
+
+enum StorageProviderType {
+  R2
+  LOCAL
+  SUPABASE
+  NEON
+}
+
+enum UploadStatus {
+  PENDING
+  COMMITTED
+  ABORTED
+}
+
+enum MigrationStatus {
+  PENDING
+  UPLOADED
+  VERIFIED
+  CUTOVER
+  FAILED
+}
+
+model FileAttachment {
+  id                 String              @id @default(cuid())
+  storageProvider    StorageProviderType @default(R2)
+  objectKey          String              @unique
+  originalFileName   String
+  mimeType           String
+  fileSize           BigInt
+  checksumSha256     String
+  accessLevel        AccessLevel         @default(PRIVATE)
+
+  // Explicit Relations with Restrict Integrity (Guards Official Government Records)
+  leaveRequestId     String?
+  leaveRequest       LeaveRequest?       @relation(fields: [leaveRequestId], references: [id], onDelete: Restrict)
+
+  incomingDocumentId String?
+  incomingDocument   IncomingDocument?   @relation(fields: [incomingDocumentId], references: [id], onDelete: Restrict)
+
+  documentRecordId   String?
+  documentRecord     DocumentRecord?     @relation(fields: [documentRecordId], references: [id], onDelete: Restrict)
+
+  systemSettingsId   String?
+  systemSettings     SystemSettings?     @relation(fields: [systemSettingsId], references: [id], onDelete: Restrict)
+
+  certificateTemplates CertificateTemplate[]
+  uploadLog          StorageUploadLog?
+
+  // Lifecycle State Machine & Crash Recovery (Invariants M, Y, Z, 1-3)
+  attachmentStatus   AttachmentStatus    @default(ACTIVE)
+  orphanedAt         DateTime?
+  deletingAt         DateTime?           // Invariant Y: Crash recovery lease
+  deletionLeaseId    String?             // Invariant 3: Fenced claim token
+  uploadExpiresAt    DateTime?           // Invariant Z: Stale upload deadline
+  uploadSessionId    String?             @unique // Invariant AH: Idempotency key
+  cleanupAttempts    Int                 @default(0) // Invariant 2: Unified generic cleanup counter
+  lastCleanupError   String?             // Invariant 2: Unified error log
+
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([leaveRequestId])
+  @@index([incomingDocumentId])
+  @@index([documentRecordId])
+  @@index([systemSettingsId])
+  @@index([attachmentStatus, orphanedAt])
+  @@index([attachmentStatus, deletingAt])
+  @@index([attachmentStatus, uploadExpiresAt])
+}
+
+model StorageUploadLog {
+  id               String          @id @default(cuid())
+  objectKey        String          @unique
+  bucket           String
+  originalFileName String
+  mimeType         String
+  fileSize         BigInt
+  checksumSha256   String
+  status           UploadStatus    @default(PENDING)
+  uploadedBy       String
+  fileAttachmentId String?         @unique
+  fileAttachment   FileAttachment? @relation(fields: [fileAttachmentId], references: [id], onDelete: SetNull)
+  createdAt        DateTime        @default(now())
+  committedAt      DateTime?
+  abortedAt        DateTime?
+  error            String?
+
+  @@index([status, createdAt])
+}
+
+model StorageMigrationLog {
+  id                   String          @id @default(cuid())
+  sourceTable          String
+  sourceRecordId       String
+  sourceField          String
+  attachmentSlot       Int             @default(0)
+  attachmentId         String?
+  sourceChecksumSha256 String
+  destinationObjectKey String?
+  destChecksumSha256   String?
+  status               MigrationStatus @default(PENDING)
+  errorMessage         String?
+  migratedAt           DateTime?
+  verifiedAt           DateTime?
+  cutoverAt            DateTime?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  @@unique([sourceTable, sourceRecordId, sourceField, attachmentSlot])
+  @@index([status])
+}
+
+enum TemplateOrientation {
+  LANDSCAPE
+  PORTRAIT
+}
+
+enum TemplateScope {
+  PRIVATE
+  SCHOOL_SHARED
+  SYSTEM_PRESET
+}
+
+enum AttachmentStatus {
+  UPLOAD_PENDING
+  UPLOAD_CLEANUP
+  ACTIVE
+  PENDING_DELETE
+  DELETING
+}
+
+model CertificateTemplate {
+  id                     String               @id @default(cuid())
+  name                   String
+  schemaVersion          Int                  @default(1)
+  templateVersion        Int                  @default(1)
+  orientation            TemplateOrientation  @default(LANDSCAPE)
+  backgroundAttachmentId String
+  backgroundAttachment   FileAttachment       @relation(fields: [backgroundAttachmentId], references: [id], onDelete: Restrict)
+  layoutConfig           Json                 // Validated via CertificateTemplateV1Schema
+  scope                  TemplateScope        @default(PRIVATE)
+  createdById            String?
+  createdBy              User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  @@index([createdById])
+  @@index([scope, createdById])
+  @@index([backgroundAttachmentId])
+}
+
+enum PolicyType {
+  PRIVACY_NOTICE
+  TERMS_OF_USE
+}
+
+enum LegalBasisType {
+  PUBLIC_TASK
+  LEGAL_OBLIGATION
+  CONTRACT
+  CONSENT
+  LEGITIMATE_INTEREST
+  VITAL_INTEREST
+}
+
+enum Section26ConditionType {
+  EXPLICIT_CONSENT
+  VITAL_INTEREST_EMERGENCY
+  NON_PROFIT_BODY_LEGITIMATE_ACTIVITY
+  MANIFESTLY_PUBLIC_DATA
+  LEGAL_CLAIMS_AND_DEFENSE
+  LABOR_AND_SOCIAL_SECURITY_LAW
+  STATUTORY_PUBLIC_HEALTH
+  SUBSTANTIAL_PUBLIC_INTEREST
+}
+
+enum DataCategoryType {
+  GENERAL_IDENTITY
+  CONTACT_INFO
+  EMPLOYMENT_RECORD
+  SENSITIVE_HEALTH
+  SENSITIVE_BIOMETRIC
+  GEOLOCATION
+  DOCUMENT_ATTACHMENT
+  SYSTEM_AUDIT_LOG
+}
+
+enum ConsentStatus {
+  GIVEN
+  WITHDRAWN
+  REVOKED
+}
+
+enum AuditEventType {
+  POLICY_ACKNOWLEDGED
+  CONSENT_GIVEN
+  CONSENT_WITHDRAWN
+  CONSENT_REVOKED
+}
+
+enum AuditSubjectType {
+  POLICY_DOCUMENT
+  CONSENT_RECORD
+}
+
+enum AuditActorType {
+  USER
+  ADMIN
+  SYSTEM
+  MIGRATION
+}
+
+enum WithdrawalReasonCode {
+  USER_CHOICE
+  NO_LONGER_USING_FEATURE
+  DATA_MINIMIZATION_PREFERENCE
+}
+
+enum RevocationReasonCode {
+  ADMINISTRATIVE_DISCONTINUATION
+  SYSTEM_MIGRATION
+  STATUTORY_LEGAL_ORDER
+  ACCOUNT_DECOMMISSIONED
+}
+
+enum RetentionRuleType {
+  EVENT_BASED
+  FISCAL_YEAR_BASED
+  STATUTORY_LOG_90_DAYS
+}
+
+enum DisposalMethod {
+  SECURE_DESTROY
+  PERMANENT_ANONYMIZE
+  TRANSFER_TO_NATIONAL_ARCHIVES
+}
+
+model PolicyDocument {
+  id                      String                  @id @default(cuid())
+  type                    PolicyType
+  version                 String
+  title                   String
+  contentMarkdown         String                  @db.Text
+  contentHash             String
+  canonicalEngineVersion  String                  @default("v1")
+  effectiveAt             DateTime
+  publishedAt             DateTime                @default(now())
+  isCurrent               Boolean                 @default(false)
+  createdAt               DateTime                @default(now())
+
+  acknowledgments         PolicyAcknowledgment[]
+
+  @@unique([type, version])
+  @@unique([type], map: "unique_current_policy_per_type", where: { isCurrent: true })
+  @@index([type, isCurrent])
+}
+
+model PolicyAcknowledgment {
+  id                      String                  @id @default(cuid())
+  userId                  String
+  policyDocumentId        String
+  policyVersionSnapshot   String
+  contentHashSnapshot     String
+  source                  String                  @default("WEB_APP")
+  acknowledgedAt          DateTime                @default(now())
+  ipAddress               String?
+  userAgent               String?
+
+  user                    User                    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  policyDocument          PolicyDocument          @relation(fields: [policyDocumentId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, policyDocumentId])
+  @@index([userId])
+}
+
+model ProcessingActivity {
+  id                      String                  @id @default(cuid())
+  code                    String                  @unique
+  module                  String
+  name                    String
+  description             String?                 @db.Text
+  controllerName          String                  @default("โรงเรียนกุดจับประชาสรรค์")
+  dpoContact              String                  @default("kpschool_dpo@obec.moe.go.th")
+  dataSubjectCategory     String
+  retentionRuleType       RetentionRuleType       @default(EVENT_BASED)
+  retentionDurationMonths Int
+  retentionAuthority      String
+  disposalMethod          DisposalMethod          @default(SECURE_DESTROY)
+  recipientsSummary       String
+  crossBorderTransfer     Boolean                 @default(false)
+  crossBorderDetails      String?
+  active                  Boolean                 @default(true)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+
+  purposes                ProcessingPurpose[]
+
+  @@index([module, active])
+}
+
+model ProcessingPurpose {
+  id                      String                         @id @default(cuid())
+  activityId              String
+  code                    String                         @unique
+  name                    String
+  description             String?                        @db.Text
+  active                  Boolean                        @default(true)
+  createdAt               DateTime                       @default(now())
+  updatedAt               DateTime                       @updatedAt
+
+  activity                ProcessingActivity             @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  dataCategoryPolicies    ProcessingDataCategoryPolicy[]
+  consents                ConsentRecord[]
+
+  @@index([activityId, active])
+}
+
+model ProcessingDataCategoryPolicy {
+  id                      String                         @id @default(cuid())
+  purposeId               String
+  dataCategory            DataCategoryType
+  legalBasis              LegalBasisType
+  section26Condition      Section26ConditionType?
+  statutoryReference      String?
+  isMandatoryForOperation Boolean                        @default(true)
+
+  purpose                 ProcessingPurpose              @relation(fields: [purposeId], references: [id], onDelete: Cascade)
+
+  @@unique([purposeId, dataCategory, legalBasis])
+}
+
+model ConsentRecord {
+  id                      String                         @id @default(cuid())
+  userId                  String
+  purposeId               String
+  status                  ConsentStatus                  @default(GIVEN)
+  consentFormVersion      String
+  privacyNoticeVersion    String?
+  consentedAt             DateTime?
+  withdrawnAt             DateTime?
+  revokedAt               DateTime?
+  source                  String
+  createdAt               DateTime                       @default(now())
+  updatedAt               DateTime                       @updatedAt
+
+  user                    User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose                 ProcessingPurpose              @relation(fields: [purposeId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, purposeId])
+  @@index([userId, status])
+}
+
+model ConsentAuditLog {
+  id                             String                  @id @default(cuid())
+  eventId                        String                  @default(cuid())
+  correlationId                  String
+  eventType                      AuditEventType
+  subjectType                    AuditSubjectType
+  userId                         String
+  policyDocumentId               String?
+  policyVersionSnapshot          String?
+  contentHashSnapshot            String?
+  purposeId                      String?
+  purposeCodeSnapshot            String?
+  consentRecordId                String?
+  consentFormVersionSnapshot     String?
+  actorType                      AuditActorType          @default(USER)
+  actorId                        String?
+  source                         String
+  withdrawalReason               WithdrawalReasonCode?
+  revocationReason               RevocationReasonCode?
+  reasonDetail                   String?
+  occurredAt                     DateTime                @default(now())
+  ipAddress                      String?
+  userAgent                      String?
+
+  @@index([userId, occurredAt])
+  @@index([eventType, occurredAt])
+  @@index([correlationId])
+  @@index([eventId])
+}
+
+// ==========================================
+// 📝 ACADEMIC OMR EXAM & GRADING SUBSYSTEM (REV 7.3 FROZEN BASELINE)
+// ==========================================
+
+enum ExamSheetType {
+  SHEET_20_ITEMS
+  SHEET_50_ITEMS
+  SHEET_75_ITEMS
+  SHEET_100_ITEMS
+  CUSTOM
+}
+
+enum ExamItemStatus {
+  CORRECT
+  INCORRECT
+  BLANK
+  MULTIPLE_MARKS
+  FLAGGED_FOR_REVIEW
+  MANUALLY_OVERRIDDEN
+}
+
+enum SubmissionSyncStatus {
+  PENDING_SYNC
+  SYNCED
+  CONFLICT
+  SUPERSEDED
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. TEMPLATE VERSIONING (Immutable Master)
+// ─────────────────────────────────────────────────────────────────────────────
+model ExamTemplate {
+  id                  String         @id @default(cuid())
+  code                String         // e.g. "KP-OMR-A4-50"
+  version             Int            // 1, 2, 3...
+  name                String         // แบบฟอร์ม 50 ข้อ มาตรฐาน 2569
+  sheetType           ExamSheetType  @default(SHEET_50_ITEMS)
+  canvasWidth         Int            @default(1654)
+  canvasHeight        Int            @default(2339)
+  
+  gridMetadata        Json           // Strict Schema: markers, bubbles, studentId
+  calibrationDefaults Json           // Configurable CV Defaults
+  
+  isDeprecated        Boolean        @default(false)
+  examPapers          ExamPaper[]
+  createdAt           DateTime       @default(now())
+
+  @@unique([code, version], map: "uk_exam_template_code_version")
+  @@index([sheetType, isDeprecated])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. EXAM PAPER & PRINTED SHEET REGISTRY
+// ─────────────────────────────────────────────────────────────────────────────
+model ExamPaper {
+  id                   String                 @id @default(cuid())
+  subjectCode          String                 // e.g. "ว23101"
+  subjectName          String                 // e.g. "วิทยาศาสตร์ 5"
+  academicYear         Int                    // e.g. 2026
+  term                 Int                    // 1 หรือ 2
+  gradeLevel           String                 // e.g. "ม.3"
+  title                String                 // e.g. "สอบกลางภาคเรียนที่ 1/2569"
+  
+  templateId           String
+  template             ExamTemplate           @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  
+  totalItems           Int                    @default(50)
+  maxScore             Decimal                @db.Decimal(6, 2)
+  passScore            Decimal                @db.Decimal(6, 2)
+
+  totalSubjectiveItems Int                    @default(0)
+  subjectiveMaxScore   Decimal                @default(0.00) @db.Decimal(6, 2)
+  
+  createdById          String
+  createdBy            User                   @relation("ExamCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  
+  isDeleted            Boolean                @default(false)
+  deletedAt            DateTime?
+  deletedById          String?
+  deletedBy            User?                  @relation("ExamDeletedByUser", fields: [deletedById], references: [id], onDelete: SetNull)
+  purgeAt              DateTime?
+
+  answerKeys           ExamAnswerKey[]
+  keyVersions          ExamAnswerKeyVersion[]
+  subjectiveItems      ExamSubjectiveItem[]
+  printedSheets        ExamPrintedSheet[]
+  submissions          ExamSubmission[]
+  regradeJobs          ExamRegradeJob[]
+  
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  @@index([subjectCode, academicYear, term])
+  @@index([createdById, isDeleted])
+  @@index([isDeleted, purgeAt])
+}
+
+model ExamSubjectiveItem {
+  id           String     @id @default(cuid())
+  examPaperId  String
+  examPaper    ExamPaper  @relation(fields: [examPaperId], references: [id], onDelete: Cascade)
+  itemNo       Int        // 1..totalSubjectiveItems
+  title        String     // คำถาม / คำชี้แจง
+  maxScore     Decimal    @db.Decimal(5, 2)
+  rubricDetail String?    // เกณฑ์คะแนน
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([examPaperId, itemNo], map: "uk_subjective_item_paper_no")
+  @@index([examPaperId])
+}
+
+model ExamAnswerKeyVersion {
+  id          String     @id @default(cuid())
+  examPaperId String
+  examPaper   ExamPaper  @relation(fields: [examPaperId], references: [id], onDelete: Cascade)
+  version     Int        // 1, 2, 3...
+  keyPayload  Json       // Snapshot of answers [{ itemNo: 1, correctChoices: ["A"], points: 1.0 }, ...]
+  totalItems  Int
+  maxScore    Decimal    @db.Decimal(6, 2)
+  changedById String
+  changedBy   User       @relation("KeyVersionChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  reason      String?
+  createdAt   DateTime   @default(now())
+
+  submissions ExamSubmission[]
+  regradeJobs ExamRegradeJob[]
+
+  @@unique([examPaperId, version], map: "uk_paper_key_version")
+  @@index([examPaperId])
+}
+
+model ExamPrintedSheet {
+  id              String         @id @default(cuid())
+  sheetToken      String         @unique(map: "uk_printed_sheet_token") // Opaque CUID2
+  examPaperId     String
+  examPaper       ExamPaper      @relation(fields: [examPaperId], references: [id], onDelete: Restrict)
+  
+  studentId       String         // รหัสนักเรียน
+  studentName     String?
+  classroom       String?
+  seatNo          Int?
+  attemptNo       Int            @default(1)
+  isUsed          Boolean        @default(false)
+  usedAt          DateTime?
+  
+  createdAt       DateTime       @default(now())
+
+  @@unique([examPaperId, studentId, attemptNo], map: "uk_printed_sheet_paper_student_attempt")
+  @@index([sheetToken])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. ANSWER KEYS & NORMALIZED ITEMS
+// ─────────────────────────────────────────────────────────────────────────────
+model ExamAnswerKey {
+  id              String               @id @default(cuid())
+  examPaperId     String
+  examPaper       ExamPaper            @relation(fields: [examPaperId], references: [id], onDelete: Cascade)
+  versionCode     String               // e.g. "01", "02", "03", "04"
+  items           ExamAnswerKeyItem[]
+  
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@unique([examPaperId, versionCode], map: "uk_answer_key_paper_version")
+  @@index([examPaperId])
+}
+
+model ExamAnswerKeyItem {
+  id              String            @id @default(cuid())
+  answerKeyId     String
+  answerKey       ExamAnswerKey     @relation(fields: [answerKeyId], references: [id], onDelete: Cascade)
+  itemNo          Int               // 1..totalItems (Validated via Trigger & Service)
+  correctChoices  String[]          // Checked by cardinality() BETWEEN 1 AND 5
+  points          Decimal           @default(1.00) @db.Decimal(5, 2)
+  penaltyPoints   Decimal           @default(0.00) @db.Decimal(5, 2)
+  
+  @@unique([answerKeyId, itemNo], map: "uk_answer_key_item_no")
+  @@index([answerKeyId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. SUBMISSION ATTEMPTS & MATERIALIZED CACHE
+// ─────────────────────────────────────────────────────────────────────────────
+model ExamSubmission {
+  id                  String               @id @default(cuid())
+  clientScanId        String               @unique(map: "uk_submission_client_scan_id") // Idempotency Key
+  examPaperId         String
+  examPaper           ExamPaper            @relation(fields: [examPaperId], references: [id], onDelete: Restrict)
+  
+  studentId           String
+  studentName         String?
+  classroom           String?
+  seatNo              Int?
+  versionCode         String               @default("01")
+  attemptNo           Int                  @default(1)
+  isLatestAttempt     Boolean              @default(true)
+  
+  // ⚠️ DERIVED MATERIALIZED SNAPSHOT ONLY: Updated exclusively via recalculateSubmissionScore
+  rawScore            Decimal              @db.Decimal(6, 2)
+  subjectiveScore     Decimal              @default(0.00) @db.Decimal(6, 2)
+  subjectiveScores    Json?                // Map of itemNo -> score
+  netScore            Decimal              @db.Decimal(6, 2)
+  totalCorrect        Int                  @default(0)
+  totalIncorrect      Int                  @default(0)
+  totalBlanks         Int                  @default(0)
+  totalMultiple       Int                  @default(0)
+  gradingVersion      Int                  @default(1)
+  gradingVersionId    String?
+  gradingKeyVersion   ExamAnswerKeyVersion? @relation(fields: [gradingVersionId], references: [id], onDelete: SetNull)
+  
+  confidenceAvg       Decimal              @db.Decimal(4, 3)
+  hasAnomalies        Boolean              @default(false)
+  isVerifiedByTeacher Boolean              @default(false)
+  verifiedByUserId    String?
+  verifiedAt          DateTime?
+  
+  scannedImageKey     String?              // Pure ASCII Storage Key
+  syncStatus          SubmissionSyncStatus @default(SYNCED)
+
+  // Raw Image Chain of Custody & Detection Metadata
+  rawImageHash        String?              // SHA-256 of master original
+  processedImageHash  String?              // SHA-256 of normalized perspective image
+  rawStorageKey       String?              // Storage Key for WORM Archival Master
+  processedStorageKey String?              // Storage Key for WebP Detection/Preview
+  detectorVersion     String?              @default("REV_9.0_HYBRID")
+  thresholdProfile    String?              @default("STANDARD_A4")
+  ingestedAt          DateTime             @default(now())
+
+  // Student Identity & Historical Snapshots
+  studentCodeSnapshot String?
+  classSnapshot       String?
+  examRosterId        String?
+  studentIdentityStatus StudentIdentityStatus @default(IDENTIFIED)
+  mappingReason       String?
+  
+  itemSubmissions     ExamItemSubmission[]
+  scannedAt           DateTime             @default(now())
+  scannedByUserId     String
+  scannedByUser       User                 @relation("ExamScannedBy", fields: [scannedByUserId], references: [id], onDelete: Restrict)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  // Partial Unique Index: 1 Latest Attempt per student per exam
+  @@unique([examPaperId, studentId], map: "uk_latest_submission_per_student", where: { isLatestAttempt: true })
+  @@index([examPaperId, classroom])
+  @@index([scannedByUserId])
+  @@index([syncStatus])
+  @@index([gradingVersionId])
+  @@index([examPaperId, isLatestAttempt, createdAt, id], map: "ExamSubmission_paper_latest_created_id_idx")
+}
+
+// ⭐ SINGLE SOURCE OF TRUTH (Leaf Item Scores)
+model ExamItemSubmission {
+  id                  String             @id @default(cuid())
+  submissionId        String
+  submission          ExamSubmission     @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  itemNo              Int
+  
+  detectedChoices     String[]
+  fillRatios          Json
+  confidenceScore     Decimal            @db.Decimal(4, 3)
+  
+  overrideVersion     Int                @default(0)
+  detectionStatus     DetectionStatus    @default(SINGLE_MARK)
+  overrideChoice      String?            // Manual Override by Teacher
+  effectiveChoice     String?            // Source of Truth for recalculation
+  isOverridden        Boolean            @default(false)
+  
+  isCorrect           Boolean            @default(false)
+  scoreEarned         Decimal            @db.Decimal(4, 2) @default(0)
+  status              ExamItemStatus     @default(CORRECT)
+
+  overrides           ExamItemOverride[]
+
+  @@unique([submissionId, itemNo], map: "uk_item_submission_item_no")
+  @@index([submissionId])
+}
+
+model ExamItemOverride {
+  id               String             @id @default(cuid())
+  submissionItemId String
+  submissionItem   ExamItemSubmission @relation(fields: [submissionItemId], references: [id], onDelete: Restrict)
+  sequenceNo       BigInt
+  previousChoice   String?
+  overrideChoice   String
+  reason           String             @db.Text
+  actorUserId      String
+  requestId        String
+  createdAt        DateTime           @default(now())
+
+  @@unique([submissionItemId, sequenceNo])
+  @@index([submissionItemId, createdAt])
+  @@index([actorUserId, createdAt])
+}
+
+model AuditEvent {
+  id                      String   @id @default(cuid())
+  entityType              String
+  entityId                String
+  action                  String
+  actorUserId             String
+  actorNameSnapshot       String
+  actorRoleSnapshot       String
+  actorDepartmentSnapshot String?
+  requestId               String
+  correlationId           String
+  source                  String   @default("WEB_PORTAL")
+  previousState           Json?
+  newState                Json?
+  metadata                Json?
+  createdAt               DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([correlationId])
+}
+
+enum OutboxEventStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
+model OutboxEvent {
+  id            String            @id @default(cuid())
+  aggregateType String
+  aggregateId   String
+  eventType     String
+  payload       Json
+  status        OutboxEventStatus @default(PENDING)
+  retryCount    Int               @default(0)
+  errorMessage  String?
+  createdAt     DateTime          @default(now())
+  processedAt   DateTime?
+
+  @@index([status, createdAt])
+}
+
+enum StudentIdentityStatus {
+  IDENTIFIED
+  UNMAPPED
+  AMBIGUOUS
+  BLANK
+  UNRESOLVED
+  PHANTOM
+}
+
+enum DetectionStatus {
+  SINGLE_MARK
+  MULTIPLE_MARKS
+  NO_MARK
+  AMBIGUOUS
+  LOW_CONFIDENCE
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. IMMUTABLE AUDIT LOG (100% PURE SNAPSHOT - NO FK COUPLING)
+// ─────────────────────────────────────────────────────────────────────────────
+model ExamAuditLog {
+  id                   String       @id @default(cuid())
+  examPaperIdSnapshot  String       // Pure Snapshot Scalar
+  submissionIdSnapshot String?      // Pure Snapshot Scalar
+  
+  action               String       // "SCAN_INGEST", "MANUAL_OVERRIDE", "RECALCULATE_SCORES", "ANSWER_KEY_MUTATION", "PAPER_RESTORED"
+  performedByUserId    String       // User ID Snapshot
+  details              Json         // Diff / Snapshot details
+  ipAddress            String?
+  userAgent            String?
+  createdAt            DateTime     @default(now())
+
+  @@index([examPaperIdSnapshot, createdAt], map: "idx_audit_paper_created")
+  @@index([performedByUserId], map: "idx_audit_user")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. ASYNCHRONOUS REGRADE JOB & CONCURRENCY LEASE
+// ─────────────────────────────────────────────────────────────────────────────
+enum RegradeJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  SUPERSEDED
+}
+
+model ExamRegradeJob {
+  id                   String               @id @default(cuid())
+  examPaperId          String
+  examPaper            ExamPaper            @relation(fields: [examPaperId], references: [id], onDelete: Cascade)
+  targetKeyVersionId   String
+  targetKeyVersion     ExamAnswerKeyVersion @relation(fields: [targetKeyVersionId], references: [id], onDelete: Cascade)
+  status               RegradeJobStatus     @default(PENDING)
+  workerToken          String?
+  leaseExpiresAt       DateTime?
+  totalSubmissions     Int                  @default(0)
+  processedSubmissions Int                  @default(0)
+  snapshotEndCreatedAt DateTime?
+  snapshotEndId        String?
+  cursorCreatedAt      DateTime?
+  cursorId             String?
+  batchSize            Int                  @default(50)
+  errorMessage         String?
+  createdById          String?
+  createdBy            User?                @relation("ExamRegradeJobCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  startedAt            DateTime?
+  completedAt          DateTime?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  @@index([examPaperId, status])
+}
+
+// ============================================================================
+// 🧑‍🤝‍🧑 STUDENT AFFAIRS FORENSIC CORE (REV 3.9)
+// ============================================================================
+
+enum StudentStatus {
+  ACTIVE
+  SUSPENDED
+  TRANSFERRED
+  DROPPED_OUT
+  GRADUATED
+}
+
+enum EnrollmentStatus {
+  ENROLLED
+  TRANSFERRED_OUT
+  COMPLETED
+  DROPPED
+}
+
+enum StudentDecommissionReason {
+  DUPLICATE_RECORD_MERGE
+  COURT_OR_LEGAL_ORDER
+  DATA_MIGRATION_CLEANUP
+  SYSTEM_DECOMMISSION
+}
+
+enum StudentGender {
+  MALE
+  FEMALE
+}
+
+enum ScheduledSessionType {
+  REGULAR
+  MAKEUP
+  CANCELLED_HOLIDAY
+  CANCELLED_TEACHER_DUTY
+  CANCELLED_SCHOOL_EVENT
+}
+
+enum StudentAttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  LEAVE
+  ACTIVITY
+}
+
+enum AttendanceExemptionStatus {
+  NONE
+  PENDING_REVIEW
+  EXEMPTED_OFFICIAL
+  REJECTED
+}
+
+enum BehaviorLedgerType {
+  DEMERIT             // points < 0
+  MERIT               // points > 0
+  CORRECTION_CREDIT   // points > 0
+  CORRECTION_DEBIT    // points < 0
+}
+
+enum BehaviorCategory {
+  PUNCTUALITY
+  DRESS_CODE
+  ATTENDANCE
+  SUBSTANCE_ABUSE
+  VIOLENCE_BULLYING
+  GAMBLING
+  HONOR_INTEGRITY
+  VOLUNTEER_MERIT
+  ACADEMIC_EXCELLENCE
+  SPECIAL_ACHIEVEMENT
+  OTHER
+}
+
+enum EvaluatorType {
+  TEACHER
+  PARENT
+  STUDENT
+}
+
+enum SdqLevel {
+  NORMAL
+  AT_RISK
+  PROBLEM
+}
+
+enum CctPovertyLevel {
+  EXTREMELY_POOR
+  POOR
+  NOT_POOR
+}
+
+enum CasePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum CaseStatus {
+  DRAFT
+  OPEN
+  IN_PROGRESS
+  FOLLOW_UP
+  RESOLVED
+  CLOSED
+  ESCALATED
+  CANCELLED
+}
+
+enum CaseOutcome {
+  PENDING
+  IMPROVED
+  STABLE
+  WORSENED
+}
+
+enum RiskLevel {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  NORMAL
+}
+
+enum NominationStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  ISSUED
+}
+
+enum AttachmentEntityType {
+  HOME_VISIT
+  BEHAVIOR_EVIDENCE
+  CASE_DOC
+}
+
+enum AttachmentCategory {
+  HOME_VISIT_FAMILY
+  HOME_VISIT_HOUSE_EXTERIOR
+  HOME_VISIT_HOUSE_INTERIOR
+  BEHAVIOR_EVIDENCE
+  CASE_INTERVENTION_DOCUMENT
+}
+
+enum CctManifestStatus {
+  PENDING_UPLOAD
+  VERIFIED
+  FAILED
+}
+
+// -------------------------------------------------------------
+// 1. Identity & Enrollment History (Atomic Status Guarded)
+// -------------------------------------------------------------
+
+model Student {
+  id              String                     @id @default(cuid())
+  studentCode     String                     @unique
+  nationalId      String?
+  title           String
+  firstName       String
+  lastName        String
+  nickname        String?
+  gender          StudentGender              @default(MALE)
+  birthDate       DateTime?
+  status          StudentStatus              @default(ACTIVE)
+  
+  homeAddress     String?
+  parentName      String?
+  parentPhone     String?
+  
+  deletedAt       DateTime?
+  deletedById     String?
+  deletedBy       User?                      @relation("StudentDeleter", fields: [deletedById], references: [id], onDelete: Restrict)
+  deletionReason  StudentDecommissionReason?
+  
+  enrollments     StudentEnrollment[]
+  statusHistories StudentStatusHistory[]
+  behaviorRecords BehaviorRecord[]
+  yearlyProjections StudentYearlyBehaviorProjection[]
+  homeVisits      StudentHomeVisit[]
+  sdqEvaluations  StudentSdqEvaluation[]
+  riskAssessments StudentRiskAssessment[]
+  interventionCases StudentInterventionCase[]
+  certNominations StudentMeritNomination[]
+  medicalCertificates StudentMedicalCertificate[]
+  
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model StudentStatusHistory {
+  id            String        @id @default(cuid())
+  studentId     String
+  student       Student       @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  fromStatus    StudentStatus
+  toStatus      StudentStatus
+  effectiveDate DateTime
+  reason        String
+  changedById   String
+  changedBy     User          @relation(fields: [changedById], references: [id], onDelete: Restrict)
+  createdAt     DateTime      @default(now())
+
+  @@index([studentId, effectiveDate])
+}
+
+model StudentEnrollment {
+  id           String           @id @default(cuid())
+  studentId    String
+  student      Student          @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  academicYear Int
+  term         Int              // CHECK IN (1, 2)
+  classRoomId  String
+  classRoom    ClassRoom        @relation(fields: [classRoomId], references: [id], onDelete: Restrict)
+  gradeLevel   Int              // CHECK BETWEEN 1 AND 6
+  roomNumber   Int              // CHECK >= 1
+  rollNumber   Int              // CHECK >= 1
+  status       EnrollmentStatus @default(ENROLLED)
+  advisorId    String?
+  advisor      User?            @relation("AdvisorEnrollments", fields: [advisorId], references: [id], onDelete: Restrict)
+  
+  morningAttendances StudentMorningAttendance[]
+  periodAttendances  StudentPeriodAttendance[]
+  riskAssessments    StudentRiskAssessment[]
+  
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@unique([studentId, academicYear, term], map: "uk_student_enrollment_term")
+  @@index([academicYear, term, gradeLevel, roomNumber])
+}
+
+// -------------------------------------------------------------
+// 2. Behavior Ledger & Projected Scores (Native Date & Clean Projection)
+// -------------------------------------------------------------
+
+model BehaviorRecord {
+  id                  String             @id @default(cuid())
+  studentId           String
+  student             Student            @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  academicYear        Int
+  sequenceNo          BigInt
+  type                BehaviorLedgerType
+  category            BehaviorCategory
+  points              Int                // CHECK points != 0 & sign
+  balanceAfter        Int
+  
+  businessDate        DateTime           @db.Date // Native PostgreSQL DATE
+  incidentTimestamp   DateTime
+  location            String?
+  description         String
+  
+  correctionForId     String?            // Partial unique index uk_behavior_single_correction
+  correctionFor       BehaviorRecord?    @relation("CorrectionRelation", fields: [correctionForId], references: [id], onDelete: Restrict)
+  corrections         BehaviorRecord[]   @relation("CorrectionRelation")
+  
+  reportedById        String
+  reportedBy          User               @relation(fields: [reportedById], references: [id], onDelete: Restrict)
+  
+  createdAt           DateTime           @default(now())
+
+  @@unique([studentId, academicYear, sequenceNo], map: "uk_student_behavior_seq")
+  @@index([academicYear, category])
+}
+
+model StudentYearlyBehaviorProjection {
+  id               String   @id @default(cuid())
+  studentId        String
+  student          Student  @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  academicYear     Int
+  startingScore    Int      @default(100)
+  currentScore     Int      @default(100)
+  totalDemerit     Int      @default(0)
+  totalMerit       Int      @default(0)
+  recordCount      Int      @default(0)
+  lastCalculatedAt DateTime @default(now())
+
+  @@unique([studentId, academicYear], map: "uk_student_yearly_behavior")
+  @@index([academicYear, currentScore])
+}
+
+// -------------------------------------------------------------
+// 3. Timezone-Strict Attendance & Authoritative 80% Schedule (Native Date)
+// -------------------------------------------------------------
+
+model ScheduledClassSession {
+  id                    String               @id @default(cuid())
+  offeringId            String
+  offering              SubjectOffering      @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  businessDate          DateTime             @db.Date // Native PostgreSQL DATE
+  periodNumber          Int                  // CHECK BETWEEN 1 AND 8
+  sessionType           ScheduledSessionType @default(REGULAR)
+  isEligibleDenominator Boolean              @default(true)
+  cancellationReason    String?
+  createdById           String
+  createdBy             User                 @relation("CreatedScheduledSessions", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt             DateTime             @default(now())
+
+  periodAttendances     StudentPeriodAttendance[]
+
+  @@unique([offeringId, businessDate, periodNumber], map: "uk_scheduled_class_session")
+  @@index([businessDate, offeringId])
+}
+
+model StudentMorningAttendance {
+  id            String                     @id @default(cuid())
+  enrollmentId  String
+  enrollment    StudentEnrollment          @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  businessDate  DateTime                   @db.Date // Native PostgreSQL DATE
+  recordedAt    DateTime                   @default(now())
+  status        StudentAttendanceStatus    @default(PRESENT)
+  medicalCertId String?
+  medicalCert   StudentMedicalCertificate? @relation(fields: [medicalCertId], references: [id], onDelete: Restrict)
+  remarks       String?
+  recordedById  String
+  recordedBy    User                       @relation(fields: [recordedById], references: [id], onDelete: Restrict)
+
+  @@unique([enrollmentId, businessDate], map: "uk_student_morning_attendance")
+  @@index([businessDate, status])
+}
+
+model StudentPeriodAttendance {
+  id                 String                    @id @default(cuid())
+  enrollmentId       String
+  enrollment         StudentEnrollment         @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  scheduledSessionId String
+  scheduledSession   ScheduledClassSession     @relation(fields: [scheduledSessionId], references: [id], onDelete: Restrict)
+  status             StudentAttendanceStatus   @default(PRESENT)
+  exemptionStatus    AttendanceExemptionStatus @default(NONE)
+  medicalCertId      String?
+  medicalCert        StudentMedicalCertificate? @relation(fields: [medicalCertId], references: [id], onDelete: Restrict)
+  remarks            String?
+  recordedById       String
+  recordedBy         User                      @relation(fields: [recordedById], references: [id], onDelete: Restrict)
+  recordedAt         DateTime                  @default(now())
+
+  @@unique([enrollmentId, scheduledSessionId], map: "uk_student_period_attendance")
+  @@index([scheduledSessionId, status])
+}
+
+model StudentMedicalCertificate {
+  id                 String                     @id @default(cuid())
+  studentId          String
+  student            Student                    @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  startDate          DateTime                   @db.Date // Native PostgreSQL DATE
+  endDate            DateTime                   @db.Date // Native PostgreSQL DATE
+  hospitalName       String
+  diagnosis          String?
+  storageKey         String                     // Pure ASCII canonical path
+  sha256             String                     // 64-character lowercase hex
+  byteSize           BigInt                     // CHECK > 0
+  isVerified         Boolean                    @default(false)
+  verifiedById       String?
+  verifiedBy         User?                      @relation("MedicalCertVerifier", fields: [verifiedById], references: [id], onDelete: Restrict)
+  verifiedAt         DateTime?
+  
+  morningAttendances StudentMorningAttendance[]
+  periodAttendances  StudentPeriodAttendance[]
+  createdAt          DateTime                   @default(now())
+
+  @@index([studentId, startDate, endDate])
+}
+
+// -------------------------------------------------------------
+// 4. Home Visit & SDQ (Direct Norms FK & Clean Attachments)
+// -------------------------------------------------------------
+
+model StudentHomeVisit {
+  id                  String          @id @default(cuid())
+  studentId           String
+  student             Student         @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  academicYear        Int
+  term                Int             // CHECK IN (1, 2)
+  visitRound          Int             @default(1) // CHECK BETWEEN 1 AND 10
+  visitDate           DateTime
+  
+  latitude            Float?
+  longitude           Float?
+  guardianIncomeMonth Decimal?        @db.Decimal(10, 2)
+  dependentCount      Int             @default(0)
+  
+  houseCondition      String?
+  roofMaterial        String?
+  wallMaterial        String?
+  floorMaterial       String?
+  waterSource         String?
+  toiletType          String?
+  electricitySource   String?
+  hasCar              Boolean         @default(false)
+  hasMotorcycle       Boolean         @default(false)
+  hasAirConditioner   Boolean         @default(false)
+  agriculturalLandRai Float?          @default(0)
+  
+  distanceKm          Float?
+  commuteMethod       String?
+  commuteCostPerDay   Decimal?        @db.Decimal(8, 2)
+  
+  cctEstimatedPoverty CctPovertyLevel @default(NOT_POOR)
+  cctPmtScore         Float?
+  
+  visitorTeacherId    String
+  visitorTeacher      User            @relation(fields: [visitorTeacherId], references: [id], onDelete: Restrict)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@unique([studentId, academicYear, term, visitRound], map: "uk_student_home_visit")
+}
+
+model SdqNormsRegistry {
+  id                  String                 @id @default(cuid())
+  instrumentVersion   String                 // "SDQ-TH-2558-V1"
+  scoringVersion      String                 // "DOH-TH-NORMS-2015"
+  evaluatorType       EvaluatorType          // TEACHER, PARENT, STUDENT
+  targetAgeMin        Int                    // 11
+  targetAgeMax        Int                    // 18
+  reverseScoredItems  Json                   // [7, 11, 14, 21, 25]
+  subscaleDefinitions Json
+  cutoffsJson         Json
+  isImmutable         Boolean                @default(false)
+  
+  evaluations         StudentSdqEvaluation[]
+  createdAt           DateTime               @default(now())
+
+  @@unique([instrumentVersion, scoringVersion, evaluatorType, targetAgeMin, targetAgeMax], map: "uk_sdq_norms")
+}
+
+model StudentSdqEvaluation {
+  id                 String           @id @default(cuid())
+  studentId          String
+  student            Student          @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  academicYear       Int
+  term               Int              // CHECK IN (1, 2)
+  evaluatorType      EvaluatorType
+  
+  normRegistryId     String
+  normRegistry       SdqNormsRegistry @relation(fields: [normRegistryId], references: [id], onDelete: Restrict)
+  
+  emotionalScore     Int              // CHECK BETWEEN 0 AND 10
+  conductScore       Int              // CHECK BETWEEN 0 AND 10
+  hyperactivityScore Int              // CHECK BETWEEN 0 AND 10
+  peerProblemScore   Int              // CHECK BETWEEN 0 AND 10
+  prosocialScore     Int              // CHECK BETWEEN 0 AND 10
+  totalDifficulties  Int              // CHECK total = sum(4 subscales)
+  
+  overallLevel       SdqLevel
+  rawAnswersJson     Json
+  evaluatorId        String
+  evaluator          User             @relation(fields: [evaluatorId], references: [id], onDelete: Restrict)
+  createdAt          DateTime         @default(now())
+
+  @@unique([studentId, academicYear, term, evaluatorType], map: "uk_student_sdq_eval")
+}
+
+// -------------------------------------------------------------
+// 5. Early Warning System & PDCA Intervention (1-to-Many Fix)
+// -------------------------------------------------------------
+
+model StudentRiskAssessment {
+  id              String                   @id @default(cuid())
+  studentId       String
+  student         Student                  @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  enrollmentId    String
+  enrollment      StudentEnrollment        @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  academicYear    Int
+  term            Int                      // CHECK IN (1, 2)
+  evaluationCycle String
+  riskLevel       RiskLevel
+  riskScore       Float                    // CHECK BETWEEN 0.0 AND 100.0
+  ruleVersion     String
+  signalsJson     Json
+  explanationJson Json
+  calculatedAt    DateTime                 @default(now())
+  
+  triggeredCaseId String?
+  triggeredCase   StudentInterventionCase? @relation("CaseRiskAssessments", fields: [triggeredCaseId], references: [id], onDelete: Restrict)
+
+  @@unique([enrollmentId, ruleVersion, evaluationCycle], map: "uk_student_risk_cycle")
+  @@index([academicYear, term, riskLevel])
+}
+
+model StudentInterventionCase {
+  id                   String                  @id @default(cuid())
+  caseNumber           String                  @unique
+  studentId            String
+  student              Student                 @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  title                String
+  priority             CasePriority            @default(MEDIUM)
+  status               CaseStatus              @default(OPEN)
+  triggerReason        String
+  actionPlan           String
+  targetOutcome        String
+  dueDate              DateTime?
+  
+  riskAssessments      StudentRiskAssessment[] @relation("CaseRiskAssessments")
+  
+  assignedToId         String
+  assignedTo           User                    @relation("CaseAssignee", fields: [assignedToId], references: [id], onDelete: Restrict)
+  createdById          String
+  createdBy            User                    @relation("CaseCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  
+  outcome              CaseOutcome             @default(PENDING)
+  outcomeNotes         String?
+  resolvedAt           DateTime?
+  
+  activities           InterventionActivity[]
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  @@index([status, priority])
+  @@index([assignedToId])
+}
+
+model InterventionActivity {
+  id               String                  @id @default(cuid())
+  caseId           String
+  case             StudentInterventionCase @relation(fields: [caseId], references: [id], onDelete: Restrict)
+  actionDate       DateTime
+  activityTitle    String
+  details          String
+  nextFollowUpDate DateTime?
+  recordedById     String
+  recordedBy       User                    @relation(fields: [recordedById], references: [id], onDelete: Restrict)
+  createdAt        DateTime                @default(now())
+
+  @@index([caseId, actionDate])
+}
+
+// -------------------------------------------------------------
+// 6. Custody, Audit & Manifest (Tombstone & Compensating Storage)
+// -------------------------------------------------------------
+
+model StudentAffairsAttachment {
+  id              String               @id @default(cuid())
+  entityType      AttachmentEntityType
+  entityId        String
+  category        AttachmentCategory   @default(HOME_VISIT_FAMILY)
+  storageKey      String               // Pure ASCII canonical path
+  sha256          String               // 64-character lowercase hex
+  mimeType        String
+  byteSize        BigInt               // CHECK > 0
+  objectVersion   String               @default("v1")
+  imageWidth      Int?
+  imageHeight     Int?
+  uploadedAt      DateTime             @default(now())
+  uploadedById    String
+  retentionUntil  DateTime?
+  isQuarantined   Boolean              @default(false)
+  
+  // Tombstone Invariant (Triad CHECK Enforced)
+  isTombstoned    Boolean              @default(false)
+  tombstonedAt    DateTime?
+  tombstonedById  String?
+  tombstoneReason String?
+
+  @@index([entityType, entityId])
+  @@index([category])
+}
+
+model StudentAffairsAuditLog {
+  id                String   @id @default(cuid())
+  entityType        String
+  entityId          String
+  action            String
+  actionVersion     String   @default("1.0")
+  actorId           String
+  actorIdSnapshot   String
+  actorRoleSnapshot String
+  correlationId     String
+  requestId         String?
+  source            String
+  beforeHash        String?
+  afterHash         String?
+  payload           Json?
+  ipAddress         String?
+  createdAt         DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
+  @@index([correlationId])
+}
+
+model CctExportManifest {
+  id             String            @id @default(cuid())
+  exportCode     String            @unique
+  academicYear   Int
+  term           Int               // CHECK IN (1, 2)
+  criteriaJson   Json
+  recordCount    Int               // CHECK >= 0
+  storageKey     String
+  payloadSha256  String
+  byteSize       BigInt
+  schemaVersion  String
+  
+  idempotencyKey String            @unique
+  retryCount     Int               @default(0) // CHECK >= 0
+  status         CctManifestStatus @default(PENDING_UPLOAD)
+  verifiedAt     DateTime?
+  verifiedById   String?
+  verifiedBy     User?             @relation("CctManifestVerifier", fields: [verifiedById], references: [id], onDelete: Restrict)
+  failureReason  String?
+  
+  createdById    String
+  createdBy      User              @relation("CctManifestCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt      DateTime          @default(now())
+
+  @@index([academicYear, term, status])
+}
+
+model StudentMeritNomination {
+  id                 String                 @id @default(cuid())
+  studentId          String
+  student            Student                @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  academicYear       Int
+  term               Int
+  awardCategory      String
+  reason             String
+  meritPointsScore   Int
+  status             NominationStatus       @default(PENDING_REVIEW)
+  
+  reviewedById       String?
+  reviewedBy         User?                  @relation("NominationReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
+  reviewedAt         DateTime?
+  rejectionReason    String?
+  decisionNotes      String?
+  
+  certificateItemId  String?                @unique
+  certificateItem    CertificateIssuedItem? @relation(fields: [certificateItemId], references: [id], onDelete: Restrict)
+  createdAt          DateTime               @default(now())
+
+  @@index([academicYear, status])
+}
+
+
+
+

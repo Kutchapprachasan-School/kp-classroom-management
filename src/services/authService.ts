@@ -67,7 +67,7 @@ export const authService = {
       try {
         const { data: users, error: uErr } = await supabase
           .from('User')
-          .select('*')
+          .select('id, name, email, username, role, position, subjectGroup, level, image')
           .or(`username.ilike.${trimmedInput},email.ilike.${trimmedInput}`);
 
         if (!uErr && users && users.length > 0) {
@@ -169,7 +169,7 @@ export const authService = {
       try {
         const { data: stuRows } = await supabase
           .from('students')
-          .select('*')
+          .select('id, seat_no, studentCode, code, name, gender, status, classroom_id')
           .or(`studentCode.eq.${trimmedCode},code.eq.${trimmedCode},id.eq.stu-${trimmedCode}`)
           .limit(1);
 
@@ -177,7 +177,7 @@ export const authService = {
         if (!row) {
           const { data: rawRows } = await supabase
             .from('Student')
-            .select('*')
+            .select('id, studentCode, title, firstName, lastName, gender, status, classroomId')
             .or(`studentCode.eq.${trimmedCode},id.eq.stu-${trimmedCode}`)
             .limit(1);
           if (rawRows && rawRows[0]) {

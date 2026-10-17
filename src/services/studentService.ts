@@ -297,17 +297,41 @@ export const studentService = {
   },
 
   // READ: List students in classroom
-  async getByClassroom(classroomId: string): Promise<StudentRecord[]> {
+  async getByClassroom(classroomId: string, forceRefresh?: boolean): Promise<StudentRecord[]> {
     const local = getLocalStudents(classroomId);
-    if (local && local.length > 0) {
-      return local;
-    }
+    const storedFpKey = `cls_students_fp_${classroomId}`;
+
     if (isSupabaseConfigured) {
+      // 1. Lightweight fingerprint check: only fetch count and max(updated_at)
+      const storedFp = typeof localStorage !== 'undefined' ? localStorage.getItem(storedFpKey) : null;
+      if (!forceRefresh && local && local.length > 0 && storedFp) {
+        try {
+          const { data: fpData, error: fpErr } = await supabase
+            .from('students')
+            .select('count(*) as count, max(updated_at) as max_updated_at')
+            .eq('classroom_id', classroomId)
+            .single();
+
+          if (!fpErr && fpData) {
+            const currentFp = `${fpData.count}::${fpData.max_updated_at}`;
+            if (storedFp === currentFp) {
+              return local;
+            }
+          }
+        } catch {
+          // If fingerprint check fails, fallback to local
+          return local;
+        }
+      } else if (!forceRefresh && local && local.length > 0 && !storedFp) {
+        // If local exists but no fingerprint yet, return local to keep app fast
+        return local;
+      }
+
       logDbOperation(`SELECT * FROM Enrollment/students WHERE classroomId = ${classroomId}`);
       try {
         const { data: vData, error: vErr } = await supabase
           .from('students')
-          .select('*')
+          .select('id, seat_no, studentCode, code, name, status, gender, classroom_id, updated_at')
           .eq('classroom_id', classroomId)
           .order('seat_no', { ascending: true });
 
@@ -325,6 +349,13 @@ export const studentService = {
             classroomId,
           }));
           saveLocalStudents(classroomId, mapped);
+
+          // Update fingerprint
+          if (typeof localStorage !== 'undefined') {
+            const maxUpdated = vData.reduce((max: string, item: any) => (item.updated_at > max ? item.updated_at : max), '');
+            localStorage.setItem(storedFpKey, `${vData.length}::${maxUpdated}`);
+          }
+
           return mapped;
         }
       } catch (err) {
@@ -334,7 +365,7 @@ export const studentService = {
       try {
         const { data, error } = await supabase
           .from('Enrollment')
-          .select('*, membership:SchoolMembership(*)')
+          .select('id, studentNo, classroomId, status, membership:SchoolMembership(studentCode, user:User(name))')
           .eq('classroomId', classroomId)
           .eq('status', 'ACTIVE')
           .order('studentNo', { ascending: true });

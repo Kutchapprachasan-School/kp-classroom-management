@@ -285,7 +285,7 @@ export async function fetchAndSyncSchoolSettingsFromSupabase(): Promise<SchoolBr
   try {
     const { data, error } = await supabase
       .from('SystemSettings')
-      .select('*')
+      .select('id, schoolName, affiliation, subheader, logoUrl, updatedAt')
       .eq('id', 'default')
       .maybeSingle();
 

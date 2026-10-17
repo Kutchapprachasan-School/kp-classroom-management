@@ -258,11 +258,19 @@ export function createUniversalAdapter<T>(config: UniversalAdapterConfig<T>): Un
       if (shouldQueryRemote()) {
         try {
           const client = getClient();
-          logDbOperation(`SELECT * FROM ${tableName}`);
+          let query = client.from(tableName).select('*');
+          if (filter && typeof filter === 'object') {
+            for (const [k, v] of Object.entries(filter)) {
+              if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
+                query = query.eq(k, v);
+              }
+            }
+          }
+          logDbOperation(`SELECT FROM ${tableName}`);
           const { data, error } = await withTimeout<any>(
-            client.from(tableName).select('*'),
+            query,
             timeoutMs,
-            `SELECT * FROM ${tableName}`
+            `SELECT FROM ${tableName}`
           );
 
           if (!error && Array.isArray(data)) {

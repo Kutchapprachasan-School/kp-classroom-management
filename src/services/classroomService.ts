@@ -76,6 +76,8 @@ export const getLocalClassrooms = (): ClassroomRosterItem[] => {
 };
 
 const saveLocalClassrooms = (items: ClassroomRosterItem[]) => {
+  cachedClassrooms = items;
+  cachedClassroomsTimestamp = Date.now();
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   }
@@ -109,9 +111,25 @@ export const INITIAL_SEED_CLASSROOMS: ClassroomRosterItem[] = [
 
 const TEACHERS_CACHE_KEY = 'kp_teacher_accounts_cache';
 
+let cachedClassrooms: ClassroomRosterItem[] | null = null;
+let cachedClassroomsTimestamp = 0;
+let cachedTeachers: TeacherAccountItem[] | null = null;
+let cachedTeachersTimestamp = 0;
+const CACHE_TTL_MS = 60_000; // 60s in-memory TTL to eliminate repetitive network roundtrips across views
+
+export function invalidateClassroomCache() {
+  cachedClassrooms = null;
+  cachedClassroomsTimestamp = 0;
+  cachedTeachers = null;
+  cachedTeachersTimestamp = 0;
+}
+
 export const classroomService = {
   // READ: List all real teacher accounts directly from Supabase User table
-  async getTeacherAccounts(): Promise<TeacherAccountItem[]> {
+  async getTeacherAccounts(forceRefresh?: boolean): Promise<TeacherAccountItem[]> {
+    if (!forceRefresh && cachedTeachers && Date.now() - cachedTeachersTimestamp < CACHE_TTL_MS) {
+      return cachedTeachers;
+    }
     if (isSupabaseConfigured) {
       try {
         const { data, error } = await supabase
@@ -129,6 +147,8 @@ export const classroomService = {
             u.subjectGroup
           );
           if (teachers.length > 0) {
+            cachedTeachers = teachers;
+            cachedTeachersTimestamp = Date.now();
             if (typeof localStorage !== 'undefined') {
               localStorage.setItem(TEACHERS_CACHE_KEY, JSON.stringify(teachers));
             }
@@ -145,7 +165,11 @@ export const classroomService = {
       if (cached) {
         try {
           const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            cachedTeachers = parsed;
+            cachedTeachersTimestamp = Date.now();
+            return parsed;
+          }
         } catch {
           // ignore
         }
@@ -155,14 +179,39 @@ export const classroomService = {
     return [];
   },
   // READ: List all classrooms directly from Supabase (Zero Mock Data)
-  async getAll(): Promise<ClassroomRosterItem[]> {
+  async getAll(forceRefresh?: boolean): Promise<ClassroomRosterItem[]> {
+    if (!forceRefresh && cachedClassrooms && Date.now() - cachedClassroomsTimestamp < CACHE_TTL_MS) {
+      return cachedClassrooms;
+    }
     const deletedSet = getDeletedRoomsSet();
+    const storedFpKey = 'cls_classrooms_fp';
+    const localItems = getLocalClassrooms();
+
     if (isSupabaseConfigured) {
-      logDbOperation('SELECT * FROM classrooms WHERE status = ACTIVE');
+      logDbOperation('SELECT selective FROM classrooms WHERE status = ACTIVE');
       try {
+        // Lightweight fingerprint check: only fetch count and max(updated_at)
+        const storedFp = typeof localStorage !== 'undefined' ? localStorage.getItem(storedFpKey) : null;
+        if (!forceRefresh && localItems.length > 0 && storedFp) {
+          const { data: fpData, error: fpErr } = await supabase
+            .from('classrooms')
+            .select('count(*) as count, max(updated_at) as max_updated_at')
+            .eq('status', 'ACTIVE')
+            .single();
+
+          if (!fpErr && fpData) {
+            const currentFp = `${fpData.count}::${fpData.max_updated_at}`;
+            if (storedFp === currentFp) {
+              cachedClassrooms = localItems;
+              cachedClassroomsTimestamp = Date.now();
+              return localItems;
+            }
+          }
+        }
+
         const { data, error } = await supabase
           .from('classrooms')
-          .select('*')
+          .select('id, name, level, grade_level, room_number, adviser, status, student_count, updated_at')
           .eq('status', 'ACTIVE')
           .order('grade_level', { ascending: true })
           .order('room_number', { ascending: true });
@@ -198,7 +247,16 @@ export const classroomService = {
                 studentCount,
               };
             });
+          cachedClassrooms = mapped;
+          cachedClassroomsTimestamp = Date.now();
           saveLocalClassrooms(mapped);
+
+          // Update fingerprint
+          if (typeof localStorage !== 'undefined') {
+            const maxUpdated = data.reduce((max: string, item: any) => (item.updated_at > max ? item.updated_at : max), '');
+            localStorage.setItem(storedFpKey, `${data.length}::${maxUpdated}`);
+          }
+
           return mapped;
         }
       } catch (err) {
@@ -209,7 +267,7 @@ export const classroomService = {
       try {
         const { data: tData, error: tErr } = await supabase
           .from('ClassRoom')
-          .select('*')
+          .select('id, name, gradeLevel, roomNumber, adviser, status')
           .eq('status', 'ACTIVE')
           .order('gradeLevel', { ascending: true })
           .order('roomNumber', { ascending: true });
@@ -242,6 +300,8 @@ export const classroomService = {
                 studentCount,
               };
             });
+          cachedClassrooms = mapped;
+          cachedClassroomsTimestamp = Date.now();
           saveLocalClassrooms(mapped);
           return mapped;
         }
