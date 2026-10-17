@@ -21,7 +21,6 @@ import {
   RefreshCw,
   X,
   User,
-  Shield,
   Type,
 } from 'lucide-react';
 import {
@@ -464,6 +463,16 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
     </div>
   );
 
+  const isFemaleTeacher =
+    Boolean((currentUser as any)?.gender === 'FEMALE') ||
+    Boolean(currentUser?.name?.includes('นาง') || currentUser?.name?.includes('น.ส.'));
+
+  const defaultTeacherAvatar = isFemaleTeacher
+    ? '/images/banners/student-avatar-girl.png'
+    : '/images/teacher/teacher_avatar.png';
+
+  const effectiveAvatar = currentUser?.avatarUrl || defaultTeacherAvatar;
+
   // Teacher Profile & Advisory Modal
   const teacherProfileModal = isTeacherProfileModalOpen && (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
@@ -589,21 +598,11 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
     </div>
   );
 
-  const isFemaleTeacher =
-    Boolean((currentUser as any)?.gender === 'FEMALE') ||
-    Boolean(currentUser?.name?.includes('นาง') || currentUser?.name?.includes('น.ส.'));
-
-  const defaultTeacherAvatar = isFemaleTeacher
-    ? '/images/banners/student-avatar-girl.png'
-    : '/images/teacher/teacher_avatar.png';
-
-  const effectiveAvatar = currentUser?.avatarUrl || defaultTeacherAvatar;
-
   // Cloud sync handler
   const handleForceCloudSync = async () => {
     try {
       setSyncToastMessage('กำลังเชื่อมต่อและดึงข้อมูลล่าสุดจากคลาวด์...');
-      await cloudDataService.syncAllFromCloud();
+      await cloudDataService.fetchAllCloudData();
       setSyncToastMessage('ซิงค์ข้อมูลกับคลาวด์สำเร็จเรียบร้อยแล้ว');
       setTimeout(() => setSyncToastMessage(null), 3000);
     } catch {

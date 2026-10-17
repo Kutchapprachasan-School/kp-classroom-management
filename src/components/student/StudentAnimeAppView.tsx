@@ -25,7 +25,8 @@ import {
   Award,
 } from 'lucide-react';
 import { JiuMeowMascot, AnimeStudentHero } from './JiuMeowMascot';
-import { ALL_BUDDIES, type GachaBuddy } from '../../services/gachaService';
+import { gachaService, ALL_BUDDIES, type GachaBuddy } from '../../services/gachaService';
+import { gachaSkillEngine } from '../../services/gachaSkillEngine';
 import { onlineQuizService } from '../../services/onlineQuizService';
 
 export type AnimeAppScreen =
@@ -52,9 +53,9 @@ export const StudentAnimeAppView: React.FC<StudentAnimeAppViewProps> = ({
   const [currentScreen, setCurrentScreen] = useState<AnimeAppScreen>(initialScreen);
   const [viewMode, setViewMode] = useState<'single' | 'gallery' | 'responsive'>('single');
 
-  // Player State
+  // Player State synced with gachaService & gachaSkillEngine
   const [coins, setCoins] = useState(2450);
-  const [tickets, setTickets] = useState(5);
+  const [tickets, setTickets] = useState(() => gachaService.getState().tickets);
   const [hunger, setHunger] = useState(72);
   const [happiness, setHappiness] = useState(85);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -73,13 +74,16 @@ export const StudentAnimeAppView: React.FC<StudentAnimeAppViewProps> = ({
   const [inventoryTab, setInventoryTab] = useState<'BUDDY' | 'ITEMS' | 'TICKETS'>('BUDDY');
 
   // Gacha Pity State & Equipped Buddy
-  const [pityCount, setPityCount] = useState(12);
-  const [equippedBuddy, setEquippedBuddy] = useState<GachaBuddy>(ALL_BUDDIES[4] || ALL_BUDDIES[0]); // น้องพิมพ์
+  const [pityCount, setPityCount] = useState(() => gachaService.getState().pityCount);
+  const [equippedBuddy, setEquippedBuddy] = useState<GachaBuddy>(() => gachaService.getActiveBuddy());
   const [rolledBuddy, setRolledBuddy] = useState<GachaBuddy>(ALL_BUDDIES[0]);
+
+  // Active Buddy Buffs
+  const activeBuffs = useMemo(() => gachaSkillEngine.getActiveBuffs(), [equippedBuddy]);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3000);
+    setTimeout(() => setToastMsg(null), 3500);
   };
 
   const handleFeed = () => {
@@ -88,15 +92,33 @@ export const StudentAnimeAppView: React.FC<StudentAnimeAppViewProps> = ({
     showToast(`🍏 ให้อาหาร "${equippedBuddy.name}" สำเร็จ! ความอิ่ม +25% ความสุข +10%`);
   };
 
+  const handlePetCompanion = () => {
+    const res = gachaSkillEngine.interactWithBuddy();
+    setCoins((c) => c + res.coinsGained);
+    setHappiness((h) => Math.min(100, h + res.happinessGained));
+    showToast(`✨ ${res.message} • "${res.quote}"`);
+  };
+
   const handlePullGacha = (count: number) => {
-    if (tickets < count) {
-      showToast('⚠️ ตั๋วสุ่มไม่เพียงพอ! สามารถซื้อได้ที่ร้านค้า');
+    const currentState = gachaService.getState();
+    if (currentState.tickets < count) {
+      showToast('⚠️ ตั๋วสุ่มไม่เพียงพอ! สามารถแลกซื้อได้ที่ร้านค้า');
       return;
     }
-    setTickets((prev) => prev - count);
-    setPityCount((prev) => prev + count);
-    const rand = ALL_BUDDIES[Math.floor(Math.random() * ALL_BUDDIES.length)];
-    setRolledBuddy(rand);
+
+    const pullResult = gachaService.pullOne();
+    if ('error' in pullResult) {
+      showToast(`⚠️ ${pullResult.error}`);
+      return;
+    }
+
+    const fresh = gachaService.getState();
+    setTickets(fresh.tickets);
+    setPityCount(fresh.pityCount);
+    setRolledBuddy(pullResult.buddy);
+    if (!pullResult.isNew && pullResult.shardsGained > 0) {
+      showToast(`✨ ได้รับเศษดาว (Star Shards) +${pullResult.shardsGained} ชิ้น!`);
+    }
     setCurrentScreen('gacha-result');
   };
 
@@ -108,7 +130,10 @@ export const StudentAnimeAppView: React.FC<StudentAnimeAppViewProps> = ({
     setCoins((prev) => prev - cost);
     if (itemName.includes('อาหาร')) setHunger((prev) => Math.min(100, prev + 25));
     if (itemName.includes('ความสุข')) setHappiness((prev) => Math.min(100, prev + 20));
-    if (itemName.includes('ตั๋วสุ่ม')) setTickets((prev) => prev + 1);
+    if (itemName.includes('ตั๋วสุ่ม')) {
+      const updatedTickets = gachaService.addTickets(1);
+      setTickets(updatedTickets);
+    }
     showToast(`🛒 ซื้อ "${itemName}" สำเร็จ! (-${cost} เหรียญ)`);
   };
 
@@ -583,40 +608,56 @@ export const StudentAnimeAppView: React.FC<StudentAnimeAppViewProps> = ({
               </div>
             </div>
 
-            {/* Active Buffs Box */}
-            <div className="bg-white rounded-2xl p-3 border border-slate-200 shadow-2xs space-y-2">
-              <h4 className="text-xs font-black text-slate-900">บัฟที่ใช้งานอยู่</h4>
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-sky-50/70 p-2 rounded-xl">
-                  <div className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px]">
-                    ★
+            {/* Active Buffs & Companion Skill Box */}
+            <div className="bg-white rounded-2xl p-3 border border-slate-200 shadow-2xs space-y-2.5">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span>สกิลคู่หู: {equippedBuddy.skillName}</span>
+                </h4>
+                <span className="text-[10px] text-slate-400 font-semibold">{equippedBuddy.element}</span>
+              </div>
+              <p className="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-xl leading-relaxed">
+                {equippedBuddy.skillDesc}
+              </p>
+
+              <div className="space-y-1.5 pt-0.5">
+                {activeBuffs.activeEffectsLabels.map((label, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-sky-50/70 p-2 rounded-xl border border-sky-100"
+                  >
+                    <div className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px] shrink-0">
+                      ★
+                    </div>
+                    <span>{label}</span>
                   </div>
-                  <span>เพิ่ม XP +5%</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-emerald-50/70 p-2 rounded-xl">
-                  <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px]">
-                    ☘
-                  </div>
-                  <span>ลดความเครียด -10%</span>
-                </div>
+                ))}
               </div>
             </div>
 
-            {/* 2 Buttons */}
-            <div className="grid grid-cols-2 gap-2 pt-1">
+            {/* 3 Interactive Buttons */}
+            <div className="grid grid-cols-3 gap-1.5 pt-1">
               <button
                 type="button"
                 onClick={() => setCurrentScreen('inventory')}
-                className="py-3 rounded-2xl bg-white border border-slate-300 text-slate-700 font-black text-xs hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
+                className="py-2.5 rounded-2xl bg-white border border-slate-300 text-slate-700 font-black text-[11px] hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer text-center"
               >
-                เปลี่ยนคู่หู
+                สลับคู่หู
               </button>
               <button
                 type="button"
                 onClick={handleFeed}
-                className="py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs shadow-md shadow-emerald-500/25 transition-transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                className="py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[11px] shadow-md shadow-emerald-500/25 transition-transform active:scale-95 flex items-center justify-center gap-1 cursor-pointer"
               >
                 <span>🍃 ให้อาหาร</span>
+              </button>
+              <button
+                type="button"
+                onClick={handlePetCompanion}
+                className="py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-500 hover:to-orange-500 text-white font-black text-[11px] shadow-md shadow-amber-500/25 transition-transform active:scale-95 flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <span>✨ ทักทาย</span>
               </button>
             </div>
           </div>
@@ -845,8 +886,9 @@ export const StudentAnimeAppView: React.FC<StudentAnimeAppViewProps> = ({
                 <div
                   key={buddy.id}
                   onClick={() => {
+                    gachaService.setActiveBuddy(buddy.id);
                     setEquippedBuddy(buddy);
-                    showToast(`เลือกคู่หู "${buddy.name}" เรียบร้อยแล้ว ✨`);
+                    showToast(`เลือกคู่หู "${buddy.name}" ประจำการแล้ว ✨`);
                     setCurrentScreen('buddy');
                   }}
                   className={`bg-white rounded-2xl p-2 border shadow-2xs hover:border-blue-400 cursor-pointer flex flex-col items-center text-center space-y-1 transition-all group ${

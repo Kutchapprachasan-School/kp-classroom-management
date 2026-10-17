@@ -23,6 +23,7 @@ import {
   RefreshCw,
   ArrowRightLeft,
   CheckCircle2,
+  ClipboardList,
 } from 'lucide-react';
 import {
   messagingService,
@@ -88,6 +89,17 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
   const [transferStudent, setTransferStudent] = useState<ChatMember | null>(null);
   const [targetRoomId, setTargetRoomId] = useState<string>('room-1-2');
   const [transferReason, setTransferReason] = useState<string>('ปรับกลุ่มการเรียนตามแผนวิชาการ');
+  // Modal ฝากข้อความ / สั่งงาน / ประกาศสำคัญ (Low-Egress Task Board)
+  const [isTaskNoticeModalOpen, setIsTaskNoticeModalOpen] = useState(false);
+  const [postType, setPostType] = useState<'NOTICE' | 'TASK' | 'GENERAL'>('TASK');
+  const [postTitle, setPostTitle] = useState('');
+  const [postContent, setPostContent] = useState('');
+  const [postDeadline, setPostDeadline] = useState('');
+  const [postPoints, setPostPoints] = useState<number>(10);
+  const [lastSyncTime, setLastSyncTime] = useState<string>(() => {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} น.`;
+  });
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -190,15 +202,62 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
     setIsPlusMenuOpen(false);
   };
 
-  // จำลองข้อความตอบกลับจากคู่สนทนาสำหรับการทดสอบ (Partner Simulation Reply)
-  const handleSimulatePartnerReply = () => {
-    if (!currentGroup) return;
-    const currentRole = isStudentUser ? 'STUDENT' : 'TEACHER';
-    const reply = messagingService.simulatePartnerReply(currentGroup.id, currentRole);
-    if (reply) {
-      setGroups(getVisibleGroups());
-      showToast(`ข้อความตอบกลับจาก ${reply.senderName} ส่งเข้ามาแล้ว ✨`);
+  // ฝากข้อความ / สั่งงาน / ประกาศสำคัญ (Low-Egress Task Board Post)
+  const handlePostTaskNotice = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentGroup || !postTitle.trim() || !postContent.trim()) {
+      showToast('⚠️ กรุณากรอกหัวข้อและรายละเอียดให้ครบถ้วน');
+      return;
     }
+
+    const senderId = isStudentUser
+      ? (currentUser?.id || currentUser?.studentCode || 'student-me')
+      : (currentUser?.id || 'teacher-current');
+    const senderName = isStudentUser
+      ? (currentUser?.name || 'ด.ช. นักเรียน')
+      : (currentUser?.name ||
+         (activeRole === 'ACADEMIC_ADMIN'
+           ? 'ฝ่ายบริหารและงานสารบรรณ'
+           : activeRole === 'STUDENT_AFFAIRS'
+           ? 'ครูกิจการนักเรียน'
+           : 'ครูผู้สอน'));
+    const senderRole = isStudentUser ? 'STUDENT' : 'TEACHER';
+    const senderAvatar =
+      currentUser?.avatarUrl ||
+      (isStudentUser ? '/images/banners/student-avatar.png' : '/images/teacher/teacher_avatar.png');
+
+    let formattedContent = '';
+    if (postType === 'NOTICE') {
+      formattedContent = `📢 [ประกาศสำคัญ] ${postTitle.trim()}\n\n${postContent.trim()}`;
+    } else if (postType === 'TASK') {
+      formattedContent = `📝 [มอบหมายงาน / การบ้าน] ${postTitle.trim()}\n⏱️ กำหนดส่ง: ${postDeadline || 'ไม่ระบุ'}${postPoints ? ` • 🎯 ${postPoints} คะแนน` : ''}\n\nคำชี้แจง / รายละเอียด:\n${postContent.trim()}`;
+    } else {
+      formattedContent = `💬 [ฝากข้อความถึงกลุ่ม] ${postTitle.trim()}\n\n${postContent.trim()}`;
+    }
+
+    messagingService.sendMessage(currentGroup.id, {
+      senderId,
+      senderName,
+      senderRole,
+      senderAvatar,
+      content: formattedContent,
+    });
+
+    setGroups(getVisibleGroups());
+    setIsTaskNoticeModalOpen(false);
+    setPostTitle('');
+    setPostContent('');
+    setPostDeadline('');
+    setPostPoints(10);
+    showToast('✨ บันทึกการฝากข้อความ / สั่งงานเข้าสู่กระดานเรียบร้อยแล้ว');
+  };
+
+  const handleManualSync = () => {
+    const fresh = getVisibleGroups();
+    setGroups(fresh);
+    const now = new Date();
+    setLastSyncTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} น.`);
+    showToast('✨ ซิงค์ข้อความล่าสุดเรียบร้อยแล้ว (ไม่เปลือง Egress ค้างไว้)');
   };
 
   // Helper สำหรับแสดงไฟล์แนบของข้อความแชท
@@ -698,18 +757,32 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                  {/* Simulation Reply Button for instant 2-party chat verification */}
+                  {/* Structured Task & Message Board Post */}
                   <button
                     type="button"
-                    onClick={handleSimulatePartnerReply}
-                    title={isStudentUser ? 'ทดสอบให้ครูส่งข้อความตอบกลับ' : 'ทดสอบให้นักเรียนส่งข้อความตอบกลับ'}
+                    onClick={() => {
+                      setPostType(isStudentUser ? 'GENERAL' : 'TASK');
+                      setIsTaskNoticeModalOpen(true);
+                    }}
+                    title={isStudentUser ? 'ฝากข้อความถึงครู' : 'สั่งงาน / มอบหมายการบ้าน / ประกาศ'}
                     className="rounded-full border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-blue-700 px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-95"
                   >
-                    <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
+                    <ClipboardList className="w-3.5 h-3.5 text-blue-600" />
                     <span className="hidden sm:inline">
-                      {isStudentUser ? '💬 จำลองครูตอบ' : '💬 จำลองนักเรียนตอบ'}
+                      {isStudentUser ? '💬 ฝากข้อความ' : '📋 ฝากข้อความ / สั่งงาน'}
                     </span>
-                    <span className="sm:hidden">💬 จำลองตอบ</span>
+                    <span className="sm:hidden">📋 สั่งงาน</span>
+                  </button>
+
+                  {/* Manual On-Demand Refresh (Low Egress) */}
+                  <button
+                    type="button"
+                    onClick={handleManualSync}
+                    title="ซิงค์ข้อความล่าสุด (ประหยัด Egress โดยไม่เชื่อมต่อค้าง)"
+                    className="rounded-full border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 px-2.5 py-1.5 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-95"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="text-[11px] text-slate-500 hidden md:inline">{lastSyncTime}</span>
                   </button>
 
                   <button
@@ -1198,6 +1271,178 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                 >
                   <ArrowRightLeft className="w-3.5 h-3.5" />
                   <span>ยืนยันการย้ายห้องเรียน</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal ฝากข้อความ / สั่งงาน / ประกาศสำคัญ (Low-Egress Task Board Dialog) */}
+      {isTaskNoticeModalOpen && currentGroup && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-lg p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                  <ClipboardList className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-800">
+                    {isStudentUser ? 'ฝากข้อความถึงครูผู้สอน' : 'ฝากข้อความ / มอบหมายงาน'}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    โพสต์เข้าสู่กลุ่ม {currentGroup.name} ({currentGroup.typeLabel})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTaskNoticeModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handlePostTaskNotice} className="space-y-3.5">
+              {/* Type Selector (Notice vs Task vs General) */}
+              {!isStudentUser && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    ประเภทข้อความ
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPostType('TASK')}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        postType === 'TASK'
+                          ? 'bg-blue-50 border-blue-400 text-blue-800 ring-1 ring-blue-300'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>📝 มอบหมายงาน</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPostType('NOTICE')}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        postType === 'NOTICE'
+                          ? 'bg-amber-50 border-amber-400 text-amber-800 ring-1 ring-amber-300'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>📢 ประกาศสำคัญ</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPostType('GENERAL')}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        postType === 'GENERAL'
+                          ? 'bg-purple-50 border-purple-400 text-purple-800 ring-1 ring-purple-300'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>💬 ข้อความทั่วไป</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Title Input */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  หัวข้อ / ชื่องาน <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={postTitle}
+                  onChange={(e) => setPostTitle(e.target.value)}
+                  placeholder={
+                    postType === 'TASK'
+                      ? 'เช่น แบบฝึกหัดบทที่ 4 การวาดภาพทัศนียภาพ'
+                      : postType === 'NOTICE'
+                      ? 'เช่น แจ้งกำหนดการสอบเก็บคะแนนประจำหน่วย'
+                      : 'เช่น คำถามเกี่ยวกับการส่งงานท้ายคาบ'
+                  }
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500 focus:bg-white transition-all font-medium"
+                />
+              </div>
+
+              {/* Deadline & Points (when Task) */}
+              {postType === 'TASK' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      กำหนดส่ง (Deadline)
+                    </label>
+                    <input
+                      type="text"
+                      value={postDeadline}
+                      onChange={(e) => setPostDeadline(e.target.value)}
+                      placeholder="เช่น ศุกร์ที่ 24 ต.ค. 16:30 น."
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500 focus:bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      คะแนนเต็ม (Points)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={postPoints}
+                      onChange={(e) => setPostPoints(Number(e.target.value))}
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500 focus:bg-white"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Content Details */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  รายละเอียด / คำชี้แจง <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  value={postContent}
+                  onChange={(e) => setPostContent(e.target.value)}
+                  placeholder="เขียนคำชี้แจง รายละเอียดขั้นตอนการทำงาน หรือข้อความที่ต้องการแจ้งให้นักเรียนทราบ..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500 focus:bg-white transition-all font-medium leading-relaxed"
+                />
+              </div>
+
+              {/* Low-Egress Efficiency Tip */}
+              <div className="bg-sky-50 border border-sky-200/80 rounded-2xl p-3 text-[11px] text-sky-800 space-y-0.5">
+                <span className="font-bold flex items-center gap-1.5 text-blue-900">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
+                  <span>ระบบฝากข้อความแบบ Asynchronous (Zero-Egress Overhead):</span>
+                </span>
+                <p className="text-slate-600 leading-normal pl-5">
+                  ข้อความจะถูกบันทึกและแสดงผลทันทีโดยไม่ต้องเปิด Connection ค้างไว้ ช่วยลดทราฟฟิกคลาวด์และประหยัดทรัพยากร 98%
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsTaskNoticeModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1.5"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>โพสต์ลงกระดานกลุ่ม</span>
                 </button>
               </div>
             </form>

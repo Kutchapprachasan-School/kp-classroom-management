@@ -65,47 +65,6 @@ export interface TeacherCourseOption {
   period: number;
 }
 
-export const TEACHER_COURSES: TeacherCourseOption[] = [
-  {
-    code: 'ญ31201',
-    name: 'ญ31201 ภาษาญี่ปุ่น 1',
-    shortSubject: 'ภาษาญี่ปุ่น 1',
-    room: 'room-3-1',
-    roomLabel: 'ม.3/1 (ห้องประจำชั้น)',
-    period: 1,
-  },
-  {
-    code: 'ญ33201',
-    name: 'ญ33201 ภาษาญี่ปุ่น 3',
-    shortSubject: 'ภาษาญี่ปุ่น 3',
-    room: 'room-3-2',
-    roomLabel: 'ม.3/2',
-    period: 2,
-  },
-  {
-    code: 'ญ21202',
-    name: 'ญ21202 ภาษาญี่ปุ่นเบื้องต้น',
-    shortSubject: 'ภาษาญี่ปุ่นเบื้องต้น',
-    room: 'room-1-1',
-    roomLabel: 'ม.1/1',
-    period: 3,
-  },
-  {
-    code: 'ก23901',
-    name: 'ก23901 กิจกรรมชุมนุมภาษาญี่ปุ่น',
-    shortSubject: 'ชุมนุมภาษาญี่ปุ่น',
-    room: 'room-3-1',
-    roomLabel: 'ม.3/1 (ห้องประจำชั้น)',
-    period: 6,
-  },
-];
-
-export const TAUGHT_CLASSROOMS = [
-  { id: 'room-3-1', label: 'ม.3/1 (ห้องประจำชั้น)' },
-  { id: 'room-3-2', label: 'ม.3/2' },
-  { id: 'room-1-1', label: 'ม.1/1' },
-];
-
 const THAI_MONTHS = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
   'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
