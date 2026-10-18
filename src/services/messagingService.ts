@@ -1028,12 +1028,8 @@ export const messagingService = {
 
     if (currentRole === 'TEACHER') {
       // ผู้ส่งปัจจุบันคือครู -> ฝั่งตอบกลับคือนักเรียน
-      const studentMember = group.members.find((m) => m.role === 'STUDENT') || {
-        id: 'std-reply',
-        name: 'ด.ช. พงศกร มุ่งมั่น',
-        role: 'STUDENT',
-        avatarUrl: '/images/banners/student-avatar.png',
-      };
+      const studentMember = group.members.find((m) => m.role === 'STUDENT');
+      if (!studentMember) return null;
 
       const replies = [
         'รับทราบครับคุณครู จะรีบดำเนินการส่งงานให้เรียบร้อยครับ! ✨',

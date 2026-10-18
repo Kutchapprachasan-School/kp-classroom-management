@@ -7,6 +7,7 @@
 
 import { cleanSlateService } from './cleanSlateService.ts';
 import { studentService, formatClassroomLabel } from './studentService.ts';
+import { isGrade1SgsStudentCode } from '../config/m1SgsLookup';
 
 export type StudentTransferState = 'ACTIVE' | 'TRANSFERRED_IN' | 'TRANSFERRED_OUT';
 export type StudentGender = 'MALE' | 'FEMALE';
@@ -98,8 +99,12 @@ export const sgsRosterAndSubmissionService = {
       if (raw) {
         const parsed: SgsStudentRecord[] = JSON.parse(raw);
         if (classroomId) {
+          const isNonGrade1 = !classroomId.includes('1-') && !classroomId.includes('1/');
           const formatted = formatClassroomLabel(classroomId);
-          const filtered = parsed.filter((s) => s.classroom === classroomId || s.classroom === formatted);
+          let filtered = parsed.filter((s) => s.classroom === classroomId || s.classroom === formatted);
+          if (isNonGrade1) {
+            filtered = filtered.filter((s) => !isGrade1SgsStudentCode(s.studentCode));
+          }
           if (filtered.length > 0) return filtered;
         } else {
           return parsed;
@@ -108,9 +113,13 @@ export const sgsRosterAndSubmissionService = {
 
       const targetRoom = classroomId || 'room-3-1';
       const formatted = formatClassroomLabel(targetRoom);
+      const isNonGrade1 = !targetRoom.includes('1-') && !targetRoom.includes('1/');
 
       // ดึงรายชื่อนักเรียนจาก studentService เพื่อให้นักเรียนในห้องเรียนต่างๆ ปรากฏใน ปพ.5 เสมอ
-      const students = studentService.getStudents(targetRoom);
+      let students = studentService.getStudents(targetRoom);
+      if (isNonGrade1) {
+        students = students.filter((stu) => !isGrade1SgsStudentCode(stu.code));
+      }
       if (students && students.length > 0) {
         return students.map((stu, idx) => ({
           sgsSeatNo: stu.no || idx + 1,

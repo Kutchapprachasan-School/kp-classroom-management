@@ -96,17 +96,18 @@ export interface TeacherAccountItem {
 export const DEFAULT_TEACHER_ACCOUNTS: TeacherAccountItem[] = [];
 
 export const INITIAL_SEED_CLASSROOMS: ClassroomRosterItem[] = [
-  { id: 'room-1-1', name: 'ม.1/1', level: 'ม.1', roomNumber: 'ม.1/1', adviser: 'admin.Panchapon', studentCount: 0 },
-  { id: 'room-1-2', name: 'ม.1/2', level: 'ม.1', roomNumber: 'ม.1/2', adviser: 'ครูพิมพ์ใจ บุญรักษ์', studentCount: 0 },
-  { id: 'room-1-8', name: 'ม.1/8', level: 'ม.1', roomNumber: 'ม.1/8', adviser: 'ครูเอกชัย มงคลรัตน์', studentCount: 0 },
-  { id: 'room-2-1', name: 'ม.2/1', level: 'ม.2', roomNumber: 'ม.2/1', adviser: 'นายปัญจพล เกษรัตน์', studentCount: 0 },
-  { id: 'room-3-1', name: 'ม.3/1', level: 'ม.3', roomNumber: 'ม.3/1', adviser: 'ครูภาสภูมิ เรืองปราชญ์', studentCount: 0 },
-  { id: 'room-3-2', name: 'ม.3/2', level: 'ม.3', roomNumber: 'ม.3/2', adviser: 'ครูวิภาดา พิมพา', studentCount: 0 },
-  { id: 'room-3-5', name: 'ม.3/5', level: 'ม.3', roomNumber: 'ม.3/5', adviser: 'ครูเกรียงไกร สิทธิโชค', studentCount: 0 },
-  { id: 'room-3-6', name: 'ม.3/6', level: 'ม.3', roomNumber: 'ม.3/6', adviser: 'ครูพงศ์พิชญ์ วิเศษ', studentCount: 0 },
-  { id: 'room-4-1', name: 'ม.4/1', level: 'ม.4', roomNumber: 'ม.4/1', adviser: 'ครูนิตยา สุขเกษม', studentCount: 0 },
-  { id: 'room-5-1', name: 'ม.5/1', level: 'ม.5', roomNumber: 'ม.5/1', adviser: 'ครูมานะ มั่งคั่ง', studentCount: 0 },
-  { id: 'room-6-1', name: 'ม.6/1', level: 'ม.6', roomNumber: 'ม.6/1', adviser: 'ครูสมปอง มีสุข', studentCount: 0 },
+  { id: 'room-1-1', name: 'ม.1/1', level: 'ม.1', roomNumber: 'ม.1/1', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
+  { id: 'room-1-2', name: 'ม.1/2', level: 'ม.1', roomNumber: 'ม.1/2', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
+  { id: 'room-1-3', name: 'ม.1/3', level: 'ม.1', roomNumber: 'ม.1/3', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
+  { id: 'room-1-4', name: 'ม.1/4', level: 'ม.1', roomNumber: 'ม.1/4', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
+  { id: 'room-1-5', name: 'ม.1/5', level: 'ม.1', roomNumber: 'ม.1/5', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
+  { id: 'room-1-6', name: 'ม.1/6', level: 'ม.1', roomNumber: 'ม.1/6', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
+  { id: 'room-2-1', name: 'ม.2/1', level: 'ม.2', roomNumber: 'ม.2/1', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
+  { id: 'room-3-1', name: 'ม.3/1', level: 'ม.3', roomNumber: 'ม.3/1', adviser: 'นายปัญจพล เกษรัตน์', studentCount: 0 },
+  { id: 'room-3-2', name: 'ม.3/2', level: 'ม.3', roomNumber: 'ม.3/2', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
+  { id: 'room-4-1', name: 'ม.4/1', level: 'ม.4', roomNumber: 'ม.4/1', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
+  { id: 'room-5-1', name: 'ม.5/1', level: 'ม.5', roomNumber: 'ม.5/1', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
+  { id: 'room-6-1', name: 'ม.6/1', level: 'ม.6', roomNumber: 'ม.6/1', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
 ];
 
 const TEACHERS_CACHE_KEY = 'kp_teacher_accounts_cache';

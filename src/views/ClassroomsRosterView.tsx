@@ -1555,7 +1555,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                   <input
                     type="text"
                     required
-                    placeholder="ด.ช. กฤษณะ ศรีสมบูรณ์"
+                    placeholder="กรอกชื่อ-นามสกุลนักเรียน"
                     value={newStudentName}
                     onChange={(e) => setNewStudentName(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"

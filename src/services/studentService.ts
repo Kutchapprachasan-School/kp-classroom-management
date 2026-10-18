@@ -1,7 +1,8 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase.ts';
 import { StudentCreateSchema, type StudentCreateInput } from './types.ts';
-import { cleanSlateService } from './cleanSlateService.ts';
 import { attendanceCorrelationService } from './attendanceCorrelationService.ts';
+
+import { isGrade1SgsStudentCode, getM1SgsStudentInfo } from '../config/m1SgsLookup';
 
 export interface StudentRecord {
   id: string;
@@ -24,49 +25,8 @@ const STORAGE_PREFIX = 'cls_students_';
 
 export const defaultStudents: StudentRecord[] = [];
 
-export const mockStudentsByRoom: Record<string, StudentRecord[]> = {
-  'room-1-1': [
-    { id: 'stu-47001', no: 1, code: '47001', name: 'ด.ช. ชนะภัย ยอดสิงห์', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-1' },
-    { id: 'stu-47002', no: 2, code: '47002', name: 'ด.ช. ปวริศร์ สุขเกษม', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-1' },
-    { id: 'stu-47003', no: 3, code: '47003', name: 'ด.ช. ธนกร วิเศษศรี', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-1' },
-    { id: 'stu-47004', no: 4, code: '47004', name: 'ด.ช. ภูริพัฒน์ จันทร์ดี', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-1' },
-    { id: 'stu-47005', no: 5, code: '47005', name: 'ด.ช. นพดล สายทอง', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-1' },
-    { id: 'stu-47006', no: 6, code: '47006', name: 'ด.ญ. ชลิตา มงคล', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-1' },
-    { id: 'stu-47007', no: 7, code: '47007', name: 'ด.ญ. กานต์พิชชา บุญรอด', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-1' },
-    { id: 'stu-47008', no: 8, code: '47008', name: 'ด.ญ. นภัสสร แก้วคำ', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-1' },
-    { id: 'stu-47009', no: 9, code: '47009', name: 'ด.ญ. รินรดา พัฒนกุล', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-1' },
-    { id: 'stu-47010', no: 10, code: '47010', name: 'ด.ญ. อรอุมา พลหาญ', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-1' },
-  ],
-  'room-1-2': [
-    { id: 'stu-47101', no: 1, code: '47101', name: 'ด.ช. เกียรติศักดิ์ พรหมมา', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-2' },
-    { id: 'stu-47102', no: 2, code: '47102', name: 'ด.ช. ธีรดนย์ ภูริภัทร', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-2' },
-    { id: 'stu-47103', no: 3, code: '47103', name: 'ด.ช. ปัญญาวุฒิ วรรณดี', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-2' },
-    { id: 'stu-47104', no: 4, code: '47104', name: 'ด.ช. พงศกร มิ่งขวัญ', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-2' },
-    { id: 'stu-47105', no: 5, code: '47105', name: 'ด.ช. วรเมธ ชาญชัย', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'MALE', classroomId: 'room-1-2' },
-    { id: 'stu-47106', no: 6, code: '47106', name: 'ด.ญ. กัญญารัตน์ วงศ์ษา', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-2' },
-    { id: 'stu-47107', no: 7, code: '47107', name: 'ด.ญ. จิราพร สุขเกษม', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-2' },
-    { id: 'stu-47108', no: 8, code: '47108', name: 'ด.ญ. ชุติกาญจน์ เจริญศิลป์', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-2' },
-    { id: 'stu-47109', no: 9, code: '47109', name: 'ด.ญ. ณิชานันท์ บุญรอด', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-2' },
-    { id: 'stu-47110', no: 10, code: '47110', name: 'ด.ญ. ทิพวรรณ อินทร', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-1-2' },
-  ],
-  'room-2-1': [
-    { id: 'stu-46101', no: 1, code: '46101', name: 'ด.ช. ภาณุพงศ์ บุญยืน', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'MALE', classroomId: 'room-2-1' },
-    { id: 'stu-46102', no: 2, code: '46102', name: 'ด.ญ. สุภัสสรา อินทร', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-2-1' },
-    { id: 'stu-46103', no: 3, code: '46103', name: 'ด.ช. ธีรภัทร ชาญชัย', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'MALE', classroomId: 'room-2-1' },
-  ],
-  'room-3-1': [
-    { id: 'stu-45101', no: 1, code: '45101', name: 'ด.ช. กฤษณะ ศรีสมบูรณ์', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'MALE', classroomId: 'room-3-1' },
-    { id: 'stu-45102', no: 2, code: '45102', name: 'ด.ช. ทัตธน คำฝั้น', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'MALE', classroomId: 'room-3-1' },
-    { id: 'stu-45103', no: 3, code: '45103', name: 'ด.ญ. ชนากานต์ สิทธิชัย', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-3-1' },
-    { id: 'stu-45104', no: 4, code: '45104', name: 'ด.ญ. ธันยพร เจริญสุข', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-3-1' },
-    { id: 'stu-45105', no: 5, code: '45105', name: 'ด.ญ. กมลชนก เลิศวิไล', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-3-1' },
-    { id: 'stu-45106', no: 6, code: '45106', name: 'ด.ช. ภานุวัฒน์ วงศ์ษา', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'MALE', classroomId: 'room-3-1' },
-    { id: 'stu-45107', no: 7, code: '45107', name: 'ด.ช. อภิสิทธิ์ แก้วคำ', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'MALE', classroomId: 'room-3-1' },
-    { id: 'stu-45108', no: 8, code: '45108', name: 'ด.ญ. สุพรรษา พัฒนกุล', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'FEMALE', classroomId: 'room-3-1' },
-    { id: 'stu-45109', no: 9, code: '45109', name: 'ด.ช. ณัฐวุฒิ สายทอง', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'MALE', classroomId: 'room-3-1' },
-    { id: 'stu-45110', no: 10, code: '45110', name: 'ด.ช. ธนพล มณีโชติ', attendance: '0/0', score: 0, status: 'NORMAL', gender: 'MALE', classroomId: 'room-3-1' },
-  ],
-};
+// Zero mock students: ข้อมูลนักเรียนทั้งหมดต้องมาจากระบบจริง/ฐานข้อมูลจริงเท่านั้น
+export const mockStudentsByRoom: Record<string, StudentRecord[]> = {};
 
 const inMemoryStudentCache: Record<string, StudentRecord[]> = {};
 
@@ -101,14 +61,72 @@ export function formatClassroomLabel(classroomId?: string): string {
   return trimmed;
 }
 
+function relocateMisplacedM1Students(misplaced: StudentRecord[]): void {
+  if (typeof localStorage === 'undefined' || !misplaced || misplaced.length === 0) return;
+  const byRoom: Record<string, StudentRecord[]> = {};
+
+  misplaced.forEach((st) => {
+    const info = getM1SgsStudentInfo(st.code || st.id);
+    const targetThaiRoom = info?.room || 'ม.1/1';
+    const match = targetThaiRoom.match(/(\d+)\/(\d+)/);
+    const targetRoomId = match ? `room-${match[1]}-${match[2]}` : 'room-1-1';
+
+    if (!byRoom[targetRoomId]) byRoom[targetRoomId] = [];
+    byRoom[targetRoomId].push({
+      ...st,
+      no: info?.seatNo || st.no,
+      classroomId: targetRoomId,
+    });
+  });
+
+  Object.entries(byRoom).forEach(([roomId, newStudents]) => {
+    try {
+      const raw = localStorage.getItem(`${STORAGE_PREFIX}${roomId}`);
+      let existing: StudentRecord[] = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(existing)) existing = [];
+
+      const existingCodes = new Set(existing.map((s) => s.code || s.id));
+      const toAdd = newStudents.filter((s) => !existingCodes.has(s.code || s.id));
+      if (toAdd.length > 0) {
+        const merged = [...existing, ...toAdd].sort((a, b) => a.no - b.no);
+        localStorage.setItem(`${STORAGE_PREFIX}${roomId}`, JSON.stringify(merged));
+        inMemoryStudentCache[roomId] = merged;
+        const alt = getAlternateRoomKey(roomId);
+        if (alt) {
+          localStorage.setItem(`${STORAGE_PREFIX}${alt}`, JSON.stringify(merged));
+          inMemoryStudentCache[alt] = merged;
+        }
+      }
+    } catch {
+      // ignore
+    }
+  });
+}
+
 const getLocalStudents = (classroomId: string): StudentRecord[] => {
   if (!classroomId) return [];
+  const isGrade1Room = classroomId.includes('1-') || classroomId.includes('1/');
+
   if (typeof localStorage !== 'undefined') {
     const raw = localStorage.getItem(`${STORAGE_PREFIX}${classroomId}`);
     if (raw !== null) {
       try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
+        let parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          // หากเป็นห้องที่ไม่ใช่ ม.1 (เช่น room-3-1) แต่มีนักเรียน ม.1 ปะปนอยู่ (204 คน) ให้ทำการ sanitize อัตโนมัติทันที
+          if (!isGrade1Room && parsed.some((s: StudentRecord) => isGrade1SgsStudentCode(s.code || s.id))) {
+            const misplaced = parsed.filter((s: StudentRecord) => isGrade1SgsStudentCode(s.code || s.id));
+            parsed = parsed.filter((s: StudentRecord) => !isGrade1SgsStudentCode(s.code || s.id));
+            localStorage.setItem(`${STORAGE_PREFIX}${classroomId}`, JSON.stringify(parsed));
+            const altKey = getAlternateRoomKey(classroomId);
+            if (altKey) {
+              localStorage.setItem(`${STORAGE_PREFIX}${altKey}`, JSON.stringify(parsed));
+            }
+            inMemoryStudentCache[classroomId] = parsed;
+            relocateMisplacedM1Students(misplaced);
+          }
+          return parsed;
+        }
       } catch {
         // fallback
       }
@@ -118,8 +136,17 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
       const altRaw = localStorage.getItem(`${STORAGE_PREFIX}${altKey}`);
       if (altRaw !== null) {
         try {
-          const parsed = JSON.parse(altRaw);
-          if (Array.isArray(parsed)) return parsed;
+          let parsed = JSON.parse(altRaw);
+          if (Array.isArray(parsed)) {
+            if (!isGrade1Room && parsed.some((s: StudentRecord) => isGrade1SgsStudentCode(s.code || s.id))) {
+              const misplaced = parsed.filter((s: StudentRecord) => isGrade1SgsStudentCode(s.code || s.id));
+              parsed = parsed.filter((s: StudentRecord) => !isGrade1SgsStudentCode(s.code || s.id));
+              localStorage.setItem(`${STORAGE_PREFIX}${altKey}`, JSON.stringify(parsed));
+              inMemoryStudentCache[altKey] = parsed;
+              relocateMisplacedM1Students(misplaced);
+            }
+            return parsed;
+          }
         } catch {
           // fallback
         }
@@ -127,17 +154,21 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
     }
   }
   if (classroomId in inMemoryStudentCache) {
-    return inMemoryStudentCache[classroomId];
+    let cached = inMemoryStudentCache[classroomId];
+    if (!isGrade1Room && cached.some((s) => isGrade1SgsStudentCode(s.code || s.id))) {
+      cached = cached.filter((s) => !isGrade1SgsStudentCode(s.code || s.id));
+      inMemoryStudentCache[classroomId] = cached;
+    }
+    return cached;
   }
   const alt = getAlternateRoomKey(classroomId);
   if (alt && alt in inMemoryStudentCache) {
-    return inMemoryStudentCache[alt];
-  }
-  if (mockStudentsByRoom[classroomId] && mockStudentsByRoom[classroomId].length > 0) {
-    return mockStudentsByRoom[classroomId];
-  }
-  if (alt && mockStudentsByRoom[alt] && mockStudentsByRoom[alt].length > 0) {
-    return mockStudentsByRoom[alt];
+    let cached = inMemoryStudentCache[alt];
+    if (!isGrade1Room && cached.some((s) => isGrade1SgsStudentCode(s.code || s.id))) {
+      cached = cached.filter((s) => !isGrade1SgsStudentCode(s.code || s.id));
+      inMemoryStudentCache[alt] = cached;
+    }
+    return cached;
   }
   return [];
 };
@@ -250,16 +281,6 @@ export const studentService = {
       const match = list.find((s) => s.code === code || s.id === code);
       if (match) {
         return { student: match, classroomId: room };
-      }
-    }
-
-    // 3. Fallback: Search mockStudentsByRoom if clean slate is not active
-    if (!cleanSlateService.isCleanSlateActive()) {
-      for (const [room, list] of Object.entries(mockStudentsByRoom)) {
-        const match = list.find((s) => s.code === code || s.id === code);
-        if (match) {
-          return { student: match, classroomId: room };
-        }
       }
     }
 

@@ -43,7 +43,7 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
       action: () => onSelectAction('overview'),
     },
     {
-      title: 'ด.ช. ทัตธน คำฝั้น (เลขที่ 15)',
+      title: 'ข้อมูลนักเรียนรายบุคคล',
       subtitle: 'วิเคราะห์รายบุคคล & Radar Chart 5 มิติ',
       icon: User3Regular,
       action: () => onSelectAction('student'),

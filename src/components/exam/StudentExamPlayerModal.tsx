@@ -39,9 +39,9 @@ export const StudentExamPlayerModal: React.FC<StudentExamPlayerModalProps> = ({
   isOpen,
   onClose,
   examId,
-  studentCode = '45101',
-  studentName = 'ด.ช. กฤษณะ ศรีสมบูรณ์',
-  classroomId = 'room-3-1',
+  studentCode = '',
+  studentName = '',
+  classroomId = '',
   onGraded,
 }) => {
   const [quiz, setQuiz] = useState<OnlineQuizConfig | null>(null);

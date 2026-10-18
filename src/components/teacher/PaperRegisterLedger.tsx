@@ -18,8 +18,9 @@ import {
   type AttendanceStatusCode,
 } from '../../services/attendanceCorrelationService';
 import { cleanSlateService } from '../../services/cleanSlateService';
-import { studentService } from '../../services/studentService';
+import { studentService, formatClassroomLabel } from '../../services/studentService';
 import { sgsRosterAndSubmissionService } from '../../services/sgsRosterAndSubmissionService';
+import { isGrade1SgsStudentCode } from '../../config/m1SgsLookup';
 
 export type PaperLedgerMode =
   | 'MORNING_ASSEMBLY'
@@ -131,16 +132,21 @@ function buildInitialRows(selectedRoom?: string, periods: PeriodDef[] = []): Stu
   if (!selectedRoom) {
     return [];
   }
+  const isNonGrade1 = !selectedRoom.includes('1-') && !selectedRoom.includes('1/');
   const students = studentService.getStudents(selectedRoom);
   const normalizedRoom = normalizeClassroomId(selectedRoom);
   const allRecords = attendanceCorrelationService.getAllPeriodRecords();
   const todayIso = new Date().toISOString().split('T')[0];
   const morningRecords = attendanceCorrelationService.getMorningRecords(normalizedRoom, todayIso);
 
-  const baseList =
+  const rawList =
     students && students.length > 0
       ? students
       : sgsRosterAndSubmissionService.getSgsRoster(selectedRoom);
+
+  const baseList = isNonGrade1
+    ? rawList.filter((st: any) => !isGrade1SgsStudentCode(st.code || st.studentCode || st.id || ''))
+    : rawList;
 
   return baseList.map((st: any, idx: number) => {
     const studentCode = st.code || st.studentCode || st.id;
@@ -664,7 +670,7 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs sm:text-sm font-extrabold text-[#163A66]">
-              สมุด ปพ.5 • ชั้น {selectedRoom}
+              สมุด ปพ.5 • ชั้น {formatClassroomLabel(selectedRoom)}
             </span>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
               {rows.length} คน
@@ -681,7 +687,7 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                   }`}
                 >
-                  {rm}
+                  {formatClassroomLabel(rm)}
                 </button>
               ))}
             </div>

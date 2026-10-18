@@ -32,8 +32,8 @@ export const StudentQrScannerModal: React.FC<StudentQrScannerModalProps> = ({
   expectedRoomId,
   expectedType,
   expectedCourseCode,
-  currentStudentCode = '47001',
-  currentStudentName = 'ด.ช. ชนะภัย ยอดสิงห์',
+  currentStudentCode = '',
+  currentStudentName = '',
   onSuccessCheckIn,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);

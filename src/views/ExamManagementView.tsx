@@ -2664,8 +2664,8 @@ D) ผู้อำนวยการ
           isOpen={!!playerExam}
           onClose={() => setPlayerExam(null)}
           examId={playerExam.id}
-          studentCode="45101"
-          studentName="ด.ช. กฤษณะ ศรีสมบูรณ์"
+          studentCode={studentService.getStudents(playerExam.roomName || 'room-1-1')[0]?.code || ''}
+          studentName={studentService.getStudents(playerExam.roomName || 'room-1-1')[0]?.name || ''}
           classroomId={playerExam.roomName || (classroomService.getClassroomsSync()[0]?.id || 'room-1-1')}
           onGraded={(score, isPassed) => {
             showToast(
