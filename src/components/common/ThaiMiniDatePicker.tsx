@@ -34,7 +34,7 @@ const THAI_MONTH_SHORT_MAP: Record<string, number> = {
 /**
  * แปลงข้อความวันที่ไทย (เช่น '15 พ.ค. 2569') เป็นข้อมูล { day, month, year, yearCe }
  */
-export function parseThaiDateString(raw: string): { day: number; month: number; yearBe: number; yearCe: number } | null {
+function parseThaiDateString(raw: string): { day: number; month: number; yearBe: number; yearCe: number } | null {
   if (!raw) return null;
   const trimmed = raw.trim();
 
@@ -71,7 +71,7 @@ export function parseThaiDateString(raw: string): { day: number; month: number; 
 /**
  * ฟอร์แมตเป็นสตริงวันที่ไทยมาตรฐาน '15 พ.ค. 2569'
  */
-export function formatThaiDate(day: number, month: number, yearBe: number): string {
+function formatThaiDate(day: number, month: number, yearBe: number): string {
   const mShort = THAI_MONTHS_SHORT[month - 1] || 'พ.ค.';
   return `${day} ${mShort} ${yearBe}`;
 }
@@ -79,7 +79,7 @@ export function formatThaiDate(day: number, month: number, yearBe: number): stri
 /**
  * ฟอร์แมตเป็น ISO Date '2026-05-15'
  */
-export function formatIsoDate(day: number, month: number, yearCe: number): string {
+function formatIsoDate(day: number, month: number, yearCe: number): string {
   const dStr = String(day).padStart(2, '0');
   const mStr = String(month).padStart(2, '0');
   return `${yearCe}-${mStr}-${dStr}`;
@@ -124,7 +124,7 @@ export const ThaiMiniDatePicker: React.FC<ThaiMiniDatePickerProps> = ({
       setViewMonth(parsedValue.month);
       setViewYearBe(parsedValue.yearBe);
     }
-  }, [value]);
+  }, [parsedValue]);
 
   // ปิดปฏิทินเมื่อคลิกด้านนอก หรือกด Escape
   useEffect(() => {

@@ -49,12 +49,14 @@ import {
   academicCalendarService,
   ACADEMIC_CALENDAR_EVENT,
   type AcademicTermRecord,
+  type DayOfWeek,
 } from '../services/academicCalendarService';
 import { coursesCurriculumService } from '../services/coursesCurriculumService';
 import { cleanSlateService } from '../services/cleanSlateService';
 import { teacherCourseAssignmentService } from '../services/teacherCourseAssignmentService';
 import { studentService } from '../services/studentService';
 import { classroomService } from '../services/classroomService';
+import { calendarEventStorageService } from '../services/calendarEventStorageService';
 
 import {
   type TimetableColorTheme,
@@ -65,7 +67,7 @@ import {
   type ComputedWeekInfo,
   computeWeekInfo,
   getBangkokDayName,
-  PERIOD_DEFINITIONS,
+  getBangkokNow,
   INITIAL_MATRIX_SLOTS,
 } from '../utils/timetableDateUtils';
 
@@ -77,7 +79,6 @@ export type {
   WeekDayInfo,
   ComputedWeekInfo,
 };
-export { computeWeekInfo, PERIOD_DEFINITIONS, INITIAL_MATRIX_SLOTS };
 
 interface TimetableViewProps {
   onDeepNavigate?: (payload: CrossViewNavigationPayload) => void;
@@ -89,23 +90,28 @@ interface TimetableViewProps {
 const MATRIX_STORAGE_KEY = 'kp_teacher_matrix_slots';
 
 const loadSavedMatrixSlots = (): TimetableMatrixSlot[] => {
+  let baseSlots: TimetableMatrixSlot[] = [];
   if (typeof window !== 'undefined' && window.localStorage) {
     try {
       const stored = window.localStorage.getItem(MATRIX_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return coursesCurriculumService.sanitizeMatrixSlotsWithCurriculum(parsed);
+          baseSlots = parsed;
         }
       }
     } catch {
       // ignore
     }
   }
-  if (cleanSlateService.isCleanSlateActive()) {
-    return [];
+  if (baseSlots.length === 0) {
+    if (cleanSlateService.isCleanSlateActive()) {
+      return [];
+    }
+    baseSlots = INITIAL_MATRIX_SLOTS;
   }
-  return coursesCurriculumService.sanitizeMatrixSlotsWithCurriculum(INITIAL_MATRIX_SLOTS);
+  const bellSynced = bellScheduleService.syncMatrixSlotsWithBellSchedule(baseSlots);
+  return coursesCurriculumService.sanitizeMatrixSlotsWithCurriculum(bellSynced);
 };
 
 const DAY_ORDER: Record<string, number> = {
@@ -115,6 +121,11 @@ const DAY_ORDER: Record<string, number> = {
   'พฤหัสบดี': 4,
   'ศุกร์': 5,
 };
+
+const THAI_MONTH_NAMES = [
+  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
+];
 
 export const TimetableView: React.FC<TimetableViewProps> = ({
   onDeepNavigate,
@@ -151,10 +162,12 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
   const [selectedSlot, setSelectedSlot] = useState<TimetableMatrixSlot | null>(null);
   const [assignWaitingSlotTarget, setAssignWaitingSlotTarget] = useState<TimetableMatrixSlot | null>(null);
 
-
   // View Mode: 'DAY' (รายวัน), 'WEEK' (รายสัปดาห์), 'MONTH' (รายเดือน)
   const [viewModeTab, setViewModeTab] = useState<'DAY' | 'WEEK' | 'MONTH'>('WEEK');
-  const [selectedDayTab, setSelectedDayTab] = useState<string>('พฤหัสบดี');
+  const [selectedDayTab, setSelectedDayTab] = useState<string>(() =>
+    calendarEventStorageService.getTodayDayKey()
+  );
+  const [calendarDate, setCalendarDate] = useState<Date>(() => getBangkokNow());
   const [mobileViewMode, setMobileViewMode] = useState<'CARDS' | 'TABLE'>('CARDS');
 
   // Add / Edit Modal State
@@ -174,9 +187,17 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
   useEffect(() => {
     const handleBellUpdate = (e: Event) => {
       const custom = e as CustomEvent<SchoolBellScheduleConfig>;
-      if (custom.detail) {
-        setBellConfig(custom.detail);
-      }
+      const newConfig = custom.detail || bellScheduleService.getConfig();
+      setBellConfig(newConfig);
+      setMatrixSlots((prev) => {
+        const synced = bellScheduleService.syncMatrixSlotsWithBellSchedule(prev, newConfig);
+        const sanitized = coursesCurriculumService.sanitizeMatrixSlotsWithCurriculum(synced);
+        if (typeof window !== 'undefined' && window.localStorage) {
+          window.localStorage.setItem(MATRIX_STORAGE_KEY, JSON.stringify(sanitized));
+          window.dispatchEvent(new CustomEvent('kp_matrix_slots_updated', { detail: sanitized }));
+        }
+        return sanitized;
+      });
     };
     window.addEventListener(BELL_SCHEDULE_UPDATED_EVENT, handleBellUpdate);
     return () => {
@@ -211,18 +232,26 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
     }
   };
 
-  const activePeriods = useMemo(() => {
-    const timeline = bellScheduleService.getTimeline();
-    const teachingList = timeline
-      .filter((t) => t.type === 'PERIOD' || (t.type === 'LUNCH' && t.periodNumber !== undefined))
-      .map((t) => ({
-        period: t.periodNumber || 1,
-        timeRange: t.timeRange,
-        label: t.label,
-        isLunch: t.isLunch,
-      }));
-    return teachingList.length > 0 ? teachingList : PERIOD_DEFINITIONS;
+  const activeTimelineRows = useMemo(() => {
+    return bellScheduleService.generateBellScheduleTimeline(bellConfig).filter(
+      (t) => t.type === 'PERIOD' || t.type === 'LUNCH'
+    );
   }, [bellConfig]);
+
+  const teachingPeriods = useMemo(() => {
+    return activeTimelineRows.filter((r) => r.type === 'PERIOD' && r.periodNumber !== undefined);
+  }, [activeTimelineRows]);
+
+  const activePeriods = useMemo(() => {
+    return activeTimelineRows.map((t) => ({
+      id: t.id,
+      period: t.periodNumber,
+      timeRange: t.timeRange,
+      label: t.label,
+      isLunch: t.isLunch,
+      type: t.type,
+    }));
+  }, [activeTimelineRows]);
 
   // Modals state
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -307,7 +336,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
   // - ยังไม่ถึงวันเช็ค: กล่องสีเทาอ่อน (bg-slate-100 text-slate-800)
   // ------------------------------------------
   const getSlotStatus = (slot: TimetableMatrixSlot): 'CHECKED' | 'UNCHECKED' | 'FUTURE' | 'LUNCH' => {
-    if (slot.status === 'LUNCH' || slot.isLunchSlot || slot.period === 5) {
+    if (slot.status === 'LUNCH' || slot.isLunchSlot || slot.subjectCode === 'พักกลางวัน') {
       return 'LUNCH';
     }
     if (slot.isFreePeriod || slot.category === 'free' || !slot.subjectCode) {
@@ -317,8 +346,8 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
       return 'CHECKED';
     }
     const dayIdx = DAY_ORDER[slot.day] || 1;
-    const todayIdx = 4; // พฤหัสบดี
-    const currentPeriod = 2;
+    const todayIdx = DAY_ORDER[todayDayKey] || 0;
+    const currentPeriod = bellScheduleService.getCurrentPeriodNumber();
 
     if (dayIdx < todayIdx) {
       return 'UNCHECKED'; // วันที่ผ่านมาแล้ว ยังไม่เช็ค -> สีแดงเข้ม
@@ -426,7 +455,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
 
         saveMatrixSlotsWithDispatch(newMatrix);
         showToast(`นำเข้าคาบสอนจากไฟล์เรียบร้อย (${importedCount} คาบ)`);
-      } catch (err) {
+      } catch {
         showToast('เกิดข้อผิดพลาดในการอ่านไฟล์ กรุณาตรวจสอบรูปแบบไฟล์ CSV');
       }
     };
@@ -473,19 +502,27 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
       }
     }
 
+    const dynamicTime = bellScheduleService.getTimeRangeForPeriod(slotToSave.period);
+    const finalizedSlot: TimetableMatrixSlot = {
+      ...slotToSave,
+      timeRange: dynamicTime || slotToSave.timeRange || `คาบที่ ${slotToSave.period}`,
+      isLunchSlot: false,
+    };
+
     const existingIdx = matrixSlots.findIndex(
-      (s) => s.id === slotToSave.id || (s.day === slotToSave.day && s.period === slotToSave.period)
+      (s) => s.id === finalizedSlot.id || (s.day === finalizedSlot.day && s.period === finalizedSlot.period)
     );
     let updated: TimetableMatrixSlot[];
     if (existingIdx >= 0) {
       updated = [...matrixSlots];
-      updated[existingIdx] = slotToSave;
+      updated[existingIdx] = finalizedSlot;
     } else {
-      updated = [...matrixSlots, slotToSave];
+      updated = [...matrixSlots, finalizedSlot];
     }
-    const sanitized = coursesCurriculumService.sanitizeMatrixSlotsWithCurriculum(updated);
+    const synced = bellScheduleService.syncMatrixSlotsWithBellSchedule(updated);
+    const sanitized = coursesCurriculumService.sanitizeMatrixSlotsWithCurriculum(synced);
     saveMatrixSlotsWithDispatch(sanitized);
-    showToast(`บันทึกรายวิชา ${slotToSave.subjectCode} (${slotToSave.day} คาบที่ ${slotToSave.period}) สำเร็จ`);
+    showToast(`บันทึกรายวิชา ${finalizedSlot.subjectCode} (${finalizedSlot.day} คาบที่ ${finalizedSlot.period}) สำเร็จ`);
   };
 
   const handleDeleteSlot = (slotId: string) => {
@@ -514,6 +551,8 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
 
     const sourceDay = moveSlotTarget.day;
     const sourcePeriod = moveSlotTarget.period;
+    const sourceTimeRange = bellScheduleService.getTimeRangeForPeriod(sourcePeriod);
+    const targetTimeRange = bellScheduleService.getTimeRangeForPeriod(targetMovePeriod);
 
     const targetExisting = matrixSlots.find(
       (s) => s.day === targetMoveDay && s.period === targetMovePeriod
@@ -527,6 +566,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
             ...targetExisting,
             day: sourceDay,
             period: sourcePeriod,
+            timeRange: sourceTimeRange || targetExisting.timeRange,
           };
         }
         return {
@@ -535,6 +575,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
           category: 'free' as const,
           subjectCode: '',
           subjectName: '',
+          timeRange: sourceTimeRange || s.timeRange,
         };
       }
       if (s.day === targetMoveDay && s.period === targetMovePeriod) {
@@ -542,12 +583,14 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
           ...moveSlotTarget,
           day: targetMoveDay as any,
           period: targetMovePeriod,
+          timeRange: targetTimeRange || moveSlotTarget.timeRange,
         };
       }
       return s;
     });
 
-    saveMatrixSlotsWithDispatch(updated);
+    const synced = bellScheduleService.syncMatrixSlotsWithBellSchedule(updated);
+    saveMatrixSlotsWithDispatch(synced);
 
     showToast(
       `ย้ายคาบ ${moveSlotTarget.subjectCode} จากวัน${sourceDay} คาบที่ ${sourcePeriod} ไปวัน${targetMoveDay} คาบที่ ${targetMovePeriod} สำเร็จ`
@@ -562,7 +605,8 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
     targetDay: string,
     targetPeriod: number,
     targetRoom?: string,
-    targetIcon?: SubjectIconConfig
+    targetIcon?: SubjectIconConfig,
+    targetTimeRange?: string
   ) => {
     const finalRoom = targetRoom?.trim() || waitingSlot.room;
     const quotaCheck = coursesCurriculumService.canAssignPeriod(
@@ -578,14 +622,22 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
       return;
     }
 
+    const periodTimeRange =
+      targetTimeRange ||
+      bellScheduleService.getTimeRangeForPeriod(targetPeriod) ||
+      `คาบที่ ${targetPeriod}`;
+
     const updatedSlot: TimetableMatrixSlot = {
       ...waitingSlot,
       id: `slot-${targetDay}-${targetPeriod}`,
       day: targetDay as any,
       period: targetPeriod,
+      timeRange: periodTimeRange,
       room: finalRoom,
       subjectIcon: targetIcon?.id || waitingSlot.subjectIcon,
       isFreePeriod: false,
+      isLunchSlot: false,
+      status: 'UNCHECKED',
     };
     handleSaveSlot(updatedSlot);
     setAssignWaitingSlotTarget(null);
@@ -892,20 +944,17 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {activePeriods.map((periodDef) => {
-              const slot = getSlot(selectedDayTab, periodDef.period);
-              const isLunch = periodDef.period === 5;
-
-              if (isLunch) {
+              if (periodDef.isLunch) {
                 return (
                   <div
-                    key={periodDef.period}
+                    key={periodDef.id || `lunch-${periodDef.timeRange}`}
                     className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-amber-900 flex items-center justify-between text-xs font-bold"
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-base">🍴</span>
                       <div>
-                        <div>พักกลางวัน</div>
-                        <div className="text-[11px] font-normal text-amber-800">11:50 - 12:40</div>
+                        <div>{periodDef.label}</div>
+                        <div className="text-[11px] font-normal text-amber-800">{periodDef.timeRange}</div>
                       </div>
                     </div>
                     <span className="px-2 py-0.5 rounded-md bg-white border border-amber-300 text-[10px]">
@@ -915,15 +964,18 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                 );
               }
 
+              const pNum = periodDef.period || 1;
+              const slot = getSlot(selectedDayTab, pNum);
+
               if (!slot || slot.isFreePeriod || !slot.subjectCode) {
                 return (
                   <div
-                    key={periodDef.period}
-                    onClick={() => handleOpenFreeSlot(selectedDayTab, periodDef.period)}
+                    key={periodDef.id || `period-${pNum}`}
+                    onClick={() => handleOpenFreeSlot(selectedDayTab, pNum)}
                     className="p-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 hover:bg-blue-50/40 hover:border-blue-300 transition-colors cursor-pointer flex flex-col justify-between min-h-[110px]"
                   >
                     <div className="flex items-center justify-between text-xs text-slate-400 font-bold">
-                      <span>คาบที่ {periodDef.period}</span>
+                      <span>{periodDef.label}</span>
                       <span>{periodDef.timeRange}</span>
                     </div>
                     <div className="text-center text-xs font-bold text-slate-400 py-3">
@@ -938,7 +990,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
 
               return (
                 <div
-                  key={periodDef.period}
+                  key={periodDef.id || `period-${pNum}`}
                   onClick={() => handleOpenSlot(slot)}
                   className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between min-h-[120px] ${boxStyle}`}
                 >
@@ -952,7 +1004,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                       </div>
                       <div>
                         <div className="text-xs opacity-80 font-bold">
-                          คาบที่ {slot.period} ({periodDef.timeRange})
+                          {periodDef.label} ({periodDef.timeRange})
                         </div>
                         <div className="text-base font-black truncate mt-0.5">
                           {slot.subjectCode} {slot.subjectName && `• ${slot.subjectName}`}
@@ -1056,242 +1108,403 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
 
               <tbody className="divide-y divide-[#E6EEF7]/80">
                 {activePeriods.map((periodDef) => {
-                  const isLunchRow = periodDef.period === 5;
+                  if (periodDef.isLunch) {
+                    return (
+                      <tr key={periodDef.id || `lunch-${periodDef.timeRange}`} className="transition-colors">
+                        {/* Time Column */}
+                        <td className="py-3.5 px-3 text-left font-bold text-slate-600 text-xs align-middle bg-slate-50/40">
+                          <div>{periodDef.timeRange}</div>
+                          <div className="text-[10px] text-slate-400 font-medium">({periodDef.label})</div>
+                        </td>
 
-                  return (
-                    <tr key={periodDef.period} className="transition-colors">
-                      {/* Time Column */}
-                      <td className="py-3.5 px-3 text-left font-bold text-slate-600 text-xs align-middle bg-slate-50/40">
-                        <div>{periodDef.timeRange}</div>
-                        <div className="text-[10px] text-slate-400 font-medium">({periodDef.label})</div>
-                      </td>
-
-                      {/* Lunch Slot */}
-                      {isLunchRow ? (
+                        {/* Lunch Slot */}
                         <td
                           colSpan={weekInfo.days.length}
                           className="p-2 align-middle bg-amber-50/50 text-center"
                         >
                           <div className="py-2.5 px-4 rounded-xl border border-amber-200/80 bg-white shadow-2xs inline-flex items-center gap-2 text-xs font-bold text-amber-900">
                             <span>🍴</span>
-                            <span>พักกลางวัน (11:50 - 12:40)</span>
+                            <span>{periodDef.label} ({periodDef.timeRange})</span>
                           </div>
                         </td>
-                      ) : (
-                        /* Mon - Fri Period Slots */
-                        weekInfo.days.map((dayObj) => {
-                          const slot = getSlot(dayObj.key, periodDef.period);
-                          const isToday = dayObj.key === todayDayKey;
-                          const colBg = isToday ? 'bg-blue-50/20' : '';
+                      </tr>
+                    );
+                  }
 
-                          if (!slot || slot.isFreePeriod || !slot.subjectCode) {
-                            return (
-                              <td
-                                key={dayObj.key}
-                                onClick={() => handleOpenFreeSlot(dayObj.key, periodDef.period)}
-                                className={`p-1.5 align-middle cursor-pointer group ${colBg}`}
-                                title="คลิกเพื่อเพิ่มรายวิชาในคาบนี้"
-                              >
-                                <div className="h-28 w-full rounded-2xl border border-dashed border-slate-200 bg-slate-50/30 hover:bg-blue-50/40 hover:border-blue-300 transition-colors flex items-center justify-center text-slate-300 group-hover:text-blue-500 text-xs font-bold">
-                                  + เพิ่มวิชา
-                                </div>
-                              </td>
-                            );
-                          }
+                  const pNum = periodDef.period || 1;
 
-                          const boxStyle = getSlotBoxStyle(slot);
-                          const status = getSlotStatus(slot);
+                  return (
+                    <tr key={periodDef.id || `period-${pNum}`} className="transition-colors">
+                      {/* Time Column */}
+                      <td className="py-3.5 px-3 text-left font-bold text-slate-600 text-xs align-middle bg-slate-50/40">
+                        <div>{periodDef.timeRange}</div>
+                        <div className="text-[10px] text-slate-400 font-medium">({periodDef.label})</div>
+                      </td>
 
+                      {/* Mon - Fri Period Slots */}
+                      {weekInfo.days.map((dayObj) => {
+                        const slot = getSlot(dayObj.key, pNum);
+                        const isToday = dayObj.key === todayDayKey;
+                        const colBg = isToday ? 'bg-blue-50/20' : '';
+
+                        if (!slot || slot.isFreePeriod || !slot.subjectCode) {
                           return (
                             <td
                               key={dayObj.key}
-                              onClick={() => handleOpenSlot(slot)}
+                              onClick={() => handleOpenFreeSlot(dayObj.key, pNum)}
                               className={`p-1.5 align-middle cursor-pointer group ${colBg}`}
+                              title="คลิกเพื่อเพิ่มรายวิชาในคาบนี้"
                             >
-                              <div
-                                className={`h-28 w-full p-2.5 rounded-2xl border flex flex-col justify-between text-left transition-all hover:scale-101 hover:shadow-md ${boxStyle}`}
-                              >
-                                {/* Top: Code & Room */}
-                                <div>
-                                  <div className="flex items-center gap-1.5">
-                                    <div className="shrink-0 scale-75 origin-left">
-                                      {renderSubjectIconBadge(
-                                        getSubjectIcon(slot.subjectIcon || slot.subjectCode, slot.subjectName),
-                                        'sm'
-                                      )}
-                                    </div>
-                                    <div className="font-black text-sm tracking-tight truncate">
-                                      {slot.subjectCode}
-                                    </div>
-                                  </div>
-                                  <div className="text-[11px] font-semibold opacity-90 truncate">
-                                    {slot.room}
-                                  </div>
-                                </div>
-
-                                {/* Subject Name */}
-                                <div className="text-[11px] font-medium opacity-85 truncate">
-                                  {slot.subjectName || slot.subjectCode}
-                                </div>
-
-                                {/* Bottom Badge */}
-                                <div className="pt-1 flex items-center justify-between">
-                                  <span
-                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                      status === 'CHECKED'
-                                        ? 'bg-white/20 text-white'
-                                        : status === 'UNCHECKED'
-                                        ? 'bg-white/20 text-white'
-                                        : 'bg-slate-200 text-slate-700'
-                                    }`}
-                                  >
-                                    {status === 'CHECKED' ? '✓ เช็คแล้ว' : status === 'UNCHECKED' ? '⚠️ ยังไม่เช็ค' : 'รอเช็ค'}
-                                  </span>
-                                </div>
+                              <div className="h-28 w-full rounded-2xl border border-dashed border-slate-200 bg-slate-50/30 hover:bg-blue-50/40 hover:border-blue-300 transition-colors flex items-center justify-center text-slate-300 group-hover:text-blue-500 text-xs font-bold">
+                                + เพิ่มวิชา
                               </div>
                             </td>
                           );
-                        })
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        }
+
+                        const boxStyle = getSlotBoxStyle(slot);
+                        const status = getSlotStatus(slot);
+
+                        return (
+                          <td
+                            key={dayObj.key}
+                            onClick={() => handleOpenSlot(slot)}
+                            className={`p-1.5 align-middle cursor-pointer group ${colBg}`}
+                          >
+                            <div
+                              className={`h-28 w-full p-2.5 rounded-2xl border flex flex-col justify-between text-left transition-all hover:scale-101 hover:shadow-md ${boxStyle}`}
+                            >
+                              {/* Top: Code & Room */}
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <div className="shrink-0 scale-75 origin-left">
+                                    {renderSubjectIconBadge(
+                                      getSubjectIcon(slot.subjectIcon || slot.subjectCode, slot.subjectName),
+                                      'sm'
+                                    )}
+                                  </div>
+                                  <div className="font-black text-sm tracking-tight truncate">
+                                    {slot.subjectCode}
+                                  </div>
+                                </div>
+                                <div className="text-[11px] font-semibold opacity-90 truncate">
+                                  {slot.room}
+                                </div>
+                              </div>
+
+                              {/* Subject Name */}
+                              <div className="text-[11px] font-medium opacity-85 truncate">
+                                {slot.subjectName || slot.subjectCode}
+                              </div>
+
+                              {/* Bottom Badge */}
+                              <div className="pt-1 flex items-center justify-between">
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                    status === 'CHECKED'
+                                      ? 'bg-white/20 text-white'
+                                      : status === 'UNCHECKED'
+                                      ? 'bg-white/20 text-white'
+                                      : 'bg-slate-200 text-slate-700'
+                                  }`}
+                                >
+                                  {status === 'CHECKED' ? '✓ เช็คแล้ว' : status === 'UNCHECKED' ? '⚠️ ยังไม่เช็ค' : 'รอเช็ค'}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                        );
+                      })
+                    }
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-      )}
 
-      {/* 4.3 VIEW: MONTH (รายเดือน) */}
-      {viewModeTab === 'MONTH' && (
-        <div className="w-full bg-white rounded-3xl border border-[#E6EEF7] p-4 sm:p-6 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-blue-600" />
-              <h2 className="font-extrabold text-slate-900 text-sm sm:text-base">
-                ปฏิทินตารางสอนรายเดือน (ตุลาคม 2569)
-              </h2>
-            </div>
-            <span className="text-xs text-slate-500 font-bold">
-              แสดงสถิติจำนวนคาบสอนและการเช็คชื่อตลอดทั้งเดือน
-            </span>
-          </div>
-
-          <div className="grid grid-cols-7 gap-2 text-center text-xs">
-            {['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'].map((w) => (
-              <div key={w} className="font-bold text-slate-500 py-1 bg-slate-50 rounded-xl">
-                {w}
-              </div>
-            ))}
-
-            {/* October 2026 Sample Day Cells based on Teacher's Actual Timetable */}
-            {Array.from({ length: 35 }).map((_, i) => {
-              const dayNum = i - 3; // 1 Oct is Thursday (index 4)
-              const isValid = dayNum >= 1 && dayNum <= 31;
-              const colIndex = i % 7;
-              const isSchoolDay = colIndex >= 1 && colIndex <= 5 && isValid;
-              const isToday = dayNum === 2;
-              const isPast = dayNum < 2 && isValid;
-              const isFuture = dayNum > 2 && isValid;
-
-              if (!isValid) {
-                return <div key={i} className="h-22 bg-slate-50/30 rounded-2xl border border-slate-100/50" />;
-              }
-
-              // Determine Day of Week Name
-              const WEEKDAY_KEYS = ['', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', ''];
-              const dayKey = isSchoolDay ? WEEKDAY_KEYS[colIndex] : '';
-              const scheduledSlots = dayKey
-                ? matrixSlots.filter((s) => s.day === dayKey && !s.isFreePeriod)
-                : [];
-              const classCount = scheduledSlots.length;
-              const hasClasses = classCount > 0;
-              const isAllChecked = hasClasses && scheduledSlots.every((s) => s.status === 'CHECKED');
-
-              // Visual styling logic: Green = checked, Red = unchecked past/today, Gray = waiting (ONLY on days with classes)
-              let cellBorderBg = 'border-slate-100 bg-slate-50/60 opacity-60';
-              if (isToday) {
-                cellBorderBg = 'border-blue-500 bg-blue-50/50 shadow-xs ring-1 ring-blue-300';
-              } else if (isSchoolDay) {
-                if (hasClasses) {
-                  if (isPast) {
-                    cellBorderBg = isAllChecked
-                      ? 'border-emerald-300 bg-emerald-50/40 hover:bg-emerald-50'
-                      : 'border-rose-300 bg-rose-50/40 hover:bg-rose-50';
-                  } else if (isFuture) {
-                    cellBorderBg = 'border-slate-200 bg-slate-50/60 hover:bg-slate-100/60';
-                  }
-                } else {
-                  cellBorderBg = 'border-slate-100 bg-white hover:bg-slate-50/50';
-                }
-              }
+        {/* Mobile Stacked Cards for Week View */}
+        {mobileViewMode === 'CARDS' && (
+          <div className="block md:hidden space-y-3">
+            {weekInfo.days.map((dayObj) => {
+              const dayTeaching = matrixSlots.filter(
+                (s) =>
+                  s.day === dayObj.key &&
+                  !s.isFreePeriod &&
+                  s.category !== 'free' &&
+                  !s.isLunchSlot &&
+                  s.status !== 'LUNCH' &&
+                  Boolean(s.subjectCode) &&
+                  s.subjectCode !== 'พักกลางวัน'
+              );
+              const isToday = dayObj.key === todayDayKey;
 
               return (
                 <div
-                  key={i}
-                  className={`h-22 p-2 rounded-2xl border text-left flex flex-col justify-between transition-all ${cellBorderBg}`}
+                  key={dayObj.key}
+                  className={`p-3.5 rounded-2xl border ${
+                    isToday ? 'border-blue-300 bg-blue-50/30' : 'border-slate-200 bg-slate-50/40'
+                  }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`text-xs font-black ${
-                        isToday ? 'text-blue-700' : 'text-slate-700'
-                      }`}
-                    >
-                      {dayNum}
-                    </span>
+                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200/80">
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-xs sm:text-sm text-slate-900">วัน{dayObj.key}</span>
+                      <span className="text-[11px] text-slate-500 font-medium">({dayObj.dateLabel})</span>
+                    </div>
                     {isToday && (
-                      <span className="text-[9px] bg-blue-600 text-white px-1.5 py-0.2 rounded-full font-bold">
+                      <span className="text-[9px] bg-blue-600 text-white px-2 py-0.2 rounded-full font-bold">
                         วันนี้
                       </span>
                     )}
                   </div>
 
-                  {isSchoolDay ? (
-                    hasClasses ? (
-                      <div className="space-y-1">
-                        <div className="text-[10px] font-bold text-slate-700">
-                          สอน {classCount} คาบ
-                        </div>
-                        {isPast ? (
-                          isAllChecked ? (
-                            <span className="inline-block text-[9px] font-extrabold text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-1.5 py-0.2 rounded-md">
-                              ✓ เช็คแล้ว
-                            </span>
-                          ) : (
-                            <span className="inline-block text-[9px] font-extrabold text-rose-800 bg-rose-100/90 border border-rose-300 px-1.5 py-0.2 rounded-md">
-                              ⚠️ ยังไม่เช็ค
-                            </span>
-                          )
-                        ) : isToday ? (
-                          isAllChecked ? (
-                            <span className="inline-block text-[9px] font-extrabold text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.2 rounded-md">
-                              ✓ เช็คแล้ว
-                            </span>
-                          ) : (
-                            <span className="inline-block text-[9px] font-extrabold text-rose-800 bg-rose-100 border border-rose-300 px-1.5 py-0.2 rounded-md">
-                              ⚠️ ยังไม่เช็ค
-                            </span>
-                          )
-                        ) : (
-                          <span className="inline-block text-[9px] font-bold text-slate-600 bg-slate-200/80 border border-slate-300 px-1.5 py-0.2 rounded-md">
-                            รอสอน
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-[10px] text-slate-400 font-medium">
-                        ไม่มีคาบสอน
-                      </span>
-                    )
+                  {dayTeaching.length === 0 ? (
+                    <div className="text-xs text-slate-400 py-2.5 text-center font-medium">
+                      ไม่มีคาบสอนในวันนี้
+                    </div>
                   ) : (
-                    <span className="text-[10px] text-slate-400">วันหยุด</span>
+                    <div className="space-y-2">
+                      {dayTeaching.map((slot) => {
+                        const status = getSlotStatus(slot);
+                        const boxStyle = getSlotBoxStyle(slot);
+                        const dynamicTime = bellScheduleService.getTimeRangeForPeriod(slot.period) || slot.timeRange;
+                        return (
+                          <div
+                            key={slot.id}
+                            onClick={() => handleOpenSlot(slot)}
+                            className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${boxStyle}`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <div className="shrink-0">
+                                {renderSubjectIconBadge(
+                                  getSubjectIcon(slot.subjectIcon || slot.subjectCode, slot.subjectName),
+                                  'sm'
+                                )}
+                              </div>
+                              <div>
+                                <div className="text-[11px] opacity-80 font-bold">
+                                  คาบที่ {slot.period} ({dynamicTime})
+                                </div>
+                                <div className="font-black text-xs truncate">
+                                  {slot.subjectCode} {slot.subjectName && `• ${slot.subjectName}`}
+                                </div>
+                                <div className="text-[11px] opacity-90 font-medium">
+                                  {slot.room}
+                                </div>
+                              </div>
+                            </div>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                status === 'CHECKED'
+                                  ? 'bg-white/20 text-white'
+                                  : status === 'UNCHECKED'
+                                  ? 'bg-white/20 text-white'
+                                  : 'bg-slate-200 text-slate-700'
+                              }`}
+                            >
+                              {status === 'CHECKED' ? '✓ เช็คแล้ว' : status === 'UNCHECKED' ? '⚠️ ยังไม่เช็ค' : 'รอเช็ค'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               );
             })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
+    )}
+
+      {/* 4.3 VIEW: MONTH (รายเดือน) */}
+      {viewModeTab === 'MONTH' && (() => {
+        const bangkokNow = getBangkokNow();
+        const calYear = calendarDate.getFullYear();
+        const calMonth = calendarDate.getMonth(); // 0 - 11
+        const thaiMonthTitle = `ปฏิทินตารางสอนรายเดือน (${THAI_MONTH_NAMES[calMonth]} ${calYear + 543})`;
+
+        const firstDayOfWeek = new Date(calYear, calMonth, 1).getDay(); // 0 = Sunday
+        const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+        const totalCells = Math.ceil((firstDayOfWeek + daysInMonth) / 7) * 7;
+
+        const isCurrentMonth =
+          calYear === bangkokNow.getFullYear() && calMonth === bangkokNow.getMonth();
+        const todayDateNum = bangkokNow.getDate();
+
+        return (
+          <div className="w-full bg-white rounded-3xl border border-[#E6EEF7] p-4 sm:p-6 shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-blue-600" />
+                <h2 className="font-extrabold text-slate-900 text-sm sm:text-base">
+                  {thaiMonthTitle}
+                </h2>
+              </div>
+              <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setCalendarDate(new Date(calYear, calMonth - 1, 1))}
+                  className="p-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 cursor-pointer transition-colors"
+                  title="เดือนก่อนหน้า"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCalendarDate(getBangkokNow())}
+                  className="px-2.5 py-1 rounded-xl text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors cursor-pointer"
+                >
+                  วันนี้
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCalendarDate(new Date(calYear, calMonth + 1, 1))}
+                  className="p-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 cursor-pointer transition-colors"
+                  title="เดือนถัดไป"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-7 gap-2 text-center text-xs">
+              {['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'].map((w) => (
+                <div key={w} className="font-bold text-slate-500 py-1 bg-slate-50 rounded-xl">
+                  {w}
+                </div>
+              ))}
+
+              {Array.from({ length: totalCells }).map((_, i) => {
+                const dayNum = i - firstDayOfWeek + 1;
+                const isValid = dayNum >= 1 && dayNum <= daysInMonth;
+                const colIndex = i % 7;
+                const isSchoolDay = colIndex >= 1 && colIndex <= 5 && isValid;
+
+                if (!isValid) {
+                  return <div key={i} className="h-22 bg-slate-50/30 rounded-2xl border border-slate-100/50" />;
+                }
+
+                const isToday = isCurrentMonth && dayNum === todayDateNum;
+                const isPast = isCurrentMonth
+                  ? dayNum < todayDateNum
+                  : new Date(calYear, calMonth, dayNum) < new Date(bangkokNow.getFullYear(), bangkokNow.getMonth(), todayDateNum);
+                const isFuture = isCurrentMonth
+                  ? dayNum > todayDateNum
+                  : new Date(calYear, calMonth, dayNum) > new Date(bangkokNow.getFullYear(), bangkokNow.getMonth(), todayDateNum);
+
+                // Determine Day of Week Name
+                const WEEKDAY_KEYS = ['', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', ''];
+                const dayKey = isSchoolDay ? WEEKDAY_KEYS[colIndex] : '';
+                const scheduledSlots = dayKey
+                  ? matrixSlots.filter(
+                      (s) =>
+                        s.day === dayKey &&
+                        !s.isFreePeriod &&
+                        s.category !== 'free' &&
+                        !s.isLunchSlot &&
+                        s.status !== 'LUNCH' &&
+                        Boolean(s.subjectCode) &&
+                        s.subjectCode !== 'พักกลางวัน'
+                    )
+                  : [];
+                const classCount = scheduledSlots.length;
+                const hasClasses = classCount > 0;
+                const isAllChecked = hasClasses && scheduledSlots.every((s) => s.status === 'CHECKED');
+
+                // Visual styling logic: Green = checked, Red = unchecked past/today, Gray = waiting (ONLY on days with classes)
+                let cellBorderBg = 'border-slate-100 bg-slate-50/60 opacity-60';
+                if (isToday) {
+                  cellBorderBg = 'border-blue-500 bg-blue-50/50 shadow-xs ring-1 ring-blue-300';
+                } else if (isSchoolDay) {
+                  if (hasClasses) {
+                    if (isPast) {
+                      cellBorderBg = isAllChecked
+                        ? 'border-emerald-300 bg-emerald-50/40 hover:bg-emerald-50'
+                        : 'border-rose-300 bg-rose-50/40 hover:bg-rose-50';
+                    } else if (isFuture) {
+                      cellBorderBg = 'border-slate-200 bg-slate-50/60 hover:bg-slate-100/60';
+                    }
+                  } else {
+                    cellBorderBg = 'border-slate-100 bg-white hover:bg-slate-50/50';
+                  }
+                }
+
+                return (
+                  <div
+                    key={i}
+                    onClick={() => {
+                      if (isSchoolDay && dayKey) {
+                        setSelectedDayTab(dayKey as DayOfWeek);
+                        setViewModeTab('DAY');
+                      }
+                    }}
+                    className={`h-22 p-2 rounded-2xl border text-left flex flex-col justify-between transition-all ${
+                      isSchoolDay && dayKey ? 'cursor-pointer hover:shadow-xs' : ''
+                    } ${cellBorderBg}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`text-xs font-black ${
+                          isToday ? 'text-blue-700 font-extrabold' : 'text-slate-700'
+                        }`}
+                      >
+                        {dayNum}
+                      </span>
+                      {isToday && (
+                        <span className="text-[9px] bg-blue-600 text-white px-1.5 py-0.2 rounded-full font-bold">
+                          วันนี้
+                        </span>
+                      )}
+                    </div>
+
+                    {isSchoolDay ? (
+                      hasClasses ? (
+                        <div className="space-y-1">
+                          <div className="text-[10px] font-bold text-slate-700">
+                            สอน {classCount} คาบ
+                          </div>
+                          {isPast ? (
+                            isAllChecked ? (
+                              <span className="inline-block text-[9px] font-extrabold text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-1.5 py-0.2 rounded-md">
+                                ✓ เช็คแล้ว
+                              </span>
+                            ) : (
+                              <span className="inline-block text-[9px] font-extrabold text-rose-800 bg-rose-100/90 border border-rose-300 px-1.5 py-0.2 rounded-md">
+                                ⚠️ ยังไม่เช็ค
+                              </span>
+                            )
+                          ) : isToday ? (
+                            isAllChecked ? (
+                              <span className="inline-block text-[9px] font-extrabold text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.2 rounded-md">
+                                ✓ เช็คแล้ว
+                              </span>
+                            ) : (
+                              <span className="inline-block text-[9px] font-extrabold text-rose-800 bg-rose-100 border border-rose-300 px-1.5 py-0.2 rounded-md">
+                                ⚠️ ยังไม่เช็ค
+                              </span>
+                            )
+                          ) : (
+                            <span className="inline-block text-[9px] font-bold text-slate-600 bg-slate-200/80 border border-slate-300 px-1.5 py-0.2 rounded-md">
+                              รอสอน
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          ไม่มีคาบสอน
+                        </span>
+                      )
+                    ) : (
+                      <span className="text-[10px] text-slate-400">วันหยุด</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ========================================================
           5. UNASSIGNED WAITING POOL (คาบที่รอจัดตาราง)
@@ -1367,7 +1580,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                     คาบที่ {selectedSlot.period}
                   </span>
                   <span className="text-xs text-slate-500 font-bold">
-                    {selectedSlot.day} • {selectedSlot.timeRange || '08:30 - 09:20'}
+                    {selectedSlot.day} • {selectedSlot.timeRange || bellScheduleService.getTimeRangeForPeriod(selectedSlot.period)}
                   </span>
                 </div>
                 <h2 className="text-base sm:text-lg font-black text-slate-900 mt-1">
@@ -1542,9 +1755,9 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                   onChange={(e) => setTargetMovePeriod(parseInt(e.target.value, 10))}
                   className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold focus:ring-2 focus:ring-blue-500"
                 >
-                  {[1, 2, 3, 4, 6, 7, 8].map((p) => (
-                    <option key={p} value={p}>
-                      คาบที่ {p}
+                  {teachingPeriods.map((p) => (
+                    <option key={p.periodNumber} value={p.periodNumber}>
+                      {p.label} ({p.timeRange})
                     </option>
                   ))}
                 </select>
@@ -1584,7 +1797,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
         onDeleteSlot={handleDeleteSlot}
         initialSlot={editingSlot}
         matrixSlots={matrixSlots}
-        maxPeriods={activePeriods.length}
+        maxPeriods={teachingPeriods.length}
       />
 
       {/* ========================================================
@@ -1596,7 +1809,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
         waitingSlot={assignWaitingSlotTarget}
         matrixSlots={matrixSlots}
         onAssignSlot={handleAssignWaitingSlot}
-        maxPeriods={activePeriods.length}
+        maxPeriods={teachingPeriods.length}
       />
     </div>
   );

@@ -246,7 +246,7 @@ async function main() {
     try {
       const res = await targetClient.query(`SELECT COUNT(*) as cnt FROM "${table}"`);
       neonCount = parseInt(res.rows[0].cnt, 10);
-    } catch (e) {
+    } catch {
       neonCount = -1;
     }
 

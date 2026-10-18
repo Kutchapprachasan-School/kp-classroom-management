@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   BookMarked,
   Plus,
@@ -66,19 +66,19 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
   };
 
   // Sync state on external update
-  const refreshCourses = () => {
+  const refreshCourses = useCallback(() => {
     const updated = coursesCurriculumService.getCourses();
     setCourses([...updated]);
     if (!updated.some((c) => c.id === selectedCourseId) && updated[0]) {
       setSelectedCourseId(updated[0].id);
     }
-  };
+  }, [selectedCourseId]);
 
   useEffect(() => {
     const handler = () => refreshCourses();
     window.addEventListener('kp-courses-curriculum-updated', handler);
     return () => window.removeEventListener('kp-courses-curriculum-updated', handler);
-  }, [selectedCourseId]);
+  }, [refreshCourses]);
 
   // Trash Bin State & Sync
   const [trashItems, setTrashItems] = useState<TrashMediaItem[]>(() =>
@@ -1103,9 +1103,10 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">หน่วยกิต (Credits):</label>
                   <select
-                    value={courseForm.credits}
+                    value={Number(courseForm.credits ?? 1.0).toFixed(1)}
                     onChange={(e) => {
-                      const newCredits = parseFloat(e.target.value) || 1.0;
+                      const parsed = parseFloat(e.target.value);
+                      const newCredits = isNaN(parsed) ? 1.0 : parsed;
                       const { periodsPerRoom } = calculatePeriodsPerWeek(
                         newCredits,
                         courseForm.assignedClassrooms.length
@@ -1118,6 +1119,7 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
                     }}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold text-slate-800 bg-white focus:border-blue-500 focus:outline-none cursor-pointer"
                   >
+                    <option value="0.0">0.0 หน่วยกิต (กิจกรรม / ไม่คิดหน่วยกิต)</option>
                     <option value="0.5">0.5 หน่วยกิต (1 คาบ/ห้อง)</option>
                     <option value="1.0">1.0 หน่วยกิต (2 คาบ/ห้อง)</option>
                     <option value="1.5">1.5 หน่วยกิต (3 คาบ/ห้อง)</option>
@@ -1331,9 +1333,10 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">หน่วยกิต (Credits):</label>
                   <select
-                    value={courseForm.credits}
+                    value={Number(courseForm.credits ?? 1.0).toFixed(1)}
                     onChange={(e) => {
-                      const newCredits = parseFloat(e.target.value) || 1.0;
+                      const parsed = parseFloat(e.target.value);
+                      const newCredits = isNaN(parsed) ? 1.0 : parsed;
                       const { periodsPerRoom } = calculatePeriodsPerWeek(
                         newCredits,
                         courseForm.assignedClassrooms.length
@@ -1346,6 +1349,7 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
                     }}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold text-slate-800 bg-white focus:border-blue-500 focus:outline-none cursor-pointer"
                   >
+                    <option value="0.0">0.0 หน่วยกิต (กิจกรรม / ไม่คิดหน่วยกิต)</option>
                     <option value="0.5">0.5 หน่วยกิต (1 คาบ/ห้อง)</option>
                     <option value="1.0">1.0 หน่วยกิต (2 คาบ/ห้อง)</option>
                     <option value="1.5">1.5 หน่วยกิต (3 คาบ/ห้อง)</option>

@@ -24,7 +24,9 @@ export interface SgsParsedRow {
   status: SgsImportRowStatus;    // สถานะเปรียบเทียบกับฐานข้อมูล
   conflictReason?: string;       // เหตุผลข้อขัดแย้ง (ถ้ามี)
   existingStudentId?: string;    // ไอดีของนักเรียนเดิมในระบบ (กรณีมีอยู่แล้ว)
-  selectedAction?: 'IMPORT' | 'SKIP' | 'TRANSFER_ROOM'; // ทางเลือกของครู
+  existingSeatNo?: number;       // เลขที่เดิมในระบบ
+  isSeatChanged?: boolean;       // ตรวจพบว่าเลขที่ในไฟล์ SGS ต่างจากเลขที่เดิม
+  selectedAction?: 'IMPORT' | 'SKIP' | 'TRANSFER_ROOM' | 'UPDATE_SEAT'; // ทางเลือกของครู
 }
 
 export interface SgsImportDryRunSummary {
@@ -33,6 +35,7 @@ export interface SgsImportDryRunSummary {
   existsCount: number;
   conflictCount: number;
   invalidCount: number;
+  seatChangedCount: number;
   rows: SgsParsedRow[];
   hasBlockingErrors: boolean;
   detectedGrade?: string;
@@ -341,12 +344,24 @@ export function evaluateSgsImportDryRun(
 
     if (isSameRoom) {
       // Exists in this exact room
+      const existingSeatNo = existing.sgsSeatNo;
+      const parsedNo = row.parsedSeatNo ?? (row.rawSeatNo ? parseInt(row.rawSeatNo, 10) : null);
+      const isSeatChanged =
+        existingSeatNo !== undefined &&
+        parsedNo !== null &&
+        !isNaN(parsedNo) &&
+        existingSeatNo !== parsedNo;
+
       return {
         ...row,
         existingStudentId: existing.id,
+        existingSeatNo,
+        isSeatChanged,
         classroom: studentRoom,
         status: 'EXISTS',
-        conflictReason: 'มีรายชื่ออยู่ในห้องเรียนนี้แล้ว (ข้ามอัตโนมัติ เพื่อรักษาคะแนนเดิม)',
+        conflictReason: isSeatChanged
+          ? `เลขที่เปลี่ยน: ในระบบคือเลขที่ ${existingSeatNo} แต่ในไฟล์ SGS คือเลขที่ ${parsedNo}`
+          : 'มีรายชื่ออยู่ในห้องเรียนนี้แล้ว (ข้ามอัตโนมัติ เพื่อรักษาคะแนนเดิม)',
         selectedAction: 'SKIP'
       };
     }
@@ -366,6 +381,7 @@ export function evaluateSgsImportDryRun(
   const existsCount = evaluatedRows.filter(r => r.status === 'EXISTS').length;
   const conflictCount = evaluatedRows.filter(r => r.status === 'CONFLICT').length;
   const invalidCount = evaluatedRows.filter(r => r.status === 'INVALID').length;
+  const seatChangedCount = evaluatedRows.filter(r => r.status === 'EXISTS' && r.isSeatChanged).length;
 
   return {
     totalRows: evaluatedRows.length,
@@ -373,6 +389,7 @@ export function evaluateSgsImportDryRun(
     existsCount,
     conflictCount,
     invalidCount,
+    seatChangedCount,
     rows: evaluatedRows,
     hasBlockingErrors: invalidCount > 0 && evaluatedRows.every(r => r.status === 'INVALID'),
     detectedGrade,

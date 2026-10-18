@@ -6,6 +6,8 @@
  * Complies with Senior Backend Review architectural constraints.
  */
 
+import { gradeService, type AssessmentColumn, type StudentScore } from '../services/gradeService.ts';
+
 export type PromotionActionType =
   | 'PROMOTED'
   | 'REPEAT_GRADE'
@@ -35,12 +37,15 @@ export interface StudentDryRunInput {
   attendancePercent?: number;  // 0 - 100
   gpa?: number;
   hasIncompleteAssignments?: boolean;
+  hasAcademicIssue?: boolean; // ติด 0 หรือ ติด ร จาก gradeService
+  academicIssueDetails?: string[];
   manualExceptionAction?: 'REPEAT_GRADE' | 'SUSPENDED' | 'TRANSFERRED_OUT' | 'CUSTOM_TARGET_ROOM';
   customTargetRoom?: string;
   graduationApproved?: boolean;
   graduationApprover?: string;
   graduationApprovalDate?: string;
 }
+
 
 export interface StudentPromotionDecision {
   studentCode: string;
@@ -196,9 +201,14 @@ export function evaluateStudentPromotion(
 
   // Case 4: Terminal Grades (ม.3 and ม.6) -> Graduation Gating
   if (mappingRule.isTerminalGrade) {
-    if (student.hasIncompleteAssignments) {
-      warnings.push('มีงานค้างส่งหรือติด ร/0 ที่ยังไม่ได้รับการแก้ไข');
+    if (student.hasIncompleteAssignments || student.hasAcademicIssue) {
+      if (student.academicIssueDetails && student.academicIssueDetails.length > 0) {
+        warnings.push(...student.academicIssueDetails);
+      } else {
+        warnings.push('มีงานค้างส่งหรือติด ร/0 ที่ยังไม่ได้รับการแก้ไข');
+      }
     }
+
 
     if (student.attendancePercent !== undefined && student.attendancePercent < minAttendance) {
       warnings.push(`เวลาเรียนไม่ถึง ${minAttendance}% (ปัจจุบัน ${student.attendancePercent}%)`);
@@ -345,3 +355,21 @@ export function runPromotionDryRun(
     decisions,
   };
 }
+
+/**
+ * Evaluates whether a student has an academic issue (grade '0' or status 'ร')
+ * using gradeService.calculateFinalGrade
+ */
+export function checkStudentAcademicIssue(
+  studentId: string,
+  columns: AssessmentColumn[],
+  scoresMap: Map<string, StudentScore>
+): { hasAcademicIssue: boolean; totalScore: number; grade: string; isIncomplete: boolean } {
+  const result = gradeService.calculateFinalGrade(studentId, columns, scoresMap);
+  const hasAcademicIssue = result.grade === '0' || result.isIncomplete;
+  return {
+    hasAcademicIssue,
+    ...result,
+  };
+}
+

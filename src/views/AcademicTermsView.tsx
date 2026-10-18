@@ -80,7 +80,7 @@ interface AcademicTermsViewProps {
 const CALENDAR_EVENTS_STORAGE_KEY = 'kp_school_calendar_events_v2';
 
 // Helper แยกวัน เดือน ปี จากสตริงวันที่ของระบบวันหยุด เช่น '13 ต.ค. 2569' หรือ '23 ต.ค. 2569'
-export const parseHolidayDate = (dateStr: string): { day: number; month: number; year: number } => {
+const parseHolidayDate = (dateStr: string): { day: number; month: number; year: number } => {
   const monthMap: Record<string, number> = {
     'ม.ค.': 1, 'มกราคม': 1,
     'ก.พ.': 2, 'กุมภาพันธ์': 2,
@@ -106,7 +106,7 @@ export const parseHolidayDate = (dateStr: string): { day: number; month: number;
 };
 
 // แปลง SpecialHolidayRecord จาก academicCalendarService (Single Source of Truth) เป็น CalendarEventItem
-export const convertHolidayToCalendarEvent = (holiday: SpecialHolidayRecord): CalendarEventItem => {
+const convertHolidayToCalendarEvent = (holiday: SpecialHolidayRecord): CalendarEventItem => {
   const { day, month, year } = parseHolidayDate(holiday.date);
   return {
     id: `holiday-${holiday.id}`,
@@ -124,15 +124,16 @@ export const convertHolidayToCalendarEvent = (holiday: SpecialHolidayRecord): Ca
   };
 };
 
-// Helper คำนวณชื่อวันในสัปดาห์ (ตุลาคม 2569: วันที่ 1 คือวันพุธ, วันที่ 2 คือวันพฤหัสบดี)
-export const getThaiDayOfWeekName = (day: number): string => {
+// Helper คำนวณชื่อวันในสัปดาห์ตามปฏิทินจริง (สากล/พุทธศักราช)
+const getThaiDayOfWeekName = (day: number, month = 10, year = 2569): string => {
   const days = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
-  const dayIdx = (day + 2) % 7;
-  return days[dayIdx];
+  const ceYear = year > 2400 ? year - 543 : year;
+  const d = new Date(ceYear, month - 1, day);
+  return days[d.getDay()];
 };
 
 // Helper แปลงวันที่เป็นข้อความภาษาไทยเต็มรูปแบบ
-export const formatThaiFullDate = (
+const formatThaiFullDate = (
   day: number,
   month = 10,
   year = 2569,
@@ -154,10 +155,10 @@ export const formatThaiFullDate = (
     'ธันวาคม',
   ];
   const monthName = monthNames[month] || 'ตุลาคม';
-  const dayOfWeek = getThaiDayOfWeekName(day);
+  const dayOfWeek = getThaiDayOfWeekName(day, month, year);
 
   if (endDay && endDay > day) {
-    const endDayOfWeek = getThaiDayOfWeekName(endDay);
+    const endDayOfWeek = getThaiDayOfWeekName(endDay, month, year);
     const durationDays = endDay - day + 1;
     return `วัน${dayOfWeek}ที่ ${day} – วัน${endDayOfWeek}ที่ ${endDay} ${monthName} ${year} (รวม ${durationDays} วัน)`;
   }
@@ -166,7 +167,7 @@ export const formatThaiFullDate = (
 };
 
 // ตรวจจับไอคอน MingCute Icons อัจฉริยะตามคำสำคัญ (Keyword Matcher)
-export const getMingCuteEventIcon = (ev: {
+const getMingCuteEventIcon = (ev: {
   title: string;
   category?: string;
   colorType?: CalendarLegendColor;
@@ -288,8 +289,11 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
   const [selectedMonthOffset, setSelectedMonthOffset] = useState<number>(0); // -1 = ก.ย., 0 = ต.ค., 1 = พ.ย.
   const [selectedDayNumber, setSelectedDayNumber] = useState<number>(() => new Date().getDate()); // วันที่ปัจจุบัน
   const [selectedWeekIndex, setSelectedWeekIndex] = useState<number>(() => {
-    const d = new Date().getDate();
-    return Math.min(4, Math.max(0, Math.floor((d + 2) / 7)));
+    const now = new Date();
+    const d = now.getDate();
+    const firstDayOfWeek = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
+    const cellIdx = firstDayOfWeek + d - 1;
+    return Math.min(4, Math.max(0, Math.floor(cellIdx / 7)));
   });
 
   const [events, setEvents] = useState<CalendarEventItem[]>(() => {
@@ -471,18 +475,58 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
     }
   };
 
-  // Calendar Days Setup (ตุลาคม 2569: เริ่มต้นวันพุธที่ 1 ต.ค., 31 วัน)
-  // Grid 5 แถว x 7 วัน = 35 ช่อง (28-30 ก.ย. และ 1 พ.ย.)
-  const calendarCells = useMemo(
-    () => [
-      { day: 28, isCurrentMonth: false },
-      { day: 29, isCurrentMonth: false },
-      { day: 30, isCurrentMonth: false },
-      ...Array.from({ length: 31 }, (_, i) => ({ day: i + 1, isCurrentMonth: true })),
-      { day: 1, isCurrentMonth: false },
-    ],
-    []
-  );
+  // Calendar Days Setup คำนวณแบบ Dynamic ตามปฏิทินสากล/ไทยจริง
+  // สำหรับตุลาคม 2569 (2026 CE): วันที่ 1 ต.ค. คือวันพฤหัสบดี (Column 4)
+  // Grid 5 แถว x 7 วัน = 35 ช่อง (มี 4 วันของเดือนกันยายน คือ 27-30 ก.ย. และสิ้นสุด 31 ต.ค. วันเสาร์)
+  const calendarCells = useMemo(() => {
+    const targetMonth = 10 + selectedMonthOffset; // 9 = ก.ย., 10 = ต.ค., 11 = พ.ย.
+    const ceYear = 2026;
+    const targetDate = new Date(ceYear, targetMonth - 1, 1);
+    const firstDayOfWeek = targetDate.getDay(); // 0 = อาทิตย์, 4 = พฤหัสบดี
+    const daysInMonth = new Date(ceYear, targetMonth, 0).getDate();
+    const daysInPrevMonth = new Date(ceYear, targetMonth - 1, 0).getDate();
+
+    const cells: {
+      day: number;
+      month: number;
+      year: number;
+      isCurrentMonth: boolean;
+    }[] = [];
+
+    // 1. วันที่ของเดือนก่อนหน้า (Padding days)
+    for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+      cells.push({
+        day: daysInPrevMonth - i,
+        month: targetMonth === 1 ? 12 : targetMonth - 1,
+        year: targetMonth === 1 ? 2568 : 2569,
+        isCurrentMonth: false,
+      });
+    }
+
+    // 2. วันที่ของเดือนปัจจุบัน
+    for (let d = 1; d <= daysInMonth; d++) {
+      cells.push({
+        day: d,
+        month: targetMonth,
+        year: 2569,
+        isCurrentMonth: true,
+      });
+    }
+
+    // 3. วันที่ของเดือนถัดไปเพื่อเติมให้เต็มสัปดาห์ (จำนวนช่องรวมเป็นทวีคูณของ 7 ขั้นต่ำ 35 ช่อง)
+    const totalNeeded = Math.max(35, Math.ceil(cells.length / 7) * 7);
+    const nextMonthDaysCount = totalNeeded - cells.length;
+    for (let d = 1; d <= nextMonthDaysCount; d++) {
+      cells.push({
+        day: d,
+        month: targetMonth === 12 ? 1 : targetMonth + 1,
+        year: targetMonth === 12 ? 2570 : 2569,
+        isCurrentMonth: false,
+      });
+    }
+
+    return cells;
+  }, [selectedMonthOffset]);
 
   // Week days for Week View
   const weekDays = useMemo(() => {
@@ -492,24 +536,31 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
 
   const weekRangeLabel = useMemo(() => {
     if (weekDays.length < 7) return '';
+    const monthShortNames = ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
     const first = weekDays[0];
     const last = weekDays[6];
-    const m1 = first.isCurrentMonth ? 'ต.ค.' : selectedWeekIndex === 0 ? 'ก.ย.' : 'ต.ค.';
-    const m2 = last.isCurrentMonth ? 'ต.ค.' : selectedWeekIndex === 4 ? 'พ.ย.' : 'ต.ค.';
-    return `${first.day} ${m1} – ${last.day} ${m2} 2569`;
-  }, [weekDays, selectedWeekIndex]);
+    const m1 = monthShortNames[first.month] || 'ต.ค.';
+    const m2 = monthShortNames[last.month] || 'ต.ค.';
+    const y1 = first.year || 2569;
+    const y2 = last.year || 2569;
+    if (y1 !== y2) {
+      return `${first.day} ${m1} ${y1} – ${last.day} ${m2} ${y2}`;
+    }
+    return `${first.day} ${m1} – ${last.day} ${m2} ${y1}`;
+  }, [weekDays]);
 
   // Day events for Day View
   const currentDayEvents = useMemo(() => {
     return allEvents.filter((ev) => {
       if (roleFilter === 'TEACHER' && ev.targetRole === 'STUDENT') return false;
       if (roleFilter === 'STUDENT' && ev.targetRole === 'TEACHER') return false;
+      if (ev.month && ev.month !== (10 + selectedMonthOffset)) return false;
       if (ev.endDay && ev.endDay >= ev.day) {
         return selectedDayNumber >= ev.day && selectedDayNumber <= ev.endDay;
       }
       return ev.day === selectedDayNumber;
     });
-  }, [allEvents, selectedDayNumber, roleFilter]);
+  }, [allEvents, selectedDayNumber, roleFilter, selectedMonthOffset]);
 
   const currentDayHoliday = useMemo(() => {
     return currentDayEvents.find(
@@ -774,11 +825,13 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
               onClick={() => {
                 const today = new Date();
                 const todayDate = today.getDate();
+                const firstDayOfWeek = new Date(today.getFullYear(), today.getMonth(), 1).getDay();
+                const cellIdx = firstDayOfWeek + todayDate - 1;
                 setSelectedMonthOffset(0);
                 setSelectedDayNumber(todayDate);
-                setSelectedWeekIndex(Math.min(4, Math.max(0, Math.floor((todayDate + 2) / 7))));
+                setSelectedWeekIndex(Math.min(4, Math.max(0, Math.floor(cellIdx / 7))));
                 setViewMode('MONTH');
-                const todayItem = allEvents.find((e) => e.day === todayDate);
+                const todayItem = allEvents.find((e) => e.day === todayDate && (!e.month || e.month === 10));
                 if (todayItem) setSelectedEvent(todayItem);
               }}
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-blue-200 bg-white hover:bg-blue-50/50 text-blue-600 font-bold text-xs shadow-2xs transition-colors cursor-pointer"
@@ -793,15 +846,23 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
         {viewMode === 'MONTH' && (
           <div className="border border-slate-200/90 rounded-2xl overflow-hidden bg-white">
             <div className="overflow-x-auto">
-              <div className="min-w-[700px] lg:min-w-0">
+              <div className="min-w-[620px] md:min-w-0">
                 {/* 7 Columns Header Row */}
                 <div className="grid grid-cols-7 border-b border-slate-200 divide-x divide-slate-100 text-center font-bold text-xs sm:text-sm">
-                  {['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'].map((dayName, colIdx) => {
+                  {[
+                    { full: 'อาทิตย์', short: 'อา.' },
+                    { full: 'จันทร์', short: 'จ.' },
+                    { full: 'อังคาร', short: 'อ.' },
+                    { full: 'พุธ', short: 'พ.' },
+                    { full: 'พฤหัสบดี', short: 'พฤ.' },
+                    { full: 'ศุกร์', short: 'ศ.' },
+                    { full: 'เสาร์', short: 'ส.' },
+                  ].map(({ full, short }, colIdx) => {
                     const isTodayColumn = colIdx === new Date().getDay() && selectedMonthOffset === 0;
                     const isWeekendCol = colIdx === 0 || colIdx === 6;
                     return (
                       <div
-                        key={dayName}
+                        key={full}
                         className={`py-2.5 ${
                           isTodayColumn
                             ? 'text-blue-700 bg-blue-50/60 font-extrabold border-x border-blue-100/70'
@@ -810,7 +871,8 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                             : 'text-slate-700 bg-slate-50/40'
                         }`}
                       >
-                        {dayName}
+                        <span className="hidden sm:inline">{full}</span>
+                        <span className="sm:hidden">{short}</span>
                       </div>
                     );
                   })}
@@ -1137,7 +1199,11 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                 </button>
                 <div className="flex items-center gap-2">
                   <span className="font-black text-base sm:text-lg text-slate-900">
-                    วัน{getThaiDayOfWeekName(selectedDayNumber)}ที่ {selectedDayNumber} ตุลาคม 2569
+                    วัน{getThaiDayOfWeekName(selectedDayNumber, 10 + selectedMonthOffset, 2569)}ที่ {selectedDayNumber}{' '}
+                    {
+                      ['', 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'][10 + selectedMonthOffset] || 'ตุลาคม'
+                    }{' '}
+                    2569
                   </span>
                   {selectedDayNumber === new Date().getDate() && selectedMonthOffset === 0 && (
                     <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-blue-600 text-white shadow-2xs">
@@ -1147,8 +1213,8 @@ export const AcademicTermsView: React.FC<AcademicTermsViewProps> = ({
                 </div>
                 <button
                   type="button"
-                  disabled={selectedDayNumber >= 31}
-                  onClick={() => setSelectedDayNumber((prev) => Math.min(31, prev + 1))}
+                  disabled={selectedDayNumber >= new Date(2026, 10 + selectedMonthOffset, 0).getDate()}
+                  onClick={() => setSelectedDayNumber((prev) => Math.min(new Date(2026, 10 + selectedMonthOffset, 0).getDate(), prev + 1))}
                   className="w-8 h-8 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-blue-600 transition-colors cursor-pointer"
                   title="วันถัดไป"
                 >

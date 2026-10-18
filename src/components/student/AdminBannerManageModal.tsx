@@ -88,7 +88,7 @@ export const AdminBannerManageModal: React.FC<AdminBannerManageModalProps> = ({
       } else {
         setStatusMessage({ type: 'error', text: res.message });
       }
-    } catch (err) {
+    } catch {
       setStatusMessage({ type: 'error', text: 'เกิดข้อผิดพลาดในการประมวลผลรูปภาพ' });
     } finally {
       setIsProcessing(false);

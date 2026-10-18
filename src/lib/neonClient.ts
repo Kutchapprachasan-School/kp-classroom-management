@@ -147,6 +147,38 @@ export class NeonQueryBuilder<T = any[]> implements PromiseLike<QueryResult<T>> 
     return this;
   }
 
+  gt(column: string, value: any): this {
+    this.whereClauses.push({
+      sql: `"${column}" > $PARAM`,
+      values: [value],
+    });
+    return this;
+  }
+
+  gte(column: string, value: any): this {
+    this.whereClauses.push({
+      sql: `"${column}" >= $PARAM`,
+      values: [value],
+    });
+    return this;
+  }
+
+  lt(column: string, value: any): this {
+    this.whereClauses.push({
+      sql: `"${column}" < $PARAM`,
+      values: [value],
+    });
+    return this;
+  }
+
+  lte(column: string, value: any): this {
+    this.whereClauses.push({
+      sql: `"${column}" <= $PARAM`,
+      values: [value],
+    });
+    return this;
+  }
+
   match(record: Record<string, any>): this {
     for (const [col, val] of Object.entries(record)) {
       this.eq(col, val);
@@ -376,9 +408,11 @@ export class NeonQueryBuilder<T = any[]> implements PromiseLike<QueryResult<T>> 
         const quotedCols = cols.map((c) => `"${c}"`).join(', ');
         const conflictTarget =
           this.upsertOptions?.onConflict || (this.table === 'kps_cloud_store' ? 'key' : 'id');
+        const conflictCols = conflictTarget.split(',').map((c) => c.trim());
+        const quotedConflictTarget = conflictCols.map((c) => `"${c}"`).join(', ');
 
         const updateCols = cols
-          .filter((c) => c !== conflictTarget)
+          .filter((c) => !conflictCols.includes(c))
           .map((c) => `"${c}" = EXCLUDED."${c}"`)
           .join(', ');
 
@@ -398,11 +432,15 @@ export class NeonQueryBuilder<T = any[]> implements PromiseLike<QueryResult<T>> 
 
         const conflictClause =
           updateCols.length > 0 && !this.upsertOptions?.ignoreDuplicates
-            ? `ON CONFLICT ("${conflictTarget}") DO UPDATE SET ${updateCols}`
-            : `ON CONFLICT DO NOTHING`;
+            ? `ON CONFLICT (${quotedConflictTarget}) DO UPDATE SET ${updateCols}`
+            : `ON CONFLICT (${quotedConflictTarget}) DO NOTHING`;
 
         const returningClause =
-          this.table === 'kps_cloud_store' ? 'RETURNING "key", "updated_at"' : 'RETURNING *';
+          this.table === 'kps_cloud_store'
+            ? 'RETURNING "key", "updated_at"'
+            : this.table === 'Attendance'
+            ? 'RETURNING "id"'
+            : 'RETURNING *';
 
         querySql = `INSERT INTO "${this.table}" (${quotedCols}) VALUES ${rowPlaceholders.join(
           ', '
@@ -479,6 +517,41 @@ class NeonClient {
     return { ...neonCacheStats };
   }
 
+  async rpc<T = any>(
+    fnName: string,
+    args: Record<string, any> = {}
+  ): Promise<{ data: T | null; error: { message: string; details?: any } | null }> {
+    try {
+      const keys = Object.keys(args);
+      const params: any[] = [];
+      const paramExpressions: string[] = [];
+
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        let val = args[key];
+        if (val !== null && typeof val === 'object') {
+          val = JSON.stringify(val);
+        }
+        params.push(val);
+        paramExpressions.push(`${key} => $${i + 1}`);
+      }
+
+      const querySql = `SELECT public.${fnName}(${paramExpressions.join(', ')}) as rpc_res;`;
+      const res =
+        typeof (sql as any).query === 'function'
+          ? await (sql as any).query(querySql, params)
+          : await (sql as any)(querySql, params);
+
+      const firstRow = Array.isArray(res) && res.length > 0 ? res[0] : null;
+      const data =
+        firstRow ? (firstRow.rpc_res !== undefined ? firstRow.rpc_res : firstRow) : null;
+      return { data, error: null };
+    } catch (err: any) {
+      console.warn(`[NeonClient.rpc] Error executing "${fnName}":`, err.message);
+      return { data: null, error: { message: err.message, details: err } };
+    }
+  }
+
   get auth() {
     return {
       signInWithOAuth: async () => ({ error: null, data: null }),
@@ -489,6 +562,7 @@ class NeonClient {
     };
   }
 }
+
 
 export const neonClient = new NeonClient();
 export default neonClient;

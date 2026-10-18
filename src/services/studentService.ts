@@ -1,8 +1,11 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase.ts';
 import { StudentCreateSchema, type StudentCreateInput } from './types.ts';
 import { attendanceCorrelationService } from './attendanceCorrelationService.ts';
+import { activityAuditLogService } from './activityAuditLogService.ts';
+import { masterDataService } from './masterDataService.ts';
+import { localCacheDb } from './localCacheDb.ts';
 
-import { isGrade1SgsStudentCode, getM1SgsStudentInfo } from '../config/m1SgsLookup';
+import { isGrade1SgsStudentCode, getM1SgsStudentInfo } from '../config/m1SgsLookup.ts';
 
 export interface StudentRecord {
   id: string;
@@ -67,14 +70,15 @@ function relocateMisplacedM1Students(misplaced: StudentRecord[]): void {
 
   misplaced.forEach((st) => {
     const info = getM1SgsStudentInfo(st.code || st.id);
-    const targetThaiRoom = info?.room || 'ม.1/1';
+    if (!info) return; // ป้องกันการดึงนักเรียนที่ไม่ใช่ ม.1 เข้ามาใน ม.1/1 โดยเด็ดขาด
+    const targetThaiRoom = info.room;
     const match = targetThaiRoom.match(/(\d+)\/(\d+)/);
     const targetRoomId = match ? `room-${match[1]}-${match[2]}` : 'room-1-1';
 
     if (!byRoom[targetRoomId]) byRoom[targetRoomId] = [];
     byRoom[targetRoomId].push({
       ...st,
-      no: info?.seatNo || st.no,
+      no: info.seatNo || st.no,
       classroomId: targetRoomId,
     });
   });
@@ -113,7 +117,7 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
       try {
         let parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          // หากเป็นห้องที่ไม่ใช่ ม.1 (เช่น room-3-1) แต่มีนักเรียน ม.1 ปะปนอยู่ (204 คน) ให้ทำการ sanitize อัตโนมัติทันที
+          // หากเป็นห้องที่ไม่ใช่ ม.1 (เช่น room-3-1) แต่มีนักเรียน ม.1 ปะปนอยู่ ให้ทำการ sanitize อัตโนมัติทันที
           if (!isGrade1Room && parsed.some((s: StudentRecord) => isGrade1SgsStudentCode(s.code || s.id))) {
             const misplaced = parsed.filter((s: StudentRecord) => isGrade1SgsStudentCode(s.code || s.id));
             parsed = parsed.filter((s: StudentRecord) => !isGrade1SgsStudentCode(s.code || s.id));
@@ -124,6 +128,24 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
             }
             inMemoryStudentCache[classroomId] = parsed;
             relocateMisplacedM1Students(misplaced);
+          } else if (isGrade1Room && parsed.some((s: StudentRecord) => s.code && /^16\d{3}$/.test(s.code) && !isGrade1SgsStudentCode(s.code))) {
+            // หากเป็นห้อง ม.1 ให้ล้างนักเรียน 16xxx ที่ไม่ใช่ ม.1 จริง (ป้องกันการหลุดเข้ามาทับซ้อน)
+            parsed = parsed.filter(
+              (s: StudentRecord) => !(s.code && /^16\d{3}$/.test(s.code) && !isGrade1SgsStudentCode(s.code))
+            );
+            const seen = new Set<string>();
+            parsed = parsed.filter((s: StudentRecord) => {
+              const k = s.code || s.id;
+              if (seen.has(k)) return false;
+              seen.add(k);
+              return true;
+            });
+            localStorage.setItem(`${STORAGE_PREFIX}${classroomId}`, JSON.stringify(parsed));
+            const altKey = getAlternateRoomKey(classroomId);
+            if (altKey) {
+              localStorage.setItem(`${STORAGE_PREFIX}${altKey}`, JSON.stringify(parsed));
+            }
+            inMemoryStudentCache[classroomId] = parsed;
           }
           return parsed;
         }
@@ -144,6 +166,19 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
               localStorage.setItem(`${STORAGE_PREFIX}${altKey}`, JSON.stringify(parsed));
               inMemoryStudentCache[altKey] = parsed;
               relocateMisplacedM1Students(misplaced);
+            } else if (isGrade1Room && parsed.some((s: StudentRecord) => s.code && /^16\d{3}$/.test(s.code) && !isGrade1SgsStudentCode(s.code))) {
+              parsed = parsed.filter(
+                (s: StudentRecord) => !(s.code && /^16\d{3}$/.test(s.code) && !isGrade1SgsStudentCode(s.code))
+              );
+              const seen = new Set<string>();
+              parsed = parsed.filter((s: StudentRecord) => {
+                const k = s.code || s.id;
+                if (seen.has(k)) return false;
+                seen.add(k);
+                return true;
+              });
+              localStorage.setItem(`${STORAGE_PREFIX}${altKey}`, JSON.stringify(parsed));
+              inMemoryStudentCache[altKey] = parsed;
             }
             return parsed;
           }
@@ -158,6 +193,9 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
     if (!isGrade1Room && cached.some((s) => isGrade1SgsStudentCode(s.code || s.id))) {
       cached = cached.filter((s) => !isGrade1SgsStudentCode(s.code || s.id));
       inMemoryStudentCache[classroomId] = cached;
+    } else if (isGrade1Room && cached.some((s) => s.code && /^16\d{3}$/.test(s.code) && !isGrade1SgsStudentCode(s.code))) {
+      cached = cached.filter((s) => !(s.code && /^16\d{3}$/.test(s.code) && !isGrade1SgsStudentCode(s.code)));
+      inMemoryStudentCache[classroomId] = cached;
     }
     return cached;
   }
@@ -170,6 +208,19 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
     }
     return cached;
   }
+
+  // Check L1 memory in masterDataService
+  const masterL1 = masterDataService.getCachedStudentsSync(classroomId);
+  if (masterL1 && masterL1.length > 0) {
+    return masterL1 as StudentRecord[];
+  }
+  if (alt) {
+    const masterAltL1 = masterDataService.getCachedStudentsSync(alt);
+    if (masterAltL1 && masterAltL1.length > 0) {
+      return masterAltL1 as StudentRecord[];
+    }
+  }
+
   return [];
 };
 
@@ -180,6 +231,9 @@ const saveLocalStudents = (classroomId: string, items: StudentRecord[]) => {
   if (altKey) {
     inMemoryStudentCache[altKey] = items;
   }
+  // L2 IndexedDB persistence
+  localCacheDb.putStudents(items as any).catch(() => {});
+
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(`${STORAGE_PREFIX}${classroomId}`, JSON.stringify(items));
     if (altKey) {
@@ -317,94 +371,16 @@ export const studentService = {
     return true;
   },
 
-  // READ: List students in classroom
+  // READ: List students in classroom (3-Tier Cache + Watermark Delta Sync)
   async getByClassroom(classroomId: string, forceRefresh?: boolean): Promise<StudentRecord[]> {
-    const local = getLocalStudents(classroomId);
-    const storedFpKey = `cls_students_fp_${classroomId}`;
-
-    if (isSupabaseConfigured) {
-      // 1. Lightweight fingerprint check: only fetch count and max(updated_at)
-      const storedFp = typeof localStorage !== 'undefined' ? localStorage.getItem(storedFpKey) : null;
-      if (!forceRefresh && local && local.length > 0 && storedFp) {
-        try {
-          const { data: fpData, error: fpErr } = await supabase
-            .from('students')
-            .select('count(*) as count, max(updated_at) as max_updated_at')
-            .eq('classroom_id', classroomId)
-            .single();
-
-          if (!fpErr && fpData) {
-            const currentFp = `${fpData.count}::${fpData.max_updated_at}`;
-            if (storedFp === currentFp) {
-              return local;
-            }
-          }
-        } catch {
-          // If fingerprint check fails, fallback to local
-          return local;
-        }
-      } else if (!forceRefresh && local && local.length > 0 && !storedFp) {
-        // If local exists but no fingerprint yet, return local to keep app fast
-        return local;
+    try {
+      const students = await masterDataService.getStudentsByRoom(classroomId, forceRefresh);
+      if (students && students.length > 0) {
+        saveLocalStudents(classroomId, students as StudentRecord[]);
+        return students as StudentRecord[];
       }
-
-      logDbOperation(`SELECT * FROM Enrollment/students WHERE classroomId = ${classroomId}`);
-      try {
-        const { data: vData, error: vErr } = await supabase
-          .from('students')
-          .select('id, seat_no, studentCode, code, name, status, gender, classroom_id, updated_at')
-          .eq('classroom_id', classroomId)
-          .order('seat_no', { ascending: true });
-
-        if (!vErr && vData && vData.length > 0) {
-          const mapped: StudentRecord[] = vData.map((s, idx) => ({
-            id: s.id,
-            no: s.seat_no || idx + 1,
-            code: s.studentCode || s.code || `4510${idx + 1}`,
-            name: s.name,
-            attendance: '0/0',
-            score: 0,
-            status: s.status === 'AT_RISK' ? 'AT_RISK' : 'NORMAL',
-            gender: s.gender === 'FEMALE' ? 'FEMALE' : 'MALE',
-            avatarUrl: s.gender === 'FEMALE' ? '/images/banners/student-avatar-girl.png' : '/images/banners/student-avatar.png',
-            classroomId,
-          }));
-          saveLocalStudents(classroomId, mapped);
-
-          // Update fingerprint
-          if (typeof localStorage !== 'undefined') {
-            const maxUpdated = vData.reduce((max: string, item: any) => (item.updated_at > max ? item.updated_at : max), '');
-            localStorage.setItem(storedFpKey, `${vData.length}::${maxUpdated}`);
-          }
-
-          return mapped;
-        }
-      } catch (err) {
-        console.warn('Error fetching students from Supabase view:', err);
-      }
-
-      try {
-        const { data, error } = await supabase
-          .from('Enrollment')
-          .select('id, studentNo, classroomId, status, membership:SchoolMembership(studentCode, user:User(name))')
-          .eq('classroomId', classroomId)
-          .eq('status', 'ACTIVE')
-          .order('studentNo', { ascending: true });
-
-        if (!error && data && data.length > 0) {
-          return data.map((item) => ({
-            id: item.id,
-            no: item.studentNo,
-            code: item.membership?.studentCode || 'N/A',
-            name: item.membership?.user?.name || `นักเรียนเลขที่ ${item.studentNo}`,
-            attendance: '8/8',
-            score: 80,
-            status: 'NORMAL',
-          }));
-        }
-      } catch (err) {
-        console.warn('Error fetching Enrollment from Supabase:', err);
-      }
+    } catch (err) {
+      console.warn('[studentService] masterDataService fallback to local students:', err);
     }
     return getLocalStudents(classroomId);
   },
@@ -415,9 +391,18 @@ export const studentService = {
     const parsedName = parseThaiStudentName(validated.name);
     const studentId = `stu-${validated.studentCode}`;
 
+    const current = getLocalStudents(classroomId);
+    let finalStudentNo = validated.studentNo;
+    const existingNos = new Set(
+      current.filter((s) => s.code !== validated.studentCode && s.id !== studentId).map((s) => s.no)
+    );
+    if (existingNos.has(finalStudentNo)) {
+      finalStudentNo = Math.max(0, ...current.map((s) => s.no)) + 1;
+    }
+
     const newStudent: StudentRecord = {
       id: studentId,
-      no: validated.studentNo,
+      no: finalStudentNo,
       code: validated.studentCode,
       name: validated.name,
       attendance: '0/0',
@@ -461,12 +446,12 @@ export const studentService = {
       }
     }
 
-    const current = getLocalStudents(classroomId);
     const updated = [
       ...current.filter((s) => s.code !== newStudent.code && s.id !== newStudent.id),
       newStudent,
     ].sort((a, b) => a.no - b.no);
     saveLocalStudents(classroomId, updated);
+    masterDataService.invalidateRoom(classroomId);
 
     return newStudent;
   },
@@ -480,6 +465,7 @@ export const studentService = {
     const updated = { ...current[index], ...updates };
     current[index] = updated;
     saveLocalStudents(classroomId, current);
+    masterDataService.invalidateRoom(classroomId);
 
     if (isSupabaseConfigured) {
       logDbOperation(`UPDATE Student WHERE id = ${id}`, updates);
@@ -507,6 +493,16 @@ export const studentService = {
       }
     }
 
+    activityAuditLogService.logUpdate(
+      'นักเรียน',
+      `แก้ไขข้อมูลนักเรียน "${updated.name}"`,
+      `อัปเดตข้อมูลนักเรียน ${updated.name} (เลขที่ ${updated.no}) ในห้อง ${classroomId}`,
+      1,
+      undefined,
+      'ครูผู้สอน',
+      { studentId: id, classroomId }
+    ).catch(() => {});
+
     return updated;
   },
 
@@ -524,6 +520,16 @@ export const studentService = {
     }
 
     saveLocalStudents(classroomId, reordered);
+
+    activityAuditLogService.recordLog({
+      actionType: 'BATCH_UPDATE',
+      entityType: 'นักเรียน',
+      title: `จัดเรียงลำดับเลขที่นักเรียนห้อง ${classroomId}`,
+      summary: `จัดเรียงเลขที่ใหม่ 1 ถึง ${reordered.length} สำเร็จเรียบร้อย ในห้อง ${classroomId}`,
+      itemCount: reordered.length,
+      targetScope: classroomId,
+      actor: 'ครูผู้สอน',
+    }).catch(() => {});
 
     if (isSupabaseConfigured) {
       logDbOperation('REORDER STUDENTS in StudentEnrollment', { count: orderedStudentIds.length });
@@ -588,6 +594,7 @@ export const studentService = {
 
     const filtered = current.filter((s) => s.id !== id);
     saveLocalStudents(classroomId, filtered);
+    masterDataService.invalidateRoom(classroomId);
 
     // ล้างประวัติการเช็คชื่อของนักเรียนคนนี้ออกจากระบบเช็คชื่อด้วย
     try {
@@ -621,6 +628,15 @@ export const studentService = {
         console.warn('Soft-delete in Supabase failed:', err);
       }
     }
+
+    activityAuditLogService.logDelete(
+      'นักเรียน',
+      `ลบข้อมูลนักเรียน "${target.name}"`,
+      `ลบนักเรียนเลขที่ ${target.no} (${target.code || target.id}) ออกจากห้อง ${classroomId}`,
+      1,
+      'ครูผู้สอน',
+      { studentId: id, classroomId, code: target.code }
+    ).catch(() => {});
 
     return true;
   },

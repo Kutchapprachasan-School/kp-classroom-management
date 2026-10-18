@@ -1,131 +1,126 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { studentPromotionService } from '../src/services/studentPromotionService';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import {
+  studentPromotionService,
+  type ClassroomMappingRule,
+} from '../src/services/studentPromotionService';
 import { studentEnrollmentService } from '../src/services/studentEnrollmentService';
+import { gradeService } from '../src/services/gradeService';
+import { supabase } from '../src/lib/supabaseClient';
+
 
 describe('studentPromotionService - Promotion Orchestrator & Batch Tracker', () => {
-  beforeEach(() => {
-    studentPromotionService._resetForTesting();
-    studentEnrollmentService._resetForTesting();
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it('generates dry-run decision report for a cohort', () => {
-    const students = [
-      { studentCode: '47001', studentName: 'เด็ก 1', currentClassroom: 'ม.1/1' },
-      { studentCode: '45001', studentName: 'ม.3 จบแล้ว', currentClassroom: 'ม.3/1', graduationApproved: true },
-      { studentCode: '45002', studentName: 'ม.3 ไม่ผ่าน', currentClassroom: 'ม.3/1', graduationApproved: false },
-    ];
+  const mappings: ClassroomMappingRule[] = [
+    {
+      fromClassroomId: 'room-1-1',
+      fromGradeLevel: 'ม.1',
+      toClassroomId: 'room-2-1',
+      toGradeLevel: 'ม.2',
+      isGraduationLevel: false,
+    },
+  ];
 
-    const report = studentPromotionService.runDryRun({
-      fromAcademicYear: 2568,
+  it('simulatePromotionDryRun maps students and returns statistics', async () => {
+    const flushSpy = vi.spyOn(gradeService, 'flushOutbox');
+
+    vi.spyOn(studentEnrollmentService, 'getStudentFullTranscript').mockResolvedValue([]);
+
+    const builder: any = {
+      in: () => builder,
+      eq: () => builder,
+      neq: () => builder,
+      order: () => builder,
+      then: (fn: any) =>
+        Promise.resolve({
+          data: [
+            {
+              id: 'stu-1',
+              prefix: 'ด.ช.',
+              first_name: 'สมปอง',
+              last_name: 'ดีใจ',
+              classroom_id: 'room-1-1',
+              academic_status: 'STUDYING',
+            },
+          ],
+          error: null,
+        }).then(fn),
+    };
+
+    vi.spyOn(supabase, 'from').mockReturnValue({
+      select: () => builder,
+    } as any);
+
+
+    const report = await studentPromotionService.simulatePromotionDryRun({
+      fromAcademicYear: 2569,
+      fromSemester: 1,
       toAcademicYear: 2569,
-      students,
+      toSemester: 2,
+      mappings,
     });
 
-    expect(report.isValid).toBe(true);
-    expect(report.summary.totalStudentsEvaluated).toBe(3);
-    expect(report.summary.promotedCount).toBe(1);
-    expect(report.summary.graduatedCount).toBe(1);
-    expect(report.summary.pendingGraduationCount).toBe(1);
+    expect(flushSpy).toHaveBeenCalled();
+    expect(report.totalStudents).toBe(1);
+    expect(report.promoteCount).toBe(1);
+    expect(report.transitions[0].to_classroom_id).toBe('room-2-1');
   });
 
-  it('executes promotion batch and creates new active enrollments', async () => {
-    const students = [
-      { studentCode: '47001', studentName: 'เด็ก 1', currentClassroom: 'ม.1/1' },
-    ];
+  it('executePromotionBatch calls execute_student_promotion_batch RPC', async () => {
+    const flushSpy = vi.spyOn(gradeService, 'flushOutbox');
+    const rpcSpy = vi.spyOn(supabase, 'rpc').mockResolvedValue({
+      data: {
+        success: true,
+        batch_id: 'promo-01',
+        promoted_count: 1,
+        repeated_count: 0,
+        graduated_count: 0,
+      },
+      error: null,
+    } as any);
 
-    // Seed initial enrollment
-    studentEnrollmentService.createEnrollment({
-      studentId: 'stu-47001',
-      studentCode: '47001',
-      studentName: 'เด็ก 1',
-      classroomId: 'room-1-1',
-      classroomName: 'ม.1/1',
-      academicYear: 2568,
-      semesterNo: 2,
-      seatNo: 1,
-      status: 'ACTIVE',
-      startDate: '2025-11-01',
+    const res = await studentPromotionService.executePromotionBatch({
+      fromAcademicYear: 2569,
+      fromSemester: 1,
+      toAcademicYear: 2570,
+      toSemester: 1,
+      executedBy: 'teacher-admin',
+      transitions: [
+        {
+          student_id: 'stu-1',
+          from_classroom_id: 'room-1-1',
+          to_classroom_id: 'room-2-1',
+          action: 'PROMOTE',
+        },
+      ],
     });
 
-    const report = studentPromotionService.runDryRun({
-      fromAcademicYear: 2568,
-      toAcademicYear: 2569,
-      students,
-    });
-
-    const result = await studentPromotionService.executePromotion({
-      fromYear: 2568,
-      fromTerm: 2,
-      toYear: 2569,
-      toTerm: 1,
-      decisions: report.decisions,
-      executedBy: 'ครูปัญจพล',
-    });
-
-    expect(result.success).toBe(true);
-    expect(result.batchId).toBeDefined();
-
-    // Verify batch history
-    const batches = studentPromotionService.getPromotionBatches();
-    expect(batches).toHaveLength(1);
-    expect(batches[0].status).toBe('COMMITTED');
-
-    // Verify enrollment transitioned to target room
-    const oldRoomActive = studentEnrollmentService.getActiveEnrollments('room-1-1');
-    expect(oldRoomActive).toHaveLength(0); // old closed
-
-    const newRoomActive = studentEnrollmentService.getActiveEnrollments('room-2-1');
-    expect(newRoomActive).toHaveLength(1); // promoted to ม.2/1
-    expect(newRoomActive[0].studentCode).toBe('47001');
+    expect(flushSpy).toHaveBeenCalled();
+    expect(rpcSpy).toHaveBeenCalledWith('execute_student_promotion_batch', expect.any(Object));
+    expect(res.success).toBe(true);
   });
 
-  it('safely rolls back a committed batch when no conflicts exist', async () => {
-    const students = [
-      { studentCode: '47001', studentName: 'เด็ก 1', currentClassroom: 'ม.1/1' },
-    ];
+  it('rollbackPromotionBatch invokes rollback_student_promotion_batch RPC', async () => {
+    const flushSpy = vi.spyOn(gradeService, 'flushOutbox');
+    const rpcSpy = vi.spyOn(supabase, 'rpc').mockResolvedValue({
+      data: {
+        success: true,
+        conflict_detected: false,
+        batch_id: 'promo-01',
+        restored_count: 1,
+      },
+      error: null,
+    } as any);
 
-    studentEnrollmentService.createEnrollment({
-      studentId: 'stu-47001',
-      studentCode: '47001',
-      studentName: 'เด็ก 1',
-      classroomId: 'room-1-1',
-      classroomName: 'ม.1/1',
-      academicYear: 2568,
-      semesterNo: 2,
-      seatNo: 1,
-      status: 'ACTIVE',
-      startDate: '2025-11-01',
+    const res = await studentPromotionService.rollbackPromotionBatch({
+      batchId: 'promo-01',
+      executedBy: 'admin',
     });
 
-    const report = studentPromotionService.runDryRun({
-      fromAcademicYear: 2568,
-      toAcademicYear: 2569,
-      students,
-    });
-
-    const result = await studentPromotionService.executePromotion({
-      fromYear: 2568,
-      fromTerm: 2,
-      toYear: 2569,
-      toTerm: 1,
-      decisions: report.decisions,
-      executedBy: 'ครูปัญจพล',
-    });
-
-    const rollbackResult = await studentPromotionService.rollbackPromotion(
-      result.batchId,
-      'admin',
-      'ยกเลิกเพื่อทดสอบการคืนค่าเดิม'
-    );
-
-    expect(rollbackResult.success).toBe(true);
-
-    // Verify restored back to room-1-1
-    const restoredActive = studentEnrollmentService.getActiveEnrollments('room-1-1');
-    expect(restoredActive).toHaveLength(1);
-    expect(restoredActive[0].studentCode).toBe('47001');
-
-    const batches = studentPromotionService.getPromotionBatches();
-    expect(batches[0].status).toBe('ROLLED_BACK');
+    expect(flushSpy).toHaveBeenCalled();
+    expect(rpcSpy).toHaveBeenCalledWith('rollback_student_promotion_batch', expect.any(Object));
+    expect(res.success).toBe(true);
   });
 });

@@ -38,6 +38,8 @@ import {
   Layers,
   Settings,
   Pencil,
+  Send,
+  MessageSquare,
 } from 'lucide-react';
 
 import { TeacherMobileSchoolInfoScreen } from '../components/mobile/TeacherMobileSchoolInfoScreen';
@@ -64,17 +66,6 @@ import {
   type BellScheduleTimelineItem,
   BELL_SCHEDULE_STORAGE_KEY,
   DEFAULT_BELL_SCHEDULE_CONFIG,
-  generateBellScheduleTimeline,
-  bellScheduleService,
-} from '../services/bellScheduleService';
-
-export {
-  type SchoolBellScheduleConfig,
-  type BellScheduleTimelineItem,
-  BELL_SCHEDULE_STORAGE_KEY,
-  DEFAULT_BELL_SCHEDULE_CONFIG,
-  addMinutesToTimeStr,
-  calculateMinutesDifference,
   generateBellScheduleTimeline,
   bellScheduleService,
 } from '../services/bellScheduleService';
@@ -111,6 +102,12 @@ import { sgsExportService, type SgsSnapshotRecord } from '../services/sgsExportS
 import { TEACHER_SUBJECTS_LIST } from '../services/teacherCourseAssignmentService';
 import { classroomService } from '../services/classroomService';
 import { cleanSlateService } from '../services/cleanSlateService';
+import { phoneNotificationService } from '../services/phoneNotificationService';
+import {
+  smsNotificationService,
+  SMS_OUTBOX_SYNC_EVENT,
+  type SmsDeliveryRecord,
+} from '../services/smsNotificationService';
 import type { ClassroomRosterItem } from '../types/viewModels';
 import { SettingsHeroBanner } from '../components/settings/SettingsHeroBanner';
 import { SettingsCategoryCard } from '../components/settings/SettingsCategoryCard';
@@ -271,6 +268,101 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
     schoolPoliciesService.getNotificationConfig()
   );
 
+  // Phone OS Push Notification State
+  const [phoneNotiPermission, setPhoneNotiPermission] = useState<'default' | 'granted' | 'denied' | 'unsupported'>('default');
+  const [isTestingPhoneNoti, setIsTestingPhoneNoti] = useState(false);
+  const [phoneNotiTestMsg, setPhoneNotiTestMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeModalKey === 'notifications') {
+      setPhoneNotiPermission(phoneNotificationService.getPermissionState());
+    }
+  }, [activeModalKey]);
+
+  const handleRequestPhonePermission = async () => {
+    const perm = await phoneNotificationService.requestPermission();
+    setPhoneNotiPermission(perm);
+    if (perm === 'granted') {
+      setPhoneNotiTestMsg('✓ อนุญาตการแจ้งเตือนระดับเครื่องโทรศัพท์เรียบร้อยแล้ว');
+    } else if (perm === 'denied') {
+      setPhoneNotiTestMsg('⚠️ อุปกรณ์หรือเบราว์เซอร์ปฏิเสธสิทธิ์ กรุณาเปิดการแจ้งเตือนในการตั้งค่าของโทรศัพท์');
+    }
+  };
+
+  const handleTestPhonePush = async () => {
+    setIsTestingPhoneNoti(true);
+    setPhoneNotiTestMsg(null);
+    try {
+      const ok = await phoneNotificationService.testNativeNotification();
+      if (ok) {
+        setPhoneNotiTestMsg('✓ ส่งการแจ้งเตือนไปยัง Notification Bar ของโทรศัพท์เรียบร้อยแล้ว! ตรวจสอบที่แถบแจ้งเตือนด้านบน');
+      } else {
+        setPhoneNotiTestMsg('⚠️ ไม่สามารถส่งแจ้งเตือนได้ กรุณาแตะ "ขอสิทธิ์รับการแจ้งเตือน" ก่อน');
+      }
+    } catch (e: any) {
+      setPhoneNotiTestMsg(`เกิดข้อผิดพลาด: ${e?.message || 'ไม่สามารถส่งได้'}`);
+    } finally {
+      setIsTestingPhoneNoti(false);
+    }
+  };
+
+  // SMS Notification Gateway State
+  const [testSmsPhone, setTestSmsPhone] = useState('');
+  const [testSmsMessage, setTestSmsMessage] = useState('');
+  const [isSendingTestSms, setIsSendingTestSms] = useState(false);
+  const [smsTestFeedback, setSmsTestFeedback] = useState<{ success: boolean; message: string } | null>(null);
+  const [smsOutbox, setSmsOutbox] = useState<SmsDeliveryRecord[]>(() => smsNotificationService.getOutbox());
+  const [smsCredits, setSmsCredits] = useState<number>(() => smsNotificationService.getCredits());
+
+  useEffect(() => {
+    const handleSmsSync = () => {
+      setSmsOutbox(smsNotificationService.getOutbox());
+      setSmsCredits(smsNotificationService.getCredits());
+    };
+    window.addEventListener(SMS_OUTBOX_SYNC_EVENT, handleSmsSync);
+    return () => {
+      window.removeEventListener(SMS_OUTBOX_SYNC_EVENT, handleSmsSync);
+    };
+  }, []);
+
+  const handleSendTestSms = async () => {
+    if (!testSmsPhone.trim()) {
+      setSmsTestFeedback({
+        success: false,
+        message: 'กรุณากรอกหมายเลขโทรศัพท์ปลายทาง (เช่น 081-234-5678)',
+      });
+      return;
+    }
+    setIsSendingTestSms(true);
+    setSmsTestFeedback(null);
+    try {
+      const res = await smsNotificationService.testSendSms(
+        testSmsPhone,
+        testSmsMessage.trim() || undefined
+      );
+      if (res.success) {
+        setSmsTestFeedback({
+          success: true,
+          message: `✓ ส่งข้อความ SMS สำเร็จ! หมายเลข: ${res.record?.recipientPhone} (ใช้ ${res.record?.creditsUsed || 1} เครดิต)`,
+        });
+        setSmsOutbox(smsNotificationService.getOutbox());
+        setSmsCredits(smsNotificationService.getCredits());
+      } else {
+        setSmsTestFeedback({
+          success: false,
+          message: `❌ ส่งข้อความ SMS ไม่สำเร็จ: ${res.error || 'ตรวจสอบหมายเลขโทรศัพท์หรือเกตเวย์'}`,
+        });
+      }
+    } catch (err: any) {
+      setSmsTestFeedback({
+        success: false,
+        message: `เกิดข้อผิดพลาด: ${err?.message || 'ไม่สามารถส่ง SMS ได้'}`,
+      });
+    } finally {
+      setIsSendingTestSms(false);
+    }
+  };
+
   // Sync with window events and fetch snapshots & classrooms
   useEffect(() => {
     sgsExportService.getSnapshots().then(setSnapshots).catch(() => {});
@@ -398,8 +490,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
   };
 
   const handleResetBellSchedule = () => {
+    bellScheduleService.resetToDefault();
     setBellSchedule(DEFAULT_BELL_SCHEDULE_CONFIG);
-    localStorage.setItem(BELL_SCHEDULE_STORAGE_KEY, JSON.stringify(DEFAULT_BELL_SCHEDULE_CONFIG));
     showToast('🔄 คืนค่าเวลาเรียนเริ่มต้นเรียบร้อย');
   };
 
@@ -3254,41 +3346,131 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         onSave={handleSaveNotificationConfig}
       >
         <div className="space-y-4">
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-4">
-            <h3 className="text-sm font-extrabold text-slate-900">เกตเวย์การแจ้งเตือน Line & SMS ประจำโรงเรียน</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Line Notify Token ประจำโรงเรียน:</label>
-                <input
-                  type="password"
-                  placeholder="กรอก Line Notify Token..."
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono"
-                  value={notificationConfig.lineNotifyToken}
-                  onChange={(e) => setNotificationConfig({ ...notificationConfig, lineNotifyToken: e.target.value })}
-                />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  ใช้สำหรับส่งการแจ้งเตือนเข้ากลุ่ม Line ครูและห้องเรียน
-                </p>
+          {/* Card 1: เกตเวย์ Line Notify ประจำโรงเรียน */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3 shadow-xs">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <Bell className="w-4 h-4 stroke-[2.2]" />
               </div>
-
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">SMS Sender Name (ชื่อผู้ส่ง SMS):</label>
-                <input
-                  type="text"
-                  placeholder="เช่น KPS_SCHOOL"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold"
-                  value={notificationConfig.smsSenderName}
-                  onChange={(e) => setNotificationConfig({ ...notificationConfig, smsSenderName: e.target.value })}
-                />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  ชื่อที่จะปรากฏบนหัวข้อข้อความ SMS ที่ส่งถึงผู้ปกครอง
+                <h3 className="text-sm font-extrabold text-slate-900">เกตเวย์ Line Notify ประจำโรงเรียน</h3>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  ส่งการแจ้งเตือนสรุปประจำวันเข้ากลุ่มไลน์ครูและผู้บริหารโรงเรียน
                 </p>
               </div>
             </div>
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1">Line Notify Token ประจำโรงเรียน:</label>
+              <input
+                type="password"
+                placeholder="กรอก Line Notify Token..."
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono"
+                value={notificationConfig.lineNotifyToken}
+                onChange={(e) => setNotificationConfig({ ...notificationConfig, lineNotifyToken: e.target.value })}
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                สร้าง Token ได้ที่ notify-bot.line.me สำหรับส่งเข้ากลุ่ม Line ห้องเรียนหรือกลุ่มครู
+              </p>
+            </div>
+          </div>
 
-            <div className="pt-3 border-t border-slate-100 space-y-2">
-              <h4 className="text-xs font-extrabold text-slate-800">เงื่อนไขการส่งแจ้งเตือนอัตโนมัติ:</h4>
+          {/* Card 2: ระบบส่งข้อความ SMS เกตเวย์ & การแจ้งเตือนผู้ปกครอง (SMS Notification Gateway) */}
+          <div className="bg-white rounded-2xl border border-blue-200/90 p-4 space-y-4 shadow-xs">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <MessageSquare className="w-5 h-5 stroke-[2.2]" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-[#163A66]">
+                    ระบบส่งข้อความ SMS & การแจ้งเตือนผู้ปกครอง (SMS Notification Engine)
+                  </h3>
+                  <p className="text-xs text-[#6B7C93] font-medium">
+                    ส่ง SMS ตรงเข้าเบอร์โทรศัพท์มือถือของผู้ปกครองและครู (ขาด/สาย/โดด/ลา/คะแนน)
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                  <span>โควตา:</span>
+                  <span className="text-blue-900 font-extrabold">{smsCredits.toLocaleString()}</span>
+                  <span>SMS</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = smsNotificationService.addCredits(500);
+                    setSmsCredits(next);
+                    showToast('✓ เพิ่มโควตา 500 เครดิต SMS เรียบร้อยแล้ว');
+                  }}
+                  className="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+                  title="เติมโควตาเครดิต SMS เพิ่มเติม"
+                >
+                  +500 เครดิต
+                </button>
+              </div>
+            </div>
+
+            {/* Provider and Gateway Config */}
+            <div className="p-3.5 bg-slate-50/70 rounded-xl border border-slate-100 space-y-3 text-xs">
+              <h4 className="font-extrabold text-slate-800 text-xs flex items-center gap-1.5">
+                <span>⚙️ ตั้งค่าเกตเวย์ผู้ให้บริการ SMS (SMS Gateway Config)</span>
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">ผู้ให้บริการ SMS:</label>
+                  <select
+                    value={notificationConfig.smsProvider || 'thaibulksms'}
+                    onChange={(e) => {
+                      const p = e.target.value as any;
+                      const endpoints: Record<string, string> = {
+                        thaibulksms: 'https://api-v2.thaibulksms.com/sms',
+                        smsmkt: 'https://support.smsmkt.com/api/send-sms',
+                        twilio: 'https://api.twilio.com/2010-04-01/Accounts',
+                        custom: notificationConfig.smsApiEndpoint || '',
+                      };
+                      setNotificationConfig({
+                        ...notificationConfig,
+                        smsProvider: p,
+                        smsApiEndpoint: endpoints[p] || notificationConfig.smsApiEndpoint,
+                      });
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-bold text-xs"
+                  >
+                    <option value="thaibulksms">ThaiBulkSMS (แนะนำสำหรับไทย)</option>
+                    <option value="smsmkt">SMSMKT</option>
+                    <option value="twilio">Twilio Global SMS</option>
+                    <option value="custom">Custom School API Gateway</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">SMS Sender Name (ชื่อผู้ส่ง):</label>
+                  <input
+                    type="text"
+                    placeholder="เช่น KPS_SCHOOL"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-bold text-xs"
+                    value={notificationConfig.smsSenderName}
+                    onChange={(e) => setNotificationConfig({ ...notificationConfig, smsSenderName: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">API Key / Token:</label>
+                  <input
+                    type="password"
+                    placeholder="กรอก SMS API Key..."
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono text-xs"
+                    value={notificationConfig.smsApiKey || ''}
+                    onChange={(e) => setNotificationConfig({ ...notificationConfig, smsApiKey: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Auto Trigger Conditions */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-extrabold text-slate-800">เงื่อนไขส่ง SMS แจ้งเตือนผู้ปกครองอัตโนมัติ:</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer">
                   <input
@@ -3320,13 +3502,242 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                 <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={notificationConfig.notifyTeacherOnGradingDue}
-                    onChange={(e) => setNotificationConfig({ ...notificationConfig, notifyTeacherOnGradingDue: e.target.checked })}
+                    checked={notificationConfig.notifyOnSmsSync ?? true}
+                    onChange={(e) => setNotificationConfig({ ...notificationConfig, notifyOnSmsSync: e.target.checked })}
                     className="w-4 h-4 text-blue-600 rounded"
                   />
-                  <span>เตือนครูเมื่อใกล้ครบกำหนดส่งคะแนน ปพ.5 / SGS</span>
+                  <span>แจ้งเตือนเมื่อซิงค์ข้อมูลกับระบบ SMS โรงเรียน</span>
                 </label>
               </div>
+            </div>
+
+            {/* Live SMS Test Box */}
+            <div className="p-3.5 rounded-2xl border border-blue-100 bg-blue-50/40 space-y-3 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-extrabold text-[#163A66] flex items-center gap-1.5">
+                  <Send className="w-3.5 h-3.5 text-blue-600" />
+                  <span>ทดสอบส่งข้อความ SMS ไปยังโทรศัพท์มือถือ</span>
+                </span>
+                <span className="text-[11px] text-slate-500 font-medium">ทดสอบระบบสด (Live Test)</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">เบอร์โทรศัพท์ปลายทาง (10 หลัก):</label>
+                  <input
+                    type="tel"
+                    placeholder="เช่น 081-234-5678"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold placeholder:font-normal"
+                    value={testSmsPhone}
+                    onChange={(e) => setTestSmsPhone(e.target.value)}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">ข้อความทดสอบ SMS:</label>
+                  <input
+                    type="text"
+                    placeholder="พิมพ์ข้อความ หรือกดเลือกเทมเพลตด้านล่าง..."
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs"
+                    value={testSmsMessage}
+                    onChange={(e) => setTestSmsMessage(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <div className="flex flex-wrap items-center gap-1 text-[11px]">
+                  <span className="text-slate-500 font-medium">เทมเพลตด่วน:</span>
+                  <button
+                    type="button"
+                    onClick={() => setTestSmsMessage('[KPS] ทดสอบระบบ SMS โรงเรียนกุดจับประชาสรรค์ ทำงานสมบูรณ์')}
+                    className="px-2 py-0.8 bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 font-medium cursor-pointer"
+                  >
+                    ข้อความทดสอบ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTestSmsMessage('[KPS] แจ้งเตือน: นักเรียนขาดเรียนวันที่ 18 ต.ค. 2569 ติดต่อครูที่ปรึกษา')}
+                    className="px-2 py-0.8 bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 font-medium cursor-pointer"
+                  >
+                    จำลองขาดเรียน
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTestSmsMessage('[KPS] ด่วน: ตรวจพบนักเรียนไม่เข้าเรียนในคาบที่ 2')}
+                    className="px-2 py-0.8 bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 font-medium cursor-pointer"
+                  >
+                    จำลองโดดเรียน
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSendTestSms}
+                  disabled={isSendingTestSms}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{isSendingTestSms ? 'กำลังส่ง SMS...' : 'ส่งข้อความ SMS ทันที'}</span>
+                </button>
+              </div>
+
+              {smsTestFeedback && (
+                <div
+                  className={`p-2.5 rounded-xl text-xs font-bold ${
+                    smsTestFeedback.success
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      : 'bg-rose-50 text-rose-800 border border-rose-200'
+                  }`}
+                >
+                  {smsTestFeedback.message}
+                </div>
+              )}
+            </div>
+
+            {/* SMS Outbox Summary Table / Cards */}
+            <div className="space-y-2 pt-1 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                  <span>📬 ประวัติการส่ง SMS ล่าสุด (SMS Delivery Outbox)</span>
+                  <span className="text-[10px] text-slate-500 font-normal">({smsOutbox.length} รายการ)</span>
+                </h4>
+                {smsOutbox.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('คุณต้องการล้างประวัติการส่ง SMS ทั้งหมดใช่หรือไม่?')) {
+                        smsNotificationService.clearOutbox();
+                        setSmsOutbox([]);
+                        showToast('✓ ล้างประวัติการส่ง SMS เรียบร้อย');
+                      }
+                    }}
+                    className="text-[11px] font-bold text-slate-500 hover:text-rose-600 cursor-pointer"
+                  >
+                    ล้างประวัติ
+                  </button>
+                )}
+              </div>
+
+              {smsOutbox.length === 0 ? (
+                <div className="p-4 text-center text-xs text-slate-400 bg-slate-50/60 rounded-xl border border-slate-100 font-medium">
+                  ยังไม่มีประวัติการส่งข้อความ SMS (ระบบจะบันทึกอัตโนมัติเมื่อมีการส่งข้อความถึงผู้ปกครองหรือครู)
+                </div>
+              ) : (
+                <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white text-xs">
+                  {smsOutbox.slice(0, 5).map((rec) => (
+                    <div key={rec.id} className="p-2.5 flex items-center justify-between gap-2 hover:bg-slate-50/60">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-slate-800">{rec.recipientPhone}</span>
+                          {rec.studentName && (
+                            <span className="text-slate-500 text-[11px]">({rec.studentName})</span>
+                          )}
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600 font-bold">
+                            {rec.category}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 truncate mt-0.5">{rec.message}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span
+                          className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            rec.status === 'DELIVERED'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-rose-50 text-rose-700 border border-rose-200'
+                          }`}
+                        >
+                          {rec.status === 'DELIVERED' ? 'ส่งสำเร็จ' : 'ล้มเหลว'}
+                        </span>
+                        <div className="text-[10px] text-slate-400 mt-0.5">{rec.formattedDate}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Card 2: การแจ้งเตือนระดับเครื่องโทรศัพท์ (Device OS Push Notification) */}
+          <div className="bg-white rounded-2xl border border-blue-200/90 p-4 space-y-3.5 shadow-xs">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <Bell className="w-5 h-5 stroke-[2.2]" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-[#163A66]">
+                    การแจ้งเตือนระดับเครื่องโทรศัพท์ (Device Push Notification)
+                  </h3>
+                  <p className="text-xs text-[#6B7C93] font-medium">
+                    แจ้งเตือนผ่าน System Notification Bar และ Lock Screen ของโทรศัพท์ (มีสั่นและเสียงเตือน)
+                  </p>
+                </div>
+              </div>
+              <div className="shrink-0">
+                {phoneNotiPermission === 'granted' ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    เปิดรับแจ้งเตือนแล้ว
+                  </span>
+                ) : phoneNotiPermission === 'denied' ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-50 text-red-700 border border-red-200">
+                    ถูกบล็อกในเครื่อง
+                  </span>
+                ) : phoneNotiPermission === 'unsupported' ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                    เครื่องไม่รองรับ
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                    ยังไม่ได้รับสิทธิ์
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100 text-xs text-[#163A66] space-y-1.5">
+              <div className="flex items-center gap-1.5 font-bold">
+                <span>📱 คุณสมบัติการแจ้งเตือนระดับ OS:</span>
+              </div>
+              <ul className="list-disc list-inside text-[11px] text-[#6B7C93] space-y-0.5 ml-1">
+                <li>แจ้งเตือนเมื่อมีการลบ หรือแก้ไขข้อมูลสำคัญ (เช่น ลบห้องเรียน, ปรับเลขที่นักเรียนตาม SGS)</li>
+                <li>แสดงบน Notification Bar ด้านบน และ Lock Screen ของ Android / iOS (เมื่อติดตั้งเป็น PWA บนหน้าจอหลัก)</li>
+                <li>มีระบบสั่นเตือน (Vibration) และแตะเพื่อเปิดหน้าระบบที่เกี่ยวข้องได้ทันที</li>
+              </ul>
+            </div>
+
+            {phoneNotiTestMsg && (
+              <div
+                className={`p-2.5 rounded-xl text-xs font-bold ${
+                  phoneNotiTestMsg.startsWith('✓')
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                    : 'bg-amber-50 text-amber-800 border border-amber-200'
+                }`}
+              >
+                {phoneNotiTestMsg}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              {phoneNotiPermission !== 'granted' && (
+                <button
+                  type="button"
+                  onClick={handleRequestPhonePermission}
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                >
+                  <Bell className="w-3.5 h-3.5" />
+                  <span>ขอสิทธิ์รับการแจ้งเตือนในโทรศัพท์</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleTestPhonePush}
+                disabled={isTestingPhoneNoti}
+                className="px-3.5 py-2 rounded-xl bg-white border border-blue-200 text-blue-700 text-xs font-bold hover:bg-blue-50 transition-colors shadow-xs flex items-center gap-1.5 active:scale-95 disabled:opacity-50 cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                <span>{isTestingPhoneNoti ? 'กำลังส่งแจ้งเตือน...' : 'ทดสอบส่งการแจ้งเตือนเข้าเครื่องโทรศัพท์'}</span>
+              </button>
             </div>
           </div>
         </div>

@@ -247,4 +247,78 @@ describe('PromotionDryRunEngine (Pure Calculation & Validation)', () => {
       expect(report.errors[0]).toContain('ไม่พบกฎการเลื่อนชั้นสำหรับห้อง \'ม.1/1\'');
     });
   });
+
+  describe('4. GradeService Integration & Academic Issue Flagging', () => {
+    it('checkStudentAcademicIssue detects grade 0 and missing exam (status ร)', async () => {
+      const { checkStudentAcademicIssue } = await import('../src/utils/promotionDryRunEngine');
+
+      const columns: AssessmentColumn[] = [
+        {
+          id: 'col-1',
+          courseId: 'math101',
+          title: 'HW',
+          maxScore: 10,
+          weight: 10,
+          category: 'HW',
+          updatedAt: '2026-10-18T00:00:00Z',
+        },
+        {
+          id: 'col-final',
+          courseId: 'math101',
+          title: 'Final',
+          maxScore: 90,
+          weight: 90,
+          category: 'FINAL',
+          updatedAt: '2026-10-18T00:00:00Z',
+        },
+      ];
+
+      // Student A: missing final exam -> ร
+      const scoresA = new Map<string, StudentScore>([
+        ['stu-a_col-1', { id: 'stu-a_col-1', studentId: 'stu-a', assignmentId: 'col-1', score: 10, updatedAt: '' }],
+      ]);
+      const resA = checkStudentAcademicIssue('stu-a', columns, scoresA);
+      expect(resA.hasAcademicIssue).toBe(true);
+      expect(resA.isIncomplete).toBe(true);
+      expect(resA.grade).toBe('ร');
+
+      // Student B: completed with 85% -> grade 4
+      const scoresB = new Map<string, StudentScore>([
+        ['stu-b_col-1', { id: 'stu-b_col-1', studentId: 'stu-b', assignmentId: 'col-1', score: 10, updatedAt: '' }],
+        ['stu-b_col-final', { id: 'stu-b_col-final', studentId: 'stu-b', assignmentId: 'col-final', score: 75, updatedAt: '' }],
+      ]);
+      const resB = checkStudentAcademicIssue('stu-b', columns, scoresB);
+      expect(resB.hasAcademicIssue).toBe(false);
+      expect(resB.grade).toBe('4');
+    });
+
+    it('flags academic warnings on students with academic issues during dry-run evaluation', () => {
+      const mappingM3: ClassroomMappingRule = {
+        sourceClassroom: 'ม.3/1',
+        sourceGradeLevel: 3,
+        targetClassroom: 'ALUMNI',
+        targetGradeLevel: 0,
+        isTerminalGrade: true,
+      };
+
+      const studentWithIssue: StudentDryRunInput = {
+        studentCode: '45003',
+        studentName: 'เด็กชาย สมเกียรติ',
+        currentClassroom: 'ม.3/1',
+        hasAcademicIssue: true,
+        academicIssueDetails: ['ติด ร ในวิชาคณิตศาสตร์เพิ่มเติม (ขาดสอบปลายภาค)'],
+      };
+
+      const testConfig: PromotionDryRunConfig = {
+        fromAcademicYear: 2568,
+        toAcademicYear: 2569,
+        classroomMappings: [mappingM3],
+      };
+
+      const decision = evaluateStudentPromotion(studentWithIssue, mappingM3, testConfig);
+      expect(decision.warnings).toContain('ติด ร ในวิชาคณิตศาสตร์เพิ่มเติม (ขาดสอบปลายภาค)');
+    });
+  });
 });
+
+

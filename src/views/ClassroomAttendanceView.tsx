@@ -11,7 +11,7 @@
 // 6. เอาแถบการ์ด 4 ใบด้านล่างและคำคมออก
 // 7. บันทึกผลผ่านปุ่ม [💾 บันทึกผลการเช็คชื่อ] ด้านล่างสุดครั้งเดียว พร้อมป้ายแจ้งเตือนเมื่อยังไม่ได้บันทึก
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Award,
   Sparkles,
@@ -234,7 +234,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
   // ----------------------------------------------------
   // Load Period Records and Calendar Info
   // ----------------------------------------------------
-  const loadData = () => {
+  const loadData = useCallback(() => {
     if (!selectedCourse || !selectedClassroom) {
       setPeriodRecords([]);
       setHasUnsavedChanges(false);
@@ -284,11 +284,20 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
       todayBangkok
     );
     setMonthCalendarDays(monthDays);
-  };
+  }, [
+    selectedCourse,
+    selectedClassroom,
+    selectedDate,
+    selectedPeriod,
+    currentCourse?.shortSubject,
+    calendarYear,
+    calendarMonth,
+    todayBangkok,
+  ]);
 
   useEffect(() => {
     loadData();
-  }, [selectedCourse, selectedClassroom, selectedDate, selectedPeriod]);
+  }, [loadData]);
 
   // Handle course dropdown change
   const handleCourseChange = (courseCode: string) => {

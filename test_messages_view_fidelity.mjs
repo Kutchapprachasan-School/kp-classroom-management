@@ -45,14 +45,14 @@ assert.ok(
   'MessagesView must render outgoing messages in primary blue rounded-br-xs bubble on the right'
 );
 assert.ok(
-  messagesViewContent.includes('handleSimulatePartnerReply'),
-  'MessagesView must provide partner simulation reply trigger for single-device test verification'
+  messagesViewContent.includes('handleSendMessage') || messagesViewContent.includes('setIsTaskNoticeModalOpen'),
+  'MessagesView must provide message sending or task notice post trigger'
 );
 assert.ok(
   messagesViewContent.includes('สมาชิกถูกดึงเข้าอัตโนมัติจากทะเบียนรายชื่อ'),
   'MessagesView must render auto-sync informative banner'
 );
-console.log('  ✓ Chat Header, Auto-Sync Banner, Two-Way Chat Bubbles (isMe), and Simulation Reply verified');
+console.log('  ✓ Chat Header, Auto-Sync Banner, Two-Way Chat Bubbles (isMe), and Message Post verified');
 
 // 1.4 Input Controls & Quick Actions
 assert.ok(

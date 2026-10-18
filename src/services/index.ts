@@ -11,3 +11,9 @@ export * from './authService';
 export * from './sgsExportService';
 export * from './attendanceCorrelationService';
 export * from './cloudDataService';
+export * from './gradeService';
+export * from './studentEnrollmentService';
+export * from './studentPromotionService';
+export * from './studentPurgeService';
+
+

@@ -30,6 +30,9 @@ interface TeacherMobileRoomScoresScreenProps {
   onBack?: () => void;
 }
 
+const DEFAULT_ROOM_OPTIONS = ['ม.3/1', 'ม.3/2', 'ม.1/1', 'ม.6/1'];
+const DEFAULT_TERM_OPTIONS = ['ภาคเรียนที่ 1/2569', 'ภาคเรียนที่ 2/2568'];
+
 export const TeacherMobileRoomScoresScreen: React.FC<TeacherMobileRoomScoresScreenProps> = ({
   onNavigate,
   onBack,
@@ -40,16 +43,13 @@ export const TeacherMobileRoomScoresScreen: React.FC<TeacherMobileRoomScoresScre
   const [isTermDropdownOpen, setIsTermDropdownOpen] = useState(false);
   const [selectedSubjectDetail, setSelectedSubjectDetail] = useState<SubjectRoomScore | null>(null);
 
-  const roomOptions = ['ม.3/1', 'ม.3/2', 'ม.1/1', 'ม.6/1'];
-  const termOptions = ['ภาคเรียนที่ 1/2569', 'ภาคเรียนที่ 2/2568'];
-
   const availableRooms = useMemo(() => {
     try {
       const loaded = getLocalClassrooms();
       const names = loaded.map((r) => r.name || r.roomNumber).filter(Boolean);
-      return Array.from(new Set([...roomOptions, ...names]));
+      return Array.from(new Set([...DEFAULT_ROOM_OPTIONS, ...names]));
     } catch {
-      return roomOptions;
+      return DEFAULT_ROOM_OPTIONS;
     }
   }, []);
 
@@ -57,9 +57,9 @@ export const TeacherMobileRoomScoresScreen: React.FC<TeacherMobileRoomScoresScre
     try {
       const loaded = academicCalendarService.getTerms();
       const names = loaded.map((t) => `${t.termName}/${t.year}`).filter(Boolean);
-      return Array.from(new Set([...termOptions, ...names]));
+      return Array.from(new Set([...DEFAULT_TERM_OPTIONS, ...names]));
     } catch {
-      return termOptions;
+      return DEFAULT_TERM_OPTIONS;
     }
   }, []);
 

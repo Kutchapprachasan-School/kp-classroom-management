@@ -4,7 +4,7 @@
 // ทั้ง Header แบนเนอร์, 4 Stat KPI cards, ชุดฟิลเตอร์, ตารางนักเรียน, ป้ายสถานะ และปุ่ม [👤 โปรไฟล์], [📊 ผลการเรียน], [⋯]
 // พร้อมโหมดมือถือแปลงเป็น Stacked Cards และปุ่ม Sticky CTA ด้านล่าง
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Users,
   Search,
@@ -40,6 +40,7 @@ import type { SchoolUserRole } from '../config/schoolRoles';
 import { getGradeLevelTheme } from '../utils/gradeLevelTheme';
 import { SgsRosterImportModal } from '../components/sgs/SgsRosterImportModal';
 import { SgsScoreExportModal } from '../components/sgs/SgsScoreExportModal';
+import { activityAuditLogService } from '../services/activityAuditLogService';
 import type { SgsParsedRow } from '../services/sgsImportExportService';
 import { getM1SgsStudentInfo, isGrade1SgsStudentCode } from '../config/m1SgsLookup';
 import { Pagination, type PageSizeOption } from '../components/common/Pagination';
@@ -164,7 +165,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
   }, []);
 
   // 1. Load All Classrooms
-  const loadClassrooms = async () => {
+  const loadClassrooms = useCallback(async () => {
     setIsLoading(true);
     try {
       const cls = await classroomService.getAll();
@@ -173,22 +174,21 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
         if (initialClassroomId) {
           const match = cls.find((c) => c.id === initialClassroomId || c.name === initialClassroomId);
           setSelectedClass(match || cls[0]);
-        } else if (!selectedClass) {
-          const defaultRoom = cls.find((c) => c.name === 'ม.3/1' || c.roomNumber === 'ม.3/1') || cls[0];
-          setSelectedClass(defaultRoom);
+        } else {
+          setSelectedClass((prev) => prev || (cls.find((c) => c.name === 'ม.3/1' || c.roomNumber === 'ม.3/1') || cls[0]));
         }
       }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [initialClassroomId]);
 
   useEffect(() => {
     loadClassrooms();
-  }, [initialClassroomId]);
+  }, [loadClassrooms]);
 
   // 2. Load Students for selected classroom
-  const loadStudents = async (classroomId: string, fallbackName?: string) => {
+  const loadStudents = useCallback(async (classroomId: string, fallbackName?: string) => {
     setIsLoading(true);
     try {
       let list = await studentService.getByClassroom(classroomId);
@@ -203,13 +203,13 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (selectedClass) {
       loadStudents(selectedClass.id, selectedClass.name || selectedClass.roomNumber);
     }
-  }, [selectedClass?.id, selectedClass?.name]);
+  }, [selectedClass, loadStudents]);
 
   // Sync when student transferred event fires
   useEffect(() => {
@@ -221,7 +221,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
     };
     window.addEventListener(STUDENT_TRANSFERRED_EVENT, handleTransferred);
     return () => window.removeEventListener(STUDENT_TRANSFERRED_EVENT, handleTransferred);
-  }, [selectedClass?.id]);
+  }, [loadClassrooms, selectedClass, loadStudents]);
 
   // Map each student to attendance state: 'NORMAL' (มาเรียนปกติ) | 'ABSENT' (ขาดเรียน) | 'LEAVE' (ลาเรียน) | 'UNCHECKED' (ยังไม่เช็คชื่อ)
   const studentAttendanceMap = useMemo(() => {
@@ -512,8 +512,9 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
       const byRoom = new Map<string, Array<{ student: StudentRecord; seatNo: number; trueRoom: string }>>();
       for (const st of misplacedM1Students) {
         const info = getM1SgsStudentInfo(st.code);
-        const trueRoom = info?.room || 'ม.1/1';
-        const seatNo = info?.seatNo || st.no;
+        if (!info) continue;
+        const trueRoom = info.room;
+        const seatNo = info.seatNo || st.no;
         if (!byRoom.has(trueRoom)) byRoom.set(trueRoom, []);
         byRoom.get(trueRoom)!.push({ student: st, seatNo, trueRoom });
       }
@@ -603,18 +604,61 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
         }
 
         const targetRoomId = room.id;
-        const studentsToImport: Array<Omit<StudentRecord, 'id'>> = rows.map((r) => ({
-          no: r.parsedSeatNo ?? r.rowIndex,
-          code: r.studentCode,
-          name: r.fullName,
-          attendance: '0/0',
-          score: 0,
-          status: 'NORMAL',
-          gender: r.gender,
-          classroomId: targetRoomId,
-        }));
+        const currentInRoom = studentService.getStudents(targetRoomId);
 
-        await studentService.batchImport(targetRoomId, studentsToImport);
+        // 1. Separate UPDATE_SEAT rows vs NEW / TRANSFER rows
+        const updateSeatRows = rows.filter((r) => r.selectedAction === 'UPDATE_SEAT');
+        const newOrTransferRows = rows.filter(
+          (r) => r.selectedAction === 'IMPORT' || r.selectedAction === 'TRANSFER_ROOM'
+        );
+
+        // Update seat numbers for existing students while strictly preserving scores, attendance, and all historical data
+        if (updateSeatRows.length > 0) {
+          const seatUpdateMap = new Map<string, number>();
+          updateSeatRows.forEach((r) => {
+            const seat = r.parsedSeatNo ?? (r.rawSeatNo ? parseInt(r.rawSeatNo, 10) : null);
+            if (seat !== null && !isNaN(seat)) {
+              seatUpdateMap.set(r.studentCode.trim(), seat);
+            }
+          });
+
+          const updatedCurrent = currentInRoom.map((stu) => {
+            const codeKey = (stu.code || stu.studentCode || '').trim();
+            const newSeat = seatUpdateMap.get(codeKey);
+            if (newSeat !== undefined) {
+              return { ...stu, no: newSeat };
+            }
+            return stu;
+          }).sort((a, b) => a.no - b.no);
+
+          studentService.saveLocalStudents(targetRoomId, updatedCurrent);
+
+          activityAuditLogService.recordLog({
+            actionType: 'BATCH_UPDATE',
+            entityType: 'นักเรียน',
+            title: `ปรับเลขที่นักเรียนตาม SGS ห้อง ${roomName}`,
+            summary: `ปรับปรุงเลขที่นักเรียนตามไฟล์ SGS สำเร็จ ${updateSeatRows.length} คน ในห้อง ${roomName} (รักษาคะแนนและประวัติเดิม 100%)`,
+            itemCount: updateSeatRows.length,
+            targetScope: roomName,
+            actor: 'ครูผู้สอน',
+          }).catch(() => {});
+        }
+
+        // Import new or transferred students
+        if (newOrTransferRows.length > 0) {
+          const studentsToImport: Array<Omit<StudentRecord, 'id'>> = newOrTransferRows.map((r) => ({
+            no: r.parsedSeatNo ?? r.rowIndex,
+            code: r.studentCode,
+            name: r.fullName,
+            attendance: '0/0',
+            score: 0,
+            status: 'NORMAL',
+            gender: r.gender,
+            classroomId: targetRoomId,
+          }));
+
+          await studentService.batchImport(targetRoomId, studentsToImport);
+        }
       }
 
       await classroomService.getAll();
@@ -623,12 +667,12 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
 
       if (rowsByRoom.size > 1) {
         setToastMessage(
-          `✓ นำเข้ารายชื่อนักเรียน ${confirmedRows.length} คน แยกเข้า ${rowsByRoom.size} ห้อง (${Array.from(rowsByRoom.keys()).join(', ')}) สำเร็จเรียบร้อย (รักษาลำดับแถว 100%)`
+          `✓ นำเข้ารายชื่อ/ปรับเลขที่นักเรียน ${confirmedRows.length} คน แยกเข้า ${rowsByRoom.size} ห้อง (${Array.from(rowsByRoom.keys()).join(', ')}) สำเร็จเรียบร้อย (รักษาคะแนนเดิม 100%)`
         );
       } else {
         const singleRoomName = Array.from(rowsByRoom.keys())[0];
         setToastMessage(
-          `✓ นำเข้ารายชื่อนักเรียน ${confirmedRows.length} คน ในห้อง ${singleRoomName} สำเร็จ (รักษาลำดับแถว 100%)`
+          `✓ นำเข้ารายชื่อ/ปรับเลขที่นักเรียน ${confirmedRows.length} คน ในห้อง ${singleRoomName} สำเร็จ (รักษาคะแนนเดิม 100%)`
         );
       }
       setTimeout(() => setToastMessage(null), 4000);

@@ -1,325 +1,289 @@
-/**
- * Student Promotion Service
- * 
- * Orchestrates pre-flight dry runs, transactional promotions,
- * batch tracking, and conflict-aware rollbacks.
- */
+// src/services/studentPromotionService.ts
+import { supabase } from '../lib/supabaseClient.ts';
+import { gradeService } from './gradeService.ts';
+import { studentEnrollmentService } from './studentEnrollmentService.ts';
 
-import {
-  runPromotionDryRun,
-  generateDefaultClassroomMappings,
-  type StudentDryRunInput,
-  type StudentPromotionDecision,
-  type ClassroomMappingRule,
-  type PromotionDryRunReport,
-} from '../utils/promotionDryRunEngine';
-import { studentEnrollmentService } from './studentEnrollmentService';
+export type PromotionAction = 'PROMOTE' | 'REPEAT' | 'GRADUATE';
 
-export interface PromotionBatchRecord {
+export interface StudentPromotionTransition {
+  student_id: string;
+  student_name?: string;
+  from_classroom_id: string;
+  to_classroom_id: string | null;
+  action: PromotionAction;
+  roll_number?: number | null;
+  grade_level?: string | null;
+  remarks?: string | null;
+  // ข้อมูลช่วยตัดสินใจสำหรับ UI (Graduation Board Step 3)
+  has_academic_issue?: boolean;
+  academic_issue_detail?: string;
+}
+
+export interface ClassroomMappingRule {
+  fromClassroomId: string;
+  fromGradeLevel: string; // เช่น 'ม.1', 'ม.3', 'ม.6'
+  toClassroomId: string | null; // null กรณีชั้นปีสุดท้ายที่จบการศึกษา ('ม.3' หรือ 'ม.6')
+  toGradeLevel: string | null;
+  isGraduationLevel: boolean;
+}
+
+export interface PromotionDryRunResult {
+  fromAcademicYear: number;
+  fromSemester: number;
+  toAcademicYear: number;
+  toSemester: number;
+  totalStudents: number;
+  promoteCount: number;
+  repeatCount: number;
+  graduateCount: number;
+  flaggedIssueCount: number;
+  transitions: StudentPromotionTransition[];
+}
+
+export interface ExecutePromotionRpcResponse {
+  success: boolean;
+  batch_id: string;
+  promoted_count: number;
+  repeated_count: number;
+  graduated_count: number;
+}
+
+export interface RollbackPromotionRpcResponse {
+  success: boolean;
+  conflict_detected: boolean;
+  conflict_score_count?: number;
+  message?: string;
+  batch_id?: string;
+  restored_count?: number;
+}
+
+export interface PromotionBatchHistoryItem {
   id: string;
-  idempotencyKey: string;
-  fromYear: number;
-  fromTerm: number;
-  toYear: number;
-  toTerm: number;
-  status: 'COMMITTED' | 'ROLLED_BACK';
-  executedBy: string;
-  executedAt: string;
-  rollbackAt?: string;
-  rollbackBy?: string;
-  rollbackReason?: string;
-  summary: {
-    totalProcessed: number;
-    promotedCount: number;
-    graduatedCount: number;
-    repeatCount: number;
-    suspendedCount: number;
-    transferredCount: number;
+  from_academic_year: number;
+  from_semester: number;
+  to_academic_year: number;
+  to_semester: number;
+  status: 'COMPLETED' | 'ROLLED_BACK';
+  summary_json: {
+    total_processed?: number;
+    promoted_count?: number;
+    repeated_count?: number;
+    graduated_count?: number;
   };
-  items: Array<{
-    id: string;
-    studentId: string;
-    studentCode: string;
-    previousEnrollmentId?: string;
-    previousClassroomId: string;
-    action: string;
-    newEnrollmentId?: string;
-    newClassroomId?: string;
-  }>;
+  executed_by: string;
+  created_at: string;
+  rolled_back_at: string | null;
 }
 
-const STORAGE_KEY_BATCHES = 'kp_promotion_batches';
-
-class StudentPromotionService {
-  private batches: Map<string, PromotionBatchRecord> = new Map();
-
-  constructor() {
-    this.loadFromStorage();
-  }
-
-  private loadFromStorage(): void {
-    if (typeof localStorage === 'undefined') return;
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY_BATCHES);
-      if (raw) {
-        const list: PromotionBatchRecord[] = JSON.parse(raw);
-        this.batches.clear();
-        for (const b of list) {
-          this.batches.set(b.id, b);
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to load promotion batches from localStorage:', e);
-    }
-  }
-
-  private persistToStorage(): void {
-    if (typeof localStorage === 'undefined') return;
-    try {
-      const list = Array.from(this.batches.values());
-      localStorage.setItem(STORAGE_KEY_BATCHES, JSON.stringify(list));
-    } catch (e) {
-      console.warn('Failed to persist promotion batches to localStorage:', e);
-    }
-  }
-
-  public _resetForTesting(): void {
-    this.batches.clear();
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem(STORAGE_KEY_BATCHES);
-    }
-  }
-
+export const studentPromotionService = {
   /**
-   * Run pre-flight dry run projection without any writes
+   * 1. คำนวณจำลองการเลื่อนชั้นล่วงหน้า (Zero-Write Dry Run)
+   * พร้อมตรวจสอบว่ามีนักเรียนคนใดติด '0' หรือ 'ร' ในปีการศึกษาปัจจุบันหรือไม่
    */
-  public runDryRun(options: {
+  async simulatePromotionDryRun(params: {
     fromAcademicYear: number;
+    fromSemester: number;
     toAcademicYear: number;
-    students: StudentDryRunInput[];
-    classroomMappings?: ClassroomMappingRule[];
-  }): PromotionDryRunReport {
-    const rooms = Array.from(new Set(options.students.map((s) => s.currentClassroom)));
-    const mappings =
-      options.classroomMappings || generateDefaultClassroomMappings(rooms);
+    toSemester: number;
+    mappings: ClassroomMappingRule[];
+    manualOverrides?: Map<string, { action: PromotionAction; toClassroomId?: string | null; remarks?: string }>;
+  }): Promise<PromotionDryRunResult> {
+    // บังคับส่งคะแนนที่ค้างในเครื่องครูขึ้น Server ก่อนประมวลผล
+    await gradeService.flushOutbox();
 
-    return runPromotionDryRun(options.students, {
-      fromAcademicYear: options.fromAcademicYear,
-      toAcademicYear: options.toAcademicYear,
-      classroomMappings: mappings,
-    });
-  }
-
-  /**
-   * Execute promotion batch
-   */
-  public async executePromotion(params: {
-    fromYear: number;
-    fromTerm: number;
-    toYear: number;
-    toTerm: number;
-    decisions: StudentPromotionDecision[];
-    executedBy: string;
-    idempotencyKey?: string;
-  }): Promise<{ success: boolean; batchId: string; isIdempotentReplay?: boolean }> {
-    const key =
-      params.idempotencyKey ||
-      `prm_${params.fromYear}_${params.toYear}_${Date.now()}`;
-
-    // Check idempotency in local cache
-    for (const b of this.batches.values()) {
-      if (b.idempotencyKey === key) {
-        return { success: true, batchId: b.id, isIdempotentReplay: true };
-      }
+    const fromClassroomIds = params.mappings.map((m) => m.fromClassroomId);
+    if (fromClassroomIds.length === 0) {
+      return {
+        fromAcademicYear: params.fromAcademicYear,
+        fromSemester: params.fromSemester,
+        toAcademicYear: params.toAcademicYear,
+        toSemester: params.toSemester,
+        totalStudents: 0,
+        promoteCount: 0,
+        repeatCount: 0,
+        graduateCount: 0,
+        flaggedIssueCount: 0,
+        transitions: [],
+      };
     }
 
-    const batchId = `prm_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
-    const now = new Date().toISOString();
+    // ดึงรายชื่อนักเรียนที่กำลังศึกษาอยู่ในห้องต้นทาง
+    const { data: students, error: stdError } = await supabase
+      .from('students')
+      .select('id, prefix, first_name, last_name, classroom_id, academic_status')
+      .in('classroom_id', fromClassroomIds)
+      .eq('academic_status', 'STUDYING');
 
-    const batchItems: PromotionBatchRecord['items'] = [];
-    let promoted = 0;
-    let graduated = 0;
-    let repeat = 0;
-    let suspended = 0;
-    let transferred = 0;
+    if (stdError) throw stdError;
 
-    for (const d of params.decisions) {
-      const studentId = `stu-${d.studentCode}`;
-      const prevClassroomId = `room-${d.currentClassroom.replace('ม.', '').replace('/', '-')}`;
-      const targetClassroomId = d.targetClassroom && d.targetClassroom !== 'ALUMNI'
-        ? `room-${d.targetClassroom.replace('ม.', '').replace('/', '-')}`
-        : undefined;
+    const activeStudents = (students as Array<{
+      id: string;
+      prefix?: string;
+      first_name?: string;
+      last_name?: string;
+      classroom_id: string;
+    }>) || [];
 
-      // 1. Close current enrollment
-      const history = studentEnrollmentService.getStudentEnrollmentHistory(studentId);
-      const activeEnr = history.find((e) => e.status === 'ACTIVE');
-      const prevEnrollmentId = activeEnr?.id;
-
-      if (d.action === 'GRADUATED') {
-        studentEnrollmentService.closeActiveEnrollment(studentId, 'GRADUATED');
-        graduated++;
-      } else if (d.action === 'SUSPENDED') {
-        studentEnrollmentService.closeActiveEnrollment(studentId, 'SUSPENDED');
-        suspended++;
-      } else if (d.action === 'TRANSFERRED_OUT') {
-        studentEnrollmentService.closeActiveEnrollment(studentId, 'TRANSFERRED_OUT');
-        transferred++;
-      } else {
-        // PROMOTED or REPEAT_GRADE
-        studentEnrollmentService.closeActiveEnrollment(
-          studentId,
-          d.action === 'REPEAT_GRADE' ? 'REPEAT_GRADE' : 'COMPLETED'
-        );
-
-        // 2. Create new active enrollment
-        let newEnrId: string | undefined;
-        if (targetClassroomId) {
-          const newEnr = studentEnrollmentService.createEnrollment({
-            studentId,
-            studentCode: d.studentCode,
-            studentName: d.studentName,
-            classroomId: targetClassroomId,
-            classroomName: d.targetClassroom,
-            academicYear: params.toYear,
-            semesterNo: params.toTerm,
-            seatNo: 1,
-            status: 'ACTIVE',
-            startDate: now.split('T')[0],
-          });
-          newEnrId = newEnr.id;
-        }
-
-        if (d.action === 'PROMOTED') {
-          promoted++;
-        } else {
-          repeat++;
-        }
-
-        batchItems.push({
-          id: `pmi_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`,
-          studentId,
-          studentCode: d.studentCode,
-          previousEnrollmentId: prevEnrollmentId,
-          previousClassroomId: prevClassroomId,
-          action: d.action,
-          newEnrollmentId: newEnrId,
-          newClassroomId: targetClassroomId,
-        });
-        continue;
-      }
-
-      batchItems.push({
-        id: `pmi_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`,
-        studentId,
-        studentCode: d.studentCode,
-        previousEnrollmentId: prevEnrollmentId,
-        previousClassroomId: prevClassroomId,
-        action: d.action,
-      });
-    }
-
-    const batchRecord: PromotionBatchRecord = {
-      id: batchId,
-      idempotencyKey: key,
-      fromYear: params.fromYear,
-      fromTerm: params.fromTerm,
-      toYear: params.toYear,
-      toTerm: params.toTerm,
-      status: 'COMMITTED',
-      executedBy: params.executedBy,
-      executedAt: now,
-      summary: {
-        totalProcessed: params.decisions.length,
-        promotedCount: promoted,
-        graduatedCount: graduated,
-        repeatCount: repeat,
-        suspendedCount: suspended,
-        transferredCount: transferred,
-      },
-      items: batchItems,
-    };
-
-    this.batches.set(batchId, batchRecord);
-    this.persistToStorage();
-
-    return { success: true, batchId };
-  }
-
-  /**
-   * Get all promotion batches
-   */
-  public getPromotionBatches(): PromotionBatchRecord[] {
-    return Array.from(this.batches.values()).sort(
-      (a, b) => new Date(b.executedAt).getTime() - new Date(a.executedAt).getTime()
+    const mappingByRoom = new Map<string, ClassroomMappingRule>(
+      params.mappings.map((m) => [m.fromClassroomId, m])
     );
-  }
 
-  /**
-   * Check if a batch is eligible for safe rollback
-   */
-  public async checkRollbackEligibility(
-    batchId: string
-  ): Promise<{ canRollback: boolean; reason?: string }> {
-    const batch = this.batches.get(batchId);
-    if (!batch) {
-      return { canRollback: false, reason: 'ไม่พบข้อมูลรอบการเลื่อนชั้นนี้' };
-    }
-    if (batch.status === 'ROLLED_BACK') {
-      return { canRollback: false, reason: 'รอบการเลื่อนชั้นนี้ถูกยกเลิกคืนค่าไปแล้ว' };
-    }
-    return { canRollback: true };
-  }
+    const transitions: StudentPromotionTransition[] = [];
+    let promoteCount = 0;
+    let repeatCount = 0;
+    let graduateCount = 0;
+    let flaggedIssueCount = 0;
 
-  /**
-   * Rollback a promotion batch safely
-   */
-  public async rollbackPromotion(
-    batchId: string,
-    rollbackBy: string,
-    reason?: string
-  ): Promise<{ success: boolean; message: string }> {
-    const eligibility = await this.checkRollbackEligibility(batchId);
-    if (!eligibility.canRollback) {
-      throw new Error(eligibility.reason || 'Cannot rollback');
-    }
+    for (let idx = 0; idx < activeStudents.length; idx += 1) {
+      const std = activeStudents[idx];
+      const rule = mappingByRoom.get(std.classroom_id);
+      if (!rule) continue;
 
-    const batch = this.batches.get(batchId)!;
-    const now = new Date().toISOString();
+      // ตรวจสอบผลการเรียนของเทอมต้นทางว่ามีติด 0 หรือ ร หรือไม่
+      const transcripts = await studentEnrollmentService.getStudentFullTranscript(std.id);
+      const currentTermTranscript = transcripts.find(
+        (t) => t.academicYear === params.fromAcademicYear && t.semester === params.fromSemester
+      );
 
-    for (const item of batch.items) {
-      // 1. Delete new active enrollment
-      if (item.newClassroomId) {
-        const activeInNew = studentEnrollmentService.getActiveEnrollments(item.newClassroomId);
-        for (const a of activeInNew) {
-          if (a.studentId === item.studentId) {
-            studentEnrollmentService.closeActiveEnrollment(item.studentId, 'COMPLETED');
-          }
-        }
+      const hasIssue = currentTermTranscript?.hasAcademicIssue ?? false;
+      const issueCourses =
+        currentTermTranscript?.courses
+          .filter((c) => c.grade === '0' || c.isIncomplete)
+          .map((c) => `${c.courseId} (${c.grade})`)
+          .join(', ') || '';
+
+      if (hasIssue) {
+        flaggedIssueCount += 1;
       }
 
-      // 2. Re-open previous enrollment
-      studentEnrollmentService.createEnrollment({
-        studentId: item.studentId,
-        studentCode: item.studentCode,
-        studentName: `นักเรียน ${item.studentCode}`,
-        classroomId: item.previousClassroomId,
-        classroomName: item.previousClassroomId.replace('room-', 'ม.').replace('-', '/'),
-        academicYear: batch.fromYear,
-        semesterNo: batch.fromTerm,
-        seatNo: 1,
-        status: 'ACTIVE',
-        startDate: now.split('T')[0],
+      // ตั้งค่า Action เริ่มต้นตามระดับชั้น (ถ้าติด 0/ร ในชั้น ม.3 หรือ ม.6 จะยังไม่ให้จบอัตโนมัติ ให้เป็น REPEAT รอครูอนุมัติ)
+      let defaultAction: PromotionAction = rule.isGraduationLevel ? 'GRADUATE' : 'PROMOTE';
+      let defaultTargetRoom: string | null = rule.isGraduationLevel ? null : rule.toClassroomId;
+
+      if (rule.isGraduationLevel && hasIssue) {
+        defaultAction = 'REPEAT';
+        defaultTargetRoom = rule.fromClassroomId;
+      }
+
+      // หากครูมีการตั้งค่าข้อยกเว้นรายบุคคล (Manual Override ใน Step 3) ให้ใช้ค่าที่ครูเลือก
+      const override = params.manualOverrides?.get(std.id);
+      const finalAction = override?.action ?? defaultAction;
+      const finalTargetRoom =
+        finalAction === 'GRADUATE'
+          ? null
+          : override?.toClassroomId !== undefined
+          ? override.toClassroomId
+          : finalAction === 'REPEAT'
+          ? std.classroom_id
+          : defaultTargetRoom;
+
+      if (finalAction === 'PROMOTE') promoteCount += 1;
+      else if (finalAction === 'REPEAT') repeatCount += 1;
+      else if (finalAction === 'GRADUATE') graduateCount += 1;
+
+      transitions.push({
+        student_id: std.id,
+        student_name: `${std.prefix ?? ''}${std.first_name ?? ''} ${std.last_name ?? ''}`.trim(),
+        from_classroom_id: std.classroom_id,
+        to_classroom_id: finalTargetRoom,
+        action: finalAction,
+        roll_number: idx + 1,
+        grade_level: finalAction === 'REPEAT' ? rule.fromGradeLevel : rule.toGradeLevel,
+        remarks: override?.remarks ?? (hasIssue ? `พบผลการเรียนต้องติดตาม: ${issueCourses}` : null),
+        has_academic_issue: hasIssue,
+        academic_issue_detail: issueCourses || undefined,
       });
     }
 
-    batch.status = 'ROLLED_BACK';
-    batch.rollbackAt = now;
-    batch.rollbackBy = rollbackBy;
-    batch.rollbackReason = reason || 'ยกเลิกการเลื่อนชั้น';
+    return {
+      fromAcademicYear: params.fromAcademicYear,
+      fromSemester: params.fromSemester,
+      toAcademicYear: params.toAcademicYear,
+      toSemester: params.toSemester,
+      totalStudents: transitions.length,
+      promoteCount,
+      repeatCount,
+      graduateCount,
+      flaggedIssueCount,
+      transitions,
+    };
+  },
 
-    this.persistToStorage();
-    return { success: true, message: 'ยกเลิกและคืนค่าเดิมเรียบร้อยแล้ว' };
-  }
-}
+  /**
+   * 2. สั่งรันการเลื่อนชั้นจริงแบบ Atomic All-or-Nothing ผ่าน PostgreSQL RPC
+   */
+  async executePromotionBatch(params: {
+    fromAcademicYear: number;
+    fromSemester: number;
+    toAcademicYear: number;
+    toSemester: number;
+    executedBy: string;
+    transitions: StudentPromotionTransition[];
+  }): Promise<ExecutePromotionRpcResponse> {
+    if (params.transitions.length === 0) {
+      throw new Error('ไม่มีรายชื่อนักเรียนในรายการเลื่อนชั้น');
+    }
 
-export const studentPromotionService = new StudentPromotionService();
+    // 1. บังคับ Flush คะแนนใน Outbox ทั้งหมดก่อนเข้าสู่ Transaction เลื่อนชั้น
+    await gradeService.flushOutbox();
+
+    // 2. เตรียม Payload สำหรับส่งเข้า RPC execute_student_promotion_batch
+    const rpcPayload = params.transitions.map((t) => ({
+      student_id: t.student_id,
+      from_classroom_id: t.from_classroom_id,
+      to_classroom_id: t.to_classroom_id ?? '',
+      action: t.action,
+      roll_number: t.roll_number ?? null,
+      grade_level: t.grade_level ?? null,
+      remarks: t.remarks ?? null,
+    }));
+
+    const { data, error } = await supabase.rpc('execute_student_promotion_batch', {
+      p_from_academic_year: params.fromAcademicYear,
+      p_from_semester: params.fromSemester,
+      p_to_academic_year: params.toAcademicYear,
+      p_to_semester: params.toSemester,
+      p_executed_by: params.executedBy,
+      p_transitions: rpcPayload,
+    });
+
+    if (error) throw error;
+    return data as ExecutePromotionRpcResponse;
+  },
+
+  /**
+   * 3. ดึงประวัติการรันเลื่อนชั้นทั้งหมดสำหรับหน้า Rollback Manager UI
+   */
+  async getPromotionBatchHistory(): Promise<PromotionBatchHistoryItem[]> {
+    const { data, error } = await supabase
+      .from('promotion_batches')
+      .select(
+        'id, from_academic_year, from_semester, to_academic_year, to_semester, status, summary_json, executed_by, created_at, rolled_back_at'
+      )
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return (data as PromotionBatchHistoryItem[]) || [];
+  },
+
+  /**
+   * 4. ย้อนกลับการเลื่อนชั้น (Conflict-Aware Rollback)
+   * หากมีครูกรอกคะแนนในเทอมใหม่แล้วและ forceOverride = false ระบบจะคืนค่า conflict_detected = true
+   */
+  async rollbackPromotionBatch(params: {
+    batchId: string;
+    executedBy: string;
+    forceOverride?: boolean;
+  }): Promise<RollbackPromotionRpcResponse> {
+    await gradeService.flushOutbox();
+
+    const { data, error } = await supabase.rpc('rollback_student_promotion_batch', {
+      p_batch_id: params.batchId,
+      p_executed_by: params.executedBy,
+      p_force_override: params.forceOverride ?? false,
+    });
+
+    if (error) throw error;
+    return data as RollbackPromotionRpcResponse;
+  },
+};

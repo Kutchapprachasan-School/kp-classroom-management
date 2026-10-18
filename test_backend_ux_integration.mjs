@@ -13,7 +13,6 @@
 // ==============================================================================
 
 import assert from 'node:assert';
-import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 
 // ------------------------------------------------------------------------------
@@ -77,17 +76,15 @@ const { sgsExportService } = await import('./src/services/sgsExportService.ts');
 const { messagingService } = await import('./src/services/messagingService.ts');
 const { bellScheduleService, DEFAULT_BELL_SCHEDULE_CONFIG } = await import('./src/services/bellScheduleService.ts');
 const { academicCalendarService } = await import('./src/services/academicCalendarService.ts');
-const { sgsRosterAndSubmissionService } = await import('./src/services/sgsRosterAndSubmissionService.ts');
 const { studentService } = await import('./src/services/studentService.ts');
 const {
   calculateProportionalDimensions,
   estimateBase64SizeBytes,
-  compressSubjectBannerImage,
   DEFAULT_BANNER_COMPRESSION_OPTIONS,
 } = await import('./src/utils/imageCompressor.ts');
 const { FEEDBACK_STICKERS_BY_STRAND } = await import('./src/config/feedbackStickersCatalog.ts');
 const { cleanSlateService } = await import('./src/services/cleanSlateService.ts');
-const { authService, hashPassword } = await import('./src/services/authService.ts');
+const { authService } = await import('./src/services/authService.ts');
 const { classroomService } = await import('./src/services/classroomService.ts');
 const { onlineQuizService, DEFAULT_SAMPLE_QUESTIONS } = await import('./src/services/onlineQuizService.ts');
 
@@ -688,7 +685,7 @@ runTestCase('T2.2.3: Non-Period 1 Arrival Boundary (Lock 3 Non-Trigger)', () => 
   // Lock 3 should NOT promote morning to LATE because arrival was not in Period 1.
   const morningStatus = 'ABSENT';
   const period1Status = 'ABSENT';
-  const period2Status = 'PRESENT';
+  const _period2Status = 'PRESENT';
 
   const shouldPromoteMorningLate = morningStatus === 'ABSENT' && (period1Status === 'PRESENT' || period1Status === 'LATE');
   assert.strictEqual(shouldPromoteMorningLate, false, 'Period 2 arrival must not trigger Lock 3');
@@ -1095,7 +1092,7 @@ await runTestCaseAsync('T4.1: Full Academic Term End-to-End Lifecycle Simulation
   assert.strictEqual(overridden.isOverridden, true);
 
   // Re-run correlation: record MUST NOT be reverted back to TRUANCY
-  const correlationAfterOverride = attendanceCorrelationService.runCorrelation('room-3-1', morningDate);
+  const _correlationAfterOverride = attendanceCorrelationService.runCorrelation('room-3-1', morningDate);
   const shieldedRecord = attendanceCorrelationService
     .getPeriodRecords('ศ23101', 'room-3-1', morningDate, 2)
     .find((p) => p.studentCode === '45105');

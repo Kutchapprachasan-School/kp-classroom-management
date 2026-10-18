@@ -154,7 +154,7 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
       gradedCount: subjectsList.length,
       pendingReviewCount: 0,
     };
-  }, [subjectsList, selectedTermYear]);
+  }, [subjectsList]);
 
   // Radar Chart Data: 8 Strands
   const strandRadarData = useMemo(() => {

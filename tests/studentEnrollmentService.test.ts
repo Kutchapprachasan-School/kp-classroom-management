@@ -1,115 +1,163 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   studentEnrollmentService,
   type StudentEnrollmentRecord,
 } from '../src/services/studentEnrollmentService';
+import { gradeService } from '../src/services/gradeService';
+import { supabase } from '../src/lib/supabaseClient';
 
-describe('studentEnrollmentService - Historical Enrollment Ledger', () => {
-  beforeEach(() => {
-    studentEnrollmentService._resetForTesting();
+describe('studentEnrollmentService - Historical Enrollment Ledger & Transcripts', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it('records an initial active enrollment for a student', () => {
-    const enr = studentEnrollmentService.createEnrollment({
-      studentId: 'stu-47001',
-      studentCode: '47001',
-      studentName: 'เด็กชาย ก สมมุติ',
-      classroomId: 'room-1-1',
-      classroomName: 'ม.1/1',
-      academicYear: 2568,
-      semesterNo: 1,
-      seatNo: 1,
-      status: 'ACTIVE',
-      startDate: '2025-05-16',
-    });
+  it('getClassroomEnrollments queries enrollments in active classroom and excludes ROLLED_BACK', async () => {
+    const mockData: StudentEnrollmentRecord[] = [
+      {
+        id: 'enr-1',
+        student_id: 'stu-1',
+        classroom_id: 'room-1-1',
+        grade_level: 'ม.1',
+        academic_year: 2569,
+        semester: 1,
+        roll_number: 1,
+        status: 'ACTIVE',
+        final_gpa: null,
+        promotion_batch_id: null,
+        remarks: null,
+        created_at: '2026-10-18T00:00:00Z',
+        updated_at: '2026-10-18T00:00:00Z',
+      },
+    ];
 
-    expect(enr.id).toBeDefined();
-    expect(enr.status).toBe('ACTIVE');
-    expect(enr.studentCode).toBe('47001');
+    const builder: any = {
+      eq: () => builder,
+      neq: () => builder,
+      order: () => Promise.resolve({ data: mockData, error: null }),
+    };
 
-    const activeList = studentEnrollmentService.getActiveEnrollments('room-1-1');
-    expect(activeList).toHaveLength(1);
-    expect(activeList[0].studentId).toBe('stu-47001');
+    vi.spyOn(supabase, 'from').mockReturnValue({
+      select: () => builder,
+    } as any);
+
+    const list = await studentEnrollmentService.getClassroomEnrollments('room-1-1', 2569, 1);
+    expect(list).toHaveLength(1);
+    expect(list[0].student_id).toBe('stu-1');
   });
 
-  it('queries historical enrollments across multiple years in chronological order', () => {
-    // Year 2567: ม.1
-    studentEnrollmentService.createEnrollment({
-      studentId: 'stu-45001',
-      studentCode: '45001',
-      studentName: 'นาย ข นักเรียน',
-      classroomId: 'room-1-1',
-      classroomName: 'ม.1/1',
-      academicYear: 2567,
-      semesterNo: 2,
-      seatNo: 5,
-      status: 'COMPLETED',
-      startDate: '2024-11-01',
-      endDate: '2025-03-31',
-      gpa: 3.45,
-    });
+  it('getStudentEnrollmentHistory returns records sorted by year and term', async () => {
+    const mockData: StudentEnrollmentRecord[] = [
+      {
+        id: 'enr-2',
+        student_id: 'stu-1',
+        classroom_id: 'room-2-1',
+        grade_level: 'ม.2',
+        academic_year: 2570,
+        semester: 1,
+        roll_number: 1,
+        status: 'ACTIVE',
+        final_gpa: null,
+        promotion_batch_id: 'promo-1',
+        remarks: null,
+        created_at: '2026-10-18T00:00:00Z',
+        updated_at: '2026-10-18T00:00:00Z',
+      },
+      {
+        id: 'enr-1',
+        student_id: 'stu-1',
+        classroom_id: 'room-1-1',
+        grade_level: 'ม.1',
+        academic_year: 2569,
+        semester: 1,
+        roll_number: 1,
+        status: 'COMPLETED',
+        final_gpa: 3.5,
+        promotion_batch_id: null,
+        remarks: null,
+        created_at: '2026-10-18T00:00:00Z',
+        updated_at: '2026-10-18T00:00:00Z',
+      },
+    ];
 
-    // Year 2568: ม.2
-    studentEnrollmentService.createEnrollment({
-      studentId: 'stu-45001',
-      studentCode: '45001',
-      studentName: 'นาย ข นักเรียน',
-      classroomId: 'room-2-1',
-      classroomName: 'ม.2/1',
-      academicYear: 2568,
-      semesterNo: 1,
-      seatNo: 4,
-      status: 'COMPLETED',
-      startDate: '2025-05-16',
-      endDate: '2025-10-10',
-      gpa: 3.60,
-    });
+    const builder: any = {
+      eq: () => builder,
+      neq: () => builder,
+      order: () => builder,
+      then: (fn: any) => Promise.resolve({ data: mockData, error: null }).then(fn),
+    };
 
-    // Year 2568 Term 2: ม.2 (Active)
-    studentEnrollmentService.createEnrollment({
-      studentId: 'stu-45001',
-      studentCode: '45001',
-      studentName: 'นาย ข นักเรียน',
-      classroomId: 'room-2-1',
-      classroomName: 'ม.2/1',
-      academicYear: 2568,
-      semesterNo: 2,
-      seatNo: 4,
-      status: 'ACTIVE',
-      startDate: '2025-11-01',
-    });
+    vi.spyOn(supabase, 'from').mockReturnValue({
+      select: () => builder,
+    } as any);
 
-    const history = studentEnrollmentService.getStudentEnrollmentHistory('stu-45001');
-    expect(history).toHaveLength(3);
-    expect(history[0].academicYear).toBe(2567);
-    expect(history[0].classroomName).toBe('ม.1/1');
-    expect(history[1].academicYear).toBe(2568);
-    expect(history[1].semesterNo).toBe(1);
-    expect(history[2].status).toBe('ACTIVE');
+    const history = await studentEnrollmentService.getStudentEnrollmentHistory('stu-1');
+    expect(history).toHaveLength(2);
+    expect(history[0].academic_year).toBe(2570);
   });
 
-  it('closes an active enrollment when student is promoted or graduated', () => {
-    studentEnrollmentService.createEnrollment({
-      studentId: 'stu-grad-1',
-      studentCode: '43001',
-      studentName: 'นางสาว จบการศึกษา',
-      classroomId: 'room-3-1',
-      classroomName: 'ม.3/1',
-      academicYear: 2568,
-      semesterNo: 2,
-      seatNo: 12,
-      status: 'ACTIVE',
-      startDate: '2025-11-01',
+  it('getStudentFullTranscript flushes outbox and computes grades for each term', async () => {
+    const flushSpy = vi.spyOn(gradeService, 'flushOutbox');
+
+    vi.spyOn(studentEnrollmentService, 'getStudentEnrollmentHistory').mockResolvedValue([
+      {
+        id: 'enr-1',
+        student_id: 'stu-1',
+        classroom_id: 'room-1-1',
+        grade_level: 'ม.1',
+        academic_year: 2569,
+        semester: 1,
+        roll_number: 1,
+        status: 'ACTIVE',
+        final_gpa: null,
+        promotion_batch_id: null,
+        remarks: null,
+        created_at: '',
+        updated_at: '',
+      },
+    ]);
+
+    vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
+      if (table === 'StudentScore') {
+        return {
+          select: () => ({
+            eq: () => Promise.resolve({
+              data: [
+                { id: 'stu-1_col-1', studentId: 'stu-1', assignmentId: 'col-1', score: 90, updatedAt: '' },
+              ],
+              error: null,
+            }),
+          }),
+        } as any;
+      }
+      if (table === 'AssessmentColumn') {
+        return {
+          select: () => ({
+            in: () => Promise.resolve({
+              data: [
+                {
+                  id: 'col-1',
+                  courseId: 'math101',
+                  academicYear: 2569,
+                  semester: 1,
+                  maxScore: 100,
+                  weight: 100,
+                  category: 'FINAL',
+                  updatedAt: '',
+                },
+              ],
+              error: null,
+            }),
+          }),
+        } as any;
+      }
+      return { select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) } as any;
     });
 
-    const closed = studentEnrollmentService.closeActiveEnrollment('stu-grad-1', 'GRADUATED', '2026-03-31');
-    expect(closed).toBe(true);
-
-    const history = studentEnrollmentService.getStudentEnrollmentHistory('stu-grad-1');
-    expect(history[0].status).toBe('GRADUATED');
-    expect(history[0].endDate).toBe('2026-03-31');
-
-    const activeList = studentEnrollmentService.getActiveEnrollments('room-3-1');
-    expect(activeList).toHaveLength(0);
+    const transcripts = await studentEnrollmentService.getStudentFullTranscript('stu-1');
+    expect(flushSpy).toHaveBeenCalled();
+    expect(transcripts).toHaveLength(1);
+    expect(transcripts[0].courses[0].grade).toBe('4');
+    expect(transcripts[0].termGpa).toBe(4);
+    expect(transcripts[0].hasAcademicIssue).toBe(false);
   });
 });

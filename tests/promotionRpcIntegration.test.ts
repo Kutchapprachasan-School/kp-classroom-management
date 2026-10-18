@@ -1,137 +1,174 @@
-import { describe, it, expect } from 'vitest';
-import {
-  runPromotionDryRun,
-  type StudentDryRunInput,
-  type PromotionDryRunConfig,
-  generateDefaultClassroomMappings,
-} from '../src/utils/promotionDryRunEngine';
+// tests/promotionRpcIntegration.test.ts
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { studentPromotionService } from '../src/services/studentPromotionService';
+import { studentPurgeService } from '../src/services/studentPurgeService';
+import { gradeService } from '../src/services/gradeService';
+import { studentEnrollmentService } from '../src/services/studentEnrollmentService';
+import { supabase } from '../src/lib/supabaseClient';
 
-/**
- * Helper to transform DryRun decisions into the PostgreSQL RPC items payload
- */
-function buildRpcPromotionPayload(
-  dryRunDecisions: ReturnType<typeof runPromotionDryRun>['decisions'],
-  studentIdMap: Record<string, string>, // code -> student_id (UUID)
-  roomIdMap: Record<string, string>     // name -> classroom_id (UUID)
-) {
-  return dryRunDecisions.map((d) => {
-    const studentId = studentIdMap[d.studentCode] || `stu_${d.studentCode}`;
-    const targetRoomId = d.targetClassroom && roomIdMap[d.targetClassroom] 
-      ? roomIdMap[d.targetClassroom] 
-      : null;
+vi.mock('../src/lib/supabaseClient', () => ({
+  supabase: {
+    from: vi.fn(),
+    rpc: vi.fn(),
+  },
+}));
 
-    return {
-      studentId,
-      studentCode: d.studentCode,
-      action: d.action,
-      targetRoomId,
-      graduationApproved: d.graduationStatus === 'APPROVED',
-      graduationApprovedBy: d.graduationStatus === 'APPROVED' ? 'admin-uid' : null,
-      notes: d.reason,
-    };
-  });
-}
-
-describe('PostgreSQL RPC Integration Contract & Payload Validation', () => {
-  const rooms = ['ม.1/1', 'ม.2/1', 'ม.3/1'];
-  const config: PromotionDryRunConfig = {
-    fromAcademicYear: 2568,
-    toAcademicYear: 2569,
-    classroomMappings: generateDefaultClassroomMappings(rooms),
-  };
-
-  const studentIdMap = {
-    '47001': 'uuid-student-47001',
-    '47002': 'uuid-student-47002',
-    '45001': 'uuid-student-45001',
-    '45002': 'uuid-student-45002',
-  };
-
-  const roomIdMap = {
-    'ม.1/1': 'uuid-room-1-1',
-    'ม.2/1': 'uuid-room-2-1',
-    'ม.3/1': 'uuid-room-3-1',
-  };
-
-  it('transforms dry-run decisions into RPC items adhering to PostgreSQL parameter schema', () => {
-    const cohort: StudentDryRunInput[] = [
-      { studentCode: '47001', studentName: 'เด็ก 1', currentClassroom: 'ม.1/1' },
-      { studentCode: '45001', studentName: 'ม.3 อนุมัติแล้ว', currentClassroom: 'ม.3/1', graduationApproved: true },
-      { studentCode: '45002', studentName: 'ม.3 ยังไม่อนุมัติ', currentClassroom: 'ม.3/1', graduationApproved: false },
-    ];
-
-    const report = runPromotionDryRun(cohort, config);
-    expect(report.isValid).toBe(true);
-
-    const rpcItems = buildRpcPromotionPayload(report.decisions, studentIdMap, roomIdMap);
-
-    expect(rpcItems).toHaveLength(3);
-
-    // Item 1: Promoted
-    expect(rpcItems[0].studentId).toBe('uuid-student-47001');
-    expect(rpcItems[0].action).toBe('PROMOTED');
-    expect(rpcItems[0].targetRoomId).toBe('uuid-room-2-1');
-    expect(rpcItems[0].graduationApproved).toBe(false);
-
-    // Item 2: Graduated (Approved)
-    expect(rpcItems[1].studentId).toBe('uuid-student-45001');
-    expect(rpcItems[1].action).toBe('GRADUATED');
-    expect(rpcItems[1].targetRoomId).toBeNull();
-    expect(rpcItems[1].graduationApproved).toBe(true);
-    expect(rpcItems[1].graduationApprovedBy).toBe('admin-uid');
-
-    // Item 3: Graduation Pending (Must NOT be flagged as GRADUATED in RPC)
-    expect(rpcItems[2].studentId).toBe('uuid-student-45002');
-    expect(rpcItems[2].action).toBe('GRADUATION_PENDING');
-    expect(rpcItems[2].graduationApproved).toBe(false);
+describe('Enterprise Student Promotion & Rollover System (v3 Integration)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(gradeService, 'flushOutbox').mockResolvedValue();
   });
 
-  it('rejects graduation action if graduation approval is missing in the RPC payload', () => {
-    const invalidGraduationItem = {
-      studentId: 'uuid-student-45002',
-      studentCode: '45002',
-      action: 'GRADUATED',
-      graduationApproved: false, // Invalid: Cannot be GRADUATED without explicit approval!
-    };
+  it('1. ควรสั่ง flushOutbox() และตั้งค่าเริ่มต้นให้เด็ก ม.3 ที่ติด ร เป็น REPEAT ใน Dry-Run', async () => {
+    // จำลองรายชื่อนักเรียน ม.3 จำนวน 2 คน (คนแรกปกติ, คนที่สองติด ร)
+    const mockSelect = vi.fn().mockReturnValue({
+      in: vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({
+          data: [
+            { id: 'std-m3-normal', first_name: 'สมชาย', last_name: 'เรียนดี', classroom_id: 'room-m3-1' },
+            { id: 'std-m3-issue', first_name: 'สมหญิง', last_name: 'รอซ่อม', classroom_id: 'room-m3-1' },
+          ],
+          error: null,
+        }),
+      }),
+    });
+    (supabase.from as any).mockReturnValue({ select: mockSelect });
 
-    // Client-side pre-validation invariant check
-    const validateRpcItem = (item: typeof invalidGraduationItem) => {
-      if (item.action === 'GRADUATED' && !item.graduationApproved) {
-        throw new Error('GRADUATION_NOT_APPROVED: Terminal students require formal graduation approval');
+    vi.spyOn(studentEnrollmentService, 'getStudentFullTranscript').mockImplementation(async (studentId) => {
+      if (studentId === 'std-m3-issue') {
+        return [
+          {
+            enrollmentId: 'enr-2',
+            academicYear: 2569,
+            semester: 2,
+            classroomId: 'room-m3-1',
+            gradeLevel: 'ม.3',
+            status: 'ACTIVE',
+            termGpa: 1.5,
+            hasAcademicIssue: true,
+            courses: [{ courseId: 'math101', totalScore: 45, grade: 'ร', isIncomplete: true }],
+          },
+        ];
       }
-    };
+      return [
+        {
+          enrollmentId: 'enr-1',
+          academicYear: 2569,
+          semester: 2,
+          classroomId: 'room-m3-1',
+          gradeLevel: 'ม.3',
+          status: 'ACTIVE',
+          termGpa: 3.8,
+          hasAcademicIssue: false,
+          courses: [{ courseId: 'math101', totalScore: 85, grade: '4', isIncomplete: false }],
+        },
+      ];
+    });
 
-    expect(() => validateRpcItem(invalidGraduationItem)).toThrow(
-      'GRADUATION_NOT_APPROVED: Terminal students require formal graduation approval'
-    );
+    const dryRun = await studentPromotionService.simulatePromotionDryRun({
+      fromAcademicYear: 2569,
+      fromSemester: 2,
+      toAcademicYear: 2570,
+      toSemester: 1,
+      mappings: [
+        {
+          fromClassroomId: 'room-m3-1',
+          fromGradeLevel: 'ม.3',
+          toClassroomId: null,
+          toGradeLevel: 'GRADUATED',
+          isGraduationLevel: true,
+        },
+      ],
+    });
+
+    expect(gradeService.flushOutbox).toHaveBeenCalledTimes(1);
+    expect(dryRun.totalStudents).toBe(2);
+    expect(dryRun.graduateCount).toBe(1);
+    expect(dryRun.repeatCount).toBe(1);
+    expect(dryRun.flaggedIssueCount).toBe(1);
+
+    const flaggedStudent = dryRun.transitions.find((t) => t.student_id === 'std-m3-issue');
+    expect(flaggedStudent?.action).toBe('REPEAT');
+    expect(flaggedStudent?.has_academic_issue).toBe(true);
   });
 
-  it('simulates rollback conflict guard detecting downstream score modifications', () => {
-    // Simulates the SQL check:
-    // SELECT count(*) FROM scores WHERE enrollment_id IN (SELECT new_enrollment_id FROM promotion_batch_items)
-    const simulatedBatchItems = [
-      { studentId: 'uuid-1', newEnrollmentId: 'enr-new-1' },
-      { studentId: 'uuid-2', newEnrollmentId: 'enr-new-2' },
-    ];
+  it('2. ควรส่งข้อมูลเข้า Atomic RPC execute_student_promotion_batch อย่างถูกต้อง', async () => {
+    (supabase.rpc as any).mockResolvedValue({
+      data: {
+        success: true,
+        batch_id: 'promo_batch_2570',
+        promoted_count: 1,
+        repeated_count: 0,
+        graduated_count: 0,
+      },
+      error: null,
+    });
 
-    const existingScores = [
-      { id: 'sc-1', enrollmentId: 'enr-new-1', score: 18 }, // Modified in new academic year!
-    ];
+    const res = await studentPromotionService.executePromotionBatch({
+      fromAcademicYear: 2569,
+      fromSemester: 2,
+      toAcademicYear: 2570,
+      toSemester: 1,
+      executedBy: 'admin-01',
+      transitions: [
+        {
+          student_id: 'std-001',
+          from_classroom_id: 'room-m1-1',
+          to_classroom_id: 'room-m2-1',
+          action: 'PROMOTE',
+          roll_number: 1,
+          grade_level: 'ม.2',
+        },
+      ],
+    });
 
-    const detectRollbackConflicts = (
-      batchItems: typeof simulatedBatchItems,
-      scores: typeof existingScores
-    ) => {
-      const newEnrollmentIds = new Set(batchItems.map((b) => b.newEnrollmentId));
-      const conflicts = scores.filter((s) => newEnrollmentIds.has(s.enrollmentId));
-      return {
-        hasConflict: conflicts.length > 0,
-        conflictCount: conflicts.length,
-      };
-    };
+    expect(gradeService.flushOutbox).toHaveBeenCalled();
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      'execute_student_promotion_batch',
+      expect.objectContaining({
+        p_from_academic_year: 2569,
+        p_to_academic_year: 2570,
+        p_executed_by: 'admin-01',
+      })
+    );
+    expect(res.batch_id).toBe('promo_batch_2570');
+  });
 
-    const conflictReport = detectRollbackConflicts(simulatedBatchItems, existingScores);
-    expect(conflictReport.hasConflict).toBe(true);
-    expect(conflictReport.conflictCount).toBe(1);
+  it('3. ควรแจ้งเตือน conflict_detected เมื่อสั่ง Rollback แล้วมีคะแนนใหม่ใน StudentScore', async () => {
+    (supabase.rpc as any).mockResolvedValue({
+      data: {
+        success: false,
+        conflict_detected: true,
+        conflict_score_count: 12,
+        message: 'พบการกรอกคะแนนในภาคเรียนใหม่แล้วจำนวน 12 รายการ',
+      },
+      error: null,
+    });
+
+    const rollbackRes = await studentPromotionService.rollbackPromotionBatch({
+      batchId: 'promo_batch_2570',
+      executedBy: 'admin-01',
+      forceOverride: false,
+    });
+
+    expect(rollbackRes.conflict_detected).toBe(true);
+    expect(rollbackRes.conflict_score_count).toBe(12);
+  });
+
+  it('4. ควรบล็อกการลบนักเรียนทดสอบหากตรวจพบคะแนนจริงใน StudentScore (Purge Guard)', async () => {
+    (supabase.rpc as any).mockResolvedValue({
+      data: {
+        success: false,
+        blocked_by_guard: true,
+        active_score_count: 8,
+        completed_term_count: 1,
+        message: 'นักเรียนมีประวัติคะแนนจริง 8 ช่อง',
+      },
+      error: null,
+    });
+
+    const purgeRes = await studentPurgeService.purgeTestStudent('std-real-001', false);
+    expect(purgeRes.blocked_by_guard).toBe(true);
+    expect(purgeRes.active_score_count).toBe(8);
   });
 });

@@ -49,7 +49,7 @@ describe('Supabase PostgREST Egress Optimization Verification', () => {
     it('should serve repeated classroom queries from in-memory cache to prevent route-transition egress', async () => {
       const start = Date.now();
       const first = await classroomService.getAll();
-      const firstDuration = Date.now() - start;
+      const _firstDuration = Date.now() - start;
 
       // Second consecutive call should hit in-memory cache immediately
       const secondStart = Date.now();

@@ -169,6 +169,9 @@ export const App: React.FC = () => {
 
   React.useEffect(() => {
     applySchoolBrandingAndTypography(schoolSettings);
+  }, [schoolSettings]);
+
+  React.useEffect(() => {
     // ซิงค์ข้อมูลโรงเรียนและโลโก้ล่าสุดจาก Supabase เพื่อให้ตรงกันทุกเครื่อง (รันครั้งเดียวเมื่อเริ่มต้นระบบ)
     fetchAndSyncSchoolSettingsFromSupabase().catch(() => {});
 
@@ -178,7 +181,6 @@ export const App: React.FC = () => {
         if (JSON.stringify(prev) === JSON.stringify(next)) {
           return prev;
         }
-        applySchoolBrandingAndTypography(next);
         return next;
       });
     };

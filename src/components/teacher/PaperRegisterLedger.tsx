@@ -261,7 +261,7 @@ export const PaperRegisterLedger: React.FC<PaperRegisterLedgerProps> = ({
     } else if (availableRooms.length > 0 && !selectedRoom) {
       setSelectedRoom(availableRooms[0]);
     }
-  }, [defaultRoom, availableRooms]);
+  }, [defaultRoom, availableRooms, selectedRoom]);
 
   useEffect(() => {
     const nextPeriods = computeDynamicPeriods(selectedRoom, subjectLabel);

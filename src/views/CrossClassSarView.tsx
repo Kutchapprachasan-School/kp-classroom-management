@@ -513,7 +513,7 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
       goodAboveCount,
       goodAbovePercent: baseCount > 0 ? Number(((goodAboveCount / baseCount) * 100).toFixed(1)) : 0,
     };
-  }, [selectedTeacherKey, selectedGradeLevelFilter, selectedRoomFilter, selectedSubjectFilter, displayedCourses]);
+  }, [displayedCourses]);
 
   // คำนวณสรุป เกรด 0, ร, มส
   const remedialBreakdown = useMemo(() => {

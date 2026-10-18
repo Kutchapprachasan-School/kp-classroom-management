@@ -21,14 +21,26 @@ export interface SchoolGradingPolicyConfig {
   allowHalfStepRounding: boolean; // ปัดคะแนนทีละ 0.5 คะแนน
 }
 
+export type SmsGatewayProvider = 'thaibulksms' | 'smsmkt' | 'twilio' | 'custom';
+
 export interface SchoolNotificationConfig {
   lineNotifyToken: string;
   lineOaChannelId?: string;
   smsSenderName: string;
+  smsProvider?: SmsGatewayProvider;
+  smsApiKey?: string;
+  smsApiSecret?: string;
+  smsApiEndpoint?: string;
+  smsCreditBalance?: number;
+  smsTemplateAbsent?: string;
+  smsTemplateLate?: string;
+  smsTemplateTruancy?: string;
+  smsTemplateLeave?: string;
   notifyParentOnAbsent: boolean;
   notifyParentOnLate: boolean;
   notifyParentOnTruancy: boolean;
   notifyTeacherOnGradingDue: boolean;
+  notifyOnSmsSync?: boolean;
 }
 
 export const DEFAULT_ATTENDANCE_POLICY: SchoolAttendancePolicyConfig = {
@@ -53,10 +65,20 @@ export const DEFAULT_GRADING_POLICY: SchoolGradingPolicyConfig = {
 export const DEFAULT_NOTIFICATION_CONFIG: SchoolNotificationConfig = {
   lineNotifyToken: '',
   smsSenderName: 'KPS_SCHOOL',
+  smsProvider: 'thaibulksms',
+  smsApiKey: '',
+  smsApiSecret: '',
+  smsApiEndpoint: 'https://api-v2.thaibulksms.com/sms',
+  smsCreditBalance: 1000,
+  smsTemplateAbsent: '[KPS] แจ้งเตือน: นักเรียน {studentName} ขาดเรียนวันที่ {date} กรุณาติดต่อครูที่ปรึกษา',
+  smsTemplateLate: '[KPS] แจ้งเตือน: นักเรียน {studentName} มาสายเวลา {time} วันที่ {date}',
+  smsTemplateTruancy: '[KPS] ด่วน: ตรวจพบ {studentName} ไม่เข้าเรียนในคาบที่ {period} วันที่ {date}',
+  smsTemplateLeave: '[KPS] การลาของ {studentName} ({leaveType}) ได้รับการอนุมัติแล้ว',
   notifyParentOnAbsent: true,
   notifyParentOnLate: true,
   notifyParentOnTruancy: true,
   notifyTeacherOnGradingDue: true,
+  notifyOnSmsSync: true,
 };
 
 const ATTENDANCE_POLICY_KEY = 'kps_school_attendance_policy_v1';

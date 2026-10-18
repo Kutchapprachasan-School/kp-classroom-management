@@ -8,6 +8,7 @@ import {
   type WeekendMakeupDayRecord,
 } from './academicCalendarService.ts';
 import { cleanSlateService } from './cleanSlateService';
+import { bellScheduleService } from './bellScheduleService';
 import {
   INITIAL_MATRIX_SLOTS,
   getBangkokNow,
@@ -190,11 +191,12 @@ export const calendarEventStorageService = {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          return bellScheduleService.syncMatrixSlotsWithBellSchedule(parsed);
         }
       }
     } catch {}
-    return cleanSlateService.isCleanSlateActive() ? [] : INITIAL_MATRIX_SLOTS;
+    const initial = cleanSlateService.isCleanSlateActive() ? [] : INITIAL_MATRIX_SLOTS;
+    return bellScheduleService.syncMatrixSlotsWithBellSchedule(initial);
   },
 
   // คำนวณจำนวนคาบสอนจริงของวันนี้จาก Matrix Slots (ตัดคาบว่าง, คาบพักเที่ยงออก)
@@ -207,6 +209,7 @@ export const calendarEventStorageService = {
         !s.isFreePeriod &&
         s.category !== 'free' &&
         !!s.subjectCode &&
+        s.subjectCode !== 'พักกลางวัน' &&
         s.status !== 'LUNCH' &&
         !s.isLunchSlot
     );
@@ -224,6 +227,7 @@ export const calendarEventStorageService = {
           !s.isFreePeriod &&
           s.category !== 'free' &&
           !!s.subjectCode &&
+          s.subjectCode !== 'พักกลางวัน' &&
           s.status !== 'LUNCH' &&
           !s.isLunchSlot
       )

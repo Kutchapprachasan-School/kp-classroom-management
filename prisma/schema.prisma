@@ -114,7 +114,6 @@ model Enrollment {
   membership    SchoolMembership @relation(fields: [userId, schoolId], references: [userId, schoolId], onDelete: Restrict)
   
   scores        Score[]
-  attendances   Attendance[]
   xpLedgers     XpLedger[]
   
   @@unique([classroomId, userId])
@@ -178,23 +177,28 @@ model Schedule {
   isConducted   Boolean      @default(false) 
   
   classroom     Classroom    @relation(fields: [classroomId], references: [id], onDelete: Restrict)
-  attendances   Attendance[]
   
   @@unique([id, classroomId]) 
   @@unique([classroomId, schoolDate, periodNo])
 }
 
 model Attendance {
-  id            String           @id @default(cuid())
-  scheduleId    String
-  enrollmentId  String
-  classroomId   String           
-  status        AttendanceStatus 
-  
-  schedule      Schedule         @relation(fields: [scheduleId, classroomId], references: [id, classroomId], onDelete: Restrict)
-  enrollment    Enrollment       @relation(fields: [enrollmentId, classroomId], references: [id, classroomId], onDelete: Restrict)
-  
-  @@unique([scheduleId, enrollmentId])
+  id          String   @id // รูปแบบ: "{studentId}_{date}_{period}" เช่น "std-65001_2026-10-19_1"
+  studentId   String
+  classroomId String   // เช่น "room-1-1"
+  date        String   // เก็บเป็น "YYYY-MM-DD" เพื่อตัดปัญหา Timezone เหลื่อมกัน
+  period      Int      // 0 = เช็คชื่อหน้าเสาธง/โฮมรูม, 1-8 = คาบเรียนที่ 1-8
+  courseId    String?  // รหัสวิชา (กรณีเช็คชื่อรายคาบ)
+  status      String   // 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE' | 'ACTIVITY'
+  remark      String?  // หมายเหตุ เช่น "ลาป่วยมีใบรับรองแพทย์"
+  recordedBy  String   // User ID ของครูผู้บันทึก
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  // หัวใจสำคัญ: ล็อกไม่ให้ข้อมูลซ้ำ และใช้เป็นเป้าหมายของคำสั่ง ON CONFLICT DO UPDATE
+  @@unique([studentId, date, period], name: "attendance_student_date_period_unique")
+  // Index สำหรับดึงข้อมูลรายห้องและวันที่อย่างรวดเร็ว
+  @@index([classroomId, date, period])
+  @@index([classroomId, date, updatedAt])
 }
 
 // ================= GAMIFICATION & EXTERNAL =================
@@ -295,4 +299,40 @@ model PromotionBatchItem {
   @@index([batchId])
   @@index([studentId])
 }
+
+// 1. โครงสร้างกำหนดการเก็บคะแนน (ผูกกับปีการศึกษาและภาคเรียน)
+model AssessmentColumn {
+  id           String   @id // เช่น "2569-1_course-math101_ass-01"
+  courseId     String   // รหัสวิชา เช่น "course-math101"
+  classroomId  String?  // รหัสห้องเรียน เช่น "class-m1-1"
+  academicYear Int      @default(2569) // ปีการศึกษา พ.ศ.
+  semester     Int      @default(1)    // ภาคเรียนที่ (1 หรือ 2)
+  title        String   // ชื่อชิ้นงาน เช่น "การบ้านบทที่ 1"
+  maxScore     Float    @default(100)  // คะแนนเต็ม
+  weight       Float    @default(10)   // น้ำหนักคะแนน (ร้อยละ)
+  category     String   @default("HW") // 'HW' | 'MIDTERM' | 'FINAL' | 'OTHER'
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  scores       StudentScore[]
+
+  @@index([courseId, academicYear, semester])
+  @@index([classroomId, academicYear, semester])
+}
+
+// 2. โครงสร้างเก็บบันทึกคะแนนรายบุคคลแยกตามช่องประเมิน
+model StudentScore {
+  id           String   @id // รูปแบบ: "{studentId}_{assignmentId}"
+  studentId    String
+  assignmentId String   // อ้างอิง AssessmentColumn.id
+  score        Float?   // คะแนนที่ได้ (null = ยังไม่ส่ง/ขาดสอบ)
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  assessment   AssessmentColumn @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, assignmentId], name: "score_student_assignment_unique")
+  @@index([assignmentId])
+  @@index([studentId])
+}
+
+
 

@@ -11,7 +11,6 @@
 import fs from 'fs';
 import assert from 'assert';
 import { spawnSync } from 'child_process';
-import { fileURLToPath } from 'url';
 
 // Auto-run with tsx if executed directly under plain Node without TypeScript ESM support
 const isTsx = process.execArgv.some((a) => a.includes('tsx')) || process.env.TSX_RUNNER === '1';
@@ -440,6 +439,18 @@ assert.ok(academicTermsCode.includes('พฤหัสบดี'), 'AcademicTerms
 assert.ok(academicTermsCode.includes('w-6 h-6 rounded-full bg-blue-600 text-white font-black text-xs'), 'AcademicTermsView contains blue circle badge for today (Day 2)');
 assert.ok(academicTermsCode.includes('+ เพิ่มกิจกรรม'), 'AcademicTermsView includes + เพิ่มกิจกรรม action button');
 assert.ok(academicTermsCode.includes('ประชุม / อบรม'), 'AcademicTermsView includes 5 category legend badges');
+assert.ok(!academicTermsCode.includes('(day + 2) % 7'), 'AcademicTermsView must not use hardcoded offset fallacy (day + 2) % 7');
+assert.ok(academicTermsCode.includes('new Date(ceYear, month - 1, day)'), 'AcademicTermsView must calculate day of week dynamically with real Date');
+assert.ok(academicTermsCode.includes('firstDayOfWeek = targetDate.getDay()'), 'calendarCells must use real firstDayOfWeek');
+
+// Validate exact calendar day math: 18 Oct 2569 MUST be Sunday
+const thaiDaysOfWeek = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+const calcDay = (d, m = 10, y = 2569) => thaiDaysOfWeek[new Date(y - 543, m - 1, d).getDay()];
+assert.strictEqual(calcDay(18, 10, 2569), 'อาทิตย์', '18 Oct 2569 must be Sunday');
+assert.strictEqual(calcDay(1, 10, 2569), 'พฤหัสบดี', '1 Oct 2569 must be Thursday');
+assert.strictEqual(calcDay(23, 10, 2569), 'ศุกร์', '23 Oct 2569 must be Friday (Chulalongkorn Day)');
+assert.strictEqual(calcDay(31, 10, 2569), 'เสาร์', '31 Oct 2569 must be Saturday');
+console.log('  ✓ Calendar day-of-week math verified: 18 ต.ค. 2569 is Sunday, 1 ต.ค. is Thursday, 23 ต.ค. is Friday');
 console.log('  ✓ AcademicTermsView refactored purely for Activities & Events timeline matching media_1791415925768_dac3bff6.png');
 
 const settingsCode = fs.readFileSync('src/views/SettingsBackupView.tsx', 'utf8');

@@ -4,7 +4,7 @@
 // 1. [นักเรียนสแกนจากจอครู]: Dynamic Rotating QR Code หมุนเวียนทุก 15 วินาที พร้อม OTP ป้องกันนักเรียนแคปภาพส่งต่อ
 // 2. [ครูสแกนบัตรนักเรียน]: Continuous Scanner สแกนรหัสบัตรนักเรียนต่อเนื่องด้วยกล้อง พร้อมเสียง Beep 🎵 ทันที
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   X,
   QrCode,
@@ -74,7 +74,7 @@ export const DynamicQrAttendanceModal: React.FC<DynamicQrAttendanceModalProps> =
   // ----------------------------------------------------
   // Dynamic QR Generation & Countdown Timer (15 Seconds)
   // ----------------------------------------------------
-  const updateDynamicQr = async () => {
+  const updateDynamicQr = useCallback(async () => {
     const payload = qrAttendanceService.generateDynamicPayload({
       type: attendanceType,
       roomId: classroomId,
@@ -85,7 +85,7 @@ export const DynamicQrAttendanceModal: React.FC<DynamicQrAttendanceModalProps> =
     setCurrentPayload(payload);
     const dataUrl = await qrAttendanceService.generateQrDataUrl(payload);
     setQrDataUrl(dataUrl);
-  };
+  }, [attendanceType, classroomId, courseCode, date, periodNo]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -105,12 +105,12 @@ export const DynamicQrAttendanceModal: React.FC<DynamicQrAttendanceModalProps> =
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isOpen, attendanceType, classroomId, courseCode, date, periodNo]);
+  }, [isOpen, updateDynamicQr]);
 
   // ----------------------------------------------------
   // Camera Scanner Logic (Tab 2)
   // ----------------------------------------------------
-  const startCamera = async () => {
+  const startCamera = useCallback(async () => {
     setCameraError(null);
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -129,7 +129,7 @@ export const DynamicQrAttendanceModal: React.FC<DynamicQrAttendanceModalProps> =
       setCameraError('ไม่สามารถเข้าถึงกล้องได้ (โปรดตรวจสอบสิทธิ์การใช้งานกล้อง) คุณสามารถแตะเลือกบัตรนักเรียนด้านล่างเพื่อสแกนได้');
       setIsCameraActive(false);
     }
-  };
+  }, [facingMode]);
 
   const stopCamera = () => {
     if (videoRef.current && videoRef.current.srcObject) {
@@ -147,7 +147,7 @@ export const DynamicQrAttendanceModal: React.FC<DynamicQrAttendanceModalProps> =
       stopCamera();
     }
     return () => stopCamera();
-  }, [isOpen, activeTab, facingMode]);
+  }, [isOpen, activeTab, startCamera]);
 
   // ----------------------------------------------------
   // Handle Student Check-in (Sound + Animation + Callback)

@@ -29,6 +29,11 @@ import {
   calculatePeriodsPerWeek,
   type CourseCurriculumRecord,
 } from '../../services/coursesCurriculumService';
+import {
+  bellScheduleService,
+  BELL_SCHEDULE_UPDATED_EVENT,
+  type SchoolBellScheduleConfig,
+} from '../../services/bellScheduleService';
 
 export interface AddEditTimetableSlotModalProps {
   isOpen: boolean;
@@ -63,6 +68,44 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
   matrixSlots = [],
 }) => {
   const isEditing = Boolean(initialSlot?.id && !initialSlot?.isFreePeriod);
+
+  const [bellConfig, setBellConfig] = useState<SchoolBellScheduleConfig>(() =>
+    bellScheduleService.getConfig()
+  );
+
+  useEffect(() => {
+    const handleBellUpdate = (e: Event) => {
+      const custom = e as CustomEvent<SchoolBellScheduleConfig>;
+      if (custom.detail) {
+        setBellConfig(custom.detail);
+      } else {
+        setBellConfig(bellScheduleService.getConfig());
+      }
+    };
+    window.addEventListener(BELL_SCHEDULE_UPDATED_EVENT, handleBellUpdate);
+    return () => {
+      window.removeEventListener(BELL_SCHEDULE_UPDATED_EVENT, handleBellUpdate);
+    };
+  }, []);
+
+  const teachingPeriods = React.useMemo(() => {
+    const list = bellScheduleService
+      .generateBellScheduleTimeline(bellConfig)
+      .filter((t) => t.type === 'PERIOD');
+    return list.length > 0
+      ? list
+      : Array.from({ length: maxPeriods }, (_, i) => ({
+          id: `slot-period-${i + 1}`,
+          type: 'PERIOD' as const,
+          periodNumber: i + 1,
+          label: `คาบที่ ${i + 1}`,
+          timeRange: `คาบที่ ${i + 1}`,
+          startTime: '',
+          endTime: '',
+          durationMinutes: 50,
+          isLunch: false,
+        }));
+  }, [bellConfig, maxPeriods]);
 
 
   // Curriculum Master Catalog State
@@ -193,13 +236,14 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
 
     const slotId = initialSlot?.id || `slot-${day}-${period}-${Date.now()}`;
     const fullRoomString = `${classroom} • ห้อง ${room || '324'}`;
+    const periodTimeRange = bellScheduleService.getTimeRangeForPeriod(period);
 
     const newSlot: TimetableMatrixSlot = {
       id: slotId,
       day,
       dayDate: initialSlot?.dayDate || '',
       period,
-      timeRange: initialSlot?.timeRange || `คาบที่ ${period}`,
+      timeRange: periodTimeRange || initialSlot?.timeRange || `คาบที่ ${period}`,
       subjectCode: subjectCode.trim(),
       subjectName: subjectName.trim() || subjectCode.trim(),
       room: fullRoomString,
@@ -207,6 +251,7 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
       isConducted: initialSlot?.isConducted || false,
       category: 'subject',
       isFreePeriod: false,
+      isLunchSlot: false,
     };
 
     onSaveSlot(newSlot);
@@ -286,9 +331,9 @@ export const AddEditTimetableSlotModal: React.FC<AddEditTimetableSlotModalProps>
                     onChange={(e) => setPeriod(Number(e.target.value))}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 appearance-none cursor-pointer"
                   >
-                    {Array.from({ length: maxPeriods }, (_, i) => i + 1).map((p) => (
-                      <option key={p} value={p}>
-                        คาบที่ {p}
+                    {teachingPeriods.map((p) => (
+                      <option key={p.periodNumber} value={p.periodNumber}>
+                        {p.label} ({p.timeRange})
                       </option>
                     ))}
                   </select>

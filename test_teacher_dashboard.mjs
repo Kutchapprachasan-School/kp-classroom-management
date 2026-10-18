@@ -2,7 +2,6 @@
 // Test suite for Teacher Dashboard, 3-Part Banners, RBAC access control, Prompt font, and assets
 
 import fs from 'fs';
-import path from 'path';
 import assert from 'assert';
 
 console.log('🧪 Starting Teacher Dashboard & Banner Service Verification Suite...\n');

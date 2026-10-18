@@ -3,6 +3,8 @@
 // รองรับการตั้งค่าเวลาเข้าแถว, เวลาเรียน, ระยะเวลาต่อคาบ
 // และโหมดการนับคาบพักเที่ยง (Mode A: Numbered Period vs Mode B: Skipped Break Slot)
 
+import type { TimetableMatrixSlot } from '../utils/timetableDateUtils';
+
 export interface SchoolBellScheduleConfig {
   morningAssemblyStart: string;     // e.g. '07:45'
   morningAssemblyEnd: string;       // e.g. '08:15'
@@ -222,6 +224,120 @@ class BellScheduleService {
 
   public getTeachingPeriods(): BellScheduleTimelineItem[] {
     return this.getTimeline().filter((t) => t.type === 'PERIOD');
+  }
+
+  public getTimeRangeForPeriod(periodNumber: number): string | undefined {
+    return this.getTimeline().find(
+      (t) => t.type === 'PERIOD' && t.periodNumber === periodNumber
+    )?.timeRange;
+  }
+
+  public getMatrixTimelineRows(): BellScheduleTimelineItem[] {
+    return this.getTimeline().filter((t) => t.type === 'PERIOD' || t.type === 'LUNCH');
+  }
+
+  public isPeriodLunch(periodNumber: number): boolean {
+    const config = this.getConfig();
+    if (config.lunchBreakMode !== 'NUMBERED_PERIOD') return false;
+    const lunchPeriodNum = Math.min(config.lunchBreakSlot + 1, config.totalPeriodsPerDay);
+    return periodNumber === lunchPeriodNum;
+  }
+
+  public getCurrentPeriodNumber(): number {
+    const timeline = this.getTimeline();
+    const now = new Date();
+    const bangkokStr = now.toLocaleTimeString('en-GB', {
+      timeZone: 'Asia/Bangkok',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+
+    for (const item of timeline) {
+      if (item.type === 'PERIOD' && item.periodNumber !== undefined) {
+        if (bangkokStr >= item.startTime && bangkokStr <= item.endTime) {
+          return item.periodNumber;
+        }
+      }
+    }
+    const periods = timeline.filter((t) => t.type === 'PERIOD');
+    const first = periods[0];
+    if (first && bangkokStr < first.startTime) {
+      return 0;
+    }
+    const last = periods[periods.length - 1];
+    if (last && bangkokStr > last.endTime) {
+      return (last.periodNumber || 7) + 1;
+    }
+    let lastPassed = 0;
+    for (const item of periods) {
+      if (item.periodNumber !== undefined && bangkokStr > item.endTime) {
+        lastPassed = item.periodNumber;
+      }
+    }
+    return lastPassed;
+  }
+
+  public syncMatrixSlotsWithBellSchedule(
+    slots: TimetableMatrixSlot[],
+    overrideConfig?: SchoolBellScheduleConfig
+  ): TimetableMatrixSlot[] {
+    const config = overrideConfig || this.getConfig();
+    const timeline = generateBellScheduleTimeline(config);
+    const teachingMap = new Map<number, string>();
+    let lunchItem: BellScheduleTimelineItem | undefined;
+
+    timeline.forEach((item) => {
+      if (item.type === 'PERIOD' && item.periodNumber !== undefined) {
+        teachingMap.set(item.periodNumber, item.timeRange);
+      } else if (item.type === 'LUNCH') {
+        lunchItem = item;
+      }
+    });
+
+    const isModeA = config.lunchBreakMode === 'NUMBERED_PERIOD';
+    const lunchPeriodNum = isModeA
+      ? Math.min(config.lunchBreakSlot + 1, config.totalPeriodsPerDay)
+      : null;
+
+    return slots.map((slot) => {
+      // If Mode B (or period is not lunch in Mode A)
+      if (!isModeA || slot.period !== lunchPeriodNum) {
+        // If this slot was previously marked as lunch slot, convert to free period
+        if (slot.isLunchSlot || slot.status === 'LUNCH' || slot.subjectCode === 'พักกลางวัน') {
+          return {
+            ...slot,
+            isLunchSlot: false,
+            isFreePeriod: true,
+            status: 'UNCHECKED' as const,
+            category: 'free' as const,
+            subjectCode: '',
+            subjectName: '',
+            room: '',
+            timeRange: teachingMap.get(slot.period) || slot.timeRange,
+          };
+        }
+        // Update timeRange to current bell schedule time
+        const dynamicTime = teachingMap.get(slot.period);
+        return {
+          ...slot,
+          timeRange: dynamicTime || slot.timeRange,
+        };
+      }
+
+      // Mode A: slot.period === lunchPeriodNum
+      return {
+        ...slot,
+        isLunchSlot: true,
+        status: 'LUNCH' as const,
+        isFreePeriod: false,
+        category: 'free' as const,
+        subjectCode: 'พักกลางวัน',
+        subjectName: 'พักรับประทานอาหารกลางวัน',
+        room: 'โรงอาหาร',
+        timeRange: lunchItem?.timeRange || slot.timeRange,
+      };
+    });
   }
 }
 

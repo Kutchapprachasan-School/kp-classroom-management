@@ -233,19 +233,19 @@ D) ผู้อำนวยการ
   // Helper parser for question import text
   const parseQuestionsFromText = (raw: string): QuizQuestionItem[] => {
     const questions: QuizQuestionItem[] = [];
-    const chunks = raw.split(/\n\s*(?=\d+[\.\)])/g).filter((c) => c.trim().length > 0);
+    const chunks = raw.split(/\n\s*(?=\d+[.)])/g).filter((c) => c.trim().length > 0);
 
     chunks.forEach((chunk, idx) => {
       const lines = chunk.split('\n').map((l) => l.trim()).filter(Boolean);
       if (lines.length < 2) return;
 
-      const qTextLine = lines[0].replace(/^\d+[\.\)]\s*/, '').trim();
+      const qTextLine = lines[0].replace(/^\d+[.)]\s*/, '').trim();
       const options: { key: 'A' | 'B' | 'C' | 'D'; text: string }[] = [];
       let correctAnswer: 'A' | 'B' | 'C' | 'D' = 'A';
 
       lines.slice(1).forEach((line) => {
-        const optionMatch = line.match(/^([A-D]|[ก-ง])[\)\.\:\s]\s*(.*)$/i);
-        const ansMatch = line.match(/(?:เฉลย|คำตอบ|answer)\s*[\:\=]\s*([A-D]|[ก-ง])/i);
+        const optionMatch = line.match(/^([A-D]|[ก-ง])[).\s:]\s*(.*)$/i);
+        const ansMatch = line.match(/(?:เฉลย|คำตอบ|answer)\s*[:=]\s*([A-D]|[ก-ง])/i);
 
         if (ansMatch) {
           const rawAns = ansMatch[1].toUpperCase();
@@ -375,7 +375,7 @@ D) ผู้อำนวยการ
         exam.roomName.toLowerCase().includes(q);
       return matchesSearch;
     });
-  }, [exams, filter, categoryTabFilter, roomDropdownFilter, searchTerm]);
+  }, [exams, filter, categoryTabFilter, courseDropdownFilter, roomDropdownFilter, searchTerm]);
 
   // ----------------------------------------------------
   // ----------------------------------------------------

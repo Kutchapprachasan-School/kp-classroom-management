@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   KeyRound,
   Plus,
@@ -11,6 +11,7 @@ import {
   Mail,
   CheckCircle2,
   Lock,
+  RefreshCw,
 } from 'lucide-react';
 import {
   getSchoolSettings,
@@ -19,6 +20,9 @@ import {
   SCHOOL_ROLE_PROFILES,
   type SchoolUserRole,
 } from '../config/schoolRoles';
+import { smsNotificationService } from '../services/smsNotificationService';
+import { masterDataService } from '../services/masterDataService';
+import { classroomService } from '../services/classroomService';
 
 interface UserAccountRow {
   id: string;
@@ -58,10 +62,55 @@ export const UserAccountsView: React.FC<UserAccountsViewProps> = ({
       email: u.username,
       schoolRole: u.role,
       schoolCode: u.smsId,
-      authType: 'SMS Unified SSO (ใช้บัญชีเดียวกับระบบ SMS)',
+      authType: 'School SSO (ระบบบัญชีโรงเรียน)',
       departmentOrClass: u.departmentOrClass,
     }))
   );
+
+  // โหลดรายชื่อผู้ใช้งานจริงจากฐานข้อมูลโรงเรียนอัตโนมัติเมื่อเปิดหน้า
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const [classrooms, teacherAccounts] = await Promise.all([
+          masterDataService.getClassrooms(),
+          classroomService.getTeacherAccounts(),
+        ]);
+        if (!isMounted) return;
+
+        if (teacherAccounts.length > 0 || classrooms.length > 0) {
+          const realRows: UserAccountRow[] = teacherAccounts.map((t) => ({
+            id: t.id,
+            name: t.name,
+            email: t.email || t.username || `${t.id}@kutchap.ac.th`,
+            schoolRole: (t.role as SchoolUserRole) || 'TEACHER_GENERAL',
+            schoolCode: t.username || t.id,
+            authType: 'School SSO (ระบบบัญชีโรงเรียน)',
+            departmentOrClass: t.subjectGroup || t.position || 'กลุ่มสาระการเรียนรู้',
+          }));
+
+          classrooms.forEach((c) => {
+            realRows.push({
+              id: `room-rep-${c.id}`,
+              name: `ตัวแทนนักเรียนห้อง ${c.name} (${c.gradeLevel}/${c.roomNumber})`,
+              email: `rep.${c.id}@kutchap.ac.th`,
+              schoolRole: 'STUDENT_COUNCIL',
+              schoolCode: `REP-${c.roomNumber}`,
+              authType: 'School SSO (ระบบบัญชีโรงเรียน)',
+              departmentOrClass: c.name,
+            });
+          });
+
+          setUsers(realRows);
+        }
+      } catch (err) {
+        console.warn('Failed to load authentic accounts on mount:', err);
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filteredUsers = users.filter((u) => {
     const matchesRole = roleFilter === 'ALL' || u.schoolRole === roleFilter;
@@ -83,6 +132,52 @@ export const UserAccountsView: React.FC<UserAccountsViewProps> = ({
       saveSmsUsers(currentSms);
       return updated;
     });
+  };
+
+  const [isSyncingSms, setIsSyncingSms] = useState(false);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
+
+  const handleSyncSmsAccounts = async () => {
+    setIsSyncingSms(true);
+    try {
+      const syncResult = await smsNotificationService.syncSmsAccountsWithDatabase();
+      const [classrooms, teacherAccounts] = await Promise.all([
+        masterDataService.getClassrooms(),
+        classroomService.getTeacherAccounts(),
+      ]);
+
+      const realUserRows: UserAccountRow[] = teacherAccounts.map((t) => ({
+        id: t.id,
+        name: t.name,
+        email: t.email || t.username || `${t.id}@kutchap.ac.th`,
+        schoolRole: (t.role as SchoolUserRole) || 'TEACHER_GENERAL',
+        schoolCode: t.username || t.id,
+        authType: 'SMS Unified SSO (ระบบบริหารงานโรงเรียน)',
+        departmentOrClass: t.subjectGroup || t.position || 'กลุ่มสาระการเรียนรู้',
+      }));
+
+      // Add classroom student representatives
+      classrooms.forEach((c) => {
+        realUserRows.push({
+          id: `room-rep-${c.id}`,
+          name: `ตัวแทนนักเรียนห้อง ${c.name} (${c.gradeLevel}/${c.roomNumber})`,
+          email: `rep.${c.id}@kutchap.ac.th`,
+          schoolRole: 'STUDENT_COUNCIL',
+          schoolCode: `REP-${c.roomNumber}`,
+          authType: 'SMS Unified SSO (ระบบบริหารงานโรงเรียน)',
+          departmentOrClass: c.name,
+        });
+      });
+
+      setUsers(realUserRows);
+      setSyncToast(`✓ ซิงค์ฐานข้อมูล SMS สำเร็จ (${syncResult.totalUsers} บัญชี) และส่งการแจ้งเตือนแล้ว`);
+      setTimeout(() => setSyncToast(null), 3500);
+    } catch (err: any) {
+      setSyncToast(`❌ การซิงค์ขัดข้อง: ${err?.message || 'โปรดลองใหม่อีกครั้ง'}`);
+      setTimeout(() => setSyncToast(null), 3500);
+    } finally {
+      setIsSyncingSms(false);
+    }
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -157,7 +252,17 @@ export const UserAccountsView: React.FC<UserAccountsViewProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto text-xs">
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto text-xs">
+          <button
+            type="button"
+            onClick={handleSyncSmsAccounts}
+            disabled={isSyncingSms}
+            className="flex items-center gap-1.5 px-3 py-2 border border-blue-200 bg-blue-50/70 hover:bg-blue-100/70 text-blue-800 rounded-xl font-bold transition-all shadow-2xs active:scale-95 disabled:opacity-50 cursor-pointer"
+            title="ซิงค์ฐานข้อมูลและส่งแจ้งเตือนสรุปเข้าระบบ"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-blue-600 ${isSyncingSms ? 'animate-spin' : ''}`} />
+            <span>{isSyncingSms ? 'กำลังเชื่อมต่อบัญชีโรงเรียน...' : 'ซิงค์บัญชีโรงเรียน (SSO)'}</span>
+          </button>
           <button
             onClick={() => setIsSlipModalOpen(true)}
             className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-colors"
@@ -174,6 +279,15 @@ export const UserAccountsView: React.FC<UserAccountsViewProps> = ({
           </button>
         </div>
       </div>
+
+      {syncToast && (
+        <div className="p-3 bg-blue-50 text-blue-900 border border-blue-200 rounded-xl text-xs font-bold animate-slide-up flex items-center justify-between">
+          <span>{syncToast}</span>
+          <button type="button" onClick={() => setSyncToast(null)} className="text-blue-500 hover:text-blue-800">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* ============================================================================
           5-ROLE PERMISSION MATRIX (ตารางสรุปขอบเขตสิทธิ์ทั้ง 5 บทบาทของ รร.กุดจับประชาสรรค์)

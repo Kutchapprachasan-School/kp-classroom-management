@@ -29,7 +29,7 @@ interface TeacherMobileGradingListScreenProps {
   onSelectAssignment?: (assignment: MobileGradingAssignmentItem) => void;
 }
 
-export const INITIAL_MOBILE_ASSIGNMENTS: MobileGradingAssignmentItem[] = [];
+const INITIAL_MOBILE_ASSIGNMENTS: MobileGradingAssignmentItem[] = [];
 
 export const TeacherMobileGradingListScreen: React.FC<
   TeacherMobileGradingListScreenProps

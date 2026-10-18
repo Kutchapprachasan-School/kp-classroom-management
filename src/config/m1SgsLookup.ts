@@ -1244,9 +1244,7 @@ export function getM1SgsStudentInfo(code: string): M1SgsLookupEntry | undefined 
 export function isGrade1SgsStudentCode(code: string): boolean {
   if (!code) return false;
   const clean = code.trim();
-  if (M1_SGS_STUDENT_LOOKUP[clean]) return true;
-  // SGS Grade 1 codes for this cohort: 15833, 16056-16326
-  if (/^16\d{3}$/.test(clean)) return true;
-  if (clean === '15833') return true;
-  return false;
+  // Must strictly match an authentic grade 1 SGS student in lookup to prevent cross-grade misclassification
+  return Boolean(M1_SGS_STUDENT_LOOKUP[clean]);
 }
+

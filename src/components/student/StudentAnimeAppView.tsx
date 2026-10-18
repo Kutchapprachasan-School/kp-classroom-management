@@ -79,7 +79,7 @@ export const StudentAnimeAppView: React.FC<StudentAnimeAppViewProps> = ({
   const [rolledBuddy, setRolledBuddy] = useState<GachaBuddy>(ALL_BUDDIES[0]);
 
   // Active Buddy Buffs
-  const activeBuffs = useMemo(() => gachaSkillEngine.getActiveBuffs(), [equippedBuddy]);
+  const activeBuffs = useMemo(() => gachaSkillEngine.getBuffsForBuddy(equippedBuddy), [equippedBuddy]);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);

@@ -29,9 +29,11 @@ const fallbackClient = createClient(supabaseUrl, supabaseAnonKey, {
 export const supabase = {
   ...fallbackClient,
   from: (table: string) => neonClient.from(table),
+  rpc: <T = any>(fnName: string, args?: any) => neonClient.rpc<T>(fnName, args),
   channel: (_name: string) => neonClient.channel(_name),
   removeChannel: (_channel: any) => neonClient.removeChannel(_channel),
 };
+
 
 // Helper for logging database operations
 export const logDbOperation = (operation: string, details?: unknown) => {

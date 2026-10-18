@@ -23,8 +23,6 @@ interface TeacherMobileClassSubmissionsScreenProps {
   onSelectStudent?: (student: MobileStudentSubmissionItem) => void;
 }
 
-export const INITIAL_STUDENT_SUBMISSIONS: MobileStudentSubmissionItem[] = [];
-
 export const TeacherMobileClassSubmissionsScreen: React.FC<
   TeacherMobileClassSubmissionsScreenProps
 > = ({ onBack, onNavigate, onSelectStudent }) => {

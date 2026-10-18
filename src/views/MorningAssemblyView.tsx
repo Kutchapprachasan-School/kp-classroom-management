@@ -9,7 +9,7 @@
 // 6. ย้ายปุ่ม QR เช็คชื่อ, มาแถวครบทุกคน, ตรวจความสอดคล้อง มาไว้ที่หัวตาราง และตัดปุ่มไปเช็คชื่อนักเรียนออก
 // 7. ลบข้อมูล Mock Demo ขาดเรียนปลอมออก โหลดรายชื่อจริงจาก studentService
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   UserCheck,
   CheckCircle2,
@@ -158,7 +158,7 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
   // ----------------------------------------------------
   // Data Loading & Roster Normalization
   // ----------------------------------------------------
-  const loadData = () => {
+  const loadData = useCallback(() => {
     // Run Lock 3 Correlation cycle to auto-promote period-1 attendance to morning late
     attendanceCorrelationService.runCorrelation(selectedClassroom, selectedDate);
     const existingList = attendanceCorrelationService.getMorningRecords(selectedClassroom, selectedDate);
@@ -191,11 +191,11 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
 
     setRecords([]);
     setHasUnsavedChanges(false);
-  };
+  }, [selectedClassroom, selectedDate]);
 
   useEffect(() => {
     loadData();
-  }, [selectedClassroom, selectedDate]);
+  }, [loadData]);
 
   // Close calendar popover on click outside
   useEffect(() => {

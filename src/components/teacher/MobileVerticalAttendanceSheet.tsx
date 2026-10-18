@@ -10,8 +10,6 @@ export interface RollCallStudentItem {
   fullName: string;
 }
 
-export const KUTCHAP_CLASS_ROSTERS: Record<string, RollCallStudentItem[]> = {};
-
 interface MobileVerticalAttendanceSheetProps {
   defaultRoom?: string;
   availableRooms?: string[];

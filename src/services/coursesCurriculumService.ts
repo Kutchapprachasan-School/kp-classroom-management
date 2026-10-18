@@ -5,6 +5,7 @@
  */
 
 import { academicCalendarService } from './academicCalendarService.ts';
+import { activityAuditLogService } from './activityAuditLogService.ts';
 
 export type MediaType = 'DOCUMENT' | 'WORKSHEET' | 'EXAM_QUIZ' | 'VIDEO' | 'LINK';
 
@@ -176,17 +177,61 @@ class CoursesCurriculumService {
     const index = all.findIndex((c) => c.id === id);
     if (index === -1) throw new Error('Course not found');
 
+    const previous = { ...all[index] };
     all[index] = { ...all[index], ...data };
     this.save();
+
+    try {
+      const changedFields: string[] = [];
+      if (data.name && data.name !== previous.name) changedFields.push(`ชื่อวิชา (${data.name})`);
+      if (data.code && data.code !== previous.code) changedFields.push(`รหัสวิชา (${data.code})`);
+      if (data.credits !== undefined && data.credits !== previous.credits) changedFields.push(`หน่วยกิต (${data.credits})`);
+      if (data.periodsPerWeek !== undefined && data.periodsPerWeek !== previous.periodsPerWeek) changedFields.push(`คาบ/สัปดาห์ (${data.periodsPerWeek})`);
+      if (data.strand && data.strand !== previous.strand) changedFields.push(`กลุ่มสาระ (${data.strand})`);
+
+      const summaryText = changedFields.length > 0
+        ? `แก้ไขข้อมูลวิชา ${all[index].code} ${all[index].name}: ${changedFields.join(', ')}`
+        : `แก้ไขข้อมูลรายวิชา ${all[index].code} ${all[index].name}`;
+
+      activityAuditLogService.logUpdate(
+        'หลักสูตร/วิชา',
+        `แก้ไขรายวิชา ${all[index].code}`,
+        summaryText,
+        1,
+        undefined,
+        'ครูผู้สอน',
+        { courseId: id, code: all[index].code, name: all[index].name }
+      ).catch(() => {});
+    } catch {
+      // safe
+    }
+
     return all[index];
   }
 
   public deleteCourse(id: string): boolean {
     const all = this.load();
+    const courseToDelete = all.find((c) => c.id === id);
     const filtered = all.filter((c) => c.id !== id);
     if (filtered.length !== all.length) {
       this.cache = filtered;
       this.save();
+
+      if (courseToDelete) {
+        try {
+          activityAuditLogService.logDelete(
+            'หลักสูตร/วิชา',
+            `ลบรายวิชา ${courseToDelete.code}`,
+            `ลบรายวิชา ${courseToDelete.code} ${courseToDelete.name} (ระดับ ${courseToDelete.level}, ${courseToDelete.credits} หน่วยกิต)`,
+            1,
+            'ครูผู้สอน',
+            { courseId: id, code: courseToDelete.code, name: courseToDelete.name }
+          ).catch(() => {});
+        } catch {
+          // safe
+        }
+      }
+
       return true;
     }
     return false;
@@ -370,12 +415,12 @@ class CoursesCurriculumService {
     if (!unit) return false;
 
     const {
-      deletedAt,
-      originalCourseId,
-      originalCourseCode,
-      originalCourseName,
-      originalUnitId,
-      originalUnitTitle,
+      deletedAt: _deletedAt,
+      originalCourseId: _originalCourseId,
+      originalCourseCode: _originalCourseCode,
+      originalCourseName: _originalCourseName,
+      originalUnitId: _originalUnitId,
+      originalUnitTitle: _originalUnitTitle,
       ...restoredMedia
     } = item;
 

@@ -114,7 +114,7 @@ assert.strictEqual(overriddenRecord.overrideBy, 'ครูภาสภูมิ 
 assert.ok(overriddenRecord.overrideAt, 'overrideAt must be populated');
 
 // Test that correlation cycle NEVER touches this overridden record
-const correlationAfterOverride = attendanceCorrelationService.runCorrelation('room-3-1', '2026-10-02');
+const _correlationAfterOverride = attendanceCorrelationService.runCorrelation('room-3-1', '2026-10-02');
 const recheckedPeriod = attendanceCorrelationService
   .getPeriodRecords('ศ23101', 'room-3-1', '2026-10-02', 1)
   .find((p) => p.id === periodRecordToOverride.id);
@@ -143,7 +143,7 @@ attendanceCorrelationService.savePeriodRecords([
   },
 ]);
 
-const correlationLock2 = attendanceCorrelationService.runCorrelation('room-3-1', '2026-10-02');
+const _correlationLock2 = attendanceCorrelationService.runCorrelation('room-3-1', '2026-10-02');
 const truancyPeriod = attendanceCorrelationService
   .getPeriodRecords('ศ23101', 'room-3-1', '2026-10-02', 2)
   .find((p) => p.studentCode === '45102');
@@ -319,7 +319,6 @@ assert.ok(existsSync(subjectIconsPath), 'src/config/subjectIcons.ts must exist')
 
 const {
   ALL_SUBJECT_ICONS,
-  DEFAULT_SUBJECT_ICON,
   getSubjectIcon,
   getSubjectBadgeClasses,
   getSubjectBadgeProps,

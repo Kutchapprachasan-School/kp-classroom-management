@@ -1,7 +1,8 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase.ts';
 import type { ClassroomRosterItem } from '../types/viewModels';
 import { ClassroomCreateSchema, type ClassroomCreateInput } from './types.ts';
-import { studentService } from './studentService.ts';
+import { studentService, getAlternateRoomKey } from './studentService.ts';
+import { activityAuditLogService } from './activityAuditLogService.ts';
 
 const STORAGE_KEY = 'cls_classrooms_data';
 const DELETED_ROOMS_KEY = 'cls_deleted_classrooms_set';
@@ -435,12 +436,26 @@ export const classroomService = {
       saveLocalClassrooms([...current, restoredRoom]);
     }
 
+    // Invalidate cache and fingerprint
+    invalidateClassroomCache();
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('cls_classrooms_fp');
+    }
+
+    // Restore archived students if present
+    if (originalData && (originalData as any).archivedStudents) {
+      const archived = (originalData as any).archivedStudents;
+      if (Array.isArray(archived) && archived.length > 0) {
+        studentService.saveLocalStudents(restoredRoom.id, archived);
+      }
+    }
+
     if (isSupabaseConfigured) {
       try {
         await supabase
           .from('ClassRoom')
           .update({ status: 'ACTIVE', updatedAt: new Date().toISOString() })
-          .or(`id.eq.${restoredRoom.id},name.eq.${restoredRoom.name}`);
+          .eq('name', restoredRoom.name);
       } catch (err) {
         console.warn('Failed to reactivate ClassRoom in Supabase:', err);
       }
@@ -450,9 +465,21 @@ export const classroomService = {
       window.dispatchEvent(new CustomEvent('kps-data-sync-event', {
         detail: { type: 'CLASSROOM_RESTORED', classroom: restoredRoom }
       }));
+      window.dispatchEvent(new CustomEvent('kps-students-updated', { detail: { classroomId: restoredRoom.id } }));
     } catch {
       // safe SSR
     }
+
+    activityAuditLogService.recordLog({
+      actionType: 'RESTORE',
+      entityType: 'ชั้นเรียน',
+      title: `กู้คืนห้องเรียน "${restoredRoom.name}"`,
+      summary: `กู้คืนห้องเรียน "${restoredRoom.name}" สำเร็จ พร้อมคืนสภาพนักเรียนเดิมเรียบร้อย`,
+      itemCount: 1,
+      targetId: restoredRoom.id,
+      targetScope: restoredRoom.name,
+      actor: 'ผู้ดูแลระบบวิชาการ',
+    }).catch(() => {});
 
     return restoredRoom;
   },
@@ -573,10 +600,36 @@ export const classroomService = {
     }
     saveLocalClassrooms(updated);
 
+    // Invalidate cache and fingerprint
+    invalidateClassroomCache();
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('cls_classrooms_fp');
+    }
+
+    // If room was previously deleted and had archived students in trash, restore them
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const trashKey = 'cls_trash_data';
+        const trash = JSON.parse(localStorage.getItem(trashKey) || '[]');
+        if (Array.isArray(trash)) {
+          const found = trash.find((t: any) => (t.name === validated.name || t.id === newClassroom.id) && t.entityType === 'ชั้นเรียน');
+          if (found && found.originalData?.archivedStudents) {
+            const archived = found.originalData.archivedStudents;
+            if (Array.isArray(archived) && archived.length > 0) {
+              studentService.saveLocalStudents(newClassroom.id, archived);
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     try {
       window.dispatchEvent(new CustomEvent('kps-data-sync-event', {
         detail: { type: 'CLASSROOM_CREATED', classroom: newClassroom }
       }));
+      window.dispatchEvent(new CustomEvent('kps-students-updated', { detail: { classroomId: newClassroom.id } }));
     } catch {
       // safe SSR
     }
@@ -695,15 +748,28 @@ export const classroomService = {
     const target = current.find((c) => c.id === id || c.name === id);
     const targetName = target?.name || id;
 
-    // Record into deleted blacklist so it NEVER resurfaces
+    // Record into deleted blacklist so it NEVER resurfaces unless explicitly recreated/restored
     const deletedSet = getDeletedRoomsSet();
     deletedSet.add(id);
     if (target?.name) deletedSet.add(target.name);
     saveDeletedRoomsSet(deletedSet);
 
+    // Invalidate classroom cache and fingerprint so queries immediately reflect deletion
+    invalidateClassroomCache();
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('cls_classrooms_fp');
+    }
+
     // Filter out from local active
     const filtered = current.filter((c) => c.id !== id && c.name !== id && c.name !== targetName);
     saveLocalClassrooms(filtered);
+
+    // Clean up active student records for this room and archive them into originalData
+    const byId = studentService.getStudents(id);
+    const byName = target?.name ? studentService.getStudents(target.name) : [];
+    const altKey = getAlternateRoomKey(id) || (target?.name ? getAlternateRoomKey(target.name) : null);
+    const byAlt = altKey ? studentService.getStudents(altKey) : [];
+    const studentsToArchive = byId.length > 0 ? byId : byName.length > 0 ? byName : byAlt;
 
     // Record into trash
     if (typeof localStorage !== 'undefined') {
@@ -716,9 +782,17 @@ export const classroomService = {
         deletedAt: new Date().toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }),
         deletedBy: 'ผู้ดูแลระบบวิชาการ',
         daysRemaining: 30,
-        originalData: target || { id, name: targetName },
+        originalData: {
+          ...(target || { id, name: targetName }),
+          archivedStudents: studentsToArchive,
+        },
       });
       localStorage.setItem(trashKey, JSON.stringify(trashItems));
+
+      // Remove from active storage so student count and student roster do NOT show orphan students
+      localStorage.removeItem(`cls_students_${id}`);
+      if (target?.name) localStorage.removeItem(`cls_students_${target.name}`);
+      if (altKey) localStorage.removeItem(`cls_students_${altKey}`);
     }
 
     if (isSupabaseConfigured) {
@@ -737,9 +811,19 @@ export const classroomService = {
       window.dispatchEvent(new CustomEvent('kps-data-sync-event', {
         detail: { type: 'CLASSROOM_DELETED', classroomId: id, classroomName: targetName }
       }));
+      window.dispatchEvent(new CustomEvent('kps-students-updated', { detail: { classroomId: id } }));
     } catch {
       // safe SSR
     }
+
+    activityAuditLogService.logDelete(
+      'ชั้นเรียน',
+      `ลบห้องเรียน "${targetName}"`,
+      `ลบห้องเรียน "${targetName}" และจัดเก็บนักเรียน ${studentsToArchive.length} คนเข้าถังขยะ`,
+      studentsToArchive.length + 1,
+      'ผู้ดูแลระบบวิชาการ',
+      { classroomId: id, studentCount: studentsToArchive.length }
+    ).catch(() => {});
 
     return true;
   },

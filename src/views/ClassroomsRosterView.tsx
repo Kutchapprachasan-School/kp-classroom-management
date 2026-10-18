@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Upload,
   Plus,
@@ -33,9 +33,15 @@ import type { SchoolUserRole } from '../config/schoolRoles';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 import { SgsRosterImportModal } from '../components/sgs/SgsRosterImportModal';
 import { SgsScoreExportModal } from '../components/sgs/SgsScoreExportModal';
+import { activityAuditLogService } from '../services/activityAuditLogService';
 import type { SgsParsedRow } from '../services/sgsImportExportService';
 import { getM1SgsStudentInfo, isGrade1SgsStudentCode } from '../config/m1SgsLookup';
 import { Pagination, type PageSizeOption } from '../components/common/Pagination';
+import {
+  PromotionWizardModal,
+  PromotionRollbackModal,
+  type ClassroomOption,
+} from '../components/promotion';
 
 interface ClassroomsRosterViewProps {
   onSelectStudent: (student: AtRiskStudent) => void;
@@ -82,6 +88,8 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
   // Modals state
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isScoreExportModalOpen, setIsScoreExportModalOpen] = useState(false);
+  const [isPromotionWizardOpen, setIsPromotionWizardOpen] = useState(false);
+  const [isPromotionRollbackOpen, setIsPromotionRollbackOpen] = useState(false);
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
   const [isAddClassroomOpen, setIsAddClassroomOpen] = useState(false);
   const [isEditClassroomOpen, setIsEditClassroomOpen] = useState(false);
@@ -140,26 +148,33 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
     (activeRole as string) === 'DIRECTOR';
 
   // โหลดรายการห้องเรียนทั้งหมดจาก Supabase (Zero Mock Data)
-  const loadClassrooms = async () => {
+  const loadClassrooms = useCallback(async () => {
     setIsLoading(true);
     try {
       const cls = await classroomService.getAll();
       setAllClassrooms(cls);
-      if (!selectedClass && cls.length > 0) {
-        const defaultRoom = cls.find((c) => c.name === 'ม.3/1' || c.roomNumber === 'ม.3/1') || cls[0];
-        setSelectedClass(defaultRoom);
+      if (cls.length > 0) {
+        setSelectedClass((prev) => prev || (cls.find((c) => c.name === 'ม.3/1' || c.roomNumber === 'ม.3/1') || cls[0]));
       }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadClassrooms();
-  }, []);
+  }, [loadClassrooms]);
+
+  const classroomPromotionOptions: ClassroomOption[] = useMemo(() => {
+    return allClassrooms.map((c) => ({
+      id: c.id,
+      name: c.name,
+      gradeLevel: c.level || c.name.split('/')[0] || 'ม.1',
+    }));
+  }, [allClassrooms]);
 
   // โหลดรายชื่อนักเรียนเมื่อเลือกห้องเรียน
-  const loadStudentsForClass = async (classId: string) => {
+  const loadStudentsForClass = useCallback(async (classId: string) => {
     setIsLoading(true);
     try {
       const stuList = await studentService.getByClassroom(classId);
@@ -170,13 +185,13 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (selectedClass) {
       loadStudentsForClass(selectedClass.id);
     }
-  }, [selectedClass?.id]);
+  }, [selectedClass, loadStudentsForClass]);
 
   // ซิงค์รายชื่อนักเรียนเมื่อมีการย้ายห้องเรียน (STUDENT_TRANSFERRED_EVENT)
   useEffect(() => {
@@ -188,7 +203,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
     };
     window.addEventListener(STUDENT_TRANSFERRED_EVENT, handleTransferred);
     return () => window.removeEventListener(STUDENT_TRANSFERRED_EVENT, handleTransferred);
-  }, [selectedClass?.id]);
+  }, [loadClassrooms, selectedClass, loadStudentsForClass]);
 
   // ปิด Action menu เมื่อคลิกนอกเมนู
   useEffect(() => {
@@ -412,11 +427,16 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
         termId: 'term-1-2569',
       });
 
-      setAllClassrooms((prev) => [...prev, created]);
+      setAllClassrooms((prev) => {
+        const exists = prev.some((c) => c.id === created.id || c.name === created.name);
+        return exists ? prev.map((c) => (c.id === created.id || c.name === created.name ? created : c)) : [...prev, created];
+      });
+      setSelectedClass(created);
       setIsAddClassroomOpen(false);
       setNewClassName('');
       setTransferSuccessNotice(`สร้างห้องเรียน "${created.name}" (ครูที่ปรึกษา: ${created.adviser}) สำเร็จ`);
       setTimeout(() => setTransferSuccessNotice(null), 3500);
+      loadClassrooms();
     } catch (err) {
       console.error('Error creating classroom:', err);
       alert('เกิดข้อผิดพลาดในการสร้างห้องเรียน');
@@ -494,18 +514,61 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
         }
 
         const targetRoomId = room.id;
-        const studentsToImport: Array<Omit<StudentRecord, 'id'>> = rows.map((r) => ({
-          no: r.parsedSeatNo ?? r.rowIndex,
-          code: r.studentCode,
-          name: r.fullName,
-          attendance: '0/0',
-          score: 0,
-          status: 'NORMAL',
-          gender: r.gender,
-          classroomId: targetRoomId,
-        }));
+        const currentInRoom = studentService.getStudents(targetRoomId);
 
-        await studentService.batchImport(targetRoomId, studentsToImport);
+        // 1. Separate UPDATE_SEAT rows vs NEW / TRANSFER rows
+        const updateSeatRows = rows.filter((r) => r.selectedAction === 'UPDATE_SEAT');
+        const newOrTransferRows = rows.filter(
+          (r) => r.selectedAction === 'IMPORT' || r.selectedAction === 'TRANSFER_ROOM'
+        );
+
+        // Update seat numbers for existing students while strictly preserving scores, attendance, and all historical data
+        if (updateSeatRows.length > 0) {
+          const seatUpdateMap = new Map<string, number>();
+          updateSeatRows.forEach((r) => {
+            const seat = r.parsedSeatNo ?? (r.rawSeatNo ? parseInt(r.rawSeatNo, 10) : null);
+            if (seat !== null && !isNaN(seat)) {
+              seatUpdateMap.set(r.studentCode.trim(), seat);
+            }
+          });
+
+          const updatedCurrent = currentInRoom.map((stu) => {
+            const codeKey = (stu.code || stu.studentCode || '').trim();
+            const newSeat = seatUpdateMap.get(codeKey);
+            if (newSeat !== undefined) {
+              return { ...stu, no: newSeat };
+            }
+            return stu;
+          }).sort((a, b) => a.no - b.no);
+
+          studentService.saveLocalStudents(targetRoomId, updatedCurrent);
+
+          activityAuditLogService.recordLog({
+            actionType: 'BATCH_UPDATE',
+            entityType: 'นักเรียน',
+            title: `ปรับเลขที่นักเรียนตาม SGS ห้อง ${roomName}`,
+            summary: `ปรับปรุงเลขที่นักเรียนตามไฟล์ SGS สำเร็จ ${updateSeatRows.length} คน ในห้อง ${roomName} (รักษาคะแนนและประวัติเดิม 100%)`,
+            itemCount: updateSeatRows.length,
+            targetScope: roomName,
+            actor: 'ครูผู้สอน',
+          }).catch(() => {});
+        }
+
+        // Import new or transferred students
+        if (newOrTransferRows.length > 0) {
+          const studentsToImport: Array<Omit<StudentRecord, 'id'>> = newOrTransferRows.map((r) => ({
+            no: r.parsedSeatNo ?? r.rowIndex,
+            code: r.studentCode,
+            name: r.fullName,
+            attendance: '0/0',
+            score: 0,
+            status: 'NORMAL',
+            gender: r.gender,
+            classroomId: targetRoomId,
+          }));
+
+          await studentService.batchImport(targetRoomId, studentsToImport);
+        }
       }
 
       await loadClassrooms();
@@ -514,12 +577,12 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
 
       if (rowsByRoom.size > 1) {
         setTransferSuccessNotice(
-          `✓ นำเข้ารายชื่อนักเรียน ${confirmedRows.length} คน แยกเข้า ${rowsByRoom.size} ห้อง (${Array.from(rowsByRoom.keys()).join(', ')}) สำเร็จเรียบร้อย (รักษาลำดับแถว 100%)`
+          `✓ นำเข้ารายชื่อ/ปรับเลขที่นักเรียน ${confirmedRows.length} คน แยกเข้า ${rowsByRoom.size} ห้อง (${Array.from(rowsByRoom.keys()).join(', ')}) สำเร็จเรียบร้อย (รักษาคะแนนเดิม 100%)`
         );
       } else {
         const singleRoomName = Array.from(rowsByRoom.keys())[0];
         setTransferSuccessNotice(
-          `นำเข้ารายชื่อนักเรียน ${confirmedRows.length} คน จาก SGS ในห้อง ${singleRoomName} สำเร็จ (รักษาลำดับแถว 100%)`
+          `✓ นำเข้ารายชื่อ/ปรับเลขที่นักเรียน ${confirmedRows.length} คน จาก SGS ในห้อง ${singleRoomName} สำเร็จ (รักษาคะแนนเดิม 100%)`
         );
       }
       setTimeout(() => setTransferSuccessNotice(null), 4000);
@@ -544,8 +607,9 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
       const byRoom = new Map<string, Array<{ student: StudentRecord; seatNo: number; trueRoom: string }>>();
       for (const st of misplacedM1Students) {
         const info = getM1SgsStudentInfo(st.code);
-        const trueRoom = info?.room || 'ม.1/1';
-        const seatNo = info?.seatNo || st.no;
+        if (!info) continue;
+        const trueRoom = info.room;
+        const seatNo = info.seatNo || st.no;
         if (!byRoom.has(trueRoom)) byRoom.set(trueRoom, []);
         byRoom.get(trueRoom)!.push({ student: st, seatNo, trueRoom });
       }
@@ -797,14 +861,34 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                 </div>
 
                 {isFullAccess && (
-                  <button
-                    type="button"
-                    onClick={() => setIsAddClassroomOpen(true)}
-                    className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>เพิ่มห้องเรียน</span>
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsPromotionWizardOpen(true)}
+                      className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+                      title="เลื่อนชั้นเรียนและปิดปีการศึกษา (4-Step Wizard)"
+                    >
+                      <GraduationCap className="w-4 h-4" />
+                      <span>เลื่อนชั้นเรียน (Wizard)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsPromotionRollbackOpen(true)}
+                      className="flex items-center justify-center gap-1.5 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+                      title="ประวัติการเลื่อนชั้น & ระบบย้อนกลับ (Rollback Manager)"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-purple-600" />
+                      <span>ประวัติ & ย้อนกลับ</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddClassroomOpen(true)}
+                      className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>เพิ่มห้องเรียน</span>
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -1943,6 +2027,29 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal: ระบบเลื่อนชั้นเรียนและปิดปีการศึกษา (4-Step Promotion Wizard) */}
+      <PromotionWizardModal
+        isOpen={isPromotionWizardOpen}
+        onClose={() => setIsPromotionWizardOpen(false)}
+        classrooms={classroomPromotionOptions}
+        currentUserId={authService.getCurrentUser()?.id || 'admin'}
+        onPromotionSuccess={(_batchId) => {
+          setTransferSuccessNotice('ดำเนินการเลื่อนชั้นเรียนและบันทึกประวัติสำเร็จเรียบร้อยแล้ว');
+          void loadClassrooms();
+        }}
+      />
+
+      {/* Modal: ระบบประวัติการเลื่อนชั้นและย้อนกลับ (Conflict-Aware Rollback Manager) */}
+      <PromotionRollbackModal
+        isOpen={isPromotionRollbackOpen}
+        onClose={() => setIsPromotionRollbackOpen(false)}
+        currentUserId={authService.getCurrentUser()?.id || 'admin'}
+        onRollbackSuccess={(_batchId) => {
+          setTransferSuccessNotice('ย้อนกลับรอบการเลื่อนชั้นและคืนสถานะเดิมสำเร็จ');
+          void loadClassrooms();
+        }}
+      />
     </div>
   );
 };

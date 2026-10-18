@@ -67,3 +67,17 @@ To prevent Quadratic Context Explosion and eliminate wasteful token consumption 
    - **Mandatory**: Run `node scripts/index_codebase.mjs` every time files are added, removed, or majorly refactored so line references stay synchronized.
 
 Detailed rule specification: [`.agent/rules/token-efficiency.md`](.agent/rules/token-efficiency.md) / [`.agents/rules/token-efficiency.md`](.agents/rules/token-efficiency.md)
+
+## Zero-Egress & Database Workload Optimization Rules (7 Pillars)
+To eliminate wasteful database egress and preserve serverless compute hours (Neon 5GB/month & scale-to-zero limits), all AI agents and developers must strictly adhere to the following 7 pillars:
+
+1. 🎯 **Strict Field Whitelisting**: Never use `SELECT *` or `prisma.findMany()` without explicit `select:`. Never include heavy binary/JSONB fields (`faceDescriptor`, `signatureUrl`) in list views.
+2. ⏱️ **Timestamp & Fingerprint Guard**: Query `updated_at` or table fingerprints (`count(*)`, `max(updated_at)`) first; download full payloads only when remote timestamp exceeds local storage.
+3. ✂️ **Minimal Mutation Return**: Always use `RETURNING "key", "updated_at"` or `RETURNING "id"` on mutations. Never use `RETURNING *` on tables with large JSONB or text payloads.
+4. 🧩 **Granular Scope & Key Sharding**: Never store monolithic all-school blobs in a single key. Shard keys by scope (e.g. `attendance:<year>:<term>:<roomId>`).
+5. 💤 **Scale-to-Zero & Compute Conservation**: Zero active polling loops (`setInterval`). No indiscriminate `revalidateOnFocus`. Always use `-pooler` connection strings to allow Neon to sleep.
+6. 🖼️ **R2-Only Storage for All Assets & Documents**: All documents, medical certificates, leave attachments, assignment files, receipts, scans, and PDFs must be stored in **Cloudflare R2 only**. Never store files as Base64 or Binary Blobs in PostgreSQL. Store only storage keys or R2 URLs in DB.
+7. 🛡️ **Schema Drift & Drop Protection**: Always declare all existing database tables (including `kps_cloud_store`) in `schema.prisma` to prevent accidental drops during `prisma db push`.
+
+Detailed rule specification: [`.agent/rules/egress-optimization.md`](.agent/rules/egress-optimization.md) / [`.agents/rules/egress-optimization.md`](.agents/rules/egress-optimization.md)
+

@@ -20,6 +20,11 @@ import {
 } from '../../config/subjectIcons';
 import { SubjectIconPickerModal } from './SubjectIconPickerModal';
 import { classroomService } from '../../services/classroomService';
+import {
+  bellScheduleService,
+  BELL_SCHEDULE_UPDATED_EVENT,
+  type SchoolBellScheduleConfig,
+} from '../../services/bellScheduleService';
 
 export interface AssignWaitingSlotModalProps {
   isOpen: boolean;
@@ -31,24 +36,14 @@ export interface AssignWaitingSlotModalProps {
     targetDay: string,
     targetPeriod: number,
     targetRoom?: string,
-    targetIcon?: SubjectIconConfig
+    targetIcon?: SubjectIconConfig,
+    targetTimeRange?: string
   ) => void;
   dayOptions?: string[];
   maxPeriods?: number;
 }
 
 const DEFAULT_DAYS = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์'];
-
-const PERIOD_TIMES: Record<number, string> = {
-  1: '08:30 - 09:20',
-  2: '09:20 - 10:10',
-  3: '10:10 - 11:00',
-  4: '11:00 - 11:50',
-  5: '11:50 - 12:40 (พักกลางวัน)',
-  6: '12:40 - 13:30',
-  7: '13:30 - 14:20',
-  8: '14:20 - 15:10',
-};
 
 export const AssignWaitingSlotModal: React.FC<AssignWaitingSlotModalProps> = ({
   isOpen,
@@ -57,40 +52,72 @@ export const AssignWaitingSlotModal: React.FC<AssignWaitingSlotModalProps> = ({
   matrixSlots,
   onAssignSlot,
   dayOptions = DEFAULT_DAYS,
-  maxPeriods = 6,
 }) => {
   const [selectedDay, setSelectedDay] = useState<string>('จันทร์');
   const [selectedPeriod, setSelectedPeriod] = useState<number>(1);
   const [selectedRoom, setSelectedRoom] = useState<string>('');
   const [selectedIcon, setSelectedIcon] = useState<SubjectIconConfig | null>(null);
   const [isIconPickerOpen, setIsIconPickerOpen] = useState<boolean>(false);
+  const [bellConfig, setBellConfig] = useState<SchoolBellScheduleConfig>(() =>
+    bellScheduleService.getConfig()
+  );
 
-  // คำนวณสถานะของแต่ละคาบในวันที่เลือก
+  useEffect(() => {
+    const handleBellUpdate = (e: Event) => {
+      const custom = e as CustomEvent<SchoolBellScheduleConfig>;
+      if (custom.detail) {
+        setBellConfig(custom.detail);
+      } else {
+        setBellConfig(bellScheduleService.getConfig());
+      }
+    };
+    window.addEventListener(BELL_SCHEDULE_UPDATED_EVENT, handleBellUpdate);
+    return () => {
+      window.removeEventListener(BELL_SCHEDULE_UPDATED_EVENT, handleBellUpdate);
+    };
+  }, []);
+
+  // คำนวณสถานะของแต่ละคาบในวันที่เลือกจากตารางระฆังเวลาของโรงเรียนจริง (Single Source of Truth)
   const periodSlotsStatus = useMemo(() => {
-    const list: Array<{
-      period: number;
-      timeRange: string;
-      isFree: boolean;
-      isLunch: boolean;
-      currentSubject?: string;
-    }> = [];
+    const timeline = bellScheduleService.generateBellScheduleTimeline(bellConfig);
+    const activeRows = timeline.filter((t) => t.type === 'PERIOD' || t.type === 'LUNCH');
 
-    for (let p = 1; p <= maxPeriods; p++) {
-      const isLunch = p === 5;
+    return activeRows.map((t) => {
+      if (t.type === 'LUNCH') {
+        return {
+          id: t.id,
+          period: t.periodNumber, // number สำหรับโหมด A, undefined สำหรับโหมด B
+          timeRange: t.timeRange,
+          label: t.label,
+          isFree: false,
+          isLunch: true,
+          currentSubject: undefined,
+        };
+      }
+
+      const p = t.periodNumber || 1;
       const existing = matrixSlots.find((s) => s.day === selectedDay && s.period === p);
-      const isFree = !existing || Boolean(existing.isFreePeriod) || !existing.subjectCode;
+      const isLunchStale =
+        existing?.isLunchSlot ||
+        existing?.status === 'LUNCH' ||
+        existing?.subjectCode === 'พักกลางวัน';
+      const isFree =
+        !existing || Boolean(existing.isFreePeriod) || !existing.subjectCode || Boolean(isLunchStale);
 
-      list.push({
+      return {
+        id: t.id,
         period: p,
-        timeRange: PERIOD_TIMES[p] || `คาบที่ ${p}`,
-        isFree: isFree && !isLunch,
-        isLunch,
-        currentSubject: existing && !existing.isFreePeriod && existing.subjectCode ? existing.subjectCode : undefined,
-      });
-    }
-
-    return list;
-  }, [selectedDay, matrixSlots, maxPeriods]);
+        timeRange: t.timeRange,
+        label: t.label,
+        isFree,
+        isLunch: false,
+        currentSubject:
+          existing && !existing.isFreePeriod && existing.subjectCode && !isLunchStale
+            ? existing.subjectCode
+            : undefined,
+      };
+    });
+  }, [bellConfig, selectedDay, matrixSlots]);
 
   // ซิงค์ข้อมูลเริ่มต้นเมื่อเปิด modal
   useEffect(() => {
@@ -102,18 +129,14 @@ export const AssignWaitingSlotModal: React.FC<AssignWaitingSlotModalProps> = ({
           waitingSlot.subjectName
         )
       );
-      const firstFree = periodSlotsStatus.find((p) => p.isFree);
-      if (firstFree) {
-        setSelectedPeriod(firstFree.period);
-      }
     }
   }, [isOpen, waitingSlot]);
 
-  // ตั้งค่าคาบเริ่มต้นเมื่อเปลี่ยนวัน
+  // ตั้งค่าคาบเริ่มต้นเมื่อเปลี่ยนวัน โดยเลือกคาบสอนแรกที่ว่าง
   useEffect(() => {
     if (isOpen) {
-      const firstFree = periodSlotsStatus.find((p) => p.isFree);
-      if (firstFree) {
+      const firstFree = periodSlotsStatus.find((p) => p.isFree && p.period !== undefined);
+      if (firstFree && firstFree.period !== undefined) {
         setSelectedPeriod(firstFree.period);
       }
     }
@@ -138,7 +161,9 @@ export const AssignWaitingSlotModal: React.FC<AssignWaitingSlotModalProps> = ({
       waitingSlot.subjectIcon || waitingSlot.subjectCode,
       waitingSlot.subjectName
     );
-  const selectedPeriodStatus = periodSlotsStatus.find((p) => p.period === selectedPeriod);
+  const selectedPeriodStatus = periodSlotsStatus.find(
+    (p) => !p.isLunch && p.period === selectedPeriod
+  );
   const isSelectedPeriodFree = Boolean(selectedPeriodStatus?.isFree);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -152,7 +177,8 @@ export const AssignWaitingSlotModal: React.FC<AssignWaitingSlotModalProps> = ({
       selectedDay,
       selectedPeriod,
       selectedRoom.trim() || waitingSlot.room,
-      currentIcon
+      currentIcon,
+      selectedPeriodStatus?.timeRange
     );
     onClose();
   };
@@ -300,15 +326,13 @@ export const AssignWaitingSlotModal: React.FC<AssignWaitingSlotModalProps> = ({
 
             <div className="space-y-1.5">
               {periodSlotsStatus.map((p) => {
-                const isSelected = selectedPeriod === p.period;
-
                 if (p.isLunch) {
                   return (
                     <div
-                      key={p.period}
+                      key={p.id || `lunch-${p.timeRange}`}
                       className="p-2.5 rounded-xl border border-amber-200 bg-amber-50/50 flex items-center justify-between text-xs text-amber-900 opacity-80"
                     >
-                      <span className="font-bold">คาบที่ {p.period} ({p.timeRange})</span>
+                      <span className="font-bold">{p.label} ({p.timeRange})</span>
                       <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-white border border-amber-300">
                         🍴 พักกลางวัน
                       </span>
@@ -316,14 +340,16 @@ export const AssignWaitingSlotModal: React.FC<AssignWaitingSlotModalProps> = ({
                   );
                 }
 
+                const isSelected = selectedPeriod === p.period;
+
                 if (!p.isFree) {
                   return (
                     <div
-                      key={p.period}
+                      key={p.id || `period-${p.period}`}
                       className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-500 opacity-70"
                     >
                       <span className="font-medium">
-                        คาบที่ {p.period} ({p.timeRange})
+                        {p.label} ({p.timeRange})
                       </span>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
                         ไม่ว่าง ({p.currentSubject})
@@ -334,9 +360,9 @@ export const AssignWaitingSlotModal: React.FC<AssignWaitingSlotModalProps> = ({
 
                 return (
                   <button
-                    key={p.period}
+                    key={p.id || `period-${p.period}`}
                     type="button"
-                    onClick={() => setSelectedPeriod(p.period)}
+                    onClick={() => p.period !== undefined && setSelectedPeriod(p.period)}
                     className={`w-full p-2.5 rounded-xl border flex items-center justify-between text-xs font-bold transition-all cursor-pointer ${
                       isSelected
                         ? 'bg-blue-50 border-blue-500 text-blue-900 ring-2 ring-blue-500/20 shadow-2xs'
@@ -345,7 +371,7 @@ export const AssignWaitingSlotModal: React.FC<AssignWaitingSlotModalProps> = ({
                   >
                     <span className="flex items-center gap-2">
                       <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-blue-600' : 'bg-emerald-500'}`} />
-                      <span>คาบที่ {p.period} ({p.timeRange})</span>
+                      <span>{p.label} ({p.timeRange})</span>
                     </span>
                     <span
                       className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${

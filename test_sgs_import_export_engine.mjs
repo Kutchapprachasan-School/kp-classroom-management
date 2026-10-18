@@ -133,11 +133,13 @@ assert.strictEqual(dryRunResult.existsCount, 1, '08451 should be classified as E
 assert.strictEqual(dryRunResult.conflictCount, 1, '08452 should be classified as CONFLICT (different room)');
 assert.strictEqual(dryRunResult.newCount, 1, '08454 should be classified as NEW');
 assert.strictEqual(dryRunResult.invalidCount, 0);
+assert.strictEqual(dryRunResult.seatChangedCount, 0, 'No seat changed when sgsSeatNo matches parsedSeatNo');
 
 // Verify specific row actions
 const existsRow = dryRunResult.rows.find(r => r.studentCode === '08451');
 assert.strictEqual(existsRow.status, 'EXISTS');
 assert.strictEqual(existsRow.selectedAction, 'SKIP', 'EXISTS row must default to safe SKIP');
+assert.strictEqual(existsRow.isSeatChanged, false);
 
 const conflictRow = dryRunResult.rows.find(r => r.studentCode === '08452');
 assert.strictEqual(conflictRow.status, 'CONFLICT');
@@ -147,7 +149,25 @@ const newRow = dryRunResult.rows.find(r => r.studentCode === '08454');
 assert.strictEqual(newRow.status, 'NEW');
 assert.strictEqual(newRow.selectedAction, 'IMPORT');
 
-console.log('  ✓ 4-State classification verified: 1 NEW, 1 EXISTS, 1 CONFLICT, 0 INVALID');
+// Verify Seat Shift Detection Test Case
+const shiftedDatabaseStudents = [
+  {
+    id: 'st-001',
+    studentCode: '08451',
+    name: 'ด.ช. ภัทรพล เจริญผล',
+    classroomId: 'ม.1/1',
+    sgsSeatNo: 5 // In DB they are seat 5, but in parsed file they are seat 1!
+  }
+];
+const shiftedResult = evaluateSgsImportDryRun(parsedTabRows, 'ม.1/1', shiftedDatabaseStudents);
+assert.strictEqual(shiftedResult.seatChangedCount, 1, 'Should detect 1 shifted seat');
+const shiftedRow = shiftedResult.rows.find(r => r.studentCode === '08451');
+assert.strictEqual(shiftedRow.isSeatChanged, true);
+assert.strictEqual(shiftedRow.existingSeatNo, 5);
+assert.strictEqual(shiftedRow.parsedSeatNo, 1);
+assert.ok(shiftedRow.conflictReason.includes('เลขที่เปลี่ยน'), 'Conflict reason must explain seat change');
+
+console.log('  ✓ 4-State classification & Smart Seat Alignment verified: 1 NEW, 1 EXISTS (Seat Shift Detected), 1 CONFLICT');
 
 // -------------------------------------------------------------
 // Test 5: Reverse Sync Score Export & 1-Click Clipboard

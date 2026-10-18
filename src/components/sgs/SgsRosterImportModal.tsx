@@ -92,9 +92,12 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
     setRawText(sample);
   };
 
-  const handleActionChange = (rowIndex: number, action: 'IMPORT' | 'SKIP' | 'TRANSFER_ROOM') => {
+  const handleActionChange = (
+    rowIndex: number,
+    action: 'IMPORT' | 'SKIP' | 'TRANSFER_ROOM' | 'UPDATE_SEAT'
+  ) => {
     if (!dryRunSummary) return;
-    const updatedRows = dryRunSummary.rows.map(r => {
+    const updatedRows = dryRunSummary.rows.map((r) => {
       if (r.rowIndex === rowIndex) {
         return { ...r, selectedAction: action };
       }
@@ -103,15 +106,30 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
 
     setDryRunSummary({
       ...dryRunSummary,
-      rows: updatedRows
+      rows: updatedRows,
+    });
+  };
+
+  const handleBatchUpdateChangedSeats = (enable: boolean) => {
+    if (!dryRunSummary) return;
+    const updatedRows = dryRunSummary.rows.map((r) => {
+      if (r.status === 'EXISTS' && r.isSeatChanged) {
+        return { ...r, selectedAction: enable ? ('UPDATE_SEAT' as const) : ('SKIP' as const) };
+      }
+      return r;
+    });
+
+    setDryRunSummary({
+      ...dryRunSummary,
+      rows: updatedRows,
     });
   };
 
   const handleConfirmImport = () => {
     if (!dryRunSummary) return;
     const confirmed = dryRunSummary.rows
-      .filter(r => r.selectedAction === 'IMPORT' || r.selectedAction === 'TRANSFER_ROOM')
-      .map(r => {
+      .filter((r) => r.selectedAction === 'IMPORT' || r.selectedAction === 'TRANSFER_ROOM' || r.selectedAction === 'UPDATE_SEAT')
+      .map((r) => {
         if (importMode === 'TARGET_ONLY') {
           return { ...r, classroom: targetClassroom };
         }
@@ -122,23 +140,25 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
   };
 
   const availableRooms = Array.from(
-    new Set(dryRunSummary?.rows.map(r => r.classroom).filter(Boolean) as string[])
+    new Set(dryRunSummary?.rows.map((r) => r.classroom).filter(Boolean) as string[])
   ).sort();
 
-  const filteredRows = dryRunSummary?.rows.filter(r => {
-    const matchStatus = statusFilter === 'ALL' || r.status === statusFilter;
-    const matchRoom = selectedRoomFilter === 'ALL' || r.classroom === selectedRoomFilter;
-    const matchSearch =
-      !searchFilter ||
-      r.studentCode.includes(searchFilter) ||
-      r.fullName.includes(searchFilter) ||
-      (r.rawSeatNo && r.rawSeatNo.includes(searchFilter));
-    return matchStatus && matchRoom && matchSearch;
-  }) || [];
+  const filteredRows =
+    dryRunSummary?.rows.filter((r) => {
+      const matchStatus = statusFilter === 'ALL' || r.status === statusFilter;
+      const matchRoom = selectedRoomFilter === 'ALL' || r.classroom === selectedRoomFilter;
+      const matchSearch =
+        !searchFilter ||
+        r.studentCode.includes(searchFilter) ||
+        r.fullName.includes(searchFilter) ||
+        (r.rawSeatNo && r.rawSeatNo.includes(searchFilter));
+      return matchStatus && matchRoom && matchSearch;
+    }) || [];
 
-  const importableCount = dryRunSummary?.rows.filter(
-    r => r.selectedAction === 'IMPORT' || r.selectedAction === 'TRANSFER_ROOM'
-  ).length || 0;
+  const importableCount =
+    dryRunSummary?.rows.filter(
+      (r) => r.selectedAction === 'IMPORT' || r.selectedAction === 'TRANSFER_ROOM' || r.selectedAction === 'UPDATE_SEAT'
+    ).length || 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn font-prompt">
@@ -544,6 +564,39 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
                 </div>
               </div>
 
+              {/* SEAT NUMBER SHIFT QUICK ACTION BANNER */}
+              {dryRunSummary.seatChangedCount > 0 && (
+                <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 animate-fadeIn">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <div>
+                      <span className="text-xs font-bold text-amber-900 block sm:inline">
+                        ตรวจพบนักเรียนเดิมที่มีเลขที่ในไฟล์ SGS ต่างจากในระบบ {dryRunSummary.seatChangedCount} คน
+                      </span>
+                      <span className="text-[11px] text-amber-700 block sm:inline sm:ml-1">
+                        (สามารถกดปรับเลขที่ใหม่ให้ตรงกับ SGS โดยคงคะแนนและประวัติเดิมไว้ 100%)
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleBatchUpdateChangedSeats(true)}
+                      className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                    >
+                      ✓ ปรับเลขที่ตาม SGS ทั้งหมด ({dryRunSummary.seatChangedCount} คน)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleBatchUpdateChangedSeats(false)}
+                      className="px-2.5 py-1.5 rounded-xl border border-amber-300 text-amber-800 hover:bg-amber-100/50 font-semibold text-xs transition-colors cursor-pointer"
+                    >
+                      ข้ามทั้งหมด
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* SEARCH & FILTER CONTROLS */}
               <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
                 <div className="flex items-center gap-2">
@@ -638,9 +691,17 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
                               </span>
                             )}
                             {row.status === 'EXISTS' && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                ✓ มีในห้องแล้ว
-                              </span>
+                              <div className="flex flex-col gap-1 items-start">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                  ✓ มีในห้องแล้ว
+                                </span>
+                                {row.isSeatChanged && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
+                                    <AlertTriangle className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                                    <span>เลขที่เดิม #{row.existingSeatNo} ➔ SGS #{row.parsedSeatNo}</span>
+                                  </span>
+                                )}
+                              </div>
                             )}
                             {row.status === 'CONFLICT' && (
                               <span
@@ -670,7 +731,24 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
                                 <option value="SKIP">ข้าม</option>
                               </select>
                             ) : row.status === 'EXISTS' ? (
-                              <span className="text-[11px] text-slate-400 font-medium">ข้ามอัตโนมัติ</span>
+                              row.isSeatChanged ? (
+                                <select
+                                  value={row.selectedAction}
+                                  onChange={(e) =>
+                                    handleActionChange(row.rowIndex, e.target.value as any)
+                                  }
+                                  className={`px-2 py-1 text-[11px] font-semibold border rounded-lg transition-colors cursor-pointer ${
+                                    row.selectedAction === 'UPDATE_SEAT'
+                                      ? 'border-blue-400 bg-blue-50 text-blue-900 font-bold'
+                                      : 'border-slate-300 bg-white text-slate-700'
+                                  }`}
+                                >
+                                  <option value="UPDATE_SEAT">ปรับเลขที่เป็น #{row.parsedSeatNo}</option>
+                                  <option value="SKIP">ข้าม (คงเลขที่ #{row.existingSeatNo})</option>
+                                </select>
+                              ) : (
+                                <span className="text-[11px] text-slate-400 font-medium">ข้ามอัตโนมัติ</span>
+                              )
                             ) : row.status === 'INVALID' ? (
                               <span className="text-[11px] text-rose-500 font-medium">ไม่นำเข้า</span>
                             ) : (
@@ -692,8 +770,8 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
           <div className="text-xs text-slate-500 font-medium">
             {dryRunSummary && (
               <span>
-                พร้อมนำเข้า <b className="text-blue-600">{importableCount}</b> คน (ข้าม{' '}
-                {dryRunSummary.existsCount + dryRunSummary.invalidCount} คน)
+                พร้อมนำเข้า/ปรับปรุง <b className="text-blue-600">{importableCount}</b> คน (ข้าม{' '}
+                {dryRunSummary.rows.filter(r => r.selectedAction === 'SKIP').length} คน)
               </span>
             )}
           </div>

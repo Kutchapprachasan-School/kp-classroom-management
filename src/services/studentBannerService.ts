@@ -140,7 +140,7 @@ export const studentBannerService = {
       try {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
         window.dispatchEvent(new CustomEvent(STUDENT_BANNERS_EVENT, { detail: current }));
-      } catch (err) {
+      } catch {
         return {
           success: false,
           message: 'เกิดข้อผิดพลาดในการบันทึกข้อมูล (ขนาดไฟล์ภาพอาจใหญ่เกินขีดจำกัดเบราว์เซอร์)',

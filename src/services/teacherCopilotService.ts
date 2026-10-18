@@ -757,8 +757,6 @@ export const teacherCopilotService = {
       }
     }
 
-    return items;
-
     // เรียงลำดับให้รายการที่ตรงกับขั้นตอนปัจจุบัน (currentFocusStep) ขึ้นเป็นอันดับ 1 เสมอ
     // เพื่อให้ป้าย ⚡ ต่อไป บน TeacherHeader ตรงกับ "สิ่งที่ควรทำตอนนี้" บนหน้าหลัก 100%
     const currentStep = this.getDailySteps().find((s) => s.isCurrentNow);

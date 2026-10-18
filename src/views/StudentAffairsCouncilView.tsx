@@ -88,8 +88,8 @@ export const StudentAffairsCouncilView: React.FC<
   useEffect(() => {
     const list = studentService.getStudents('room-3-1');
     setAvailableStudents(list);
-    if (list.length > 0 && !newDiscStudent) {
-      setNewDiscStudent(list[0].name);
+    if (list.length > 0) {
+      setNewDiscStudent((prev) => prev || list[0].name);
     }
   }, []);
 
