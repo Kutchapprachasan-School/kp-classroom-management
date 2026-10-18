@@ -31,6 +31,19 @@ All UI development, information architecture, mobile layouts, and components in 
 14. **Anti-patterns**: No pure black dark themes, no neon crypto gradients, no sharp square cards, no bloated top text, no horizontal scroll tables on mobile.
 15. **Implementation for AI**: Always verify hierarchy (Importance-driven), tokens, MingCute icons, mobile card conversion, and Thai readability before finishing.
 
+## Strict Zero Mock Policy & Explicit Consent Rule (กฎเหล็กห้ามใส่ Mock Data โดยพลการ & ถามก่อนเสมอ)
+- Detailed Specification: [`.agents/rules/zero-mock-data.md`](.agents/rules/zero-mock-data.md) (or [`.agent/rules/zero-mock-data.md`](.agent/rules/zero-mock-data.md))
+1. **Absolute Ban on Mock Data (ห้ามนำ Mock Data เข้ามาเองโดยเด็ดขาด)**:
+   - ห้ามสร้างหรือใส่ข้อมูลจำลอง (Mock Data, Dummy Arrays, Hardcoded Fake Fallbacks, ข้อมูลหลอก) ใน view, component หรือ service เองโดยเด็ดขาด
+   - ห้ามแต่งชื่อนักเรียน, ครู, ปฏิทิน, คาบเรียน, หรือคะแนนจำลองขึ้นมาเอง
+   - หากระบบยังไม่มีข้อมูล หรือไม่มีข้อมูลในฐานข้อมูล (Neon / Supabase) ให้แสดงเป็น **Empty State** หรือ Array ว่าง `[]` เสมอ
+2. **No Unilateral Assumptions (เลิกคิดเองว่ามันต้องมี)**:
+   - ห้ามคิดแทนผู้ใช้ว่า "ใส่ข้อมูลจำลองไว้ก่อนเพื่อให้ดูสวยงาม/ไม่โล่ง" หรือ "ระบบจำเป็นต้องมีข้อมูลเหล่านี้"
+   - ห้ามใส่ hardcoded fallback เพื่อหลบ error หรือเอาใจการแสดงผลชั่วคราว
+3. **Mandatory Pre-Approval for Data Addition/Removal (จะเพิ่มหรือลด ต้องถามก่อนเสมอ)**:
+   - หากมีความจำเป็นต้องเพิ่มชุดข้อมูลใหม่, ปรับโครงสร้างข้อมูล (Schema), ลบข้อมูลเก่า, หรือสร้างค่าเริ่มต้น (Seeding): **ต้องถามและขอความเห็นชอบจากผู้ใช้ก่อนดำเนินการทุกครั้ง**
+   - ห้ามทำการเพิ่ม ลด หรือดัดแปลงข้อมูลจริงของผู้ใช้โดยพลการเป็นอันขาด
+
 ## Token Optimization & Anti-Context Explosion Rules (6 Pillars)
 To prevent Quadratic Context Explosion and eliminate wasteful token consumption (90%+ lost to repeated context re-reading in long sessions), all AI agents and developers must strictly adhere to the following 6 pillars:
 
