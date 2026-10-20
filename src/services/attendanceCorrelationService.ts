@@ -947,7 +947,7 @@ export const attendanceCorrelationService = {
     const earnedPeriods = presentCount + lateCount + activityCount;
     // Calculate attendance percentage strictly based on elapsed/conducted periods to date (records.length)
     // NOT the full 20-week semester boundary, so students are aware of risk early in term
-    const totalScheduledPeriods = totalScheduledPeriodsParam ?? (records.length > 0 ? records.length : 1);
+    const totalScheduledPeriods = totalScheduledPeriodsParam ?? records.length;
 
     // Rate calculation strictly adhering to 0.8 / 80% threshold based on elapsed periods
     const attendanceRate =
@@ -955,8 +955,8 @@ export const attendanceCorrelationService = {
         ? Number(((earnedPeriods / totalScheduledPeriods) * 100).toFixed(1))
         : 100.0;
 
-    const isEligibleForExam = attendanceRate >= 80.0;
-    const isAtRisk = attendanceRate < 80.0;
+    const isEligibleForExam = totalScheduledPeriods === 0 ? true : attendanceRate >= 80.0;
+    const isAtRisk = totalScheduledPeriods === 0 ? false : attendanceRate < 80.0;
 
     return {
       studentCode,

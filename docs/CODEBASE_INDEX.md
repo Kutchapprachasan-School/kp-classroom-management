@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 20/10/2569 10:24:52 | รวมทั้งหมด 204 ไฟล์*
+*อัปเดตล่าสุด: 20/10/2569 10:37:24 | รวมทั้งหมด 204 ไฟล์*
 
 ---
 
@@ -15,7 +15,7 @@
 | [src/views/AcademicTermsView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/AcademicTermsView.tsx) | 2081 | `ActivityCategory` (L50), `CalendarLegendColor` (L52), `CalendarEventItem` (L54), `AcademicTermsView` (L282) |
 | [src/views/AdminExecutiveDashboardView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/AdminExecutiveDashboardView.tsx) | 312 | `AdminExecutiveDashboardView` (L39) |
 | [src/views/AssignmentManagementView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/AssignmentManagementView.tsx) | 2108 | `QuickFilterMode` (L41), `AssignmentManagementView` (L55) |
-| [src/views/ClassroomAttendanceView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomAttendanceView.tsx) | 1694 | `ClassroomAttendanceViewProps` (L56), `TeacherCourseOption` (L61), `ClassroomAttendanceView` (L83) |
+| [src/views/ClassroomAttendanceView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomAttendanceView.tsx) | 1845 | `ClassroomAttendanceViewProps` (L56), `TeacherCourseOption` (L61), `ClassroomAttendanceView` (L85) |
 | [src/views/ClassroomManagementView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomManagementView.tsx) | 1523 | `ImportPreviewRow` (L51), `ClassroomManagementView` (L63) |
 | [src/views/ClassroomsRosterView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomsRosterView.tsx) | 2088 | `ClassroomsRosterView` (L62) |
 | [src/views/CoursesCurriculumView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/CoursesCurriculumView.tsx) | 2100 | `CoursesCurriculumViewProps` (L38), `CoursesCurriculumView` (L42) |

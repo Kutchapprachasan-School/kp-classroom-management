@@ -73,11 +73,13 @@ const THAI_MONTHS = [
 ];
 
 const parseStudentNameParts = (fullName: string): { title: string; name: string } => {
-  const match = fullName.match(/^(ด\.ช\.|ด\.ญ\.|นาย|น\.ส\.)\s*(.*)$/);
+  if (!fullName) return { title: '-', name: '-' };
+  const trimmed = fullName.trim();
+  const match = trimmed.match(/^(นางสาว|น\.ส\.|เด็กหญิง|ด\.ญ\.|เด็กชาย|ด\.ช\.|นาย|นาง)\s*(.*)$/);
   if (match) {
-    return { title: match[1], name: match[2] };
+    return { title: match[1], name: match[2].trim() };
   }
-  return { title: '-', name: fullName };
+  return { title: '-', name: trimmed };
 };
 
 export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = ({
@@ -210,6 +212,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
   // Data Records & Save State
   const [periodRecords, setPeriodRecords] = useState<PeriodAttendanceRecord[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+  const [isPeriodSavedInStorage, setIsPeriodSavedInStorage] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Calendar Widget State
@@ -282,16 +285,22 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
     if (!selectedCourse || !selectedClassroom) {
       setPeriodRecords([]);
       setHasUnsavedChanges(false);
+      setIsPeriodSavedInStorage(false);
       setMonthCalendarDays([]);
       return;
     }
 
-    let pRecords = attendanceCorrelationService.getPeriodRecords(
+    const savedFromStorage = attendanceCorrelationService.getPeriodRecords(
       selectedCourse,
       selectedClassroom,
       selectedDate,
       selectedPeriod
     );
+
+    const isSaved = savedFromStorage.length > 0;
+    setIsPeriodSavedInStorage(isSaved);
+
+    let pRecords = savedFromStorage;
 
     // If records are empty in storage, load actual enrolled students from studentService
     if (pRecords.length === 0) {
@@ -412,6 +421,18 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
 
     attendanceCorrelationService.savePeriodRecords(periodRecords);
     setHasUnsavedChanges(false);
+    setIsPeriodSavedInStorage(true);
+
+    // อัปเดตสถานะปฏิทินทันที
+    const monthDays = attendanceCorrelationService.getPeriodCalendarMonthStatus(
+      selectedCourse,
+      selectedClassroom,
+      calendarYear,
+      calendarMonth,
+      todayBangkok
+    );
+    setMonthCalendarDays(monthDays);
+
     showToast(
       `💾 บันทึกผลการเช็คชื่อวิชา ${selectedCourse} (${periodRecords.length} คน) ประจำวันที่ ${selectedDate} เรียบร้อยแล้ว`
     );
@@ -807,6 +828,15 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                   <div>
                     <h2 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
                       <span>{currentCourse.name}</span>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                          isPeriodSavedInStorage
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                        }`}
+                      >
+                        {isPeriodSavedInStorage ? '✓ บันทึกผลแล้ว' : 'รอเช็คชื่อ'}
+                      </span>
                     </h2>
                     <p className="text-[11px] text-slate-400 font-medium">
                       ประจำวันที่ {formatDateThai(selectedDate)} (คาบที่ {selectedPeriod})
@@ -1413,12 +1443,17 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
             {hasUnsavedChanges ? (
               <span className="flex items-center gap-1.5 text-amber-600 font-bold bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
                 <AlertTriangle className="w-3.5 h-3.5" />
-                <span>มีการแก้ไขที่ยังไม่ได้บันทึก</span>
+                <span>มีการแก้ไขที่ยังไม่ได้บันทึก (กดปุ่มบันทึกด้านขวา)</span>
               </span>
-            ) : (
+            ) : isPeriodSavedInStorage ? (
               <span className="flex items-center gap-1.5 text-emerald-600 font-bold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
                 <Check className="w-3.5 h-3.5" />
-                <span>ข้อมูลบันทึกล่าสุดเรียบร้อย</span>
+                <span>บันทึกผลการเช็คชื่อเรียบร้อยแล้ว</span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-amber-700 font-bold bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                <span>ยังไม่ได้เช็คชื่อในคาบนี้ (กดบันทึกเพื่อยืนยัน)</span>
               </span>
             )}
             <span className="hidden md:inline text-slate-400">
@@ -1431,13 +1466,17 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
               type="button"
               onClick={handleSaveAttendance}
               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer ${
-                hasUnsavedChanges
+                hasUnsavedChanges || !isPeriodSavedInStorage
                   ? 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white ring-2 ring-blue-300 animate-pulse'
                   : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white'
               }`}
             >
               <Save className="w-4 h-4" />
-              <span>💾 บันทึกผลการเช็คชื่อเข้าเรียน</span>
+              <span>
+                {isPeriodSavedInStorage && !hasUnsavedChanges
+                  ? '✓ บันทึกผลแล้ว (กดเพื่อบันทึกซ้ำ)'
+                  : '💾 บันทึกผลการเช็คชื่อเข้าเรียน'}
+              </span>
             </button>
           </div>
         </div>
@@ -1596,38 +1635,150 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
               </button>
             </div>
 
-            <div className="p-3 bg-blue-50/60 rounded-2xl border border-blue-100 flex items-center justify-between">
+            {/* กล่องแสดงสถานะประจำคาบนี้ */}
+            <div
+              className={`p-3 rounded-2xl border flex items-center justify-between ${
+                !isPeriodSavedInStorage && !hasUnsavedChanges
+                  ? 'bg-slate-50 border-slate-200 text-slate-800'
+                  : 'bg-blue-50/60 border-blue-100 text-blue-900'
+              }`}
+            >
               <div>
-                <div className="text-xs text-blue-700 font-bold">สถานะวันนี้</div>
-                <div className="text-sm font-extrabold text-blue-900">
-                  {personalStatsStudent.status === 'PRESENT' && 'มาเรียน'}
-                  {personalStatsStudent.status === 'LATE' && 'มาสาย'}
-                  {personalStatsStudent.status === 'ABSENT' && 'ขาดเรียน'}
-                  {personalStatsStudent.status === 'LEAVE' && 'ลา'}
-                  {personalStatsStudent.status === 'ACTIVITY' && 'กิจกรรม'}
-                  {personalStatsStudent.status === 'TRUANCY' && 'โดดเรียน'}
+                <div className="text-[11px] text-slate-500 font-bold">
+                  สถานะคาบนี้ (วันที่ {formatDateThai(selectedDate)} คาบที่ {selectedPeriod})
+                </div>
+                <div className="text-sm font-extrabold mt-0.5 flex items-center gap-1.5">
+                  {!isPeriodSavedInStorage && !hasUnsavedChanges ? (
+                    <span className="text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-lg text-xs font-bold">
+                      รอเช็คชื่อ (ยังไม่ได้บันทึกผล)
+                    </span>
+                  ) : (
+                    <>
+                      <span
+                        className={
+                          personalStatsStudent.status === 'PRESENT'
+                            ? 'text-emerald-700'
+                            : personalStatsStudent.status === 'LATE'
+                            ? 'text-amber-700'
+                            : personalStatsStudent.status === 'ABSENT'
+                            ? 'text-rose-700'
+                            : personalStatsStudent.status === 'LEAVE'
+                            ? 'text-purple-700'
+                            : personalStatsStudent.status === 'ACTIVITY'
+                            ? 'text-sky-700'
+                            : 'text-red-800'
+                        }
+                      >
+                        {personalStatsStudent.status === 'PRESENT' && 'มาเรียน'}
+                        {personalStatsStudent.status === 'LATE' && 'มาสาย'}
+                        {personalStatsStudent.status === 'ABSENT' && 'ขาดเรียน'}
+                        {personalStatsStudent.status === 'LEAVE' && 'ลา'}
+                        {personalStatsStudent.status === 'ACTIVITY' && 'กิจกรรม'}
+                        {personalStatsStudent.status === 'TRUANCY' && 'โดดเรียน'}
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-400">
+                        {isPeriodSavedInStorage && !hasUnsavedChanges
+                          ? '(บันทึกแล้ว)'
+                          : '(ยังไม่ได้กดบันทึก)'}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-blue-800 font-bold">
+              <div className="flex items-center gap-1.5 text-xs text-blue-800 font-bold shrink-0">
                 <Flame className="w-4 h-4 text-amber-500" />
                 <span>วิชา {selectedCourse}</span>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 text-center text-xs">
-              <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-100">
-                <div className="font-bold text-sm">92%</div>
-                <div className="text-[10px] text-emerald-600">สิทธิ์สอบ (ผ่าน)</div>
-              </div>
-              <div className="p-2.5 rounded-xl bg-slate-50 text-slate-800 border border-slate-200">
-                <div className="font-bold text-sm">36 คาบ</div>
-                <div className="text-[10px] text-slate-500">เวลาเรียนทั้งหมด</div>
-              </div>
-              <div className="p-2.5 rounded-xl bg-purple-50 text-purple-800 border border-purple-100">
-                <div className="font-bold text-sm">33 คาบ</div>
-                <div className="text-[10px] text-purple-600">มาเรียนจริง</div>
-              </div>
-            </div>
+            {/* สถิติเวลาเรียนจริงตามเกณฑ์ 80% (Zero Mock) */}
+            {(() => {
+              const summary = attendanceCorrelationService.calculateAttendance80Rule(
+                personalStatsStudent.studentCode,
+                selectedCourse
+              );
+              const hasRecords = summary.totalScheduledPeriods > 0;
+
+              return (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    {/* การ์ด 1: ร้อยละเวลาเรียน & สิทธิ์สอบ */}
+                    <div
+                      className={`p-2.5 rounded-xl border ${
+                        !hasRecords
+                          ? 'bg-slate-50 text-slate-700 border-slate-200'
+                          : summary.isEligibleForExam
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-100'
+                          : 'bg-rose-50 text-rose-800 border-rose-100'
+                      }`}
+                    >
+                      <div className="font-bold text-sm">
+                        {hasRecords ? `${summary.attendanceRate}%` : '100%'}
+                      </div>
+                      <div
+                        className={`text-[10px] font-semibold ${
+                          !hasRecords
+                            ? 'text-slate-500'
+                            : summary.isEligibleForExam
+                            ? 'text-emerald-600'
+                            : 'text-rose-600'
+                        }`}
+                      >
+                        {!hasRecords
+                          ? 'ยังไม่มีการเช็คชื่อ'
+                          : summary.isEligibleForExam
+                          ? 'สิทธิ์สอบ (ผ่านเกณฑ์ 80%)'
+                          : 'เสี่ยง มส. (ต่ำกว่า 80%)'}
+                      </div>
+                    </div>
+
+                    {/* การ์ด 2: คาบเรียนที่บันทึกแล้วทั้งหมด */}
+                    <div className="p-2.5 rounded-xl bg-slate-50 text-slate-800 border border-slate-200">
+                      <div className="font-bold text-sm">
+                        {summary.totalScheduledPeriods} คาบ
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-medium">
+                        เวลาเรียนที่บันทึก
+                      </div>
+                    </div>
+
+                    {/* การ์ด 3: มาเรียนจริง */}
+                    <div className="p-2.5 rounded-xl bg-purple-50 text-purple-800 border border-purple-100">
+                      <div className="font-bold text-sm">
+                        {summary.earnedPeriods} คาบ
+                      </div>
+                      <div className="text-[10px] text-purple-600 font-medium">
+                        มาเรียนจริง (สะสม)
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* สรุปแจกแจงสถานะสะสมรายบุคคล */}
+                  <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-200/60 text-[11px] text-slate-600 flex flex-wrap items-center justify-between gap-1.5">
+                    <span className="font-bold text-slate-700">สถิติสะสมวิชานี้:</span>
+                    <div className="flex items-center gap-2 font-medium">
+                      <span className="text-emerald-700 font-bold">มา {summary.presentCount}</span>
+                      <span>•</span>
+                      <span className="text-amber-700 font-bold">สาย {summary.lateCount}</span>
+                      <span>•</span>
+                      <span className="text-purple-700 font-bold">ลา {summary.leaveCount}</span>
+                      <span>•</span>
+                      <span className="text-rose-700 font-bold">ขาด {summary.absentCount}</span>
+                      <span>•</span>
+                      <span className="text-sky-700 font-bold">กิจกรรม {summary.activityCount}</span>
+                      {summary.truancyCount > 0 && (
+                        <>
+                          <span>•</span>
+                          <span className="text-red-700 font-extrabold">
+                            โดด {summary.truancyCount}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="flex justify-end pt-2 border-t border-slate-100">
               <button
