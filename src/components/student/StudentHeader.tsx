@@ -97,10 +97,14 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
   const studentNo = studentRecord?.no || (currentUser as any)?.no || (currentUser as any)?.seatNo || 1;
 
   // Avatar state in sync with real-time updates
-  const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatarUrl || "/images/banners/student-avatar.png");
+  const [avatarUrl, setAvatarUrl] = useState(() =>
+    studentService.getStudentAvatar(currentUser?.studentCode, currentUser?.avatarUrl || "/images/banners/student-avatar.png")
+  );
   useEffect(() => {
-    if (currentUser?.avatarUrl) setAvatarUrl(currentUser.avatarUrl);
-  }, [currentUser?.avatarUrl]);
+    if (currentUser?.studentCode || currentUser?.avatarUrl) {
+      setAvatarUrl(studentService.getStudentAvatar(currentUser?.studentCode, currentUser?.avatarUrl || "/images/banners/student-avatar.png"));
+    }
+  }, [currentUser?.studentCode, currentUser?.avatarUrl]);
 
   useEffect(() => {
     const handleAvatarUpdated = (e: any) => {

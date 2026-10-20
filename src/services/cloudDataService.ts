@@ -71,17 +71,31 @@ class CloudDataService {
     }
   }
 
+  // Keys that belong strictly to the local browser/device session and must NEVER be synced to Supabase kps_cloud_store
+  // (Prevents session bleed where refreshing on Device B overwrites auth session with Device A!)
+  private static readonly LOCAL_SESSION_KEYS = new Set([
+    'cls_current_auth_user',
+    'cms_affairs_active_role_v1',
+    'kp_teacher_sidebar_open',
+    'kp_student_sidebar_open',
+    'kps_cloud_timestamps_v1',
+    'kp_hide_completed_periods',
+    'kp_teacher_font_scale',
+    'kp_teacher_custom_font_px',
+    'kp_pwa_install_dismissed_v1',
+  ]);
+
   // Filter to determine which keys should be automatically mirrored to Supabase
   private isAppStorageKey(key: string): boolean {
     if (!key || typeof key !== 'string') return false;
-    // Exclude internal browser / telemetry / debug flags / timestamp meta
+    // Exclude device-local session keys, internal telemetry, supabase tokens
     if (
+      CloudDataService.LOCAL_SESSION_KEYS.has(key) ||
+      key.startsWith('sb-') ||
+      key.startsWith('supabase.') ||
       key.startsWith('__') ||
       key.startsWith('loglevel') ||
       key.includes('test') ||
-      key === 'kp_teacher_sidebar_open' ||
-      key === 'kp_student_sidebar_open' ||
-      key === 'kps_cloud_timestamps_v1' ||
       /^cls_students_ม\.\s*\d+\/\d+$/.test(key) // Exclude duplicate Thai room aliases (canonical cls_students_room- is already synced)
     ) {
       return false;
@@ -137,6 +151,10 @@ class CloudDataService {
    * Fetch a single key from Supabase cloud store
    */
   public async fetchCloudKey<T = unknown>(key: string, fallback?: T): Promise<T | null> {
+    if (!this.isAppStorageKey(key)) {
+      return this.inMemoryCache.get(key) ?? fallback ?? null;
+    }
+
     if (!isSupabaseConfigured) {
       return this.inMemoryCache.get(key) ?? fallback ?? null;
     }
@@ -223,7 +241,7 @@ class CloudDataService {
       }
     }
 
-    if (!isSupabaseConfigured) {
+    if (!isSupabaseConfigured || !this.isAppStorageKey(key)) {
       return data;
     }
 
@@ -301,7 +319,7 @@ class CloudDataService {
         // Determine which keys are missing locally or have been updated remotely
         const dirtyKeys: string[] = [];
         for (const r of remoteKeys) {
-          if (!r || !r.key) continue;
+          if (!r || !r.key || !this.isAppStorageKey(r.key)) continue;
           const localTime = localTimestamps[r.key];
           const isMissing = !hasLocalKey(r.key);
           const isStale = !localTime || localTime !== r.updated_at;
@@ -314,6 +332,7 @@ class CloudDataService {
         if (dirtyKeys.length === 0) {
           console.log(`[CloudDataService] Delta sync: All ${remoteKeys.length} cloud records are up-to-date locally (0 payload bytes downloaded)!`);
           for (const r of remoteKeys) {
+            if (!this.isAppStorageKey(r.key)) continue;
             const val = this.inMemoryCache.get(r.key) ?? (typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem(r.key) : null);
             if (val !== null && val !== undefined) {
               try {
@@ -348,7 +367,7 @@ class CloudDataService {
           const updatedTimestamps = { ...localTimestamps };
 
           for (const item of dirtyData) {
-            if (item && item.key) {
+            if (item && item.key && this.isAppStorageKey(item.key)) {
               result[item.key] = item.data;
               this.inMemoryCache.set(item.key, item.data);
               this.inMemoryTimestamps.set(item.key, item.updated_at);
@@ -368,7 +387,7 @@ class CloudDataService {
 
           // Also populate untouched keys from local cache so caller gets complete data map
           for (const r of remoteKeys) {
-            if (!result[r.key]) {
+            if (this.isAppStorageKey(r.key) && !result[r.key]) {
               const val = this.inMemoryCache.get(r.key) ?? (typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem(r.key) : null);
               if (val !== null && val !== undefined) {
                 try {
@@ -417,6 +436,16 @@ class CloudDataService {
     this.syncState.isInitialized = true;
 
     console.log('[CloudDataService] Initializing Cloud Sync Engine...');
+
+    // 0. Purge any leaked device-local session keys from remote kps_cloud_store to prevent cross-device session bleeding
+    if (isSupabaseConfigured) {
+      supabase
+        .from('kps_cloud_store')
+        .delete()
+        .in('key', Array.from(CloudDataService.LOCAL_SESSION_KEYS))
+        .then(() => {})
+        .catch(() => {});
+    }
 
     // 1. Pull all data from Supabase Cloud Store
     await this.fetchAllCloudData();
@@ -524,7 +553,7 @@ class CloudDataService {
           (payload: any) => {
             const { eventType, new: newRecord, old: oldRecord } = payload;
             if (eventType === 'INSERT' || eventType === 'UPDATE') {
-              if (newRecord && newRecord.key) {
+              if (newRecord && newRecord.key && this.isAppStorageKey(newRecord.key)) {
                 const key = newRecord.key;
                 const data = newRecord.data;
 
@@ -576,7 +605,7 @@ class CloudDataService {
                 }
               }
             } else if (eventType === 'DELETE') {
-              if (oldRecord && oldRecord.key) {
+              if (oldRecord && oldRecord.key && this.isAppStorageKey(oldRecord.key)) {
                 this.inMemoryCache.delete(oldRecord.key);
                 if (typeof window !== 'undefined' && window.localStorage) {
                   try {

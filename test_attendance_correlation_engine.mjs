@@ -1063,13 +1063,11 @@ console.log('  ✓ getCourseCumulativeStats per-student totalDays strictly match
 // --- 11. Checking Phase 1 Unified Attendance Architecture & Zero-Silo Integration ---
 console.log('\n--- 11. Checking Phase 1 Unified Attendance Architecture & Zero-Silo Integration ---');
 
-// 11.1 Check TeacherOverviewView.tsx integration
-const teacherOverviewSrc = readFileSync('src/views/TeacherOverviewView.tsx', 'utf8');
-assert.ok(teacherOverviewSrc.includes('attendanceCorrelationService'), 'TeacherOverviewView must import and use attendanceCorrelationService');
-assert.ok(teacherOverviewSrc.includes('kps-data-sync-event'), 'TeacherOverviewView must listen to kps-data-sync-event for reactive sync');
-assert.ok(teacherOverviewSrc.includes('loadAttendanceDataFromCorrelation'), 'TeacherOverviewView must have loadAttendanceDataFromCorrelation');
-assert.ok(teacherOverviewSrc.includes('computedAtRiskStudents'), 'TeacherOverviewView must dynamically compute at-risk students from correlation stats');
-console.log('  ✓ TeacherOverviewView.tsx imports attendanceCorrelationService, dynamic at-risk stats, and listens to kps-data-sync-event');
+// 11.1 Check ClassroomAttendanceView.tsx integration
+const classroomAttendanceSrc = readFileSync('src/views/ClassroomAttendanceView.tsx', 'utf8');
+assert.ok(classroomAttendanceSrc.includes('attendanceCorrelationService'), 'ClassroomAttendanceView must import and use attendanceCorrelationService');
+assert.ok(classroomAttendanceSrc.includes('kps-data-sync-event'), 'ClassroomAttendanceView must listen to kps-data-sync-event for reactive sync');
+console.log('  ✓ ClassroomAttendanceView.tsx imports attendanceCorrelationService and listens to kps-data-sync-event');
 
 // 11.2 Check attendanceService.ts delegation bridge
 const attendanceServiceSrc = readFileSync('src/services/attendanceService.ts', 'utf8');

@@ -104,6 +104,22 @@ export const App: React.FC = () => {
   }, []);
 
   const [currentAuthUser, setCurrentAuthUser] = useState<AuthUser | null>(() => authService.getCurrentUser());
+
+  // Real-time synchronization for Auth session and student avatar changes
+  useEffect(() => {
+    const handleAuthChanged = () => {
+      setCurrentAuthUser(authService.getCurrentUser());
+    };
+    const handleAvatarUpdated = () => {
+      setCurrentAuthUser(authService.getCurrentUser());
+    };
+    window.addEventListener('kps-auth-changed', handleAuthChanged);
+    window.addEventListener('kps-student-avatar-updated', handleAvatarUpdated);
+    return () => {
+      window.removeEventListener('kps-auth-changed', handleAuthChanged);
+      window.removeEventListener('kps-student-avatar-updated', handleAvatarUpdated);
+    };
+  }, []);
   const [currentView, setCurrentView] = useState<TeacherViewKey>(() => {
     const user = authService.getCurrentUser();
     if (user) {

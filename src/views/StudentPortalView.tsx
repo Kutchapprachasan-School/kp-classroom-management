@@ -56,7 +56,21 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
   onChangeStudentRole,
   onSwitchToTeacherRole,
 }) => {
-  const effectiveUser = currentUser || authService.getCurrentUser();
+  const [localUser, setLocalUser] = useState<AuthUser | null>(() => currentUser || authService.getCurrentUser());
+
+  useEffect(() => {
+    const handleSync = () => {
+      setLocalUser(authService.getCurrentUser());
+    };
+    window.addEventListener('kps-auth-changed', handleSync);
+    window.addEventListener('kps-student-avatar-updated', handleSync);
+    return () => {
+      window.removeEventListener('kps-auth-changed', handleSync);
+      window.removeEventListener('kps-student-avatar-updated', handleSync);
+    };
+  }, []);
+
+  const effectiveUser = currentUser || localUser || authService.getCurrentUser();
   const effectiveSettings = schoolSettings || getSchoolSettings();
   const studentName = effectiveUser?.name || 'นักเรียน';
 

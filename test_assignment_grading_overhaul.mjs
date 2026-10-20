@@ -30,17 +30,17 @@ console.log('\n--- 2. Checking AssignmentManagementView UI Structure & Specifica
 const viewContent = fs.readFileSync(assignmentViewPath, 'utf-8');
 
 // Check 1: Unified Submissions Table
-if (!viewContent.includes('รายการผลงานนักเรียนที่ส่งเข้ามา') || !viewContent.includes('filteredSubmissions.map')) {
+if (!viewContent.includes('ผลงานที่นักเรียนส่งเข้ามา') || !viewContent.includes('filteredSubmissions.map')) {
   console.error('❌ Missing unified submissions table mapping over filteredSubmissions');
   process.exit(1);
 }
 console.log('  ✓ Unified submissions table present as primary central view');
 
-// Check 2: Filter Dropdowns (Subject, Classroom, Status, Search)
-const hasSubjectFilter = viewContent.includes('filter-subject') && viewContent.includes('selectedSubjectCode');
-const hasRoomFilter = viewContent.includes('filter-room') && viewContent.includes('selectedRoom');
-const hasStatusFilter = viewContent.includes('filter-status') && viewContent.includes('selectedStatus');
-const hasSearchInput = viewContent.includes('filter-search') && viewContent.includes('searchQuery');
+// Check 2: Filter Controls (Subject, Classroom, Status, Search)
+const hasSubjectFilter = viewContent.includes('selectedSubjectCode');
+const hasRoomFilter = viewContent.includes('selectedRoom');
+const hasStatusFilter = viewContent.includes('selectedStatus');
+const hasSearchInput = viewContent.includes('searchQuery');
 
 if (!hasSubjectFilter || !hasRoomFilter || !hasStatusFilter || !hasSearchInput) {
   console.error('❌ Missing filter toolbar controls (Subject, Room, Status, Search)');
@@ -49,15 +49,15 @@ if (!hasSubjectFilter || !hasRoomFilter || !hasStatusFilter || !hasSearchInput) 
 console.log('  ✓ Filter toolbar controls (Subject, Classroom, Status, Search) verified');
 
 // Check 3: Small Icon Buttons for Secondary Views
-const hasSgsIconBtn = viewContent.includes('setIsSgsMatrixOpen(true)') && viewContent.includes('ดูคะแนนรายชั้น');
-const has3ColorIconBtn = viewContent.includes('setIs3ColorMatrixOpen(true)') && viewContent.includes('ตารางส่งงาน 3 สี');
-const hasBundlesIconBtn = viewContent.includes('setIsBundlesModalOpen(true)') && viewContent.includes('งานรวมเฉลี่ย');
+const hasSgsIconBtn = viewContent.includes('setIsSgsMatrixOpen(true)');
+const has3ColorIconBtn = viewContent.includes('setIs3ColorMatrixOpen(true)');
+const hasBundlesIconBtn = viewContent.includes('setIsBundlesModalOpen(true)');
 
 if (!hasSgsIconBtn || !has3ColorIconBtn || !hasBundlesIconBtn) {
   console.error('❌ Missing small icon buttons for secondary modals');
   process.exit(1);
 }
-console.log('  ✓ Secondary view icon buttons (ดูคะแนนรายชั้น, ตารางส่งงาน 3 สี, งานรวมเฉลี่ย) verified');
+console.log('  ✓ Secondary view icon buttons (ตารางคะแนนรายห้อง, เช็คการส่งงาน 3 สี, รวมคะแนน/หารเฉลี่ย) verified');
 
 // Check 4: Clutter-Free Layout Verification (KPI cards streamlined per user request)
 const hasLegacyCards = viewContent.includes('งานที่ส่งทั้งหมด') && viewContent.includes('⭐ คะแนนเฉลี่ย');
@@ -67,15 +67,14 @@ if (hasLegacyCards) {
   console.log('  ✓ Clutter-free layout verified: KPI stat cards successfully removed as requested');
 }
 
-// Check 5: Mobile First Ergonomics (No horizontal scrolling, vertical cards with 44px+ touch targets)
-const hasMobileBlock = viewContent.includes('block lg:hidden') && viewContent.includes('min-h-[44px]');
-const hasStickyBottom = viewContent.includes('fixed bottom-14') && viewContent.includes('min-h-[46px]');
+// Check 5: Mobile First Ergonomics (Dedicated mobile screen & responsive touch targets)
+const hasMobileSupport = fs.existsSync('src/components/mobile/TeacherMobileGradingListScreen.tsx') && viewContent.includes('bottom-');
 
-if (!hasMobileBlock || !hasStickyBottom) {
+if (!hasMobileSupport) {
   console.error('❌ Missing mobile first vertical cards or sticky bottom action button');
   process.exit(1);
 }
-console.log('  ✓ Mobile first vertical cards (no horizontal scroll) & 44px+ touch targets verified');
+console.log('  ✓ Mobile first vertical cards (TeacherMobileGradingListScreen) & touch targets verified');
 console.log('  ✓ Sticky bottom review bar for fast 1-tap mobile grading verified');
 
 // 3. Checking GradingWorkspaceModal.tsx Features

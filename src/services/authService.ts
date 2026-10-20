@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase.ts';
 import { studentService, formatClassroomLabel, registerClassroomNames } from './studentService.ts';
-import { getSchoolSettings } from '../config/schoolSettings';
+import { getSchoolSettings } from '../config/schoolSettings.ts';
 import { scryptAsync } from '@noble/hashes/scrypt.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 
@@ -261,6 +261,15 @@ export const authService = {
         }
       }
 
+      // ตรวจสอบรูปภาพโปรไฟล์ที่นักเรียนเคยบันทึกไว้
+      let effectiveAvatar = student.avatarUrl;
+      if (typeof localStorage !== 'undefined') {
+        const savedAvatar = localStorage.getItem(`kp_student_avatar_${trimmedCode}`);
+        if (savedAvatar) {
+          effectiveAvatar = savedAvatar;
+        }
+      }
+
       const now = Date.now();
       const user: AuthUser = {
         id: student.id || `stu-${trimmedCode}`,
@@ -269,7 +278,7 @@ export const authService = {
         role: 'STUDENT',
         classroomId,
         classroomName: resolvedClassroomName,
-        avatarUrl: student.avatarUrl,
+        avatarUrl: effectiveAvatar,
         loginAt: now,
         expiresAt: now + 24 * 60 * 60 * 1000,
       };
@@ -382,6 +391,9 @@ export const authService = {
         const user = JSON.parse(raw);
         user.avatarUrl = avatarUrl;
         localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(user));
+        if (user.studentCode) {
+          localStorage.setItem(`kp_student_avatar_${user.studentCode.trim()}`, avatarUrl);
+        }
       }
     } catch {
       // ignore
@@ -400,6 +412,13 @@ export const authService = {
           console.warn('[authService] Session expired. Automatically clearing credentials.');
           localStorage.removeItem(STORAGE_KEY_AUTH_USER);
           return null;
+        }
+        // ตรวจสอบรูปภาพโปรไฟล์ล่าสุดที่นักเรียนบันทึกไว้ในเบราว์เซอร์หรือซิงค์ผ่านคลาวด์
+        if (user.role === 'STUDENT' && user.studentCode) {
+          const savedAvatar = localStorage.getItem(`kp_student_avatar_${user.studentCode.trim()}`);
+          if (savedAvatar) {
+            user.avatarUrl = savedAvatar;
+          }
         }
         return user;
       } catch {

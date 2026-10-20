@@ -55,15 +55,33 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
   const studentCode = currentUser?.studentCode || 'STD-001';
   const classroomId = currentUser?.classroomName || currentUser?.classroomId || 'ม.3/1';
 
-  // Avatar state
-  const [currentAvatar, setCurrentAvatar] = useState<string>(
-    currentUser?.avatarUrl || '/images/banners/student-avatar.png'
+  // Avatar state - loaded from studentService (localStorage/cloud cache prioritized)
+  const [currentAvatar, setCurrentAvatar] = useState<string>(() =>
+    studentService.getStudentAvatar(studentCode, currentUser?.avatarUrl || '/images/banners/student-avatar.png')
   );
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
   const [selectedAvatarUrl, setSelectedAvatarUrl] = useState<string>(currentAvatar);
   const [avatarTab, setAvatarTab] = useState<'PRESET' | 'UPLOAD'>('PRESET');
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync avatar with updates across tabs and background cloud sync
+  useEffect(() => {
+    const avatar = studentService.getStudentAvatar(studentCode, currentUser?.avatarUrl || '/images/banners/student-avatar.png');
+    setCurrentAvatar(avatar);
+    setSelectedAvatarUrl(avatar);
+  }, [studentCode, currentUser?.avatarUrl]);
+
+  useEffect(() => {
+    const handleAvatarUpdated = (e: any) => {
+      if (e.detail?.avatarUrl) {
+        setCurrentAvatar(e.detail.avatarUrl);
+        setSelectedAvatarUrl(e.detail.avatarUrl);
+      }
+    };
+    window.addEventListener('kps-student-avatar-updated', handleAvatarUpdated);
+    return () => window.removeEventListener('kps-student-avatar-updated', handleAvatarUpdated);
+  }, []);
 
   // Change Password state
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
@@ -143,34 +161,55 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
 
     if (!file.type.startsWith('image/')) {
       alert('กรุณาเลือกไฟล์รูปภาพเท่านั้น');
+      if (e.target) e.target.value = '';
       return;
     }
 
     setIsUploading(true);
     const reader = new FileReader();
     reader.onload = (event) => {
+      const resultStr = event.target?.result as string;
+      if (!resultStr) {
+        setIsUploading(false);
+        return;
+      }
+
       const img = new Image();
       img.onload = () => {
-        // Compress & scale to square 256x256 to minimize memory and egress
-        const canvas = document.createElement('canvas');
-        const size = Math.min(img.width, img.height);
-        canvas.width = 256;
-        canvas.height = 256;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          const offsetX = (img.width - size) / 2;
-          const offsetY = (img.height - size) / 2;
-          ctx.drawImage(img, offsetX, offsetY, size, size, 0, 0, 256, 256);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-          setSelectedAvatarUrl(dataUrl);
+        try {
+          // Compress & scale to square 256x256 to minimize memory and egress
+          const canvas = document.createElement('canvas');
+          const size = Math.min(img.width, img.height);
+          canvas.width = 256;
+          canvas.height = 256;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            const offsetX = (img.width - size) / 2;
+            const offsetY = (img.height - size) / 2;
+            ctx.drawImage(img, offsetX, offsetY, size, size, 0, 0, 256, 256);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            setSelectedAvatarUrl(dataUrl);
+          } else {
+            setSelectedAvatarUrl(resultStr);
+          }
+        } catch {
+          setSelectedAvatarUrl(resultStr);
+        } finally {
+          setIsUploading(false);
+          if (e.target) e.target.value = '';
         }
-        setIsUploading(false);
       };
       img.onerror = () => {
         setIsUploading(false);
+        if (e.target) e.target.value = '';
         alert('ไม่สามารถอ่านไฟล์รูปภาพได้');
       };
-      img.src = event.target?.result as string;
+      img.src = resultStr;
+    };
+    reader.onerror = () => {
+      setIsUploading(false);
+      if (e.target) e.target.value = '';
+      alert('เกิดข้อผิดพลาดในการเปิดไฟล์');
     };
     reader.readAsDataURL(file);
   };

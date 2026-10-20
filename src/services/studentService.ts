@@ -475,29 +475,62 @@ export const studentService = {
     };
   },
 
+  // ดึงรูปโปรไฟล์นักเรียน (รองรับทั้งรูปที่อัปโหลดเองและรูปเริ่มต้น)
+  getStudentAvatar(code?: string, fallback?: string): string {
+    const cleanCode = String(code || '').trim();
+    if (!cleanCode) return fallback || '/images/banners/student-avatar.png';
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem(`kp_student_avatar_${cleanCode}`);
+      if (saved) return saved;
+    }
+    const found = this.findStudentByCode(cleanCode);
+    if (found?.student?.avatarUrl) return found.student.avatarUrl;
+    return fallback || '/images/banners/student-avatar.png';
+  },
+
   // อัปเดตรูปภาพโปรไฟล์นักเรียน
   updateStudentAvatar(code: string, avatarUrl: string): boolean {
-    const found = this.findStudentByCode(code);
-    if (!found) return false;
-    const { student, classroomId } = found;
-    const list = getLocalStudents(classroomId);
-    const updated = list.map((s) =>
-      s.code === student.code || s.id === student.id
-        ? { ...s, avatarUrl }
-        : s
-    );
-    saveLocalStudents(classroomId, updated);
-    inMemoryStudentCache[classroomId] = updated;
+    const cleanCode = String(code || '').trim();
+    if (!cleanCode || !avatarUrl) return false;
 
-    // หากบัญชีที่ล็อกอินอยู่คือผู้ใช้นี้ ให้ปรับปรุง Auth Session ด้วย
+    // 1. บันทึกรูปลงคีย์ประจำตัวนักเรียนเดี่ยวเสมอ (จะถูก Cloud Sync ไปยัง Supabase อัตโนมัติและไม่หายเมื่อรีเฟรช)
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(`kp_student_avatar_${cleanCode}`, avatarUrl);
+      } catch {
+        // ignore quota
+      }
+    }
+
+    // 2. อัปเดตข้อมูลในบัญชีนักเรียนห้องเรียน (cls_students_<classroomId>) หากมีอยู่ในแคช
+    const found = this.findStudentByCode(cleanCode);
+    if (found) {
+      const { student, classroomId } = found;
+      const list = getLocalStudents(classroomId);
+      const updated = list.map((s) =>
+        s.code === student.code || s.id === student.id
+          ? { ...s, avatarUrl }
+          : s
+      );
+      saveLocalStudents(classroomId, updated);
+      inMemoryStudentCache[classroomId] = updated;
+    }
+
+    // 3. หากบัญชีที่ล็อกอินอยู่คือผู้ใช้นี้ ให้ปรับปรุง Auth Session (cls_current_auth_user) ทันที
+    let updatedAuthUser: any = null;
     if (typeof localStorage !== 'undefined') {
       try {
         const rawAuth = localStorage.getItem('cls_current_auth_user');
         if (rawAuth) {
           const authUser = JSON.parse(rawAuth);
-          if (authUser?.studentCode === code || authUser?.id === code || authUser?.id === student.id) {
+          if (
+            authUser?.studentCode === cleanCode ||
+            authUser?.id === cleanCode ||
+            String(authUser?.studentCode).trim() === cleanCode
+          ) {
             authUser.avatarUrl = avatarUrl;
             localStorage.setItem('cls_current_auth_user', JSON.stringify(authUser));
+            updatedAuthUser = authUser;
           }
         }
       } catch {
@@ -505,10 +538,20 @@ export const studentService = {
       }
     }
 
+    // 4. ส่ง Event แจ้งเตือนทุก View และ Component ให้แสดงภาพใหม่ทันที
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('kps-student-avatar-updated', {
-        detail: { studentCode: code, avatarUrl }
-      }));
+      window.dispatchEvent(
+        new CustomEvent('kps-student-avatar-updated', {
+          detail: { studentCode: cleanCode, avatarUrl },
+        })
+      );
+      if (updatedAuthUser) {
+        window.dispatchEvent(
+          new CustomEvent('kps-auth-changed', {
+            detail: { user: updatedAuthUser },
+          })
+        );
+      }
     }
     return true;
   },
