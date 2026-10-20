@@ -30,6 +30,9 @@ import {
   FileSpreadsheet,
   Upload,
   Sparkles,
+  KeyRound,
+  Printer,
+  Copy,
 } from 'lucide-react';
 import { classroomService } from '../services/classroomService';
 import { studentService, getAlternateRoomKey, type StudentRecord } from '../services/studentService';
@@ -42,6 +45,7 @@ import { SgsRosterImportModal } from '../components/sgs/SgsRosterImportModal';
 import { SgsScoreExportModal } from '../components/sgs/SgsScoreExportModal';
 import { activityAuditLogService } from '../services/activityAuditLogService';
 import type { SgsParsedRow } from '../services/sgsImportExportService';
+import { authService } from '../services/authService';
 import { getM1SgsStudentInfo, isGrade1SgsStudentCode } from '../config/m1SgsLookup';
 import { Pagination, type PageSizeOption } from '../components/common/Pagination';
 
@@ -124,11 +128,45 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const isFullAccess =
+  const currentUser = authService.getCurrentUser();
+
+  const isAdmin =
+    currentUser?.role === 'ADMIN' ||
     activeRole === 'ACADEMIC_ADMIN' ||
     activeRole === 'STUDENT_AFFAIRS' ||
     (activeRole as string) === 'ADMIN' ||
     (activeRole as string) === 'DIRECTOR';
+
+  const isFullAccess = isAdmin;
+
+  // ตรวจสอบว่าผู้ใช้ปัจจุบันเป็นครูที่ปรึกษาประจำห้องนี้หรือไม่ (หรือเป็นแอดมิน)
+  const isHomeroomAdvisor = useMemo(() => {
+    if (!currentUser || !selectedClass) return false;
+    if (isAdmin) return true; // แอดมินจัดการได้ทุกห้อง
+    const cName = (currentUser.name || '').trim().toLowerCase();
+
+    if (selectedClass.adviser && cName && selectedClass.adviser.toLowerCase().includes(cName)) return true;
+    if (selectedClass.coAdviser && cName && selectedClass.coAdviser.toLowerCase().includes(cName)) return true;
+    if (selectedClass.thirdAdviser && cName && selectedClass.thirdAdviser.toLowerCase().includes(cName)) return true;
+    if (Array.isArray(selectedClass.advisers) && selectedClass.advisers.some((a) => a.toLowerCase().includes(cName))) return true;
+
+    if (currentUser.classroomId && (currentUser.classroomId === selectedClass.id || currentUser.classroomId === selectedClass.roomNumber)) return true;
+
+    return false;
+  }, [currentUser, selectedClass, isAdmin]);
+
+  const canResetPassword = isAdmin || isHomeroomAdvisor;
+
+  // Password Reset Modals
+  const [resettingStudent, setResettingStudent] = useState<StudentRecord | null>(null);
+  const [isResetSingleModalOpen, setIsResetSingleModalOpen] = useState(false);
+  const [isResettingSingle, setIsResettingSingle] = useState(false);
+
+  const [isResetClassModalOpen, setIsResetClassModalOpen] = useState(false);
+  const [isResettingClass, setIsResettingClass] = useState(false);
+
+  const [isSlipModalOpen, setIsSlipModalOpen] = useState(false);
+  const [slipCopied, setSlipCopied] = useState(false);
 
   // Refs for clicking outside dropdowns
   const classDropdownRef = useRef<HTMLDivElement>(null);
@@ -175,7 +213,9 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
           const match = cls.find((c) => c.id === initialClassroomId || c.name === initialClassroomId);
           setSelectedClass(match || cls[0]);
         } else {
-          setSelectedClass((prev) => prev || (cls.find((c) => c.name === 'ม.3/1' || c.roomNumber === 'ม.3/1') || cls[0]));
+          const currentUser = authService.getCurrentUser();
+          const preferred = (currentUser?.classroomId && cls.find((c) => c.id === currentUser.classroomId || c.name === currentUser.classroomId)) || cls[0];
+          setSelectedClass((prev) => prev || preferred);
         }
       }
     } finally {
@@ -473,6 +513,43 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
     }
   };
 
+  // รีเซ็ตรหัสผ่านนักเรียนรายบุคคล (เป็นรหัสประจำตัว 5 หลัก)
+  const handleConfirmResetSingle = async () => {
+    if (!resettingStudent) return;
+    setIsResettingSingle(true);
+    try {
+      await authService.resetStudentPasswordByAdvisor(resettingStudent.code, currentUser?.name);
+      setToastMessage(
+        `✓ รีเซ็ตรหัสผ่านของ "${resettingStudent.name}" เป็นรหัสเริ่มต้น 5 หลัก (${resettingStudent.code}) เรียบร้อยแล้ว`
+      );
+      setIsResetSingleModalOpen(false);
+      setResettingStudent(null);
+      if (selectedClass) loadStudents(selectedClass.id);
+    } catch (err: any) {
+      alert(err?.message || 'เกิดข้อผิดพลาดในการรีเซ็ตรหัสผ่าน');
+    } finally {
+      setIsResettingSingle(false);
+    }
+  };
+
+  // รีเซ็ตรหัสผ่านนักเรียนทั้งห้องเรียน (เป็นรหัสประจำตัว 5 หลักของแต่ละคน)
+  const handleConfirmResetClass = async () => {
+    if (!selectedClass) return;
+    setIsResettingClass(true);
+    try {
+      const res = await authService.resetClassroomPasswords(selectedClass.id, currentUser?.name);
+      setToastMessage(
+        `✓ รีเซ็ตรหัสผ่านนักเรียนทั้งห้อง ${selectedClass.name} จำนวน ${res.count} คน เป็นรหัสเริ่มต้น 5 หลักเรียบร้อยแล้ว`
+      );
+      setIsResetClassModalOpen(false);
+      loadStudents(selectedClass.id);
+    } catch (err: any) {
+      alert(err?.message || 'เกิดข้อผิดพลาดในการรีเซ็ตรหัสผ่านห้อง');
+    } finally {
+      setIsResettingClass(false);
+    }
+  };
+
   // Add new student
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -574,8 +651,11 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
     }
   };
 
-  // นำเข้ารายชื่อนักเรียนจาก SGS & Smart Parser ที่ผ่านการตรวจสอบ Dry-Run แล้ว
-  const handleSgsImportConfirmed = async (confirmedRows: SgsParsedRow[]) => {
+  // นำเข้ารายชื่อนักเรียนจาก SGS & Smart Parser ที่ผ่านการตรวจสอบ Dry-Run แล้ว พร้อม Progress Bar รายงานความคืบหน้า
+  const handleSgsImportConfirmed = async (
+    confirmedRows: SgsParsedRow[],
+    onProgress?: (update: { current: number; total: number; percentage: number; currentStudentName?: string; roomName?: string }) => void
+  ) => {
     if (!selectedClass || confirmedRows.length === 0) return;
 
     try {
@@ -588,6 +668,8 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
       }
 
       const allRooms = await classroomService.getAll();
+      const totalStudents = confirmedRows.length;
+      let processedStudents = 0;
 
       for (const [roomName, rows] of rowsByRoom.entries()) {
         let room = allRooms.find(
@@ -642,9 +724,18 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
             targetScope: roomName,
             actor: 'ครูผู้สอน',
           }).catch(() => {});
+
+          processedStudents += updateSeatRows.length;
+          onProgress?.({
+            current: Math.min(processedStudents, totalStudents),
+            total: totalStudents,
+            percentage: Math.min(100, Math.round((processedStudents / totalStudents) * 100)),
+            currentStudentName: updateSeatRows[updateSeatRows.length - 1]?.fullName,
+            roomName,
+          });
         }
 
-        // Import new or transferred students
+        // Import new or transferred students with progress reporting
         if (newOrTransferRows.length > 0) {
           const studentsToImport: Array<Omit<StudentRecord, 'id'>> = newOrTransferRows.map((r) => ({
             no: r.parsedSeatNo ?? r.rowIndex,
@@ -657,7 +748,24 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
             classroomId: targetRoomId,
           }));
 
-          await studentService.batchImport(targetRoomId, studentsToImport);
+          const initialProcessed = processedStudents;
+          await studentService.batchImport(targetRoomId, studentsToImport, {
+            term: 2,
+            academicYear: 2569,
+            roomName,
+            onProgress: (p) => {
+              const currentOverall = initialProcessed + p.current;
+              onProgress?.({
+                current: Math.min(currentOverall, totalStudents),
+                total: totalStudents,
+                percentage: Math.min(100, Math.round((currentOverall / totalStudents) * 100)),
+                currentStudentName: p.currentStudentName,
+                roomName,
+              });
+            },
+          });
+
+          processedStudents += newOrTransferRows.length;
         }
       }
 
@@ -1130,7 +1238,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
             </div>
 
             {/* Reorder Mode Button & Actions */}
-            {isFullAccess && (
+            {(isFullAccess || canResetPassword) && (
               <div className="flex items-center gap-1.5">
                 {!isReorderMode ? (
                   <button
@@ -1193,6 +1301,33 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
                   <UserPlus className="w-3.5 h-3.5" />
                   <span>เพิ่มนักเรียน</span>
                 </button>
+
+                {canResetPassword && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsResetClassModalOpen(true)}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs shadow-2xs transition-all cursor-pointer"
+                      title={isAdmin ? "รีเซ็ตรหัสผ่านนักเรียนทั้งห้อง (สิทธิ์แอดมิน)" : "รีเซ็ตรหัสผ่านนักเรียนทั้งห้อง (ครูที่ปรึกษา)"}
+                    >
+                      <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                      <span>รีเซ็ตรหัสผ่านห้อง</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSlipCopied(false);
+                        setIsSlipModalOpen(true);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs shadow-2xs transition-all cursor-pointer"
+                      title="พิมพ์ใบรหัสผ่านเริ่มต้นสำหรับแจกนักเรียน"
+                    >
+                      <Printer className="w-3.5 h-3.5 text-slate-600" />
+                      <span>ใบรหัสผ่าน</span>
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -1459,6 +1594,21 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
                                 <ArrowRightLeft className="w-3.5 h-3.5" />
                                 <span>ย้ายห้องเรียน</span>
                               </button>
+                              {canResetPassword && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setResettingStudent(stu);
+                                    setIsResetSingleModalOpen(true);
+                                    setOpenActionMenuId(null);
+                                  }}
+                                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-amber-50 text-amber-700 text-left cursor-pointer font-medium"
+                                  title="รีเซ็ตรหัสผ่านกลับเป็นรหัสประจำตัว 5 หลัก"
+                                >
+                                  <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                                  <span>รีเซ็ตรหัสผ่าน (5 หลัก)</span>
+                                </button>
+                              )}
                               {isFullAccess && (
                                 <button
                                   type="button"
@@ -1614,6 +1764,21 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
                           <ArrowRightLeft className="w-3.5 h-3.5" />
                           <span>ย้ายห้องเรียน</span>
                         </button>
+                        {canResetPassword && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setResettingStudent(stu);
+                              setIsResetSingleModalOpen(true);
+                              setOpenActionMenuId(null);
+                            }}
+                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-amber-50 text-amber-700 text-left cursor-pointer font-medium"
+                            title="รีเซ็ตรหัสผ่านกลับเป็นรหัสประจำตัว 5 หลัก"
+                          >
+                            <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                            <span>รีเซ็ตรหัสผ่าน (5 หลัก)</span>
+                          </button>
+                        )}
                         {isFullAccess && (
                           <button
                             type="button"
@@ -2089,6 +2254,229 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
             totalScore: s.score || 80
           }))}
         />
+      )}
+
+      {/* Modal: รีเซ็ตรหัสผ่านนักเรียนรายบุคคล */}
+      {isResetSingleModalOpen && resettingStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-sm overflow-hidden animate-scale-up">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-amber-600" />
+                <h3 className="font-bold text-slate-900 text-sm">รีเซ็ตรหัสผ่านนักเรียน</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsResetSingleModalOpen(false);
+                  setResettingStudent(null);
+                }}
+                className="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="text-center space-y-2">
+                <div className="w-16 h-16 mx-auto rounded-full border-2 border-amber-200 overflow-hidden bg-amber-50 flex items-center justify-center">
+                  <img
+                    src={resettingStudent.avatarUrl || '/images/banners/student-avatar.png'}
+                    alt={resettingStudent.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div>
+                  <h4 className="font-bold text-slate-900 text-sm">{resettingStudent.name}</h4>
+                  <p className="text-xs text-slate-500 font-mono">
+                    เลขประจำตัว: {resettingStudent.code} (เลขที่ {resettingStudent.no})
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200 text-xs text-amber-900 space-y-1.5">
+                <p className="font-bold flex items-center gap-1.5">
+                  <span>🔑 รหัสผ่านเริ่มต้นใหม่:</span>
+                  <span className="font-mono bg-white px-2 py-0.5 rounded border border-amber-300 text-amber-950 font-extrabold text-sm">
+                    {resettingStudent.code}
+                  </span>
+                </p>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  เมื่อยืนยัน รหัสผ่านจะถูกรีเซ็ตกลับเป็นรหัสประจำตัว 5 หลัก นักเรียนสามารถใช้เข้าสู่ระบบและไปตั้งรหัสผ่านใหม่ได้ทันที
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsResetSingleModalOpen(false);
+                    setResettingStudent(null);
+                  }}
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-100 cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  disabled={isResettingSingle}
+                  onClick={handleConfirmResetSingle}
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>{isResettingSingle ? 'กำลังรีเซ็ต...' : 'ยืนยันรีเซ็ตรหัสผ่าน'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: รีเซ็ตรหัสผ่านนักเรียนทั้งห้องเรียน */}
+      {isResetClassModalOpen && selectedClass && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden animate-scale-up">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-amber-600" />
+                <h3 className="font-bold text-slate-900 text-sm">รีเซ็ตรหัสผ่านห้อง {selectedClass.name}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsResetClassModalOpen(false)}
+                className="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs">
+              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 space-y-2">
+                <p className="font-bold text-sm">
+                  ⚠️ ยืนยันการรีเซ็ตรหัสผ่านนักเรียนทั้งห้อง ({students.length} คน)
+                </p>
+                <p className="text-amber-800 leading-relaxed">
+                  รหัสผ่านของนักเรียนทุกคนในห้อง <strong>{selectedClass.name}</strong> จะถูกรีเซ็ตกลับเป็น <strong>รหัสประจำตัว 5 หลักของแต่ละคน</strong> (เช่น 15171)
+                </p>
+                <p className="text-[11px] text-amber-700">
+                  {isAdmin ? 'ดำเนินการโดยสิทธิ์: ผู้ดูแลระบบ (Admin)' : `ดำเนินการโดยครูที่ปรึกษา: ${currentUser?.name || selectedClass.adviser}`}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsResetClassModalOpen(false)}
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-100 cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  disabled={isResettingClass}
+                  onClick={handleConfirmResetClass}
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>{isResettingClass ? 'กำลังรีเซ็ต...' : `รีเซ็ตทั้ง ${students.length} คน`}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: พิมพ์ / ดูใบรหัสผ่านเริ่มต้นนักเรียน (Slip) */}
+      {isSlipModalOpen && selectedClass && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden animate-scale-up">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <Printer className="w-4 h-4 text-blue-600" />
+                <h3 className="font-bold text-slate-900 text-sm">
+                  ใบรหัสผ่านเริ่มต้นนักเรียน (ห้อง {selectedClass.name} • {students.length} คน)
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSlipModalOpen(false)}
+                className="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto flex-1 space-y-3 font-mono text-xs">
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                <p className="font-bold text-slate-800 font-sans">คำแนะนำสำหรับครูที่ปรึกษา:</p>
+                <p className="text-[11px] text-slate-600 font-sans">
+                  สามารถคัดลอกหรือสั่งพิมพ์ตารางรหัสผ่านเริ่มต้น (รหัส 5 หลัก) เพื่อแจกให้นักเรียนในห้องใช้เข้าสู่ระบบครั้งแรกได้ทันที
+                </p>
+              </div>
+
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead className="bg-slate-100 text-slate-700 font-sans font-bold">
+                    <tr>
+                      <th className="py-2 px-3 w-16 text-center">เลขที่</th>
+                      <th className="py-2 px-3">เลขประจำตัว</th>
+                      <th className="py-2 px-3">ชื่อ - นามสกุล</th>
+                      <th className="py-2 px-3 text-center">รหัสผ่านเริ่มต้น</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {students.map((s) => (
+                      <tr key={s.id} className="hover:bg-slate-50">
+                        <td className="py-2 px-3 text-center font-bold text-slate-600">{s.no}</td>
+                        <td className="py-2 px-3 font-mono font-bold text-blue-700">{s.code}</td>
+                        <td className="py-2 px-3 font-sans text-slate-800">{s.name}</td>
+                        <td className="py-2 px-3 text-center">
+                          <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-bold font-mono">
+                            {s.code}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
+              <button
+                type="button"
+                onClick={() => {
+                  const slipText = authService.generateStudentCredentialSlip(students);
+                  navigator.clipboard.writeText(slipText);
+                  setSlipCopied(true);
+                  setTimeout(() => setSlipCopied(false), 2000);
+                }}
+                className="px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              >
+                <Copy className="w-3.5 h-3.5 text-slate-500" />
+                <span>{slipCopied ? 'คัดลอกเรียบร้อยแล้ว ✓' : 'คัดลอกข้อความ Slip'}</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSlipModalOpen(false)}
+                  className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-100 cursor-pointer"
+                >
+                  ปิด
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>สั่งพิมพ์</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

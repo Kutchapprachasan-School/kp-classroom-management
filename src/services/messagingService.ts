@@ -662,19 +662,19 @@ export const messagingService = {
       return allGroups;
     }
 
-    const currentTeacherName = teacherUser?.name || 'นายปัญจพล เกษรัตน์';
+    const currentTeacherName = teacherUser?.name?.trim() || '';
     const allCls = classroomService.getClassroomsSync();
 
     // 1. ระบุห้องที่ปรึกษาของครูท่านนี้ (Homeroom)
-    const homeroom =
-      allCls.find(
-        (c) =>
-          c.id === teacherUser?.classroomId ||
-          c.adviser === currentTeacherName ||
-          (teacherUser?.name && c.adviser.includes(teacherUser.name.split(' ')[0]))
-      ) ||
-      allCls.find((c) => c.id === 'room-1-1') ||
-      allCls[0];
+    const homeroom = currentTeacherName
+      ? allCls.find(
+          (c) =>
+            c.id === teacherUser?.classroomId ||
+            c.adviser === currentTeacherName ||
+            (c.advisers && c.advisers.some((adv) => adv && (adv.includes(currentTeacherName) || currentTeacherName.includes(adv)))) ||
+            (c.adviser && c.adviser.includes(currentTeacherName.split(' ')[0]))
+        )
+      : (teacherUser?.classroomId ? allCls.find((c) => c.id === teacherUser.classroomId) : null);
 
     const allowedHomeroomKeys = new Set<string>();
     if (homeroom) {
@@ -1048,7 +1048,7 @@ export const messagingService = {
       });
     } else {
       // ผู้ส่งปัจจุบันคือนักเรียน -> ฝั่งตอบกลับคือครู
-      const teacherName = group.teacherName || 'ครูปัญจพล (ครูผู้สอน)';
+      const teacherName = group.teacherName || 'ครูผู้สอน';
       const replies = [
         'สวัสดีครับนักเรียน มีข้อสงสัยเรื่องบทเรียนสอบถามครูได้ตลอดเวลานะครับ 📚',
         'ครูตรวจงานให้แล้วนะครับ ทำได้ดีมาก พัฒนาต่อไปนะ! ⭐',

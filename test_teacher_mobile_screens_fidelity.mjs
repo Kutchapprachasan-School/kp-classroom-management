@@ -33,7 +33,7 @@ for (const file of expectedFiles) {
 
 // 2. Verify Screen 1 (HomeScreen)
 const homeContent = fs.readFileSync(path.join(mobileDir, 'TeacherMobileHomeScreen.tsx'), 'utf-8');
-assert(homeContent.includes('ครูปัญจพล เกษรัตน์'), 'Screen 1 missing teacher name');
+assert(homeContent.includes('teacherName'), 'Screen 1 missing teacher name');
 assert(homeContent.includes('งานที่ต้องดำเนินการด่วน'), 'Screen 1 missing urgent tasks header');
 assert(homeContent.includes('ตรวจงานนักเรียน'), 'Screen 1 missing grading task');
 console.log('✅ Screen 1 (Home Dashboard) passed checks');
@@ -103,7 +103,7 @@ console.log('✅ Screen 9 (School Info) passed checks');
 
 // 11. Verify Screen 10 (MoreMenuScreen)
 const moreMenuContent = fs.readFileSync(path.join(mobileDir, 'TeacherMobileMoreMenuScreen.tsx'), 'utf-8');
-assert(moreMenuContent.includes('ครูปัญจพล เกษรัตน์'), 'Screen 10 missing teacher name');
+assert(moreMenuContent.includes('teacherName'), 'Screen 10 missing teacher name');
 assert(moreMenuContent.includes('ตรวจงาน / สอน'), 'Screen 10 missing grading item');
 assert(moreMenuContent.includes('ออกจากระบบ'), 'Screen 10 missing logout button');
 console.log('✅ Screen 10 (More Menu) passed checks');

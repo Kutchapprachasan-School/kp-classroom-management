@@ -5,6 +5,8 @@ import type { SchoolSettingsConfig } from '../../config/schoolSettings';
 import { bellScheduleService, type BellScheduleTimelineItem } from '../../services/bellScheduleService';
 import { TEACHER_SUBJECTS_LIST } from '../../services/teacherCourseAssignmentService';
 import { cleanSlateService } from '../../services/cleanSlateService';
+import { formatClassroomLabel } from '../../services/studentService';
+import { calendarEventStorageService } from '../../services/calendarEventStorageService';
 
 interface StudentTimetableViewProps {
   onBack: () => void;
@@ -12,16 +14,25 @@ interface StudentTimetableViewProps {
   schoolSettings?: SchoolSettingsConfig;
 }
 
+const DAY_MAP = {
+  MON: 'จันทร์',
+  TUE: 'อังคาร',
+  WED: 'พุธ',
+  THU: 'พฤหัสบดี',
+  FRI: 'ศุกร์',
+} as const;
+
 export const StudentTimetableView: React.FC<StudentTimetableViewProps> = ({
   onBack,
   currentUser,
 }) => {
   const [selectedDay, setSelectedDay] = useState<'MON' | 'TUE' | 'WED' | 'THU' | 'FRI'>('MON');
-  const studentRoom = currentUser?.classroomId || 'ม.3/1';
+  const studentRoom = formatClassroomLabel(currentUser?.classroomName || currentUser?.classroomId) || 'ม.3/1';
   const isClean = cleanSlateService.isCleanSlateActive();
 
   // Load configured timeline from bell schedule service
   const timeline = bellScheduleService.getPeriodsTimeline();
+  const matrixSlots = calendarEventStorageService.loadMatrixSlots();
   const scheduleDays = [
     { key: 'MON' as const, label: 'จันทร์', isToday: new Date().getDay() === 1 },
     { key: 'TUE' as const, label: 'อังคาร', isToday: new Date().getDay() === 2 },
@@ -32,7 +43,11 @@ export const StudentTimetableView: React.FC<StudentTimetableViewProps> = ({
 
   // Matched subjects for this student's classroom
   const roomSubjects = TEACHER_SUBJECTS_LIST.filter((s) =>
-    s.classrooms.some((c) => c === studentRoom || c.includes(studentRoom))
+    s.classrooms.some((c) => {
+      const normC = formatClassroomLabel(c);
+      const normRoom = formatClassroomLabel(studentRoom);
+      return normC === normRoom || normC.includes(normRoom) || normRoom.includes(normC);
+    })
   );
 
   return (
@@ -133,8 +148,27 @@ export const StudentTimetableView: React.FC<StudentTimetableViewProps> = ({
             );
           }
 
-          // Regular period
-          const subject = roomSubjects[index % Math.max(1, roomSubjects.length)];
+          // Regular period matching matrix slots or day-offset subjects
+          const thaiDay = DAY_MAP[selectedDay];
+          const matchedMatrix = matrixSlots.find(
+            (m) =>
+              m.day === thaiDay &&
+              m.period === slot.periodNumber &&
+              !m.isFreePeriod &&
+              !m.isLunchSlot &&
+              (formatClassroomLabel(m.room) === studentRoom ||
+                formatClassroomLabel(m.room).includes(studentRoom) ||
+                studentRoom.includes(formatClassroomLabel(m.room)))
+          );
+
+          const dayIndex = ['MON', 'TUE', 'WED', 'THU', 'FRI'].indexOf(selectedDay);
+          const fallbackSubject =
+            roomSubjects.length > 0 ? roomSubjects[(index + dayIndex * 2) % roomSubjects.length] : null;
+
+          const code = matchedMatrix?.subjectCode || fallbackSubject?.code;
+          const name = matchedMatrix?.subjectName || fallbackSubject?.name;
+          const credits = matchedMatrix?.credits || fallbackSubject?.credits;
+
           return (
             <div
               key={slot.id}
@@ -147,11 +181,11 @@ export const StudentTimetableView: React.FC<StudentTimetableViewProps> = ({
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-bold text-slate-900 text-sm">
-                      {subject ? `${subject.code} ${subject.name}` : `คาบเรียนที่ ${slot.periodNumber}`}
+                      {code && name ? `${code} ${name}` : `คาบเรียนที่ ${slot.periodNumber}`}
                     </span>
-                    {subject && (
+                    {credits && (
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
-                        {subject.credits} หน่วยกิต
+                        {credits} หน่วยกิต
                       </span>
                     )}
                   </div>

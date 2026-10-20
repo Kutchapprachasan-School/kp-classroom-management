@@ -24,7 +24,7 @@ import {
 import { MobileVerticalAttendanceSheet } from '../components/teacher/MobileVerticalAttendanceSheet';
 import { PaperRegisterLedger } from '../components/teacher/PaperRegisterLedger';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
-import { studentService, type StudentRecord } from '../services/studentService';
+import { studentService, formatClassroomLabel, type StudentRecord } from '../services/studentService';
 import { authService } from '../services/authService';
 
 interface StudentAffairsCouncilViewProps {
@@ -107,7 +107,7 @@ export const StudentAffairsCouncilView: React.FC<
     const updated = studentAffairsCouncilService.addDisciplineLog({
       studentCode: stu.code || stu.id,
       studentName: stu.name,
-      classroom: stu.classroomId || 'ม.3/1',
+      classroom: formatClassroomLabel(stu.classroomId) || 'ม.3/1',
       type: newDiscType,
       points: Number(newDiscPoints),
       reason: newDiscReason.trim(),

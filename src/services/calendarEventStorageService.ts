@@ -9,6 +9,7 @@ import {
 } from './academicCalendarService.ts';
 import { cleanSlateService } from './cleanSlateService';
 import { bellScheduleService } from './bellScheduleService';
+import { authService } from './authService';
 import {
   INITIAL_MATRIX_SLOTS,
   getBangkokNow,
@@ -18,6 +19,14 @@ import {
 export const CALENDAR_EVENTS_STORAGE_KEY = 'kp_school_calendar_events_v2';
 export const MATRIX_STORAGE_KEY = 'kp_teacher_matrix_slots';
 export const MATRIX_SLOTS_UPDATED_EVENT = 'kp_matrix_slots_updated';
+
+/**
+ * คืนค่า Storage Key สำหรับตารางสอนแยกรายบุคคลของครูแต่ละคน (ของใครของมัน)
+ */
+export const getMatrixStorageKey = (teacherId?: string): string => {
+  const effectiveTeacherId = teacherId || authService.getCurrentUser()?.id;
+  return effectiveTeacherId ? `${MATRIX_STORAGE_KEY}_${effectiveTeacherId}` : MATRIX_STORAGE_KEY;
+};
 
 export type CalendarLegendColor = 'BLUE' | 'ORANGE' | 'GREEN' | 'RED' | 'PURPLE';
 
@@ -181,28 +190,61 @@ export const calendarEventStorageService = {
     return dayMap[jsDay] || 'ศุกร์';
   },
 
-  // อ่าน Matrix Slots ทั้งหมดจาก LocalStorage (ซิงค์ตรงกับหน้าตารางสอน TimetableView)
-  loadMatrixSlots(): TimetableMatrixSlot[] {
+  getMatrixStorageKey(teacherId?: string): string {
+    return getMatrixStorageKey(teacherId);
+  },
+
+  // อ่าน Matrix Slots ทั้งหมดจาก LocalStorage โดยแยกตามครูผู้สอน (ของใครของมัน)
+  loadMatrixSlots(teacherId?: string): TimetableMatrixSlot[] {
     if (typeof window === 'undefined') {
       return [];
     }
+    const scopedKey = getMatrixStorageKey(teacherId);
     try {
-      const raw = localStorage.getItem(MATRIX_STORAGE_KEY);
+      const raw = localStorage.getItem(scopedKey);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
           return bellScheduleService.syncMatrixSlotsWithBellSchedule(parsed);
         }
       }
+
+      // หากยังไม่มีตารางสอนเฉพาะของครูท่านนี้ ตรวจสอบตารางส่วนกลางเดิม (ถ้ามี)
+      if (scopedKey !== MATRIX_STORAGE_KEY) {
+        const legacyRaw = localStorage.getItem(MATRIX_STORAGE_KEY);
+        if (legacyRaw) {
+          const parsedLegacy = JSON.parse(legacyRaw);
+          if (Array.isArray(parsedLegacy) && parsedLegacy.length > 0) {
+            const currentUserId = teacherId || authService.getCurrentUser()?.id;
+            const mySlots = parsedLegacy.filter((s) => s.teacherId === currentUserId);
+            if (mySlots.length > 0) {
+              return bellScheduleService.syncMatrixSlotsWithBellSchedule(mySlots);
+            }
+          }
+        }
+      }
     } catch {}
+
     const initial = cleanSlateService.isCleanSlateActive() ? [] : INITIAL_MATRIX_SLOTS;
     return bellScheduleService.syncMatrixSlotsWithBellSchedule(initial);
   },
 
   // คำนวณจำนวนคาบสอนจริงของวันนี้จาก Matrix Slots (ตัดคาบว่าง, คาบพักเที่ยงออก)
-  getTodayTeachingPeriodsCount(dayKey?: 'จันทร์' | 'อังคาร' | 'พุธ' | 'พฤหัสบดี' | 'ศุกร์'): number {
+  // หากอยู่นอกช่วงเปิดภาคเรียน หรือเป็นวันหยุด จะคืนค่า 0 ทันที ไม่แจ้งเตือน
+  getTodayTeachingPeriodsCount(
+    dayKey?: 'จันทร์' | 'อังคาร' | 'พุธ' | 'พฤหัสบดี' | 'ศุกร์',
+    teacherId?: string
+  ): number {
+    const todayDate = getBangkokNow();
+    const todayIso = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
+    
+    // 1. ถ้าอยู่นอกช่วงเปิดเทอม หรือเป็นวันหยุด ไม่นับคาบสอน
+    if (!academicCalendarService.isInstructionalDay(todayIso)) {
+      return 0;
+    }
+
     const targetDay = dayKey || this.getTodayDayKey();
-    const matrix = this.loadMatrixSlots();
+    const matrix = this.loadMatrixSlots(teacherId);
     const todayTeachingSlots = matrix.filter(
       (s) =>
         s.day === targetDay &&
@@ -216,10 +258,21 @@ export const calendarEventStorageService = {
     return todayTeachingSlots.length;
   },
 
-  // ดึงรายการคาบสอนจริงของวันนี้จาก Matrix Slots
-  getTodayTeachingSlots(dayKey?: 'จันทร์' | 'อังคาร' | 'พุธ' | 'พฤหัสบดี' | 'ศุกร์'): TimetableMatrixSlot[] {
+  // ดึงรายการคาบสอนจริงของวันนี้จาก Matrix Slots (หากปิดเทอมหรือเป็นวันหยุดจะคืนค่า [])
+  getTodayTeachingSlots(
+    dayKey?: 'จันทร์' | 'อังคาร' | 'พุธ' | 'พฤหัสบดี' | 'ศุกร์',
+    teacherId?: string
+  ): TimetableMatrixSlot[] {
+    const todayDate = getBangkokNow();
+    const todayIso = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
+
+    // ถ้าอยู่นอกช่วงเปิดเทอม หรือเป็นวันหยุด คืนค่าว่าง
+    if (!academicCalendarService.isInstructionalDay(todayIso)) {
+      return [];
+    }
+
     const targetDay = dayKey || this.getTodayDayKey();
-    const matrix = this.loadMatrixSlots();
+    const matrix = this.loadMatrixSlots(teacherId);
     return matrix
       .filter(
         (s) =>
@@ -235,9 +288,10 @@ export const calendarEventStorageService = {
   },
 
   // บันทึกสถานะการเช็คชื่อของคาบสอนลงใน Matrix Slots และกระจาย Event ซิงค์
-  markMatrixSlotChecked(day: string, period: number): void {
+  markMatrixSlotChecked(day: string, period: number, teacherId?: string): void {
     if (typeof window === 'undefined') return;
-    const current = this.loadMatrixSlots();
+    const scopedKey = getMatrixStorageKey(teacherId);
+    const current = this.loadMatrixSlots(teacherId);
     const updated = current.map((s) => {
       if (s.day === day && s.period === period) {
         return { ...s, status: 'CHECKED' as const, isConducted: true };
@@ -245,7 +299,7 @@ export const calendarEventStorageService = {
       return s;
     });
     try {
-      localStorage.setItem(MATRIX_STORAGE_KEY, JSON.stringify(updated));
+      localStorage.setItem(scopedKey, JSON.stringify(updated));
       window.dispatchEvent(new CustomEvent(MATRIX_SLOTS_UPDATED_EVENT, { detail: updated }));
       window.dispatchEvent(new Event('storage'));
     } catch {}

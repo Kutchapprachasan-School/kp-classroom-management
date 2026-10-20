@@ -13,10 +13,51 @@ export type StudentTransferState = 'ACTIVE' | 'TRANSFERRED_IN' | 'TRANSFERRED_OU
 export type StudentGender = 'MALE' | 'FEMALE';
 export type SgsInsertPosition = 'AFTER_SAME_GENDER' | 'END_OF_CLASS' | 'CUSTOM_SEAT';
 
+export type FourScorePart = 'PRE_MIDTERM' | 'MIDTERM' | 'POST_MIDTERM' | 'FINAL';
+
+export interface CourseScoreWeights {
+  courseCode: string;
+  preMidterm: number;  // ก่อนกลางภาค (เช่น 25 หรือ 30)
+  midterm: number;     // กลางภาค (เช่น 20)
+  postMidterm: number; // หลังกลางภาค (เช่น 25 หรือ 30)
+  final: number;       // ปลายภาค (เช่น 30 หรือ 20)
+}
+
+export interface StudentCourseScoreEntry {
+  preMidterm?: number | null;
+  midterm?: number | null;
+  postMidterm?: number | null;
+  final?: number | null;
+  analyticalThinkingLevel?: 0 | 1 | 2 | 3;
+  desiredCharacteristicsLevel?: 0 | 1 | 2 | 3;
+  isAttributeManual?: boolean;
+}
+
+export const DESIRABLE_CHARACTERISTICS_LIST: string[] = [
+  '1. รักชาติ ศาสน์ กษัตริย์',
+  '2. ซื่อสัตย์สุจริต',
+  '3. มีวินัย',
+  '4. ใฝ่เรียนรู้',
+  '5. อยู่อย่างพอเพียง',
+  '6. มุ่งมั่นในการทำงาน',
+  '7. รักความเป็นไทย',
+  '8. มีจิตสาธารณะ',
+];
+
+export const CRITICAL_THINKING_LIST: string[] = [
+  '1. การอ่านเพื่อหาข้อมูลสารสนเทศ',
+  '2. การจับประเด็นสำคัญและแยกแยะข้อเท็จจริง',
+  '3. การคิดวิเคราะห์ เชื่อมโยง และสังเคราะห์',
+  '4. การประเมินค่าและตัดสินใจอย่างมีเหตุผล',
+  '5. การเขียนสื่อสารอย่างสร้างสรรค์',
+];
+
 export interface SgsStudentRecord {
   sgsSeatNo: number; // เลขที่ตามใบรายชื่อ SGS (ศูนย์กลางจากห้องทะเบียน/ครูที่ปรึกษา)
+  no: number;
   studentCode: string;
   studentName: string;
+  fullName: string;
   gender: StudentGender; // ชายขึ้นก่อนหญิง (ผู้ชายเข้าใหม่ต่อท้ายผู้ชาย)
   classroom: string;
   transferState: StudentTransferState;
@@ -30,17 +71,33 @@ export interface SgsStudentRecord {
   manualAccumulatedOverride?: number | null;
   manualOverrideNote?: string;
   attendancePercent: number;
+  attendanceRate: number;
+  specialStatus: 'NORMAL' | 'ร' | 'มส';
   morningStatusLabel: string;
-  midtermScore: number; // เต็ม 20
-  finalScore: number; // เต็ม 30
+  preMidtermScore?: number | null; // คะแนนก่อนกลางภาค
+  midtermScore: number; // คะแนนกลางภาค
+  postMidtermScore?: number | null; // คะแนนหลังกลางภาค
+  finalScore: number; // คะแนนปลายภาค
   analyticalThinkingLevel?: 0 | 1 | 2 | 3; // อ่าน คิดวิเคราะห์ และเขียน (ระดับ 0-3)
   desiredCharacteristicsLevel?: 0 | 1 | 2 | 3; // คุณลักษณะอันพึงประสงค์ (ระดับ 0-3)
+  desirableCharacteristics: (0 | 1 | 2 | 3)[];
+  criticalThinking: (0 | 1 | 2 | 3)[];
+  submissions?: Record<string, { score?: number | null; status?: string; submittedAt?: string; teacherNote?: string; note?: string }>;
+  isAttributeManual?: boolean;
+  courseScores?: Record<string, StudentCourseScoreEntry>;
 }
 
 export interface TermAssignmentItem {
   id: string;
   orderNo: number;
   title: string;
+  description?: string;
+  courseCode?: string;
+  courseName?: string;
+  unitKey?: 'U1' | 'U2' | 'U3' | 'MIDTERM' | 'FINAL' | string;
+  indicatorCode?: string;
+  targetClassrooms?: string[]; // ['ALL'] หรือ ['ม.1/1', 'ม.1/2']
+  scorePart?: FourScorePart;   // 'PRE_MIDTERM' | 'MIDTERM' | 'POST_MIDTERM' | 'FINAL'
   sgsUnit: 'u1' | 'u2' | 'u3'; // ผูกเข้าช่องคะแนน SGS (หน่วย 1, 2, 3)
   sgsUnitLabel: string;
   maxScore: number;
@@ -49,6 +106,8 @@ export interface TermAssignmentItem {
   // Q3-A: งานบังคับ / ตัวชี้วัดต้องรู้ (ถ้าไม่ส่งติด "ร" ทันที และเมื่อตรวจให้คะแนนแล้วปลด "ร" อัตโนมัติ)
   isRequiredForPass?: boolean;
 }
+
+export type TermAssignmentConfig = TermAssignmentItem;
 
 export interface CentralRosterSyncMeta {
   lastUpdatedBy: string;
@@ -84,6 +143,7 @@ const STORAGE_KEY_SGS_ROSTER = 'kp_sgs_roster_v3';
 const STORAGE_KEY_TERM_ASSIGNMENTS = 'kp_term_assignments_v2';
 const STORAGE_KEY_WORK_SUBMISSIONS = 'kp_work_submissions_v2';
 const STORAGE_KEY_ROSTER_SYNC_META = 'kp_sgs_roster_sync_meta_v1';
+const STORAGE_KEY_COURSE_WEIGHTS = 'kp_course_four_part_weights_v1';
 
 // เรียงตามมาตรฐานทะเบียนโรงเรียนไทย: นักเรียนชาย (เลขที่ 1-5) -> นักเรียนหญิง (เลขที่ 6-8)
 const INITIAL_SGS_ROSTER: SgsStudentRecord[] = [];
@@ -93,46 +153,166 @@ export const INITIAL_TERM_ASSIGNMENTS: TermAssignmentItem[] = [];
 export const INITIAL_SUBMISSIONS: StudentWorkSubmission[] = [];
 
 export const sgsRosterAndSubmissionService = {
+  getCourseWeights(courseCode = 'DEFAULT'): CourseScoreWeights {
+    const key = courseCode || 'DEFAULT';
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_COURSE_WEIGHTS);
+      if (raw) {
+        const map: Record<string, CourseScoreWeights> = JSON.parse(raw);
+        if (map[key]) return map[key];
+      }
+    } catch {
+      // ignore
+    }
+    return {
+      courseCode: key,
+      preMidterm: 25,
+      midterm: 20,
+      postMidterm: 25,
+      final: 30,
+    };
+  },
+
+  saveCourseWeights(weights: CourseScoreWeights): CourseScoreWeights {
+    const key = weights.courseCode || 'DEFAULT';
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_COURSE_WEIGHTS);
+      const map: Record<string, CourseScoreWeights> = raw ? JSON.parse(raw) : {};
+      map[key] = {
+        courseCode: key,
+        preMidterm: Number(weights.preMidterm) || 0,
+        midterm: Number(weights.midterm) || 0,
+        postMidterm: Number(weights.postMidterm) || 0,
+        final: Number(weights.final) || 0,
+      };
+      localStorage.setItem(STORAGE_KEY_COURSE_WEIGHTS, JSON.stringify(map));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('kp-sgs-roster-updated'));
+      }
+      return map[key];
+    } catch {
+      return weights;
+    }
+  },
+
   getSgsRoster(classroomId?: string): SgsStudentRecord[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_SGS_ROSTER);
-      if (raw) {
-        const parsed: SgsStudentRecord[] = JSON.parse(raw);
-        if (classroomId) {
-          const isNonGrade1 = !classroomId.includes('1-') && !classroomId.includes('1/');
-          const formatted = formatClassroomLabel(classroomId);
-          let filtered = parsed.filter((s) => s.classroom === classroomId || s.classroom === formatted);
-          if (isNonGrade1) {
-            filtered = filtered.filter((s) => !isGrade1SgsStudentCode(s.studentCode));
-          }
-          if (filtered.length > 0) return filtered;
-        } else {
-          return parsed;
+      const savedList: SgsStudentRecord[] = raw ? JSON.parse(raw) : [];
+      const savedMap = new Map<string, SgsStudentRecord>();
+      savedList.forEach((item) => {
+        if (item && item.studentCode) {
+          savedMap.set(String(item.studentCode).trim(), item);
         }
-      }
+      });
 
-      const targetRoom = classroomId || 'room-3-1';
-      const formatted = formatClassroomLabel(targetRoom);
-      const isNonGrade1 = !targetRoom.includes('1-') && !targetRoom.includes('1/');
+      const targetRoom = classroomId || '';
+      const formatted = targetRoom ? formatClassroomLabel(targetRoom) : '';
+      const isNonGrade1 = targetRoom
+        ? !targetRoom.includes('1-') && !targetRoom.includes('1/') && !formatted.includes('1/')
+        : false;
 
-      // ดึงรายชื่อนักเรียนจาก studentService เพื่อให้นักเรียนในห้องเรียนต่างๆ ปรากฏใน ปพ.5 เสมอ
-      let students = studentService.getStudents(targetRoom);
+      // ดึงรายชื่อนักเรียนจริงจาก studentService เพื่อให้นักเรียนในห้องเรียนต่างๆ ปรากฏใน ปพ.5 เสมอ
+      let students = targetRoom ? studentService.getStudents(targetRoom) : [];
       if (isNonGrade1) {
         students = students.filter((stu) => !isGrade1SgsStudentCode(stu.code));
       }
+
+      const allSubs = this.getSubmissions();
+      const enrichRecord = (rec: SgsStudentRecord, idx: number): SgsStudentRecord => {
+        const seatNo = rec.sgsSeatNo ?? rec.no ?? idx + 1;
+        const name = rec.studentName || rec.fullName || '';
+        const att = rec.attendancePercent ?? rec.attendanceRate ?? 100;
+        const charLvl = rec.desiredCharacteristicsLevel ?? 3;
+        const critLvl = rec.analyticalThinkingLevel ?? 3;
+        const stuSubsMap: Record<string, { score?: number | null; status?: string; submittedAt?: string; teacherNote?: string; note?: string }> = {
+          ...(rec.submissions || {}),
+        };
+        allSubs
+          .filter((sub) => sub.studentCode === rec.studentCode)
+          .forEach((sub) => {
+            stuSubsMap[sub.assignmentId] = {
+              score: sub.score ?? null,
+              status: sub.status === 'GRADED' ? 'GRADED' : sub.status === 'SUBMITTED_PENDING' ? 'SUBMITTED' : 'MISSING',
+              submittedAt: sub.submittedAt,
+              teacherNote: sub.teacherFeedback,
+              note: sub.teacherFeedback,
+            };
+          });
+        return {
+          ...rec,
+          sgsSeatNo: seatNo,
+          no: seatNo,
+          studentName: name,
+          fullName: name,
+          attendancePercent: att,
+          attendanceRate: att,
+          specialStatus: rec.specialStatus || 'NORMAL',
+          desirableCharacteristics:
+            rec.desirableCharacteristics && rec.desirableCharacteristics.length === 8
+              ? rec.desirableCharacteristics
+              : Array(8).fill(charLvl),
+          criticalThinking:
+            rec.criticalThinking && rec.criticalThinking.length === 5
+              ? rec.criticalThinking
+              : Array(5).fill(critLvl),
+          submissions: stuSubsMap,
+        };
+      };
+
       if (students && students.length > 0) {
-        return students.map((stu, idx) => ({
-          sgsSeatNo: stu.no || idx + 1,
-          studentCode: stu.code,
-          studentName: stu.name,
-          gender: (stu.gender || (stu.name.includes('ด.ญ.') || stu.name.includes('นางสาว') ? 'FEMALE' : 'MALE')) as StudentGender,
-          classroom: formatted,
-          transferState: 'ACTIVE' as StudentTransferState,
-          attendancePercent: 0,
-          morningStatusLabel: '',
-          midtermScore: '' as any,
-          finalScore: '' as any,
-        }));
+        return students.map((stu, idx) => {
+          const code = String(stu.code).trim();
+          const saved = savedMap.get(code);
+          const inferredGender = (stu.gender ||
+            (stu.name.includes('ด.ญ.') || stu.name.includes('นางสาว') || stu.name.includes('น.ส.')
+              ? 'FEMALE'
+              : 'MALE')) as StudentGender;
+          const baseRec: SgsStudentRecord = {
+            sgsSeatNo: saved?.sgsSeatNo ?? (stu.no || idx + 1),
+            no: saved?.sgsSeatNo ?? (stu.no || idx + 1),
+            studentCode: code,
+            studentName: stu.name || saved?.studentName || '',
+            fullName: stu.name || saved?.studentName || '',
+            gender: saved?.gender || inferredGender,
+            classroom: formatted || saved?.classroom || targetRoom,
+            transferState: saved?.transferState || ('ACTIVE' as StudentTransferState),
+            transferDate: saved?.transferDate,
+            transferNote: saved?.transferNote,
+            transferredBaseScore: saved?.transferredBaseScore,
+            manualAccumulatedOverride: saved?.manualAccumulatedOverride,
+            manualOverrideNote: saved?.manualOverrideNote,
+            attendancePercent: saved?.attendancePercent ?? 100,
+            attendanceRate: saved?.attendancePercent ?? 100,
+            specialStatus: saved?.specialStatus || 'NORMAL',
+            morningStatusLabel: saved?.morningStatusLabel || '',
+            preMidtermScore: saved?.preMidtermScore ?? null,
+            midtermScore: typeof saved?.midtermScore === 'number' ? saved.midtermScore : ('' as any),
+            postMidtermScore: saved?.postMidtermScore ?? null,
+            finalScore: typeof saved?.finalScore === 'number' ? saved.finalScore : ('' as any),
+            analyticalThinkingLevel: saved?.analyticalThinkingLevel,
+            desiredCharacteristicsLevel: saved?.desiredCharacteristicsLevel,
+            desirableCharacteristics: saved?.desirableCharacteristics || Array(8).fill(3),
+            criticalThinking: saved?.criticalThinking || Array(5).fill(3),
+            isAttributeManual: saved?.isAttributeManual,
+            courseScores: saved?.courseScores || {},
+            submissions: saved?.submissions || {},
+          };
+          return enrichRecord(baseRec, idx);
+        });
+      }
+
+      if (savedList.length > 0) {
+        if (classroomId) {
+          let filtered = savedList.filter(
+            (s) => s.classroom === classroomId || s.classroom === formatted
+          );
+          if (isNonGrade1) {
+            filtered = filtered.filter((s) => !isGrade1SgsStudentCode(s.studentCode));
+          }
+          return filtered.map((s, idx) => enrichRecord(s, idx));
+        }
+        return savedList.map((s, idx) => enrichRecord(s, idx));
       }
 
       return [];
@@ -142,7 +322,21 @@ export const sgsRosterAndSubmissionService = {
   },
 
   saveSgsRoster(roster: SgsStudentRecord[], actorLabel = 'งานทะเบียน / ครูที่ปรึกษา'): SgsStudentRecord[] {
-    localStorage.setItem(STORAGE_KEY_SGS_ROSTER, JSON.stringify(roster));
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_SGS_ROSTER);
+      const existingList: SgsStudentRecord[] = raw ? JSON.parse(raw) : [];
+      const mergedMap = new Map<string, SgsStudentRecord>();
+      existingList.forEach((s) => {
+        if (s && s.studentCode) mergedMap.set(String(s.studentCode).trim(), s);
+      });
+      roster.forEach((s) => {
+        if (s && s.studentCode) mergedMap.set(String(s.studentCode).trim(), s);
+      });
+      const mergedArray = Array.from(mergedMap.values());
+      localStorage.setItem(STORAGE_KEY_SGS_ROSTER, JSON.stringify(mergedArray));
+    } catch {
+      localStorage.setItem(STORAGE_KEY_SGS_ROSTER, JSON.stringify(roster));
+    }
     this.markCentralRosterSynced(
       actorLabel,
       `ซิงค์ลำดับเลขที่ SGS (${roster.length} รายชื่อ • ชาย ➔ หญิง)`
@@ -186,24 +380,81 @@ export const sgsRosterAndSubmissionService = {
     return meta;
   },
 
+  // อัปเดตคะแนน 4 ส่วน (ก่อนกลางภาค, กลางภาค, หลังกลางภาค, ปลายภาค) รายบุคคล
+  updateStudentFourPartScore(
+    studentCode: string,
+    partInput: 'preMidterm' | 'midterm' | 'postMidterm' | 'final' | FourScorePart,
+    rawScore: number | null,
+    classroomId?: string,
+    courseCode?: string
+  ): SgsStudentRecord[] {
+    const partNormalized: 'preMidterm' | 'midterm' | 'postMidterm' | 'final' =
+      partInput === 'PRE_MIDTERM'
+        ? 'preMidterm'
+        : partInput === 'MIDTERM'
+        ? 'midterm'
+        : partInput === 'POST_MIDTERM'
+        ? 'postMidterm'
+        : partInput === 'FINAL'
+        ? 'final'
+        : partInput;
+    const weights = this.getCourseWeights(courseCode);
+    const maxMap = {
+      preMidterm: weights.preMidterm,
+      midterm: weights.midterm,
+      postMidterm: weights.postMidterm,
+      final: weights.final,
+    };
+    const maxAllowed = maxMap[partNormalized] ?? 100;
+    const clamped =
+      rawScore === null || Number.isNaN(rawScore)
+        ? null
+        : Math.max(0, Math.min(maxAllowed, Number(rawScore)));
+
+    const cKey = courseCode || 'DEFAULT';
+    const roster = this.getSgsRoster(classroomId).map((stu) => {
+      if (stu.studentCode !== studentCode) return stu;
+      const prevCourse = stu.courseScores?.[cKey] || {};
+      const nextCourse: StudentCourseScoreEntry = {
+        ...prevCourse,
+        [partNormalized]: clamped,
+      };
+      return {
+        ...stu,
+        preMidtermScore: partNormalized === 'preMidterm' ? clamped : stu.preMidtermScore,
+        midtermScore:
+          partNormalized === 'midterm' ? (clamped === null ? ('' as any) : clamped) : stu.midtermScore,
+        postMidtermScore: partNormalized === 'postMidterm' ? clamped : stu.postMidtermScore,
+        finalScore:
+          partNormalized === 'final' ? (clamped === null ? ('' as any) : clamped) : stu.finalScore,
+        courseScores: {
+          ...(stu.courseScores || {}),
+          [cKey]: nextCourse,
+        },
+      };
+    });
+    return this.saveSgsRoster(roster, 'ครูประจำวิชา (บันทึกคะแนน 4 ส่วน)');
+  },
+
   // Q1-C: ครูประจำวิชาพิมพ์คะแนนเก็บสุทธิทับเองท้ายเทอมได้อิสระ (เต็ม 50) สำหรับกรณีบางวิชาไม่มีเทียบโอน
   updateStudentManualAccumulatedScore(
     studentCode: string,
     manualScore: number | null,
-    note?: string
+    note?: string,
+    classroomId?: string
   ): SgsStudentRecord[] {
     const clamped =
       manualScore === null || Number.isNaN(manualScore)
         ? null
-        : Math.max(0, Math.min(50, Math.round(manualScore)));
-    const roster = this.getSgsRoster().map((stu) => {
+        : Math.max(0, Math.min(60, Math.round(manualScore)));
+    const roster = this.getSgsRoster(classroomId).map((stu) => {
       if (stu.studentCode !== studentCode) return stu;
       return {
         ...stu,
         manualAccumulatedOverride: clamped,
         manualOverrideNote:
           clamped !== null
-            ? note || `ครูผู้สอนกำหนดคะแนนเก็บสุทธิท้ายเทอม (${clamped}/50)`
+            ? note || `ครูผู้สอนกำหนดคะแนนเก็บสุทธิท้ายเทอม (${clamped})`
             : undefined,
       };
     });
@@ -261,8 +512,10 @@ export const sgsRosterAndSubmissionService = {
 
     const newStudent: SgsStudentRecord = {
       sgsSeatNo: assignedSeatNo,
+      no: assignedSeatNo,
       studentCode: payload.studentCode,
       studentName: payload.studentName,
+      fullName: payload.studentName,
       gender: payload.gender,
       classroom: 'ม.3/1',
       transferState: 'TRANSFERRED_IN',
@@ -279,9 +532,13 @@ export const sgsRosterAndSubmissionService = {
         ? `ไม่มีคะแนนเทียบโอน — ครูระบุคะแนนเก็บสุทธิ ${payload.manualNetAccumulatedScore}/50`
         : undefined,
       attendancePercent: 100,
+      attendanceRate: 100,
+      specialStatus: 'NORMAL',
       morningStatusLabel: 'มาเข้าแถวปกติ (นักเรียนย้ายเข้าใหม่)',
       midtermScore: 15,
       finalScore: 22,
+      desirableCharacteristics: Array(8).fill(3),
+      criticalThinking: Array(5).fill(3),
     };
 
     const nextRoster = [
@@ -349,11 +606,29 @@ export const sgsRosterAndSubmissionService = {
     return this.saveSgsRoster(roster, 'งานทะเบียน / ครูที่ปรึกษา');
   },
 
-  getTermAssignments(): TermAssignmentItem[] {
+  getTermAssignments(courseCode?: string, classroomId?: string): TermAssignmentItem[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_TERM_ASSIGNMENTS);
-      if (raw) return JSON.parse(raw);
-      return [];
+      const list: TermAssignmentItem[] = raw ? JSON.parse(raw) : [];
+      return list.filter((item) => {
+        if (courseCode && courseCode !== 'ALL' && item.courseCode && item.courseCode !== courseCode) {
+          return false;
+        }
+        if (
+          classroomId &&
+          classroomId !== 'ALL' &&
+          item.targetClassrooms &&
+          item.targetClassrooms.length > 0 &&
+          !item.targetClassrooms.includes('ALL')
+        ) {
+          const formattedTarget = formatClassroomLabel(classroomId);
+          const matchRoom = item.targetClassrooms.some(
+            (r) => r === classroomId || r === formattedTarget || formatClassroomLabel(r) === formattedTarget
+          );
+          if (!matchRoom) return false;
+        }
+        return true;
+      });
     } catch {
       return [];
     }
@@ -367,35 +642,81 @@ export const sgsRosterAndSubmissionService = {
         : item
     );
     localStorage.setItem(STORAGE_KEY_TERM_ASSIGNMENTS, JSON.stringify(list));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('kp-sgs-roster-updated'));
+    }
+    return list;
+  },
+
+  deleteTermAssignment(assignmentId: string): TermAssignmentItem[] {
+    const list = this.getTermAssignments().filter((item) => item.id !== assignmentId);
+    localStorage.setItem(STORAGE_KEY_TERM_ASSIGNMENTS, JSON.stringify(list));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('kp-sgs-roster-updated'));
+    }
     return list;
   },
 
   addTermAssignment(payload: {
     title: string;
-    sgsUnit: 'u1' | 'u2' | 'u3';
+    description?: string;
+    courseCode?: string;
+    courseName?: string;
+    targetClassrooms?: string[];
+    scorePart?: FourScorePart;
+    sgsUnit?: 'u1' | 'u2' | 'u3';
+    unitKey?: string;
+    indicatorCode?: string;
     maxScore: number;
     dueDate: string;
     isRequiredForPass?: boolean;
   }): TermAssignmentItem[] {
     const list = this.getTermAssignments();
-    const unitLabelMap = {
-      u1: 'หน่วยที่ 1 (15 คะแนน)',
-      u2: 'หน่วยที่ 2 (20 คะแนน)',
-      u3: 'หน่วยที่ 3 (15 คะแนน)',
+    const part: FourScorePart =
+      payload.scorePart ||
+      (payload.sgsUnit === 'u1'
+        ? 'PRE_MIDTERM'
+        : payload.sgsUnit === 'u2' || payload.sgsUnit === 'u3'
+        ? 'POST_MIDTERM'
+        : 'PRE_MIDTERM');
+
+    const partLabelMap: Record<FourScorePart, string> = {
+      PRE_MIDTERM: 'ก่อนกลางภาค',
+      MIDTERM: 'สอบกลางภาค',
+      POST_MIDTERM: 'หลังกลางภาค',
+      FINAL: 'สอบปลายภาค',
     };
+    const mappedUnit: 'u1' | 'u2' | 'u3' =
+      payload.sgsUnit || (part === 'PRE_MIDTERM' || part === 'MIDTERM' ? 'u1' : 'u2');
+
     const newItem: TermAssignmentItem = {
       id: `asg-${Date.now()}`,
       orderNo: list.length + 1,
-      title: payload.title,
-      sgsUnit: payload.sgsUnit,
-      sgsUnitLabel: unitLabelMap[payload.sgsUnit],
-      maxScore: payload.maxScore,
-      assignedDate: 'วันนี้',
-      dueDate: payload.dueDate || '30 ก.ย. 69',
-      isRequiredForPass: payload.isRequiredForPass ?? true,
+      title: payload.title.trim(),
+      description: payload.description?.trim(),
+      courseCode: payload.courseCode,
+      targetClassrooms:
+        payload.targetClassrooms && payload.targetClassrooms.length > 0
+          ? payload.targetClassrooms
+          : ['ALL'],
+      scorePart: part,
+      sgsUnit: mappedUnit,
+      sgsUnitLabel: partLabelMap[part],
+      maxScore: Number(payload.maxScore) || 10,
+      assignedDate: new Date().toLocaleDateString('th-TH', {
+        day: 'numeric',
+        month: 'short',
+        year: '2-digit',
+      }),
+      dueDate: payload.dueDate || 'ไม่ระบุกำหนดส่ง',
+      isRequiredForPass: payload.isRequiredForPass ?? false,
     };
     const updated = [...list, newItem];
     localStorage.setItem(STORAGE_KEY_TERM_ASSIGNMENTS, JSON.stringify(updated));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('kp-sgs-roster-updated'));
+      window.dispatchEvent(new CustomEvent('kp-copilot-updated'));
+    }
     return updated;
   },
 
@@ -493,16 +814,25 @@ export const sgsRosterAndSubmissionService = {
     return this.saveSubmissions(subs);
   },
 
-  // คำนวณคะแนนเก็บหน่วยที่ 1, 2, 3 + รองรับการพิมพ์คะแนนเก็บสุทธิทับเอง (Q1-C) + ตรวจสอบงานบังคับติด "ร" อัตโนมัติ (Q3-A)
-  computeStudentSgsGrades(student: SgsStudentRecord): {
+  // คำนวณคะแนน 4 ส่วน (ก่อนกลางภาค, กลางภาค, หลังกลางภาค, ปลายภาค) + รองรับการพิมพ์คะแนนตรงในตาราง ปพ.5
+  computeStudentSgsGrades(
+    student: SgsStudentRecord,
+    courseCode?: string,
+    classroomId?: string
+  ): {
     u1: number;
     u2: number;
     u3: number;
+    preMidterm: number | '';
+    postMidterm: number | '';
+    isPreMidtermManual: boolean;
+    isPostMidtermManual: boolean;
+    weights: CourseScoreWeights;
     calculatedAccumulated: number;
     effectiveAccumulated: number;
     isManualOverride: boolean;
-    midterm: number;
-    final: number;
+    midterm: number | '';
+    final: number | '';
     total: number;
     gradeLabel: string;
     numericGrade: number;
@@ -516,7 +846,8 @@ export const sgsRosterAndSubmissionService = {
     missingMandatoryTitles: string[];
     rReasonLabel?: string;
   } {
-    const assignments = this.getTermAssignments();
+    const weights = this.getCourseWeights(courseCode);
+    const assignments = this.getTermAssignments(courseCode, classroomId || student.classroom);
     const subs = this.getSubmissions().filter(
       (s) => s.studentCode === student.studentCode
     );
@@ -526,6 +857,11 @@ export const sgsRosterAndSubmissionService = {
         u1: 0,
         u2: 0,
         u3: 0,
+        preMidterm: 0,
+        postMidterm: 0,
+        isPreMidtermManual: false,
+        isPostMidtermManual: false,
+        weights,
         calculatedAccumulated: 0,
         effectiveAccumulated: 0,
         isManualOverride: false,
@@ -548,6 +884,10 @@ export const sgsRosterAndSubmissionService = {
     let u1 = 0;
     let u2 = 0;
     let u3 = 0;
+    let preFromWorks = 0;
+    let midFromWorks = 0;
+    let postFromWorks = 0;
+    let finalFromWorks = 0;
     let submittedCount = 0;
     let missingCount = 0;
     let pendingReviewCount = 0;
@@ -569,15 +909,23 @@ export const sgsRosterAndSubmissionService = {
           sub.score !== null && sub.score !== undefined
             ? sub.score
             : sub.status === 'SUBMITTED_PENDING'
-            ? asg.maxScore // คาดการณ์คะแนนหรือรอตรวจ
+            ? asg.maxScore
             : 0;
         if (asg.sgsUnit === 'u1') u1 += earned;
         if (asg.sgsUnit === 'u2') u2 += earned;
         if (asg.sgsUnit === 'u3') u3 += earned;
+
+        const part: FourScorePart =
+          asg.scorePart ||
+          (asg.sgsUnit === 'u1' ? 'PRE_MIDTERM' : 'POST_MIDTERM');
+        if (part === 'PRE_MIDTERM') preFromWorks += earned;
+        else if (part === 'MIDTERM') midFromWorks += earned;
+        else if (part === 'POST_MIDTERM') postFromWorks += earned;
+        else if (part === 'FINAL') finalFromWorks += earned;
       } else {
         missingCount += 1;
         if (asg.isRequiredForPass) {
-          missingMandatoryTitles.push(`งานที่ ${asg.orderNo}`);
+          missingMandatoryTitles.push(asg.title || `งานที่ ${asg.orderNo}`);
         }
       }
     }
@@ -589,9 +937,59 @@ export const sgsRosterAndSubmissionService = {
       u1 === 0
     ) {
       u1 = student.transferredBaseScore.u1;
+      preFromWorks = student.transferredBaseScore.u1;
     }
 
-    const calculatedAccumulated = u1 + u2 + u3;
+    const cKey = courseCode || 'DEFAULT';
+    const courseOverride = student.courseScores?.[cKey];
+
+    const manualPre =
+      courseOverride?.preMidterm !== undefined
+        ? courseOverride.preMidterm
+        : student.preMidtermScore !== undefined
+        ? student.preMidtermScore
+        : null;
+    const manualPost =
+      courseOverride?.postMidterm !== undefined
+        ? courseOverride.postMidterm
+        : student.postMidtermScore !== undefined
+        ? student.postMidtermScore
+        : null;
+    const manualMid =
+      courseOverride?.midterm !== undefined
+        ? courseOverride.midterm
+        : typeof student.midtermScore === 'number'
+        ? student.midtermScore
+        : null;
+    const manualFinal =
+      courseOverride?.final !== undefined
+        ? courseOverride.final
+        : typeof student.finalScore === 'number'
+        ? student.finalScore
+        : null;
+
+    const isPreMidtermManual = manualPre !== null && manualPre !== undefined;
+    const isPostMidtermManual = manualPost !== null && manualPost !== undefined;
+
+    const preVal = isPreMidtermManual
+      ? Math.min(weights.preMidterm, Math.max(0, Number(manualPre)))
+      : Math.min(weights.preMidterm, preFromWorks);
+
+    const postVal = isPostMidtermManual
+      ? Math.min(weights.postMidterm, Math.max(0, Number(manualPost)))
+      : Math.min(weights.postMidterm, postFromWorks);
+
+    const midtermVal =
+      manualMid !== null && manualMid !== undefined
+        ? Math.min(weights.midterm, Math.max(0, Number(manualMid)))
+        : Math.min(weights.midterm, midFromWorks);
+
+    const finalVal =
+      manualFinal !== null && manualFinal !== undefined
+        ? Math.min(weights.final, Math.max(0, Number(manualFinal)))
+        : Math.min(weights.final, finalFromWorks);
+
+    const calculatedAccumulated = preVal + postVal;
     const isManualOverride =
       student.manualAccumulatedOverride !== undefined &&
       student.manualAccumulatedOverride !== null;
@@ -599,22 +997,26 @@ export const sgsRosterAndSubmissionService = {
       ? (student.manualAccumulatedOverride as number)
       : calculatedAccumulated;
 
-    const midtermVal = typeof student.midtermScore === 'number' ? student.midtermScore : 0;
-    const finalVal = typeof student.finalScore === 'number' ? student.finalScore : 0;
     const total = effectiveAccumulated + midtermVal + finalVal;
 
     let gradeLabel = '0';
     let rReasonLabel: string | undefined;
 
-    const hasRealAttendance = typeof student.attendancePercent === 'number' && student.attendancePercent > 0;
-    const hasAnyAssessment = assignments.length > 0 || typeof student.midtermScore === 'number' || typeof student.finalScore === 'number' || effectiveAccumulated > 0;
+    const hasRealAttendance =
+      typeof student.attendancePercent === 'number' && student.attendancePercent > 0;
+    const hasAnyAssessment =
+      assignments.length > 0 ||
+      isPreMidtermManual ||
+      isPostMidtermManual ||
+      manualMid !== null ||
+      manualFinal !== null ||
+      effectiveAccumulated > 0;
 
     if (hasRealAttendance && student.attendancePercent < 80) {
       gradeLabel = 'มส.';
     } else if (missingMandatoryTitles.length > 0) {
-      // Q3-A: ค้างส่งชิ้นงานบังคับ (ตัวชี้วัดต้องรู้) -> ติด "ร" อัตโนมัติแม้คะแนนรวมเกิน 50
       gradeLabel = 'ร';
-      rReasonLabel = `ค้างงานบังคับ (${missingMandatoryTitles.join(', ')})`;
+      rReasonLabel = `ค้างงานสำคัญ (${missingMandatoryTitles.join(', ')})`;
     } else if (!hasAnyAssessment && total === 0) {
       gradeLabel = '—';
     } else if (total >= 80) {
@@ -660,22 +1062,30 @@ export const sgsRosterAndSubmissionService = {
         : 0;
 
     const analyticalThinkingLevel: 0 | 1 | 2 | 3 =
-      student.analyticalThinkingLevel ?? autoLevelFromGrade;
+      courseOverride?.analyticalThinkingLevel ??
+      student.analyticalThinkingLevel ??
+      autoLevelFromGrade;
     const desiredCharacteristicsLevel: 0 | 1 | 2 | 3 =
+      courseOverride?.desiredCharacteristicsLevel ??
       student.desiredCharacteristicsLevel ??
       (student.attendancePercent >= 80 && autoLevelFromGrade === 0
         ? 1
         : autoLevelFromGrade);
 
     return {
-      u1,
-      u2,
+      u1: preVal,
+      u2: postVal,
       u3,
+      preMidterm: isPreMidtermManual || preFromWorks > 0 ? preVal : '',
+      postMidterm: isPostMidtermManual || postFromWorks > 0 ? postVal : '',
+      isPreMidtermManual,
+      isPostMidtermManual,
+      weights,
       calculatedAccumulated,
       effectiveAccumulated,
       isManualOverride,
-      midterm: student.midtermScore,
-      final: student.finalScore,
+      midterm: manualMid !== null || midFromWorks > 0 ? midtermVal : '',
+      final: manualFinal !== null || finalFromWorks > 0 ? finalVal : '',
       total,
       gradeLabel,
       numericGrade,
@@ -691,21 +1101,75 @@ export const sgsRosterAndSubmissionService = {
     };
   },
 
+  calculateStudentFinalGrade(
+    stu: SgsStudentRecord | undefined,
+    courseCode?: string,
+    classroomId?: string
+  ) {
+    if (!stu) {
+      return {
+        u1: 0,
+        u2: 0,
+        u3: 0,
+        preMidterm: '' as const,
+        postMidterm: '' as const,
+        isPreMidtermManual: false,
+        isPostMidtermManual: false,
+        weights: this.getCourseWeights(courseCode),
+        calculatedAccumulated: 0,
+        effectiveAccumulated: 0,
+        isManualOverride: false,
+        midterm: '' as const,
+        final: '' as const,
+        total: 0,
+        gradeLabel: '-',
+        numericGrade: 0,
+        autoLevelFromGrade: 0 as 0 | 1 | 2 | 3,
+        analyticalThinkingLevel: 0 as 0 | 1 | 2 | 3,
+        desiredCharacteristicsLevel: 0 as 0 | 1 | 2 | 3,
+        submittedCount: 0,
+        totalAssignedCount: 0,
+        missingCount: 0,
+        pendingReviewCount: 0,
+        missingMandatoryTitles: [] as string[],
+        rReasonLabel: '',
+        isComplete: false,
+      };
+    }
+    const res = this.computeStudentSgsGrades(stu, courseCode, classroomId);
+    return {
+      ...res,
+      isComplete: res.total > 0,
+    };
+  },
+
   // คำนวณระดับ "อ่าน คิดวิเคราะห์ เขียน (0-3)" และ "คุณลักษณะอันพึงประสงค์ (0-3)" อัตโนมัติจากเกรดวิชาทั้งห้อง
-  calculateAttributesFromGrades(options?: {
-    minGradeFor3?: number;
-    minGradeFor2?: number;
-    minGradeFor1?: number;
-    fallbackForR?: 0 | 1;
-  }): SgsStudentRecord[] {
+  calculateAttributesFromGrades(
+    optionsOrClassroom?:
+      | {
+          minGradeFor3?: number;
+          minGradeFor2?: number;
+          minGradeFor1?: number;
+          fallbackForR?: 0 | 1;
+        }
+      | string,
+    classroomIdOrCourse?: string,
+    courseCodeArg?: string
+  ): SgsStudentRecord[] {
+    const isFirstString = typeof optionsOrClassroom === 'string';
+    const options = isFirstString ? undefined : optionsOrClassroom;
+    const classroomId = isFirstString ? optionsOrClassroom : classroomIdOrCourse;
+    const courseCode = isFirstString ? classroomIdOrCourse : courseCodeArg;
+
     const min3 = options?.minGradeFor3 ?? 3.0;
     const min2 = options?.minGradeFor2 ?? 2.0;
     const min1 = options?.minGradeFor1 ?? 1.0;
     const fallback = options?.fallbackForR ?? 0;
+    const cKey = courseCode || 'DEFAULT';
 
-    const roster = this.getSgsRoster().map((stu) => {
+    const roster = this.getSgsRoster(classroomId).map((stu) => {
       if (stu.transferState === 'TRANSFERRED_OUT') return stu;
-      const g = this.computeStudentSgsGrades(stu);
+      const g = this.computeStudentSgsGrades(stu, courseCode, classroomId);
       const level: 0 | 1 | 2 | 3 =
         g.numericGrade >= min3
           ? 3
@@ -718,10 +1182,23 @@ export const sgsRosterAndSubmissionService = {
         stu.attendancePercent >= 90 && level < 3
           ? (Math.min(3, level + 1) as 0 | 1 | 2 | 3)
           : level;
+      const prevCourse = stu.courseScores?.[cKey] || {};
       return {
         ...stu,
         analyticalThinkingLevel: level,
         desiredCharacteristicsLevel: charLevel,
+        desirableCharacteristics: Array(8).fill(charLevel),
+        criticalThinking: Array(5).fill(level),
+        isAttributeManual: false,
+        courseScores: {
+          ...(stu.courseScores || {}),
+          [cKey]: {
+            ...prevCourse,
+            analyticalThinkingLevel: level,
+            desiredCharacteristicsLevel: charLevel,
+            isAttributeManual: false,
+          },
+        },
       };
     });
     return this.saveSgsRoster(
@@ -732,13 +1209,165 @@ export const sgsRosterAndSubmissionService = {
 
   updateStudentAttributeLevel(
     studentCode: string,
-    field: 'analyticalThinkingLevel' | 'desiredCharacteristicsLevel',
-    level: 0 | 1 | 2 | 3
+    fieldOrCategory: 'analyticalThinkingLevel' | 'desiredCharacteristicsLevel' | 'CHAR' | 'CRIT',
+    levelOrIdx: number,
+    classroomIdOrLevel?: string | (0 | 1 | 2 | 3),
+    courseCodeOrClassroom?: string
   ): SgsStudentRecord[] {
-    const roster = this.getSgsRoster().map((stu) =>
-      stu.studentCode === studentCode ? { ...stu, [field]: level } : stu
-    );
+    if (fieldOrCategory === 'CHAR' || fieldOrCategory === 'CRIT') {
+      const idx = levelOrIdx;
+      const lvl = (typeof classroomIdOrLevel === 'number' ? classroomIdOrLevel : 3) as 0 | 1 | 2 | 3;
+      const classroomId = typeof courseCodeOrClassroom === 'string' ? courseCodeOrClassroom : undefined;
+      const roster = this.getSgsRoster(classroomId).map((stu) => {
+        if (stu.studentCode !== studentCode) return stu;
+        if (fieldOrCategory === 'CHAR') {
+          const nextArr = [...(stu.desirableCharacteristics || Array(8).fill(stu.desiredCharacteristicsLevel ?? 3))];
+          nextArr[idx] = lvl;
+          const mode = this.computeOverallAttributeMode(nextArr);
+          return {
+            ...stu,
+            desirableCharacteristics: nextArr,
+            desiredCharacteristicsLevel: mode,
+            isAttributeManual: true,
+          };
+        } else {
+          const nextArr = [...(stu.criticalThinking || Array(5).fill(stu.analyticalThinkingLevel ?? 3))];
+          nextArr[idx] = lvl;
+          const mode = this.computeOverallAttributeMode(nextArr);
+          return {
+            ...stu,
+            criticalThinking: nextArr,
+            analyticalThinkingLevel: mode,
+            isAttributeManual: true,
+          };
+        }
+      });
+      return this.saveSgsRoster(roster, 'แก้ไขระดับประเมินรายข้อ');
+    }
+
+    const field = fieldOrCategory;
+    const level = levelOrIdx as 0 | 1 | 2 | 3;
+    const classroomId = typeof classroomIdOrLevel === 'string' ? classroomIdOrLevel : undefined;
+    const courseCode = courseCodeOrClassroom;
+    const cKey = courseCode || 'DEFAULT';
+    const roster = this.getSgsRoster(classroomId).map((stu) => {
+      if (stu.studentCode !== studentCode) return stu;
+      const prevCourse = stu.courseScores?.[cKey] || {};
+      return {
+        ...stu,
+        [field]: level,
+        desirableCharacteristics:
+          field === 'desiredCharacteristicsLevel' ? Array(8).fill(level) : stu.desirableCharacteristics,
+        criticalThinking:
+          field === 'analyticalThinkingLevel' ? Array(5).fill(level) : stu.criticalThinking,
+        isAttributeManual: true,
+        courseScores: {
+          ...(stu.courseScores || {}),
+          [cKey]: {
+            ...prevCourse,
+            [field]: level,
+            isAttributeManual: true,
+          },
+        },
+      };
+    });
     return this.saveSgsRoster(roster, 'แก้ไขระดับประเมินรายบุคคล');
+  },
+
+  computeOverallAttributeMode(arr?: (0 | 1 | 2 | 3)[]): 0 | 1 | 2 | 3 {
+    if (!arr || arr.length === 0) return 3;
+    const counts: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
+    arr.forEach((v) => {
+      counts[v] = (counts[v] || 0) + 1;
+    });
+    let best: 0 | 1 | 2 | 3 = 3;
+    let maxCount = -1;
+    ([3, 2, 1, 0] as const).forEach((lvl) => {
+      if (counts[lvl] > maxCount) {
+        maxCount = counts[lvl];
+        best = lvl;
+      }
+    });
+    return best;
+  },
+
+  bulkSetAllAttributesToLevel(level: 0 | 1 | 2 | 3, classroomId?: string): SgsStudentRecord[] {
+    const roster = this.getSgsRoster(classroomId).map((stu) => ({
+      ...stu,
+      desiredCharacteristicsLevel: level,
+      analyticalThinkingLevel: level,
+      desirableCharacteristics: Array(8).fill(level),
+      criticalThinking: Array(5).fill(level),
+      isAttributeManual: true,
+    }));
+    return this.saveSgsRoster(roster, `ตั้งค่าระดับประเมินทั้งห้องเป็น ${level}`);
+  },
+
+  updateStudentSpecialStatus(
+    studentCode: string,
+    status: 'NORMAL' | 'ร' | 'มส',
+    classroomId?: string
+  ): SgsStudentRecord[] {
+    const roster = this.getSgsRoster(classroomId).map((stu) => {
+      if (stu.studentCode !== studentCode) return stu;
+      return {
+        ...stu,
+        specialStatus: status,
+      };
+    });
+    return this.saveSgsRoster(roster, `อัปเดตสถานะผลการเรียน (${status})`);
+  },
+
+  gradeStudentSubmission(
+    studentCode: string,
+    assignmentId: string,
+    score: number,
+    _note?: string,
+    classroomId?: string
+  ): SgsStudentRecord[] {
+    this.gradeSubmission(assignmentId, studentCode, score, 'GRADED');
+    return this.getSgsRoster(classroomId);
+  },
+
+  exportSgsGradebookCsv(courseCode?: string, courseName?: string, classroomId?: string): string {
+    const roster = this.getSgsRoster(classroomId);
+    const header = [
+      'เลขที่',
+      'รหัสประจำตัว',
+      'ชื่อ-สกุล',
+      'ห้องเรียน',
+      'รหัสวิชา',
+      'ชื่อวิชา',
+      'ก่อนกลางภาค',
+      'กลางภาค',
+      'หลังกลางภาค',
+      'ปลายภาค',
+      'คะแนนรวม',
+      'ผลการเรียน',
+      'คุณลักษณะอันพึงประสงค์',
+      'อ่านคิดวิเคราะห์เขียน',
+    ];
+    const rows = roster.map((stu) => {
+      const g = this.computeStudentSgsGrades(stu, courseCode, classroomId);
+      const gradeOut = stu.specialStatus && stu.specialStatus !== 'NORMAL' ? stu.specialStatus : g.gradeLabel;
+      return [
+        stu.sgsSeatNo,
+        `"${stu.studentCode}"`,
+        `"${stu.studentName}"`,
+        `"${stu.classroom}"`,
+        `"${courseCode || ''}"`,
+        `"${courseName || ''}"`,
+        g.preMidterm === '' ? 0 : g.preMidterm,
+        g.midterm === '' ? 0 : g.midterm,
+        g.postMidterm === '' ? 0 : g.postMidterm,
+        g.final === '' ? 0 : g.final,
+        g.total,
+        `"${gradeOut}"`,
+        g.desiredCharacteristicsLevel,
+        g.analyticalThinkingLevel,
+      ].join(',');
+    });
+    return '\uFEFF' + [header.join(','), ...rows].join('\n');
   },
 
   // อัปโหลดไฟล์งานนักเรียนขึ้น Cloudflare R2 (บีบอัดรูป WebP อัตโนมัติ + รองรับแนบลิงก์เสริม Google Drive/Canva)

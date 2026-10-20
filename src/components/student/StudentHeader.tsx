@@ -1,22 +1,19 @@
-// src/components/student/StudentHeader.tsx
-// แถบด้านบนของนักเรียน (ตรงตามภาพอ้างอิง media_1791203662191.png พร้อมฟอนต์ Prompt)
-
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import NotificationRegular from '@mingcute/react/core-regular/notification';
 import ExitDoorRegular from '@mingcute/react/core-regular/exit-door';
 import MenuRegular from '@mingcute/react/core-regular/menu';
 import Calendar2Regular from '@mingcute/react/core-regular/calendar-2';
 import SparklesRegular from '@mingcute/react/core-regular/sparkles';
 import Settings3Regular from '@mingcute/react/core-regular/settings-3';
-import { Search, ChevronDown } from 'lucide-react';
+import { Search, ChevronDown, CheckCircle, Bell, X } from 'lucide-react';
 import { studentBannerService } from '../../services/studentBannerService';
-import { getSchoolSettings, type SchoolUserRole, type SchoolBrandingSettings } from '../../config/schoolRoles';
+import { type SchoolUserRole, type SchoolBrandingSettings } from '../../config/schoolRoles';
 import type { SchoolSettingsConfig } from '../../config/schoolSettings';
 import type { AuthUser } from '../../services/authService';
 import { formatThaiDateFull } from '../../utils/timetableDateUtils';
-import { formatClassroomLabel } from '../../services/studentService';
-
+import { formatClassroomLabel, studentService } from '../../services/studentService';
 import { calculateStudentExp } from '../../services/studentExpService';
+import { studentAffairsCouncilService } from '../../services/studentAffairsCouncilService';
 
 interface StudentHeaderProps {
   onExit: () => void;
@@ -31,6 +28,7 @@ interface StudentHeaderProps {
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
   onOpenAdminBannerModal?: () => void;
+  onOpenSearch?: () => void;
 }
 
 export const StudentHeader: React.FC<StudentHeaderProps> = ({
@@ -40,20 +38,79 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
   classroomName,
   currentUser,
   activeRole,
-  schoolSettings,
+  schoolSettings: _schoolSettings,
   onOpenMobileMenu,
   isSidebarOpen = true,
   onToggleSidebar,
   onOpenAdminBannerModal,
+  onOpenSearch,
 }) => {
-  const [defaultSettings] = useState(() => getSchoolSettings());
-  const effectiveSettings = schoolSettings || defaultSettings;
+  const [showNotifications, setShowNotifications] = useState(false);
 
-  const isAdmin = studentBannerService.canManageBanners(activeRole);
+  const studentCode = currentUser?.studentCode || 'STD-001';
+
+  const notifications = useMemo(() => {
+    const list: Array<{ id: string; title: string; desc: string; type: 'LEAVE' | 'GENERAL' }> = [];
+    const leaves = studentAffairsCouncilService.getStudentLeaves().filter((l) => l.studentCode === studentCode);
+    leaves.forEach((l) => {
+      if (l.status === 'APPROVED') {
+        list.push({
+          id: `leave-${l.id}`,
+          title: `ใบลา ${l.leaveType} ได้รับการอนุมัติแล้ว`,
+          desc: `ช่วงวันที่ ${l.startDate} ${l.endDate && l.endDate !== l.startDate ? `ถึง ${l.endDate}` : ''}`,
+          type: 'LEAVE',
+        });
+      } else if (l.status === 'REJECTED') {
+        list.push({
+          id: `leave-${l.id}`,
+          title: `ใบลา ${l.leaveType} ไม่ผ่านการอนุมัติ`,
+          desc: l.reason || 'กรุณาติดต่อครูที่ปรึกษา',
+          type: 'LEAVE',
+        });
+      }
+    });
+    return list;
+  }, [studentCode]);
+
+  const unreadCount = notifications.length;
+
+  const isAdmin =
+    currentUser?.role !== 'STUDENT' && studentBannerService.canManageBanners(activeRole);
   const displayXp =
     typeof totalXp === 'number'
       ? totalXp
       : calculateStudentExp(currentUser?.id, currentUser?.studentCode).totalXp;
+
+  // Real student record for student number (ลำดับ)
+  const studentRecord = useMemo(() => {
+    if (currentUser?.studentCode) {
+      const found = studentService.findStudentByCode(currentUser.studentCode);
+      if (found) return found.student;
+    }
+    if (currentUser?.id) {
+      const found = studentService.findStudentByCode(currentUser.id);
+      if (found) return found.student;
+    }
+    return null;
+  }, [currentUser?.studentCode, currentUser?.id]);
+
+  const studentNo = studentRecord?.no || (currentUser as any)?.no || (currentUser as any)?.seatNo || 1;
+
+  // Avatar state in sync with real-time updates
+  const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatarUrl || "/images/banners/student-avatar.png");
+  useEffect(() => {
+    if (currentUser?.avatarUrl) setAvatarUrl(currentUser.avatarUrl);
+  }, [currentUser?.avatarUrl]);
+
+  useEffect(() => {
+    const handleAvatarUpdated = (e: any) => {
+      if (e.detail?.avatarUrl) {
+        setAvatarUrl(e.detail.avatarUrl);
+      }
+    };
+    window.addEventListener('kps-student-avatar-updated', handleAvatarUpdated);
+    return () => window.removeEventListener('kps-student-avatar-updated', handleAvatarUpdated);
+  }, []);
 
   return (
     <header className="h-16 bg-white border-b border-slate-200/80 px-3.5 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-20 font-['Prompt',sans-serif] select-none">
@@ -61,7 +118,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
           1. MOBILE TOP HEADER (< 1024px) - Aligned to Mockup Image
           ======================================================== */}
       <div className="flex lg:hidden items-center justify-between w-full">
-        {/* Left: Hamburger + Student Avatar + School info & Class badge */}
+        {/* Left: Hamburger + Student Avatar + Student Name + EXP & Rank # */}
         <div className="flex items-center gap-2.5 min-w-0">
           {(onToggleSidebar || onOpenMobileMenu) && (
             <button
@@ -77,7 +134,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
 
           <div className="w-10 h-10 rounded-full border-2 border-sky-200 overflow-hidden shadow-2xs bg-sky-50 flex items-center justify-center shrink-0">
             <img
-              src={currentUser?.avatarUrl || "/images/banners/student-avatar.png"}
+              src={avatarUrl}
               alt={studentName}
               className="w-full h-full object-cover"
               onError={(e) => {
@@ -91,21 +148,28 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
 
           <div className="min-w-0">
             <span className="font-extrabold text-[#163A66] text-xs sm:text-sm leading-tight block truncate">
-              {effectiveSettings?.nameTh || 'โรงเรียนกุดจับประชาสรรค์'}
+              {studentName}
             </span>
-            <span className="text-[10px] text-[#6B7C93] font-medium leading-tight block truncate mt-0.5">
-              {effectiveSettings?.districtProvince || 'ต.กุดจับ อ.กุดจับ จ.อุดรธานี'}
-            </span>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-[11px] text-amber-600 font-bold leading-tight">
+                ⚡ {displayXp.toLocaleString()} XP
+              </span>
+              <span className="text-[10px] text-slate-300">•</span>
+              <span className="text-[10px] text-blue-600 font-bold leading-tight">
+                ลำดับ #{studentNo}
+              </span>
+            </div>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-200 mt-0.5">
               <span>🏠 {formatClassroomLabel(classroomName)}</span>
             </span>
           </div>
         </div>
 
-        {/* Right: Search + Bell (3) + Dropdown Chevron */}
+        {/* Right: Search + Bell + Dropdown Chevron */}
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
+            onClick={onOpenSearch}
             className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer border border-slate-200/60"
             title="ค้นหา"
           >
@@ -114,13 +178,16 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
 
           <button
             type="button"
+            onClick={() => setShowNotifications((prev) => !prev)}
             className="relative w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer border border-slate-200/60"
             title="การแจ้งเตือน"
           >
             <NotificationRegular className="w-3.5 h-3.5" />
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center shadow-xs">
-              3
-            </span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center shadow-xs">
+                {unreadCount}
+              </span>
+            )}
           </button>
 
           <button
@@ -160,7 +227,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
           <div className="relative shrink-0">
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full border-2 border-sky-100 overflow-hidden shadow-2xs bg-sky-50 flex items-center justify-center">
               <img
-                src={currentUser?.avatarUrl || "/images/banners/student-avatar.png"}
+                src={avatarUrl}
                 alt={studentName}
                 className="w-full h-full object-cover"
                 onError={(e) => {
@@ -185,8 +252,12 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                 </span>
               )}
             </div>
-            <p className="text-[11px] sm:text-xs text-slate-400 font-medium truncate mt-0.5">
-              ตั้งใจเรียน พัฒนาตัวเอง สู่อนาคตที่ดีกว่า ✨
+            <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate mt-0.5 flex items-center gap-1.5">
+              <span className="text-amber-600 font-bold">⚡ {displayXp.toLocaleString()} XP</span>
+              <span className="text-slate-300">•</span>
+              <span className="text-blue-600 font-semibold">ลำดับ #{studentNo}</span>
+              <span className="text-slate-300">•</span>
+              <span className="text-slate-400">ตั้งใจเรียน พัฒนาตัวเอง สู่อนาคตที่ดีกว่า ✨</span>
             </p>
           </div>
         </div>
@@ -205,16 +276,19 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
             </button>
           )}
 
-          {/* Notification Bell with Badge '3' */}
+          {/* Notification Bell */}
           <button
             type="button"
+            onClick={() => setShowNotifications((prev) => !prev)}
             className="relative w-9 h-9 rounded-xl bg-sky-50 hover:bg-sky-100/80 text-sky-600 flex items-center justify-center transition-colors cursor-pointer border border-sky-100/60"
-            title="การแจ้งเตือน (3 รายการ)"
+            title={`การแจ้งเตือน (${unreadCount} รายการ)`}
           >
             <NotificationRegular className="w-4 h-4" />
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center shadow-xs">
-              3
-            </span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center shadow-xs">
+                {unreadCount}
+              </span>
+            )}
           </button>
 
           {/* Date Chip */}
@@ -240,6 +314,56 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Notifications Popover Dropdown */}
+      {showNotifications && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setShowNotifications(false)}
+          />
+          <div className="absolute right-4 top-16 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-slate-200/90 p-4 z-50 text-xs animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2 font-bold text-slate-800 text-sm">
+                <Bell className="w-4 h-4 text-blue-600" />
+                <span>การแจ้งเตือน</span>
+                {unreadCount > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-100 text-blue-700 font-bold">
+                    {unreadCount}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNotifications(false)}
+                className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 py-2">
+              {notifications.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 space-y-2">
+                  <CheckCircle className="w-8 h-8 mx-auto text-emerald-400 opacity-80" />
+                  <p className="font-medium text-slate-600">ไม่มีการแจ้งเตือนใหม่</p>
+                  <p className="text-[11px] text-slate-400">คุณอัปเดตข้อมูลทุกอย่างเป็นปัจจุบันแล้ว</p>
+                </div>
+              ) : (
+                notifications.map((n) => (
+                  <div key={n.id} className="py-2.5 px-2 hover:bg-blue-50/50 rounded-xl transition-colors space-y-1">
+                    <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                      <span>{n.title}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 pl-3.5">{n.desc}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </header>
   );
 };

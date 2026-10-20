@@ -9,12 +9,14 @@ interface StudentMobileBottomNavProps {
   activeTab: StudentTabKey;
   onSelectTab: (tab: StudentTabKey) => void;
   onOpenMoreMenu: () => void;
+  unreadMessagesCount?: number;
 }
 
 export const StudentMobileBottomNav: React.FC<StudentMobileBottomNavProps> = ({
   activeTab,
   onSelectTab,
   onOpenMoreMenu,
+  unreadMessagesCount = 0,
 }) => {
   const isHomeActive = activeTab === 'home';
   const isMissionsActive = activeTab === 'missions';
@@ -75,7 +77,9 @@ export const StudentMobileBottomNav: React.FC<StudentMobileBottomNavProps> = ({
                 isMessagesActive ? 'text-blue-600 stroke-[2.5]' : 'text-slate-500'
               }`}
             />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 border border-white" />
+            {unreadMessagesCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 border border-white" />
+            )}
           </div>
           <span>ข้อความ</span>
         </button>

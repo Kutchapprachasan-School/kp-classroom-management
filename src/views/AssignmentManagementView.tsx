@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   CheckCircle2,
   Clock,
@@ -9,16 +9,23 @@ import {
   Search,
   Layers,
   FileSpreadsheet,
-  Edit3,
   Play,
   RotateCcw,
+  Plus,
+  HelpCircle,
+  Trash2,
+  X,
+  ClipboardList,
 } from 'lucide-react';
 import {
   sgsRosterAndSubmissionService,
+  type FourScorePart,
+  type TermAssignmentConfig,
 } from '../services/sgsRosterAndSubmissionService';
 import {
   teacherCourseAssignmentService,
-  TEACHER_SUBJECTS_LIST,
+  getDynamicTeachingSubjects,
+  getAllAvailableClassroomLabels,
   type GradingQueueItem,
 } from '../services/teacherCourseAssignmentService';
 import { ArtworkPreviewModal } from '../components/teacher/ArtworkPreviewModal';
@@ -26,7 +33,7 @@ import { SgsClassroomMatrixModal } from '../components/teacher/SgsClassroomMatri
 import { Submission3ColorMatrixModal } from '../components/teacher/Submission3ColorMatrixModal';
 import { AssignmentBundlesModal } from '../components/teacher/AssignmentBundlesModal';
 import { GradingWorkspaceModal } from '../components/teacher/GradingWorkspaceModal';
-import { PageHeroBanner } from '../components/layout/PageHeroBanner';
+import { getBangkokTodayString } from '../utils/timetableDateUtils';
 
 export type QuickFilterMode = 'ALL' | 'MISSING_OR_R' | 'PENDING_REVIEW';
 
@@ -35,35 +42,162 @@ interface AssignmentManagementViewProps {
   initialHighlightBanner?: string | null;
 }
 
+const SCORE_PART_LABELS: Record<FourScorePart, { label: string; cls: string }> = {
+  PRE_MIDTERM: { label: 'ก่อนกลางภาค', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+  MIDTERM: { label: 'กลางภาค', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+  POST_MIDTERM: { label: 'หลังกลางภาค', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  FINAL: { label: 'ปลายภาค', cls: 'bg-purple-50 text-purple-700 border-purple-200' },
+};
+
 export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> = ({
   initialQuickFilter: _initialQuickFilter = 'ALL',
   initialHighlightBanner: _initialHighlightBanner = null,
 }) => {
-  // --------------------------------------------------------------------------
-  // 1. Queue & Filtering State
-  // --------------------------------------------------------------------------
+  // 1. Dynamic Subjects & Real Classrooms
+  const subjectsList = useMemo(() => getDynamicTeachingSubjects(), []);
+  const allSystemClassrooms = useMemo(() => getAllAvailableClassroomLabels(), []);
+
+  // 2. Queue & Filtering State
   const [queueItems, setQueueItems] = useState<GradingQueueItem[]>(() =>
     teacherCourseAssignmentService.getGradingQueue()
   );
 
-  // Filters
   const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>('ALL');
   const [selectedRoom, setSelectedRoom] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<'ALL' | 'PENDING' | 'GRADED'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [activeSectionTab, setActiveSectionTab] = useState<'SUBMISSIONS' | 'ASSIGNED_LIST'>(
+    'ASSIGNED_LIST'
+  );
 
-  // --------------------------------------------------------------------------
-  // 2. Modals State
-  // --------------------------------------------------------------------------
-  // Focused Grading Workspace Modal
+  // Classrooms available for the selected subject filter
+  const availableFilterRooms = useMemo(() => {
+    if (selectedSubjectCode === 'ALL') return allSystemClassrooms;
+    const matched = subjectsList.find((s) => s.courseCode === selectedSubjectCode);
+    return matched?.classrooms && matched.classrooms.length > 0
+      ? matched.classrooms
+      : allSystemClassrooms;
+  }, [selectedSubjectCode, subjectsList, allSystemClassrooms]);
+
+  // Term Assignments List (Linked to ปพ.5)
+  const [termAssignments, setTermAssignments] = useState<TermAssignmentConfig[]>(() =>
+    sgsRosterAndSubmissionService.getTermAssignments()
+  );
+
+  const refreshTermAssignments = useCallback(() => {
+    const code = selectedSubjectCode === 'ALL' ? undefined : selectedSubjectCode;
+    const room = selectedRoom === 'ALL' ? undefined : selectedRoom;
+    setTermAssignments(sgsRosterAndSubmissionService.getTermAssignments(code, room));
+  }, [selectedSubjectCode, selectedRoom]);
+
+  useEffect(() => {
+    refreshTermAssignments();
+  }, [refreshTermAssignments]);
+
+  // 3. Create New Assignment Modal State
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [formCourseCode, setFormCourseCode] = useState<string>(
+    () => subjectsList[0]?.courseCode || 'ท23102'
+  );
+  const [formTitle, setFormTitle] = useState('');
+  const [formScorePart, setFormScorePart] = useState<FourScorePart>('PRE_MIDTERM');
+  const [formMaxScore, setFormMaxScore] = useState<number>(10);
+  const [formDueDate, setFormDueDate] = useState<string>(() => getBangkokTodayString());
+  const [formScopeMode, setFormScopeMode] = useState<'ALL_SUBJECT_ROOMS' | 'SELECTED_ROOMS'>(
+    'ALL_SUBJECT_ROOMS'
+  );
+  const [formSelectedRooms, setFormSelectedRooms] = useState<string[]>([]);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+
+  const currentFormSubject = useMemo(
+    () =>
+      subjectsList.find((s) => s.courseCode === formCourseCode) ||
+      subjectsList[0] || {
+        courseCode: formCourseCode || 'ท23102',
+        courseName: 'รายวิชาหลัก',
+        classrooms: allSystemClassrooms,
+      },
+    [subjectsList, formCourseCode, allSystemClassrooms]
+  );
+
+  const currentFormSubjectRooms = useMemo(() => {
+    return currentFormSubject.classrooms && currentFormSubject.classrooms.length > 0
+      ? currentFormSubject.classrooms
+      : allSystemClassrooms;
+  }, [currentFormSubject, allSystemClassrooms]);
+
+  const currentFormCourseWeights = useMemo(
+    () => sgsRosterAndSubmissionService.getCourseWeights(currentFormSubject.courseCode),
+    [currentFormSubject.courseCode]
+  );
+
+  const handleOpenCreateModal = () => {
+    const initialCourse =
+      selectedSubjectCode !== 'ALL'
+        ? selectedSubjectCode
+        : subjectsList[0]?.courseCode || 'ท23102';
+    setFormCourseCode(initialCourse);
+    setFormTitle('');
+    setFormScorePart('PRE_MIDTERM');
+    setFormMaxScore(10);
+    setFormDueDate(getBangkokTodayString());
+    setFormScopeMode('ALL_SUBJECT_ROOMS');
+    setFormSelectedRooms(
+      selectedRoom !== 'ALL'
+        ? [selectedRoom]
+        : currentFormSubjectRooms[0]
+          ? [currentFormSubjectRooms[0]]
+          : []
+    );
+    setIsCreateModalOpen(true);
+  };
+
+  const handleCreateAssignmentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formTitle.trim()) return;
+
+    const targetRooms =
+      formScopeMode === 'ALL_SUBJECT_ROOMS'
+        ? currentFormSubjectRooms
+        : formSelectedRooms.length > 0
+          ? formSelectedRooms
+          : currentFormSubjectRooms.slice(0, 1);
+
+    const partToUnitMap: Record<FourScorePart, 'U1' | 'U2' | 'U3' | 'MIDTERM' | 'FINAL'> = {
+      PRE_MIDTERM: 'U1',
+      MIDTERM: 'MIDTERM',
+      POST_MIDTERM: 'U2',
+      FINAL: 'FINAL',
+    };
+
+    sgsRosterAndSubmissionService.addTermAssignment({
+      title: formTitle.trim(),
+      unitKey: partToUnitMap[formScorePart],
+      scorePart: formScorePart,
+      maxScore: Math.max(1, Number(formMaxScore) || 10),
+      indicatorCode: SCORE_PART_LABELS[formScorePart].label,
+      dueDate: formDueDate || getBangkokTodayString(),
+      courseCode: currentFormSubject.courseCode,
+      courseName: currentFormSubject.courseName,
+      targetClassrooms: targetRooms,
+    });
+
+    refreshTermAssignments();
+    setIsCreateModalOpen(false);
+    setActiveSectionTab('ASSIGNED_LIST');
+    showToast(
+      `✓ สั่งงาน "${formTitle.trim()}" (${SCORE_PART_LABELS[formScorePart].label}) ให้ ${
+        targetRooms.length > 1 ? `ทุกห้อง (${targetRooms.length} ห้อง)` : targetRooms[0] || 'ห้องเรียน'
+      } เรียบร้อยแล้ว`
+    );
+  };
+
+  // 4. Secondary Modals State
   const [gradingModalItem, setGradingModalItem] = useState<GradingQueueItem | null>(null);
-
-  // Small Icon Triggered Modals
   const [isSgsMatrixOpen, setIsSgsMatrixOpen] = useState<boolean>(false);
   const [is3ColorMatrixOpen, setIs3ColorMatrixOpen] = useState<boolean>(false);
   const [isBundlesModalOpen, setIsBundlesModalOpen] = useState<boolean>(false);
 
-  // Artwork Preview Modal
   const [previewItem, setPreviewItem] = useState<{
     title: string;
     studentName: string;
@@ -76,14 +210,12 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     platform?: 'CANVA' | 'GOOGLE_DOCS' | 'GOOGLE_DRIVE' | 'YOUTUBE' | 'FIGMA' | 'OTHER';
   } | null>(null);
 
-  // Toast feedback
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3200);
   };
 
-  // Sync on external events
   useEffect(() => {
     const handleQueueUpdate = () => {
       setQueueItems([...teacherCourseAssignmentService.getGradingQueue()]);
@@ -94,27 +226,21 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     };
   }, []);
 
-  // --------------------------------------------------------------------------
-  // 3. Filtered Queue Submissions (FIFO order)
-  // --------------------------------------------------------------------------
+  // Filtered Submissions
   const filteredSubmissions = useMemo(() => {
     return queueItems.filter((item) => {
-      // Filter by subject
       if (selectedSubjectCode !== 'ALL' && item.subjectCode !== selectedSubjectCode) {
         return false;
       }
-      // Filter by classroom
       if (selectedRoom !== 'ALL' && item.classroom !== selectedRoom) {
         return false;
       }
-      // Filter by status
       if (selectedStatus === 'PENDING' && item.status !== 'PENDING_REVIEW') {
         return false;
       }
       if (selectedStatus === 'GRADED' && item.status !== 'GRADED') {
         return false;
       }
-      // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesName = item.studentName.toLowerCase().includes(q);
@@ -129,31 +255,19 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     });
   }, [queueItems, selectedSubjectCode, selectedRoom, selectedStatus, searchQuery]);
 
-  // Overall statistics for KPI cards
   const stats = useMemo(() => {
     const total = queueItems.length;
     const pending = queueItems.filter((i) => i.status === 'PENDING_REVIEW').length;
     const graded = queueItems.filter((i) => i.status === 'GRADED').length;
-    // Items submitted with delay or pending review count
-    const late = queueItems.filter((i) => i.submittedAtText.includes('14:') || i.submittedAtText.includes('15:')).length;
-
-    const gradedItems = queueItems.filter((i) => i.status === 'GRADED' && i.score !== undefined && i.score !== null);
-    const avgScore =
-      gradedItems.length > 0
-        ? (gradedItems.reduce((sum, i) => sum + (i.score || 0), 0) / gradedItems.length).toFixed(1)
-        : '-';
-
-    return { total, pending, graded, late, avgScore };
+    return { total, pending, graded };
   }, [queueItems]);
 
-  // Handle grade submission
   const handleSaveGrade = (itemId: string, score: number, feedback: string) => {
     const targetItem = queueItems.find((i) => i.id === itemId);
     if (!targetItem) return;
 
     const { nextPendingItem } = teacherCourseAssignmentService.submitGrade(itemId, score, feedback);
 
-    // Sync to SGS submission service
     sgsRosterAndSubmissionService.gradeSubmission(
       targetItem.assignmentId,
       targetItem.studentCode,
@@ -161,9 +275,10 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       'GRADED'
     );
 
-    showToast(`✓ บันทึกคะแนน ${targetItem.studentName} (${score}/${targetItem.maxScore} คะแนน) เรียบร้อยแล้ว`);
+    showToast(
+      `✓ บันทึกคะแนน ${targetItem.studentName} (${score}/${targetItem.maxScore} คะแนน) เรียบร้อยแล้ว`
+    );
 
-    // Auto advance to next pending submission in the current filtered list
     if (nextPendingItem) {
       const nextFiltered = filteredSubmissions.find((i) => i.id === nextPendingItem.id);
       if (nextFiltered) {
@@ -172,8 +287,9 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       }
     }
 
-    // Look for any other pending item in filtered list
-    const nextInFilter = filteredSubmissions.find((i) => i.id !== itemId && i.status === 'PENDING_REVIEW');
+    const nextInFilter = filteredSubmissions.find(
+      (i) => i.id !== itemId && i.status === 'PENDING_REVIEW'
+    );
     if (nextInFilter) {
       setGradingModalItem(nextInFilter);
     } else {
@@ -182,9 +298,9 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     }
   };
 
-  // Launch grading on first pending item
   const handleStartFirstPending = () => {
-    const firstPending = filteredSubmissions.find((i) => i.status === 'PENDING_REVIEW') || filteredSubmissions[0];
+    const firstPending =
+      filteredSubmissions.find((i) => i.status === 'PENDING_REVIEW') || filteredSubmissions[0];
     if (firstPending) {
       setGradingModalItem(firstPending);
     } else {
@@ -193,114 +309,176 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
   };
 
   return (
-    <div className="space-y-4 font-sans text-slate-800 pb-16">
+    <div className="max-w-7xl mx-auto space-y-4 font-['Prompt',sans-serif] text-[#163A66] pb-20">
       {/* Toast Notification */}
       {toastMsg && (
-        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs font-bold border border-slate-700 animate-slide-up">
+        <div className="fixed bottom-5 right-5 z-50 bg-[#163A66] text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 text-xs sm:text-sm font-semibold border border-blue-400/30">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMsg}</span>
         </div>
       )}
 
-      {/* ==================================================================== */}
-      {/* 1. HERO BANNER: Master PageHeroBanner Design (2-Line Strictly)       */}
-      {/* ==================================================================== */}
-      <PageHeroBanner
-        title="ตรวจงาน & ให้คะแนน (Assignment Grading)"
-        subtitle="ศูนย์รวมผลงานที่นักเรียนส่งเข้ามา ตรวจงานและบันทึกคะแนนสะดวกรวดเร็วตามลำดับเวลา"
-        icon={<BookOpen className="w-7 h-7 text-blue-600" />}
-        badgeText="FIFO Queue"
-        quoteText="ตรวจงานด้วยความใส่ใจ ให้คำแนะนำเพื่อการเติบโต"
-      />
+      {/* ====================================================================
+          1. COMPACT HEADER + PROMINENT "+ สั่งงานใหม่" CTA (ไม่มีข้อความรกตา)
+         ==================================================================== */}
+      <div className="bg-white rounded-[18px] border border-[#E6EEF7] p-4 sm:p-5 shadow-[0_4px_16px_rgba(40,90,140,0.06)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-[#EFF6FF] border border-[#BFDBFE] flex items-center justify-center text-[#3B82F6] shrink-0">
+            <ClipboardList className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-lg sm:text-xl font-bold text-[#163A66]">
+              การสั่งงานและตรวจงาน (เชื่อมสมุดคะแนน ปพ.5)
+            </h1>
+            <p className="text-xs sm:text-sm text-[#6B7C93]">
+              สั่งงานรายห้องหรือทุกห้องในรายวิชา และตรวจให้คะแนนเข้า 4 ส่วนของ ปพ.5 อัตโนมัติ
+            </p>
+          </div>
+        </div>
 
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsHelpModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-[#6B7C93] hover:text-[#163A66] cursor-pointer"
+          >
+            <HelpCircle className="w-4 h-4 text-[#3B82F6]" />
+            <span>วิธีใช้งาน</span>
+          </button>
 
-      {/* ==================================================================== */}
-      {/* 4. FILTER TOOLBAR: รายวิชา | ชั้น | สถานะ | ค้นหา */}
-      {/* ==================================================================== */}
-      <div className="bg-white rounded-3xl border border-slate-200/90 p-4 shadow-xs">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center">
-          {/* Filter 1: Subject Dropdown */}
+          <button
+            type="button"
+            onClick={handleOpenCreateModal}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs sm:text-sm font-semibold shadow-xs transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>สั่งงานใหม่</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ====================================================================
+          2. FILTER BAR + MODE SWITCHER (ชิ้นงานที่สั่งไว้ vs คิวตรวจงานที่นักเรียนส่ง)
+         ==================================================================== */}
+      <div className="bg-white rounded-[18px] border border-[#E6EEF7] p-4 shadow-[0_4px_16px_rgba(40,90,140,0.06)] space-y-3.5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          {/* 2 Mode Tabs */}
+          <div className="flex items-center bg-[#F2F7FC] p-1 rounded-2xl border border-[#E6EEF7] self-start">
+            <button
+              type="button"
+              onClick={() => setActiveSectionTab('ASSIGNED_LIST')}
+              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                activeSectionTab === 'ASSIGNED_LIST'
+                  ? 'bg-white text-[#3B82F6] shadow-xs border border-[#BFDBFE]/60'
+                  : 'text-[#6B7C93] hover:text-[#163A66]'
+              }`}
+            >
+              1. ชิ้นงานที่สั่งไว้ ({termAssignments.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveSectionTab('SUBMISSIONS')}
+              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                activeSectionTab === 'SUBMISSIONS'
+                  ? 'bg-white text-[#3B82F6] shadow-xs border border-[#BFDBFE]/60'
+                  : 'text-[#6B7C93] hover:text-[#163A66]'
+              }`}
+            >
+              2. คิวตรวจงานที่ส่งเข้ามา ({stats.pending} รอตรวจ)
+            </button>
+          </div>
+
+          {/* Secondary Quick Tools */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsSgsMatrixOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-[#163A66] cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-[#3B82F6]" />
+              <span>ตารางคะแนนรายห้อง</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIs3ColorMatrixOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-[#163A66] cursor-pointer"
+            >
+              <CheckSquare className="w-3.5 h-3.5 text-emerald-600" />
+              <span>เช็คการส่งงาน 3 สี</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsBundlesModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-[#163A66] cursor-pointer"
+            >
+              <Layers className="w-3.5 h-3.5 text-[#3B82F6]" />
+              <span>รวมคะแนน/หารเฉลี่ย</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Filters Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end pt-2 border-t border-slate-100">
+          {/* Subject Filter */}
+          <div className="lg:col-span-4">
+            <label className="text-[11px] font-semibold text-[#6B7C93] block mb-1">
+              กรองตามรายวิชา:
+            </label>
+            <select
+              value={selectedSubjectCode}
+              onChange={(e) => {
+                setSelectedSubjectCode(e.target.value);
+                setSelectedRoom('ALL');
+              }}
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm font-semibold text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+            >
+              <option value="ALL">ทุกรายวิชา ({subjectsList.length} วิชา)</option>
+              {subjectsList.map((subj) => (
+                <option key={subj.courseCode} value={subj.courseCode}>
+                  {subj.courseCode} — {subj.courseName}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Dynamic Real Classroom Filter (No hardcoded ม.3/1!) */}
           <div className="lg:col-span-3">
-            <label htmlFor="filter-subject" className="text-[11px] font-bold text-slate-500 block mb-1">
-              รายวิชาที่สอน:
+            <label className="text-[11px] font-semibold text-[#6B7C93] block mb-1">
+              กรองตามห้องเรียน:
             </label>
-            <div className="relative">
-              <select
-                id="filter-subject"
-                value={selectedSubjectCode}
-                onChange={(e) => setSelectedSubjectCode(e.target.value)}
-                className="w-full pl-3 pr-8 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer"
-              >
-                <option value="ALL">ทุกรายวิชาที่สอน (ทั้งหมด)</option>
-                {TEACHER_SUBJECTS_LIST.map((subj) => (
-                  <option key={subj.code} value={subj.code}>
-                    {subj.code} {subj.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <select
+              value={selectedRoom}
+              onChange={(e) => setSelectedRoom(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm font-semibold text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+            >
+              <option value="ALL">ทุกห้องเรียน ({availableFilterRooms.length} ห้อง)</option>
+              {availableFilterRooms.map((room) => (
+                <option key={room} value={room}>
+                  ห้อง {room}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Filter 2: Classroom Dropdown */}
-          <div className="lg:col-span-2">
-            <label htmlFor="filter-room" className="text-[11px] font-bold text-slate-500 block mb-1">
-              ชั้น / ห้องเรียน:
-            </label>
-            <div className="relative">
-              <select
-                id="filter-room"
-                value={selectedRoom}
-                onChange={(e) => setSelectedRoom(e.target.value)}
-                className="w-full pl-3 pr-8 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer"
-              >
-                <option value="ALL">ทุกห้องเรียน (ทั้งหมด)</option>
-                <option value="ม.3/1">ห้อง ม.3/1 (ห้องประจำชั้น)</option>
-                <option value="ม.3/2">ห้อง ม.3/2</option>
-                <option value="ม.2/1">ห้อง ม.2/1</option>
-                <option value="ม.1/8">ห้อง ม.1/8</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Filter 3: Status Dropdown */}
-          <div className="lg:col-span-2">
-            <label htmlFor="filter-status" className="text-[11px] font-bold text-slate-500 block mb-1">
-              สถานะตรวจงาน:
-            </label>
-            <div className="relative">
-              <select
-                id="filter-status"
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value as 'ALL' | 'PENDING' | 'GRADED')}
-                className="w-full pl-3 pr-8 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer"
-              >
-                <option value="ALL">ทั้งหมด ({queueItems.length})</option>
-                <option value="PENDING">⏳ รอตรวจ ({stats.pending})</option>
-                <option value="GRADED">✅ ตรวจแล้ว ({stats.graded})</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Filter 4: Search input */}
+          {/* Search */}
           <div className="lg:col-span-3">
-            <label htmlFor="filter-search" className="text-[11px] font-bold text-slate-500 block mb-1">
-              ค้นหาข้อมูล:
+            <label className="text-[11px] font-semibold text-[#6B7C93] block mb-1">
+              ค้นหาชื่องาน / ชื่อนักเรียน:
             </label>
             <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
-                id="filter-search"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="ค้นหาชื่อนักเรียน, รหัส, ชื่องาน..."
-                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-blue-500"
+                placeholder="พิมพ์คำค้นหา..."
+                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
               />
             </div>
           </div>
 
-          {/* Reset button */}
-          <div className="lg:col-span-2 flex items-end">
+          {/* Reset */}
+          <div className="lg:col-span-2">
             <button
               type="button"
               onClick={() => {
@@ -309,7 +487,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                 setSelectedStatus('ALL');
                 setSearchQuery('');
               }}
-              className="w-full py-2 px-3 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer mt-auto"
+              className="w-full py-2 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-[#6B7C93] text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>ล้างตัวกรอง</span>
@@ -318,471 +496,550 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         </div>
       </div>
 
-      {/* ==================================================================== */}
-      {/* 4.5 FIFO START GRADING & SECONDARY SHORTCUTS (BEFORE TABLE)          */}
-      {/* ==================================================================== */}
-      <div className="bg-white rounded-2xl border border-blue-100 p-3 sm:p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <button
-            type="button"
-            onClick={handleStartFirstPending}
-            disabled={stats.pending === 0}
-            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 whitespace-nowrap"
-          >
-            <Play className="w-4 h-4 fill-white" />
-            <span>เริ่มตรวจงานทันที ({stats.pending} งานรอตรวจ)</span>
-          </button>
-          <span className="text-xs text-slate-500 font-medium">
-            เปิดตรวจผลงานแรกที่รอตรวจตามลำดับเวลา (FIFO) ให้อัตโนมัติ
-          </span>
-        </div>
-
-        {/* Secondary Actions */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => setIsSgsMatrixOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 hover:bg-slate-100 hover:border-slate-300 text-slate-700 hover:text-slate-900 text-xs font-bold transition-all cursor-pointer shadow-2xs"
-            title="ดูคะแนนรายชั้น และสมุด ปพ.5"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-blue-600" />
-            <span>ดูคะแนนรายชั้น</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIs3ColorMatrixOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 hover:bg-slate-100 hover:border-slate-300 text-slate-700 hover:text-slate-900 text-xs font-bold transition-all cursor-pointer shadow-2xs"
-            title="ตารางเช็คส่งงาน 3 สี เขียว-ส้ม-แดง"
-          >
-            <CheckSquare className="w-4 h-4 text-emerald-600" />
-            <span>ตารางส่งงาน 3 สี</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsBundlesModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 hover:bg-slate-100 hover:border-slate-300 text-slate-700 hover:text-slate-900 text-xs font-bold transition-all cursor-pointer shadow-2xs"
-            title="ตั้งค่าหมวดหมู่งานรวมและปัดเศษทศนิยม 0.5"
-          >
-            <Layers className="w-4 h-4 text-blue-600" />
-            <span>งานรวมเฉลี่ย</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ==================================================================== */}
-      {/* 5. CENTRAL VIEW: UNIFIED SUBMISSIONS TABLE (DESKTOP) */}
-      {/* ==================================================================== */}
-      <div className="bg-white rounded-3xl border border-slate-200/90 overflow-hidden shadow-xs">
-        {/* Table Header Bar */}
-        <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
-            <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
-              รายการผลงานนักเรียนที่ส่งเข้ามา ({filteredSubmissions.length} รายการ)
-            </h3>
-            <span className="text-xs text-slate-400 font-medium hidden sm:inline">
-              • เรียงตามเวลาที่ส่งจริง (FIFO ใครส่งก่อนอยู่บนสุด)
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-            <span>แสดง {filteredSubmissions.length} จาก {queueItems.length} งาน</span>
-          </div>
-        </div>
-
-        {/* Empty State */}
-        {filteredSubmissions.length === 0 ? (
-          <div className="p-12 text-center space-y-3">
-            <div className="w-16 h-16 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-8 h-8" />
+      {/* ====================================================================
+          SECTION A: รายการชิ้นงานที่ครูสั่งไว้ (เชื่อม 4 ส่วนของ ปพ.5)
+         ==================================================================== */}
+      {activeSectionTab === 'ASSIGNED_LIST' && (
+        <div className="bg-white rounded-[18px] border border-[#E6EEF7] p-4 sm:p-5 shadow-[0_4px_16px_rgba(40,90,140,0.06)] space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm sm:text-base font-bold text-[#163A66]">
+                ชิ้นงานที่สั่งไว้แล้ว ({termAssignments.length} รายการ)
+              </h2>
+              <p className="text-xs text-[#6B7C93]">
+                แสดงหมวดคะแนน 4 ส่วน (ก่อนกลางภาค / กลางภาค / หลังกลางภาค / ปลายภาค) และห้องเรียนที่ได้รับมอบหมาย
+              </p>
             </div>
-            <h4 className="text-base font-bold text-slate-800">
-              ไม่พบผลงานที่ตรงกับเงื่อนไขการค้นหา
-            </h4>
-            <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              ลองเปลี่ยนรายวิชา ห้องเรียน หรือล้างคำค้นหาเพื่อดูรายการส่งงานอื่น
-            </p>
+            <button
+              type="button"
+              onClick={handleOpenCreateModal}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-semibold cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>สั่งงานเพิ่ม</span>
+            </button>
           </div>
-        ) : (
-          <>
-            {/* Desktop Table View (Hidden on mobile) */}
-            <div className="hidden lg:block overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/80 text-slate-600 font-bold border-b border-slate-200">
-                    <th className="py-3 px-4 w-12 text-center">#</th>
-                    <th className="py-3 px-4 min-w-[200px]">ข้อมูลนักเรียน</th>
-                    <th className="py-3 px-4 min-w-[220px]">รายวิชา & ชื่องาน</th>
-                    <th className="py-3 px-4 min-w-[160px]">ไฟล์/สื่อที่ส่ง</th>
-                    <th className="py-3 px-4 min-w-[130px]">เวลาที่ส่ง</th>
-                    <th className="py-3 px-4 text-center min-w-[100px]">คะแนน</th>
-                    <th className="py-3 px-4 text-center min-w-[110px]">สถานะ</th>
-                    <th className="py-3 px-4 text-center min-w-[140px]">ตรวจงาน</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
-                  {filteredSubmissions.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="py-16 px-4 text-center">
-                        <div className="max-w-md mx-auto flex flex-col items-center justify-center text-center">
-                          <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
-                            <BookOpen className="w-8 h-8" />
-                          </div>
-                          <h3 className="text-base font-bold text-slate-800 mb-1">
-                            ยังไม่มีภาระงานหรือการบ้านในขณะนี้
-                          </h3>
-                          <p className="text-xs text-slate-500 mb-5 leading-relaxed">
-                            เริ่มต้นสร้างภาระงาน กำหนดคะแนน และมอบหมายให้นักเรียนส่งงานในรายวิชาของคุณ
+
+          {termAssignments.length === 0 ? (
+            <div className="py-12 px-4 text-center bg-[#F7FAFF] rounded-2xl border border-dashed border-[#BFDBFE] space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-[#EFF6FF] text-[#3B82F6] flex items-center justify-center mx-auto">
+                <BookOpen className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-[#163A66]">ยังไม่มีชิ้นงานที่สั่งในหมวดนี้</p>
+                <p className="text-xs text-[#6B7C93] mt-0.5">
+                  กดปุ่ม "สั่งงานใหม่" เพื่อมอบหมายงานให้ทุกห้องในรายวิชา หรือเฉพาะห้องที่เลือก
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleOpenCreateModal}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-semibold shadow-xs cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>สั่งงานใหม่ทันที</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {termAssignments
+                .filter((a) => {
+                  if (!searchQuery.trim()) return true;
+                  return a.title.toLowerCase().includes(searchQuery.trim().toLowerCase());
+                })
+                .map((assign) => {
+                  const partKey: FourScorePart =
+                    assign.scorePart ||
+                    (assign.unitKey === 'MIDTERM'
+                      ? 'MIDTERM'
+                      : assign.unitKey === 'FINAL'
+                        ? 'FINAL'
+                        : assign.unitKey === 'U2' || assign.unitKey === 'U3'
+                          ? 'POST_MIDTERM'
+                          : 'PRE_MIDTERM');
+                  const partMeta = SCORE_PART_LABELS[partKey];
+                  const roomsText =
+                    assign.targetClassrooms && assign.targetClassrooms.length > 0
+                      ? assign.targetClassrooms.length > 4
+                        ? `ทุกห้องที่เลือก (${assign.targetClassrooms.length} ห้อง: ${assign.targetClassrooms.slice(0, 3).join(', ')}...)`
+                        : `ห้อง ${assign.targetClassrooms.join(', ')}`
+                      : 'ทุกห้องในรายวิชา';
+
+                  return (
+                    <div
+                      key={assign.id}
+                      className="p-4 rounded-2xl border border-[#E6EEF7] bg-[#F7FAFF]/60 hover:bg-white hover:border-[#BFDBFE] transition-all flex flex-col justify-between gap-3"
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span
+                            className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold border ${partMeta.cls}`}
+                          >
+                            {partMeta.label}
+                          </span>
+                          <span className="text-xs font-bold text-[#163A66]">
+                            เต็ม {assign.maxScore} คะแนน
+                          </span>
+                        </div>
+
+                        <h3 className="text-sm font-bold text-[#163A66]">{assign.title}</h3>
+
+                        <div className="text-xs text-[#6B7C93] space-y-0.5">
+                          <p>
+                            วิชา:{' '}
+                            <span className="font-semibold text-[#163A66]">
+                              {assign.courseCode || 'ทุกวิชา'} {assign.courseName || ''}
+                            </span>
                           </p>
-                          <button
-                            type="button"
-                            onClick={() => setIsBundlesModalOpen(true)}
-                            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-95"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                            <span>สร้างภาระงานใหม่</span>
-                          </button>
+                          <p>
+                            กลุ่มเป้าหมาย:{' '}
+                            <span className="font-semibold text-[#3B82F6]">{roomsText}</span>
+                          </p>
+                          <p>กำหนดส่ง: {assign.dueDate}</p>
                         </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredSubmissions.map((item) => {
-                      const isGraded = item.status === 'GRADED';
-                      const isPdf = item.submissionChannel === 'PDF_UPLOAD' || (item.fileName || '').endsWith('.pdf');
-                      const isDrive = Boolean(
-                        item.externalLinkUrl?.includes('drive.google.com') ||
-                          item.externalLinkUrl?.includes('docs.google.com') ||
-                          item.externalPlatform === 'GOOGLE_DRIVE'
-                      );
-                      const isLink = item.submissionChannel === 'LINK_URL' || item.externalLinkUrl || isDrive;
+                      </div>
 
-                      return (
-                        <tr
-                          key={item.id}
-                          className="hover:bg-blue-50/40 transition-colors group"
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-200/70">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (assign.courseCode) setSelectedSubjectCode(assign.courseCode);
+                            setIs3ColorMatrixOpen(true);
+                          }}
+                          className="text-xs font-semibold text-[#3B82F6] hover:underline cursor-pointer"
                         >
-                        {/* Queue No */}
-                        <td className="py-3 px-4 text-center font-bold text-slate-500 tabular-nums">
-                          <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center mx-auto text-[11px]">
-                            {item.queueNo}
+                          เช็คส่งงาน / ให้คะแนน →
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sgsRosterAndSubmissionService.deleteTermAssignment(assign.id);
+                            refreshTermAssignments();
+                            showToast(`ลบชิ้นงาน "${assign.title}" เรียบร้อยแล้ว`);
+                          }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                          title="ลบชิ้นงาน"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ====================================================================
+          SECTION B: คิวตรวจงานที่นักเรียนส่งเข้ามา (FIFO Submissions Queue)
+         ==================================================================== */}
+      {activeSectionTab === 'SUBMISSIONS' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-[18px] border border-[#E6EEF7] p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleStartFirstPending}
+                disabled={stats.pending === 0}
+                className="px-4 py-2 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] disabled:opacity-50 text-white font-semibold text-xs sm:text-sm flex items-center gap-2 cursor-pointer"
+              >
+                <Play className="w-4 h-4 fill-white" />
+                <span>เริ่มตรวจงานทันที ({stats.pending} งานรอตรวจ)</span>
+              </button>
+              <div className="flex items-center gap-1.5">
+                {(['ALL', 'PENDING', 'GRADED'] as const).map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => setSelectedStatus(st)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer ${
+                      selectedStatus === st
+                        ? 'bg-[#EFF6FF] text-[#3B82F6] border border-[#BFDBFE]'
+                        : 'bg-slate-50 text-[#6B7C93]'
+                    }`}
+                  >
+                    {st === 'ALL'
+                      ? `ทั้งหมด (${stats.total})`
+                      : st === 'PENDING'
+                        ? `รอตรวจ (${stats.pending})`
+                        : `ตรวจแล้ว (${stats.graded})`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-[18px] border border-[#E6EEF7] overflow-hidden shadow-[0_4px_16px_rgba(40,90,140,0.06)]">
+            {filteredSubmissions.length === 0 ? (
+              <div className="p-12 text-center space-y-2">
+                <CheckCircle2 className="w-8 h-8 text-slate-300 mx-auto" />
+                <h4 className="text-sm font-bold text-[#163A66]">
+                  ยังไม่มีผลงานที่นักเรียนส่งเข้ามาในเงื่อนไขนี้
+                </h4>
+                <p className="text-xs text-[#6B7C93]">
+                  เมื่อนักเรียนส่งงานออนไลน์ รายการจะปรากฏที่นี่ตามลำดับเวลาส่งจริง
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {filteredSubmissions.map((item) => {
+                  const isGraded = item.status === 'GRADED';
+                  const isPdf =
+                    item.submissionChannel === 'PDF_UPLOAD' ||
+                    (item.fileName || '').endsWith('.pdf');
+                  const isDrive = Boolean(
+                    item.externalLinkUrl?.includes('drive.google.com') ||
+                      item.externalLinkUrl?.includes('docs.google.com') ||
+                      item.externalPlatform === 'GOOGLE_DRIVE'
+                  );
+                  const isLink =
+                    item.submissionChannel === 'LINK_URL' || item.externalLinkUrl || isDrive;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-4 hover:bg-slate-50/80 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="w-7 h-7 rounded-xl bg-slate-100 text-[#6B7C93] font-bold text-xs flex items-center justify-center shrink-0">
+                          {item.queueNo}
+                        </span>
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-bold text-[#163A66]">
+                              {item.studentName}
+                            </span>
+                            <span className="text-xs text-[#6B7C93]">
+                              (เลขที่ {item.seatNo} • ห้อง {item.classroom} • รหัส {item.studentCode})
+                            </span>
+                          </div>
+                          <p className="text-xs font-semibold text-[#3B82F6] mt-0.5">
+                            {item.subjectCode} • {item.assignmentTitle}
+                          </p>
+                          <p className="text-[11px] text-[#94A3B8]">
+                            ส่งเมื่อ {item.submittedAtText}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPreviewItem({
+                              title: item.assignmentTitle,
+                              studentName: item.studentName,
+                              studentCode: item.studentCode,
+                              classroom: item.classroom,
+                              seatNo: item.seatNo,
+                              type: isPdf ? 'PDF' : isLink ? 'LINK' : 'IMAGE',
+                              url: item.filePreviewUrl || item.externalLinkUrl,
+                              fileName: item.fileName,
+                              platform: isDrive ? 'GOOGLE_DRIVE' : item.externalPlatform,
+                            })
+                          }
+                          className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-[#163A66] flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-[#3B82F6]" />
+                          <span>ดูไฟล์ที่ส่ง</span>
+                        </button>
+
+                        {isGraded ? (
+                          <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
+                            ✓ {item.score}/{item.maxScore}
                           </span>
-                        </td>
-
-                        {/* Student Info */}
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-9 h-9 rounded-full overflow-hidden bg-blue-100 flex items-center justify-center shrink-0 border border-blue-200">
-                              <img
-                                src={
-                                  item.studentName.includes('ด.ญ.')
-                                    ? '/images/banners/student-avatar-girl.png'
-                                    : '/images/banners/student-avatar.png'
-                                }
-                                alt={item.studentName}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div>
-                              <div className="font-extrabold text-slate-900 leading-tight">
-                                {item.studentName}
-                              </div>
-                              <div className="text-[11px] text-slate-500 font-medium mt-0.5">
-                                เลขที่ {item.seatNo} • ห้อง {item.classroom} • รหัส {item.studentCode}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Course & Assignment */}
-                        <td className="py-3 px-4">
-                          <div>
-                            <div className="flex items-center gap-1.5 mb-0.5">
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">
-                                {item.subjectCode}
-                              </span>
-                              <span className="text-[10px] text-slate-500 font-semibold truncate">
-                                {item.sgsUnit}
-                              </span>
-                            </div>
-                            <div className="font-bold text-slate-900 line-clamp-1" title={item.assignmentTitle}>
-                              {item.assignmentTitle}
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Attachment Preview Badge */}
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setPreviewItem({
-                                  title: item.assignmentTitle,
-                                  studentName: item.studentName,
-                                  studentCode: item.studentCode,
-                                  classroom: item.classroom,
-                                  seatNo: item.seatNo,
-                                  type: isPdf ? 'PDF' : isLink ? 'LINK' : 'IMAGE',
-                                  url: item.filePreviewUrl || item.externalLinkUrl,
-                                  fileName: item.fileName,
-                                  platform: isDrive ? 'GOOGLE_DRIVE' : item.externalPlatform,
-                                });
-                              }}
-                              className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
-                                isDrive
-                                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
-                                  : isPdf
-                                  ? 'bg-rose-50 border-rose-200 text-rose-800 hover:bg-rose-100'
-                                  : isLink
-                                  ? 'bg-indigo-50 border-indigo-200 text-indigo-800 hover:bg-indigo-100'
-                                  : 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100'
-                              }`}
-                              title={isDrive ? 'คลิกเพื่อตรวจสอบโฟลเดอร์ Google Drive (Pre-Flight Link Check)' : 'คลิกเพื่อพรีวิวผลงานเต็มตา'}
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span className="truncate max-w-[120px]">
-                                {isDrive ? '📁 Google Drive' : isPdf ? '📄 PDF' : isLink ? (item.externalPlatform || 'Link') : '☁️ รูปภาพ R2'}
-                              </span>
-                            </button>
-                            <span className="text-[11px] text-slate-500 truncate max-w-[90px]" title={item.fileName}>
-                              {item.fileName || (isDrive ? 'โฟลเดอร์งาน' : 'ไฟล์ผลงาน')}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Submitted Timestamp */}
-                        <td className="py-3 px-4">
-                          <div className="text-[11px] font-bold text-slate-800">
-                            {item.submittedAtText}
-                          </div>
-                          <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            ✓ ตรงเวลา
+                        ) : (
+                          <span className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>รอตรวจ</span>
                           </span>
-                        </td>
+                        )}
 
-                        {/* Score Column */}
-                        <td className="py-3 px-4 text-center">
-                          {isGraded ? (
-                            <div className="font-extrabold text-sm text-emerald-700 tabular-nums">
-                              {item.score}{' '}
-                              <span className="text-[10px] text-slate-400 font-normal">
-                                / {item.maxScore}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-400 font-mono text-xs">
-                              - / {item.maxScore}
-                            </span>
-                          )}
-                        </td>
+                        <button
+                          type="button"
+                          onClick={() => setGradingModalItem(item)}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold cursor-pointer ${
+                            isGraded
+                              ? 'bg-slate-100 text-[#163A66] hover:bg-slate-200'
+                              : 'bg-[#3B82F6] text-white hover:bg-[#2563EB]'
+                          }`}
+                        >
+                          {isGraded ? 'แก้ไขคะแนน' : 'ให้คะแนน'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
-                        {/* Status Column */}
-                        <td className="py-3 px-4 text-center">
-                          {isGraded ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800">
-                              <Check className="w-3 h-3" />
-                              <span>ตรวจแล้ว</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-amber-100 text-amber-900 border border-amber-200">
-                              <Clock className="w-3 h-3" />
-                              <span>รอตรวจ</span>
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Action Column: Big Focus Grading Button */}
-                        <td className="py-3 px-4 text-center">
-                          <button
-                            type="button"
-                            onClick={() => setGradingModalItem(item)}
-                            className={`w-full py-2 px-3 rounded-xl font-extrabold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
-                              isGraded
-                                ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                                : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20'
-                            }`}
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                            <span>{isGraded ? 'แก้ไขคะแนน' : 'ตรวจและให้คะแนน'}</span>
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-              </table>
+      {/* ====================================================================
+          MODAL 1: สั่งงานใหม่ (เลือกได้ทั้ง "ทุกห้องในรายวิชา" หรือ "เฉพาะห้องที่เลือก")
+         ==================================================================== */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <form
+            onSubmit={handleCreateAssignmentSubmit}
+            className="bg-white rounded-[22px] border border-[#E6EEF7] max-w-lg w-full p-5 sm:p-6 shadow-xl space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-[#163A66]">
+                  สั่งงาน / มอบหมายภาระงานใหม่
+                </h3>
+                <p className="text-xs text-[#6B7C93]">
+                  เชื่อมคะแนนเข้ากับสมุดคะแนน ปพ.5 อัตโนมัติ
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            {/* ================================================================ */}
-            {/* 6. MOBILE FIRST RESPONSIVE VIEW (NO HORIZONTAL SCROLL) */}
-            {/* ================================================================ */}
-            <div className="block lg:hidden divide-y divide-slate-100 p-3 space-y-3">
-              {filteredSubmissions.length === 0 ? (
-                <div className="bg-white rounded-2xl p-8 border border-slate-200/90 text-center flex flex-col items-center">
-                  <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
-                    <BookOpen className="w-7 h-7" />
-                  </div>
-                  <h3 className="text-sm font-bold text-slate-800 mb-1">
-                    ยังไม่มีภาระงานหรือการบ้านในขณะนี้
-                  </h3>
-                  <p className="text-xs text-slate-500 mb-4 leading-relaxed max-w-xs">
-                    เริ่มต้นสร้างภาระงาน กำหนดคะแนน และมอบหมายให้นักเรียนส่งงานในรายวิชาของคุณ
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setIsBundlesModalOpen(true)}
-                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center gap-2 cursor-pointer active:scale-95"
-                  >
-                    <Edit3 className="w-4 h-4" />
-                    <span>สร้างภาระงานใหม่</span>
-                  </button>
+            {/* 1. เลือกรายวิชา */}
+            <div>
+              <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                1. รายวิชาที่ต้องการสั่งงาน *
+              </label>
+              <select
+                value={formCourseCode}
+                onChange={(e) => {
+                  setFormCourseCode(e.target.value);
+                  setFormSelectedRooms([]);
+                }}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-[#163A66]"
+              >
+                {subjectsList.map((subj) => (
+                  <option key={subj.courseCode} value={subj.courseCode}>
+                    {subj.courseCode} — {subj.courseName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 2. ชื่องาน */}
+            <div>
+              <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                2. ชื่อชิ้นงาน / การบ้าน / การสอบย่อย *
+              </label>
+              <input
+                type="text"
+                required
+                value={formTitle}
+                onChange={(e) => setFormTitle(e.target.value)}
+                placeholder="เช่น ใบงานที่ 1, สอบเก็บคะแนนก่อนกลางภาค"
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+              />
+            </div>
+
+            {/* 3. ส่วนคะแนน 4 ส่วน + คะแนนเต็ม + กำหนดส่ง */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                  3. เก็บเข้าส่วนคะแนนใดของ ปพ.5 *
+                </label>
+                <select
+                  value={formScorePart}
+                  onChange={(e) => setFormScorePart(e.target.value as FourScorePart)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-[#163A66]"
+                >
+                  <option value="PRE_MIDTERM">
+                    ก่อนกลางภาค (เต็ม {currentFormCourseWeights.preMidterm})
+                  </option>
+                  <option value="MIDTERM">
+                    กลางภาค (เต็ม {currentFormCourseWeights.midterm})
+                  </option>
+                  <option value="POST_MIDTERM">
+                    หลังกลางภาค (เต็ม {currentFormCourseWeights.postMidterm})
+                  </option>
+                  <option value="FINAL">
+                    ปลายภาค (เต็ม {currentFormCourseWeights.final})
+                  </option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                    คะแนนเต็ม
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={formMaxScore}
+                    onChange={(e) => setFormMaxScore(Number(e.target.value) || 10)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-[#163A66]"
+                  />
                 </div>
-              ) : (
-                filteredSubmissions.map((item) => {
-                const isGraded = item.status === 'GRADED';
-                const isPdf = item.submissionChannel === 'PDF_UPLOAD' || (item.fileName || '').endsWith('.pdf');
-                const isDrive = Boolean(
-                  item.externalLinkUrl?.includes('drive.google.com') ||
-                    item.externalLinkUrl?.includes('docs.google.com') ||
-                    item.externalPlatform === 'GOOGLE_DRIVE'
-                );
-                const isLink = item.submissionChannel === 'LINK_URL' || item.externalLinkUrl || isDrive;
+                <div>
+                  <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                    กำหนดส่ง
+                  </label>
+                  <input
+                    type="date"
+                    value={formDueDate}
+                    onChange={(e) => setFormDueDate(e.target.value)}
+                    className="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-xs text-[#163A66]"
+                  />
+                </div>
+              </div>
+            </div>
 
-                return (
-                  <div
-                    key={item.id}
-                    className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-3 shadow-2xs"
-                  >
-                    {/* Header: Student & Queue & Status */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 rounded-full overflow-hidden bg-blue-100 flex items-center justify-center shrink-0 border border-blue-200">
-                          <img
-                            src={
-                              item.studentName.includes('ด.ญ.')
-                                ? '/images/banners/student-avatar-girl.png'
-                                : '/images/banners/student-avatar.png'
-                            }
-                            alt={item.studentName}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div>
-                          <div className="font-extrabold text-slate-900 text-sm">
-                            {item.studentName}
-                          </div>
-                          <div className="text-xs text-slate-500 font-semibold">
-                            เลขที่ {item.seatNo} • ห้อง {item.classroom} (คิว #{item.queueNo})
-                          </div>
-                        </div>
-                      </div>
+            {/* 4. เลือกห้องเรียน: ทุกห้องในรายวิชา หรือ เฉพาะห้องที่เลือก */}
+            <div className="space-y-2 pt-1">
+              <label className="block text-xs font-semibold text-[#163A66]">
+                4. ห้องเรียนที่ได้รับมอบหมาย:
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormScopeMode('ALL_SUBJECT_ROOMS')}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    formScopeMode === 'ALL_SUBJECT_ROOMS'
+                      ? 'border-[#3B82F6] bg-[#EFF6FF] text-[#163A66]'
+                      : 'border-slate-200 bg-white text-[#6B7C93]'
+                  }`}
+                >
+                  <p className="text-xs font-bold">
+                    สั่งทุกห้องในรายวิชานี้ ({currentFormSubjectRooms.length} ห้อง)
+                  </p>
+                  <p className="text-[11px] opacity-80 mt-0.5">
+                    สั่งครั้งเดียวใช้กับทุกห้องที่เรียนวิชานี้
+                  </p>
+                </button>
 
-                      {/* Status Pill */}
-                      {isGraded ? (
-                        <span className="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 shrink-0">
-                          ✓ {item.score}/{item.maxScore}
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-amber-100 text-amber-900 border border-amber-200 shrink-0">
-                          ⏳ รอตรวจ
-                        </span>
-                      )}
-                    </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormScopeMode('SELECTED_ROOMS');
+                    if (formSelectedRooms.length === 0 && currentFormSubjectRooms[0]) {
+                      setFormSelectedRooms([currentFormSubjectRooms[0]]);
+                    }
+                  }}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    formScopeMode === 'SELECTED_ROOMS'
+                      ? 'border-[#3B82F6] bg-[#EFF6FF] text-[#163A66]'
+                      : 'border-slate-200 bg-white text-[#6B7C93]'
+                  }`}
+                >
+                  <p className="text-xs font-bold">เลือกเฉพาะห้องเรียน</p>
+                  <p className="text-[11px] opacity-80 mt-0.5">
+                    ติ๊กเลือกเฉพาะห้องที่ต้องการสั่งงาน
+                  </p>
+                </button>
+              </div>
 
-                    {/* Assignment Info */}
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
-                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-blue-700">
-                        <span>{item.subjectCode}</span>
-                        <span>•</span>
-                        <span>{item.sgsUnit}</span>
-                      </div>
-                      <div className="text-xs font-extrabold text-slate-900">
-                        {item.assignmentTitle}
-                      </div>
-                    </div>
-
-                    {/* Attachment preview row */}
-                    <div className="flex items-center justify-between gap-2 text-xs">
+              {formScopeMode === 'SELECTED_ROOMS' && (
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
+                  {currentFormSubjectRooms.map((room) => {
+                    const checked = formSelectedRooms.includes(room);
+                    return (
                       <button
+                        key={room}
                         type="button"
                         onClick={() => {
-                          setPreviewItem({
-                            title: item.assignmentTitle,
-                            studentName: item.studentName,
-                            studentCode: item.studentCode,
-                            classroom: item.classroom,
-                            seatNo: item.seatNo,
-                            type: isPdf ? 'PDF' : isLink ? 'LINK' : 'IMAGE',
-                            url: item.filePreviewUrl || item.externalLinkUrl,
-                            fileName: item.fileName,
-                            platform: isDrive ? 'GOOGLE_DRIVE' : item.externalPlatform,
-                          });
+                          setFormSelectedRooms((prev) =>
+                            checked ? prev.filter((r) => r !== room) : [...prev, room]
+                          );
                         }}
-                        className={`py-1.5 px-3 rounded-xl border text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs ${
-                          isDrive
-                            ? 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
-                            : isPdf
-                            ? 'bg-rose-50 border-rose-200 text-rose-800 hover:bg-rose-100'
-                            : isLink
-                            ? 'bg-indigo-50 border-indigo-200 text-indigo-800 hover:bg-indigo-100'
-                            : 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100'
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer ${
+                          checked
+                            ? 'bg-[#3B82F6] text-white border-[#3B82F6]'
+                            : 'bg-white text-[#6B7C93] border-slate-200'
                         }`}
-                        title={isDrive ? 'คลิกเพื่อตรวจสอบโฟลเดอร์ Google Drive' : 'คลิกเพื่อดูผลงาน'}
                       >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>
-                          {isDrive ? '📁 Google Drive' : isPdf ? '📄 PDF' : isLink ? (item.externalPlatform || 'Link') : '☁️ รูปภาพ R2'}
-                        </span>
+                        {checked && <Check className="w-3 h-3" />}
+                        <span>{room}</span>
                       </button>
-
-                      <span className="text-[11px] text-slate-500">
-                        ส่งเมื่อ {item.submittedAtText}
-                      </span>
-                    </div>
-
-                    {/* Big Touch Action Button (min-height 44px) */}
-                    <button
-                      type="button"
-                      onClick={() => setGradingModalItem(item)}
-                      className={`w-full min-h-[44px] py-2.5 px-4 rounded-xl font-extrabold text-xs sm:text-sm shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 ${
-                        isGraded
-                          ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                          : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-500/20'
-                      }`}
-                    >
-                      <Edit3 className="w-4 h-4" />
-                      <span>{isGraded ? 'แก้ไขคะแนน' : `ตรวจและให้คะแนน (${item.maxScore} คะแนน)`}</span>
-                    </button>
-                  </div>
-                );
-              })
-            )}
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </>
-        )}
-      </div>
 
-      {/* ==================================================================== */}
-      {/* 7. STICKY MOBILE BOTTOM REVIEW BAR */}
-      {/* ==================================================================== */}
-      <div className="lg:hidden fixed bottom-14 left-0 right-0 z-30 p-3 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-lg">
-        <button
-          type="button"
-          onClick={handleStartFirstPending}
-          className="w-full min-h-[46px] py-3 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-98"
-        >
-          <Play className="w-4 h-4 fill-white" />
-          <span>🚀 ตรวจงานถัดไปทันที ({stats.pending} งานค้าง)</span>
-        </button>
-      </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-[#6B7C93] hover:bg-slate-50 cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-semibold shadow-xs cursor-pointer"
+              >
+                บันทึกและสั่งงาน
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
-      {/* ==================================================================== */}
-      {/* 8. MODALS (FOCUSED WORKSPACE & SECONDARY VIEWS) */}
-      {/* ==================================================================== */}
-      {/* Dedicated Dual-Pane Grading Workspace Modal */}
+      {/* ====================================================================
+          MODAL 2: วิธีใช้งาน (ซ่อนคำอธิบายไว้ในปุ่ม ⓘ)
+         ==================================================================== */}
+      {isHelpModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-[22px] border border-[#E6EEF7] max-w-md w-full p-5 sm:p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <HelpCircle className="w-5 h-5 text-[#3B82F6]" />
+                <h3 className="text-base font-bold text-[#163A66]">วิธีสั่งงานและตรวจงาน</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHelpModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs sm:text-sm text-[#163A66]">
+              <div className="p-3 rounded-xl bg-[#F7FAFF] border border-[#E6EEF7]">
+                <p className="font-bold text-[#3B82F6]">1. กดปุ่ม "+ สั่งงานใหม่"</p>
+                <p className="text-xs text-[#6B7C93] mt-0.5">
+                  เลือกรายวิชา และเลือกส่วนคะแนนที่จะเก็บ (ก่อนกลางภาค / กลางภาค / หลังกลางภาค / ปลายภาค)
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-[#F7FAFF] border border-[#E6EEF7]">
+                <p className="font-bold text-[#3B82F6]">2. เลือกสั่งทุกห้อง หรือ เฉพาะห้อง</p>
+                <p className="text-xs text-[#6B7C93] mt-0.5">
+                  สามารถสั่งครั้งเดียวให้ทุกห้องที่เรียนรายวิชานี้ หรือติ๊กเลือกเฉพาะห้องที่ต้องการได้ทันที
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-[#F7FAFF] border border-[#E6EEF7]">
+                <p className="font-bold text-[#3B82F6]">3. คะแนนซิงก์เข้า ปพ.5 อัตโนมัติ</p>
+                <p className="text-xs text-[#6B7C93] mt-0.5">
+                  เมื่อตรวจให้คะแนนแล้ว ระบบจะคำนวณสัดส่วนเข้าสมุดคะแนน ปพ.5 ให้โดยอัตโนมัติ
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsHelpModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-[#3B82F6] text-white text-xs font-semibold cursor-pointer"
+              >
+                เข้าใจแล้ว
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Existing Modals */}
       <GradingWorkspaceModal
         isOpen={Boolean(gradingModalItem)}
         onClose={() => setGradingModalItem(null)}
@@ -792,41 +1049,41 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         onSelectQueueItem={(item) => setGradingModalItem(item)}
       />
 
-      {/* Classroom Score Matrix Modal (Icon triggered) */}
       <SgsClassroomMatrixModal
         isOpen={isSgsMatrixOpen}
         onClose={() => setIsSgsMatrixOpen(false)}
-        defaultSubjectCode={selectedSubjectCode === 'ALL' ? 'ศ23101' : selectedSubjectCode}
-        defaultRoom={selectedRoom === 'ALL' ? 'ม.3/1' : selectedRoom}
+        defaultSubjectCode={
+          selectedSubjectCode === 'ALL' ? subjectsList[0]?.courseCode || 'ท23102' : selectedSubjectCode
+        }
+        defaultRoom={selectedRoom === 'ALL' ? availableFilterRooms[0] || 'ม.1/1' : selectedRoom}
       />
 
-      {/* 3-Color Submission Matrix Modal (Icon triggered) */}
       <Submission3ColorMatrixModal
         isOpen={is3ColorMatrixOpen}
         onClose={() => setIs3ColorMatrixOpen(false)}
-        defaultSubjectCode={selectedSubjectCode === 'ALL' ? 'ศ23101' : selectedSubjectCode}
-        defaultRoom={selectedRoom === 'ALL' ? 'ม.3/1' : selectedRoom}
+        defaultSubjectCode={
+          selectedSubjectCode === 'ALL' ? subjectsList[0]?.courseCode || 'ท23102' : selectedSubjectCode
+        }
+        defaultRoom={selectedRoom === 'ALL' ? availableFilterRooms[0] || 'ม.1/1' : selectedRoom}
         onOpenPreview={(preview) => setPreviewItem(preview)}
         onGradeQuick={(_asgId, _stuCode, _max) => {
           showToast('✓ บันทึกสถานะส่งงานเรียบร้อยแล้ว');
         }}
       />
 
-      {/* Assignment Bundles Modal (Icon triggered) */}
       <AssignmentBundlesModal
         isOpen={isBundlesModalOpen}
         onClose={() => setIsBundlesModalOpen(false)}
         onShowToast={showToast}
       />
 
-      {/* Artwork Preview Modal */}
       <ArtworkPreviewModal
         isOpen={Boolean(previewItem)}
         onClose={() => setPreviewItem(null)}
         title={previewItem?.title || 'ผลงานนักเรียน'}
         studentName={previewItem?.studentName || ''}
         studentCode={previewItem?.studentCode}
-        classroom={previewItem?.classroom || 'ม.3/1'}
+        classroom={previewItem?.classroom || availableFilterRooms[0] || 'ม.1/1'}
         seatNo={previewItem?.seatNo}
         type={previewItem?.type || 'IMAGE'}
         url={previewItem?.url}

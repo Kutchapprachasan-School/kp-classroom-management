@@ -4,6 +4,7 @@ import type { AuthUser } from '../../services/authService';
 import type { SchoolSettingsConfig } from '../../config/schoolSettings';
 import { getSchoolSettings } from '../../config/schoolSettings';
 import { classroomService } from '../../services/classroomService';
+import { formatClassroomLabel } from '../../services/studentService';
 import { MessagesView } from '../../views/MessagesView';
 
 interface StudentContactTeacherViewProps {
@@ -19,22 +20,22 @@ export const StudentContactTeacherView: React.FC<StudentContactTeacherViewProps>
 }) => {
   const [activeTab, setActiveTab] = useState<'CHAT' | 'DIRECTORY'>('CHAT');
   const settings = schoolSettings || getSchoolSettings();
-  const studentRoom = currentUser?.classroomId || 'ม.3/1';
+  const studentRoom = formatClassroomLabel(currentUser?.classroomName || currentUser?.classroomId) || 'ม.3/1';
 
   // Find homeroom advisor
   const rooms = classroomService.getClassroomsSync();
   const matchedRoom = rooms.find(
-    (c) => c.id === studentRoom || c.roomNumber === studentRoom || c.name.includes(studentRoom)
+    (c) => c.id === studentRoom || c.roomNumber === studentRoom || c.name === studentRoom || c.name.includes(studentRoom)
   );
   const advisorName = matchedRoom?.adviser || 'ครูที่ปรึกษาประจำชั้น';
 
   const contacts = [
     {
       name: advisorName,
-      role: `ครูที่ปรึกษาประจำชั้น ${matchedRoom?.roomNumber || studentRoom}`,
+      role: `ครูที่ปรึกษาประจำชั้น ${matchedRoom?.roomNumber || matchedRoom?.name || studentRoom}`,
       subject: 'ให้คำปรึกษาด้านการเรียน การดูแลช่วยเหลือนักเรียน และกิจกรรมโฮมรูม',
       room: 'ห้องพักครูประจำสายชั้น / ประจำห้องเรียน',
-      email: `advisor.${studentRoom.replace('/', '_')}@${settings.domain || 'school.ac.th'}`,
+      email: `advisor.${studentRoom.replace('ม.', '').replace('/', '_')}@${settings.domain || 'school.ac.th'}`,
       badgeBg: 'bg-blue-100 text-blue-700',
       icon: User,
     },

@@ -52,11 +52,14 @@ import {
   type DayOfWeek,
 } from '../services/academicCalendarService';
 import { coursesCurriculumService } from '../services/coursesCurriculumService';
-import { cleanSlateService } from '../services/cleanSlateService';
 import { teacherCourseAssignmentService } from '../services/teacherCourseAssignmentService';
 import { studentService } from '../services/studentService';
 import { classroomService } from '../services/classroomService';
-import { calendarEventStorageService } from '../services/calendarEventStorageService';
+import {
+  calendarEventStorageService,
+  getMatrixStorageKey,
+} from '../services/calendarEventStorageService';
+import { authService } from '../services/authService';
 
 import {
   type TimetableColorTheme,
@@ -68,7 +71,6 @@ import {
   computeWeekInfo,
   getBangkokDayName,
   getBangkokNow,
-  INITIAL_MATRIX_SLOTS,
 } from '../utils/timetableDateUtils';
 
 export type {
@@ -87,31 +89,8 @@ interface TimetableViewProps {
   activeRole?: SchoolUserRole;
 }
 
-const MATRIX_STORAGE_KEY = 'kp_teacher_matrix_slots';
-
-const loadSavedMatrixSlots = (): TimetableMatrixSlot[] => {
-  let baseSlots: TimetableMatrixSlot[] = [];
-  if (typeof window !== 'undefined' && window.localStorage) {
-    try {
-      const stored = window.localStorage.getItem(MATRIX_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          baseSlots = parsed;
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
-  if (baseSlots.length === 0) {
-    if (cleanSlateService.isCleanSlateActive()) {
-      return [];
-    }
-    baseSlots = INITIAL_MATRIX_SLOTS;
-  }
-  const bellSynced = bellScheduleService.syncMatrixSlotsWithBellSchedule(baseSlots);
-  return coursesCurriculumService.sanitizeMatrixSlotsWithCurriculum(bellSynced);
+const loadSavedMatrixSlots = (teacherId?: string): TimetableMatrixSlot[] => {
+  return calendarEventStorageService.loadMatrixSlots(teacherId);
 };
 
 const DAY_ORDER: Record<string, number> = {
@@ -130,11 +109,17 @@ const THAI_MONTH_NAMES = [
 export const TimetableView: React.FC<TimetableViewProps> = ({
   onDeepNavigate,
 }) => {
+  const currentUser = authService.getCurrentUser();
+  const currentTeacherId = currentUser?.id;
+  const currentTeacherName = currentUser?.name;
+
   // ------------------------------------------
-  // Core States
+  // Core States (ตารางสอนแยกรายบุคคล - ของใครของมัน)
   // ------------------------------------------
   const [weekOffset, setWeekOffset] = useState<number>(0);
-  const [matrixSlots, setMatrixSlots] = useState<TimetableMatrixSlot[]>(loadSavedMatrixSlots);
+  const [matrixSlots, setMatrixSlots] = useState<TimetableMatrixSlot[]>(() =>
+    loadSavedMatrixSlots(currentTeacherId)
+  );
 
   const [activeTerm, setActiveTerm] = useState<AcademicTermRecord | null>(() =>
     academicCalendarService.getActiveTerm()
@@ -150,14 +135,15 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
     };
   }, []);
 
-  // คำนวณ Waiting Pool โดยตรงจากหลักสูตรที่เลือกใช้ หักลบด้วยจำนวนคาบที่ลงตารางแล้ว (โควตาตามหน่วยกิต)
+  // คำนวณ Waiting Pool โดยตรงจากหลักสูตรที่ครูท่านนี้ลงทะเบียนไว้เท่านั้น
   const unassignedSlots = useMemo(() => {
     return coursesCurriculumService.getCurriculumWaitingPoolSlots(
       matrixSlots,
       activeTerm ? String(activeTerm.year) : undefined,
-      activeTerm ? String(activeTerm.semesterNo) : undefined
+      activeTerm ? String(activeTerm.semesterNo) : undefined,
+      currentUser?.role !== 'ADMIN' ? (currentTeacherId || currentTeacherName) : undefined
     );
-  }, [matrixSlots, activeTerm]);
+  }, [matrixSlots, activeTerm, currentTeacherId, currentTeacherName, currentUser]);
 
   const [selectedSlot, setSelectedSlot] = useState<TimetableMatrixSlot | null>(null);
   const [assignWaitingSlotTarget, setAssignWaitingSlotTarget] = useState<TimetableMatrixSlot | null>(null);
@@ -193,7 +179,8 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
         const synced = bellScheduleService.syncMatrixSlotsWithBellSchedule(prev, newConfig);
         const sanitized = coursesCurriculumService.sanitizeMatrixSlotsWithCurriculum(synced);
         if (typeof window !== 'undefined' && window.localStorage) {
-          window.localStorage.setItem(MATRIX_STORAGE_KEY, JSON.stringify(sanitized));
+          const scopedKey = getMatrixStorageKey(currentTeacherId);
+          window.localStorage.setItem(scopedKey, JSON.stringify(sanitized));
           window.dispatchEvent(new CustomEvent('kp_matrix_slots_updated', { detail: sanitized }));
         }
         return sanitized;
@@ -203,7 +190,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
     return () => {
       window.removeEventListener(BELL_SCHEDULE_UPDATED_EVENT, handleBellUpdate);
     };
-  }, []);
+  }, [currentTeacherId]);
 
   // ซิงค์การเปลี่ยนแปลงคาบสอนจากหน้าอื่น (เช่น การเช็คชื่อจากหน้าหลัก) แบบเรียลไทม์
   useEffect(() => {
@@ -212,7 +199,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
       if (custom.detail && Array.isArray(custom.detail)) {
         setMatrixSlots(custom.detail);
       } else {
-        setMatrixSlots(loadSavedMatrixSlots());
+        setMatrixSlots(loadSavedMatrixSlots(currentTeacherId));
       }
     };
     window.addEventListener('kp_matrix_slots_updated', handleSlotsSync);
@@ -221,13 +208,19 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
       window.removeEventListener('kp_matrix_slots_updated', handleSlotsSync);
       window.removeEventListener('storage', handleSlotsSync);
     };
-  }, []);
+  }, [currentTeacherId]);
 
   const saveMatrixSlotsWithDispatch = (updated: TimetableMatrixSlot[]) => {
-    setMatrixSlots(updated);
+    const stamped = updated.map((s) => ({
+      ...s,
+      teacherId: s.teacherId || currentTeacherId,
+      teacherName: s.teacherName || currentTeacherName,
+    }));
+    setMatrixSlots(stamped);
     if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem(MATRIX_STORAGE_KEY, JSON.stringify(updated));
-      window.dispatchEvent(new CustomEvent('kp_matrix_slots_updated', { detail: updated }));
+      const scopedKey = getMatrixStorageKey(currentTeacherId);
+      window.localStorage.setItem(scopedKey, JSON.stringify(stamped));
+      window.dispatchEvent(new CustomEvent('kp_matrix_slots_updated', { detail: stamped }));
       window.dispatchEvent(new Event('storage'));
     }
   };

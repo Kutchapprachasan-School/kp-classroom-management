@@ -13,6 +13,8 @@ import {
 import type { QuizQuestion, StudentLeaderboardEntry } from '../types/viewModels';
 import { gamificationService } from '../services/gamificationService';
 import { authService, type AuthUser } from '../services/authService';
+import { formatClassroomLabel } from '../services/studentService';
+import { behaviorService } from '../services/behaviorService';
 
 const arenaQuestions: QuizQuestion[] = [
   {
@@ -45,7 +47,7 @@ interface StudentArenaViewProps {
 export const StudentArenaView: React.FC<StudentArenaViewProps> = ({ currentUser }) => {
   const effectiveUser = currentUser || authService.getCurrentUser();
   const studentName = effectiveUser?.name || 'นักเรียน';
-  const studentRoom = effectiveUser?.classroomId || 'ม.3/1';
+  const studentRoom = formatClassroomLabel(effectiveUser?.classroomName || effectiveUser?.classroomId) || 'ม.3/1';
   const [streakDays, setStreakDays] = useState<number>(() =>
     gamificationService.getStreak(effectiveUser?.id || '')
   );
@@ -112,10 +114,18 @@ export const StudentArenaView: React.FC<StudentArenaViewProps> = ({ currentUser 
       setHasAnsweredCurrent(false);
     } else {
       // Finished
-      const finalScore = score + (selectedOption === arenaQuestions[currentQIndex].correctIndex ? 0 : 0);
+      const finalScore = score + (selectedOption === arenaQuestions[currentQIndex].correctIndex && !hasAnsweredCurrent ? 1 : 0);
       const calculatedXp = finalScore * 50 + 50; // 50 per correct + 50 streak bonus
       setXpGained(calculatedXp);
       setQuizState('RESULT');
+      if (calculatedXp > 0 && effectiveUser?.id) {
+        behaviorService.awardXp(
+          effectiveUser.id,
+          calculatedXp,
+          `ประลองความรู้ Weekly Battle Arena สัปดาห์ที่ 8 (${finalScore}/${arenaQuestions.length} ข้อ)`,
+          `arena-week8-${effectiveUser.id}-${Date.now()}`
+        ).catch(() => {});
+      }
     }
   };
 

@@ -26,6 +26,7 @@ import { SchoolLeaveExecutiveDashboardView } from './views/SchoolLeaveExecutiveD
 import { MorningAssemblyView } from './views/MorningAssemblyView';
 import { ClassroomAttendanceView } from './views/ClassroomAttendanceView';
 import { QuickSearchModal } from './components/common/QuickSearchModal';
+import { PwaInstallPrompt } from './components/common/PwaInstallPrompt';
 import type { AtRiskStudent } from './types/viewModels';
 import {
   Eye,
@@ -201,8 +202,54 @@ export const App: React.FC = () => {
     }
   }, [currentView]);
 
+  // =========================================================================
+  // STRICT SECURITY GUARD: Authentication & Role-Based Access Control (RBAC)
+  // ป้องกันนักเรียนหลุดเข้าหน้าแอดมิน/ครู และบังคับหน้า Login เมื่อหมดอายุเซสชัน
+  // =========================================================================
+  useEffect(() => {
+    // 1. กรณีไม่ได้เข้าสู่ระบบ (Unauthenticated) -> ต้องอยู่ที่ school-login เท่านั้น
+    if (!currentAuthUser) {
+      if (currentView !== 'school-login') {
+        console.warn('[Security Guard] ตรวจพบการพยายามเข้าถึงโดยไม่ได้เข้าสู่ระบบ บังคับกลับหน้า Login');
+        setCurrentView('school-login');
+      }
+      return;
+    }
+
+    // 2. กรณีนิสิต/นักเรียน (STUDENT) -> ต้องอยู่เฉพาะในพอร์ทัลนักเรียน (student-portal) เท่านั้น
+    if (currentAuthUser.role === 'STUDENT') {
+      if (currentView !== 'student-portal') {
+        console.warn(
+          `[Security Guard] ป้องกันสิทธิ์: นักเรียน ${currentAuthUser.name} (${currentAuthUser.studentCode}) ไม่ได้รับอนุญาตให้เข้าหน้า "${currentView}". บังคับกลับ student-portal`
+        );
+        setCurrentView('student-portal');
+      }
+      // บังคับบทบาทนักเรียนให้เป็น STUDENT_GENERAL หรือ STUDENT_COUNCIL เท่านั้น
+      if (activeRole !== 'STUDENT_GENERAL' && activeRole !== 'STUDENT_COUNCIL') {
+        setActiveRole(
+          currentAuthUser.studentCode?.startsWith('42') ? 'STUDENT_COUNCIL' : 'STUDENT_GENERAL'
+        );
+      }
+      return;
+    }
+
+    // 3. กรณีครู / แอดมิน (TEACHER / ADMIN)
+    if (currentAuthUser.role === 'TEACHER' || currentAuthUser.role === 'ADMIN') {
+      // หากเข้าสู่ระบบแล้ว ห้ามค้างอยู่ที่หน้า school-login
+      if (currentView === 'school-login') {
+        const defaultTarget = (SCHOOL_ROLE_PROFILES[activeRole]?.defaultView as TeacherViewKey) || 'home';
+        setCurrentView(defaultTarget);
+      }
+      // ครูทั่วไปที่ไม่ใช่ ADMIN ห้ามเข้าถึงหน้าจัดการสิทธิ์บัญชี (accounts)
+      if (currentAuthUser.role !== 'ADMIN' && activeRole !== 'ACADEMIC_ADMIN' && currentView === 'accounts') {
+        console.warn('[Security Guard] เฉพาะผู้ดูแลระบบเท่านั้นที่เข้าถึงหน้าจัดการสิทธิ์ได้');
+        setCurrentView('home');
+      }
+    }
+  }, [currentAuthUser, currentView, activeRole]);
+
   // Context-Aware Deep-Link Navigation States
-  const [deepLinkClassTab, setDeepLinkClassTab] = useState<ClassSubTab>('attendance');
+  const [deepLinkClassTab, setDeepLinkClassTab] = useState<ClassSubTab>('grades');
   const [deepLinkAffairsTab, setDeepLinkAffairsTab] = useState<
     'ASSEMBLY' | 'DISCIPLINE' | 'STUDENT_LEAVE'
   >('ASSEMBLY');
@@ -215,6 +262,16 @@ export const App: React.FC = () => {
   >(undefined);
 
   const handleChangeRole = (nextRole: SchoolUserRole) => {
+    // SECURITY GUARD: นักเรียนไม่สามารถยกตนเองขึ้นเป็นครูหรือแอดมินได้เป็นอันขาด!
+    if (currentAuthUser?.role === 'STUDENT') {
+      if (nextRole === 'STUDENT_GENERAL' || nextRole === 'STUDENT_COUNCIL') {
+        setActiveRole(nextRole);
+      } else {
+        console.warn(`[Security Guard] ปฏิเสธการสลับสิทธิ์: นักเรียนไม่สามารถปรับบทบาทเป็น ${nextRole} ได้`);
+      }
+      return;
+    }
+
     setActiveRole(nextRole);
     if (nextRole === 'STUDENT_GENERAL' || nextRole === 'STUDENT_COUNCIL') {
       setCurrentView('student-portal');
@@ -255,6 +312,12 @@ export const App: React.FC = () => {
   };
 
   const handleDeepNavigate = (payload: CrossViewNavigationPayload) => {
+    // SECURITY GUARD: นักเรียนไม่สามารถกระโดดข้ามหน้าไปยังหน้าครูได้
+    if (currentAuthUser?.role === 'STUDENT') {
+      console.warn('[Security Guard] ระงับการ Deep Navigate ของนักเรียนไปยังมุมมองครู');
+      return;
+    }
+
     if (payload.classSubTab) {
       setDeepLinkClassTab(payload.classSubTab);
     }
@@ -353,6 +416,10 @@ export const App: React.FC = () => {
   };
 
   const handleBack = () => {
+    if (currentAuthUser?.role === 'STUDENT') {
+      setCurrentView('student-portal');
+      return;
+    }
     if (currentView === 'mobile-submission-detail') {
       setCurrentView('mobile-class-submissions');
     } else if (currentView === 'mobile-class-submissions') {
@@ -564,7 +631,6 @@ export const App: React.FC = () => {
           currentUser={currentAuthUser}
           schoolSettings={schoolSettings}
           onChangeStudentRole={(stuRole) => setActiveRole(stuRole)}
-          onSwitchToTeacherRole={(tRole) => handleChangeRole(tRole)}
           onExit={handleLogout}
         />
       ) : currentView === 'school-leave-dashboard' ? (
@@ -593,6 +659,9 @@ export const App: React.FC = () => {
               } else {
                 if (view === 'settings') {
                   setSettingsInitialTab(undefined);
+                }
+                if (view === 'class-overview') {
+                  setDeepLinkClassTab('grades');
                 }
                 setCurrentView(view);
               }
@@ -643,6 +712,13 @@ export const App: React.FC = () => {
               {currentView === 'mobile-home' && (
                 <TeacherMobileHomeScreen
                   onNavigate={(v) => setCurrentView(v)}
+                  teacherName={currentAuthUser?.name || 'ครูผู้สอน'}
+                  department={
+                    currentAuthUser?.subjectGroup
+                      ? `กลุ่มสาระฯ${currentAuthUser.subjectGroup}`
+                      : currentAuthUser?.position || 'ครูผู้สอน'
+                  }
+                  avatarUrl={currentAuthUser?.avatarUrl}
                 />
               )}
 
@@ -848,6 +924,13 @@ export const App: React.FC = () => {
                 <TeacherMobileMoreMenuScreen
                   onNavigate={(v) => setCurrentView(v)}
                   onLogout={handleLogout}
+                  teacherName={currentAuthUser?.name || 'ครูผู้สอน'}
+                  department={
+                    currentAuthUser?.subjectGroup
+                      ? `กลุ่มสาระฯ${currentAuthUser.subjectGroup}`
+                      : currentAuthUser?.position || 'ครูผู้สอน'
+                  }
+                  avatarUrl={currentAuthUser?.avatarUrl}
                 />
               )}
             </main>
@@ -873,13 +956,21 @@ export const App: React.FC = () => {
       <QuickSearchModal
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
+        currentUser={currentAuthUser}
         onSelectAction={(view) => {
+          if (currentAuthUser?.role === 'STUDENT') {
+            setCurrentView('student-portal');
+            return;
+          }
           if (view === 'overview') setCurrentView('class-overview');
           else if (view === 'student') setCurrentView('student');
           else if (view === 'sar') setCurrentView('sar');
           else if (view === 'student-portal') setCurrentView('student-portal');
         }}
       />
+
+      {/* PWA Install Prompt for Mobile and Desktop Browser */}
+      <PwaInstallPrompt />
     </div>
   );
 };

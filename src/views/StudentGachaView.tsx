@@ -11,10 +11,14 @@ import {
 import {
   gachaService,
   ALL_BUDDIES,
+  getBangkokTodayKey,
+  getWeekKey,
   type GachaBuddy,
   type GachaPullResult,
   type GachaState,
 } from '../services/gachaService';
+import { gachaConfigService } from '../services/gachaConfigService';
+import { MAX_BUDDY_STARS } from '../config/gachaStarTable';
 import { gachaSkillEngine } from '../services/gachaSkillEngine';
 import { ChibiBuddyAvatar } from '../components/student/ChibiBuddyAvatar';
 
@@ -113,11 +117,56 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
     }
   };
 
-  const handleAddFreeTickets = (amount: number) => {
-    gachaService.addTickets(amount);
+  const handleExchangeShardsForTickets = (count = 1) => {
+    const res = gachaService.exchangeShardsForTickets(count);
+    if ('error' in res) {
+      showToast(`⚠️ ${res.error}`);
+      return;
+    }
     reloadState();
-    setIsAddTicketsOpen(false);
-    showToast(`ได้รับตั๋วสุ่ม +${amount} ใบ เรียบร้อยแล้ว! 🎟️`);
+    showToast(`✨ แลกตั๋วสุ่ม +${count} ใบ สำเร็จ! (ใช้ ${res.spent} เศษดาว)`);
+  };
+
+  const handleBuyTicketsWithCoins = (count = 1) => {
+    const res = gachaService.buyTicketsWithCoins(count);
+    if ('error' in res) {
+      showToast(`⚠️ ${res.error}`);
+      return;
+    }
+    reloadState();
+    showToast(`🛒 ซื้อตั๋วสุ่ม +${count} ใบ สำเร็จ! (ใช้ ${res.spent} เหรียญ)`);
+  };
+
+  const handleClaimWeeklyFreeTicket = () => {
+    const fresh = gachaService.getState();
+    const res = gachaService.applyFreeTickets(fresh);
+    if (res.allowed === 0) {
+      showToast(`⚠️ ${res.message}`);
+      return;
+    }
+    gachaService.saveState(fresh);
+    reloadState();
+    showToast(`🎁 ${res.message}`);
+  };
+
+  const handleUpgradeStar = (buddyId: string) => {
+    const res = gachaService.upgradeBuddyStar(buddyId);
+    if (!res.ok) {
+      showToast(`⚠️ ${res.error}`);
+      return;
+    }
+    reloadState();
+    showToast(`🌟 เลื่อนขั้นคู่หูสู่ระดับ ${res.stars} ดาว สำเร็จ! (ใช้ ${res.spent} เศษดาว)`);
+  };
+
+  const handleUnlockWithShards = (buddyId: string) => {
+    const res = gachaService.unlockBuddyWithShards(buddyId);
+    if (!res.ok) {
+      showToast(`⚠️ ${res.error}`);
+      return;
+    }
+    reloadState();
+    showToast(`🎉 ปลดล็อกคู่หูใหม่สำเร็จ! (ใช้ ${res.spent} เศษดาว)`);
   };
 
   // Group buddies by rarity for the bottom showcase
@@ -176,8 +225,18 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
             <span className="font-extrabold text-xs text-teal-800">
               {activeBuddy.name}
             </span>
+            <span className="text-[10px] text-amber-500 font-black">
+              {'★'.repeat(Math.max(1, gachaService.getBuddyStars(activeBuddy.id)))}
+            </span>
             <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${activeBuddy.badgeBg}`}>
               {activeBuddy.rarity}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 shadow-2xs" title="เศษดาว (Star Shards)">
+            <Sparkles className="w-4 h-4 text-amber-500" />
+            <span className="font-extrabold text-sm text-slate-900 tabular-nums">
+              {gachaState.starShards}
             </span>
           </div>
 
@@ -189,7 +248,7 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
             <button
               onClick={() => setIsAddTicketsOpen(true)}
               className="w-5 h-5 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center text-xs font-bold transition-transform hover:scale-110 ml-0.5 cursor-pointer"
-              title="รับตั๋วเพิ่ม"
+              title="รับตั๋วเพิ่ม / ร้านค้าแลกตั๋ว"
             >
               +
             </button>
@@ -842,35 +901,77 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
               “{selectedBuddyDetail.quote}”
             </div>
 
-            <div className="flex items-center gap-2 pt-2">
-              {gachaState.unlockedBuddyIds.includes(selectedBuddyDetail.id) ? (
-                activeBuddy.id === selectedBuddyDetail.id ? (
+            {gachaState.unlockedBuddyIds.includes(selectedBuddyDetail.id) ? (
+              <div className="space-y-2 pt-2">
+                {/* Star Level & Upgrade section */}
+                <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-black text-amber-950 block">ระดับดาวของคู่หู:</span>
+                    <div className="flex items-center gap-1 text-sm font-black text-amber-500">
+                      {'★'.repeat(gachaService.getBuddyStars(selectedBuddyDetail.id))}
+                      <span className="text-xs text-slate-400 font-normal">
+                        ({gachaService.getBuddyStars(selectedBuddyDetail.id)} / {MAX_BUDDY_STARS} ดาว)
+                      </span>
+                    </div>
+                  </div>
+                  {gachaService.getBuddyStars(selectedBuddyDetail.id) < MAX_BUDDY_STARS && (
+                    <button
+                      type="button"
+                      onClick={() => handleUpgradeStar(selectedBuddyDetail.id)}
+                      className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs shadow-2xs transition-transform active:scale-95 cursor-pointer"
+                    >
+                      🌟 เลื่อนขั้น ({gachaConfigService.getConfig().starUpgradeCosts[selectedBuddyDetail.rarity]?.[Math.max(0, gachaService.getBuddyStars(selectedBuddyDetail.id) - 1)] || 50} ✨)
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {activeBuddy.id === selectedBuddyDetail.id ? (
+                    <button
+                      disabled
+                      className="w-full py-2.5 rounded-xl bg-teal-100 text-teal-800 font-bold text-xs"
+                    >
+                      ✓ เป็นคู่หูหลักอยู่แล้ว
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        handleSetActive(selectedBuddyDetail.id);
+                        setSelectedBuddyDetail(null);
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                    >
+                      ตั้งเป็นคู่หูหลัก
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2 pt-2">
+                <div className="p-3 rounded-2xl bg-purple-50/70 border border-purple-200 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-black text-purple-950 block">ปลดล็อกทันที:</span>
+                    <span className="text-[11px] text-purple-700 font-medium">
+                      ใช้ {gachaConfigService.getConfig().unlockCostShards[selectedBuddyDetail.rarity] || 100} เศษดาว (มี {gachaState.starShards} ชิ้น)
+                    </span>
+                  </div>
                   <button
-                    disabled
-                    className="w-full py-2.5 rounded-xl bg-teal-100 text-teal-800 font-bold text-xs"
+                    type="button"
+                    onClick={() => handleUnlockWithShards(selectedBuddyDetail.id)}
+                    disabled={gachaState.starShards < (gachaConfigService.getConfig().unlockCostShards[selectedBuddyDetail.rarity] || 100)}
+                    className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-black text-xs shadow-2xs transition-transform active:scale-95 cursor-pointer"
                   >
-                    ✓ เป็นคู่หูหลักอยู่แล้ว
+                    🔓 ปลดล็อก
                   </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      handleSetActive(selectedBuddyDetail.id);
-                      setSelectedBuddyDetail(null);
-                    }}
-                    className="w-full py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
-                  >
-                    ตั้งเป็นคู่หูหลัก
-                  </button>
-                )
-              ) : (
+                </div>
                 <button
                   disabled
-                  className="w-full py-2.5 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs"
+                  className="w-full py-2 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs"
                 >
-                  🔒 ยังไม่ปลดล็อก (สุ่มได้จากกาชา)
+                  🔒 สุ่มได้จากตู้กาชา หรือใช้เศษดาวปลดล็อก
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -980,26 +1081,104 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
               ตั๋วสุ่มสามารถได้รับจากการทำการบ้าน, เช็คชื่อตรงเวลา, และรางวัลกิจกรรมประจำสัปดาห์
             </p>
 
+            {/* Currency overview inside modal */}
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
+              <span className="text-slate-500 font-bold">ทรัพย์สินของคุณ:</span>
+              <div className="flex items-center gap-3 font-extrabold text-slate-800">
+                <span className="flex items-center gap-1">✨ {gachaState.starShards}</span>
+                <span className="flex items-center gap-1">🪙 {gachaState.coins}</span>
+                <span className="flex items-center gap-1">🎫 {gachaState.tickets}</span>
+              </div>
+            </div>
+
             <div className="space-y-2">
+              {/* Option 1: Exchange Star Shards for Tickets */}
               <button
-                onClick={() => handleAddFreeTickets(10)}
-                className="w-full p-3 rounded-2xl bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 font-bold text-xs flex items-center justify-between transition-colors cursor-pointer"
+                type="button"
+                onClick={() => handleExchangeShardsForTickets(1)}
+                disabled={gachaState.starShards < gachaConfigService.getConfig().shop.shardsPerTicket}
+                className="w-full p-3 rounded-2xl bg-amber-50 hover:bg-amber-100 disabled:opacity-50 text-amber-950 border border-amber-200 font-bold text-xs flex items-center justify-between transition-colors cursor-pointer"
               >
-                <span>🎁 รับโบนัสตั๋วฟรี (ภารกิจสัปดาห์)</span>
-                <span className="bg-purple-600 text-white px-2 py-0.5 rounded-lg text-[11px]">
-                  +10 ใบ
+                <div className="text-left">
+                  <span className="block font-black">✨ แลกตั๋วสุ่มด้วยเศษดาว</span>
+                  <span className="text-[10px] text-amber-700">
+                    ใช้ {gachaConfigService.getConfig().shop.shardsPerTicket} เศษดาว ต่อ 1 ตั๋ว
+                  </span>
+                </div>
+                <span className="bg-amber-500 text-white px-2.5 py-1 rounded-xl text-xs font-black">
+                  แลก 1 ใบ
                 </span>
               </button>
 
+              {/* Option 2: Buy Tickets with Coins */}
               <button
-                onClick={() => handleAddFreeTickets(50)}
-                className="w-full p-3 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold text-xs flex items-center justify-between transition-colors cursor-pointer"
+                type="button"
+                onClick={() => handleBuyTicketsWithCoins(1)}
+                disabled={gachaState.coins < gachaConfigService.getConfig().shop.coinsPerTicket}
+                className="w-full p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 disabled:opacity-50 text-blue-950 border border-blue-200 font-bold text-xs flex items-center justify-between transition-colors cursor-pointer"
               >
-                <span>⚡ โควตาตั๋วทดสอบระบบ (Dev / Test)</span>
-                <span className="bg-amber-600 text-white px-2 py-0.5 rounded-lg text-[11px]">
-                  +50 ใบ
+                <div className="text-left">
+                  <span className="block font-black">🪙 ซื้อตั๋วสุ่มด้วยเหรียญทอง</span>
+                  <span className="text-[10px] text-blue-700">
+                    ใช้ {gachaConfigService.getConfig().shop.coinsPerTicket} เหรียญ ต่อ 1 ตั๋ว
+                  </span>
+                </div>
+                <span className="bg-blue-600 text-white px-2.5 py-1 rounded-xl text-xs font-black">
+                  ซื้อ 1 ใบ
                 </span>
               </button>
+
+              {/* Option 3: Daily Free Ticket (กดได้วันละ 1 ใบ สูงสุด 5 ใบ/สัปดาห์) */}
+              {(() => {
+                const today = getBangkokTodayKey();
+                const currentWeek = getWeekKey();
+                const claimedThisWeek = gachaState.freeTicketsByWeek?.[currentWeek] || 0;
+                const cap = gachaConfigService.getConfig().rewards.weeklyFreeTicketCap || 5;
+                const isClaimedToday = gachaState.lastFreeTicketClaimDate === today;
+                const isWeekFull = claimedThisWeek >= cap;
+
+                return (
+                  <button
+                    type="button"
+                    onClick={handleClaimWeeklyFreeTicket}
+                    disabled={isClaimedToday || isWeekFull}
+                    className={`w-full p-3 rounded-2xl border font-bold text-xs flex items-center justify-between transition-all ${
+                      isWeekFull
+                        ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed opacity-80'
+                        : isClaimedToday
+                        ? 'bg-purple-50/70 text-purple-700 border-purple-200 cursor-not-allowed'
+                        : 'bg-purple-50 hover:bg-purple-100 text-purple-950 border-purple-200 cursor-pointer shadow-2xs hover:shadow-xs active:scale-98'
+                    }`}
+                  >
+                    <div className="text-left">
+                      <div className="flex items-center gap-1.5">
+                        <span className="block font-black">🎁 รับตั๋วฟรีประจำวัน</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-200/80 text-purple-900 font-extrabold">
+                          {claimedThisWeek}/{cap} สัปดาห์นี้
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-purple-700 block mt-0.5">
+                        {isWeekFull
+                          ? `สัปดาห์นี้รับครบ ${cap} ใบแล้ว • รีเซ็ตวันจันทร์หน้า`
+                          : isClaimedToday
+                          ? 'วันนี้รับไปแล้ว (กดรับได้วันละ 1 ใบ พรุ่งนี้มารับใหม่นะครับ)'
+                          : `กดรับได้วันละ 1 ใบ (สูงสุด ${cap} ใบ / สัปดาห์)`}
+                      </span>
+                    </div>
+                    <span
+                      className={`px-2.5 py-1 rounded-xl text-xs font-black transition-all ${
+                        isWeekFull
+                          ? 'bg-slate-200 text-slate-500'
+                          : isClaimedToday
+                          ? 'bg-purple-200 text-purple-800'
+                          : 'bg-purple-600 hover:bg-purple-700 text-white shadow-xs'
+                      }`}
+                    >
+                      {isWeekFull ? 'ครบสัปดาห์นี้' : isClaimedToday ? '✓ วันนี้รับแล้ว' : 'รับฟรี 1 ใบ'}
+                    </span>
+                  </button>
+                );
+              })()}
             </div>
           </div>
         </div>

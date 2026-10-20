@@ -11,10 +11,15 @@
 import { cleanSlateService } from './cleanSlateService.ts';
 import { coursesCurriculumService } from './coursesCurriculumService.ts';
 import { studentService } from './studentService.ts';
+import { classroomService } from './classroomService.ts';
+import { authService } from './authService.ts';
 
 export interface TeachingSubjectInfo {
   code: string;
   name: string;
+  courseCode: string;
+  courseName: string;
+  termLabel?: string;
   shortName: string;
   classrooms: string[];
   credits: number;
@@ -27,12 +32,31 @@ export interface TeachingCourseClassroom {
   label: string;
 }
 
+export const getAllAvailableClassroomLabels = (): string[] => {
+  try {
+    const rooms = classroomService.getClassroomsSync();
+    if (rooms && rooms.length > 0) {
+      return rooms
+        .map((r) => r.name || r.roomNumber || r.id)
+        .filter(Boolean);
+    }
+  } catch {
+    // ignore
+  }
+  return [];
+};
+
 /**
  * ดึงรายวิชาที่สอนจริงจากหลักสูตร (Curriculum Service) แบบ Real-time
- * หากมีรายวิชาในหลักสูตร จะใช้ข้อมูลจริงทันที
+ * กรองเฉพาะรายวิชาที่เป็นของครูผู้สอนที่ระบุ (หรือครูที่ล็อกอินอยู่ปัจจุบัน) เพื่อไม่ให้วิชาปนกัน
  */
-export const getDynamicTeachingSubjects = (): TeachingSubjectInfo[] => {
-  const curriculumCourses = coursesCurriculumService.getCourses();
+export const getDynamicTeachingSubjects = (teacherIdOrName?: string): TeachingSubjectInfo[] => {
+  const currentUser = authService.getCurrentUser();
+  const effectiveTeacher =
+    teacherIdOrName ||
+    (currentUser?.role !== 'ADMIN' ? (currentUser?.id || currentUser?.name) : undefined);
+  const curriculumCourses = coursesCurriculumService.getCourses(undefined, undefined, effectiveTeacher);
+  const fallbackRooms = getAllAvailableClassroomLabels();
   if (curriculumCourses && curriculumCourses.length > 0) {
     const colorMap: Record<number, string> = {
       0: 'bg-rose-100 text-rose-800 border-rose-300',
@@ -44,8 +68,14 @@ export const getDynamicTeachingSubjects = (): TeachingSubjectInfo[] => {
     return curriculumCourses.map((c, idx) => ({
       code: c.code,
       name: c.name,
+      courseCode: c.code,
+      courseName: c.name,
+      termLabel: `${c.term || '2'}/${c.academicYear || '2569'}`,
       shortName: c.name.length > 15 ? `${c.name.slice(0, 15)}...` : c.name,
-      classrooms: c.assignedClassrooms && c.assignedClassrooms.length > 0 ? c.assignedClassrooms : [],
+      classrooms:
+        c.assignedClassrooms && c.assignedClassrooms.length > 0
+          ? c.assignedClassrooms
+          : fallbackRooms,
       credits: Number(c.credits) || 1.0,
       colorBadge: colorMap[idx % 5] || 'bg-blue-100 text-blue-800 border-blue-300',
     }));
@@ -401,6 +431,10 @@ export const teacherCourseAssignmentService = {
     });
 
     return this.saveBundle({ ...bundle, students: updatedStudents });
+  },
+
+  getDynamicTeachingSubjects(teacherIdOrName?: string) {
+    return getDynamicTeachingSubjects(teacherIdOrName);
   },
 
   resetAllDemoData(): void {

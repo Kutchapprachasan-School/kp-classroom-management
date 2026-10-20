@@ -7,8 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "test": "node test_calendar_messaging_sync.mjs && node test_admin_dashboard_fidelity.mjs && node test_teacher_dashboard.mjs && node test_exam_management_fidelity.mjs && node test_messages_view_fidelity.mjs && node test_attendance_correlation_engine.mjs && node test_assignment_grading_overhaul.mjs && node test_lesson_plans_fidelity.mjs && node test_backend_ux_integration.mjs && node test_sgs_import_export_engine.mjs && node test_sms_notification_engine.mjs",
+    "test": "node test_calendar_messaging_sync.mjs && node test_admin_dashboard_fidelity.mjs && node test_teacher_dashboard.mjs && node test_exam_management_fidelity.mjs && node test_messages_view_fidelity.mjs && node test_attendance_correlation_engine.mjs && node test_assignment_grading_overhaul.mjs && node test_lesson_plans_fidelity.mjs && node test_backend_ux_integration.mjs && node test_sgs_import_export_engine.mjs && node test_sms_notification_engine.mjs && node test_student_import_progress_and_pwa.mjs && node test_auth_security_guard.mjs",
     "index:codebase": "node scripts/index_codebase.mjs",
+    "index:schema": "node scripts/index_data_schema.mjs",
+    "index:all": "node scripts/index_codebase.mjs && node scripts/index_data_schema.mjs",
     "seed": "tsx prisma/seed.ts",
     "preview": "vite preview"
   },

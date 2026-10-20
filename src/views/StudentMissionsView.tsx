@@ -17,12 +17,23 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { gamificationService } from '../services/gamificationService';
-import { sgsRosterAndSubmissionService } from '../services/sgsRosterAndSubmissionService';
-import { cleanSlateService } from '../services/cleanSlateService';
+import { sgsRosterAndSubmissionService, type FourScorePart } from '../services/sgsRosterAndSubmissionService';
+import { coursesCurriculumService } from '../services/coursesCurriculumService';
+import { behaviorService } from '../services/behaviorService';
 import { validateGoogleDriveUrl, generateRecommendedFolderPath } from '../utils/googleDriveUtils';
 import type { StudentQuestItem, StudentLeaderboardEntry } from '../types/viewModels';
 import { authService, type AuthUser } from '../services/authService';
 import { getSchoolSettings } from '../config/schoolRoles';
+import { weeklyQuizService } from '../services/weeklyQuizService';
+import { calculateStudentExp } from '../services/studentExpService';
+import { formatClassroomLabel } from '../services/studentService';
+
+export interface ExtendedStudentQuestItem extends StudentQuestItem {
+  scorePart?: FourScorePart;
+  scorePartLabel?: string;
+  isRequiredForPass?: boolean;
+  description?: string;
+}
 
 interface StudentMissionsViewProps {
   currentUser?: AuthUser | null;
@@ -32,13 +43,14 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
   const currentUser = propUser || authService.getCurrentUser();
   const studentCode = currentUser?.studentCode || '45101';
   const studentId = currentUser?.id || 'stu-1';
+  const studentRoom = formatClassroomLabel(currentUser?.classroomName || currentUser?.classroomId) || 'ม.3/1';
   const schoolSettings = getSchoolSettings();
   const academicYearTerm = schoolSettings.academicTerm || '1/2569';
-  const isClean = cleanSlateService.isCleanSlateActive();
-  const [quests, setQuests] = useState<StudentQuestItem[]>([]);
+  const [quests, setQuests] = useState<ExtendedStudentQuestItem[]>([]);
   const [leaderboard, setLeaderboard] = useState<StudentLeaderboardEntry[]>([]);
   const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'SUBMITTED'>('ALL');
-  const [selectedQuest, setSelectedQuest] = useState<StudentQuestItem | null>(null);
+  const [selectedQuest, setSelectedQuest] = useState<ExtendedStudentQuestItem | null>(null);
+  const [isEditingSubmission, setIsEditingSubmission] = useState(false);
   const [submissionType, setSubmissionType] = useState<'R2_FILE' | 'CANVA_VIDEO' | 'GOOGLE_DRIVE'>('R2_FILE');
   const [submitLink, setSubmitLink] = useState('');
   const [selectedFileName, setSelectedFileName] = useState('perspective_2point_45102.jpg');
@@ -46,23 +58,140 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
   const [folderCopied, setFolderCopied] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  // Weekly Quiz Modal State
+  // Real Weekly Quiz State (connected to 40-week bank)
+  const weekInfo = weeklyQuizService.getCurrentWeekInfo();
+  const currentWeek = weekInfo?.week || 1;
+  const weeklyQuestions = React.useMemo(() => {
+    return weeklyQuizService.getQuestionsForWeek(currentWeek);
+  }, [currentWeek]);
+
   const [isWeeklyQuizOpen, setIsWeeklyQuizOpen] = useState(false);
   const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
   const [quizFinished, setQuizFinished] = useState(false);
   const [hasCompletedWeekly, setHasCompletedWeekly] = useState(false);
 
+  const existingQuizResult = React.useMemo(() => {
+    return weeklyQuizService.getResult(currentWeek, currentUser?.id);
+  }, [currentWeek, currentUser?.id, quizFinished]);
+
+  useEffect(() => {
+    if (existingQuizResult) {
+      setHasCompletedWeekly(true);
+    }
+  }, [existingQuizResult]);
+
+  // Real student XP calculation
+  const myExp = React.useMemo(() => {
+    return calculateStudentExp(studentId, studentCode);
+  }, [studentId, studentCode, quests]);
+
+  // Real classroom leaderboard
+  const classroomLeaderboard = React.useMemo(() => {
+    const roster = sgsRosterAndSubmissionService.getSgsRoster(studentRoom);
+    if (roster.length === 0) return leaderboard;
+    const entries: StudentLeaderboardEntry[] = roster.map((s) => {
+      const expCalc = calculateStudentExp(s.studentCode, s.studentCode);
+      return {
+        rank: 0,
+        name: s.studentName,
+        classroom: studentRoom,
+        xp: expCalc.totalXp,
+        avatarText: s.gender === 'FEMALE' ? '👧' : '👦',
+        streakDays: 0,
+      };
+    });
+    entries.sort((a, b) => b.xp - a.xp);
+    return entries.map((e, idx) => ({ ...e, rank: idx + 1 }));
+  }, [studentRoom, leaderboard, myExp]);
+
+  const myRank = React.useMemo(() => {
+    const foundIdx = classroomLeaderboard.findIndex((e) => e.name === currentUser?.name);
+    return foundIdx >= 0 ? foundIdx + 1 : 1;
+  }, [classroomLeaderboard, currentUser?.name]);
+
+  const getScorePartLabel = (part?: FourScorePart, unit?: string): string => {
+    if (part === 'PRE_MIDTERM') return 'ก่อนกลางภาค';
+    if (part === 'MIDTERM') return 'กลางภาค';
+    if (part === 'POST_MIDTERM') return 'หลังกลางภาค';
+    if (part === 'FINAL') return 'ปลายภาค';
+    if (unit === 'u1') return 'ก่อนกลางภาค';
+    if (unit === 'u2' || unit === 'u3') return 'หลังกลางภาค';
+    return 'ก่อนกลางภาค';
+  };
+
   const loadQuests = async () => {
-    const data = await gamificationService.getQuests();
-    setQuests(data);
+    try {
+      // Pass the student's classroom to show assignments targeted to all rooms or specifically to the student's room
+      const termAssignments = sgsRosterAndSubmissionService.getTermAssignments(undefined, studentRoom);
+      const allCourses = coursesCurriculumService.getCourses();
+      const allSubmissions = sgsRosterAndSubmissionService.getSubmissions();
+
+      const sgsQuests: ExtendedStudentQuestItem[] = termAssignments.map((asg) => {
+        const sub = allSubmissions.find((s) => s.assignmentId === asg.id && s.studentCode === studentCode);
+        const isSubmitted =
+          !!sub &&
+          (sub.status === 'SUBMITTED_PENDING' ||
+            sub.status === 'GRADED' ||
+            sub.status === 'EXEMPT_TRANSFERRED');
+
+        const course = allCourses.find((c) => c.code === asg.courseCode);
+        const subjectTitle = course
+          ? `${course.name} · ${course.code}`
+          : asg.courseCode || 'วิชาทั่วไป';
+        const partLabel = getScorePartLabel(asg.scorePart, asg.sgsUnit);
+
+        return {
+          id: asg.id,
+          subjectTitle,
+          title: asg.title,
+          dueDateText: asg.dueDate ? `ส่งภายใน ${asg.dueDate}` : 'ไม่ระบุกำหนดส่ง',
+          maxScore: asg.maxScore || 10,
+          xpReward: (asg.maxScore || 10) * 3,
+          status: isSubmitted ? ('SUBMITTED' as const) : ('PENDING' as const),
+          statusLabel:
+            sub?.status === 'GRADED'
+              ? 'ตรวจแล้ว'
+              : isSubmitted
+              ? 'ส่งแล้ว (รอตรวจ)'
+              : 'รอส่งงาน',
+          scorePart: asg.scorePart,
+          scorePartLabel: partLabel,
+          isRequiredForPass: asg.isRequiredForPass,
+          description: asg.description,
+        };
+      });
+
+      if (sgsQuests.length > 0) {
+        setQuests(sgsQuests);
+      } else {
+        const data = await gamificationService.getQuests();
+        setQuests(data);
+      }
+    } catch (err) {
+      console.error('Failed to load assignments', err);
+      const data = await gamificationService.getQuests();
+      setQuests(data);
+    }
+
     const lb = await gamificationService.getLeaderboard();
     setLeaderboard(lb);
   };
 
   useEffect(() => {
     loadQuests();
-  }, []);
+    const handleUpdate = () => {
+      loadQuests();
+    };
+    window.addEventListener('kp-sgs-roster-updated', handleUpdate);
+    window.addEventListener('kp-copilot-updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('kp-sgs-roster-updated', handleUpdate);
+      window.removeEventListener('kp-copilot-updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, [studentRoom, studentCode]);
 
   const allCount = quests.length;
   const pendingCount = quests.filter((q) => q.status === 'PENDING').length;
@@ -88,7 +217,17 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
 
     setIsSubmitting(true);
     try {
-      await gamificationService.submitQuest(selectedQuest.id, submitLink, studentId);
+      try {
+        await gamificationService.submitQuest(selectedQuest.id, submitLink, studentId);
+      } catch {
+        // If quest was an SGS term assignment, award XP directly
+        await behaviorService.awardXp(
+          studentId,
+          selectedQuest.xpReward,
+          `ส่งภารกิจ: ${selectedQuest.title}`,
+          `quest-sub-${selectedQuest.id}-${studentId}`
+        );
+      }
 
       if (submissionType === 'GOOGLE_DRIVE') {
         sgsRosterAndSubmissionService.submitStudentWorkToR2({
@@ -141,14 +280,29 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
     }
   };
 
-  const handleFinishQuiz = () => {
-    setQuizFinished(true);
-    setHasCompletedWeekly(true);
-    setToastMsg('🎉 ยินดีด้วย! ทำแบบฝึกหัดสัปดาห์ที่ 8 ครบ 3 ข้อ ได้รับ +200 XP เรียบร้อย!');
-    setTimeout(() => {
-      setIsWeeklyQuizOpen(false);
-      setToastMsg(null);
-    }, 2500);
+  const handleFinishQuiz = async () => {
+    if (weeklyQuestions.length === 0) return;
+    const answerArr = weeklyQuestions.map((_, i) => quizAnswers[i] ?? -1);
+    if (answerArr.some((a) => a < 0)) {
+      setToastMsg('⚠️ กรุณาตอบคำถามให้ครบทุกข้อก่อนส่งคำตอบ');
+      setTimeout(() => setToastMsg(null), 3000);
+      return;
+    }
+    const res = await weeklyQuizService.submit(answerArr, 0, currentUser?.id);
+    if (res.ok) {
+      setQuizFinished(true);
+      setHasCompletedWeekly(true);
+      setToastMsg(
+        `🎉 ยินดีด้วย! ตอบถูก ${res.result.correct}/${res.result.total} ข้อ ได้รับ +${res.result.xpEarned} XP และ +${res.result.coinsEarned} เหรียญ!`
+      );
+      setTimeout(() => {
+        setIsWeeklyQuizOpen(false);
+        setToastMsg(null);
+      }, 2500);
+    } else {
+      setToastMsg(`⚠️ ${res.error}`);
+      setTimeout(() => setToastMsg(null), 3500);
+    }
   };
 
   return (
@@ -175,14 +329,16 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                 กิจกรรมประจำสัปดาห์
               </h3>
               <span className="text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E]">
-                สัปดาห์ที่ 8
+                สัปดาห์ที่ {currentWeek}
               </span>
               <span className="text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#FEF9C3] text-[#854D0E] flex items-center gap-1">
-                ⭐ 200 XP
+                ⭐ สูงสุด 200 XP
               </span>
             </div>
             <p className="text-xs text-[#6B7C93] mt-0.5 truncate sm:whitespace-normal">
-              ทำแบบฝึกหัดให้ครบ 3 ข้อ เพื่อรับรางวัล
+              {hasCompletedWeekly
+                ? `ทำแบบฝึกหัดสัปดาห์นี้แล้ว ได้คะแนน ${existingQuizResult?.correct ?? weeklyQuestions.length}/${existingQuizResult?.total ?? weeklyQuestions.length} ข้อ (+${existingQuizResult?.xpEarned ?? 200} XP)`
+                : `ตอบคำถามวัดความรู้ ${weeklyQuestions.length} ข้อ เพื่อรับ XP และเหรียญรางวัล`}
             </p>
           </div>
         </div>
@@ -190,12 +346,15 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
         {hasCompletedWeekly ? (
           <div className="px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-1.5 shrink-0">
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>สำเร็จแล้ว</span>
+            <span>ทำแล้ว ({existingQuizResult?.correct ?? weeklyQuestions.length}/{existingQuizResult?.total ?? weeklyQuestions.length})</span>
           </div>
         ) : (
           <button
             type="button"
-            onClick={() => setIsWeeklyQuizOpen(true)}
+            onClick={() => {
+              setQuizAnswers({});
+              setIsWeeklyQuizOpen(true);
+            }}
             className="px-4 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs shadow-xs hover:shadow-sm transition-all flex items-center gap-1 shrink-0 cursor-pointer"
           >
             <span>เริ่มทำ</span>
@@ -313,10 +472,31 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                   <FileText className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[11px] font-bold text-[#0D9488] uppercase tracking-wide">
                       {quest.subjectTitle}
                     </span>
+                    {/* 4-part score category badge */}
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${
+                        quest.scorePartLabel === 'ก่อนกลางภาค'
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : quest.scorePartLabel === 'กลางภาค'
+                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                          : quest.scorePartLabel === 'หลังกลางภาค'
+                          ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                          : quest.scorePartLabel === 'ปลายภาค'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-slate-100 text-slate-700 border border-slate-200'
+                      }`}
+                    >
+                      {quest.scorePartLabel || 'ก่อนกลางภาค'}
+                    </span>
+                    {quest.isRequiredForPass && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 font-bold">
+                        ⭐ งานบังคับ (ไม่ส่งติด ร)
+                      </span>
+                    )}
                     <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-semibold">
                       {quest.statusLabel}
                     </span>
@@ -408,7 +588,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
             </div>
 
             <div className="space-y-2">
-              {leaderboard.length === 0 ? (
+              {classroomLeaderboard.length === 0 ? (
                 <div className="p-6 text-center bg-slate-50/70 rounded-2xl border border-dashed border-slate-200">
                   <Trophy className="w-8 h-8 text-amber-500 mx-auto mb-2 opacity-80" />
                   <p className="text-xs font-bold text-slate-700">เริ่มต้นการเก็บคะแนนสัปดาห์นี้</p>
@@ -417,7 +597,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                   </p>
                 </div>
               ) : (
-                leaderboard.slice(0, 5).map((user) => (
+                classroomLeaderboard.slice(0, 5).map((user) => (
                   <div
                     key={user.rank}
                     className={`flex items-center justify-between p-3 rounded-xl transition-colors ${
@@ -440,7 +620,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                           {user.name}
                         </p>
                         <p className="text-[10px] text-[#6B7C93]">
-                          {user.classroom || 'ม.3/1'}
+                          {user.classroom || studentRoom}
                         </p>
                       </div>
                     </div>
@@ -460,7 +640,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
             <div className="pt-3 border-t border-slate-100 bg-slate-50/80 rounded-xl p-3 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-6 text-center text-xs font-black text-slate-600">
-                  {isClean ? '-' : '#8'}
+                  #{myRank}
                 </span>
                 <span className="text-lg">🦊</span>
                 <div>
@@ -468,13 +648,13 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                     คุณ ({currentUser?.name || 'นักเรียน'})
                   </p>
                   <p className="text-[10px] text-[#6B7C93]">
-                    {isClean ? 'เริ่มต้นสะสมแต้ม XP' : 'อีก 70 XP เพื่อเลื่อนอันดับ'}
+                    {myRank === 1 ? '🌟 ครองอันดับ 1 ของห้องเรียน!' : `อันดับที่ ${myRank} ของห้อง ${studentRoom}`}
                   </p>
                 </div>
               </div>
               <div className="text-right">
                 <span className="text-xs font-black text-[#163A66]">
-                  {isClean ? '0' : '650'}
+                  {myExp.totalXp.toLocaleString()}
                 </span>
                 <span className="text-[10px] text-slate-400 ml-0.5">XP</span>
               </div>
@@ -483,110 +663,71 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
         </div>
       )}
 
-      {/* Modal: Weekly Quiz (แบบฝึกหัด 3 ข้อ) */}
+      {/* Modal: Weekly Quiz (แบบฝึกหัดประจำสัปดาห์ 40 สัปดาห์) */}
       {isWeeklyQuizOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-lg w-full p-6 space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <span className="text-[11px] font-bold text-orange-600">แบบฝึกหัดสัปดาห์ที่ 8</span>
+                <span className="text-[11px] font-bold text-orange-600">แบบฝึกหัดสัปดาห์ที่ {currentWeek}</span>
                 <h3 className="font-extrabold text-slate-900 text-base">
-                  วินัยในตนเองและการจัดระเบียบ (3 ข้อ)
+                  แบบทดสอบวัดความรู้ประจำสัปดาห์ ({weeklyQuestions.length} ข้อ)
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsWeeklyQuizOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 text-xs font-semibold"
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 text-xs font-semibold cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            {/* 3 Questions */}
+            {/* Questions list from 40-week bank */}
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
-                <p className="font-bold text-xs text-slate-900 flex items-center gap-1.5">
-                  <HelpCircle className="w-4 h-4 text-orange-600" />
-                  <span>ข้อ 1: เมื่อได้รับการบ้านมา ควรทำสิ่งใดเป็นลำดับแรก?</span>
-                </p>
-                <div className="space-y-1.5 pt-1 text-xs">
-                  {['จดบันทึกกำหนดส่งและวางแผนเวลา', 'รอให้ใกล้ถึงวันส่งค่อยเริ่มทำ', 'แชร์ให้เพื่อนทำแทน'].map((opt, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => setQuizAnswers((prev) => ({ ...prev, 1: i }))}
-                      className={`w-full text-left p-2.5 rounded-xl border transition-colors ${
-                        quizAnswers[1] === i
-                          ? 'border-orange-500 bg-orange-50 font-bold text-orange-950'
-                          : 'border-slate-200 bg-white hover:bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      {i + 1}. {opt}
-                    </button>
-                  ))}
+              {weeklyQuestions.map((q, qIdx) => (
+                <div key={q.id || qIdx} className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-orange-100 text-orange-800">
+                      {q.subject}
+                    </span>
+                  </div>
+                  <p className="font-bold text-xs text-slate-900 flex items-start gap-1.5">
+                    <HelpCircle className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
+                    <span>ข้อ {qIdx + 1}: {q.question}</span>
+                  </p>
+                  <div className="space-y-1.5 pt-1 text-xs">
+                    {q.choices.map((opt, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setQuizAnswers((prev) => ({ ...prev, [qIdx]: i }))}
+                        className={`w-full text-left p-2.5 rounded-xl border transition-colors cursor-pointer ${
+                          quizAnswers[qIdx] === i
+                            ? 'border-orange-500 bg-orange-50 font-bold text-orange-950'
+                            : 'border-slate-200 bg-white hover:bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        {i + 1}. {opt}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
-                <p className="font-bold text-xs text-slate-900 flex items-center gap-1.5">
-                  <HelpCircle className="w-4 h-4 text-orange-600" />
-                  <span>ข้อ 2: พฤติกรรมใดแสดงถึง &ldquo;ความมีวินัยในตนเอง&rdquo; ได้ดีที่สุด?</span>
-                </p>
-                <div className="space-y-1.5 pt-1 text-xs">
-                  {['ทำการบ้านตรงเวลาแม้ไม่มีใครคอยเตือน', 'ทำเฉพาะวันที่ครูบอกจะตรวจ', 'เล่นเกมก่อนเสมอ'].map((opt, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => setQuizAnswers((prev) => ({ ...prev, 2: i }))}
-                      className={`w-full text-left p-2.5 rounded-xl border transition-colors ${
-                        quizAnswers[2] === i
-                          ? 'border-orange-500 bg-orange-50 font-bold text-orange-950'
-                          : 'border-slate-200 bg-white hover:bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      {i + 1}. {opt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
-                <p className="font-bold text-xs text-slate-900 flex items-center gap-1.5">
-                  <HelpCircle className="w-4 h-4 text-orange-600" />
-                  <span>ข้อ 3: ประโยชน์หลักของการจัดระเบียบโต๊ะเรียนคืออะไร?</span>
-                </p>
-                <div className="space-y-1.5 pt-1 text-xs">
-                  {['หยิบจับอุปกรณ์ง่าย ไม่เสียเวลาค้นหา และมีสมาธิ', 'เอาไว้โชว์เพื่อน', 'ไม่มีผลอะไร'].map((opt, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => setQuizAnswers((prev) => ({ ...prev, 3: i }))}
-                      className={`w-full text-left p-2.5 rounded-xl border transition-colors ${
-                        quizAnswers[3] === i
-                          ? 'border-orange-500 bg-orange-50 font-bold text-orange-950'
-                          : 'border-slate-200 bg-white hover:bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      {i + 1}. {opt}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              ))}
             </div>
 
             <div className="flex items-center justify-between pt-3 border-t border-slate-100">
               <span className="text-xs text-slate-500 font-medium">
-                ตอบแล้ว {Object.keys(quizAnswers).length}/3 ข้อ
+                ตอบแล้ว {Object.keys(quizAnswers).length}/{weeklyQuestions.length} ข้อ
               </span>
               <button
                 type="button"
-                disabled={Object.keys(quizAnswers).length < 3 || quizFinished}
+                disabled={Object.keys(quizAnswers).length < weeklyQuestions.length || quizFinished}
                 onClick={handleFinishQuiz}
-                className="px-6 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-orange-500/20 transition-all flex items-center gap-1.5"
+                className="px-6 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-orange-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Sparkles className="w-4 h-4 fill-white" />
-                <span>ส่งคำตอบ & รับ 200 XP</span>
+                <span>ส่งคำตอบ & รับ XP</span>
               </button>
             </div>
           </div>
@@ -599,17 +740,155 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-lg w-full p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <span className="text-[11px] font-bold text-[#0C6D5B]">{selectedQuest.subjectTitle}</span>
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <span className="text-[11px] font-bold text-[#0C6D5B]">{selectedQuest.subjectTitle}</span>
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${
+                      selectedQuest.scorePartLabel === 'ก่อนกลางภาค'
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                        : selectedQuest.scorePartLabel === 'กลางภาค'
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                        : selectedQuest.scorePartLabel === 'หลังกลางภาค'
+                        ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                        : selectedQuest.scorePartLabel === 'ปลายภาค'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-slate-100 text-slate-700 border border-slate-200'
+                    }`}
+                  >
+                    {selectedQuest.scorePartLabel || 'ก่อนกลางภาค'}
+                  </span>
+                  {selectedQuest.isRequiredForPass && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 font-bold">
+                      ⭐ งานบังคับ (ไม่ส่งติด ร)
+                    </span>
+                  )}
+                </div>
                 <h3 className="font-bold text-slate-800 text-base">{selectedQuest.title}</h3>
+                {selectedQuest.description && (
+                  <p className="text-xs text-[#6B7C93] mt-1 leading-relaxed">
+                    {selectedQuest.description}
+                  </p>
+                )}
               </div>
               <button
-                onClick={() => setSelectedQuest(null)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 text-xs font-semibold"
+                type="button"
+                onClick={() => {
+                  setSelectedQuest(null);
+                  setIsEditingSubmission(false);
+                }}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 text-xs font-semibold cursor-pointer"
               >
                 ✕ ปิด
               </button>
             </div>
 
+            {selectedQuest.status === 'SUBMITTED' && !isEditingSubmission ? (
+              <div className="space-y-4 py-2">
+                {(() => {
+                  const submission = sgsRosterAndSubmissionService
+                    .getSubmissions()
+                    .find((s) => s.assignmentId === selectedQuest.id && s.studentCode === studentCode);
+                  return (
+                    <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span>สถานะ: ส่งงานเรียบร้อยแล้ว</span>
+                        </span>
+                        <span className="text-[11px] font-semibold text-emerald-700 bg-white px-2.5 py-0.5 rounded-full border border-emerald-200 shadow-2xs">
+                          {submission?.status === 'GRADED' ? 'ตรวจและประเมินแล้ว' : 'รอคุณครูตรวจ'}
+                        </span>
+                      </div>
+
+                      <div className="bg-white rounded-xl p-3 border border-emerald-100 space-y-1.5 text-xs text-slate-700">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500">ประเภทการส่ง:</span>
+                          <span className="font-bold text-[#163A66]">
+                            {submission?.externalLinkUrl
+                              ? submission.externalLinkUrl.includes('canva.com')
+                                ? '🎨 Canva / วิดีโอ'
+                                : '📁 Google Drive โฟลเดอร์'
+                              : '☁️ Cloudflare R2 (รูปภาพ/PDF)'}
+                          </span>
+                        </div>
+                        {(submission?.workAttachmentLabel || (submission as any)?.fileName) && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500">ชื่อไฟล์:</span>
+                            <span className="font-semibold text-slate-800">
+                              {submission?.workAttachmentLabel || (submission as any)?.fileName}
+                            </span>
+                          </div>
+                        )}
+                        {submission?.externalLinkUrl && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500">ลิงก์ชิ้นงาน:</span>
+                            <a
+                              href={submission.externalLinkUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-bold text-blue-600 hover:underline max-w-[200px] truncate"
+                            >
+                              {submission.externalLinkUrl}
+                            </a>
+                          </div>
+                        )}
+                        {submission?.submittedAt && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500">วันที่ส่งงาน:</span>
+                            <span className="text-slate-600">{new Date(submission.submittedAt).toLocaleDateString('th-TH')}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Teacher Feedback & Score */}
+                      {submission?.status === 'GRADED' ? (
+                        <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200/80 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-amber-900 flex items-center gap-1">
+                              <Award className="w-4 h-4 text-amber-600" />
+                              <span>ผลการประเมินจากคุณครู:</span>
+                            </span>
+                            <span className="text-xs font-black text-amber-700">
+                              {submission.score ?? '-'} / {selectedQuest.maxScore} คะแนน
+                            </span>
+                          </div>
+                          {(submission.teacherFeedback || (submission as any).feedback) && (
+                            <p className="text-xs text-amber-800 bg-white p-2.5 rounded-lg border border-amber-100 leading-relaxed">
+                              &ldquo;{submission.teacherFeedback || (submission as any).feedback}&rdquo;
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100 text-xs text-blue-800 flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-blue-500 shrink-0" />
+                          <span>คุณครูประจำวิชากำลังตรวจและประเมินผลคะแนน</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingSubmission(true)}
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer transition-colors"
+                  >
+                    แก้ไขหรือส่งไฟล์ใหม่
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedQuest(null);
+                      setIsEditingSubmission(false);
+                    }}
+                    className="px-5 py-2 rounded-xl bg-[#0D9488] hover:bg-[#0B7A70] text-white font-bold text-xs cursor-pointer transition-colors"
+                  >
+                    ตกลง
+                  </button>
+                </div>
+              </div>
+            ) : (
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
               <div className="space-y-3">
                 {/* 3 Submission Tabs */}
@@ -833,6 +1112,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                 </button>
               </div>
             </form>
+            )}
           </div>
         </div>
       )}

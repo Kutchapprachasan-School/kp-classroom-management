@@ -13,6 +13,7 @@ import {
   Award,
   BookOpen,
 } from 'lucide-react';
+import { formatClassroomLabel } from '../../services/studentService';
 
 export const AlumniDirectoryView: React.FC = () => {
   const [alumniList, setAlumniList] = useState<AlumniStudentSummary[]>([]);
@@ -209,7 +210,7 @@ export const AlumniDirectoryView: React.FC = () => {
                       <div className="text-sm font-bold text-[#163A66]">
                         ปีการศึกษา {term.academicYear} / ภาคเรียนที่ {term.semester}{' '}
                         <span className="text-xs font-normal text-[#6B7C93]">
-                          (ห้อง {term.classroomId} {term.gradeLevel ? `• ${term.gradeLevel}` : ''})
+                          (ห้อง {formatClassroomLabel(term.classroomId)} {term.gradeLevel ? `• ${term.gradeLevel}` : ''})
                         </span>
                       </div>
                       <div className="flex items-center gap-2">

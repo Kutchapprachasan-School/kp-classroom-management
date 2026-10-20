@@ -154,7 +154,9 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
       const cls = await classroomService.getAll();
       setAllClassrooms(cls);
       if (cls.length > 0) {
-        setSelectedClass((prev) => prev || (cls.find((c) => c.name === 'ม.3/1' || c.roomNumber === 'ม.3/1') || cls[0]));
+        const currentUser = authService.getCurrentUser();
+        const preferred = (currentUser?.classroomId && cls.find((c) => c.id === currentUser.classroomId || c.name === currentUser.classroomId)) || cls[0];
+        setSelectedClass((prev) => prev || preferred);
       }
     } finally {
       setIsLoading(false);
@@ -484,8 +486,11 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
     }
   };
 
-  // นำเข้ารายชื่อนักเรียนจาก SGS & Smart Parser ที่ผ่านการตรวจสอบ Dry-Run แล้ว
-  const handleSgsImportConfirmed = async (confirmedRows: SgsParsedRow[]) => {
+  // นำเข้ารายชื่อนักเรียนจาก SGS & Smart Parser ที่ผ่านการตรวจสอบ Dry-Run แล้ว พร้อม Progress Bar รายงานความคืบหน้า
+  const handleSgsImportConfirmed = async (
+    confirmedRows: SgsParsedRow[],
+    onProgress?: (update: { current: number; total: number; percentage: number; currentStudentName?: string; roomName?: string }) => void
+  ) => {
     if (!selectedClass || confirmedRows.length === 0) return;
 
     try {
@@ -498,6 +503,8 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
       }
 
       const allRooms = await classroomService.getAll();
+      const totalStudents = confirmedRows.length;
+      let processedStudents = 0;
 
       for (const [roomName, rows] of rowsByRoom.entries()) {
         let room = allRooms.find(
@@ -552,9 +559,18 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
             targetScope: roomName,
             actor: 'ครูผู้สอน',
           }).catch(() => {});
+
+          processedStudents += updateSeatRows.length;
+          onProgress?.({
+            current: Math.min(processedStudents, totalStudents),
+            total: totalStudents,
+            percentage: Math.min(100, Math.round((processedStudents / totalStudents) * 100)),
+            currentStudentName: updateSeatRows[updateSeatRows.length - 1]?.fullName,
+            roomName,
+          });
         }
 
-        // Import new or transferred students
+        // Import new or transferred students with real-time progress callbacks
         if (newOrTransferRows.length > 0) {
           const studentsToImport: Array<Omit<StudentRecord, 'id'>> = newOrTransferRows.map((r) => ({
             no: r.parsedSeatNo ?? r.rowIndex,
@@ -567,13 +583,29 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
             classroomId: targetRoomId,
           }));
 
-          await studentService.batchImport(targetRoomId, studentsToImport);
+          const initialProcessed = processedStudents;
+          await studentService.batchImport(targetRoomId, studentsToImport, {
+            term: 2,
+            academicYear: 2569,
+            roomName,
+            onProgress: (p) => {
+              const currentOverall = initialProcessed + p.current;
+              onProgress?.({
+                current: Math.min(currentOverall, totalStudents),
+                total: totalStudents,
+                percentage: Math.min(100, Math.round((currentOverall / totalStudents) * 100)),
+                currentStudentName: p.currentStudentName,
+                roomName,
+              });
+            },
+          });
+
+          processedStudents += newOrTransferRows.length;
         }
       }
 
       await loadClassrooms();
       await loadStudentsForClass(selectedClass.id);
-      setIsImportModalOpen(false);
 
       if (rowsByRoom.size > 1) {
         setTransferSuccessNotice(
@@ -588,7 +620,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
       setTimeout(() => setTransferSuccessNotice(null), 4000);
     } catch (err) {
       console.error('Import error:', err);
-      alert('เกิดข้อผิดพลาดในการบันทึกรายชื่อนักเรียน');
+      throw err;
     }
   };
 

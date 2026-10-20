@@ -27,8 +27,8 @@ interface TeacherMobileMoreMenuScreenProps {
 export const TeacherMobileMoreMenuScreen: React.FC<TeacherMobileMoreMenuScreenProps> = ({
   onNavigate,
   onLogout,
-  teacherName = 'ครูปัญจพล เกษรัตน์',
-  department = 'ครู กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ',
+  teacherName = 'ครูผู้สอน',
+  department = 'ครู',
   avatarUrl = '/images/teacher/teacher_avatar.png',
   currentActiveItem = 'grading',
 }) => {

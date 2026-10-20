@@ -2,7 +2,7 @@
 // สมุดคะแนนและสถิติการเรียนรู้ของนักเรียน (ตรงตามภาพอ้างอิง media_1792044507234_3e60e1a8.jpg, media_1792044541421_d63ead8c.png, media_1792044662907_51ecf92f.png)
 // ออกแบบตามระบบ Pastel Anime Education Dashboard (Prompt Font, Primary #3B82F6)
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   GraduationCap,
   Sparkles,
@@ -43,13 +43,15 @@ import { academicCalendarService } from '../services/academicCalendarService';
 import { formatClassroomLabel } from '../services/studentService';
 import { coursesCurriculumService, type CourseCurriculumRecord } from '../services/coursesCurriculumService';
 import { getSubjectIcon } from '../config/subjectIcons';
+import { sgsRosterAndSubmissionService, type CourseScoreWeights } from '../services/sgsRosterAndSubmissionService';
+import { studentAffairsCouncilService } from '../services/studentAffairsCouncilService';
 
 interface StudentGradebookViewProps {
   currentUser?: AuthUser | null;
   schoolSettings?: SchoolSettingsConfig;
 }
 
-// 8 Strands Subject Item
+// 8 Strands Subject Item with 4-part score breakdown
 interface SubjectGradeItem {
   id: string;
   strand: string;
@@ -57,10 +59,14 @@ interface SubjectGradeItem {
   title: string;
   symbol: string;
   iconBg: string;
-  midtermScore: number;
-  finalScore: number;
+  preMidtermScore: number | '';
+  midtermScore: number | '';
+  postMidtermScore: number | '';
+  finalScore: number | '';
   totalScore: number;
   grade: number | string;
+  gradeLabel: string;
+  weights: CourseScoreWeights;
   teacherName: string;
   teacherDepartment: string;
   teacherAvatar: string;
@@ -90,13 +96,47 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
   // 3. Teacher Evaluation Modal State
   const [evalModalTeacher, setEvalModalTeacher] = useState<SubjectGradeItem | null>(null);
 
-  // Dynamic Subjects List (Zero Mock Data: checks coursesCurriculumService)
+  const [refreshKey, setRefreshKey] = useState(0);
+  useEffect(() => {
+    const handleUpdate = () => setRefreshKey((k) => k + 1);
+    window.addEventListener('kp-sgs-roster-updated', handleUpdate);
+    window.addEventListener('kp-copilot-updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('kp-sgs-roster-updated', handleUpdate);
+      window.removeEventListener('kp-copilot-updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
+  const studentCode = currentUser?.studentCode || 'STD-001';
+
+  // Real roster student
+  const rosterStudent = useMemo(() => {
+    return (
+      sgsRosterAndSubmissionService.getSgsRoster(studentRoom).find((s) => s.studentCode === studentCode) || {
+        sgsSeatNo: 1,
+        studentCode,
+        studentName: currentUser?.name || 'นักเรียน',
+        gender: 'MALE' as const,
+        classroom: studentRoom,
+        transferState: 'ACTIVE' as const,
+        attendancePercent: 100,
+        morningStatusLabel: 'ปกติ',
+        midtermScore: 0,
+        finalScore: 0,
+      }
+    );
+  }, [studentRoom, studentCode, currentUser, refreshKey]);
+
+  // Dynamic Subjects List (Zero Mock Data: checks coursesCurriculumService and real grades with 4 parts)
   const subjectsList: SubjectGradeItem[] = useMemo(() => {
     try {
       const allCourses = coursesCurriculumService.getCourses();
       const currentLevel = studentRoom.split('/')[0] || ''; // e.g. 'ม.1'
       const matched = allCourses.filter((c: CourseCurriculumRecord) => {
-        const matchRoom = Array.isArray(c.assignedClassrooms) &&
+        const matchRoom =
+          Array.isArray(c.assignedClassrooms) &&
           c.assignedClassrooms.some((r: string) => r === studentRoom || formatClassroomLabel(r) === studentRoom);
         const matchLevel = c.level === currentLevel;
         return matchRoom || matchLevel;
@@ -105,6 +145,11 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
       if (matched.length > 0) {
         return matched.map((c: CourseCurriculumRecord) => {
           const iconConfig = getSubjectIcon(c.code, c.name);
+          const grades = rosterStudent
+            ? sgsRosterAndSubmissionService.computeStudentSgsGrades(rosterStudent as any, c.code, studentRoom)
+            : null;
+          const weights = grades?.weights || sgsRosterAndSubmissionService.getCourseWeights(c.code);
+
           return {
             id: c.id,
             strand: c.strand || 'วิชาพื้นฐาน',
@@ -112,10 +157,14 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
             title: `${c.name} (${c.code})`,
             symbol: iconConfig.symbol || '📘',
             iconBg: `${iconConfig.bgClass} ${iconConfig.textClass}`,
-            midtermScore: 0,
-            finalScore: 0,
-            totalScore: 0,
-            grade: 0,
+            preMidtermScore: grades ? grades.preMidterm : '',
+            midtermScore: grades ? grades.midterm : '',
+            postMidtermScore: grades ? grades.postMidterm : '',
+            finalScore: grades ? grades.final : '',
+            totalScore: grades ? grades.total : 0,
+            grade: grades ? (grades.gradeLabel || grades.numericGrade) : 0,
+            gradeLabel: grades ? (grades.gradeLabel || String(grades.numericGrade)) : '0',
+            weights,
             teacherName: c.teacherName || 'ครูผู้สอน',
             teacherDepartment: `กลุ่มสาระฯ ${c.strand || 'การเรียนรู้'}`,
             teacherAvatar: '👨‍🏫',
@@ -128,7 +177,7 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
       // fallback
     }
     return [];
-  }, [studentRoom]);
+  }, [studentRoom, rosterStudent, refreshKey]);
 
   // Term Data Matrix: Calculated Dynamically
   const termData = useMemo(() => {
@@ -178,16 +227,33 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
   }, [subjectsList]);
 
   // Radar Chart Data: 5 Competencies
+  const disciplineScore = useMemo(() => {
+    return studentAffairsCouncilService.getStudentDisciplineScore(studentCode).score;
+  }, [studentCode]);
+
+  const submissionRate = useMemo(() => {
+    const assignments = sgsRosterAndSubmissionService.getTermAssignments(undefined, studentRoom);
+    if (assignments.length === 0) return 100;
+    const allSubs = sgsRosterAndSubmissionService.getSubmissions();
+    const submittedCount = assignments.filter((a) =>
+      allSubs.some((s) => s.assignmentId === a.id && s.studentCode === studentCode)
+    ).length;
+    return Math.round((submittedCount / assignments.length) * 100);
+  }, [studentRoom, studentCode, refreshKey]);
+
   const competencyRadarData = useMemo(() => {
     const hasData = subjectsList.length > 0;
+    const avgScore = hasData
+      ? Math.round(subjectsList.reduce((acc, s) => acc + s.totalScore, 0) / subjectsList.length)
+      : 0;
     return [
-      { subject: 'คะแนนเก็บ', student: hasData ? Number(termData.gpa) * 25 : 0, fullMark: 100 },
-      { subject: 'คะแนนสอบ', student: hasData ? Number(termData.gpa) * 25 : 0, fullMark: 100 },
-      { subject: 'ส่งงานตรงเวลา', student: hasData ? 95 : 0, fullMark: 100 },
-      { subject: 'เวลาเรียน', student: hasData ? 100 : 0, fullMark: 100 },
-      { subject: 'พฤติกรรม', student: hasData ? 100 : 0, fullMark: 100 },
+      { subject: 'คะแนนเก็บ', student: avgScore, fullMark: 100 },
+      { subject: 'คะแนนสอบ', student: avgScore, fullMark: 100 },
+      { subject: 'ส่งงานตรงเวลา', student: hasData ? submissionRate : 0, fullMark: 100 },
+      { subject: 'เวลาเรียน', student: hasData ? (rosterStudent?.attendancePercent ?? 100) : 0, fullMark: 100 },
+      { subject: 'พฤติกรรม', student: hasData ? disciplineScore : 0, fullMark: 100 },
     ];
-  }, [subjectsList, termData.gpa]);
+  }, [subjectsList, submissionRate, rosterStudent?.attendancePercent, disciplineScore]);
 
   // Donut Chart Data: Grade Distribution
   const gradeDistributionData = useMemo(() => {
@@ -402,22 +468,24 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
             </div>
           </div>
 
-          {/* Table */}
-          <div className="overflow-x-auto">
+          {/* Desktop Table (Hidden on mobile) */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead>
                 <tr className="border-b border-slate-100 text-[#6B7C93] font-semibold">
                   <th className="py-2.5 px-3">รายวิชา</th>
-                  <th className="py-2.5 px-2 text-center">คะแนนกลางภาค</th>
-                  <th className="py-2.5 px-2 text-center">คะแนนปลายภาค</th>
-                  <th className="py-2.5 px-2 text-center">คะแนนรวม</th>
+                  <th className="py-2.5 px-2 text-center">ก่อนกลางภาค</th>
+                  <th className="py-2.5 px-2 text-center">กลางภาค</th>
+                  <th className="py-2.5 px-2 text-center">หลังกลางภาค</th>
+                  <th className="py-2.5 px-2 text-center">ปลายภาค</th>
+                  <th className="py-2.5 px-2 text-center">คะแนนรวม (100)</th>
                   <th className="py-2.5 px-2 text-center">เกรด</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100/70">
                 {subjectsList.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-12 text-center">
+                    <td colSpan={7} className="py-12 text-center">
                       <div className="flex flex-col items-center justify-center space-y-2 text-slate-400">
                         <BookOpen className="w-8 h-8 text-slate-300" />
                         <p className="text-xs font-bold text-slate-600">
@@ -449,39 +517,62 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
                       </div>
                     </td>
 
+                    {/* Pre-Midterm */}
+                    <td className="py-3 px-2 text-center font-bold text-[#163A66]">
+                      {sub.preMidtermScore !== '' ? sub.preMidtermScore : '-'}{' '}
+                      <span className="text-[10px] text-[#94A3B8] font-normal">
+                        / {sub.weights.preMidterm}
+                      </span>
+                    </td>
+
                     {/* Midterm */}
                     <td className="py-3 px-2 text-center font-bold text-[#163A66]">
-                      {sub.midtermScore}{' '}
+                      {sub.midtermScore !== '' ? sub.midtermScore : '-'}{' '}
                       <span className="text-[10px] text-[#94A3B8] font-normal">
-                        / 100
+                        / {sub.weights.midterm}
+                      </span>
+                    </td>
+
+                    {/* Post-Midterm */}
+                    <td className="py-3 px-2 text-center font-bold text-[#163A66]">
+                      {sub.postMidtermScore !== '' ? sub.postMidtermScore : '-'}{' '}
+                      <span className="text-[10px] text-[#94A3B8] font-normal">
+                        / {sub.weights.postMidterm}
                       </span>
                     </td>
 
                     {/* Final */}
                     <td className="py-3 px-2 text-center font-bold text-[#163A66]">
-                      {sub.finalScore}{' '}
+                      {sub.finalScore !== '' ? sub.finalScore : '-'}{' '}
                       <span className="text-[10px] text-[#94A3B8] font-normal">
-                        / 100
+                        / {sub.weights.final}
                       </span>
                     </td>
 
                     {/* Total */}
                     <td className="py-3 px-2 text-center font-black text-[#163A66]">
-                      {sub.totalScore.toFixed(1)}
+                      {sub.totalScore.toFixed(1)}{' '}
+                      <span className="text-[10px] text-[#94A3B8] font-normal">
+                        / 100
+                      </span>
                     </td>
 
                     {/* Grade Badge */}
                     <td className="py-3 px-2 text-center">
                       <span
-                        className={`inline-block w-8 py-0.5 rounded-full text-xs font-black shadow-2xs ${
-                          Number(sub.grade) === 4
+                        className={`inline-block min-w-[32px] px-2 py-0.5 rounded-full text-xs font-black shadow-2xs ${
+                          sub.gradeLabel === 'ร'
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                            : Number(sub.grade) === 4
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                             : Number(sub.grade) >= 3
                             ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : Number(sub.grade) >= 2
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : 'bg-slate-100 text-slate-700 border border-slate-200'
                         }`}
                       >
-                        {sub.grade}
+                        {sub.gradeLabel || sub.grade}
                       </span>
                     </td>
                   </tr>
@@ -489,6 +580,85 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
               )}
             </tbody>
             </table>
+          </div>
+
+          {/* Mobile Stacked Cards (Visible only on mobile) */}
+          <div className="md:hidden space-y-3">
+            {subjectsList.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 space-y-1">
+                <BookOpen className="w-8 h-8 text-slate-300 mx-auto" />
+                <p className="text-xs font-bold text-slate-600">
+                  ยังไม่มีข้อมูลผลการเรียนในภาคเรียนนี้
+                </p>
+              </div>
+            ) : (
+              subjectsList.map((sub) => (
+                <div
+                  key={sub.id}
+                  className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-3.5 space-y-2.5"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-7 h-7 rounded-lg ${sub.iconBg} flex items-center justify-center font-bold text-xs shrink-0`}>
+                        {sub.symbol}
+                      </div>
+                      <span className="font-bold text-xs text-[#163A66]">{sub.title}</span>
+                    </div>
+                    <span
+                      className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-black shadow-2xs ${
+                        sub.gradeLabel === 'ร'
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                          : Number(sub.grade) === 4
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : Number(sub.grade) >= 3
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : Number(sub.grade) >= 2
+                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                          : 'bg-slate-100 text-slate-700 border border-slate-200'
+                      }`}
+                    >
+                      {sub.gradeLabel === 'ร' ? 'ติด ร' : `เกรด ${sub.gradeLabel || sub.grade}`}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-slate-200/50 text-center">
+                    <div className="bg-white rounded-xl p-1.5 border border-slate-100">
+                      <span className="text-[10px] text-slate-500 block">ก่อนกลางภาค</span>
+                      <span className="text-xs font-bold text-[#163A66]">
+                        {sub.preMidtermScore !== '' ? sub.preMidtermScore : '-'}{' '}
+                        <span className="text-[10px] text-slate-400 font-normal">/{sub.weights.preMidterm}</span>
+                      </span>
+                    </div>
+                    <div className="bg-white rounded-xl p-1.5 border border-slate-100">
+                      <span className="text-[10px] text-slate-500 block">กลางภาค</span>
+                      <span className="text-xs font-bold text-[#163A66]">
+                        {sub.midtermScore !== '' ? sub.midtermScore : '-'}{' '}
+                        <span className="text-[10px] text-slate-400 font-normal">/{sub.weights.midterm}</span>
+                      </span>
+                    </div>
+                    <div className="bg-white rounded-xl p-1.5 border border-slate-100">
+                      <span className="text-[10px] text-slate-500 block">หลังกลางภาค</span>
+                      <span className="text-xs font-bold text-[#163A66]">
+                        {sub.postMidtermScore !== '' ? sub.postMidtermScore : '-'}{' '}
+                        <span className="text-[10px] text-slate-400 font-normal">/{sub.weights.postMidterm}</span>
+                      </span>
+                    </div>
+                    <div className="bg-white rounded-xl p-1.5 border border-slate-100">
+                      <span className="text-[10px] text-slate-500 block">ปลายภาค</span>
+                      <span className="text-xs font-bold text-[#163A66]">
+                        {sub.finalScore !== '' ? sub.finalScore : '-'}{' '}
+                        <span className="text-[10px] text-slate-400 font-normal">/{sub.weights.final}</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-200/50 px-1 text-xs">
+                    <span className="text-slate-500 font-medium">คะแนนรวมทั้งหมด:</span>
+                    <span className="font-black text-blue-600">{sub.totalScore.toFixed(1)} / 100</span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
           {/* Bottom Summary Bar */}
@@ -590,22 +760,53 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
                 <Lightbulb className="w-4 h-4 text-blue-600 shrink-0" />
                 <span>จุดเด่น / พัฒนาการ</span>
               </div>
-              <div className="space-y-1 text-[11px]">
-                <div className="flex items-center gap-2 text-slate-700">
-                  <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
-                  <span>
-                    จุดเด่น: <strong>วิทยาศาสตร์ (86.5)</strong> ,{' '}
-                    <strong>สังคมศึกษา (90.0)</strong>
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-slate-700">
-                  <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
-                  <span>
-                    ควรพัฒนา: <strong>ภาษาไทย (72.5)</strong> ,{' '}
-                    <strong>ภาษาอังกฤษ (71.5)</strong>
-                  </span>
-                </div>
-              </div>
+              {(() => {
+                const graded = [...subjectsList].filter((s) => s.totalScore > 0);
+                if (graded.length === 0) {
+                  return (
+                    <div className="text-[11px] text-slate-500 py-1">
+                      ยังไม่มีผลคะแนนที่บันทึกในระบบ หรือรอคุณครูประจำวิชาประเมินผลคะแนน
+                    </div>
+                  );
+                }
+                const sorted = [...graded].sort((a, b) => b.totalScore - a.totalScore);
+                const best = sorted.slice(0, 2);
+                const need = sorted.length > 2 ? [...sorted].reverse().slice(0, 2) : [];
+                return (
+                  <div className="space-y-1 text-[11px]">
+                    <div className="flex items-center gap-2 text-slate-700">
+                      <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                      <span>
+                        จุดเด่น:{' '}
+                        {best.map((b, i) => (
+                          <React.Fragment key={b.id}>
+                            {i > 0 && ' , '}
+                            <strong>
+                              {b.strand} ({b.totalScore.toFixed(1)})
+                            </strong>
+                          </React.Fragment>
+                        ))}
+                      </span>
+                    </div>
+                    {need.length > 0 && (
+                      <div className="flex items-center gap-2 text-slate-700">
+                        <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
+                        <span>
+                          ควรพัฒนา:{' '}
+                          {need.map((n, i) => (
+                            <React.Fragment key={n.id}>
+                              {i > 0 && ' , '}
+                              <strong>
+                                {n.strand} ({n.totalScore.toFixed(1)})
+                              </strong>
+                            </React.Fragment>
+                          ))}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           ) : (
             // Insight for 5 Competencies (Image 3)
@@ -796,8 +997,8 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
           </button>
         </div>
 
-        {/* Teachers Evaluation Table */}
-        <div className="overflow-x-auto">
+        {/* Teachers Evaluation Desktop Table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead>
               <tr className="border-b border-slate-100 text-[#6B7C93] font-semibold">
@@ -890,6 +1091,52 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
             )}
           </tbody>
           </table>
+        </div>
+
+        {/* Teachers Evaluation Mobile Cards */}
+        <div className="md:hidden space-y-3">
+          {subjectsList.length === 0 ? (
+            <div className="py-6 text-center text-slate-400 text-xs">
+              ยังไม่มีรายวิชาที่เปิดให้ประเมินการสอน
+            </div>
+          ) : (
+            subjectsList.slice(0, 3).map((sub) => (
+              <div
+                key={sub.id}
+                className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-3.5 space-y-2.5"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-blue-50 text-sm flex items-center justify-center border border-blue-100 shrink-0">
+                      {sub.teacherAvatar}
+                    </div>
+                    <div>
+                      <div className="font-bold text-xs text-[#163A66]">{sub.teacherName}</div>
+                      <div className="text-[10px] text-[#6B7C93]">{sub.strand}</div>
+                    </div>
+                  </div>
+                  <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    {sub.evalStatus}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between pt-1 border-t border-slate-200/50">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-slate-500">คะแนน:</span>
+                    <span className="text-xs font-bold text-[#163A66]">{sub.evalScore.toFixed(2)} / 5.00</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEvalModalTeacher(sub)}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>ดูรายละเอียด</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

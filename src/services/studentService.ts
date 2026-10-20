@@ -44,23 +44,93 @@ export function getAlternateRoomKey(classroomId: string): string | null {
   if (matchThai) {
     return `room-${matchThai[1]}-${matchThai[2]}`;
   }
+  const label = formatClassroomLabel(trimmed);
+  if (label && label !== trimmed) {
+    return label;
+  }
   return null;
 }
 
+const classroomNameCache = new Map<string, string>();
+
 /**
- * แปลงรหัสห้องเรียนหรือไอดี (เช่น room-1-1, room-3-1) เป็นชื่อห้องภาษาไทยที่สวยงาม (เช่น ม.1/1, ม.3/1)
+ * ลงทะเบียนชื่อห้องเรียนเข้า In-Memory Cache เพื่อให้ formatClassroomLabel แปลงรหัสภายใน (เช่น room-1791986991422) เป็นชื่อห้องจริงได้ทันที
+ */
+export function registerClassroomNames(
+  classrooms: Array<{ id?: string; name?: string; roomNumber?: string }>
+): void {
+  for (const c of classrooms) {
+    const name = c.name || c.roomNumber;
+    if (c.id && name) {
+      classroomNameCache.set(c.id.trim(), name.trim());
+    }
+    if (name) {
+      classroomNameCache.set(name.trim(), name.trim());
+    }
+  }
+}
+
+/**
+ * แปลงรหัสห้องเรียนหรือไอดี (เช่น room-1-1, room-3-1, room-1791986991422) เป็นชื่อห้องภาษาไทยที่สวยงาม (เช่น ม.1/1, ม.3/1)
  */
 export function formatClassroomLabel(classroomId?: string): string {
   if (!classroomId) return 'ม.1/1';
   const trimmed = classroomId.trim();
+
+  // 1. Direct match in in-memory cache
+  if (classroomNameCache.has(trimmed)) {
+    const cachedName = classroomNameCache.get(trimmed)!;
+    const matchThai = cachedName.match(/^ม\.?\s*(\d+)\s*\/\s*(\d+)$/);
+    if (matchThai) return `ม.${matchThai[1]}/${matchThai[2]}`;
+    return cachedName;
+  }
+
+  // 2. Direct Thai pattern match: ม.3/1, ม. 3/1
+  const matchThai = trimmed.match(/^ม\.?\s*(\d+)\s*\/\s*(\d+)$/);
+  if (matchThai) {
+    return `ม.${matchThai[1]}/${matchThai[2]}`;
+  }
+
+  // 3. Simple room-grade-number pattern: room-3-1 -> ม.3/1
   const matchRoom = trimmed.match(/^room-(\d+)-(\d+)$/);
   if (matchRoom) {
     return `ม.${matchRoom[1]}/${matchRoom[2]}`;
   }
-  const matchThai = trimmed.match(/^ม\.?\s*(\d+)\/(\d+)$/);
-  if (matchThai) {
-    return `ม.${matchThai[1]}/${matchThai[2]}`;
+
+  // 4. Resolve from cached classroom roster in localStorage (cls_classrooms_data)
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('cls_classrooms_data');
+      if (stored) {
+        const list = JSON.parse(stored);
+        if (Array.isArray(list)) {
+          const found = list.find(
+            (c: any) =>
+              c.id === trimmed ||
+              c.name === trimmed ||
+              c.roomNumber === trimmed ||
+              (c.id && trimmed.includes(c.id))
+          );
+          if (found && (found.name || found.roomNumber)) {
+            const rawName = (found.name || found.roomNumber).trim();
+            classroomNameCache.set(trimmed, rawName);
+            if (found.id) classroomNameCache.set(found.id, rawName);
+            const mThai = rawName.match(/^ม\.?\s*(\d+)\s*\/\s*(\d+)$/);
+            return mThai ? `ม.${mThai[1]}/${mThai[2]}` : rawName;
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
   }
+
+  // 5. Fallback for plain digit slash pattern e.g. "3/1" -> "ม.3/1"
+  const plainSlashMatch = trimmed.match(/^(\d+)\s*\/\s*(\d+)$/);
+  if (plainSlashMatch) {
+    return `ม.${plainSlashMatch[1]}/${plainSlashMatch[2]}`;
+  }
+
   return trimmed;
 }
 
@@ -285,6 +355,21 @@ export function parseThaiStudentName(fullName: string): {
   return { title, firstName: firstName || trimmed, lastName, gender };
 }
 
+export interface BatchImportProgress {
+  current: number;
+  total: number;
+  percentage: number;
+  currentStudentName?: string;
+  roomName?: string;
+}
+
+export interface BatchImportOptions {
+  term?: number;
+  academicYear?: number;
+  roomName?: string;
+  onProgress?: (progress: BatchImportProgress) => void;
+}
+
 export const studentService = {
   getLocalStudents,
   saveLocalStudents,
@@ -353,6 +438,7 @@ export const studentService = {
         : s
     );
     saveLocalStudents(classroomId, updated);
+    inMemoryStudentCache[classroomId] = updated;
     return true;
   },
 
@@ -368,6 +454,62 @@ export const studentService = {
         : s
     );
     saveLocalStudents(classroomId, updated);
+    inMemoryStudentCache[classroomId] = updated;
+    return true;
+  },
+
+  // รีเซ็ตรหัสผ่านนักเรียนทั้งห้องเรียนกลับเป็นค่าเริ่มต้น
+  resetAllStudentsPasswordInClassroom(classroomId: string): { successCount: number; studentCodes: string[] } {
+    const list = getLocalStudents(classroomId);
+    if (list.length === 0) return { successCount: 0, studentCodes: [] };
+    const updated = list.map((s) => ({
+      ...s,
+      passwordHash: null,
+      isPasswordChanged: false,
+    }));
+    saveLocalStudents(classroomId, updated);
+    inMemoryStudentCache[classroomId] = updated;
+    return {
+      successCount: updated.length,
+      studentCodes: updated.map((s) => s.code),
+    };
+  },
+
+  // อัปเดตรูปภาพโปรไฟล์นักเรียน
+  updateStudentAvatar(code: string, avatarUrl: string): boolean {
+    const found = this.findStudentByCode(code);
+    if (!found) return false;
+    const { student, classroomId } = found;
+    const list = getLocalStudents(classroomId);
+    const updated = list.map((s) =>
+      s.code === student.code || s.id === student.id
+        ? { ...s, avatarUrl }
+        : s
+    );
+    saveLocalStudents(classroomId, updated);
+    inMemoryStudentCache[classroomId] = updated;
+
+    // หากบัญชีที่ล็อกอินอยู่คือผู้ใช้นี้ ให้ปรับปรุง Auth Session ด้วย
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const rawAuth = localStorage.getItem('cls_current_auth_user');
+        if (rawAuth) {
+          const authUser = JSON.parse(rawAuth);
+          if (authUser?.studentCode === code || authUser?.id === code || authUser?.id === student.id) {
+            authUser.avatarUrl = avatarUrl;
+            localStorage.setItem('cls_current_auth_user', JSON.stringify(authUser));
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('kps-student-avatar-updated', {
+        detail: { studentCode: code, avatarUrl }
+      }));
+    }
     return true;
   },
 
@@ -641,8 +783,17 @@ export const studentService = {
     return true;
   },
 
-  // BATCH IMPORT: Import from SGS Excel
-  async batchImport(classroomId: string, students: Array<Omit<StudentRecord, 'id'>>): Promise<number> {
+  // BATCH IMPORT: Import from SGS Excel with Real-time Progress Tracking
+  async batchImport(
+    classroomId: string,
+    students: Array<Omit<StudentRecord, 'id'>>,
+    options?: BatchImportOptions
+  ): Promise<number> {
+    const term = options?.term ?? 2;
+    const academicYear = options?.academicYear ?? 2569;
+    const roomName = options?.roomName;
+    const onProgress = options?.onProgress;
+
     const current = getLocalStudents(classroomId);
     const newItems: StudentRecord[] = students.map((s, idx) => {
       const parsed = parseThaiStudentName(s.name);
@@ -669,48 +820,81 @@ export const studentService = {
 
     if (isSupabaseConfigured) {
       logDbOperation('BATCH UPSERT INTO Student', { count: newItems.length });
-      for (const item of newItems) {
-        const parsed = parseThaiStudentName(item.name);
-        try {
-          await supabase.from('Student').upsert(
-            {
-              id: item.id,
-              studentCode: item.code,
-              title: parsed.title,
-              firstName: parsed.firstName,
-              lastName: parsed.lastName,
-              gender: item.gender || parsed.gender,
-              status: item.status || 'ACTIVE',
-              updatedAt: new Date().toISOString(),
-            },
-            { onConflict: 'id' }
-          );
+      let processed = 0;
+      const CHUNK_SIZE = 15;
 
-          await supabase.from('StudentEnrollment').upsert(
-            {
-              id: `enr-${item.id}`,
-              studentId: item.id,
-              academicYear: 2569,
-              term: 1,
-              classRoomId: classroomId,
-              rollNumber: item.no,
-              status: 'ENROLLED',
-              updatedAt: new Date().toISOString(),
-            },
-            { onConflict: 'id' }
-          );
-        } catch {
-          // continue
+      for (let i = 0; i < newItems.length; i += CHUNK_SIZE) {
+        const chunk = newItems.slice(i, i + CHUNK_SIZE);
+        await Promise.all(
+          chunk.map(async (item) => {
+            const parsed = parseThaiStudentName(item.name);
+            try {
+              await supabase.from('Student').upsert(
+                {
+                  id: item.id,
+                  studentCode: item.code,
+                  title: parsed.title,
+                  firstName: parsed.firstName,
+                  lastName: parsed.lastName,
+                  gender: item.gender || parsed.gender,
+                  status: item.status || 'ACTIVE',
+                  academic_status: 'STUDYING',
+                  updatedAt: new Date().toISOString(),
+                },
+                { onConflict: 'studentCode' }
+              );
+
+              await supabase.from('StudentEnrollment').upsert(
+                {
+                  id: `enr-${academicYear}-${term}-${item.code}`,
+                  studentId: item.id,
+                  academicYear,
+                  term,
+                  classRoomId: classroomId,
+                  rollNumber: item.no,
+                  status: 'ENROLLED',
+                  updatedAt: new Date().toISOString(),
+                },
+                { onConflict: 'studentId,academicYear,term' }
+              );
+            } catch {
+              // continue
+            }
+          })
+        );
+
+        processed += chunk.length;
+        if (onProgress) {
+          const lastItem = chunk[chunk.length - 1];
+          onProgress({
+            current: Math.min(processed, newItems.length),
+            total: newItems.length,
+            percentage: Math.min(100, Math.round((processed / newItems.length) * 100)),
+            currentStudentName: lastItem?.name,
+            roomName,
+          });
         }
       }
+    } else if (onProgress) {
+      // Local mode instant progress completion
+      onProgress({
+        current: newItems.length,
+        total: newItems.length,
+        percentage: 100,
+        roomName,
+      });
     }
 
     return newItems.length;
   },
 
   // Alias for compatibility
-  async importBatch(classroomId: string, students: Array<Omit<StudentRecord, 'id'>>): Promise<number> {
-    return this.batchImport(classroomId, students);
+  async importBatch(
+    classroomId: string,
+    students: Array<Omit<StudentRecord, 'id'>>,
+    options?: BatchImportOptions
+  ): Promise<number> {
+    return this.batchImport(classroomId, students, options);
   },
 };
 

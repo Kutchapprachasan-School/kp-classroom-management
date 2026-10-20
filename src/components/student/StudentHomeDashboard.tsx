@@ -39,6 +39,7 @@ import {
   STUDENT_EXP_EVENT,
   type StudentExpCalculation,
 } from '../../services/studentExpService';
+import { formatClassroomLabel } from '../../services/studentService';
 import type { StudentTabKey } from './StudentSidebar';
 import type { AuthUser } from '../../services/authService';
 import type { SchoolSettingsConfig } from '../../config/schoolSettings';
@@ -56,7 +57,7 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
   onOpenAssignment,
   currentUser,
 }) => {
-  const studentRoom = currentUser?.classroomId || 'ม.3/1';
+  const studentRoom = formatClassroomLabel(currentUser?.classroomName || currentUser?.classroomId) || 'ม.3/1';
   const bellConfig = bellScheduleService.getConfig();
 
   const [quests, setQuests] = useState<StudentQuestItem[]>([]);
@@ -107,7 +108,11 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
 
   const pendingQuests = quests.filter((q) => q.status === 'PENDING');
   const enrolledSubjects = TEACHER_SUBJECTS_LIST.filter((s) =>
-    s.classrooms.some((c) => c === studentRoom || c.includes(studentRoom))
+    s.classrooms.some((c) => {
+      const normC = formatClassroomLabel(c);
+      const normRoom = formatClassroomLabel(studentRoom);
+      return normC === normRoom || normC.includes(normRoom) || normRoom.includes(normC);
+    })
   );
 
   return (
@@ -478,7 +483,7 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
                     XP ทั้งหมด
                   </div>
                   <div className="text-xs sm:text-sm font-bold text-slate-800 mt-0.5">
-                    0
+                    {expInfo.totalXp.toLocaleString()}
                   </div>
                 </div>
               </div>
@@ -604,75 +609,92 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
             {/* Buddies Grid */}
             <div className="flex-1 overflow-y-auto space-y-3 pr-1">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {ALL_BUDDIES.map((buddy) => {
-                  const isActive = activeBuddy.id === buddy.id;
-                  return (
-                    <div
-                      key={buddy.id}
-                      onClick={() => {
-                        gachaService.setActiveBuddy(buddy.id);
-                        setActiveBuddy(buddy);
-                        setIsBuddySelectorOpen(false);
-                      }}
-                      className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center gap-3 relative ${
-                        isActive
-                          ? 'border-blue-500 bg-blue-50/50 shadow-xs ring-2 ring-blue-500/20'
-                          : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50/80 bg-white'
-                      }`}
-                    >
-                      <div className="w-14 h-14 rounded-xl border border-slate-200/80 bg-amber-50/40 p-1 flex items-center justify-center shrink-0 relative overflow-hidden">
-                        <img
-                          src={`/images/buddies/${buddy.id}.png`}
-                          alt={buddy.name}
-                          className="w-full h-full object-cover rounded-lg"
-                          onError={(e) => {
-                            (e.target as HTMLElement).setAttribute(
-                              'src',
-                              '/images/buddies/cat_mascot.png'
-                            );
-                          }}
-                        />
-                        {isActive && (
-                          <div className="absolute inset-0 bg-blue-600/30 flex items-center justify-center">
-                            <Check className="w-5 h-5 text-white stroke-[3]" />
+                {(() => {
+                  const gachaState = gachaService.getState(currentUser?.id);
+                  const unlockedBuddyIds = gachaState.unlockedBuddyIds || ['buddy-1'];
+                  return ALL_BUDDIES.map((buddy) => {
+                    const isActive = activeBuddy.id === buddy.id;
+                    const isUnlocked = unlockedBuddyIds.includes(buddy.id);
+                    return (
+                      <div
+                        key={buddy.id}
+                        onClick={() => {
+                          if (!isUnlocked) return;
+                          gachaService.setActiveBuddy(buddy.id);
+                          setActiveBuddy(buddy);
+                          setIsBuddySelectorOpen(false);
+                        }}
+                        className={`p-3 rounded-2xl border transition-all flex items-center gap-3 relative ${
+                          isActive
+                            ? 'border-blue-500 bg-blue-50/50 shadow-xs ring-2 ring-blue-500/20 cursor-pointer'
+                            : isUnlocked
+                            ? 'border-slate-200 hover:border-blue-300 hover:bg-slate-50/80 bg-white cursor-pointer'
+                            : 'border-slate-200/60 bg-slate-100/60 opacity-60 cursor-not-allowed'
+                        }`}
+                      >
+                        <div className="w-14 h-14 rounded-xl border border-slate-200/80 bg-amber-50/40 p-1 flex items-center justify-center shrink-0 relative overflow-hidden">
+                          <img
+                            src={`/images/buddies/${buddy.id}.png`}
+                            alt={buddy.name}
+                            className={`w-full h-full object-cover rounded-lg ${!isUnlocked ? 'grayscale contrast-75' : ''}`}
+                            onError={(e) => {
+                              (e.target as HTMLElement).setAttribute(
+                                'src',
+                                '/images/buddies/cat_mascot.png'
+                              );
+                            }}
+                          />
+                          {isActive && (
+                            <div className="absolute inset-0 bg-blue-600/30 flex items-center justify-center">
+                              <Check className="w-5 h-5 text-white stroke-[3]" />
+                            </div>
+                          )}
+                          {!isUnlocked && (
+                            <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center text-xs">
+                              🔒
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h4 className="font-bold text-slate-900 text-sm truncate">
+                              {buddy.name}
+                            </h4>
+                            <span
+                              className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${buddy.badgeBg}`}
+                            >
+                              {buddy.rarity}
+                            </span>
                           </div>
+                          <p className="text-[11px] text-slate-500 truncate mt-0.5" title={buddy.title}>
+                            {buddy.title}
+                          </p>
+                          <p className="text-[10px] text-blue-600 font-semibold truncate mt-0.5">
+                            ⚡ {buddy.skillName}
+                          </p>
+                        </div>
+
+                        {isActive ? (
+                          <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-blue-600 text-white shrink-0">
+                            ใช้อยู่
+                          </span>
+                        ) : isUnlocked ? (
+                          <button
+                            type="button"
+                            className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-600 transition-colors shrink-0 cursor-pointer"
+                          >
+                            เลือก
+                          </button>
+                        ) : (
+                          <span className="text-[10px] font-medium px-2 py-1 rounded-lg bg-slate-200 text-slate-500 shrink-0">
+                            ยังไม่ปลดล็อก
+                          </span>
                         )}
                       </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <h4 className="font-bold text-slate-900 text-sm truncate">
-                            {buddy.name}
-                          </h4>
-                          <span
-                            className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${buddy.badgeBg}`}
-                          >
-                            {buddy.rarity}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-500 truncate mt-0.5" title={buddy.title}>
-                          {buddy.title}
-                        </p>
-                        <p className="text-[10px] text-blue-600 font-semibold truncate mt-0.5">
-                          ⚡ {buddy.skillName}
-                        </p>
-                      </div>
-
-                      {isActive ? (
-                        <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-blue-600 text-white shrink-0">
-                          ใช้อยู่
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-600 transition-colors shrink-0 cursor-pointer"
-                        >
-                          เลือก
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
               </div>
             </div>
 

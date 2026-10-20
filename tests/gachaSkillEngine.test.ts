@@ -34,6 +34,10 @@ describe('GachaSkillEngine Ecosystem', () => {
   it('scales XP and Coin multipliers based on buddy rarity', () => {
     // Epic buddy
     const epicBuddy = ALL_BUDDIES.find((b) => b.rarity === 'EPIC') || ALL_BUDDIES[0];
+    const state = gachaService.getState();
+    if (!state.unlockedBuddyIds.includes(epicBuddy.id)) state.unlockedBuddyIds.push(epicBuddy.id);
+    gachaService.saveState(state);
+
     gachaService.setActiveBuddy(epicBuddy.id);
     const epicBuffs = gachaSkillEngine.getActiveBuffs();
 
@@ -44,6 +48,10 @@ describe('GachaSkillEngine Ecosystem', () => {
 
     // Mythic buddy
     const mythicBuddy = ALL_BUDDIES.find((b) => b.rarity === 'MYTHIC') || ALL_BUDDIES[0];
+    const state2 = gachaService.getState();
+    if (!state2.unlockedBuddyIds.includes(mythicBuddy.id)) state2.unlockedBuddyIds.push(mythicBuddy.id);
+    gachaService.saveState(state2);
+
     gachaService.setActiveBuddy(mythicBuddy.id);
     const mythicBuffs = gachaSkillEngine.getActiveBuffs();
 
@@ -55,6 +63,10 @@ describe('GachaSkillEngine Ecosystem', () => {
 
   it('handles quiz hints consumption and replenishment', () => {
     const mythicBuddy = ALL_BUDDIES.find((b) => b.rarity === 'MYTHIC') || ALL_BUDDIES[0];
+    const state = gachaService.getState();
+    if (!state.unlockedBuddyIds.includes(mythicBuddy.id)) state.unlockedBuddyIds.push(mythicBuddy.id);
+    gachaService.saveState(state);
+
     gachaService.setActiveBuddy(mythicBuddy.id);
 
     const initialBuffs = gachaSkillEngine.getActiveBuffs();
@@ -66,13 +78,20 @@ describe('GachaSkillEngine Ecosystem', () => {
     const afterConsume = gachaSkillEngine.getActiveBuffs();
     expect(afterConsume.quizHintCharges).toBe(initialBuffs.quizHintCharges - 1);
 
-    // Replenish
-    const replenished = gachaSkillEngine.replenishQuizHints(1);
-    expect(replenished).toBe(initialBuffs.quizHintCharges);
+    // Adding inventory quiz hint increases available charges
+    const s = gachaService.getState();
+    s.inventory.quizHint += 1;
+    gachaService.saveState(s);
+    const afterInventory = gachaSkillEngine.getActiveBuffs();
+    expect(afterInventory.quizHintCharges).toBe(initialBuffs.quizHintCharges);
   });
 
   it('handles streak shield consumption correctly', () => {
     const mythicBuddy = ALL_BUDDIES.find((b) => b.rarity === 'MYTHIC') || ALL_BUDDIES[0];
+    const state = gachaService.getState();
+    if (!state.unlockedBuddyIds.includes(mythicBuddy.id)) state.unlockedBuddyIds.push(mythicBuddy.id);
+    gachaService.saveState(state);
+
     gachaService.setActiveBuddy(mythicBuddy.id);
 
     const buffs = gachaSkillEngine.getActiveBuffs();

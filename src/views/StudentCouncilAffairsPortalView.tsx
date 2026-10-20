@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Vote,
   FileCheck2,
@@ -17,6 +17,7 @@ import {
 
 import type { AuthUser } from '../services/authService';
 import { authService } from '../services/authService';
+import { formatClassroomLabel } from '../services/studentService';
 
 interface StudentCouncilAffairsPortalViewProps {
   section?: 'LEAVE' | 'COUNCIL';
@@ -30,7 +31,12 @@ export const StudentCouncilAffairsPortalView: React.FC<
   const effectiveUser = currentUser || authService.getCurrentUser();
   const studentCode = effectiveUser?.studentCode || 'STD-001';
   const studentName = effectiveUser?.name || 'นักเรียน';
-  const classroom = effectiveUser?.classroomId || 'ม.3/1';
+  const classroom = formatClassroomLabel(effectiveUser?.classroomName || effectiveUser?.classroomId) || 'ม.3/1';
+
+  const disciplineInfo = useMemo(
+    () => studentAffairsCouncilService.getStudentDisciplineScore(studentCode),
+    [studentCode]
+  );
 
   const [parties, setParties] = useState<CouncilCandidateParty[]>(() =>
     studentAffairsCouncilService.getCandidateParties()
@@ -40,10 +46,11 @@ export const StudentCouncilAffairsPortalView: React.FC<
   );
 
   // Leave form state
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [leaveType, setLeaveType] =
     useState<StudentLeaveRequest['leaveType']>('ลาป่วย');
-  const [startDate, setStartDate] = useState('2026-09-25');
-  const [endDate, setEndDate] = useState('2026-09-25');
+  const [startDate, setStartDate] = useState(todayStr);
+  const [endDate, setEndDate] = useState(todayStr);
   const [leaveReason, setLeaveReason] = useState('');
   const [myLeaves, setMyLeaves] = useState<StudentLeaveRequest[]>(() =>
     studentAffairsCouncilService
@@ -83,6 +90,11 @@ export const StudentCouncilAffairsPortalView: React.FC<
   const handleSubmitLeave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!leaveReason.trim()) return;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = end.getTime() - start.getTime();
+    const days = Math.max(1, Math.round(diffTime / (1000 * 3600 * 24)) + 1);
+    const phone = (effectiveUser as any)?.parentPhone || (effectiveUser as any)?.phone || '';
     const updated = studentAffairsCouncilService.submitStudentLeave({
       studentCode,
       studentName,
@@ -90,9 +102,9 @@ export const StudentCouncilAffairsPortalView: React.FC<
       leaveType,
       startDate,
       endDate,
-      daysCount: 1,
+      daysCount: days,
       reason: leaveReason.trim(),
-      guardianPhone: '081-452-9918',
+      guardianPhone: phone,
     });
     setMyLeaves(updated.filter((l) => l.studentCode === studentCode));
     setLeaveReason('');
@@ -143,7 +155,7 @@ export const StudentCouncilAffairsPortalView: React.FC<
               <div className="text-slate-500">คะแนนความประพฤติของฉัน</div>
               <div className="text-base font-bold text-teal-700 flex items-center gap-1 mt-0.5 tabular-nums">
                 <ShieldCheck className="w-4 h-4" />
-                <span>110 / 100 คะแนน (ดีเยี่ยม)</span>
+                <span>{disciplineInfo.score} / 100 คะแนน ({disciplineInfo.label})</span>
               </div>
             </div>
           </div>
@@ -219,14 +231,47 @@ export const StudentCouncilAffairsPortalView: React.FC<
             {myLeaves.length > 0 && (
               <div className="border-t border-slate-100">
                 <div className="px-5 py-3 bg-slate-50/80 border-b border-slate-100 font-bold text-slate-700">
-                  ตารางประวัติใบลาของฉัน
+                  ตารางประวัติใบลาของฉัน ({myLeaves.length} รายการ)
                 </div>
-                <div className="overflow-x-auto">
+
+                {/* Mobile Cards View */}
+                <div className="block sm:hidden divide-y divide-slate-100 p-3 space-y-3">
+                  {myLeaves.map((l) => (
+                    <div key={l.id} className="bg-slate-50/60 rounded-xl p-3 border border-slate-100 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-800 text-xs">{l.leaveType}</span>
+                        {l.status === 'APPROVED' ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            อนุมัติแล้ว
+                          </span>
+                        ) : l.status === 'REJECTED' ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-700 border border-red-200">
+                            ไม่อนุมัติ
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                            รอพิจารณา
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-500 tabular-nums">
+                        วันที่ลา: {l.startDate} {l.endDate && l.endDate !== l.startDate ? `ถึง ${l.endDate}` : ''} ({l.daysCount || 1} วัน)
+                      </div>
+                      <div className="text-[11px] text-slate-600 bg-white/70 p-2 rounded-lg border border-slate-100">
+                        เหตุผล: {l.reason}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-slate-50/40 border-b border-slate-100 text-slate-500 font-semibold">
                         <th className="py-2.5 px-4">ประเภท</th>
                         <th className="py-2.5 px-4">วันที่ลา</th>
+                        <th className="py-2.5 px-4">จำนวนวัน</th>
                         <th className="py-2.5 px-4">สาเหตุ</th>
                         <th className="py-2.5 px-4 text-right">สถานะ</th>
                       </tr>
@@ -238,11 +283,26 @@ export const StudentCouncilAffairsPortalView: React.FC<
                             {l.leaveType}
                           </td>
                           <td className="py-2.5 px-4 text-slate-500 tabular-nums">
-                            {l.startDate}
+                            {l.startDate} {l.endDate && l.endDate !== l.startDate ? `ถึง ${l.endDate}` : ''}
+                          </td>
+                          <td className="py-2.5 px-4 text-slate-500 tabular-nums">
+                            {l.daysCount || 1} วัน
                           </td>
                           <td className="py-2.5 px-4 text-slate-600">{l.reason}</td>
-                          <td className="py-2.5 px-4 text-right font-semibold text-teal-700">
-                            {l.status === 'APPROVED' ? 'อนุมัติแล้ว' : 'รอพิจารณา'}
+                          <td className="py-2.5 px-4 text-right">
+                            {l.status === 'APPROVED' ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                อนุมัติแล้ว
+                              </span>
+                            ) : l.status === 'REJECTED' ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                                ไม่อนุมัติ
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                รอพิจารณา
+                              </span>
+                            )}
                           </td>
                         </tr>
                       ))}

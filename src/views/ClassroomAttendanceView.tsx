@@ -50,6 +50,8 @@ import { DynamicQrAttendanceModal } from '../components/attendance/DynamicQrAtte
 import { StudentQrScannerModal } from '../components/attendance/StudentQrScannerModal';
 import { StudentIdCardModal } from '../components/attendance/StudentIdCardModal';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
+import { authService } from '../services/authService';
+import { academicCalendarService } from '../services/academicCalendarService';
 
 export interface ClassroomAttendanceViewProps {
   onDeepNavigate?: (payload: CrossViewNavigationPayload) => void;
@@ -81,9 +83,13 @@ const parseStudentNameParts = (fullName: string): { title: string; name: string 
 export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = ({
   onDeepNavigate,
 }) => {
-  // Curriculum & Classrooms live state
+  const currentUser = authService.getCurrentUser();
+  const effectiveTeacher =
+    currentUser?.role !== 'ADMIN' ? (currentUser?.id || currentUser?.name) : undefined;
+
+  // Curriculum & Classrooms live state - กรองเฉพาะวิชาของครูท่านนี้ (ของใครของมัน)
   const [curriculumCourses, setCurriculumCourses] = useState<CourseCurriculumRecord[]>(() =>
-    coursesCurriculumService.getCourses()
+    coursesCurriculumService.getCourses(undefined, undefined, effectiveTeacher)
   );
   const [allClassrooms, setAllClassrooms] = useState<ClassroomRosterItem[]>(() =>
     classroomService.getClassroomsSync()
@@ -91,7 +97,9 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
 
   useEffect(() => {
     const handleCurriculumSync = () => {
-      setCurriculumCourses(coursesCurriculumService.getCourses());
+      setCurriculumCourses(
+        coursesCurriculumService.getCourses(undefined, undefined, effectiveTeacher)
+      );
     };
     const handleClassroomSync = () => {
       setAllClassrooms(classroomService.getClassroomsSync());
@@ -102,7 +110,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
       window.removeEventListener('kp-courses-curriculum-updated', handleCurriculumSync);
       window.removeEventListener('kps-data-sync-event', handleClassroomSync);
     };
-  }, []);
+  }, [effectiveTeacher]);
 
   const availableCourseOptions: TeacherCourseOption[] = useMemo(() => {
     if (!curriculumCourses || curriculumCourses.length === 0) {
@@ -146,15 +154,37 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
   // Available classrooms dynamically filtered based on selected curriculum course
   const availableClassroomOptions = useMemo(() => {
     const activeCurriculum = curriculumCourses.find((c) => c.code === selectedCourse);
+    const currentUser = authService.getCurrentUser();
+    const currentTeacherName = currentUser?.name?.trim() || '';
+
     if (activeCurriculum && activeCurriculum.assignedClassrooms && activeCurriculum.assignedClassrooms.length > 0) {
       return activeCurriculum.assignedClassrooms.map((roomName) => {
         const found = allClassrooms.find(
           (c: ClassroomRosterItem) => c.name === roomName || c.roomNumber === roomName || c.id === roomName
         );
-        const isAdvisory = found?.adviser?.includes('ปัญจพล');
+        const advisers = found?.advisers || [found?.adviser, found?.coAdviser, found?.thirdAdviser].filter(Boolean) as string[];
+        const isAdvisory = Boolean(
+          (currentTeacherName && advisers.some((adv) => adv && (adv.includes(currentTeacherName) || currentTeacherName.includes(adv)))) ||
+          (currentUser?.classroomId && (currentUser.classroomId === found?.id || currentUser.classroomId === found?.name))
+        );
         return {
           id: found?.id || `room-${roomName.replace(/[^0-9-]/g, '')}`,
           label: `${roomName}${isAdvisory ? ' (ห้องประจำชั้น)' : ''}`,
+        };
+      });
+    }
+
+    // Fallback: If no assignedClassrooms or empty, return all real classrooms from allClassrooms
+    if (allClassrooms && allClassrooms.length > 0) {
+      return allClassrooms.map((c: ClassroomRosterItem) => {
+        const advisers = c.advisers || [c.adviser, c.coAdviser, c.thirdAdviser].filter(Boolean) as string[];
+        const isAdvisory = Boolean(
+          (currentTeacherName && advisers.some((adv) => adv && (adv.includes(currentTeacherName) || currentTeacherName.includes(adv)))) ||
+          (currentUser?.classroomId && (currentUser.classroomId === c.id || currentUser.classroomId === c.name))
+        );
+        return {
+          id: c.id,
+          label: `${c.name || c.roomNumber || c.id}${isAdvisory ? ' (ห้องประจำชั้น)' : ''}`,
         };
       });
     }
@@ -203,17 +233,31 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
   const [activeStudentForBadge, setActiveStudentForBadge] = useState<PeriodAttendanceRecord | null>(null);
 
   const currentCourse = useMemo(() => {
-    const fromAvailable = availableCourseOptions.find((c) => c.code === selectedCourse);
-    if (fromAvailable) return fromAvailable;
     const fromCurriculum = curriculumCourses.find((c) => c.code === selectedCourse);
+    const matchedClassroom = availableClassroomOptions.find((r) => r.id === selectedClassroom);
+    const fromAvailable = availableCourseOptions.find((c) => c.code === selectedCourse);
+
+    const roomLabel =
+      matchedClassroom?.label ||
+      allClassrooms.find((c) => c.id === selectedClassroom)?.name ||
+      selectedClassroom ||
+      'ห้องเรียน';
+
     if (fromCurriculum) {
       return {
         code: fromCurriculum.code,
         name: `${fromCurriculum.code} ${fromCurriculum.name}`,
         shortSubject: fromCurriculum.name,
         room: selectedClassroom,
-        roomLabel: availableClassroomOptions.find((r) => r.id === selectedClassroom)?.label || 'ห้องเรียน',
-        period: selectedPeriod,
+        roomLabel,
+        period: fromAvailable?.period || selectedPeriod || 1,
+      };
+    }
+    if (fromAvailable) {
+      return {
+        ...fromAvailable,
+        room: selectedClassroom,
+        roomLabel,
       };
     }
     return {
@@ -221,10 +265,10 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
       name: selectedCourse ? `${selectedCourse}` : 'ไม่มีรายวิชา',
       shortSubject: 'รายวิชา',
       room: selectedClassroom,
-      roomLabel: 'ห้องเรียน',
+      roomLabel,
       period: selectedPeriod || 1,
     };
-  }, [availableCourseOptions, curriculumCourses, selectedCourse, selectedClassroom, availableClassroomOptions, selectedPeriod]);
+  }, [availableCourseOptions, curriculumCourses, selectedCourse, selectedClassroom, availableClassroomOptions, allClassrooms, selectedPeriod]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -309,6 +353,8 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
         (c: ClassroomRosterItem) => c.name === firstRoomName || c.roomNumber === firstRoomName || c.id === firstRoomName
       );
       setSelectedClassroom(found?.id || `room-${firstRoomName.replace(/[^0-9-]/g, '')}`);
+    } else if (allClassrooms && allClassrooms.length > 0) {
+      setSelectedClassroom(allClassrooms[0].id);
     } else {
       const course = availableCourseOptions.find((c) => c.code === courseCode);
       if (course) {
@@ -334,7 +380,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
               ...r,
               status: newStatus,
               isOverridden: true,
-              overrideBy: 'ครูปัญจพล เกษรัตน์',
+              overrideBy: authService.getCurrentUser()?.name || 'ครูผู้สอน',
               overrideReason: `ครูปรับสถานะเป็น ${newStatus}`,
               markedAt: new Date().toISOString(),
             }
@@ -692,6 +738,21 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
           </div>
         </div>
       </div>
+
+      {/* Notice Banner when Selected Date is Outside Active Term (School Break) */}
+      {!academicCalendarService.isDateInActiveTerm(selectedDate) && (
+        <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-900 flex items-center justify-between gap-3 text-xs font-bold animate-fade-in">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🏖️</span>
+            <span>
+              วันที่เลือก ({formatDateThai(selectedDate)}) อยู่นอกช่วงเปิดภาคเรียน: ระบบจะไม่นำสถิติการเช็คชื่อของวันนี้ไปคำนวณรวมในเกณฑ์เวลาเรียน 80% หรือสถิติสะสม
+            </span>
+          </div>
+          <span className="px-2.5 py-1 rounded-xl bg-amber-200/70 text-amber-950 text-[11px] shrink-0 font-extrabold">
+            ช่วงปิดเทอม
+          </span>
+        </div>
+      )}
 
 
 

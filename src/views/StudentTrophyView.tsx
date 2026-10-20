@@ -22,6 +22,8 @@ import {
 import { ChibiBuddyAvatar } from '../components/student/ChibiBuddyAvatar';
 import { cleanSlateService } from '../services/cleanSlateService';
 import type { AuthUser } from '../services/authService';
+import { sgsRosterAndSubmissionService } from '../services/sgsRosterAndSubmissionService';
+import { studentAffairsCouncilService } from '../services/studentAffairsCouncilService';
 
 export interface TrophyBadgeItem {
   id: string;
@@ -94,7 +96,10 @@ export const StudentTrophyView: React.FC<StudentTrophyViewProps> = ({
   );
   const [buddyCustomName, setBuddyCustomName] = useState(currentBuddy.name);
   const [isEditingName, setIsEditingName] = useState(false);
-  const [buddyMorale, setBuddyMorale] = useState(100);
+  const studentCode = currentUser?.studentCode || 'STD-001';
+  const [buddyMorale, setBuddyMorale] = useState(() => {
+    return gachaService.getState(currentUser?.id).happiness ?? 100;
+  });
   const [buddyQuote, setBuddyQuote] = useState(() => {
     return currentBuddy.id === 'buddy-l1'
       ? 'เพลิงแห่งความมุ่งมั่นลุกโชนแล้ว! ลุยการบ้านกันเลย!'
@@ -108,6 +113,7 @@ export const StudentTrophyView: React.FC<StudentTrophyViewProps> = ({
       const b = gachaService.getActiveBuddy();
       setCurrentBuddy(b);
       setBuddyCustomName(b.name);
+      setBuddyMorale(gachaService.getState(currentUser?.id).happiness ?? 100);
     };
     const handleExpUpdate = () => {
       setExpInfo(calculateStudentExp(currentUser?.id, currentUser?.studentCode));
@@ -124,7 +130,11 @@ export const StudentTrophyView: React.FC<StudentTrophyViewProps> = ({
 
   const handleBuddyAction = () => {
     setIsBuddyJumping(true);
-    setBuddyMorale((prev) => Math.min(100, prev + 5));
+    const newMorale = Math.min(100, buddyMorale + 5);
+    setBuddyMorale(newMorale);
+    const state = gachaService.getState(currentUser?.id);
+    state.happiness = newMorale;
+    gachaService.saveState(state);
     const quotes = [
       `เย้! วันนี้เราพร้อมลุยไปด้วยกันแล้วครับ! ⚡`,
       `ความพยายามวันนี้ จะพาเราไปสู่ความสำเร็จ! ✨`,
@@ -139,15 +149,70 @@ export const StudentTrophyView: React.FC<StudentTrophyViewProps> = ({
 
   const handleCheerBuddy = () => {
     setBuddyMorale(100);
+    const state = gachaService.getState(currentUser?.id);
+    state.happiness = 100;
+    gachaService.saveState(state);
     setToastMsg(`✨ เสริมพลังใจให้น้อง${currentBuddy.name} เรียบร้อย! กำลังใจเต็ม 100%`);
     setBuddyQuote(`ขอบคุณที่ส่งกำลังใจให้นะครับ! พลังใจพร้อมลุยเต็ม 100% แล้ว! 💖`);
     setTimeout(() => setToastMsg(null), 3000);
   };
 
-  const isClean = cleanSlateService.isCleanSlateActive();
-  const badgesList = isClean
-    ? BADGES_SCREEN_2.map((b) => ({ ...b, isUnlocked: false, unlockedAt: undefined }))
-    : BADGES_SCREEN_2;
+  const disciplineInfo = studentAffairsCouncilService.getStudentDisciplineScore(studentCode);
+  const submissions = sgsRosterAndSubmissionService.getSubmissions();
+  const studentSubs = submissions.filter(
+    (s) => s.studentCode === studentCode || s.studentCode === currentUser?.id
+  );
+
+  const badgesList: TrophyBadgeItem[] = React.useMemo(() => {
+    if (cleanSlateService.isCleanSlateActive()) {
+      return BADGES_SCREEN_2.map((b) => ({ ...b, isUnlocked: false, unlockedAt: undefined }));
+    }
+    return [
+      {
+        id: 'badge-1',
+        title: 'ส่งงานครบครั้งแรก',
+        description: 'ส่งการบ้านหรือใบงานครบตรงเวลาเป็นชิ้นแรกของเทอม',
+        isUnlocked: studentSubs.length >= 1,
+        unlockedAt: studentSubs[0]?.submittedAt,
+        iconName: 'work',
+      },
+      {
+        id: 'badge-2',
+        title: 'คะแนนเต็มวิชา (คณิต/วิทย์)',
+        description: 'ได้คะแนนเต็ม 100% ในการสอบหรือการส่งงานเก็บคะแนน',
+        isUnlocked: studentSubs.some((s) => typeof s.score === 'number' && s.score > 0 && s.score === ((s as any).maxScore || 10)),
+        iconName: 'score',
+      },
+      {
+        id: 'badge-3',
+        title: 'อ่านหนังสือครบ 5 เล่ม',
+        description: 'บันทึกการอ่านวรรณกรรมและหนังสือเรียนครบ 5 เล่ม',
+        isUnlocked: false,
+        iconName: 'book',
+      },
+      {
+        id: 'badge-4',
+        title: 'ทำกิจกรรมต่อเนื่อง 7 วัน',
+        description: 'ล็อกอินเช็คอินและร่วมกิจกรรมห้องเรียน 7 วันติดต่อกัน',
+        isUnlocked: expInfo.breakdown.streakCount >= 7,
+        iconName: 'streak',
+      },
+      {
+        id: 'badge-5',
+        title: 'ชนะเลิศกิจกรรม ร.ร.',
+        description: 'ได้รับรางวัลชนะเลิศอันดับ 1 ในการแข่งขันกิจกรรมของโรงเรียน',
+        isUnlocked: false,
+        iconName: 'winner',
+      },
+      {
+        id: 'badge-6',
+        title: 'นักเรียนตัวอย่าง (ระดับสูง)',
+        description: 'ได้รับการยกย่องเป็นนักเรียนประพฤติดีเด่นระดับเหรียญทองประจำปี',
+        isUnlocked: disciplineInfo.score >= 100,
+        iconName: 'model',
+      },
+    ];
+  }, [studentSubs, expInfo.breakdown.streakCount, disciplineInfo.score]);
   const unlockedCount = badgesList.filter((b) => b.isUnlocked).length;
 
   return (

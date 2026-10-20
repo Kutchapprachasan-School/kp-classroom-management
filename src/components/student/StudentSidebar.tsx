@@ -14,12 +14,12 @@ import Chat2Regular from '@mingcute/react/core-regular/chat-2';
 import ExitDoorRegular from '@mingcute/react/core-regular/exit-door';
 import CloseRegular from '@mingcute/react/core-regular/close';
 import LayoutLeftbarCloseRegular from '@mingcute/react/core-regular/layout-leftbar-close';
+import FileCheckRegular from '@mingcute/react/core-regular/file-check';
+import TrophyRegular from '@mingcute/react/core-regular/trophy';
 import SparklesRegular from '@mingcute/react/core-regular/sparkles';
-import CellphoneRegular from '@mingcute/react/core-regular/cellphone';
 import SafeShieldRegular from '@mingcute/react/core-regular/safe-shield';
 import { type SchoolUserRole } from '../../config/schoolRoles';
 import { getSchoolSettings } from '../../config/schoolSettings';
-import { cleanSlateService } from '../../services/cleanSlateService';
 import {
   studentBannerService,
   STUDENT_BANNERS_EVENT,
@@ -100,15 +100,17 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
           key: 'missions' as StudentTabKey,
           label: 'งานที่ได้รับมอบหมาย',
           icon: ClipboardRegular,
-          badge: cleanSlateService.isCleanSlateActive() ? null : 3,
+          badge: null,
         },
         { key: 'timetable' as StudentTabKey, label: 'ตารางเรียน', icon: Calendar2Regular, badge: null },
+        { key: 'student-leave' as StudentTabKey, label: 'แจ้งลาป่วย / ลากิจ', icon: FileCheckRegular, badge: null },
       ],
     },
     {
       title: 'ผลการเรียน & สถิติ',
       items: [
         { key: 'gradebook' as StudentTabKey, label: 'ผลการเรียน', icon: ChartBarRegular, badge: null },
+        { key: 'trophy' as StudentTabKey, label: 'เหรียญรางวัล', icon: TrophyRegular, badge: null },
         { key: 'announcements' as StudentTabKey, label: 'กิจกรรม / ประกาศ', icon: AnnouncementRegular, badge: null },
       ],
     },
@@ -117,13 +119,14 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
       items: [
         { key: 'profile' as StudentTabKey, label: 'ข้อมูลส่วนตัว', icon: User3Regular, badge: null },
         { key: 'contact' as StudentTabKey, label: 'ติดต่อครู', icon: Chat2Regular, badge: null },
+        { key: 'home-visit' as StudentTabKey, label: 'ข้อมูลเยี่ยมบ้าน', icon: User3Regular, badge: null },
       ],
     },
     {
       title: 'กิจกรรม & บัดดี้',
       items: [
-        { key: 'gacha' as StudentTabKey, label: 'สุ่มคู่หู (Gacha)', icon: SparklesRegular, badge: 'Lv.2' },
-        { key: 'mobile-care' as StudentTabKey, label: 'ดูแลนักเรียน 9 หน้า', icon: CellphoneRegular, badge: null },
+        { key: 'gacha' as StudentTabKey, label: 'สุ่มคู่หู (Gacha)', icon: SparklesRegular, badge: null },
+        { key: 'student-council' as StudentTabKey, label: 'สภานักเรียน & โหวต', icon: SafeShieldRegular, badge: null },
         ...(studentRole === 'STUDENT_COUNCIL'
           ? [
               {

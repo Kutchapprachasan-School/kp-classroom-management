@@ -6,7 +6,8 @@ import { BookOpen, ArrowRight, BookCheck } from 'lucide-react';
 import type { AuthUser } from '../../services/authService';
 import type { SchoolSettingsConfig } from '../../config/schoolSettings';
 import { TEACHER_SUBJECTS_LIST } from '../../services/teacherCourseAssignmentService';
-import { cleanSlateService } from '../../services/cleanSlateService';
+import { formatClassroomLabel } from '../../services/studentService';
+import { sgsRosterAndSubmissionService } from '../../services/sgsRosterAndSubmissionService';
 
 interface StudentCoursesViewProps {
   onBack: () => void;
@@ -20,14 +21,28 @@ export const StudentCoursesView: React.FC<StudentCoursesViewProps> = ({
   onSelectCourse,
   currentUser,
 }) => {
-  const isClean = cleanSlateService.isCleanSlateActive();
-  const studentRoom = currentUser?.classroomId || 'ม.3/1';
+  const studentRoom = formatClassroomLabel(currentUser?.classroomName || currentUser?.classroomId) || 'ม.3/1';
+  const studentCode = currentUser?.studentCode || 'STD-001';
+
+  const rosterStudent = sgsRosterAndSubmissionService.getSgsRoster(studentRoom).find((s) => s.studentCode === studentCode) || {
+    sgsSeatNo: 1,
+    studentCode,
+    studentName: currentUser?.name || 'นักเรียน',
+    gender: 'MALE' as const,
+    classroom: studentRoom,
+    transferState: 'ACTIVE' as const,
+    attendancePercent: 100,
+    midtermScore: 0,
+    finalScore: 0,
+  };
 
   // Find courses enrolled for this classroom
   const enrolledSubjects = TEACHER_SUBJECTS_LIST.filter((s) =>
-    s.classrooms.some(
-      (c) => c === studentRoom || studentRoom.includes(c) || c.includes(studentRoom)
-    )
+    s.classrooms.some((c) => {
+      const normC = formatClassroomLabel(c);
+      const normRoom = formatClassroomLabel(studentRoom);
+      return normC === normRoom || normC.includes(normRoom) || normRoom.includes(normC);
+    })
   );
 
   return (
@@ -67,52 +82,63 @@ export const StudentCoursesView: React.FC<StudentCoursesViewProps> = ({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {enrolledSubjects.map((course) => (
-            <div
-              key={course.code}
-              className="bg-white rounded-2xl border border-slate-200/90 hover:border-blue-300 p-4 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between group"
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
-                    {course.code}
-                  </span>
-                  <span className="text-[11px] font-semibold text-slate-500">
-                    {course.credits} หน่วยกิต
-                  </span>
-                </div>
+          {enrolledSubjects.map((course) => {
+            const summary = sgsRosterAndSubmissionService.calculateStudentFinalGrade(
+              rosterStudent as any,
+              course.code,
+              studentRoom
+            );
+            const totalAssigned = summary.totalAssignedCount;
+            const submitted = summary.submittedCount;
+            const hasScore = summary.total > 0;
 
-                <h3 className="font-bold text-slate-900 text-sm group-hover:text-blue-600 transition-colors line-clamp-1">
-                  {course.name}
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  ห้องเรียน: {studentRoom}
-                </p>
-
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                  <span>งานที่ส่งแล้ว:</span>
-                  <span className="font-bold text-slate-800">
-                    {isClean ? '0 งาน' : '0/0 งาน'}
-                  </span>
-                </div>
-                <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
-                  <span>คะแนนปัจจุบัน:</span>
-                  <span className="font-bold text-blue-600">
-                    {isClean ? 'รอประเมิน' : '- / 100'}
-                  </span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => onSelectCourse?.(course.code)}
-                className="mt-4 w-full py-2 rounded-xl bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-xs font-bold transition-all border border-slate-200/80 flex items-center justify-center gap-1.5 cursor-pointer"
+            return (
+              <div
+                key={course.code}
+                className="bg-white rounded-2xl border border-slate-200/90 hover:border-blue-300 p-4 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between group"
               >
-                <span>ดูเนื้อหาและงาน</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))}
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
+                      {course.code}
+                    </span>
+                    <span className="text-[11px] font-semibold text-slate-500">
+                      {course.credits} หน่วยกิต
+                    </span>
+                  </div>
+
+                  <h3 className="font-bold text-slate-900 text-sm group-hover:text-blue-600 transition-colors line-clamp-1">
+                    {course.name}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    ห้องเรียน: {studentRoom}
+                  </p>
+
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                    <span>งานที่ส่งแล้ว:</span>
+                    <span className="font-bold text-slate-800">
+                      {totalAssigned > 0 ? `${submitted}/${totalAssigned} งาน` : '0 งาน'}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
+                    <span>คะแนนปัจจุบัน:</span>
+                    <span className="font-bold text-blue-600">
+                      {hasScore ? `${summary.total} / 100` : 'รอประเมิน'}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onSelectCourse?.(course.code)}
+                  className="mt-4 w-full py-2 rounded-xl bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-xs font-bold transition-all border border-slate-200/80 flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span>ดูเนื้อหาและงาน</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

@@ -87,7 +87,7 @@ export const TeacherMoreAccountMobileView: React.FC<TeacherMoreAccountMobileView
           <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-slate-100 shadow-md">
             <img
               src={currentUser?.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200"}
-              alt={currentUser?.name || "ครูปัญจพล เกษรัตน์"}
+              alt={currentUser?.name || "ครูผู้สอน"}
               className="w-full h-full object-cover"
             />
           </div>
@@ -95,10 +95,10 @@ export const TeacherMoreAccountMobileView: React.FC<TeacherMoreAccountMobileView
         </div>
 
         <h2 className="text-base font-extrabold text-slate-900 mt-3">
-          {currentUser?.name || 'ปัญจพล เกษรัตน์'}
+          {currentUser?.name || 'ครูผู้สอน'}
         </h2>
         <p className="text-xs text-slate-500 mt-0.5">
-          {currentUser?.position || 'ครู'} {currentUser?.subjectGroup ? `กลุ่มสาระการเรียนรู้${currentUser.subjectGroup}` : 'กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ'}
+          {currentUser?.position || 'ครู'} {currentUser?.subjectGroup ? `กลุ่มสาระการเรียนรู้${currentUser.subjectGroup}` : ''}
         </p>
       </div>
 

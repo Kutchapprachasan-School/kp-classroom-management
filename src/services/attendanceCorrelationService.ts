@@ -12,6 +12,7 @@
  */
 
 import { getBangkokTodayString } from '../utils/timetableDateUtils.ts';
+import { academicCalendarService } from './academicCalendarService.ts';
 
 export type AttendanceStatusCode =
   | 'PRESENT'   // มาเรียน / มาแถวปกติ (ได้เวลาเรียน 100%)
@@ -985,8 +986,12 @@ export const attendanceCorrelationService = {
     const allPeriodRecords = this.getAllPeriodRecords();
     const targetCourse = normalizeCourseCode(courseCode);
 
+    // คำนวณเฉพาะวันที่อยู่ในช่วงเปิดภาคเรียนเท่านั้น (ไม่นับวันปิดเทอมและวันหยุด)
     const studentCourseRecords = allPeriodRecords.filter(
-      (r) => r.studentCode === studentCode && normalizeCourseCode(r.courseCode) === targetCourse
+      (r) =>
+        r.studentCode === studentCode &&
+        normalizeCourseCode(r.courseCode) === targetCourse &&
+        academicCalendarService.isDateInActiveTerm(r.date)
     );
 
     return this.compute80RuleFromRecords(
@@ -1002,8 +1007,11 @@ export const attendanceCorrelationService = {
    */
   getClassroomCumulativeStats(classroomId: string): ClassroomTermStatsSummary {
     const targetRoom = normalizeClassroomId(classroomId);
+    // คำนวณเฉพาะวันที่อยู่ในช่วงเปิดภาคเรียนเท่านั้น
     let allMorning = this.getAllMorningRecords().filter(
-      (r) => normalizeClassroomId(r.classroomId) === targetRoom
+      (r) =>
+        normalizeClassroomId(r.classroomId) === targetRoom &&
+        academicCalendarService.isDateInActiveTerm(r.date)
     );
 
     if (allMorning.length === 0) {
@@ -1245,7 +1253,8 @@ export const attendanceCorrelationService = {
     const allRecords = this.getAllPeriodRecords().filter(
       (r) =>
         normalizeClassroomId(r.classroomId) === targetRoom &&
-        normalizeCourseCode(r.courseCode) === targetCourse
+        normalizeCourseCode(r.courseCode) === targetCourse &&
+        academicCalendarService.isDateInActiveTerm(r.date)
     );
 
     // Group records by student code

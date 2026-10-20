@@ -95,7 +95,7 @@ export const CrossClassSarView: React.FC<CrossClassSarViewProps> = ({
   const [classroomsList, setClassroomsList] = useState<ClassroomRosterItem[]>([]);
 
   // State สำหรับ Filters ต่างๆ (รองรับดูรายห้อง รายชั้น รายวิชา และรายผู้สอน)
-  const [selectedTerm, setSelectedTerm] = useState(() => getSchoolSettings().academicTerm || 'ภาคเรียนที่ 1/2569');
+  const [selectedTerm, setSelectedTerm] = useState(() => getSchoolSettings().academicTerm || 'ภาคเรียนที่ 2/2569');
   const [selectedTeacherKey, setSelectedTeacherKey] = useState<string>('ALL');
   const [selectedGradeLevelFilter, setSelectedGradeLevelFilter] = useState<string>('ALL');
   const [selectedRoomFilter, setSelectedRoomFilter] = useState<string>('ALL');

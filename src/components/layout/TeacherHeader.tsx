@@ -444,7 +444,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
             type="button"
             onClick={() => {
               setIsTermSwitcherOpen(false);
-              onDeepNavigate?.({ view: 'settings' });
+              onDeepNavigate?.({ view: 'settings', highlightBanner: 'ตั้งค่าวันเปิด-ปิดเทอม' });
             }}
             className="text-blue-600 hover:underline font-bold inline-flex items-center gap-1 cursor-pointer"
           >
@@ -515,17 +515,17 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-extrabold text-slate-800 truncate">
-                {currentUser?.name || 'นายปัญจพล เกษรัตน์'}
+                {currentUser?.name || 'ครูผู้สอน'}
               </h3>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
                 {activeRole === 'ACADEMIC_ADMIN' ? 'ผู้บริหาร/แอดมิน' : activeRole === 'STUDENT_AFFAIRS' ? 'ครูกิจการ' : 'ครูผู้สอน'}
               </span>
             </div>
             <p className="text-xs text-slate-600 font-medium mt-0.5 truncate">
-              {currentUser?.position || 'ครูชำนาญการพิเศษ'}
+              {currentUser?.position || 'ครูผู้สอน'}
             </p>
             <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">
-              {currentUser?.email || 'panjapol.k@kutchap.ac.th'} • รหัส {currentUser?.id || 'KPS-T104'}
+              {currentUser?.email ? `${currentUser.email} • ` : ''}รหัส {currentUser?.id || '-'}
             </p>
           </div>
         </div>
@@ -586,7 +586,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
             type="button"
             onClick={() => {
               setIsTeacherProfileModalOpen(false);
-              onDeepNavigate?.({ view: 'settings' });
+              onDeepNavigate?.({ view: 'settings', highlightBanner: 'ตั้งค่าวันเปิด-ปิดเทอม' });
             }}
             className="w-full py-2 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
           >
@@ -628,7 +628,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-extrabold text-slate-900 text-sm truncate">
-            {currentUser?.name || 'นายปัญจพล เกษรัตน์'}
+            {currentUser?.name || 'ครูผู้สอน'}
           </div>
           <div className="text-[11px] text-slate-500 truncate mt-0.5 font-medium">
             {currentUser?.subjectGroup
@@ -892,7 +892,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
               <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-slate-200 shadow-2xs">
                 <img
                   src={effectiveAvatar}
-                  alt={currentUser?.name || "ครูปัญจพล"}
+                  alt={currentUser?.name || "ครูผู้สอน"}
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -936,7 +936,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
 
             <div className="flex flex-col min-w-0">
               <h1 className="font-extrabold text-slate-800 text-sm sm:text-base leading-snug truncate">
-                {currentUser?.name || 'นายปัญจพล เกษรัตน์'}
+                {currentUser?.name || 'ครูผู้สอน'}
               </h1>
               <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate mt-0.5">
                 {currentUser?.position || 'ครู'} | {currentUser?.subjectGroup ? `กลุ่มสาระการเรียนรู้${currentUser.subjectGroup}` : 'กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ (ภาษาญี่ปุ่น)'}
@@ -1152,7 +1152,7 @@ export const TeacherHeader: React.FC<TeacherHeaderProps> = ({
               </div>
               <div className="flex flex-col text-left leading-none">
                 <span className="text-xs font-bold text-slate-800 truncate max-w-[120px]">
-                  {currentUser?.name ? currentUser.name.replace(/^(นาย|นางสาว|นาง|ด\.ช\.|ด\.ญ\.)\s*/, 'ครู') : 'ครูปัญจพล'}
+                  {currentUser?.name ? currentUser.name.replace(/^(นาย|นางสาว|นาง|ด\.ช\.|ด\.ญ\.)\s*/, 'ครู') : 'ครูผู้สอน'}
                 </span>
               </div>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />

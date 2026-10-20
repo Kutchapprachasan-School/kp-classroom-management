@@ -24,9 +24,18 @@ import {
   calendarEventStorageService,
   MATRIX_SLOTS_UPDATED_EVENT,
 } from '../../services/calendarEventStorageService';
+import {
+  academicCalendarService,
+  ACADEMIC_CALENDAR_EVENT,
+} from '../../services/academicCalendarService';
 import { getSubjectIcon } from '../../config/subjectIcons';
-import { formatThaiDateFull, type TimetableMatrixSlot } from '../../utils/timetableDateUtils';
+import {
+  formatThaiDateFull,
+  getBangkokNow,
+  type TimetableMatrixSlot,
+} from '../../utils/timetableDateUtils';
 import { classroomService } from '../../services/classroomService';
+import { formatClassroomLabel } from '../../services/studentService';
 import type { ClassroomRosterItem } from '../../types/viewModels';
 
 export interface TodayPeriodItem {
@@ -66,10 +75,42 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
     bellScheduleService.getConfig()
   );
 
-  // เชื่อมโยงข้อมูลตารางสอนจริงจากหน้าตารางสอน (TimetableView)
+  // เชื่อมโยงข้อมูลตารางสอนจริงจากหน้าตารางสอน โดยแยกตามครูผู้สอน (ของใครของมัน)
   const [matrixSlots, setMatrixSlots] = useState<TimetableMatrixSlot[]>(() =>
-    calendarEventStorageService.loadMatrixSlots()
+    calendarEventStorageService.loadMatrixSlots(currentUser?.id)
   );
+
+  const [calendarVersion, setCalendarVersion] = useState(0);
+  useEffect(() => {
+    const handleCalendarChange = () => setCalendarVersion((v) => v + 1);
+    window.addEventListener(ACADEMIC_CALENDAR_EVENT, handleCalendarChange);
+    return () => window.removeEventListener(ACADEMIC_CALENDAR_EVENT, handleCalendarChange);
+  }, []);
+
+  const todayDate = useMemo(() => getBangkokNow(), [calendarVersion]);
+  const todayIso = useMemo(() => {
+    return `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
+  }, [todayDate]);
+
+  const inActiveTerm = useMemo(() => {
+    return academicCalendarService.isDateInActiveTerm(todayIso);
+  }, [todayIso, calendarVersion]);
+
+  const isInstructional = useMemo(() => {
+    return academicCalendarService.isInstructionalDay(todayIso);
+  }, [todayIso, calendarVersion]);
+
+  const activeTerm = useMemo(() => {
+    return academicCalendarService.getActiveTerm();
+  }, [calendarVersion]);
+
+  const allTerms = useMemo(() => {
+    return academicCalendarService.getTerms();
+  }, [calendarVersion]);
+
+  const nextTerm = useMemo(() => {
+    return allTerms.find((t) => t.id !== activeTerm?.id && !t.isArchived);
+  }, [allTerms, activeTerm]);
 
   useEffect(() => {
     const handleBellUpdate = (e: Event) => {
@@ -91,7 +132,7 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
       if (custom.detail && Array.isArray(custom.detail)) {
         setMatrixSlots(custom.detail);
       } else {
-        setMatrixSlots(calendarEventStorageService.loadMatrixSlots());
+        setMatrixSlots(calendarEventStorageService.loadMatrixSlots(currentUser?.id));
       }
     };
     window.addEventListener(MATRIX_SLOTS_UPDATED_EVENT, handleSlotsUpdate);
@@ -100,7 +141,7 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
       window.removeEventListener(MATRIX_SLOTS_UPDATED_EVENT, handleSlotsUpdate);
       window.removeEventListener('storage', handleSlotsUpdate);
     };
-  }, []);
+  }, [currentUser?.id]);
 
   const todayDayKey = useMemo(() => calendarEventStorageService.getTodayDayKey(), []);
 
@@ -134,10 +175,16 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
     };
   }, [currentUser]);
 
-  // คำนวณรายการคาบสอนวันนี้จาก matrixSlots จริง ไม่ใช้ mock data
+  // คำนวณรายการคาบสอนวันนี้จาก matrixSlots จริง โดยแยกเฉพาะของครูที่ล็อกอิน
   const periodsList = useMemo<TodayPeriodItem[]>(() => {
+    // 1. ถ้าอยู่นอกช่วงเปิดเทอม หรือเป็นวันหยุด ไม่แสดงคาบสอนและไม่ต้องเช็คชื่อ
+    if (!inActiveTerm || !isInstructional) {
+      return [];
+    }
+
     // คาบที่ 0: กิจกรรมเข้าแถวเคารพธงชาติ & โฮมรูม (แสดงเฉพาะกรณีครูมีห้องที่ปรึกษาจริง)
-    const effectiveAdvisoryRoom = teacherAdvisoryRoom?.name || currentUser?.classroomId;
+    const rawAdvisory = teacherAdvisoryRoom?.name || currentUser?.classroomName || currentUser?.classroomId;
+    const effectiveAdvisoryRoom = rawAdvisory ? formatClassroomLabel(rawAdvisory) : undefined;
     const period0: TodayPeriodItem | null = effectiveAdvisoryRoom
       ? {
           periodNumber: 0,
@@ -153,7 +200,8 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
         }
       : null;
 
-    // คาบการสอนจริงจาก matrixSlots ในวันปัจจุบัน
+    // คาบการสอนจริงจาก matrixSlots ในวันปัจจุบัน เฉพาะของครูผู้สอนท่านนี้
+    const currentUserId = currentUser?.id;
     const dayTeachingSlots = matrixSlots
       .filter(
         (s) =>
@@ -162,11 +210,12 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
           s.category !== 'free' &&
           !!s.subjectCode &&
           s.status !== 'LUNCH' &&
-          !s.isLunchSlot
+          !s.isLunchSlot &&
+          (!s.teacherId || !currentUserId || s.teacherId === currentUserId)
       )
       .sort((a, b) => a.period - b.period);
 
-    // หากยังไม่มีคาบสอนจริงถูกบันทึกในตาราง ให้ fallback ไปที่คาบมาตรฐาน
+    // หากยังไม่มีคาบสอนจริงถูกบันทึกในตาราง ให้ fallback ไปที่คาบ 0 (ถ้ามี)
     if (dayTeachingSlots.length === 0) {
       return period0 ? [period0] : [];
     }
@@ -338,35 +387,42 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
               </h2>
             </div>
             <p className="text-xs text-slate-500 font-medium hidden sm:block">
-              {formatThaiDateFull(new Date())} ({Math.max(0, periodsList.length - 1)} คาบสอน)
+              {formatThaiDateFull(new Date())}{' '}
+              {!inActiveTerm
+                ? '• อยู่ในช่วงปิดภาคเรียน'
+                : !isInstructional
+                ? '• วันหยุด (ไม่มีการเรียนการสอน)'
+                : `(${Math.max(0, periodsList.length - (teacherAdvisoryRoom ? 1 : 0))} คาบสอน)`}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Toggle Button: ซ่อนคาบที่เสร็จแล้ว / แสดงทุกคาบ (Persisted in LocalStorage) */}
-          <button
-            type="button"
-            onClick={handleToggleHideCompleted}
-            className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              hideCompleted
-                ? 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 shadow-2xs'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200/70'
-            }`}
-            title={hideCompleted ? 'แสดงทุกคาบ' : 'ซ่อนคาบที่เสร็จแล้ว'}
-          >
-            {hideCompleted ? (
-              <>
-                <Eye className="w-3.5 h-3.5 text-blue-600" />
-                <span>👁️ แสดงทุกคาบ</span>
-              </>
-            ) : (
-              <>
-                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                <span>✓ ซ่อนคาบที่เสร็จแล้ว</span>
-              </>
-            )}
-          </button>
+          {/* Toggle Button: ซ่อนคาบที่เสร็จแล้ว / แสดงทุกคาบ (แสดงเฉพาะเมื่อมีคาบสอน) */}
+          {inActiveTerm && isInstructional && (
+            <button
+              type="button"
+              onClick={handleToggleHideCompleted}
+              className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                hideCompleted
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 shadow-2xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200/70'
+              }`}
+              title={hideCompleted ? 'แสดงทุกคาบ' : 'ซ่อนคาบที่เสร็จแล้ว'}
+            >
+              {hideCompleted ? (
+                <>
+                  <Eye className="w-3.5 h-3.5 text-blue-600" />
+                  <span>👁️ แสดงทุกคาบ</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>✓ ซ่อนคาบที่เสร็จแล้ว</span>
+                </>
+              )}
+            </button>
+          )}
 
           <button
             type="button"
@@ -381,7 +437,56 @@ export const TeacherTodayTimetableCard: React.FC<TeacherTodayTimetableCardProps>
 
       {/* Period Rows matching Image 1 & Design Specs */}
       <div className="divide-y divide-slate-50 p-2 sm:p-4 space-y-2.5 sm:space-y-3">
-        {displayedPeriods.length === 0 ? (
+        {!inActiveTerm ? (
+          <div className="p-8 text-center bg-gradient-to-b from-amber-50/60 to-orange-50/40 rounded-2xl border border-amber-200/70 space-y-3.5 animate-fade-in">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center text-2xl shadow-xs">
+              🏖️
+            </div>
+            <div className="space-y-1">
+              <span className="px-3 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-200/70 text-amber-900 border border-amber-300">
+                ช่วงปิดภาคเรียน
+              </span>
+              <h4 className="font-extrabold text-slate-800 text-base sm:text-lg">
+                อยู่ในช่วงปิดภาคเรียน ({activeTerm?.termName || 'ภาคเรียน'} ปีการศึกษา {activeTerm?.year || 2569})
+              </h4>
+              <p className="text-xs text-slate-600 max-w-lg mx-auto leading-relaxed">
+                ขณะนี้อยู่นอกช่วงเวลาเปิดเรียน ระบบไม่นำวันนี้มาคำนวณสถิติเวลาเรียน และไม่มีการแจ้งเตือนให้เช็คชื่อเข้าเรียน
+              </p>
+            </div>
+            {nextTerm && (
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white border border-amber-200 text-xs font-bold text-slate-700 shadow-2xs">
+                <span>📅 กำหนดการเปิด{nextTerm.termName}/{nextTerm.year}:</span>
+                <span className="text-blue-600 font-extrabold">{nextTerm.startDate}</span>
+              </div>
+            )}
+            <div>
+              <button
+                type="button"
+                onClick={() =>
+                  onDeepNavigate?.({
+                    view: 'settings',
+                    highlightBanner: 'ตั้งค่าวันเปิด-ปิดเทอม',
+                  })
+                }
+                className="px-4 py-2 rounded-xl bg-white border border-slate-300 hover:border-blue-400 text-blue-700 hover:bg-blue-50 text-xs font-bold shadow-2xs transition-all cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <span>⚙️ ตั้งค่าวันเปิด-ปิดภาคเรียน</span>
+              </button>
+            </div>
+          </div>
+        ) : !isInstructional ? (
+          <div className="p-8 text-center bg-slate-50/70 rounded-2xl border border-slate-200 space-y-2 animate-fade-in">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl shadow-2xs">
+              🌿
+            </div>
+            <h4 className="font-extrabold text-slate-800 text-sm sm:text-base">
+              วันนี้เป็นวันหยุด (ไม่มีคาบเรียนและการเช็คชื่อ)
+            </h4>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              วันหยุดราชการหรือวันหยุดสุดสัปดาห์ ระบบจะไม่แจ้งเตือนการเช็คชื่อเข้าเรียน
+            </p>
+          </div>
+        ) : displayedPeriods.length === 0 ? (
           <div className="p-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
             <div className="w-12 h-12 mx-auto rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3">
               <Check className="w-6 h-6" />

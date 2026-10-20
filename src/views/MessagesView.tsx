@@ -33,6 +33,7 @@ import {
   type ChatMember,
 } from '../services/messagingService';
 import { classroomService } from '../services/classroomService';
+import { formatClassroomLabel } from '../services/studentService';
 import { authService, type AuthUser } from '../services/authService';
 import type { SchoolUserRole } from '../config/schoolRoles';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
@@ -447,9 +448,9 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                 <span>ซิงค์สมาชิก</span>
               </button>
             ) : (
-              currentUser?.classroomId && (
+              (currentUser?.classroomId || currentUser?.classroomName) && (
                 <span className="bg-[#EFF6FF] border border-[#BFDBFE] text-blue-700 rounded-xl px-2.5 py-1 text-[11px] font-bold">
-                  ห้อง {currentUser.classroomId}
+                  ห้อง {formatClassroomLabel(currentUser.classroomName || currentUser.classroomId)}
                 </span>
               )
             )}
@@ -877,8 +878,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                       (!isStudentUser &&
                         msg.senderRole === 'TEACHER' &&
                         (msg.senderId === currentUserId ||
-                          msg.senderName === currentUserName ||
-                          msg.senderName === 'ครูปัญจพล (ครูผู้สอน)'));
+                          (Boolean(currentUserName) && msg.senderName === currentUserName)));
 
                     // กรณีที่ 1: ข้อความของตัวเราเอง -> ชิดขวา สีฟ้า Primary (#3B82F6)
                     if (isMe) {
@@ -1205,7 +1205,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                   นักเรียน: {transferStudent.name} (รหัส {transferStudent.code})
                 </div>
                 <div className="text-slate-600">
-                  ห้องเรียนปัจจุบัน: <strong>{currentGroup.classroomName || currentGroup.classroomId}</strong>
+                  ห้องเรียนปัจจุบัน: <strong>{formatClassroomLabel(currentGroup.classroomName || currentGroup.classroomId)}</strong>
                 </div>
               </div>
 

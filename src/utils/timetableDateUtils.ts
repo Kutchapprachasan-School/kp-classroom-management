@@ -29,6 +29,8 @@ export interface TimetableMatrixSlot {
   totalPeriods?: string;
   subType?: string;
   subjectIcon?: string;
+  teacherId?: string;
+  teacherName?: string;
 }
 
 export interface TaskWidgetItem {

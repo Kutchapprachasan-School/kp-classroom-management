@@ -6,16 +6,20 @@ import User3Regular from '@mingcute/react/core-regular/user-3';
 import SparklesRegular from '@mingcute/react/core-regular/sparkles';
 import ArrowRightRegular from '@mingcute/react/core-regular/arrow-right';
 
+import type { AuthUser } from '../../services/authService';
+
 interface QuickSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectAction: (view: 'overview' | 'student' | 'sar' | 'student-portal') => void;
+  currentUser?: AuthUser | null;
 }
 
 export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
   isOpen,
   onClose,
   onSelectAction,
+  currentUser,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -35,32 +39,43 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
 
   if (!isOpen) return null;
 
-  const quickLinks = [
-    {
-      title: 'ศ23101 ศิลปะ — ม.3/1',
-      subtitle: 'ภาพรวมชั้นเรียน และนักเรียนที่ต้องดูแล',
-      icon: Book2Regular,
-      action: () => onSelectAction('overview'),
-    },
-    {
-      title: 'ข้อมูลนักเรียนรายบุคคล',
-      subtitle: 'วิเคราะห์รายบุคคล & Radar Chart 5 มิติ',
-      icon: User3Regular,
-      action: () => onSelectAction('student'),
-    },
-    {
-      title: 'เทียบผลข้ามห้อง (SAR / PA)',
-      subtitle: 'รายงานสรุปผลการสอน และการกระจายเกรด',
-      icon: SparklesRegular,
-      action: () => onSelectAction('sar'),
-    },
-    {
-      title: 'ห้องเรียนผจญภัย (มุมมองนักเรียน)',
-      subtitle: 'พอร์ทัลเกมมิฟิเคชัน สัตว์เลี้ยงโมจิ และภารกิจ',
-      icon: ArrowRightRegular,
-      action: () => onSelectAction('student-portal'),
-    },
-  ];
+  const isStudent = currentUser?.role === 'STUDENT';
+
+  const quickLinks = isStudent
+    ? [
+        {
+          title: 'ห้องเรียนผจญภัย (พอร์ทัลนักเรียน)',
+          subtitle: 'พอร์ทัลเกมมิฟิเคชัน สัตว์เลี้ยงโมจิ และภารกิจ',
+          icon: ArrowRightRegular,
+          action: () => onSelectAction('student-portal'),
+        },
+      ]
+    : [
+        {
+          title: 'ศ23101 ศิลปะ — ม.3/1',
+          subtitle: 'ภาพรวมชั้นเรียน และนักเรียนที่ต้องดูแล',
+          icon: Book2Regular,
+          action: () => onSelectAction('overview'),
+        },
+        {
+          title: 'ข้อมูลนักเรียนรายบุคคล',
+          subtitle: 'วิเคราะห์รายบุคคล & Radar Chart 5 มิติ',
+          icon: User3Regular,
+          action: () => onSelectAction('student'),
+        },
+        {
+          title: 'เทียบผลข้ามห้อง (SAR / PA)',
+          subtitle: 'รายงานสรุปผลการสอน และการกระจายเกรด',
+          icon: SparklesRegular,
+          action: () => onSelectAction('sar'),
+        },
+        {
+          title: 'ห้องเรียนผจญภัย (มุมมองนักเรียน)',
+          subtitle: 'พอร์ทัลเกมมิฟิเคชัน สัตว์เลี้ยงโมจิ และภารกิจ',
+          icon: ArrowRightRegular,
+          action: () => onSelectAction('student-portal'),
+        },
+      ];
 
   const filteredLinks = quickLinks.filter(
     (item) =>

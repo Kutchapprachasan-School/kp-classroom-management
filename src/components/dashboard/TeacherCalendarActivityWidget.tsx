@@ -57,14 +57,19 @@ export const TeacherCalendarActivityWidget: React.FC<
     calendarEventStorageService.loadAllEvents()
   );
 
-  // จำนวนคาบสอนจริงของวันนี้จากตารางสอน (เชื่อมโยงอัตโนมัติ ไม่ใช่ mock data)
-  const [todayPeriodsCount, setTodayPeriodsCount] = useState<number>(() =>
-    calendarEventStorageService.getTodayTeachingPeriodsCount()
-  );
+  // จำนวนคาบสอนจริงของวันนี้จากตารางสอน (เชื่อมโยงอัตโนมัติ ไม่นับวันปิดเทอมและวันหยุด)
+  const [todayPeriodsCount, setTodayPeriodsCount] = useState<number>(() => {
+    const user = authService.getCurrentUser();
+    return calendarEventStorageService.getTodayTeachingPeriodsCount(undefined, user?.id);
+  });
 
   useEffect(() => {
     const handleEventsUpdate = () => {
       setCalendarEvents(calendarEventStorageService.loadAllEvents());
+      const user = authService.getCurrentUser();
+      setTodayPeriodsCount(
+        calendarEventStorageService.getTodayTeachingPeriodsCount(undefined, user?.id)
+      );
     };
     window.addEventListener('kps-academic-calendar-updated', handleEventsUpdate);
     window.addEventListener(ACADEMIC_CALENDAR_EVENT, handleEventsUpdate);
@@ -79,12 +84,17 @@ export const TeacherCalendarActivityWidget: React.FC<
   // ซิงค์จำนวนคาบสอนของวันนี้แบบเรียลไทม์เมื่อมีการเปลี่ยนแปลงในตารางสอน
   useEffect(() => {
     const handleTimetableUpdate = () => {
-      setTodayPeriodsCount(calendarEventStorageService.getTodayTeachingPeriodsCount());
+      const user = authService.getCurrentUser();
+      setTodayPeriodsCount(
+        calendarEventStorageService.getTodayTeachingPeriodsCount(undefined, user?.id)
+      );
     };
     window.addEventListener(MATRIX_SLOTS_UPDATED_EVENT, handleTimetableUpdate);
+    window.addEventListener(ACADEMIC_CALENDAR_EVENT, handleTimetableUpdate);
     window.addEventListener('storage', handleTimetableUpdate);
     return () => {
       window.removeEventListener(MATRIX_SLOTS_UPDATED_EVENT, handleTimetableUpdate);
+      window.removeEventListener(ACADEMIC_CALENDAR_EVENT, handleTimetableUpdate);
       window.removeEventListener('storage', handleTimetableUpdate);
     };
   }, []);

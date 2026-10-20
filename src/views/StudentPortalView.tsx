@@ -24,6 +24,8 @@ import { StudentMobileCareView } from '../components/student/StudentMobileCareVi
 import { StudentAnimeAppView } from '../components/student/StudentAnimeAppView';
 import { StudentAffairsCouncilView } from './StudentAffairsCouncilView';
 import { StudentMobileBottomNav } from '../components/student/StudentMobileBottomNav';
+import { QuickSearchModal } from '../components/common/QuickSearchModal';
+import { messagingService } from '../services/messagingService';
 
 import MenuRegular from '@mingcute/react/core-regular/menu';
 import { gamificationService } from '../services/gamificationService';
@@ -32,7 +34,8 @@ import { authService, type AuthUser } from '../services/authService';
 import { getSchoolSettings, type SchoolSettingsConfig } from '../config/schoolSettings';
 import { type SchoolUserRole } from '../config/schoolRoles';
 import { calculateStudentExp, STUDENT_EXP_EVENT } from '../services/studentExpService';
-import { formatClassroomLabel } from '../services/studentService';
+import { formatClassroomLabel, registerClassroomNames } from '../services/studentService';
+import { classroomService } from '../services/classroomService';
 
 interface StudentPortalViewProps {
   onExit: () => void;
@@ -56,7 +59,46 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
   const effectiveUser = currentUser || authService.getCurrentUser();
   const effectiveSettings = schoolSettings || getSchoolSettings();
   const studentName = effectiveUser?.name || 'นักเรียน';
-  const studentClassroom = formatClassroomLabel(effectiveUser?.classroomId);
+
+  // แปลง Classroom ID ให้ออกมาเป็นชื่อห้องที่ถูกต้อง (เช่น ม.3/1 หรือ ม.4/4) แทนการแสดงรหัสระบบ room-1791986991422
+  const [resolvedClassroom, setResolvedClassroom] = useState<string>(() => {
+    return formatClassroomLabel(effectiveUser?.classroomName || effectiveUser?.classroomId);
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    classroomService
+      .getAll()
+      .then((rooms) => {
+        if (!isMounted) return;
+        const cid = effectiveUser?.classroomId;
+        if (cid) {
+          const found = rooms.find(
+            (r) => r.id === cid || r.name === cid || r.roomNumber === cid
+          );
+          if (found?.name) {
+            const clean = formatClassroomLabel(found.name);
+            setResolvedClassroom(clean);
+            registerClassroomNames([{ id: cid, name: found.name }]);
+          }
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [effectiveUser?.classroomId]);
+
+  const sanitizedUser = React.useMemo<AuthUser | null>(() => {
+    if (!effectiveUser) return null;
+    return {
+      ...effectiveUser,
+      classroomId: resolvedClassroom || effectiveUser.classroomId,
+      classroomName: resolvedClassroom || effectiveUser.classroomName,
+    };
+  }, [effectiveUser, resolvedClassroom]);
+
+  const studentClassroom = resolvedClassroom;
 
   const [activeTab, setActiveTab] = useState<StudentTabKey>('home');
   const [currentXp, setCurrentXp] = useState<number>(() =>
@@ -71,8 +113,15 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
   });
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isAdminBannerModalOpen, setIsAdminBannerModalOpen] = useState(false);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
 
-  const isAdmin = studentBannerService.canManageBanners(activeRole);
+  const unreadMessagesCount = React.useMemo(() => {
+    return messagingService.getTotalUnreadCount(sanitizedUser);
+  }, [sanitizedUser]);
+
+  // Student can NEVER have admin permissions
+  const isAdmin =
+    effectiveUser?.role !== 'STUDENT' && studentBannerService.canManageBanners(activeRole);
 
   // Sync EXP whenever student activities update
   useEffect(() => {
@@ -138,7 +187,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
         onSelectTab={(tab) => setActiveTab(tab)}
         studentRole={studentRole}
         onChangeStudentRole={onChangeStudentRole}
-        onSwitchToTeacherRole={onSwitchToTeacherRole}
+        onSwitchToTeacherRole={effectiveUser?.role !== 'STUDENT' ? onSwitchToTeacherRole : undefined}
         onLogout={onExit}
         isOpen={isMobileSidebarOpen}
         onClose={() => setIsMobileSidebarOpen(false)}
@@ -153,7 +202,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
           totalXp={currentXp}
           studentName={studentName}
           classroomName={studentClassroom}
-          currentUser={effectiveUser}
+          currentUser={sanitizedUser}
           studentRole={studentRole}
           activeRole={activeRole}
           schoolSettings={effectiveSettings}
@@ -161,14 +210,15 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
           isSidebarOpen={isDesktopSidebarOpen}
           onToggleSidebar={handleToggleSidebar}
           onOpenAdminBannerModal={() => setIsAdminBannerModalOpen(true)}
+          onOpenSearch={() => setIsSearchModalOpen(true)}
         />
 
-        <main className="flex-1 p-3.5 sm:p-5 md:p-6 overflow-y-auto overflow-x-hidden">
+        <main className="flex-1 p-3.5 sm:p-5 md:p-6 pb-24 lg:pb-6 overflow-y-auto overflow-x-hidden">
           <div className="max-w-[1360px] mx-auto">
             {/* 1. หน้าแรก (Home) */}
             {activeTab === 'home' && (
               <StudentHomeDashboard
-                currentUser={effectiveUser}
+                currentUser={sanitizedUser}
                 schoolSettings={effectiveSettings}
                 onNavigate={(tab) => setActiveTab(tab)}
                 onOpenAssignment={(_id) => setActiveTab('missions')}
@@ -178,7 +228,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
             {/* 2. รายวิชาของฉัน */}
             {activeTab === 'courses' && (
               <StudentCoursesView
-                currentUser={effectiveUser}
+                currentUser={sanitizedUser}
                 schoolSettings={effectiveSettings}
                 onBack={() => setActiveTab('home')}
                 onSelectCourse={(_code) => setActiveTab('missions')}
@@ -188,7 +238,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
             {/* 3. ตารางเรียน */}
             {activeTab === 'timetable' && (
               <StudentTimetableView
-                currentUser={effectiveUser}
+                currentUser={sanitizedUser}
                 schoolSettings={effectiveSettings}
                 onBack={() => setActiveTab('home')}
               />
@@ -202,7 +252,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
             {/* 5. ข้อมูลส่วนตัว */}
             {activeTab === 'profile' && (
               <StudentProfileView
-                currentUser={effectiveUser}
+                currentUser={sanitizedUser}
                 schoolSettings={effectiveSettings}
                 onBack={() => setActiveTab('home')}
               />
@@ -211,7 +261,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
             {/* 6. ติดต่อครู */}
             {activeTab === 'contact' && (
               <StudentContactTeacherView
-                currentUser={effectiveUser}
+                currentUser={sanitizedUser}
                 schoolSettings={effectiveSettings}
                 onBack={() => setActiveTab('home')}
               />
@@ -219,13 +269,13 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
             {/* 7. งานที่ได้รับมอบหมาย */}
             {activeTab === 'missions' && (
-              <StudentMissionsView currentUser={effectiveUser} />
+              <StudentMissionsView currentUser={sanitizedUser} />
             )}
 
             {/* 8. ผลการเรียน */}
             {activeTab === 'gradebook' && (
               <StudentGradebookView
-                currentUser={effectiveUser}
+                currentUser={sanitizedUser}
                 schoolSettings={effectiveSettings}
               />
             )}
@@ -241,7 +291,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
             {/* 10. ตู้รางวัล */}
             {activeTab === 'trophy' && (
               <StudentTrophyView
-                currentUser={effectiveUser}
+                currentUser={sanitizedUser}
                 onNavigateToGacha={() => setActiveTab('gacha')}
                 onNavigateToMissions={() => setActiveTab('missions')}
               />
@@ -258,26 +308,35 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
             )}
 
             {/* 13. สนามประลอง Arena */}
-            {activeTab === 'arena' && <StudentArenaView currentUser={effectiveUser} />}
+            {activeTab === 'arena' && <StudentArenaView currentUser={sanitizedUser} />}
 
             {/* 14. เยี่ยมบ้าน */}
             {activeTab === 'home-visit' && (
               <StudentHomeVisitFormView
-                currentUser={effectiveUser}
+                currentUser={sanitizedUser}
                 schoolSettings={effectiveSettings}
                 onAwardXp={(xp) => setCurrentXp((prev) => prev + xp)}
               />
             )}
 
-            {/* 15. เลือกตั้งสภานักเรียน */}
-            {activeTab === 'student-council' && (
+            {/* 15. แจ้งลาป่วย / ลากิจ */}
+            {activeTab === 'student-leave' && (
               <StudentCouncilAffairsPortalView
-                section="COUNCIL"
-                currentUser={effectiveUser}
+                section="LEAVE"
+                currentUser={sanitizedUser}
+                onAwardXp={(xp) => setCurrentXp((prev) => prev + xp)}
               />
             )}
 
-            {/* 16. ปฏิบัติงานสภานักเรียน */}
+            {/* 16. เลือกตั้งสภานักเรียน */}
+            {activeTab === 'student-council' && (
+              <StudentCouncilAffairsPortalView
+                section="COUNCIL"
+                currentUser={sanitizedUser}
+              />
+            )}
+
+            {/* 17. ปฏิบัติงานสภานักเรียน */}
             {activeTab === 'council-affairs' && (
               <StudentAffairsCouncilView initialSection="COUNCIL" />
             )}
@@ -290,6 +349,18 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
         activeTab={activeTab}
         onSelectTab={(tab) => setActiveTab(tab)}
         onOpenMoreMenu={() => setIsMobileSidebarOpen(true)}
+        unreadMessagesCount={unreadMessagesCount}
+      />
+
+      {/* Quick Search Modal */}
+      <QuickSearchModal
+        isOpen={isSearchModalOpen}
+        onClose={() => setIsSearchModalOpen(false)}
+        onSelectAction={(id) => {
+          setActiveTab(id as StudentTabKey);
+          setIsSearchModalOpen(false);
+        }}
+        currentUser={sanitizedUser}
       />
 
       {/* Floating Reopen Button if sidebar collapsed on desktop */}

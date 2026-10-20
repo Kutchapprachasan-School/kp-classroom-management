@@ -132,21 +132,23 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
       setAllClassrooms(rooms);
       const match = rooms.find((r) => r.id === selectedClassroom || r.name === selectedClassroom);
       const currentUser = authService.getCurrentUser();
-      const currentTeacherName = currentUser?.name || 'นายปัญจพล';
+      const currentTeacherName = currentUser?.name?.trim() || '';
       if (match) {
         setSelectedClassroomName(match.name);
         const advisers = match.advisers || [match.adviser, match.coAdviser, match.thirdAdviser].filter(Boolean) as string[];
-        const isAdvisor = advisers.some((adv) => adv.includes(currentTeacherName) || currentTeacherName.includes(adv)) ||
-          currentUser?.classroomId === match.id ||
-          currentUser?.classroomId === match.name;
+        const isAdvisor = Boolean(
+          (currentTeacherName && advisers.some((adv) => adv && (adv.includes(currentTeacherName) || currentTeacherName.includes(adv)))) ||
+          (currentUser?.classroomId && (currentUser.classroomId === match.id || currentUser.classroomId === match.name))
+        );
         setIsTeacherAdvisor(isAdvisor);
       } else if (!selectedClassroom && rooms.length > 0) {
         setSelectedClassroom(rooms[0].id);
         setSelectedClassroomName(rooms[0].name);
         const advisers = rooms[0].advisers || [rooms[0].adviser, rooms[0].coAdviser, rooms[0].thirdAdviser].filter(Boolean) as string[];
-        const isAdvisor = advisers.some((adv) => adv.includes(currentTeacherName) || currentTeacherName.includes(adv)) ||
-          currentUser?.classroomId === rooms[0].id ||
-          currentUser?.classroomId === rooms[0].name;
+        const isAdvisor = Boolean(
+          (currentTeacherName && advisers.some((adv) => adv && (adv.includes(currentTeacherName) || currentTeacherName.includes(adv)))) ||
+          (currentUser?.classroomId && (currentUser.classroomId === rooms[0].id || currentUser.classroomId === rooms[0].name))
+        );
         setIsTeacherAdvisor(isAdvisor);
       }
     });
@@ -507,11 +509,12 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
                 if (r) {
                   setSelectedClassroomName(r.name);
                   const currentUser = authService.getCurrentUser();
-                  const currentTeacherName = currentUser?.name || 'นายปัญจพล';
+                  const currentTeacherName = currentUser?.name?.trim() || '';
                   const advisers = r.advisers || [r.adviser, r.coAdviser, r.thirdAdviser].filter(Boolean) as string[];
-                  const isAdvisor = advisers.some((adv) => adv.includes(currentTeacherName) || currentTeacherName.includes(adv)) ||
-                    currentUser?.classroomId === r.id ||
-                    currentUser?.classroomId === r.name;
+                  const isAdvisor = Boolean(
+                    (currentTeacherName && advisers.some((adv) => adv && (adv.includes(currentTeacherName) || currentTeacherName.includes(adv)))) ||
+                    (currentUser?.classroomId && (currentUser.classroomId === r.id || currentUser.classroomId === r.name))
+                  );
                   setIsTeacherAdvisor(isAdvisor);
                 }
               }}
@@ -725,6 +728,21 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
           </select>
         </div>
       </div>
+
+      {/* Notice Banner when Selected Date is Outside Active Term (School Break) */}
+      {!academicCalendarService.isDateInActiveTerm(selectedDate) && (
+        <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-900 flex items-center justify-between gap-3 text-xs font-bold animate-fade-in">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🏖️</span>
+            <span>
+              วันที่เลือก ({formattedDatePill}) อยู่นอกช่วงเปิดภาคเรียน: วันนี้เป็นช่วงปิดภาคเรียน ไม่มีการเรียนการสอนและไม่มีการแจ้งเตือนเช็คชื่อแถวเช้า
+            </span>
+          </div>
+          <span className="px-2.5 py-1 rounded-xl bg-amber-200/70 text-amber-950 text-[11px] shrink-0 font-extrabold">
+            ช่วงปิดเทอม
+          </span>
+        </div>
+      )}
 
       {/* ========================================================
           4. ROSTER ATTENDANCE CONTAINER (หัวตารางพร้อมปุ่ม QR & Action Toolbar)

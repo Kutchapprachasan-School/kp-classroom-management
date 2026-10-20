@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   ClipboardPaste,
@@ -22,12 +22,23 @@ import {
   type ExistingStudentLookup
 } from '../../services/sgsImportExportService';
 
-interface SgsRosterImportModalProps {
+export interface ImportProgressUpdate {
+  current: number;
+  total: number;
+  percentage: number;
+  currentStudentName?: string;
+  roomName?: string;
+}
+
+export interface SgsRosterImportModalProps {
   isOpen: boolean;
   onClose: () => void;
   targetClassroom: string;
   existingStudents: ExistingStudentLookup[];
-  onImportComplete: (confirmedRows: SgsParsedRow[]) => void;
+  onImportComplete: (
+    confirmedRows: SgsParsedRow[],
+    onProgress?: (update: ImportProgressUpdate) => void
+  ) => Promise<void> | void;
 }
 
 export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
@@ -46,6 +57,38 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
   const [isParsingFile, setIsParsingFile] = useState(false);
   const [importMode, setImportMode] = useState<'MULTI_ROOM' | 'TARGET_ONLY'>('MULTI_ROOM');
 
+  // Real-time Import Progress State
+  const [importProgress, setImportProgress] = useState<{
+    current: number;
+    total: number;
+    percentage: number;
+    currentStudentName?: string;
+    roomName?: string;
+    status: 'IDLE' | 'IMPORTING' | 'COMPLETED' | 'ERROR';
+    errorMessage?: string;
+  }>({
+    current: 0,
+    total: 0,
+    percentage: 0,
+    status: 'IDLE',
+  });
+
+  const isImporting = importProgress.status === 'IMPORTING';
+
+  // Prevent accidental tab/browser close during active import
+  useEffect(() => {
+    if (!isImporting) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = 'ระบบกำลังนำเข้าข้อมูลนักเรียน กรุณาอย่าปิดหน้าต่างจนกว่าจะเสร็จสิ้น';
+      return e.returnValue;
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isImporting]);
+
   const handleReset = () => {
     setRawText('');
     setDryRunSummary(null);
@@ -53,10 +96,12 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
     setStatusFilter('ALL');
     setSelectedRoomFilter('ALL');
     setImportMode('MULTI_ROOM');
+    setImportProgress({ current: 0, total: 0, percentage: 0, status: 'IDLE' });
     setActiveTab('clipboard');
   };
 
   const handleClose = () => {
+    if (importProgress.status === 'IMPORTING') return;
     handleReset();
     onClose();
   };
@@ -67,8 +112,6 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
       handleReset();
     }
   }, [isOpen]);
-
-  if (!isOpen) return null;
 
   const handleParseClipboard = () => {
     if (!rawText.trim()) return;
@@ -125,18 +168,121 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
     });
   };
 
-  const handleConfirmImport = () => {
+  // Effective target classroom:
+  // If the uploaded file has detected rooms and targetClassroom is not among them,
+  // adapt to the first detected room of the file (e.g. ม.1/1) instead of the mismatched room (e.g. ม.3/1)
+  const effectiveTargetClassroom = useMemo(() => {
+    if (dryRunSummary?.detectedRooms && dryRunSummary.detectedRooms.length > 0) {
+      if (dryRunSummary.detectedRooms.includes(targetClassroom)) {
+        return targetClassroom;
+      }
+      return dryRunSummary.detectedRooms[0];
+    }
+    return targetClassroom;
+  }, [dryRunSummary, targetClassroom]);
+
+  // Active room for single-room / current-room view (reflects selected room pill or dropdown filter):
+  const activeRoom = useMemo(() => {
+    if (selectedRoomFilter && selectedRoomFilter !== 'ALL') {
+      return selectedRoomFilter;
+    }
+    return effectiveTargetClassroom;
+  }, [selectedRoomFilter, effectiveTargetClassroom]);
+
+  // Count of students eligible for import for current active room
+  const currentRoomImportableCount = useMemo(() => {
+    if (!dryRunSummary) return 0;
+    return dryRunSummary.rows.filter(
+      (r) =>
+        (r.classroom || effectiveTargetClassroom) === activeRoom &&
+        (r.selectedAction === 'IMPORT' || r.selectedAction === 'TRANSFER_ROOM' || r.selectedAction === 'UPDATE_SEAT')
+    ).length;
+  }, [dryRunSummary, effectiveTargetClassroom, activeRoom]);
+
+  // Total eligible students across all rooms in file
+  const allImportableCount = useMemo(() => {
+    if (!dryRunSummary) return 0;
+    return dryRunSummary.rows.filter(
+      (r) => r.selectedAction === 'IMPORT' || r.selectedAction === 'TRANSFER_ROOM' || r.selectedAction === 'UPDATE_SEAT'
+    ).length;
+  }, [dryRunSummary]);
+
+  // Active importable count based on importMode:
+  // If MULTI_ROOM: counts all rooms in file
+  // If TARGET_ONLY: counts ONLY the active room (never the whole file!)
+  const activeImportableCount = importMode === 'MULTI_ROOM' ? allImportableCount : currentRoomImportableCount;
+
+  // Count of skipped rows
+  const currentRoomSkipCount = useMemo(() => {
+    if (!dryRunSummary) return 0;
+    if (importMode === 'MULTI_ROOM') {
+      return dryRunSummary.rows.filter((r) => r.selectedAction === 'SKIP').length;
+    }
+    return dryRunSummary.rows.filter(
+      (r) => (r.classroom || effectiveTargetClassroom) === activeRoom && r.selectedAction === 'SKIP'
+    ).length;
+  }, [dryRunSummary, effectiveTargetClassroom, activeRoom, importMode]);
+
+  const handleConfirmImport = async () => {
     if (!dryRunSummary) return;
-    const confirmed = dryRunSummary.rows
+
+    // In TARGET_ONLY mode, only import rows belonging to the active room!
+    const candidateRows =
+      importMode === 'TARGET_ONLY' && dryRunSummary.isMultiRoomFile
+        ? dryRunSummary.rows.filter((r) => (r.classroom || effectiveTargetClassroom) === activeRoom)
+        : dryRunSummary.rows;
+
+    const confirmed = candidateRows
       .filter((r) => r.selectedAction === 'IMPORT' || r.selectedAction === 'TRANSFER_ROOM' || r.selectedAction === 'UPDATE_SEAT')
       .map((r) => {
         if (importMode === 'TARGET_ONLY') {
-          return { ...r, classroom: targetClassroom };
+          return { ...r, classroom: activeRoom };
         }
         return r;
       });
-    onImportComplete(confirmed);
-    handleClose();
+
+    if (confirmed.length === 0) return;
+
+    setImportProgress({
+      current: 0,
+      total: confirmed.length,
+      percentage: 0,
+      status: 'IMPORTING',
+      roomName: importMode === 'TARGET_ONLY' ? activeRoom : (dryRunSummary.isMultiRoomFile ? 'ทุกห้อง' : activeRoom),
+    });
+
+    try {
+      await onImportComplete(confirmed, (update) => {
+        setImportProgress({
+          current: update.current,
+          total: update.total,
+          percentage: update.percentage,
+          currentStudentName: update.currentStudentName,
+          roomName: update.roomName,
+          status: update.current >= update.total ? 'COMPLETED' : 'IMPORTING',
+        });
+      });
+
+      setImportProgress((prev) => ({
+        ...prev,
+        percentage: 100,
+        current: confirmed.length,
+        status: 'COMPLETED',
+      }));
+
+      // Give user time to see 100% completion before closing
+      setTimeout(() => {
+        setImportProgress({ current: 0, total: 0, percentage: 0, status: 'IDLE' });
+        handleReset();
+        onClose();
+      }, 1500);
+    } catch (err: any) {
+      setImportProgress((prev) => ({
+        ...prev,
+        status: 'ERROR',
+        errorMessage: err.message || 'เกิดข้อผิดพลาดในการนำเข้าข้อมูล',
+      }));
+    }
   };
 
   const availableRooms = Array.from(
@@ -155,14 +301,17 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
       return matchStatus && matchRoom && matchSearch;
     }) || [];
 
-  const importableCount =
-    dryRunSummary?.rows.filter(
-      (r) => r.selectedAction === 'IMPORT' || r.selectedAction === 'TRANSFER_ROOM' || r.selectedAction === 'UPDATE_SEAT'
-    ).length || 0;
+  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn font-prompt">
-      <div className="bg-white w-full max-w-4xl max-h-[92vh] rounded-2xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden">
+    <div
+      onClick={isImporting ? undefined : handleClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn font-prompt"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white w-full max-w-4xl max-h-[92vh] rounded-2xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden"
+      >
         
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-blue-50/70 via-sky-50/40 to-white">
@@ -174,7 +323,9 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
               <h3 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
                 นำเข้ารายชื่อนักเรียนจาก SGS / Excel
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">
-                  ห้อง {targetClassroom}
+                  {dryRunSummary?.isMultiRoomFile && importMode === 'MULTI_ROOM'
+                    ? `รวม ${dryRunSummary.detectedRooms.length} ห้อง (${dryRunSummary.detectedGrade || 'ทุกห้อง'})`
+                    : `ห้อง ${activeRoom}`}
                 </span>
               </h3>
               <p className="text-xs text-slate-500">
@@ -182,16 +333,112 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
               </p>
             </div>
           </div>
-          <button
-            onClick={handleClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          {!isImporting && (
+            <button
+              onClick={handleClose}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
-        {/* Tab Selection */}
-        <div className="flex border-b border-slate-200 px-6 bg-slate-50/50 gap-2 pt-2">
+        {importProgress.status !== 'IDLE' ? (
+          <div className="p-8 sm:p-12 flex flex-col items-center justify-center text-center space-y-6 my-auto">
+            {/* Status Icon */}
+            <div className="relative">
+              {importProgress.status === 'IMPORTING' && (
+                <div className="w-20 h-20 rounded-3xl bg-blue-50 border-2 border-blue-200 flex items-center justify-center text-blue-600 shadow-lg shadow-blue-500/10">
+                  <Loader2 className="w-10 h-10 animate-spin" />
+                </div>
+              )}
+              {importProgress.status === 'COMPLETED' && (
+                <div className="w-20 h-20 rounded-3xl bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center text-emerald-600 shadow-lg shadow-emerald-500/10 animate-bounce">
+                  <CheckCircle2 className="w-10 h-10" />
+                </div>
+              )}
+              {importProgress.status === 'ERROR' && (
+                <div className="w-20 h-20 rounded-3xl bg-rose-50 border-2 border-rose-200 flex items-center justify-center text-rose-600 shadow-lg shadow-rose-500/10">
+                  <AlertCircle className="w-10 h-10" />
+                </div>
+              )}
+            </div>
+
+            {/* Title & Subtitle */}
+            <div className="space-y-1.5 max-w-md">
+              <h4 className="text-xl font-bold text-slate-800">
+                {importProgress.status === 'IMPORTING' && 'กำลังนำเข้ารายชื่อนักเรียนสู่ระบบ...'}
+                {importProgress.status === 'COMPLETED' && '✓ นำเข้ารายชื่อนักเรียนสำเร็จ ครบถ้วน!'}
+                {importProgress.status === 'ERROR' && 'เกิดข้อผิดพลาดในการนำเข้าข้อมูล'}
+              </h4>
+              <p className="text-xs sm:text-sm text-slate-500">
+                {importProgress.status === 'IMPORTING' &&
+                  'ระบบกำลังจัดเลขที่ บันทึกรายชื่อ และซิงค์ฐานข้อมูล กรุณาอย่าปิดหรือรีเฟรชหน้าต่างนี้'}
+                {importProgress.status === 'COMPLETED' &&
+                  `บันทึกข้อมูลเรียบร้อยแล้ว ${importProgress.total} คน (หน้าต่างนี้จะปิดอัตโนมัติ)`}
+                {importProgress.status === 'ERROR' &&
+                  (importProgress.errorMessage || 'กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่อีกครั้ง')}
+              </p>
+            </div>
+
+            {/* Progress Bar Container */}
+            <div className="w-full max-w-lg space-y-2">
+              <div className="flex items-center justify-between text-xs font-semibold text-slate-600 px-1">
+                <span>
+                  ความคืบหน้า: <b className="text-blue-600">{importProgress.current}</b> / {importProgress.total} คน
+                </span>
+                <span className="text-sm font-bold text-blue-600">{importProgress.percentage}%</span>
+              </div>
+              
+              <div className="w-full h-4 bg-slate-100 rounded-full border border-slate-200 p-0.5 overflow-hidden shadow-inner">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 relative overflow-hidden ${
+                    importProgress.status === 'ERROR'
+                      ? 'bg-rose-500'
+                      : importProgress.status === 'COMPLETED'
+                      ? 'bg-emerald-500'
+                      : 'bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-400'
+                  }`}
+                  style={{ width: `${Math.max(4, importProgress.percentage)}%` }}
+                >
+                  {importProgress.status === 'IMPORTING' && (
+                    <div className="absolute inset-0 bg-white/25 animate-pulse" />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Detail Badges */}
+            {importProgress.status === 'IMPORTING' && (
+              <div className="flex flex-wrap items-center justify-center gap-2 pt-1 text-xs">
+                {importProgress.roomName && (
+                  <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-200">
+                    กำลังบันทึก: ห้อง {importProgress.roomName}
+                  </span>
+                )}
+                {importProgress.currentStudentName && (
+                  <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 font-medium border border-slate-200">
+                    นักเรียน: {importProgress.currentStudentName}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Error Retry Button */}
+            {importProgress.status === 'ERROR' && (
+              <button
+                type="button"
+                onClick={() => setImportProgress((prev) => ({ ...prev, status: 'IDLE' }))}
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
+              >
+                กลับไปแก้ไขและลองใหม่
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* Tab Selection */}
+            <div className="flex border-b border-slate-200 px-6 bg-slate-50/50 gap-2 pt-2">
           <button
             onClick={() => setActiveTab('clipboard')}
             className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
@@ -401,7 +648,7 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
                         </div>
                         <p className="text-xs text-slate-600 mt-0.5">
                           {dryRunSummary.targetClassroomMismatch
-                            ? `คุณกำลังดูห้อง ${targetClassroom} แต่ไฟล์นี้เป็นของ ${dryRunSummary.detectedGrade || 'ระดับชั้นอื่น'} (${dryRunSummary.detectedRooms.join(', ')})`
+                            ? `คุณกำลังดูห้อง ${targetClassroom} แต่ไฟล์นี้เป็นของ ${dryRunSummary.detectedGrade || 'ระดับชั้นอื่น'} (${dryRunSummary.detectedRooms.join(', ')}) ระบบจึงปรับเป้าหมายเป็นห้อง ${activeRoom} ให้อัตโนมัติ`
                             : `ระบบแยกแยะห้องเรียนและลำดับเลขที่ของแต่ละห้องให้อัตโนมัติ 100%`}
                         </p>
                       </div>
@@ -411,7 +658,10 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
                     <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-auto">
                       <button
                         type="button"
-                        onClick={() => setSelectedRoomFilter('ALL')}
+                        onClick={() => {
+                          setSelectedRoomFilter('ALL');
+                          setImportMode('MULTI_ROOM');
+                        }}
                         className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                           selectedRoomFilter === 'ALL'
                             ? 'bg-blue-600 text-white shadow-2xs'
@@ -424,7 +674,15 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
                         <button
                           key={rm}
                           type="button"
-                          onClick={() => setSelectedRoomFilter(selectedRoomFilter === rm ? 'ALL' : rm)}
+                          onClick={() => {
+                            if (selectedRoomFilter === rm) {
+                              setSelectedRoomFilter('ALL');
+                              setImportMode('MULTI_ROOM');
+                            } else {
+                              setSelectedRoomFilter(rm);
+                              setImportMode('TARGET_ONLY');
+                            }
+                          }}
                           className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                             selectedRoomFilter === rm
                               ? 'bg-blue-600 text-white shadow-2xs'
@@ -440,7 +698,12 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
                   {/* Mode Selection Cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                     <label
-                      onClick={() => setImportMode('MULTI_ROOM')}
+                      onClick={() => {
+                        setImportMode('MULTI_ROOM');
+                        if (selectedRoomFilter !== 'ALL') {
+                          setSelectedRoomFilter('ALL');
+                        }
+                      }}
                       className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
                         importMode === 'MULTI_ROOM'
                           ? 'bg-white border-blue-500 ring-2 ring-blue-400/30 shadow-xs'
@@ -451,18 +714,23 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
                         type="radio"
                         name="importMode"
                         checked={importMode === 'MULTI_ROOM'}
-                        onChange={() => setImportMode('MULTI_ROOM')}
+                        onChange={() => {
+                          setImportMode('MULTI_ROOM');
+                          if (selectedRoomFilter !== 'ALL') {
+                            setSelectedRoomFilter('ALL');
+                          }
+                        }}
                         className="mt-0.5 text-blue-600 focus:ring-blue-500"
                       />
                       <div>
                         <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                           <span>⚡ โหมดนำเข้าแยกห้องอัตโนมัติ (แนะนำ)</span>
                           <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                            {dryRunSummary.detectedRooms.length} ห้อง
+                            {dryRunSummary.detectedRooms.length} ห้อง ({allImportableCount} คน)
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                          จัดสรรนักเรียนเข้าห้องตามเอกสาร SGS โดยอัตโนมัติ (ห้องใดที่ยังไม่มีในระบบ จะถูกสร้างให้อัตโนมัติ)
+                          จัดสรรนักเรียนเข้าห้องตามเอกสาร SGS โดยอัตโนมัติ (แยกเข้า {dryRunSummary.detectedRooms.join(', ')})
                         </p>
                       </div>
                     </label>
@@ -483,11 +751,16 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
                         className="mt-0.5 text-blue-600 focus:ring-blue-500"
                       />
                       <div>
-                        <div className="text-xs font-bold text-slate-900">
-                          นำเข้าเฉพาะห้องปัจจุบัน ({targetClassroom})
+                        <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                          <span>นำเข้าเฉพาะห้อง {activeRoom}</span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">
+                            {currentRoomImportableCount} คน
+                          </span>
                         </div>
                         <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                          บังคับนำเข้าข้อมูลทั้งหมดเข้าสู่ห้อง {targetClassroom} เพียงห้องเดียว
+                          {dryRunSummary.isMultiRoomFile
+                            ? `นำเข้าเฉพาะนักเรียนห้อง ${activeRoom} จำนวน ${currentRoomImportableCount} คน (ไม่รวมห้องอื่น)`
+                            : `นำเข้าข้อมูลนักเรียนเข้าสู่ห้อง ${activeRoom}`}
                         </p>
                       </div>
                     </label>
@@ -610,7 +883,15 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
                   {availableRooms.length > 1 && (
                     <select
                       value={selectedRoomFilter}
-                      onChange={(e) => setSelectedRoomFilter(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSelectedRoomFilter(val);
+                        if (val === 'ALL') {
+                          setImportMode('MULTI_ROOM');
+                        } else {
+                          setImportMode('TARGET_ONLY');
+                        }
+                      }}
                       className="px-2.5 py-1.5 border border-blue-200 rounded-lg bg-blue-50/70 text-blue-800 font-semibold text-xs outline-hidden focus:border-blue-500 cursor-pointer"
                     >
                       <option value="ALL">ทุกห้องเรียน ({availableRooms.length} ห้อง)</option>
@@ -770,8 +1051,15 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
           <div className="text-xs text-slate-500 font-medium">
             {dryRunSummary && (
               <span>
-                พร้อมนำเข้า/ปรับปรุง <b className="text-blue-600">{importableCount}</b> คน (ข้าม{' '}
-                {dryRunSummary.rows.filter(r => r.selectedAction === 'SKIP').length} คน)
+                {importMode === 'MULTI_ROOM' ? (
+                  <>
+                    พร้อมนำเข้า/ปรับปรุง <b className="text-blue-600">{activeImportableCount}</b> คน (แยก {dryRunSummary.detectedRooms.length} ห้อง, ข้าม {currentRoomSkipCount} คน)
+                  </>
+                ) : (
+                  <>
+                    พร้อมนำเข้าห้อง <b className="text-slate-800 font-bold">{activeRoom}</b> จำนวน <b className="text-blue-600">{activeImportableCount}</b> คน (ข้าม {currentRoomSkipCount} คน)
+                  </>
+                )}
               </span>
             )}
           </div>
@@ -786,16 +1074,18 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
             <button
               type="button"
               onClick={handleConfirmImport}
-              disabled={!dryRunSummary || importableCount === 0}
+              disabled={!dryRunSummary || activeImportableCount === 0}
               className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-500/20 transition-all cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4" />
               {importMode === 'MULTI_ROOM' && dryRunSummary?.isMultiRoomFile
-                ? `⚡ นำเข้าแยก ${dryRunSummary.detectedRooms.length} ห้อง (${importableCount} คน)`
-                : `ยืนยันนำเข้าห้อง ${targetClassroom} (${importableCount} คน)`}
+                ? `⚡ นำเข้าแยก ${dryRunSummary.detectedRooms.length} ห้อง (${activeImportableCount} คน)`
+                : `ยืนยันนำเข้าห้อง ${activeRoom} (${activeImportableCount} คน)`}
             </button>
           </div>
         </div>
+        </>
+        )}
 
       </div>
     </div>

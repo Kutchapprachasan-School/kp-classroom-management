@@ -18,6 +18,7 @@ import {
   type SchoolBrandingSettings,
 } from '../config/schoolRoles';
 import { authService } from '../services/authService';
+import { formatClassroomLabel } from '../services/studentService';
 
 export type TeacherLoginChannel = 'E_LEAVE' | 'DIRECT_CLASSROOM';
 
@@ -163,7 +164,7 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
         passwordOrPin: cleanPass,
         fullName: studentUser.name,
         role: 'STUDENT_GENERAL',
-        departmentOrClass: studentUser.classroomId || 'นักเรียน',
+        departmentOrClass: formatClassroomLabel(studentUser.classroomName || studentUser.classroomId) || 'นักเรียน',
         positionTitle: 'นักเรียน',
         smsGroup: 'STUDENT',
         smsSynced: true,

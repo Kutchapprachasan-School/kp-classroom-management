@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { StudentRadarChart } from '../components/teacher/StudentRadarChart';
 import { StudentNotesCard } from '../components/teacher/StudentNotesCard';
 import { homeVisitService, type HomeVisitRecord } from '../services/homeVisitService';
@@ -20,7 +20,9 @@ import {
   ArrowRightLeft,
   ArrowLeft,
   X,
+  KeyRound,
 } from 'lucide-react';
+import { authService } from '../services/authService';
 
 interface StudentDetailViewProps {
   studentCode?: string;
@@ -153,6 +155,36 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ studentCod
     }
   };
 
+  const currentUser = authService.getCurrentUser();
+  const isAdmin = currentUser?.role === 'ADMIN';
+  const isHomeroomAdvisor = useMemo(() => {
+    if (!currentUser) return false;
+    if (isAdmin) return true;
+    const cName = (currentUser.name || '').trim().toLowerCase();
+    if (currentRoom.adviser && cName && currentRoom.adviser.toLowerCase().includes(cName)) return true;
+    if (currentUser.classroomId && (currentUser.classroomId === currentRoom.id || currentUser.classroomId === currentRoom.roomNumber)) return true;
+    return false;
+  }, [currentUser, currentRoom, isAdmin]);
+  const canResetPassword = isAdmin || isHomeroomAdvisor;
+
+  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+
+  const handleConfirmResetPassword = async () => {
+    if (!targetCode) return;
+    setIsResetting(true);
+    try {
+      await authService.resetStudentPasswordByAdvisor(targetCode, currentUser?.name);
+      setTransferSuccessNotice(`✓ รีเซ็ตรหัสผ่านของ "${studentName}" เป็นรหัสเริ่มต้น 5 หลัก (${targetCode}) เรียบร้อยแล้ว`);
+      setIsResetPasswordModalOpen(false);
+      setTimeout(() => setTransferSuccessNotice(null), 6000);
+    } catch (err: any) {
+      alert(err?.message || 'เกิดข้อผิดพลาดในการรีเซ็ตรหัสผ่าน');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in">
       {/* Top Back Navigation Button */}
@@ -190,14 +222,28 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ studentCod
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleOpenTransferModal}
-          className="inline-flex items-center gap-2 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-colors cursor-pointer self-start sm:self-auto"
-        >
-          <ArrowRightLeft className="w-4 h-4 text-indigo-600" />
-          <span>ย้ายห้องเรียน (ซิงค์กลุ่มแชท)</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {canResetPassword && (
+            <button
+              type="button"
+              onClick={() => setIsResetPasswordModalOpen(true)}
+              className="inline-flex items-center gap-2 px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              title="รีเซ็ตรหัสผ่านกลับเป็นรหัสประจำตัว 5 หลัก"
+            >
+              <KeyRound className="w-4 h-4 text-amber-600" />
+              <span>รีเซ็ตรหัสผ่าน (5 หลัก)</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleOpenTransferModal}
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-colors cursor-pointer self-start sm:self-auto"
+          >
+            <ArrowRightLeft className="w-4 h-4 text-indigo-600" />
+            <span>ย้ายห้องเรียน (ซิงค์กลุ่มแชท)</span>
+          </button>
+        </div>
       </div>
 
       {transferSuccessNotice && (
@@ -483,6 +529,75 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ studentCod
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Modal: รีเซ็ตรหัสผ่านนักเรียนรายบุคคล */}
+      {isResetPasswordModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-sm overflow-hidden animate-scale-up">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-amber-600" />
+                <h3 className="font-bold text-slate-900 text-sm">รีเซ็ตรหัสผ่านนักเรียน</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsResetPasswordModalOpen(false)}
+                className="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="text-center space-y-2">
+                <div className="w-16 h-16 mx-auto rounded-full border-2 border-amber-200 overflow-hidden bg-amber-50 flex items-center justify-center">
+                  <img
+                    src={currentStudent?.avatarUrl || '/images/banners/student-avatar.png'}
+                    alt={studentName}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div>
+                  <h4 className="font-bold text-slate-900 text-sm">{studentName}</h4>
+                  <p className="text-xs text-slate-500 font-mono">
+                    เลขประจำตัว: {targetCode} (ห้อง {currentRoomName})
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200 text-xs text-amber-900 space-y-1.5">
+                <p className="font-bold flex items-center gap-1.5">
+                  <span>🔑 รหัสผ่านเริ่มต้นใหม่:</span>
+                  <span className="font-mono bg-white px-2 py-0.5 rounded border border-amber-300 text-amber-950 font-extrabold text-sm">
+                    {targetCode}
+                  </span>
+                </p>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  เมื่อยืนยัน รหัสผ่านจะถูกรีเซ็ตกลับเป็นรหัสประจำตัว 5 หลัก นักเรียนสามารถใช้เข้าสู่ระบบและไปตั้งรหัสผ่านใหม่ได้ทันที
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsResetPasswordModalOpen(false)}
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-100 cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  disabled={isResetting}
+                  onClick={handleConfirmResetPassword}
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>{isResetting ? 'กำลังรีเซ็ต...' : 'ยืนยันรีเซ็ตรหัสผ่าน'}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

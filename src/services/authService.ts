@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase.ts';
-import { studentService } from './studentService.ts';
+import { studentService, formatClassroomLabel, registerClassroomNames } from './studentService.ts';
+import { getSchoolSettings } from '../config/schoolSettings';
 import { scryptAsync } from '@noble/hashes/scrypt.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 
@@ -14,7 +15,10 @@ export interface AuthUser {
   subjectGroup?: string;
   level?: string;
   classroomId?: string;
+  classroomName?: string;
   avatarUrl?: string;
+  loginAt?: number;
+  expiresAt?: number;
 }
 
 const STORAGE_KEY_AUTH_USER = 'cls_current_auth_user';
@@ -85,6 +89,7 @@ export const authService = {
               throw new Error('รหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบรหัสผ่านของคุณอีกครั้ง');
             }
 
+            const now = Date.now();
             const authUser: AuthUser = {
               id: user.id,
               name: user.name,
@@ -95,6 +100,8 @@ export const authService = {
               subjectGroup: user.subjectGroup || '',
               level: user.level || '',
               avatarUrl: user.image || undefined,
+              loginAt: now,
+              expiresAt: now + 24 * 60 * 60 * 1000,
             };
             if (typeof localStorage !== 'undefined') {
               localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(authUser));
@@ -122,24 +129,17 @@ export const authService = {
   async loginTeacherGoogle(): Promise<AuthUser> {
     if (isSupabaseConfigured) {
       logDbOperation('AUTH: signInWithOAuth (Google)');
-      await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin,
+          redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
         },
       });
+      if (error) {
+        throw new Error(`Google SSO error: ${error.message}`);
+      }
     }
-
-    const user: AuthUser = {
-      id: 'usr-teacher-sso',
-      name: 'ครูภาสภูมิ เรืองปราชญ์ (Google SSO)',
-      email: 'pasphum.r@obec.moe.go.th',
-      role: 'TEACHER',
-    };
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(user));
-    }
-    return user;
+    throw new Error('ระบบ Google Workspace SSO ต้องเชื่อมต่อกับบัญชีอีเมลสถานศึกษา (@obec.moe.go.th หรือ @kutchap.ac.th) กรุณาเข้าสู่ระบบด้วยชื่อผู้ใช้และรหัสผ่าน');
   },
 
   // STUDENT LOGIN: 5-digit Student Code + Password / Initial 5-digit code
@@ -243,13 +243,35 @@ export const authService = {
         }
       }
 
+      // แปลง Classroom ID เป็นชื่อห้องภาษาไทย (เช่น ม.3/1 หรือ ม.4/4) เพื่อป้องกันไม่ให้แสดง room-1791986991422
+      let resolvedClassroomName = formatClassroomLabel(classroomId);
+      if (resolvedClassroomName.startsWith('room-') && isSupabaseConfigured) {
+        try {
+          const { data: roomRows } = await supabase
+            .from('classrooms')
+            .select('id, name, grade_level, room_number')
+            .eq('id', classroomId)
+            .limit(1);
+          if (roomRows && roomRows[0]?.name) {
+            resolvedClassroomName = formatClassroomLabel(roomRows[0].name);
+            registerClassroomNames([{ id: classroomId, name: roomRows[0].name }]);
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      const now = Date.now();
       const user: AuthUser = {
         id: student.id || `stu-${trimmedCode}`,
         name: student.name,
         studentCode: student.code || trimmedCode,
         role: 'STUDENT',
         classroomId,
+        classroomName: resolvedClassroomName,
         avatarUrl: student.avatarUrl,
+        loginAt: now,
+        expiresAt: now + 24 * 60 * 60 * 1000,
       };
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(user));
@@ -329,13 +351,57 @@ export const authService = {
     return true;
   },
 
-  // SESSION: Get currently logged in user
+  // ADVISOR / ADMIN RESET CLASSROOM: รีเซ็ตรหัสผ่านนักเรียนทั้งห้องเรียนกลับเป็นรหัส 5 หลัก
+  async resetClassroomPasswords(classroomId: string, advisorName?: string): Promise<{ count: number; studentCodes: string[] }> {
+    const res = studentService.resetAllStudentsPasswordInClassroom(classroomId);
+    if (res.successCount > 0) {
+      try {
+        window.dispatchEvent(
+          new CustomEvent('kps-data-sync-event', {
+            detail: {
+              type: 'CLASSROOM_PASSWORDS_RESET',
+              classroomId,
+              count: res.successCount,
+              resetBy: advisorName || 'ครูที่ปรึกษา / แอดมิน',
+            },
+          })
+        );
+      } catch {
+        // safe SSR
+      }
+    }
+    return { count: res.successCount, studentCodes: res.studentCodes };
+  },
+
+  // อัปเดตรูปภาพโปรไฟล์ของผู้ใช้ปัจจุบัน
+  updateCurrentUserAvatar(avatarUrl: string): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_AUTH_USER);
+      if (raw) {
+        const user = JSON.parse(raw);
+        user.avatarUrl = avatarUrl;
+        localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(user));
+      }
+    } catch {
+      // ignore
+    }
+  },
+
+  // SESSION: Get currently logged in user (with 24-hour expiration check)
   getCurrentUser(): AuthUser | null {
     if (typeof localStorage === 'undefined') return null;
     const raw = localStorage.getItem(STORAGE_KEY_AUTH_USER);
     if (raw) {
       try {
-        return JSON.parse(raw);
+        const user = JSON.parse(raw) as AuthUser;
+        // Check session expiration (default 24 hours)
+        if (user.expiresAt && Date.now() > user.expiresAt) {
+          console.warn('[authService] Session expired. Automatically clearing credentials.');
+          localStorage.removeItem(STORAGE_KEY_AUTH_USER);
+          return null;
+        }
+        return user;
       } catch {
         // fallback
       }
@@ -343,22 +409,35 @@ export const authService = {
     return null;
   },
 
-  // LOGOUT
+  // LOGOUT: Thoroughly clear session from both localStorage and sessionStorage
   async logout(): Promise<void> {
     if (isSupabaseConfigured) {
-      await supabase.auth.signOut();
+      try {
+        await supabase.auth.signOut();
+      } catch {
+        // ignore
+      }
     }
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(STORAGE_KEY_AUTH_USER);
+    }
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem(STORAGE_KEY_AUTH_USER);
+    }
+    try {
+      window.dispatchEvent(new CustomEvent('kps-auth-changed', { detail: { user: null } }));
+    } catch {
+      // safe SSR
     }
   },
 
   // SLIP GENERATION: Printable student password slip for classroom teachers
   generateStudentCredentialSlip(students: Array<{ no: number; code: string; name: string }>): string {
+    const schoolName = getSchoolSettings()?.nameTh || 'โรงเรียน';
     return students
       .map(
         (s) =>
-          `[โรงเรียนหางดงรัฐราษฎร์อุปถัมภ์] เลขที่: ${s.no} | รหัส: ${s.code} | ชื่อ: ${s.name} | รหัสผ่านเริ่มต้น (PIN): ${s.code.substring(1)} | QR Login: https://cls.school.ac.th/login?code=${s.code}`
+          `[${schoolName}] เลขที่: ${s.no} | รหัส: ${s.code} | ชื่อ: ${s.name} | รหัสผ่านเริ่มต้น: ${s.code} (PIN: ${s.code.length > 4 ? s.code.substring(1) : s.code})`
       )
       .join('\n');
   },

@@ -1,7 +1,7 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase.ts';
 import type { ClassroomRosterItem } from '../types/viewModels';
 import { ClassroomCreateSchema, type ClassroomCreateInput } from './types.ts';
-import { studentService, getAlternateRoomKey } from './studentService.ts';
+import { studentService, getAlternateRoomKey, registerClassroomNames, formatClassroomLabel } from './studentService.ts';
 import { activityAuditLogService } from './activityAuditLogService.ts';
 
 const STORAGE_KEY = 'cls_classrooms_data';
@@ -53,7 +53,7 @@ export const getLocalClassrooms = (): ClassroomRosterItem[] => {
       saveLocalClassrooms(INITIAL_SEED_CLASSROOMS);
     }
   }
-  return result
+  const mappedResult = result
     .filter((c) => !deletedSet.has(c.id) && !deletedSet.has(c.name))
     .map((c) => {
       const advisers = c.advisers || [c.adviser, c.coAdviser, c.thirdAdviser].filter(Boolean) as string[];
@@ -74,11 +74,14 @@ export const getLocalClassrooms = (): ClassroomRosterItem[] => {
         studentCount,
       };
     });
+  registerClassroomNames(mappedResult);
+  return mappedResult;
 };
 
 const saveLocalClassrooms = (items: ClassroomRosterItem[]) => {
   cachedClassrooms = items;
   cachedClassroomsTimestamp = Date.now();
+  registerClassroomNames(items);
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   }
@@ -227,15 +230,17 @@ export const classroomService = {
               const thirdAdviser = item.third_adviser || item.thirdAdviser || undefined;
               const advisers = [adviser, coAdviser, thirdAdviser].filter(Boolean) as string[];
               let studentCount = Number(item.student_count || 0);
-              try {
-                const byId = studentService.getStudents(item.id).length;
-                const byName = studentService.getStudents(item.name).length;
-                const realCount = Math.max(byId, byName);
-                if (realCount > 0 || typeof localStorage !== 'undefined') {
-                  studentCount = realCount;
+              if (studentCount === 0) {
+                try {
+                  const byId = studentService.getStudents(item.id).length;
+                  const byName = studentService.getStudents(item.name).length;
+                  const realCount = Math.max(byId, byName);
+                  if (realCount > 0) {
+                    studentCount = realCount;
+                  }
+                } catch {
+                  // ignore
                 }
-              } catch {
-                // ignore
               }
               return {
                 id: item.id,
@@ -323,6 +328,16 @@ export const classroomService = {
   // READ: List all classrooms synchronously from local storage / cache
   getClassroomsSync(): ClassroomRosterItem[] {
     return getLocalClassrooms();
+  },
+
+  // RESOLVER: แปลง Classroom ID หรือ Key (เช่น room-1791986991422 หรือ room-3-1) เป็นชื่อห้องภาษาไทย (เช่น ม.3/1)
+  resolveClassroomName(idOrName?: string): string {
+    if (!idOrName) return 'ม.1/1';
+    const clean = idOrName.trim();
+    const rooms = this.getClassroomsSync();
+    const found = rooms.find((r) => r.id === clean || r.name === clean || r.roomNumber === clean);
+    if (found?.name) return formatClassroomLabel(found.name);
+    return formatClassroomLabel(clean);
   },
 
   // READ: Get single classroom

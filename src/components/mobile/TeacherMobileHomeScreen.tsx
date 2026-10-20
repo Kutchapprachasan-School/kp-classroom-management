@@ -20,8 +20,8 @@ interface TeacherMobileHomeScreenProps {
 
 export const TeacherMobileHomeScreen: React.FC<TeacherMobileHomeScreenProps> = ({
   onNavigate,
-  teacherName = 'ครูปัญจพล เกษรัตน์',
-  department = 'ครู กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ',
+  teacherName = 'ครูผู้สอน',
+  department = 'ครู',
   avatarUrl = '/images/teacher/teacher_avatar.png',
 }) => {
   return (

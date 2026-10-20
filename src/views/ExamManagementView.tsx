@@ -37,7 +37,14 @@ import {
   type QuizQuestionItem,
   type QuizOptionItem,
 } from '../services/onlineQuizService';
-import { sgsRosterAndSubmissionService } from '../services/sgsRosterAndSubmissionService';
+import {
+  sgsRosterAndSubmissionService,
+  type FourScorePart,
+} from '../services/sgsRosterAndSubmissionService';
+import {
+  getDynamicTeachingSubjects,
+  getAllAvailableClassroomLabels,
+} from '../services/teacherCourseAssignmentService';
 import { coursesCurriculumService, type CourseCurriculumRecord } from '../services/coursesCurriculumService';
 import { studentService } from '../services/studentService';
 import { classroomService } from '../services/classroomService';
@@ -73,6 +80,9 @@ export interface ExtendedExamItem extends ExamItem {
   classroom?: string;
   category?: 'QUIZ' | 'MIDTERM' | 'FINAL';
   targetGradebookColumn?: 'u1' | 'u2' | 'u3' | 'midterm' | 'final';
+  targetFourScorePart?: FourScorePart;
+  targetClassrooms?: string[];
+  scopeMode?: 'ALL_SUBJECT_ROOMS' | 'SELECTED_ROOMS';
   targetCurriculumCourseId?: string;
   targetCurriculumUnitId?: string;
   targetCurriculumUnitName?: string;
@@ -116,39 +126,20 @@ export const ExamManagementView: React.FC = () => {
   // 3. Question Importer Modal State
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importTargetExamId, setImportTargetExamId] = useState<string>('');
-  const [importRawText, setImportRawText] = useState<string>(
-    `1. คำทักทาย "おはようございます" (Ohayou Gozaimasu) ในภาษาญี่ปุ่นตรงกับข้อใด?
-A) สวัสดีตอนเช้า
-B) สวัสดีตอนบ่าย
-C) ราตรีสวัสดิ์
-D) ขอบคุณมาก
-เฉลย: A
-
-2. ตัวอักษรฮิรางานะ "あ" อ่านออกเสียงว่าอย่างไร?
-A) อิ
-B) อะ
-C) อุ
-D) เอะ
-เฉลย: B
-
-3. คำศัพท์ "せんせい" (Sensei) มีความหมายว่าอย่างไร?
-A) นักเรียน
-B) คุณครู / อาจารย์
-C) ผู้ปกครอง
-D) ผู้อำนวยการ
-เฉลย: B`
-  );
+  const [importRawText, setImportRawText] = useState<string>('');
   const [importPreviewQuestions, setImportPreviewQuestions] = useState<QuizQuestionItem[]>([]);
 
   // Dynamic lists of unique courses and classrooms for filtering
   const availableCourses = useMemo(() => {
     const list = Array.from(new Set(exams.map((e) => e.subjectCode).filter(Boolean)));
-    return list;
+    const dynamicSubs = getDynamicTeachingSubjects().map((s) => `${s.code} ${s.name}`);
+    return Array.from(new Set([...dynamicSubs, ...list]));
   }, [exams]);
 
   const availableRooms = useMemo(() => {
     const list = Array.from(new Set(exams.map((e) => e.roomName).filter(Boolean)));
-    return list;
+    const systemRooms = getAllAvailableClassroomLabels();
+    return Array.from(new Set([...systemRooms, ...list]));
   }, [exams]);
 
   // Dynamic counts for category summary cards and tabs
@@ -393,15 +384,29 @@ D) ผู้อำนวยการ
     return () => window.removeEventListener('kp-courses-curriculum-updated', handleCurriculumSync);
   }, []);
 
+  const teachingSubjects = useMemo(() => getDynamicTeachingSubjects(), []);
+  const allSystemClassrooms = useMemo(() => getAllAvailableClassroomLabels(), []);
+
   const [newTitle, setNewTitle] = useState('');
-  const [newSubjectCode, setNewSubjectCode] = useState('ญี่ปุ่น ม.3/1');
-  const [newRoomName, setNewRoomName] = useState('ม.3/1');
+  const [newSubjectCode, setNewSubjectCode] = useState<string>(() => {
+    const firstCourse = coursesCurriculumService.getCourses()[0];
+    if (firstCourse) return `${firstCourse.code} ${firstCourse.name}`;
+    const subs = getDynamicTeachingSubjects();
+    return subs[0] ? `${subs[0].code} ${subs[0].name}` : '';
+  });
+  const [newRoomName, setNewRoomName] = useState<string>(() => {
+    const rooms = getAllAvailableClassroomLabels();
+    return rooms[0] || '';
+  });
   const [newTargetCurriculumCourseId, setNewTargetCurriculumCourseId] = useState<string>(() =>
     curriculumCourses[0]?.id || ''
   );
   const [newTargetGradebookColumn, setNewTargetGradebookColumn] = useState<'u1' | 'u2' | 'u3' | 'midterm' | 'final'>('u1');
+  const [newTargetFourScorePart, setNewTargetFourScorePart] = useState<FourScorePart>('PRE_MIDTERM');
+  const [formScopeMode, setFormScopeMode] = useState<'ALL_SUBJECT_ROOMS' | 'SELECTED_ROOMS'>('ALL_SUBJECT_ROOMS');
+  const [formSelectedRooms, setFormSelectedRooms] = useState<string[]>([]);
   const [newTargetCurriculumUnitId, setNewTargetCurriculumUnitId] = useState<string>('');
-  const [newSgsUnitName, setNewSgsUnitName] = useState('สอบเก็บคะแนนหน่วยที่ 1');
+  const [newSgsUnitName, setNewSgsUnitName] = useState('สอบเก็บคะแนนก่อนกลางภาค (หน่วยที่ 1)');
   const [newMaxScore, setNewMaxScore] = useState<number>(10);
   const [newDate, setNewDate] = useState('18 ต.ค. 2569');
   const [newStatus, setNewStatus] = useState<'UPCOMING' | 'GRADING'>('GRADING');
@@ -416,6 +421,19 @@ D) ผู้อำนวยการ
     [curriculumCourses, newTargetCurriculumCourseId]
   );
 
+  const currentSubjectRooms = useMemo(() => {
+    if (selectedCurriculumCourse?.assignedClassrooms && selectedCurriculumCourse.assignedClassrooms.length > 0) {
+      return selectedCurriculumCourse.assignedClassrooms;
+    }
+    const matchedSubject = teachingSubjects.find(
+      (s) => s.code === newSubjectCode || `${s.code} ${s.name}` === newSubjectCode
+    );
+    if (matchedSubject?.classrooms && matchedSubject.classrooms.length > 0) {
+      return matchedSubject.classrooms;
+    }
+    return allSystemClassrooms;
+  }, [selectedCurriculumCourse, newSubjectCode, teachingSubjects, allSystemClassrooms]);
+
   const handleCurriculumCourseSelect = (courseId: string) => {
     setNewTargetCurriculumCourseId(courseId);
     const course = curriculumCourses.find((c) => c.id === courseId);
@@ -423,6 +441,7 @@ D) ผู้อำนวยการ
       setNewSubjectCode(`${course.code} ${course.name}`);
       if (course.assignedClassrooms && course.assignedClassrooms.length > 0) {
         setNewRoomName(course.assignedClassrooms.join(', '));
+        setFormSelectedRooms(course.assignedClassrooms);
       }
       if (course.units && course.units.length > 0) {
         const firstUnit = course.units[0];
@@ -436,21 +455,71 @@ D) ผู้อำนวยการ
     }
   };
 
+  const handleFourScorePartSelect = (part: FourScorePart) => {
+    setNewTargetFourScorePart(part);
+    if (part === 'MIDTERM') {
+      setNewTargetGradebookColumn('midterm');
+      setNewMaxScore(20);
+      setNewSgsUnitName('วัดผลกลางภาคเรียน');
+      if (!newTitle || newTitle.includes('แบบทดสอบ') || newTitle.includes('สอบ')) {
+        setNewTitle('สอบกลางภาค ภาคเรียนที่ 1/2569');
+      }
+    } else if (part === 'FINAL') {
+      setNewTargetGradebookColumn('final');
+      setNewMaxScore(30);
+      setNewSgsUnitName('วัดผลปลายภาคเรียน');
+      if (!newTitle || newTitle.includes('แบบทดสอบ') || newTitle.includes('สอบ')) {
+        setNewTitle('สอบปลายภาค ภาคเรียนที่ 1/2569');
+      }
+    } else if (part === 'PRE_MIDTERM') {
+      setNewTargetGradebookColumn('u1');
+      const matchedUnit = selectedCurriculumCourse?.units.find((u) => u.unitNo === 1);
+      if (matchedUnit) {
+        setNewTargetCurriculumUnitId(matchedUnit.id);
+        setNewSgsUnitName(matchedUnit.title);
+        setNewMaxScore(matchedUnit.maxScore);
+      } else {
+        setNewSgsUnitName('สอบเก็บคะแนนก่อนกลางภาค (หน่วยที่ 1)');
+        setNewMaxScore(15);
+      }
+      if (!newTitle || newTitle.includes('สอบ')) {
+        setNewTitle('แบบทดสอบเก็บคะแนนก่อนกลางภาค');
+      }
+    } else if (part === 'POST_MIDTERM') {
+      setNewTargetGradebookColumn('u2');
+      const matchedUnit = selectedCurriculumCourse?.units.find((u) => u.unitNo === 2);
+      if (matchedUnit) {
+        setNewTargetCurriculumUnitId(matchedUnit.id);
+        setNewSgsUnitName(matchedUnit.title);
+        setNewMaxScore(matchedUnit.maxScore);
+      } else {
+        setNewSgsUnitName('สอบเก็บคะแนนหลังกลางภาค (หน่วยที่ 2)');
+        setNewMaxScore(15);
+      }
+      if (!newTitle || newTitle.includes('สอบ')) {
+        setNewTitle('แบบทดสอบเก็บคะแนนหลังกลางภาค');
+      }
+    }
+  };
+
   const handleTargetColumnSelect = (col: 'u1' | 'u2' | 'u3' | 'midterm' | 'final') => {
     setNewTargetGradebookColumn(col);
     if (col === 'midterm') {
+      setNewTargetFourScorePart('MIDTERM');
       setNewMaxScore(20);
       setNewSgsUnitName('วัดผลกลางภาคเรียน');
       if (!newTitle || newTitle.includes('แบบทดสอบ')) {
         setNewTitle('สอบกลางภาค ภาคเรียนที่ 1/2569');
       }
     } else if (col === 'final') {
+      setNewTargetFourScorePart('FINAL');
       setNewMaxScore(30);
       setNewSgsUnitName('วัดผลปลายภาคเรียน');
       if (!newTitle || newTitle.includes('แบบทดสอบ')) {
         setNewTitle('สอบปลายภาค ภาคเรียนที่ 1/2569');
       }
     } else {
+      setNewTargetFourScorePart(col === 'u1' ? 'PRE_MIDTERM' : 'POST_MIDTERM');
       const unitNo = col === 'u1' ? 1 : col === 'u2' ? 2 : 3;
       const matchedUnit = selectedCurriculumCourse?.units.find((u) => u.unitNo === unitNo);
       if (matchedUnit) {
@@ -468,22 +537,36 @@ D) ผู้อำนวยการ
     e.preventDefault();
     if (!newTitle.trim()) return;
 
+    const targetRooms =
+      formScopeMode === 'ALL_SUBJECT_ROOMS'
+        ? (currentSubjectRooms.length > 0 ? currentSubjectRooms : allSystemClassrooms)
+        : (formSelectedRooms.length > 0 ? formSelectedRooms : currentSubjectRooms.slice(0, 1));
+
+    const roomLabel =
+      formScopeMode === 'ALL_SUBJECT_ROOMS'
+        ? (targetRooms.length > 1 ? `ทุกห้อง (${targetRooms.length} ห้อง: ${targetRooms.join(', ')})` : targetRooms[0] || 'ทุกห้อง')
+        : (targetRooms.join(', ') || newRoomName);
+
     const examCategory: 'QUIZ' | 'MIDTERM' | 'FINAL' =
-      newTargetGradebookColumn === 'final' || newTitle.includes('ปลายภาค') ? 'FINAL' :
-      newTargetGradebookColumn === 'midterm' || newTitle.includes('กลางภาค') ? 'MIDTERM' : 'QUIZ';
+      newTargetFourScorePart === 'FINAL' || newTargetGradebookColumn === 'final' || newTitle.includes('ปลายภาค') ? 'FINAL' :
+      newTargetFourScorePart === 'MIDTERM' || newTargetGradebookColumn === 'midterm' || newTitle.includes('กลางภาค') ? 'MIDTERM' : 'QUIZ';
 
     const targetUnitLabel =
-      newTargetGradebookColumn === 'midterm'
+      newTargetFourScorePart === 'MIDTERM' || newTargetGradebookColumn === 'midterm'
         ? 'สอบกลางภาค'
-        : newTargetGradebookColumn === 'final'
+        : newTargetFourScorePart === 'FINAL' || newTargetGradebookColumn === 'final'
         ? 'สอบปลายภาค'
         : `หน่วยที่ ${newTargetGradebookColumn === 'u1' ? 1 : newTargetGradebookColumn === 'u2' ? 2 : 3} (${newTargetGradebookColumn})`;
 
     const newExam: ExtendedExamItem = {
       id: `ex-${Date.now()}`,
       title: newTitle.trim(),
-      subjectCode: newSubjectCode.trim() || 'ญี่ปุ่น ม.3/1',
-      roomName: newRoomName.trim() || 'ม.3/1',
+      subjectCode: newSubjectCode.trim() || (teachingSubjects[0] ? `${teachingSubjects[0].code} ${teachingSubjects[0].name}` : ''),
+      roomName: roomLabel,
+      classroom: targetRooms[0] || '',
+      targetClassrooms: targetRooms,
+      scopeMode: formScopeMode,
+      targetFourScorePart: newTargetFourScorePart,
       sgsUnitName: newSgsUnitName.trim() || 'สอบเก็บคะแนนหน่วยการเรียนรู้',
       maxScore: Number(newMaxScore) || 20,
       date: newDate.trim() || '18 ต.ค. 2569',
@@ -498,7 +581,7 @@ D) ผู้อำนวยการ
       typeBadge: examCategory === 'QUIZ' ? 'เก็บคะแนน' : examCategory === 'MIDTERM' ? 'กลางภาค' : 'ปลายภาค',
       badgeColor: examCategory === 'QUIZ' ? 'bg-blue-500 text-white' : examCategory === 'MIDTERM' ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white',
       status: newStatus,
-      statusRatio: '0/39',
+      statusRatio: `0/${targetRooms.length > 0 ? targetRooms.length * 35 : '0'}`,
       isOnlineQuiz,
       isOpen: true,
       passingScore: Number(passingScore) || 5.0,
@@ -537,38 +620,53 @@ D) ผู้อำนวยการ
   };
 
   const applyPreset = (presetType: 'MIDTERM' | 'FINAL' | 'QUIZ' | 'PRACTICAL') => {
+    const defaultSubject =
+      teachingSubjects[0]
+        ? `${teachingSubjects[0].code} ${teachingSubjects[0].name}`
+        : curriculumCourses[0]
+        ? `${curriculumCourses[0].code} ${curriculumCourses[0].name}`
+        : '';
+    const defaultRoom = allSystemClassrooms[0] || '';
     switch (presetType) {
       case 'MIDTERM':
+        setNewTargetFourScorePart('MIDTERM');
         setNewTargetGradebookColumn('midterm');
         setNewTitle('สอบกลางภาค ภาคเรียนที่ 1/2569');
         setNewSgsUnitName('วัดผลกลางภาคเรียน (หน่วยที่ 1-2)');
         setNewMaxScore(20);
-        setNewSubjectCode('ญี่ปุ่น ม.3/1');
-        setNewRoomName('ม.3/1');
+        if (defaultSubject) setNewSubjectCode(defaultSubject);
+        if (defaultRoom) setNewRoomName(defaultRoom);
+        setFormScopeMode('ALL_SUBJECT_ROOMS');
         break;
       case 'FINAL':
+        setNewTargetFourScorePart('FINAL');
         setNewTargetGradebookColumn('final');
         setNewTitle('สอบปลายภาค ภาคเรียนที่ 1/2569');
         setNewSgsUnitName('วัดผลปลายภาคเรียน');
         setNewMaxScore(30);
-        setNewSubjectCode('ญี่ปุ่น ม.3/1');
-        setNewRoomName('ม.3/1');
+        if (defaultSubject) setNewSubjectCode(defaultSubject);
+        if (defaultRoom) setNewRoomName(defaultRoom);
+        setFormScopeMode('ALL_SUBJECT_ROOMS');
         break;
       case 'QUIZ':
+        setNewTargetFourScorePart('PRE_MIDTERM');
         setNewTargetGradebookColumn('u1');
         setNewTitle('แบบทดสอบย่อยที่ 1 (บทที่ 1)');
         setNewSgsUnitName('เก็บคะแนนหน่วยที่ 1');
         setNewMaxScore(10);
-        setNewSubjectCode('ญี่ปุ่น ม.3/1');
-        setNewRoomName('ม.3/1');
+        if (defaultSubject) setNewSubjectCode(defaultSubject);
+        if (defaultRoom) setNewRoomName(defaultRoom);
+        setFormScopeMode('ALL_SUBJECT_ROOMS');
         break;
       case 'PRACTICAL':
+        setNewTargetFourScorePart('POST_MIDTERM');
         setNewTargetGradebookColumn('u2');
-        setNewTitle('สอบอ่านโน้ตเพลงไทยและสากล');
+        setNewTitle('สอบปฏิบัติทักษะ ภาคเรียนที่ 1/2569');
         setNewSgsUnitName('ทักษะการปฏิบัติ 1');
         setNewMaxScore(15);
-        setNewSubjectCode('ศ20221 ดนตรีปฏิบัติ 1');
-        setNewRoomName('ม.1/8');
+        if (defaultSubject) setNewSubjectCode(defaultSubject);
+        if (defaultRoom) setNewRoomName(defaultRoom);
+        setFormScopeMode('ALL_SUBJECT_ROOMS');
         break;
     }
   };
@@ -609,7 +707,7 @@ D) ผู้อำนวยการ
           studentNo: stu.no,
           studentCode: stu.code,
           name: stu.name,
-          room: matched?.name || currentExam.roomName || 'ม.3/1',
+          room: matched?.name || currentExam.roomName || (allSystemClassrooms[0] || ''),
           score: null,
           status: 'PENDING',
         }));
@@ -779,6 +877,46 @@ D) ผู้อำนวยการ
 
       if (updatedCount > 0) {
         sgsRosterAndSubmissionService.saveSgsRoster(updatedRoster, 'ครูผู้สอนบันทึกคะแนนสอบ');
+      }
+
+      // Sync 4-Part Score of ปพ.5 (PRE_MIDTERM, MIDTERM, POST_MIDTERM, FINAL)
+      const fourPart: FourScorePart =
+        exam.targetFourScorePart ||
+        (targetCol === 'midterm' || exam.category === 'MIDTERM'
+          ? 'MIDTERM'
+          : targetCol === 'final' || exam.category === 'FINAL'
+          ? 'FINAL'
+          : targetCol === 'u2' || targetCol === 'u3'
+          ? 'POST_MIDTERM'
+          : 'PRE_MIDTERM');
+
+      const fourPartKeyMap: Record<FourScorePart, 'preMidterm' | 'midterm' | 'postMidterm' | 'final'> = {
+        PRE_MIDTERM: 'preMidterm',
+        MIDTERM: 'midterm',
+        POST_MIDTERM: 'postMidterm',
+        FINAL: 'final',
+      };
+      const scorePartKey = fourPartKeyMap[fourPart];
+
+      const examCourseCode =
+        exam.targetCurriculumCourseId ||
+        (exam.subjectCode ? exam.subjectCode.split(' ')[0] : undefined);
+      const examClassroom = exam.classroom || exam.roomName || undefined;
+
+      for (const [studentId, scoreVal] of Object.entries(scores)) {
+        if (typeof scoreVal === 'number') {
+          const stu = scoreGridStudents.find((s) => s.id === studentId);
+          if (stu && stu.studentCode) {
+            const studentRoom = stu.room || examClassroom;
+            sgsRosterAndSubmissionService.updateStudentFourPartScore(
+              stu.studentCode,
+              scorePartKey,
+              Math.round(scoreVal),
+              studentRoom,
+              examCourseCode
+            );
+          }
+        }
       }
 
       // If target is unit u1, u2, or u3, record in term assignments and student work submissions
@@ -1921,60 +2059,95 @@ D) ผู้อำนวยการ
                   ))}
                 </select>
 
-                {/* Target Gradebook Column (Auto-Sync) */}
-                <div className="pt-1.5 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                      ช่องบันทึกคะแนน ปพ.5 (Target Column) <span className="text-rose-500">*</span>
-                    </label>
-                    <select
-                      value={newTargetGradebookColumn}
-                      onChange={(e) => handleTargetColumnSelect(e.target.value as any)}
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg font-bold text-blue-700 focus:outline-none focus:border-blue-500"
-                    >
-                      <option value="u1">คะแนนหน่วยที่ 1 (ระหว่างภาค - u1)</option>
-                      <option value="u2">คะแนนหน่วยที่ 2 (ระหว่างภาค - u2)</option>
-                      <option value="u3">คะแนนหน่วยที่ 3 (ระหว่างภาค - u3)</option>
-                      <option value="midterm">สอบกลางภาค (Midterm - 20 คะแนน)</option>
-                      <option value="final">สอบปลายภาค (Final - 30 คะแนน)</option>
-                    </select>
+                {/* 4-part score section of ปพ.5 (Auto-Sync) */}
+                <div className="pt-1.5 space-y-2">
+                  <label className="text-[11px] font-bold text-slate-700 block">
+                    ส่วนคะแนนสมุด ปพ.5 ที่เชื่อมโยง (4 ส่วนมาตรฐาน) <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { id: 'PRE_MIDTERM', label: 'ก่อนกลางภาค', sub: 'คะแนนเก็บ', defaultCol: 'u1' },
+                      { id: 'MIDTERM', label: 'กลางภาค', sub: 'สอบกลางภาค (20)', defaultCol: 'midterm' },
+                      { id: 'POST_MIDTERM', label: 'หลังกลางภาค', sub: 'คะแนนเก็บ', defaultCol: 'u2' },
+                      { id: 'FINAL', label: 'ปลายภาค', sub: 'สอบปลายภาค (30)', defaultCol: 'final' },
+                    ].map((part) => {
+                      const active = newTargetFourScorePart === part.id;
+                      return (
+                        <button
+                          key={part.id}
+                          type="button"
+                          onClick={() => handleFourScorePartSelect(part.id as FourScorePart)}
+                          className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                            active
+                              ? 'border-blue-500 bg-blue-50/80 text-blue-900 shadow-xs ring-2 ring-blue-400/20'
+                              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="text-xs font-bold">{part.label}</div>
+                          <div className="text-[10px] text-slate-500 mt-0.5">{part.sub}</div>
+                        </button>
+                      );
+                    })}
                   </div>
 
-                  {['u1', 'u2', 'u3'].includes(newTargetGradebookColumn) &&
-                    selectedCurriculumCourse &&
-                    selectedCurriculumCourse.units &&
-                    selectedCurriculumCourse.units.length > 0 && (
+                  {/* Sub-unit selection if PRE_MIDTERM or POST_MIDTERM */}
+                  {['PRE_MIDTERM', 'POST_MIDTERM'].includes(newTargetFourScorePart) && (
+                    <div className="pt-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
                         <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                          หน่วยการเรียนรู้ในหลักสูตร
+                          ช่องคะแนนย่อยใน ปพ.5
                         </label>
                         <select
-                          value={newTargetCurriculumUnitId}
-                          onChange={(e) => {
-                            const uId = e.target.value;
-                            setNewTargetCurriculumUnitId(uId);
-                            const u = selectedCurriculumCourse.units.find((unit) => unit.id === uId);
-                            if (u) {
-                              setNewSgsUnitName(u.title);
-                              setNewMaxScore(u.maxScore);
-                            }
-                          }}
-                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-blue-500"
+                          value={newTargetGradebookColumn}
+                          onChange={(e) => handleTargetColumnSelect(e.target.value as any)}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg font-bold text-blue-700 focus:outline-none focus:border-blue-500"
                         >
-                          {selectedCurriculumCourse.units.map((u) => (
-                            <option key={u.id} value={u.id}>
-                              หน่วยที่ {u.unitNo}: {u.title} ({u.maxScore} คะแนน)
-                            </option>
-                          ))}
+                          <option value="u1">หน่วยที่ 1 (u1)</option>
+                          <option value="u2">หน่วยที่ 2 (u2)</option>
+                          <option value="u3">หน่วยที่ 3 (u3)</option>
                         </select>
                       </div>
-                    )}
-                </div>
 
-                <p className="text-[10px] text-blue-700 flex items-center gap-1 pt-0.5">
-                  <Sparkles className="w-3 h-3 text-blue-600 shrink-0" />
-                  <span>เมื่อนักเรียนสอบเสร็จสิ้น ระบบจะลงคะแนนในช่อง {newTargetGradebookColumn === 'midterm' ? 'กลางภาค' : newTargetGradebookColumn === 'final' ? 'ปลายภาค' : `หน่วยที่ ${newTargetGradebookColumn.slice(1)}`} ในสมุด ปพ.5 ให้อัตโนมัติทันที</span>
-                </p>
+                      {selectedCurriculumCourse?.units && selectedCurriculumCourse.units.length > 0 && (
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                            หน่วยการเรียนรู้ในหลักสูตร
+                          </label>
+                          <select
+                            value={newTargetCurriculumUnitId}
+                            onChange={(e) => {
+                              const uId = e.target.value;
+                              setNewTargetCurriculumUnitId(uId);
+                              const u = selectedCurriculumCourse.units.find((unit) => unit.id === uId);
+                              if (u) {
+                                setNewSgsUnitName(u.title);
+                                setNewMaxScore(u.maxScore);
+                              }
+                            }}
+                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-blue-500"
+                          >
+                            {selectedCurriculumCourse.units.map((u) => (
+                              <option key={u.id} value={u.id}>
+                                หน่วยที่ {u.unitNo}: {u.title} ({u.maxScore} คะแนน)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <p className="text-[10px] text-blue-700 flex items-center gap-1 pt-0.5">
+                    <Sparkles className="w-3 h-3 text-blue-600 shrink-0" />
+                    <span>
+                      เมื่อนักเรียนสอบเสร็จสิ้น ระบบจะลงคะแนนในส่วน {
+                        newTargetFourScorePart === 'PRE_MIDTERM' ? 'ก่อนกลางภาค' :
+                        newTargetFourScorePart === 'MIDTERM' ? 'กลางภาค' :
+                        newTargetFourScorePart === 'POST_MIDTERM' ? 'หลังกลางภาค' : 'ปลายภาค'
+                      } ในสมุด ปพ.5 ให้อัตโนมัติทันที
+                    </span>
+                  </p>
+                </div>
               </div>
 
               <div>
@@ -1991,33 +2164,89 @@ D) ผู้อำนวยการ
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">
-                    รหัสวิชาและชื่อวิชา
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="เช่น ศ23101 ศิลปะ"
-                    value={newSubjectCode}
-                    onChange={(e) => setNewSubjectCode(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white"
-                  />
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  รหัสวิชาและชื่อวิชา
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="เช่น ศ23101 ศิลปะ"
+                  value={newSubjectCode}
+                  onChange={(e) => setNewSubjectCode(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white"
+                />
+              </div>
+
+              {/* Classroom Scope Selection: All classrooms in course or Selected classrooms */}
+              <div className="space-y-2 pt-1">
+                <label className="block text-xs font-semibold text-[#163A66]">
+                  ห้องเรียนเป้าหมายที่ได้รับมอบหมาย:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormScopeMode('ALL_SUBJECT_ROOMS')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      formScopeMode === 'ALL_SUBJECT_ROOMS'
+                        ? 'border-[#3B82F6] bg-[#EFF6FF] text-[#163A66]'
+                        : 'border-slate-200 bg-white text-[#6B7C93]'
+                    }`}
+                  >
+                    <p className="text-xs font-bold">
+                      ทุกห้องในรายวิชานี้ ({currentSubjectRooms.length} ห้อง)
+                    </p>
+                    <p className="text-[11px] opacity-80 mt-0.5">
+                      สอบพร้อมกันทุกห้องที่เรียนวิชานี้ ({currentSubjectRooms.join(', ') || 'ทุกห้อง'})
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormScopeMode('SELECTED_ROOMS');
+                      if (formSelectedRooms.length === 0 && (currentSubjectRooms[0] || allSystemClassrooms[0])) {
+                        setFormSelectedRooms([currentSubjectRooms[0] || allSystemClassrooms[0]]);
+                      }
+                    }}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      formScopeMode === 'SELECTED_ROOMS'
+                        ? 'border-[#3B82F6] bg-[#EFF6FF] text-[#163A66]'
+                        : 'border-slate-200 bg-white text-[#6B7C93]'
+                    }`}
+                  >
+                    <p className="text-xs font-bold">เลือกเฉพาะห้องเรียน</p>
+                    <p className="text-[11px] opacity-80 mt-0.5">
+                      ติ๊กเลือกเฉพาะห้องที่ต้องการให้สอบ
+                    </p>
+                  </button>
                 </div>
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">
-                    ห้องเรียนเป้าหมาย
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="เช่น ม.3/1 - ม.3/8"
-                    value={newRoomName}
-                    onChange={(e) => setNewRoomName(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white"
-                  />
-                </div>
+
+                {formScopeMode === 'SELECTED_ROOMS' && (
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
+                    {(allSystemClassrooms.length > 0 ? allSystemClassrooms : currentSubjectRooms).map((room) => {
+                      const checked = formSelectedRooms.includes(room);
+                      return (
+                        <button
+                          key={room}
+                          type="button"
+                          onClick={() => {
+                            setFormSelectedRooms((prev) =>
+                              checked ? prev.filter((r) => r !== room) : [...prev, room]
+                            );
+                          }}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer ${
+                            checked
+                              ? 'bg-[#3B82F6] text-white border-[#3B82F6]'
+                              : 'bg-white text-[#6B7C93] border-slate-200'
+                          }`}
+                        >
+                          {checked ? '✓ ' : ''}ห้อง {room}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -2664,10 +2893,22 @@ D) ผู้อำนวยการ
           isOpen={!!playerExam}
           onClose={() => setPlayerExam(null)}
           examId={playerExam.id}
-          studentCode={studentService.getStudents(playerExam.roomName || 'room-1-1')[0]?.code || ''}
-          studentName={studentService.getStudents(playerExam.roomName || 'room-1-1')[0]?.name || ''}
-          classroomId={playerExam.roomName || (classroomService.getClassroomsSync()[0]?.id || 'room-1-1')}
+          studentCode={studentService.getStudents(playerExam.classroom || playerExam.roomName || '')[0]?.code || ''}
+          studentName={studentService.getStudents(playerExam.classroom || playerExam.roomName || '')[0]?.name || ''}
+          classroomId={playerExam.classroom || playerExam.roomName || (allSystemClassrooms[0] || '')}
           onGraded={(score, isPassed) => {
+            const stu = studentService.getStudents(playerExam.classroom || playerExam.roomName || '')[0];
+            if (stu?.id && stu?.code) {
+              const currentStored = JSON.parse(
+                localStorage.getItem(`kp_exam_scores_${playerExam.id}`) || '{}'
+              );
+              const updatedScores = { ...currentStored, [stu.id]: score };
+              localStorage.setItem(
+                `kp_exam_scores_${playerExam.id}`,
+                JSON.stringify(updatedScores)
+              );
+              syncScoresToSgsRoster(playerExam, updatedScores);
+            }
             showToast(
               isPassed
                 ? `✓ บันทึกคะแนนเรียบร้อย: นักเรียนสอบผ่านเกณฑ์ ได้ ${score} คะแนน`
@@ -2943,31 +3184,7 @@ D) ผู้อำนวยการ
         </div>
       )}
 
-      {/* Student Exam Player Modal for Taking Quiz & Auto-syncing Score */}
-      {playerExam && (
-        <StudentExamPlayerModal
-          isOpen={!!playerExam}
-          onClose={() => setPlayerExam(null)}
-          examId={playerExam.id}
-          onGraded={(score) => {
-            const stuId = 'st-1';
-            const currentStored = JSON.parse(
-              localStorage.getItem(`kp_exam_scores_${playerExam.id}`) || '{}'
-            );
-            const updated = { ...currentStored, [stuId]: score };
-            localStorage.setItem(
-              `kp_exam_scores_${playerExam.id}`,
-              JSON.stringify(updated)
-            );
-            syncScoresToSgsRoster(playerExam, updated);
-            showToast(
-              `✓ บันทึกคะแนน ${score}/${playerExam.maxScore} ลงช่อง ${
-                playerExam.targetCurriculumUnitName || 'ปพ.5'
-              } เรียบร้อยแล้ว`
-            );
-          }}
-        />
-      )}
+
     </div>
   );
 };

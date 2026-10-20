@@ -15,9 +15,9 @@ import {
   type HomeVisitRecord,
   type SdqLevel,
 } from '../services/homeVisitService';
-import { cleanSlateService } from '../services/cleanSlateService';
 import { authService, type AuthUser } from '../services/authService';
 import { type SchoolSettingsConfig } from '../config/schoolSettings';
+import { studentService } from '../services/studentService';
 
 interface StudentHomeVisitFormViewProps {
   onAwardXp?: (xp: number) => void;
@@ -32,59 +32,60 @@ export const StudentHomeVisitFormView: React.FC<StudentHomeVisitFormViewProps> =
 }) => {
   const effectiveUser = currentUser || authService.getCurrentUser();
   const studentCode = effectiveUser?.studentCode || '45102';
-  const isClean = cleanSlateService.isCleanSlateActive();
   const existing = homeVisitService.getByStudentCode(studentCode);
+
+  const draftRaw = typeof localStorage !== 'undefined' ? localStorage.getItem(`kp_home_visit_draft_${studentCode}`) : null;
+  const draft = draftRaw ? JSON.parse(draftRaw) : null;
+  const realStudent: any = ((studentService as any).getStudents?.() || []).find((s: any) => s.studentCode === studentCode || s.id === effectiveUser?.id);
 
   // Stepper State (1, 2, 3)
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
 
   // Step 1: ข้อมูลผู้ปกครองและที่อยู่
   const [guardianName, setGuardianName] = useState(
-    existing?.guardianName || (isClean ? '' : 'นางสมพร คำฝั้น')
+    draft?.guardianName || existing?.guardianName || realStudent?.parentName || ''
   );
   const [guardianRelation, setGuardianRelation] = useState(
-    existing?.guardianRelation || 'มารดา'
+    draft?.guardianRelation || existing?.guardianRelation || 'มารดา'
   );
   const [guardianPhone, setGuardianPhone] = useState(
-    existing?.guardianPhone || (isClean ? '' : '081-452-9918')
+    draft?.guardianPhone || existing?.guardianPhone || realStudent?.parentPhone || ''
   );
   const [addressLine, setAddressLine] = useState(
-    existing?.address || (isClean ? '' : '142/8 หมู่ 4')
+    draft?.addressLine || existing?.address || realStudent?.address || ''
   );
   const [province, setProvince] = useState(
-    schoolSettings?.districtProvince?.includes('จ.')
+    draft?.province || (schoolSettings?.districtProvince?.includes('จ.')
       ? schoolSettings.districtProvince.split('จ.')[1].trim()
-      : isClean ? 'อุดรธานี' : 'เชียงใหม่'
+      : 'อุดรธานี')
   );
   const [district, setDistrict] = useState(
-    schoolSettings?.districtProvince?.includes('อ.')
+    draft?.district || (schoolSettings?.districtProvince?.includes('อ.')
       ? schoolSettings.districtProvince.split('อ.')[1].split(' ')[0]
-      : isClean ? 'กุดจับ' : 'เมืองเชียงใหม่'
+      : 'กุดจับ')
   );
-  const [subdistrict, setSubdistrict] = useState(isClean ? 'เมืองเพีย' : 'หนองบัว');
-  const [postalCode, setPostalCode] = useState(isClean ? '41250' : '50200');
+  const [subdistrict, setSubdistrict] = useState(draft?.subdistrict || '');
+  const [postalCode, setPostalCode] = useState(draft?.postalCode || '');
 
   // Step 2: สภาพครอบครัวและการเรียน
-  const [familyMembersCount, setFamilyMembersCount] = useState('4 คน');
+  const [familyMembersCount, setFamilyMembersCount] = useState(draft?.familyMembersCount || '4 คน');
   const [familyIncomeRange, setFamilyIncomeRange] = useState<string>(
-    '10,001 - 20,000 บาท'
+    draft?.familyIncomeRange || '10,001 - 20,000 บาท'
   );
   const [guardianOccupation, setGuardianOccupation] = useState(
-    isClean ? '' : 'รับจ้างทั่วไป / ค้าขาย'
+    draft?.guardianOccupation || existing?.guardianOccupation || ''
   );
-  const [housingType, setHousingType] = useState('บ้านของตนเอง');
+  const [housingType, setHousingType] = useState(draft?.housingType || 'บ้านของตนเอง');
   const travelMethod = 'รถโดยสารประจำทาง/รับจ้าง';
   const [familyNotes, setFamilyNotes] = useState(
-    existing?.sdqEmotionalNote || (isClean ? '' : 'ช่วงเย็นช่วยผู้ปกครองขายของที่ตลาด บางวันทำการบ้านเสร็จดึก ต้องการคำแนะนำเรื่องตารางอ่านหนังสือ')
+    draft?.familyNotes || existing?.sdqEmotionalNote || ''
   );
 
   // Step 3: สรุปผลการเยี่ยมบ้าน & GPS
-  const [gpsLat, setGpsLat] = useState<number>(existing?.gpsLat || 17.4167);
-  const [gpsLng, setGpsLng] = useState<number>(existing?.gpsLng || 102.5833);
+  const [gpsLat, setGpsLat] = useState<number>(draft?.gpsLat || existing?.gpsLat || 0);
+  const [gpsLng, setGpsLng] = useState<number>(draft?.gpsLng || existing?.gpsLng || 0);
   const [isLocating, setIsLocating] = useState(false);
-  const [teacherSummary, setTeacherSummary] = useState(
-    existing?.teacherSummaryNote || (isClean ? 'อยู่ระหว่างรอการลงพื้นที่เยี่ยมบ้านโดยครูที่ปรึกษา' : 'นักเรียนมีความกตัญญูและตั้งใจเรียน สภาพแวดล้อมครอบครัวอบอุ่นแต่มีภาระงานช่วยครอบครัว ครูประจำชั้นจะช่วยติดตามและให้คำปรึกษาอย่างใกล้ชิด')
-  );
+  const teacherSummary = existing?.teacherSummaryNote || 'อยู่ระหว่างรอการลงพื้นที่เยี่ยมบ้านโดยครูที่ปรึกษา';
 
   // SDQ Self Assessment (5 dimensions, 0-8 each = 0-40)
   const sdqEmotion = 4;
@@ -110,29 +111,58 @@ export const StudentHomeVisitFormView: React.FC<StudentHomeVisitFormViewProps> =
           setTimeout(() => setToastMsg(null), 3000);
         },
         () => {
-          setGpsLat(18.7883 + (Math.random() - 0.5) * 0.005);
-          setGpsLng(98.9542 + (Math.random() - 0.5) * 0.005);
           setIsLocating(false);
-          setToastMsg('📍 จำลองพิกัดบ้านนักเรียน ต.หนองบัว จ.เชียงใหม่ สำเร็จ!');
-          setTimeout(() => setToastMsg(null), 3000);
+          setToastMsg('⚠️ ไม่สามารถดึงพิกัด GPS ได้ กรุณาเปิดสิทธิ์เข้าถึงตำแหน่งที่ตั้ง');
+          setTimeout(() => setToastMsg(null), 3500);
         },
-        { enableHighAccuracy: true, timeout: 5000 }
+        { enableHighAccuracy: true, timeout: 8000 }
       );
     } else {
       setIsLocating(false);
+      setToastMsg('⚠️ อุปกรณ์ของคุณไม่รองรับการดึงพิกัด GPS');
+      setTimeout(() => setToastMsg(null), 3000);
     }
   };
 
   const handleSaveDraft = () => {
-    setToastMsg('💾 บันทึกฉบับร่างเรียบร้อยแล้ว');
+    const draftPayload = {
+      guardianName,
+      guardianRelation,
+      guardianPhone,
+      addressLine,
+      province,
+      district,
+      subdistrict,
+      postalCode,
+      familyMembersCount,
+      familyIncomeRange,
+      guardianOccupation,
+      housingType,
+      familyNotes,
+      gpsLat,
+      gpsLng,
+      updatedAt: new Date().toISOString(),
+    };
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(`kp_home_visit_draft_${studentCode}`, JSON.stringify(draftPayload));
+    }
+    setToastMsg('💾 บันทึกแบบร่างข้อมูลเยี่ยมบ้านเรียบร้อยแล้ว');
     setTimeout(() => setToastMsg(null), 3000);
   };
 
   const handleSaveFinal = () => {
-    const fullAddress = `${addressLine} ต.${subdistrict} อ.${district} จ.${province} ${postalCode}`;
+    const parts = [
+      addressLine,
+      subdistrict ? `ต.${subdistrict}` : '',
+      district ? `อ.${district}` : '',
+      province ? `จ.${province}` : '',
+      postalCode,
+    ].filter(Boolean);
+    const fullAddress = parts.join(' ');
+
     homeVisitService.submitStudentHomeInfo(studentCode, {
       address: fullAddress,
-      landmarkNote: 'ข้างวัดป่าแดง บ้านรั้วไม้สีน้ำตาล',
+      landmarkNote: '',
       gpsLat,
       gpsLng,
       guardianName,
@@ -142,7 +172,7 @@ export const StudentHomeVisitFormView: React.FC<StudentHomeVisitFormViewProps> =
       familyIncomeRange: familyIncomeRange as HomeVisitRecord['familyIncomeRange'],
       housingType: housingType as any,
       travelMethod: travelMethod as any,
-      travelDistanceKm: 11.5,
+      travelDistanceKm: 0,
       sdqStudentScore: totalSdqScore,
       sdqStudentStatus: computedSdqStatus,
       sdqEmotionalNote: familyNotes,
@@ -309,45 +339,39 @@ export const StudentHomeVisitFormView: React.FC<StudentHomeVisitFormViewProps> =
               </div>
             </div>
 
-            {/* Address Location Row (Dropdowns matching Mockup 3) */}
+            {/* Address Location Row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">จังหวัด</label>
-                <select
+                <input
+                  type="text"
                   value={province}
                   onChange={(e) => setProvince(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-orange-500 focus:outline-none bg-white"
-                >
-                  <option value="เชียงใหม่">เชียงใหม่</option>
-                  <option value="เชียงราย">เชียงราย</option>
-                  <option value="ลำพูน">ลำพูน</option>
-                </select>
+                  placeholder="ระบุจังหวัด"
+                />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">อำเภอ</label>
-                <select
+                <label className="text-xs font-bold text-slate-700">อำเภอ / เขต</label>
+                <input
+                  type="text"
                   value={district}
                   onChange={(e) => setDistrict(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-orange-500 focus:outline-none bg-white"
-                >
-                  <option value="เมืองเชียงใหม่">เมืองเชียงใหม่</option>
-                  <option value="สันทราย">สันทราย</option>
-                  <option value="หางดง">หางดง</option>
-                </select>
+                  placeholder="ระบุอำเภอ"
+                />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">ตำบล</label>
-                <select
+                <label className="text-xs font-bold text-slate-700">ตำบล / แขวง</label>
+                <input
+                  type="text"
                   value={subdistrict}
                   onChange={(e) => setSubdistrict(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-orange-500 focus:outline-none bg-white"
-                >
-                  <option value="หนองบัว">หนองบัว</option>
-                  <option value="สุเทพ">สุเทพ</option>
-                  <option value="ช้างเผือก">ช้างเผือก</option>
-                </select>
+                  placeholder="ระบุตำบล"
+                />
               </div>
 
               <div className="space-y-1.5">
@@ -357,7 +381,7 @@ export const StudentHomeVisitFormView: React.FC<StudentHomeVisitFormViewProps> =
                   value={postalCode}
                   onChange={(e) => setPostalCode(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-orange-500 focus:outline-none"
-                  placeholder="50200"
+                  placeholder="รหัสไปรษณีย์"
                 />
               </div>
             </div>
@@ -460,7 +484,9 @@ export const StudentHomeVisitFormView: React.FC<StudentHomeVisitFormViewProps> =
                   <span>พิกัด GPS บ้านนักเรียน</span>
                 </span>
                 <p className="text-xs text-slate-500 font-mono">
-                  {gpsLat.toFixed(5)}, {gpsLng.toFixed(5)} (ต.หนองบัว จ.เชียงใหม่)
+                  {gpsLat !== 0 || gpsLng !== 0
+                    ? `${gpsLat.toFixed(5)}, ${gpsLng.toFixed(5)}${subdistrict && province ? ` (${subdistrict} ${province})` : ''}`
+                    : 'ยังไม่ได้ระบุพิกัด (กดปุ่มเพื่อบันทึกพิกัดปัจจุบัน)'}
                 </p>
               </div>
 
@@ -477,15 +503,18 @@ export const StudentHomeVisitFormView: React.FC<StudentHomeVisitFormViewProps> =
 
             {/* Teacher Assessment Summary */}
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">
-                สรุปความเห็นของครูประจำชั้น / แผนการดูแลช่วยเหลือ
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700">
+                  สรุปความเห็นของครูประจำชั้น / แผนการดูแลช่วยเหลือ
+                </label>
+                <span className="text-[11px] text-slate-400 font-medium">(ครูประจำชั้นเป็นผู้บันทึก)</span>
+              </div>
               <textarea
                 rows={3}
                 value={teacherSummary}
-                onChange={(e) => setTeacherSummary(e.target.value)}
-                className="w-full p-3 rounded-2xl border border-slate-200 text-xs focus:border-orange-500 focus:outline-none leading-relaxed"
-                placeholder="สรุปข้อสังเกตและแนวทางช่วยเหลือส่งต่อนักเรียน..."
+                readOnly
+                className="w-full p-3 rounded-2xl border border-slate-200 bg-slate-50/70 text-slate-600 text-xs focus:outline-none leading-relaxed cursor-default"
+                placeholder="ส่วนนี้สำหรับครูประจำชั้นบันทึกสรุปผลและข้อเสนอแนะเมื่อลงพื้นที่จริง..."
               />
             </div>
           </div>

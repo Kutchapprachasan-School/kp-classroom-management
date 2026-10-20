@@ -31,6 +31,7 @@ import {
 } from '../services/coursesCurriculumService';
 import { classroomService } from '../services/classroomService';
 import { academicCalendarService } from '../services/academicCalendarService';
+import { authService } from '../services/authService';
 import type { ClassroomRosterItem } from '../types/viewModels';
 import type { CrossViewNavigationPayload } from '../services/teacherCopilotService';
 
@@ -41,9 +42,33 @@ export interface CoursesCurriculumViewProps {
 export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
   onDeepNavigate,
 }) => {
-  const [courses, setCourses] = useState<CourseCurriculumRecord[]>(() =>
+  const currentUser = authService.getCurrentUser();
+  const isAdmin = currentUser?.role === 'ADMIN' || (currentUser?.role as string) === 'DIRECTOR';
+
+  // ตัวกรองรายวิชา: ครูทั่วไปจะเห็นเฉพาะวิชาที่ตนเองลงทะเบียนไว้เท่านั้น (ของใครของมัน)
+  const [teacherFilter, setTeacherFilter] = useState<'MY_COURSES' | 'ALL'>(
+    isAdmin ? 'ALL' : 'MY_COURSES'
+  );
+
+  const [allRawCourses, setAllRawCourses] = useState<CourseCurriculumRecord[]>(() =>
     coursesCurriculumService.getCourses()
   );
+
+  const courses = useMemo(() => {
+    if (teacherFilter === 'ALL') return allRawCourses;
+    const myId = currentUser?.id;
+    const myName = currentUser?.name;
+    const myUsername = currentUser?.username;
+    return allRawCourses.filter((c) => {
+      if (c.teacherId && myId && c.teacherId === myId) return true;
+      if (c.teacherName && myName && c.teacherName === myName) return true;
+      if (c.teacherUsername && myUsername && c.teacherUsername === myUsername) return true;
+      // Fallback: หากยังไม่เคยระบุครูผู้รับผิดชอบ ให้แสดงเฉพาะเมื่อไม่มีวิชาอื่น
+      if (!c.teacherId && !c.teacherName) return true;
+      return false;
+    });
+  }, [allRawCourses, teacherFilter, currentUser]);
+
   const [selectedCourseId, setSelectedCourseId] = useState<string>(
     courses[0]?.id || ''
   );
@@ -68,7 +93,7 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
   // Sync state on external update
   const refreshCourses = useCallback(() => {
     const updated = coursesCurriculumService.getCourses();
-    setCourses([...updated]);
+    setAllRawCourses([...updated]);
     if (!updated.some((c) => c.id === selectedCourseId) && updated[0]) {
       setSelectedCourseId(updated[0].id);
     }
@@ -118,7 +143,7 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
     credits: 1.5,
     periodsPerWeek: 3,
     academicYear: '2569',
-    term: '1',
+    term: '2',
     assignedClassrooms: ['ม.3/1', 'ม.3/2'] as string[],
   });
   const [roomFilterTab, setRoomFilterTab] = useState<string>('ALL');
@@ -221,9 +246,10 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
   };
 
   const selectAllRoomsOfLevel = (levelPrefix: string) => {
-    const targetRooms = allClassrooms
-      .filter((c) => c.name.startsWith(levelPrefix) || c.level.startsWith(levelPrefix))
-      .map((c) => c.name);
+    const targetRooms = (levelPrefix === 'ALL'
+      ? allClassrooms
+      : allClassrooms.filter((c) => c.name.startsWith(levelPrefix) || c.level.startsWith(levelPrefix))
+    ).map((c) => c.name);
     if (targetRooms.length === 0) return;
 
     setCourseForm((prev) => {
@@ -245,16 +271,16 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
     const defaultLevel = 'ม.3';
     const initialRooms: string[] = [];
     const { periodsPerRoom } = calculatePeriodsPerWeek(1.5, 1);
-    let defaultTerm = '1';
+    let defaultTerm = '2';
     let defaultYear = '2569';
     if (termFilter !== 'ALL' && termFilter.includes('/')) {
       const parts = termFilter.split('/');
-      defaultTerm = parts[0] || '1';
+      defaultTerm = parts[0] || '2';
       defaultYear = parts[1] || '2569';
     } else {
       try {
         const active = academicCalendarService.getActiveTerm();
-        defaultTerm = String(active.semesterNo || '1');
+        defaultTerm = String(active.semesterNo || '2');
         defaultYear = String(active.year || '2569');
       } catch {
         // fallback
@@ -299,6 +325,9 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
       academicYear: courseForm.academicYear,
       term: courseForm.term,
       assignedClassrooms: courseForm.assignedClassrooms,
+      teacherId: currentUser?.id,
+      teacherName: currentUser?.name || 'ครูผู้สอน',
+      teacherUsername: currentUser?.username,
       units: [],
     });
 
@@ -533,10 +562,42 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
         quoteText="หลักสูตรที่เข้มแข็ง คือสะพานเชื่อมสู่ความรู้ที่ยั่งยืน"
       />
 
-      {/* 2. Action & Navigation Toolbar (ย้ายปุ่มลงมาข้างล่างตามที่ผู้ใช้ร้องขอ) */}
+      {/* 2. Action & Navigation Toolbar */}
       <div className="bg-white rounded-2xl border border-slate-200/90 p-3.5 sm:p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-        {/* Term / Academic Year Filter Tabs */}
+        {/* Term / Academic Year Filter Tabs & Teacher Scope */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+          {/* Teacher Scope Badge / Selector (ของใครของมัน) */}
+          {isAdmin ? (
+            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200 mr-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => setTeacherFilter('MY_COURSES')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  teacherFilter === 'MY_COURSES'
+                    ? 'bg-white text-blue-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                👤 วิชาของฉัน
+              </button>
+              <button
+                type="button"
+                onClick={() => setTeacherFilter('ALL')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  teacherFilter === 'ALL'
+                    ? 'bg-white text-blue-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                👥 ทุกคุณครู ({allRawCourses.length})
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-xs font-bold mr-1 shrink-0">
+              <span>👤 รายวิชาสอนของ: {currentUser?.name || 'ครูผู้สอน'}</span>
+            </div>
+          )}
+
           <button
             type="button"
             onClick={() => setTermFilter('ALL')}
@@ -1165,15 +1226,19 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
                       {lvl === 'ALL' ? 'ทุกระดับ' : lvl}
                     </button>
                   ))}
-                  {roomFilterTab !== 'ALL' && (
-                    <button
-                      type="button"
-                      onClick={() => selectAllRoomsOfLevel(roomFilterTab)}
-                      className="text-[10px] font-bold text-blue-600 hover:underline px-2 cursor-pointer ml-auto whitespace-nowrap"
-                    >
-                      เลือก/ยกเลิก ทั้ง {roomFilterTab}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => selectAllRoomsOfLevel(roomFilterTab)}
+                    className="text-[10px] font-bold text-blue-600 hover:underline px-2 cursor-pointer ml-auto whitespace-nowrap"
+                  >
+                    {roomFilterTab === 'ALL'
+                      ? allClassrooms.length > 0 && allClassrooms.every((c) => courseForm.assignedClassrooms.includes(c.name))
+                        ? 'ยกเลิกทุกห้อง'
+                        : 'เลือกทุกห้อง'
+                      : allClassrooms.filter((c) => c.name.startsWith(roomFilterTab) || c.level.startsWith(roomFilterTab)).every((c) => courseForm.assignedClassrooms.includes(c.name))
+                        ? `ยกเลิกทั้ง ${roomFilterTab}`
+                        : `เลือกทั้ง ${roomFilterTab}`}
+                  </button>
                 </div>
 
                 {/* Room Chips Grid */}
@@ -1395,15 +1460,19 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
                       {lvl === 'ALL' ? 'ทุกระดับ' : lvl}
                     </button>
                   ))}
-                  {roomFilterTab !== 'ALL' && (
-                    <button
-                      type="button"
-                      onClick={() => selectAllRoomsOfLevel(roomFilterTab)}
-                      className="text-[10px] font-bold text-blue-600 hover:underline px-2 cursor-pointer ml-auto whitespace-nowrap"
-                    >
-                      เลือก/ยกเลิก ทั้ง {roomFilterTab}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => selectAllRoomsOfLevel(roomFilterTab)}
+                    className="text-[10px] font-bold text-blue-600 hover:underline px-2 cursor-pointer ml-auto whitespace-nowrap"
+                  >
+                    {roomFilterTab === 'ALL'
+                      ? allClassrooms.length > 0 && allClassrooms.every((c) => courseForm.assignedClassrooms.includes(c.name))
+                        ? 'ยกเลิกทุกห้อง'
+                        : 'เลือกทุกห้อง'
+                      : allClassrooms.filter((c) => c.name.startsWith(roomFilterTab) || c.level.startsWith(roomFilterTab)).every((c) => courseForm.assignedClassrooms.includes(c.name))
+                        ? `ยกเลิกทั้ง ${roomFilterTab}`
+                        : `เลือกทั้ง ${roomFilterTab}`}
+                  </button>
                 </div>
 
                 {/* Room Chips Grid */}

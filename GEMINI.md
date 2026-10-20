@@ -81,3 +81,31 @@ To eliminate wasteful database egress and preserve serverless compute hours (Neo
 
 Detailed rule specification: [`.agent/rules/egress-optimization.md`](.agent/rules/egress-optimization.md) / [`.agents/rules/egress-optimization.md`](.agents/rules/egress-optimization.md)
 
+## Cross-System Data Schema Governance Rules (SMS ⟷ Classroom Management)
+Because `09 ระบบจัดการชั้นเรียน` and `ระบบบริหารจัดการโรงเรียน (SMS / SuraLeave)` share the same Neon PostgreSQL database, all AI agents and developers must strictly follow the **Cross-System Data Schema Contract** to prevent Split-Brain dashboards:
+
+1. 🗺️ **Consult the Data Schema Index First**:
+   - Always check [`docs/DATA_SCHEMA_INDEX.md`](docs/DATA_SCHEMA_INDEX.md) before writing or modifying any `.from(...)`, `.rpc(...)`, or `prisma.<model>` query.
+2. 🏛️ **Canonical Base Tables vs Read Views vs Config Store**:
+   - **Students & Parent Contacts**: Write to `"Student"` (or via `public.students` view `INSTEAD OF` trigger); Read via `public.students` view (Classroom) or `prisma.student` (SMS).
+   - **Classroom Enrollment & Promotion**: Keep `"StudentEnrollment"` (`status = 'ENROLLED'`) and `public.student_enrollments` (`status = 'ACTIVE'`) 100% synchronized. Both `public.students`, `public.classrooms` (`student_count`), and SMS Dashboard read active enrollments from `"StudentEnrollment"`.
+   - **Classrooms**: Write to `"ClassRoom"`; Read via `public.classrooms` view (`student_count` from DB must never be overwritten by `localStorage` zero/stale counts).
+   - **Attendance**: Student morning attendance (`period = 0` in `"Attendance"`) must sync with `"StudentMorningAttendance"` for the SMS Dashboard, while staff attendance in `"Attendance"` uses `userId IS NOT NULL`.
+   - **Forbidden in `kps_cloud_store`**: `kps_cloud_store` is strictly for UI/app settings (`kp_school_bell_schedule`, `kps_school_branding_settings_v1`, etc.). Never use `kps_cloud_store` as the source of truth for students, classrooms, enrollments, attendance, or grades.
+3. 🔄 **Living Data Schema Index Maintenance**:
+   - **Mandatory**: Run `node scripts/index_data_schema.mjs` every time database queries, services, or migrations are modified so both systems stay synchronized.
+
+Detailed rule specification: [`.agent/rules/data-schema-governance.md`](.agent/rules/data-schema-governance.md) / [`.agents/rules/data-schema-governance.md`](.agents/rules/data-schema-governance.md)
+
+## Zero-Token Multi-Agent File Conflict Guard Rules (ป้องกันหลาย Agent แก้ไฟล์ชนกัน)
+To prevent code corruption when multiple conversations or subagents run concurrently while consuming near-zero tokens:
+
+1. 🚫 **Never Read Raw Transcripts Directly**: Never use `view_file` on another conversation's `transcript.jsonl` to check for conflicts (wastes 3,000–10,000 tokens).
+2. 📡 **Use the Conflict Radar CLI (~30 Tokens)**: Before editing shared or multi-file scopes, run:
+   - `node scripts/check_agent_conflicts.mjs --self=<conversation-id> <file1> <file2> ...`
+   - Optionally lock scope upfront: `node scripts/check_agent_conflicts.mjs --lock <conversation-id> <file1> <file2> ...`
+3. 🛡️ **Respect Automatic `PreToolUse` Hook Blocks (0 Tokens)**: `.agents/hooks.json` automatically runs `scripts/check_agent_conflicts.mjs --hook` before every `replace_file_content` / `write_to_file`. If blocked (`⛔ [Multi-Agent Conflict Guard]`), do not force-overwrite; wait or work on non-conflicting files first.
+
+Detailed rule specification: [`.agent/rules/multi-agent-conflict-guard.md`](.agent/rules/multi-agent-conflict-guard.md) / [`.agents/rules/multi-agent-conflict-guard.md`](.agents/rules/multi-agent-conflict-guard.md)
+
+

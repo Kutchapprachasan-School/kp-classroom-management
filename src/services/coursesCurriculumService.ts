@@ -6,6 +6,7 @@
 
 import { academicCalendarService } from './academicCalendarService.ts';
 import { activityAuditLogService } from './activityAuditLogService.ts';
+import { authService } from './authService.ts';
 
 export type MediaType = 'DOCUMENT' | 'WORKSHEET' | 'EXAM_QUIZ' | 'VIDEO' | 'LINK';
 
@@ -47,6 +48,8 @@ export interface CourseCurriculumRecord {
   term: string; // เช่น '1'
   assignedClassrooms: string[]; // เช่น ['ม.3/1', 'ม.3/2']
   teacherName?: string;
+  teacherId?: string;
+  teacherUsername?: string;
   units: CurriculumUnit[];
 }
 
@@ -147,11 +150,23 @@ class CoursesCurriculumService {
     this.save();
   }
 
-  public getCourses(academicYear?: string, term?: string): CourseCurriculumRecord[] {
+  public getCourses(
+    academicYear?: string,
+    term?: string,
+    teacherIdOrName?: string
+  ): CourseCurriculumRecord[] {
     const all = this.load();
     return all.filter((c) => {
       if (academicYear && c.academicYear !== academicYear) return false;
       if (term && c.term !== term) return false;
+      if (teacherIdOrName) {
+        const matchesTeacher =
+          c.teacherId === teacherIdOrName ||
+          c.teacherName === teacherIdOrName ||
+          c.teacherUsername === teacherIdOrName ||
+          (!c.teacherId && !c.teacherName); // Fallback สำหรับวิชาเดิมที่บันทึกก่อนหน้า
+        if (!matchesTeacher) return false;
+      }
       return true;
     });
   }
@@ -162,8 +177,12 @@ class CoursesCurriculumService {
 
   public createCourse(data: Omit<CourseCurriculumRecord, 'id'>): CourseCurriculumRecord {
     const all = this.load();
+    const currentUser = authService.getCurrentUser();
     const newCourse: CourseCurriculumRecord = {
       ...data,
+      teacherId: data.teacherId || currentUser?.id,
+      teacherName: data.teacherName || currentUser?.name || 'ครูผู้สอน',
+      teacherUsername: data.teacherUsername || currentUser?.username,
       id: `course-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       units: data.units || [],
     };
@@ -622,9 +641,11 @@ class CoursesCurriculumService {
       isFreePeriod?: boolean;
       isLunchSlot?: boolean;
       status?: string;
+      teacherId?: string;
     }>,
     academicYear?: string,
-    term?: string
+    term?: string,
+    teacherIdOrName?: string
   ): Array<{
     id: string;
     day: 'จันทร์' | 'อังคาร' | 'พุธ' | 'พฤหัสบดี' | 'ศุกร์';
@@ -639,13 +660,15 @@ class CoursesCurriculumService {
     isFreePeriod: boolean;
     status: 'UNCHECKED';
     subjectIcon?: string;
+    teacherId?: string;
+    teacherName?: string;
   }> {
     const activeTerm = academicCalendarService.getActiveTerm();
     const targetYear = academicYear || (activeTerm ? String(activeTerm.year) : '2569');
     const targetTerm = term || (activeTerm ? String(activeTerm.semesterNo) : '1');
 
-    let courses = this.getCourses(targetYear, targetTerm);
-    if (courses.length === 0) {
+    let courses = this.getCourses(targetYear, targetTerm, teacherIdOrName);
+    if (courses.length === 0 && !teacherIdOrName) {
       courses = this.load();
     }
     const waitingSlots: Array<any> = [];
@@ -686,6 +709,8 @@ class CoursesCurriculumService {
             category: 'subject',
             isFreePeriod: false,
             status: 'UNCHECKED',
+            teacherId: course.teacherId,
+            teacherName: course.teacherName,
           });
         }
       });

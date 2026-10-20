@@ -168,9 +168,8 @@ assert.strictEqual(teacherBannerService.getEffectiveBanner('bottom').customUrl, 
 console.log('  ✓ Reset all banners restores all 3 banners to default');
 
 // 4. Verify Component Header and Timetable Card Rendering
-console.log('\n--- 4. Checking Code Implementations ---');
 const teacherHeaderCode = fs.readFileSync('src/components/layout/TeacherHeader.tsx', 'utf8');
-assert.ok(teacherHeaderCode.includes('นายปัญจพล เกษรัตน์'), 'Header must contain teacher name');
+assert.ok(teacherHeaderCode.includes('currentUser?.name') || teacherHeaderCode.includes('ครูผู้สอน'), 'Header must support dynamic current user teacher name');
 assert.ok(teacherHeaderCode.includes('formatThaiDateFull'), 'Header must contain dynamic Thai date function');
 assert.ok(teacherHeaderCode.includes('lg:hidden'), 'Header must support dedicated mobile view');
 console.log('  ✓ TeacherHeader supports dual desktop and mobile header with dynamic Thai date');

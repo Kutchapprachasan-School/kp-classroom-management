@@ -210,6 +210,26 @@ export const studentAffairsCouncilService = {
     return updated;
   },
 
+  getStudentDisciplineScore(studentCode: string): { score: number; label: string; logs: DisciplineRecord[] } {
+    const all = this.getDisciplineLogs();
+    const studentLogs = all.filter((l) => l.studentCode === studentCode);
+    let score = 100;
+    for (const log of studentLogs) {
+      if (log.type === 'DEDUCT') {
+        score -= log.points;
+      } else {
+        score += log.points;
+      }
+    }
+    const finalScore = Math.max(0, score);
+    let label = 'ดีเยี่ยม';
+    if (finalScore >= 90) label = 'ดีเยี่ยม';
+    else if (finalScore >= 75) label = 'ดี';
+    else if (finalScore >= 60) label = 'พอใช้';
+    else label = 'ต้องปรับปรุง';
+    return { score: finalScore, label, logs: studentLogs };
+  },
+
   // 3. ใบลานักเรียน (แยกจาก E-Leave ครู)
   getStudentLeaves(): StudentLeaveRequest[] {
     if (cleanSlateService.isCleanSlateActive()) {

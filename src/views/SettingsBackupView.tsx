@@ -114,6 +114,7 @@ import { SettingsCategoryCard } from '../components/settings/SettingsCategoryCar
 import { SettingsSubModal } from '../components/settings/SettingsSubModal';
 import { AdminTeacherBannerModal } from '../components/teacher/AdminTeacherBannerModal';
 import { ThaiMiniDatePicker } from '../components/common/ThaiMiniDatePicker';
+import { AdminGachaSettingsModal } from '../components/admin/AdminGachaSettingsModal';
 
 export type SettingsKey =
   | 'school_info'
@@ -134,7 +135,8 @@ export type SettingsKey =
   | 'backup'
   | 'notifications'
   | 'theme'
-  | 'security';
+  | 'security'
+  | 'gacha';
 
 interface SettingsBackupViewProps {
   activeRole?: SchoolUserRole;
@@ -1213,6 +1215,21 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
             isExpanded={expandedCards['security']}
             onToggleExpand={(e) => toggleExpand('security', e)}
             quickInfo="Teacher PIN & สิทธิ์ RBAC"
+          />
+
+          {/* Card 5.4: ระบบกาชา & ควิซ 40 สัปดาห์ */}
+          <SettingsCategoryCard
+            id="gacha"
+            title="กาชา & ควิซ 40 สัปดาห์"
+            subtitle="อัตราสุ่ม, การันตี, ร้านค้า, จัดการโจทย์ 40 สัปดาห์ และรีเซ็ต/คืนค่า"
+            icon={<Sparkles className="w-5 h-5" />}
+            iconBgClass="bg-purple-50"
+            iconColorClass="text-purple-600"
+            onClick={() => setActiveModalKey('gacha')}
+            isExpanded={expandedCards['gacha']}
+            onToggleExpand={(e) => toggleExpand('gacha', e)}
+            badge="40 สัปดาห์"
+            quickInfo="Rates, Pity, Reset, Rollback, Quiz Bank"
           />
         </div>
       </section>
@@ -3905,6 +3922,12 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
           </div>
         </div>
       </SettingsSubModal>
+
+      {/* Modal 5.4: ระบบกาชา & ควิซ 40 สัปดาห์ */}
+      <AdminGachaSettingsModal
+        isOpen={activeModalKey === 'gacha'}
+        onClose={() => setActiveModalKey(null)}
+      />
 
       {/* Fallback Banner Modal if opened outside Settings */}
       {adminBannerModalKey !== null && activeModalKey !== 'theme' && (

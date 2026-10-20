@@ -25,6 +25,7 @@ import {
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 import { coursesCurriculumService, type CourseCurriculumRecord } from '../services/coursesCurriculumService';
 import { getSchoolSettings } from '../config/schoolRoles';
+import { authService } from '../services/authService';
 
 // ==========================================
 // DATA TYPES
@@ -109,7 +110,7 @@ export const LessonPlansView: React.FC = () => {
   });
   const [selectedCourseIndex, setSelectedCourseIndex] = useState(0);
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
-  const [selectedSemester, setSelectedSemester] = useState(() => getSchoolSettings().academicTerm || 'ภาคเรียนที่ 1/2569');
+  const [selectedSemester, setSelectedSemester] = useState(() => getSchoolSettings().academicTerm || 'ภาคเรียนที่ 2/2569');
   const [isSemesterDropdownOpen, setIsSemesterDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -303,7 +304,7 @@ export const LessonPlansView: React.FC = () => {
         summary: 'ยังไม่ได้ดำเนินการสอน',
         problem: '-',
         solution: '-',
-        recordedBy: 'นายปัญจพล เกษรัตน์',
+        recordedBy: authService.getCurrentUser()?.name || 'ครูผู้สอน',
       },
     };
 
@@ -426,7 +427,7 @@ export const LessonPlansView: React.FC = () => {
 
               {isSemesterDropdownOpen && (
                 <div className="absolute top-full left-0 mt-1.5 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-30 py-1.5 animate-fade-in">
-                  {['ภาคเรียนที่ 1/2569', 'ภาคเรียนที่ 2/2568'].map((sem) => (
+                  {['ภาคเรียนที่ 2/2569', 'ภาคเรียนที่ 1/2569', 'ภาคเรียนที่ 2/2568'].map((sem) => (
                     <button
                       key={sem}
                       type="button"
