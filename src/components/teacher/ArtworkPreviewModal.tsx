@@ -10,9 +10,7 @@ import {
   FileText,
   Palette,
   CheckCircle2,
-  Sparkles,
 } from 'lucide-react';
-import { getSchoolSettings } from '../../config/schoolRoles';
 
 export interface ArtworkPreviewModalProps {
   isOpen: boolean;
@@ -337,74 +335,47 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                   </a>
                 </div>
 
-                {/* Canva Poster Artwork Rendering */}
-                <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 p-6 sm:p-10 text-white min-h-[500px] flex flex-col justify-between relative overflow-hidden border border-slate-800">
-                  {/* Decorative modern geometric shapes */}
-                  <div className="absolute -right-20 -top-20 w-80 h-80 rounded-full bg-cyan-500/20 blur-3xl" />
-                  <div className="absolute -left-20 -bottom-20 w-80 h-80 rounded-full bg-purple-500/20 blur-3xl" />
-                  <div className="absolute right-10 bottom-24 w-32 h-32 border border-cyan-400/20 rounded-full" />
-
-                  {/* Header of Poster */}
-                  <div className="relative z-10 space-y-2 text-center sm:text-left">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 text-xs font-black tracking-widest uppercase">
-                      <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>KUTCHAP CONTEMPORARY ART FESTIVAL 2026</span>
+                {/* Canva Artwork Presentation */}
+                <div className="bg-slate-950 p-6 sm:p-10 text-white min-h-[420px] flex flex-col justify-between items-center text-center relative overflow-hidden border border-slate-800">
+                  <div className="max-w-md w-full space-y-4 my-auto">
+                    <div className="w-16 h-16 rounded-2xl bg-[#00C4CC]/20 border border-[#00C4CC]/40 text-[#00C4CC] mx-auto flex items-center justify-center text-2xl font-black">
+                      🎨
                     </div>
-                    <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-teal-200 to-pink-300">
-                      ศิลปวัฒนธรรมกุดจับร่วมสมัย
-                    </h1>
-                    <p className="text-xs sm:text-sm text-slate-300 max-w-lg font-light leading-relaxed">
-                      การผสานลวดลายไทยประเพณีเข้ากับศิลปะนามธรรมสมัยใหม่ (Contemporary Neo-Tradition)
-                      สะท้อนอัตลักษณ์ชุมชนและวรรณคดีพื้นบ้านอีสาน
-                    </p>
-                  </div>
-
-                  {/* Graphic Showcase Section */}
-                  <div className="relative z-10 my-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="p-4 rounded-xl bg-white/5 backdrop-blur-md border border-white/10 text-center space-y-1.5">
-                      <div className="w-10 h-10 rounded-full bg-cyan-500/20 text-cyan-300 mx-auto flex items-center justify-center font-black">
-                        ๑
-                      </div>
-                      <h4 className="text-xs font-bold text-white">ลายกนกสามเหลี่ยม</h4>
-                      <p className="text-[10px] text-slate-400">พัฒนาจากลายผ้าขิดโบราณ</p>
-                    </div>
-
-                    <div className="p-4 rounded-xl bg-white/5 backdrop-blur-md border border-white/10 text-center space-y-1.5">
-                      <div className="w-10 h-10 rounded-full bg-pink-500/20 text-pink-300 mx-auto flex items-center justify-center font-black">
-                        ๒
-                      </div>
-                      <h4 className="text-xs font-bold text-white">วงจรสีคู่ตรงข้าม</h4>
-                      <p className="text-[10px] text-slate-400">สีกรมท่าตัดกับสีทองอร่าม</p>
-                    </div>
-
-                    <div className="p-4 rounded-xl bg-white/5 backdrop-blur-md border border-white/10 text-center space-y-1.5">
-                      <div className="w-10 h-10 rounded-full bg-purple-500/20 text-purple-300 mx-auto flex items-center justify-center font-black">
-                        ๓
-                      </div>
-                      <h4 className="text-xs font-bold text-white">การจัดวางอสมมาตร</h4>
-                      <p className="text-[10px] text-slate-400">ความสมดุลแบบเคลื่อนไหว</p>
-                    </div>
-                  </div>
-
-                  {/* Poster Footer with Student Info */}
-                  <div className="relative z-10 pt-4 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-400">
                     <div>
-                      <span className="text-white font-bold block">
-                        ออกแบบโดย: {studentName}
+                      <span className="inline-block px-3 py-1 rounded-full bg-[#00C4CC]/10 text-[#00C4CC] border border-[#00C4CC]/30 text-xs font-bold uppercase mb-2">
+                        Canva Project Link
                       </span>
-                      <span className="text-[11px] text-slate-400">
-                        เลขที่ {seatNo} • ชั้น {classroom} • รหัส {studentCode}
-                      </span>
+                      <h2 className="text-xl font-bold text-white">
+                        {title}
+                      </h2>
+                      <p className="text-xs text-slate-400 mt-1">
+                        ผลงานของ {studentName} (เลขที่ {seatNo} • ห้อง {classroom} • รหัส {studentCode})
+                      </p>
                     </div>
 
-                    <div className="text-left sm:text-right">
-                      <span className="text-cyan-300 font-bold block">
-                        กลุ่มสาระการเรียนรู้ศิลปะ (ศ23101)
-                      </span>
-                      <span className="text-[11px] text-slate-400">
-                        {getSchoolSettings().nameTh}
-                      </span>
+                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 break-all text-left">
+                      <p className="text-[11px] text-slate-500 font-semibold mb-1">ลิงก์ชิ้นงานที่ส่ง:</p>
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#00C4CC] hover:underline"
+                      >
+                        {url || 'ไม่มีลิงก์แนบ'}
+                      </a>
                     </div>
+
+                    {url && (
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#00C4CC] hover:bg-[#00b2b8] text-white text-xs font-bold transition-colors shadow-lg w-full"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        <span>เปิดดูชิ้นงานใน Canva ต้นฉบับ ↗</span>
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>
@@ -612,37 +583,52 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                   className="max-w-full max-h-[72vh] object-contain rounded-2xl shadow-2xl border border-slate-700/60 bg-slate-900"
                 />
               ) : (
-                /* High-fidelity Vector Fallback when external link is blocked or local JPG */
-                <div className="bg-gradient-to-tr from-slate-900 via-teal-950 to-indigo-950 p-6 sm:p-8 rounded-2xl border-2 border-teal-500/40 shadow-2xl text-white max-w-xl text-center space-y-4">
-                  <div className="w-20 h-20 rounded-2xl bg-teal-500/20 border-2 border-teal-400 text-teal-300 mx-auto flex items-center justify-center font-black text-3xl shadow-lg">
-                    🎨
+                /* Clean file status card conforming to Strict Zero Mock Policy */
+                <div className="bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-700 shadow-2xl text-white max-w-lg w-full text-center space-y-4">
+                  <div className="w-16 h-16 rounded-2xl bg-teal-500/10 border border-teal-500/30 text-teal-400 mx-auto flex items-center justify-center font-bold text-2xl shadow-inner">
+                    🖼️
                   </div>
                   <div className="space-y-1">
-                    <span className="px-3 py-1 rounded-full bg-teal-500/10 border border-teal-400/30 text-teal-300 text-xs font-black">
-                      {isJpg ? 'JPG HIGH-RESOLUTION ARTWORK' : 'PNG ARTWORK'}
+                    <span className="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-700">
+                      {isJpg ? 'ไฟล์ภาพ JPG' : isPng ? 'ไฟล์ภาพ PNG' : 'ไฟล์ภาพชิ้นงาน'}
                     </span>
-                    <h3 className="text-xl font-extrabold text-white">
-                      {fileName || 'จิตรกรรมไทยร่วมสมัย_ผลงานจริง'}
+                    <h3 className="text-base sm:text-lg font-bold text-white break-all">
+                      {fileName || 'ไฟล์ผลงานนักเรียน'}
                     </h3>
-                    <p className="text-xs text-slate-300">
-                      ภาพวาดระบายสีน้ำและแรเงาดินสอ EE ของนักเรียน {studentName}
+                    <p className="text-xs text-slate-400">
+                      ผลงานของ: <span className="text-teal-300 font-semibold">{studentName}</span> (เลขที่ {seatNo} • ชั้น {classroom} • รหัส {studentCode})
                     </p>
                   </div>
 
-                  <div className="h-44 rounded-xl bg-slate-950/60 border border-teal-500/30 p-4 flex flex-col items-center justify-center space-y-2">
-                    <div className="flex items-center gap-2 text-teal-400 text-xs font-bold">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      <span>ไฟล์ {isJpg ? 'JPG' : 'PNG'} ถูกตรวจสอบและแคชในระบบ R2 Storage เรียบร้อย</span>
+                  <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 text-left space-y-2 text-xs">
+                    {imgLoadError ? (
+                      <div className="text-amber-400 flex items-start gap-2">
+                        <span className="shrink-0">⚠️</span>
+                        <span>
+                          ไม่สามารถแสดงผลตัวอย่างภาพบนเบราว์เซอร์ได้โดยตรง (อาจติดการตั้งค่าสิทธิ์เครือข่าย หรือรูปแบบไฟล์ไม่รองรับการแสดงตัวอย่างในหน้านี้)
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="text-slate-300 flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                        <span>ไฟล์ได้รับการบันทึกและส่งผ่านระบบเรียบร้อยแล้ว</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {url && (
+                    <div className="pt-2">
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition-colors shadow-md w-full"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        <span>เปิดไฟล์ต้นฉบับในแท็บใหม่ ↗</span>
+                      </a>
                     </div>
-                    <p className="text-[11px] text-slate-400 max-w-md">
-                      ขนาดภาพ: 2400 x 1800 px (300 DPI) • ตรวจสอบลายเส้นและน้ำหนักแสงเงาผ่านเกณฑ์มาตรฐาน
-                    </p>
-                  </div>
-
-                  <div className="text-[11px] text-slate-400 flex items-center justify-between pt-2 border-t border-slate-800">
-                    <span>รหัสนักเรียน: {studentCode}</span>
-                    <span>ห้อง {classroom} เลขที่ {seatNo}</span>
-                  </div>
+                  )}
                 </div>
               )}
             </div>

@@ -149,8 +149,49 @@ export interface StudentWorkSubmission {
   originalSizeKb?: number;
   compressedSizeKb?: number;
   externalLinkUrl?: string;
+  fileDataUrl?: string;
   academicYearTerm?: string;
   isR2FilePurged?: boolean;
+}
+
+// ฟังก์ชันแปลงเวลาส่งงานให้เป็นภาษาไทยที่แม่นยำ ไม่ค้างข้อความ "เพิ่งส่งเมื่อสักครู่" ตลอดไป
+export function formatSubmissionTimestamp(val?: string | number): string {
+  if (!val) return 'ส่งแล้ว';
+
+  // ถ้าเป็นข้อความเก่าที่เคยฮาร์ดโค้ดไว้
+  if (typeof val === 'string' && val.includes('เพิ่งส่งเมื่อสักครู่ (Cloudflare R2)')) {
+    return 'ส่งแล้วในระบบ';
+  }
+
+  const d = typeof val === 'number' ? new Date(val) : new Date(val);
+  if (isNaN(d.getTime())) {
+    return String(val);
+  }
+
+  const now = Date.now();
+  const diffMs = Math.max(0, now - d.getTime());
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHr = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+
+  const thaiMonths = [
+    'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+    'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+  ];
+  const day = d.getDate();
+  const month = thaiMonths[d.getMonth()];
+  const year = d.getFullYear() + 543;
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const timeStr = `${hours}:${minutes} น.`;
+
+  if (diffMin < 2) return 'เพิ่งส่งเมื่อสักครู่';
+  if (diffMin < 60) return `${diffMin} นาทีที่แล้ว (${timeStr})`;
+  if (diffHr < 24) return `${diffHr} ชั่วโมงที่แล้ว (${timeStr})`;
+  if (diffDay === 1) return `เมื่อวานนี้ ${timeStr}`;
+  if (diffDay < 7) return `${diffDay} วันที่แล้ว (${day} ${month} ${timeStr})`;
+
+  return `${day} ${month} ${year} ${timeStr}`;
 }
 
 const STORAGE_KEY_SGS_ROSTER = 'kp_sgs_roster_v3';
@@ -1499,6 +1540,16 @@ export const sgsRosterAndSubmissionService = {
     return '\uFEFF' + [header.join(','), ...rows].join('\n');
   },
 
+  // ดึง Data URL ไฟล์ชิ้นงานจริงที่นักเรียนอัปโหลดไว้ (ถ้ามี)
+  getSubmissionFileUrl(assignmentId: string, studentCode: string): string | undefined {
+    if (typeof localStorage === 'undefined') return undefined;
+    try {
+      return localStorage.getItem(`kp_sub_file_${assignmentId}_${studentCode}`) || undefined;
+    } catch {
+      return undefined;
+    }
+  },
+
   // อัปโหลดไฟล์งานนักเรียนขึ้น Cloudflare R2 (บีบอัดรูป WebP อัตโนมัติ + รองรับแนบลิงก์เสริม Google Drive/Canva)
   submitStudentWorkToR2(payload: {
     assignmentId: string;
@@ -1508,6 +1559,7 @@ export const sgsRosterAndSubmissionService = {
     originalSizeKb?: number;
     compressedSizeKb?: number;
     externalLinkUrl?: string;
+    fileDataUrl?: string;
     academicYearTerm?: string;
   }): StudentWorkSubmission[] {
     const subs = this.getSubmissions();
@@ -1526,6 +1578,18 @@ export const sgsRosterAndSubmissionService = {
     const origKb = payload.originalSizeKb ?? (cleanFileName ? 4250 : 0);
     const compKb = payload.compressedSizeKb ?? (cleanFileName ? 148 : 0);
 
+    // เก็บไฟล์ภาพจริงเข้า LocalStorage แยกคีย์เพื่อไม่ให้ล้นโควต้าอาร์เรย์หลัก
+    if (payload.fileDataUrl && typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(
+          `kp_sub_file_${payload.assignmentId}_${payload.studentCode}`,
+          payload.fileDataUrl
+        );
+      } catch (e) {
+        console.warn('Could not cache submission file preview URL', e);
+      }
+    }
+
     const attachmentLabel = cleanFileName
       ? `☁️ R2: ${cleanFileName} (บีบอัดเหลือ ${compKb} KB จาก ${(origKb / 1024).toFixed(1)} MB)`
       : payload.externalLinkUrl
@@ -1533,6 +1597,14 @@ export const sgsRosterAndSubmissionService = {
       : 'ส่งงานออนไลน์';
 
     const existingScore = idx !== -1 ? subs[idx].score : null;
+    const existingSubmittedAt = idx !== -1 ? subs[idx].submittedAt : undefined;
+    const nowIso = new Date().toISOString();
+    // ถ้าเคยมี submittedAt ที่ถูกต้องแล้วให้ใช้เดิม ถ้าไม่มีหรือเป็นข้อความเดิมให้ใส่เวลาจริงปัจจุบัน
+    const finalSubmittedAt =
+      existingSubmittedAt && !existingSubmittedAt.includes('เพิ่งส่งเมื่อสักครู่')
+        ? existingSubmittedAt
+        : nowIso;
+
     const nextItem: StudentWorkSubmission = {
       ...(idx !== -1 ? subs[idx] : {}),
       assignmentId: payload.assignmentId,
@@ -1542,13 +1614,14 @@ export const sgsRosterAndSubmissionService = {
           ? 'GRADED'
           : 'SUBMITTED_PENDING',
       score: existingScore,
-      submittedAt: 'เพิ่งส่งเมื่อสักครู่ (Cloudflare R2)',
+      submittedAt: finalSubmittedAt,
       workTitle: payload.workTitle || 'ส่งชิ้นงานผ่านระบบออนไลน์',
       workAttachmentLabel: attachmentLabel,
       r2ObjectKey: r2Key,
       originalSizeKb: origKb,
       compressedSizeKb: compKb,
       externalLinkUrl: payload.externalLinkUrl,
+      fileDataUrl: payload.fileDataUrl,
       academicYearTerm: term,
       isR2FilePurged: false,
     };

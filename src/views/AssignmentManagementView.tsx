@@ -21,10 +21,12 @@ import {
 } from 'lucide-react';
 import {
   sgsRosterAndSubmissionService,
+  formatSubmissionTimestamp,
   type FourScorePart,
   type TermAssignmentConfig,
   type SgsStudentRecord,
 } from '../services/sgsRosterAndSubmissionService';
+import { studentService, formatClassroomLabel } from '../services/studentService';
 import {
   teacherCourseAssignmentService,
   getDynamicTeachingSubjects,
@@ -283,10 +285,32 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     refreshMatrixStudents();
   }, [refreshMatrixStudents]);
 
-  const matrixAssignments = useMemo(() => {
+  const [matrixPartFilter, setMatrixPartFilter] = useState<'ALL' | 'PRE_MIDTERM' | 'POST_MIDTERM'>('ALL');
+
+  const matrixCourseWeights = useMemo(
+    () => sgsRosterAndSubmissionService.getCourseWeights(selectedSubjectCode === 'ALL' ? undefined : selectedSubjectCode),
+    [selectedSubjectCode]
+  );
+
+  const matrixAssignmentsRaw = useMemo(() => {
     const code = selectedSubjectCode === 'ALL' ? undefined : selectedSubjectCode;
     return sgsRosterAndSubmissionService.getTermAssignments(code, matrixClassroom);
   }, [selectedSubjectCode, matrixClassroom, termAssignments]);
+
+  const matrixAssignments = useMemo(() => {
+    if (matrixPartFilter === 'ALL') return matrixAssignmentsRaw;
+    if (matrixPartFilter === 'PRE_MIDTERM') {
+      return matrixAssignmentsRaw.filter(
+        (a) => !a.scorePart || a.scorePart === 'PRE_MIDTERM'
+      );
+    }
+    if (matrixPartFilter === 'POST_MIDTERM') {
+      return matrixAssignmentsRaw.filter(
+        (a) => a.scorePart === 'POST_MIDTERM' || a.scorePart === 'FINAL'
+      );
+    }
+    return matrixAssignmentsRaw;
+  }, [matrixAssignmentsRaw, matrixPartFilter]);
 
   const allSubmissions = useMemo(() => {
     return sgsRosterAndSubmissionService.getSubmissions();
@@ -924,6 +948,39 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                   const isLink =
                     item.submissionChannel === 'LINK_URL' || item.externalLinkUrl || isDrive;
 
+                  // ดึงชื่อ ชั้น เลขที่จริงของนักเรียน
+                  const resolvedStu = studentService.findStudentByCode(item.studentCode);
+                  const displayName =
+                    item.studentName && item.studentName !== item.studentCode
+                      ? item.studentName
+                      : resolvedStu?.student.name || `นักเรียน (${item.studentCode})`;
+                  const displayRoom =
+                    item.classroom ||
+                    (resolvedStu?.classroomId ? formatClassroomLabel(resolvedStu.classroomId) : 'ม.3/1');
+                  const displaySeat = item.seatNo ?? resolvedStu?.student.no ?? '-';
+
+                  // ตรวจสอบข้อมูลคะแนนก่อนกลางภาคของชิ้นงานและนักเรียนคนนี้
+                  const matchedAsg = termAssignments.find((a) => a.id === item.assignmentId);
+                  const isPreMidterm = !matchedAsg?.scorePart || matchedAsg?.scorePart === 'PRE_MIDTERM';
+                  const partBadgeText = matchedAsg?.scorePart
+                    ? SCORE_PART_LABELS[matchedAsg.scorePart]?.label
+                    : 'ก่อนกลางภาค';
+
+                  const preMidtermAsgs = termAssignments.filter(
+                    (a) => !a.scorePart || a.scorePart === 'PRE_MIDTERM'
+                  );
+                  let preMidtermEarned = 0;
+                  let preMidtermMax = 0;
+                  preMidtermAsgs.forEach((asg) => {
+                    preMidtermMax += asg.maxScore;
+                    const sub = allSubmissions.find(
+                      (s) => s.assignmentId === asg.id && s.studentCode === item.studentCode
+                    );
+                    if (sub && sub.status === 'GRADED') {
+                      preMidtermEarned += sub.score ?? 0;
+                    }
+                  });
+
                   return (
                     <div
                       key={item.id}
@@ -936,17 +993,34 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-sm font-bold text-[#163A66]">
-                              {item.studentName}
+                              {displayName}
                             </span>
-                            <span className="text-xs text-[#6B7C93]">
-                              (เลขที่ {item.seatNo} • ห้อง {item.classroom} • รหัส {item.studentCode})
+                            <span className="text-xs text-[#6B7C93] font-medium">
+                              (เลขที่ {displaySeat} • ห้อง {displayRoom} • รหัส {item.studentCode})
                             </span>
                           </div>
-                          <p className="text-xs font-semibold text-[#3B82F6] mt-0.5">
-                            {item.subjectCode} • {item.assignmentTitle}
-                          </p>
-                          <p className="text-[11px] text-[#94A3B8]">
-                            ส่งเมื่อ {item.submittedAtText}
+                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                            <p className="text-xs font-semibold text-[#3B82F6]">
+                              {item.subjectCode} • {item.assignmentTitle}
+                            </p>
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${
+                                isPreMidterm
+                                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                  : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                              }`}
+                            >
+                              {partBadgeText} (เต็ม {item.maxScore})
+                            </span>
+                            {preMidtermMax > 0 && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                คะแนนก่อนกลางภาคสะสม: {preMidtermEarned}/{preMidtermMax} คะแนน
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-[#94A3B8] mt-1 flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-[#94A3B8]" />
+                            <span>ส่งเมื่อ {formatSubmissionTimestamp(item.submittedAtText || item.submittedTimestamp)}</span>
                           </p>
                         </div>
                       </div>
@@ -957,10 +1031,10 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                           onClick={() =>
                             setPreviewItem({
                               title: item.assignmentTitle,
-                              studentName: item.studentName,
+                              studentName: displayName,
                               studentCode: item.studentCode,
-                              classroom: item.classroom,
-                              seatNo: item.seatNo,
+                              classroom: displayRoom,
+                              seatNo: typeof displaySeat === 'number' ? displaySeat : item.seatNo,
                               type: isPdf ? 'PDF' : isLink ? 'LINK' : 'IMAGE',
                               url: item.filePreviewUrl || item.externalLinkUrl,
                               fileName: item.fileName,
@@ -1056,6 +1130,57 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
             </div>
           </div>
 
+          {/* Sub-filter bar: หมวดคะแนน 4 ส่วน และตัวกรองเจาะจงคะแนนก่อนกลางภาค */}
+          <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-[#F8FAFC] rounded-2xl border border-[#E6EEF7]">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold text-[#163A66] px-1 flex items-center gap-1">
+                <Layers className="w-3.5 h-3.5 text-[#3B82F6]" />
+                <span>แสดงหมวดคะแนน:</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setMatrixPartFilter('ALL')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  matrixPartFilter === 'ALL'
+                    ? 'bg-white text-[#163A66] shadow-xs border border-slate-200'
+                    : 'text-[#6B7C93] hover:text-[#163A66]'
+                }`}
+              >
+                ทุกหมวดงาน ({matrixAssignmentsRaw.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setMatrixPartFilter('PRE_MIDTERM')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  matrixPartFilter === 'PRE_MIDTERM'
+                    ? 'bg-[#3B82F6] text-white shadow-xs'
+                    : 'text-[#3B82F6] bg-blue-50/70 hover:bg-blue-100 border border-blue-200'
+                }`}
+              >
+                <span>📘 เจาะจงคะแนนก่อนกลางภาค</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${matrixPartFilter === 'PRE_MIDTERM' ? 'bg-white/25 text-white' : 'bg-blue-200 text-blue-900'}`}>
+                  เต็ม {matrixCourseWeights.preMidterm}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMatrixPartFilter('POST_MIDTERM')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  matrixPartFilter === 'POST_MIDTERM'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-[#6B7C93] hover:text-indigo-700'
+                }`}
+              >
+                หลังกลางภาค
+              </button>
+            </div>
+
+            <div className="text-xs text-[#6B7C93] px-2 flex items-center gap-1.5">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500" />
+              <span>เกณฑ์วิชา: ก่อนกลางภาค {matrixCourseWeights.preMidterm} • กลางภาค {matrixCourseWeights.midterm} • หลังกลางภาค {matrixCourseWeights.postMidterm} • ปลายภาค {matrixCourseWeights.final}</span>
+            </div>
+          </div>
+
           {/* If no assignments or students */}
           {matrixStudents.length === 0 ? (
             <div className="py-12 text-center bg-[#F7FAFF] rounded-2xl border border-dashed border-[#BFDBFE] space-y-2">
@@ -1130,6 +1255,14 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                         </th>
                       )}
 
+                      {/* Pre-Midterm Column Header */}
+                      <th className="p-2.5 font-bold text-center bg-blue-100 text-blue-900 border-r border-blue-200 w-28">
+                        <div className="flex flex-col items-center justify-center">
+                          <span>รวมก่อนกลางภาค</span>
+                          <span className="text-[10px] text-blue-700 font-semibold">(เต็ม {matrixCourseWeights.preMidterm})</span>
+                        </div>
+                      </th>
+
                       {/* Grand Total */}
                       <th className="p-2.5 font-bold text-center bg-[#FEF3C7] text-[#92400E] w-24">
                         รวมทุกงาน
@@ -1182,6 +1315,11 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                         </th>
                       ))}
 
+                      {/* Pre-Midterm Column Subtitle */}
+                      <th className="p-2 text-center font-bold text-blue-800 bg-blue-50/80 border-r border-blue-200">
+                        คะแนนเก็บ
+                      </th>
+
                       {/* Grand Total */}
                       <th className="p-2 text-center font-bold text-[#92400E] bg-[#FEF3C7]/60">
                         คะแนนสุทธิ
@@ -1192,6 +1330,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                   <tbody className="divide-y divide-[#E6EEF7]">
                     {matrixStudents.map((stu) => {
                       let grandTotal = 0;
+                      let preMidtermEarned = 0;
 
                       return (
                         <tr
@@ -1279,6 +1418,9 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                                 : Math.round(raw * 10) / 10;
                             }
                             grandTotal += uScore;
+                            if (!u.assignments[0]?.scorePart || u.assignments[0]?.scorePart === 'PRE_MIDTERM') {
+                              preMidtermEarned += uScore;
+                            }
 
                             return (
                               <React.Fragment key={`cells-group-${stu.studentCode}-${u.id}`}>
@@ -1305,6 +1447,9 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                             const isGraded = sub?.status === 'GRADED';
                             const score = sub?.score ?? 0;
                             grandTotal += isGraded ? score : 0;
+                            if (!asg.scorePart || asg.scorePart === 'PRE_MIDTERM') {
+                              preMidtermEarned += isGraded ? score : 0;
+                            }
 
                             return (
                               <td
@@ -1338,6 +1483,14 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                             );
                           })}
 
+                          {/* Pre-Midterm Summary Cell */}
+                          <td className="p-2 text-center font-bold text-xs bg-blue-50/70 text-blue-900 border-r border-blue-200">
+                            <div className="flex flex-col items-center">
+                              <span className="text-xs font-black text-blue-800">{preMidtermEarned}</span>
+                              <span className="text-[10px] text-blue-600 font-medium">/{matrixCourseWeights.preMidterm}</span>
+                            </div>
+                          </td>
+
                           {/* Grand Total */}
                           <td className="p-2 text-center font-bold text-sm bg-[#FEF3C7]/40 text-[#92400E]">
                             {grandTotal}
@@ -1353,6 +1506,44 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
               <div className="md:hidden space-y-3">
                 {matrixStudents.map((stu) => {
                   let grandTotal = 0;
+                  let preMidtermEarned = 0;
+
+                  // คำนวณคะแนนก่อนกลางภาคของนักเรียนคนนี้ล่วงหน้าเพื่อแสดงในการ์ดด้านบน
+                  matrixUnits.unitList.forEach((u) => {
+                    if (!u.assignments[0]?.scorePart || u.assignments[0]?.scorePart === 'PRE_MIDTERM') {
+                      let subInUnit = 0;
+                      let earnInUnit = 0;
+                      let maxInUnit = 0;
+                      u.assignments.forEach((asg) => {
+                        const sub = allSubmissions.find(
+                          (s) => s.assignmentId === asg.id && s.studentCode === stu.studentCode
+                        );
+                        if (sub && sub.status !== 'MISSING') {
+                          subInUnit += 1;
+                          earnInUnit += sub.score ?? asg.maxScore;
+                        }
+                        maxInUnit += asg.maxScore;
+                      });
+                      const raw = u.scoringMethod === 'SUBMISSION_COUNT_RATIO'
+                        ? (u.totalTasks > 0 ? (Math.min(u.totalTasks, subInUnit) / u.totalTasks) * u.maxScore : 0)
+                        : (maxInUnit > 0 ? (earnInUnit / maxInUnit) * u.maxScore : 0);
+                      const uSc = u.autoRoundUp
+                        ? (Math.round((raw - Math.floor(raw)) * 100) / 100 >= 0.5 ? Math.ceil(raw) : Math.floor(raw))
+                        : Math.round(raw * 10) / 10;
+                      preMidtermEarned += uSc;
+                    }
+                  });
+
+                  matrixUnits.independentList.forEach((asg) => {
+                    if (!asg.scorePart || asg.scorePart === 'PRE_MIDTERM') {
+                      const sub = allSubmissions.find(
+                        (s) => s.assignmentId === asg.id && s.studentCode === stu.studentCode
+                      );
+                      if (sub && sub.status === 'GRADED') {
+                        preMidtermEarned += sub.score ?? 0;
+                      }
+                    }
+                  });
 
                   return (
                     <div
@@ -1369,6 +1560,20 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                             <p className="text-[11px] text-[#6B7C93] font-mono">รหัส {stu.studentCode}</p>
                           </div>
                         </div>
+                      </div>
+
+                      {/* สรุปคะแนนก่อนกลางภาคบนมือถือ */}
+                      <div className="p-3 rounded-xl bg-gradient-to-r from-blue-50/90 to-sky-50/80 border border-blue-200 flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-bold text-blue-900 flex items-center gap-1">
+                            <Layers className="w-3.5 h-3.5 text-blue-600" />
+                            <span>คะแนนก่อนกลางภาค</span>
+                          </span>
+                          <p className="text-[10px] text-blue-700">เกณฑ์วิชา: เต็ม {matrixCourseWeights.preMidterm} คะแนน</p>
+                        </div>
+                        <span className="px-3 py-1 rounded-xl bg-blue-600 text-white font-extrabold text-xs shadow-xs">
+                          {preMidtermEarned} / {matrixCourseWeights.preMidterm} คะแนน
+                        </span>
                       </div>
 
                       {/* Units in mobile card */}

@@ -10,10 +10,10 @@
 
 import { cleanSlateService } from './cleanSlateService.ts';
 import { coursesCurriculumService } from './coursesCurriculumService.ts';
-import { studentService } from './studentService.ts';
+import { studentService, formatClassroomLabel } from './studentService.ts';
 import { classroomService } from './classroomService.ts';
 import { authService } from './authService.ts';
-import { sgsRosterAndSubmissionService } from './sgsRosterAndSubmissionService.ts';
+import { sgsRosterAndSubmissionService, formatSubmissionTimestamp } from './sgsRosterAndSubmissionService.ts';
 
 export interface TeachingSubjectInfo {
   code: string;
@@ -293,7 +293,9 @@ export const teacherCourseAssignmentService = {
 
         const savedMatch = savedMap.get(pairKey) || savedMap.get(`q_${pairKey}`);
         const asg = termAssignments.find((a) => a.id === sub.assignmentId);
-        const stu = studentMap.get(sub.studentCode.trim());
+        const subCode = sub.studentCode.trim();
+        const stu = studentMap.get(subCode);
+        const foundInService = studentService.findStudentByCode(subCode);
 
         const isGraded = sub.status === 'GRADED' || (savedMatch && savedMatch.status === 'GRADED');
         const score = sub.score !== null && sub.score !== undefined ? sub.score : savedMatch?.score ?? null;
@@ -318,23 +320,57 @@ export const teacherCourseAssignmentService = {
 
         const cleanFileName = sub.r2ObjectKey ? sub.r2ObjectKey.split('/').pop() : undefined;
 
+        // คำนวณชื่อ ชั้น เลขที่จริงของนักเรียน ไม่เอาแค่รหัสนักเรียนมาแสดงซ้ำ
+        const realStudentName =
+          (foundInService?.student.name && foundInService.student.name !== subCode)
+            ? foundInService.student.name
+            : (stu?.studentName && stu.studentName !== subCode)
+              ? stu.studentName
+              : (stu?.fullName && stu.fullName !== subCode)
+                ? stu.fullName
+                : (savedMatch?.studentName && savedMatch.studentName !== subCode)
+                  ? savedMatch.studentName
+                  : `นักเรียน (${subCode})`;
+
+        const realClassroom =
+          foundInService?.classroomId
+            ? formatClassroomLabel(foundInService.classroomId)
+            : stu?.classroom
+              ? formatClassroomLabel(stu.classroom)
+              : savedMatch?.classroom || 'ม.3/1';
+
+        const realSeatNo =
+          foundInService?.student.no ?? stu?.sgsSeatNo ?? stu?.no ?? savedMatch?.seatNo ?? (idx + 1);
+
+        // ดึงไฟล์รูปภาพจริง Data URL ที่อัปโหลดไว้
+        const realFileUrl =
+          sub.fileDataUrl ||
+          sgsRosterAndSubmissionService.getSubmissionFileUrl(sub.assignmentId, subCode) ||
+          savedMatch?.filePreviewUrl ||
+          (sub.r2ObjectKey ? `https://storage.kps.ac.th/${sub.r2ObjectKey.replace('r2://', '')}` : undefined);
+
+        const subTimestamp =
+          sub.submittedAt && !isNaN(new Date(sub.submittedAt).getTime())
+            ? new Date(sub.submittedAt).getTime()
+            : savedMatch?.submittedTimestamp || (Date.now() - idx * 60000);
+
         const queueItem: GradingQueueItem = {
           id: savedMatch?.id || `q_${pairKey}`,
           queueNo: savedMatch?.queueNo || idx + 1,
           subjectCode: asg?.courseCode || savedMatch?.subjectCode || 'ท23102',
           subjectName: asg?.courseName || savedMatch?.subjectName || 'รายวิชา',
-          classroom: stu?.classroom || savedMatch?.classroom || 'ม.3/1',
-          seatNo: stu?.sgsSeatNo ?? stu?.no ?? savedMatch?.seatNo ?? idx + 1,
-          studentCode: sub.studentCode,
-          studentName: stu?.studentName || stu?.fullName || savedMatch?.studentName || sub.studentCode,
+          classroom: realClassroom,
+          seatNo: realSeatNo,
+          studentCode: subCode,
+          studentName: realStudentName,
           assignmentId: sub.assignmentId,
           assignmentTitle: asg?.title || sub.workTitle || savedMatch?.assignmentTitle || 'ชิ้นงานที่มอบหมาย',
           sgsUnit: asg?.sgsUnitLabel || asg?.unitTitle || savedMatch?.sgsUnit || 'คะแนนเก็บระหว่างภาค',
           maxScore: asg?.maxScore || savedMatch?.maxScore || 10,
-          submittedAtText: sub.submittedAt || savedMatch?.submittedAtText || 'ส่งเมื่อสักครู่',
-          submittedTimestamp: savedMatch?.submittedTimestamp || Date.now() - idx * 60000,
+          submittedAtText: formatSubmissionTimestamp(sub.submittedAt || subTimestamp),
+          submittedTimestamp: subTimestamp,
           submissionChannel: savedMatch?.submissionChannel || channel,
-          filePreviewUrl: savedMatch?.filePreviewUrl || (sub.r2ObjectKey ? `https://storage.kps.ac.th/${sub.r2ObjectKey.replace('r2://', '')}` : undefined),
+          filePreviewUrl: realFileUrl,
           fileName: savedMatch?.fileName || cleanFileName,
           externalLinkUrl: sub.externalLinkUrl || savedMatch?.externalLinkUrl,
           externalPlatform: platform || savedMatch?.externalPlatform,
@@ -342,7 +378,7 @@ export const teacherCourseAssignmentService = {
           score,
           teacherFeedback: feedback,
           gradedAtText: savedMatch?.gradedAtText,
-          studentAvatarUrl: savedMatch?.studentAvatarUrl || (stu as any)?.avatarUrl,
+          studentAvatarUrl: savedMatch?.studentAvatarUrl || (stu as any)?.avatarUrl || (foundInService?.student as any)?.avatarUrl,
         };
 
         mergedQueue.push(queueItem);

@@ -54,6 +54,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
   const [submissionType, setSubmissionType] = useState<'R2_FILE' | 'CANVA_VIDEO' | 'GOOGLE_DRIVE'>('R2_FILE');
   const [submitLink, setSubmitLink] = useState('');
   const [selectedFileName, setSelectedFileName] = useState('perspective_2point_45102.jpg');
+  const [selectedFileDataUrl, setSelectedFileDataUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [folderCopied, setFolderCopied] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -261,8 +262,9 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
           studentCode,
           workTitle: selectedQuest.title,
           fileName: selectedFileName || `student_work_${studentCode}.jpg`,
-          originalSizeKb: 4250,
-          compressedSizeKb: 148,
+          originalSizeKb: selectedFileDataUrl ? Math.round(selectedFileDataUrl.length / 1024) : 4250,
+          compressedSizeKb: selectedFileDataUrl ? Math.round(selectedFileDataUrl.length / 1365) : 148,
+          fileDataUrl: selectedFileDataUrl || undefined,
           academicYearTerm,
         });
         setToastMsg(
@@ -967,6 +969,48 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                           return;
                         }
                         setSelectedFileName(f.name);
+
+                        // อ่านไฟล์จริงเป็น Data URL เพื่อให้ครูเปิดดูงานจริงที่นักเรียนส่งมาได้
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          const resultStr = event.target?.result as string;
+                          if (!resultStr) return;
+                          if (f.type.startsWith('image/')) {
+                            const img = new Image();
+                            img.onload = () => {
+                              try {
+                                const canvas = document.createElement('canvas');
+                                const maxDim = 1200;
+                                let w = img.width;
+                                let h = img.height;
+                                if (w > maxDim || h > maxDim) {
+                                  if (w > h) {
+                                    h = Math.round((h * maxDim) / w);
+                                    w = maxDim;
+                                  } else {
+                                    w = Math.round((w * maxDim) / h);
+                                    h = maxDim;
+                                  }
+                                }
+                                canvas.width = w;
+                                canvas.height = h;
+                                const ctx = canvas.getContext('2d');
+                                if (ctx) {
+                                  ctx.drawImage(img, 0, 0, w, h);
+                                  setSelectedFileDataUrl(canvas.toDataURL('image/webp', 0.82));
+                                } else {
+                                  setSelectedFileDataUrl(resultStr);
+                                }
+                              } catch {
+                                setSelectedFileDataUrl(resultStr);
+                              }
+                            };
+                            img.src = resultStr;
+                          } else {
+                            setSelectedFileDataUrl(resultStr);
+                          }
+                        };
+                        reader.readAsDataURL(f);
                       }}
                     />
                   </label>

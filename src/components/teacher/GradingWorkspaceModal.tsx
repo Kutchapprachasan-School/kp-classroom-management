@@ -14,6 +14,7 @@ import {
   Layers,
 } from 'lucide-react';
 import type { GradingQueueItem } from '../../services/teacherCourseAssignmentService';
+import { studentService, formatClassroomLabel } from '../../services/studentService';
 import {
   FEEDBACK_STRAND_CATALOG,
   detectFeedbackStrand,
@@ -118,6 +119,17 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
   const isImage = currentItem.submissionChannel === 'IMAGE_UPLOAD' || (currentItem.fileName || '').match(/\.(jpg|jpeg|png|webp)$/i);
   const isPdf = currentItem.submissionChannel === 'PDF_UPLOAD' || (currentItem.fileName || '').endsWith('.pdf');
 
+  // ตรวจสอบและดึงชื่อจริง ชั้น เลขที่ของนักเรียน
+  const resolvedStu = currentItem ? studentService.findStudentByCode(currentItem.studentCode) : null;
+  const resolvedName =
+    currentItem?.studentName && currentItem.studentName !== currentItem.studentCode
+      ? currentItem.studentName
+      : resolvedStu?.student.name || `นักเรียน (${currentItem?.studentCode})`;
+  const resolvedRoom =
+    currentItem?.classroom ||
+    (resolvedStu?.classroomId ? formatClassroomLabel(resolvedStu.classroomId) : 'ม.3/1');
+  const resolvedSeat = currentItem?.seatNo ?? resolvedStu?.student.no ?? '-';
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 animate-fade-in font-sans">
       <div className="bg-white rounded-3xl max-w-6xl w-full h-[94vh] flex flex-col overflow-hidden shadow-2xl border border-slate-200">
@@ -130,10 +142,10 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                  {currentItem.studentName}
+                  {resolvedName}
                 </h2>
                 <span className="text-xs text-slate-500 font-semibold">
-                  เลขที่ {currentItem.seatNo} • ห้อง {currentItem.classroom}
+                  เลขที่ {resolvedSeat} • ห้อง {resolvedRoom} • รหัส {currentItem.studentCode}
                 </span>
                 {currentItem.status === 'GRADED' ? (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
@@ -146,7 +158,7 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
                 )}
               </div>
               <p className="text-xs text-slate-500">
-                วิชา {currentItem.subjectCode} {currentItem.subjectName} • ส่งเมื่อ {currentItem.submittedAtText}
+                วิชา {currentItem.subjectCode} {currentItem.subjectName} • {currentItem.assignmentTitle} • ส่งเมื่อ {currentItem.submittedAtText}
               </p>
             </div>
           </div>
@@ -236,12 +248,12 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
                   />
                 ) : (
                   <div className="p-8 text-center space-y-3 bg-blue-50/50 rounded-2xl w-full">
-                    <span className="text-4xl">🎨</span>
+                    <span className="text-4xl">📁</span>
                     <h4 className="text-sm font-bold text-slate-800">
-                      {currentItem.fileName}
+                      {currentItem.fileName || 'ไฟล์ผลงานนักเรียน'}
                     </h4>
                     <p className="text-xs text-slate-500">
-                      ภาพวาด/ผลงานทัศนศิลป์ของ {currentItem.studentName}
+                      ชิ้นงานที่ส่งของ {resolvedName}
                     </p>
                   </div>
                 )
@@ -268,13 +280,13 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
                     <FileText className="w-12 h-12 text-rose-500 mx-auto" />
                     <div>
                       <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white font-black text-[10px]">
-                        PDF PORTFOLIO
+                        เอกสาร PDF
                       </span>
                       <h4 className="text-sm font-bold text-slate-900 mt-2">
-                        {currentItem.fileName}
+                        {currentItem.fileName || 'เอกสารแนบของนักเรียน'}
                       </h4>
                       <p className="text-xs text-slate-500 mt-1">
-                        แฟ้มสะสมงานทัศนศิลป์ (Art Portfolio 3 หน้า)
+                        เอกสารผลงานของ {resolvedName}
                       </p>
                     </div>
                     {currentItem.filePreviewUrl && (
