@@ -130,7 +130,8 @@ export const formatThaiDateShort = (dateStrOrObj?: string | Date): string => {
 
 export const computeWeekInfo = (
   offset: number = 0,
-  activeTermParam?: { startDate: string; semesterNo?: number; termName?: string } | null
+  activeTermParam?: { startDate: string; semesterNo?: number; termName?: string } | null,
+  referenceDateParam?: Date | string
 ): ComputedWeekInfo => {
   const totalWeeks = 20;
 
@@ -152,13 +153,31 @@ export const computeWeekInfo = (
     termStartMonday = new Date(2026, 9, 19);
   }
 
-  // วันปัจจุบันในเขตเวลาไทย (Bangkok)
+  // วันอ้างอิงในเขตเวลาไทย (Bangkok)
+  let refDate: Date;
+  if (referenceDateParam) {
+    if (typeof referenceDateParam === 'string') {
+      const iso = academicCalendarService.parseThaiDateToIso(referenceDateParam);
+      if (iso && /^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+        const [y, m, d] = iso.split('-').map(Number);
+        refDate = new Date(y, m - 1, d);
+      } else {
+        refDate = new Date(referenceDateParam);
+      }
+    } else {
+      refDate = new Date(referenceDateParam);
+    }
+  } else {
+    refDate = getBangkokNow();
+  }
+  refDate.setHours(0, 0, 0, 0);
+
   const todayBangkok = getBangkokNow();
   todayBangkok.setHours(0, 0, 0, 0);
 
   // คำนวณสัปดาห์ปัจจุบันของภาคเรียน
   const diffDays = Math.floor(
-    (todayBangkok.getTime() - termStartMonday.getTime()) / (1000 * 60 * 60 * 24)
+    (refDate.getTime() - termStartMonday.getTime()) / (1000 * 60 * 60 * 24)
   );
   const currentWeek = diffDays < 0 ? 1 : Math.floor(diffDays / 7) + 1;
   const clampedCurrentWeek = Math.min(totalWeeks, Math.max(1, currentWeek));
@@ -211,6 +230,80 @@ export const computeWeekInfo = (
     days,
     canPrev: weekNumber > 1,
     canNext: weekNumber < totalWeeks,
+  };
+};
+
+export interface TeachingWeekInfo {
+  weekNumber: number;
+  totalWeeks: number;
+  isInTerm: boolean;
+  termLabel: string;
+  startDateLabel: string;
+  endDateLabel: string;
+}
+
+/**
+ * คำนวณสัปดาห์ที่สอน (Teaching Week 1-20) สำหรับวันที่ระบุอิงตามวันเปิดภาคเรียน
+ */
+export const computeTeachingWeekForDate = (
+  dateStrOrObj?: string | Date,
+  activeTermParam?: { startDate: string; endDate?: string; semesterNo?: number; termName?: string; year?: number } | null
+): TeachingWeekInfo => {
+  const totalWeeks = 20;
+  const term = activeTermParam ?? academicCalendarService.getActiveTerm();
+  const startIso = term ? academicCalendarService.parseThaiDateToIso(term.startDate) : '';
+
+  let termStartMonday: Date;
+  if (startIso && /^\d{4}-\d{2}-\d{2}$/.test(startIso)) {
+    const [sYear, sMonth, sDay] = startIso.split('-').map(Number);
+    const startDate = new Date(sYear, sMonth - 1, sDay);
+    const dayOfW = startDate.getDay(); // 0 = Sun, 1 = Mon
+    const diffToMon = (dayOfW === 0 ? -6 : 1) - dayOfW;
+    termStartMonday = new Date(startDate);
+    termStartMonday.setDate(startDate.getDate() + diffToMon);
+    termStartMonday.setHours(0, 0, 0, 0);
+  } else {
+    termStartMonday = new Date(2026, 9, 19);
+    termStartMonday.setHours(0, 0, 0, 0);
+  }
+
+  let targetDate: Date;
+  if (dateStrOrObj) {
+    if (typeof dateStrOrObj === 'string') {
+      const iso = academicCalendarService.parseThaiDateToIso(dateStrOrObj);
+      if (iso && /^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+        const [y, m, d] = iso.split('-').map(Number);
+        targetDate = new Date(y, m - 1, d);
+      } else {
+        targetDate = new Date(dateStrOrObj);
+      }
+    } else {
+      targetDate = new Date(dateStrOrObj);
+    }
+  } else {
+    targetDate = getBangkokNow();
+  }
+  targetDate.setHours(0, 0, 0, 0);
+
+  const diffDays = Math.floor(
+    (targetDate.getTime() - termStartMonday.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  const rawWeek = diffDays < 0 ? 1 : Math.floor(diffDays / 7) + 1;
+  const weekNumber = Math.min(totalWeeks, Math.max(1, rawWeek));
+
+  const termLabel = term
+    ? `${term.termName || 'ภาคเรียน'}/${term.year || ''}`.replace(/\/$/, '')
+    : 'ภาคเรียนปัจจุบัน';
+  const isInTerm = diffDays >= 0 && rawWeek <= totalWeeks;
+
+  return {
+    weekNumber,
+    totalWeeks,
+    isInTerm,
+    termLabel,
+    startDateLabel: term?.startDate || '',
+    endDateLabel: term?.endDate || '',
   };
 };
 

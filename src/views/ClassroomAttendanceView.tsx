@@ -44,7 +44,7 @@ import { studentService } from '../services/studentService';
 import { coursesCurriculumService, type CourseCurriculumRecord } from '../services/coursesCurriculumService';
 import { classroomService } from '../services/classroomService';
 import type { ClassroomRosterItem } from '../types/viewModels';
-import { getBangkokTodayString, getBangkokNow } from '../utils/timetableDateUtils';
+import { getBangkokTodayString, getBangkokNow, computeTeachingWeekForDate } from '../utils/timetableDateUtils';
 import type { CrossViewNavigationPayload } from '../services/teacherCopilotService';
 import { DynamicQrAttendanceModal } from '../components/attendance/DynamicQrAttendanceModal';
 import { StudentQrScannerModal } from '../components/attendance/StudentQrScannerModal';
@@ -272,6 +272,11 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
       period: selectedPeriod || 1,
     };
   }, [availableCourseOptions, curriculumCourses, selectedCourse, selectedClassroom, availableClassroomOptions, allClassrooms, selectedPeriod]);
+
+  const activeTerm = useMemo(() => academicCalendarService.getActiveTerm(), []);
+  const teachingWeekInfo = useMemo(() => {
+    return computeTeachingWeekForDate(selectedDate, activeTerm);
+  }, [selectedDate, activeTerm]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -614,7 +619,14 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
 
   // Open Classroom Term Stats Modal
   const handleOpenStatsModal = () => {
-    const summary = attendanceCorrelationService.getClassroomCumulativeStats(selectedClassroom);
+    const enrolledStudents = studentService.getStudents(selectedClassroom);
+    const summary = attendanceCorrelationService.getCourseCumulativeStats(
+      selectedCourse,
+      selectedClassroom,
+      enrolledStudents && enrolledStudents.length > 0
+        ? enrolledStudents.map((s) => ({ code: s.code, name: s.name }))
+        : undefined
+    );
     setClassroomStats(summary);
     setIsStatsModalOpen(true);
   };
@@ -838,8 +850,12 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                         {isPeriodSavedInStorage ? '✓ บันทึกผลแล้ว' : 'รอเช็คชื่อ'}
                       </span>
                     </h2>
-                    <p className="text-[11px] text-slate-400 font-medium">
-                      ประจำวันที่ {formatDateThai(selectedDate)} (คาบที่ {selectedPeriod})
+                    <p className="text-[11px] text-slate-500 font-medium flex items-center gap-2 flex-wrap mt-0.5">
+                      <span>ประจำวันที่ {formatDateThai(selectedDate)} (คาบที่ {selectedPeriod})</span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold">
+                        <Calendar className="w-3 h-3 text-blue-600" />
+                        สัปดาห์ที่ {teachingWeekInfo.weekNumber} / 20 ({teachingWeekInfo.termLabel})
+                      </span>
                     </p>
                   </div>
                 </div>
@@ -1538,13 +1554,17 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                 <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80">
                   <div className="text-xs text-slate-500 font-semibold">อัตรามาเรียนเฉลี่ย</div>
                   <div className="text-xl font-extrabold text-emerald-600 mt-1">
-                    {classroomStats.averageRate}%
+                    {classroomStats.totalAssemblyDays === 0 ? '-' : `${classroomStats.averageRate}%`}
                   </div>
                 </div>
                 <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80">
                   <div className="text-xs text-slate-500 font-semibold">เกณฑ์มีสิทธิ์สอบ (80%)</div>
                   <div className="text-xl font-extrabold text-indigo-600 mt-1">
-                    {classroomStats.averageRate >= 80 ? 'ผ่านเกณฑ์' : 'เฝ้าระวัง'}
+                    {classroomStats.totalAssemblyDays === 0
+                      ? 'รอเช็คชื่อ'
+                      : classroomStats.averageRate >= 80
+                      ? 'ผ่านเกณฑ์'
+                      : 'เฝ้าระวัง'}
                   </div>
                 </div>
               </div>
@@ -1586,18 +1606,24 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                           {stu.leaveDays}
                         </td>
                         <td className="py-2.5 px-3 text-center font-black text-blue-700">
-                          {stu.attendanceRate}%
+                          {stu.totalDays === 0 ? '-' : `${stu.attendanceRate}%`}
                         </td>
                         <td className="py-2.5 px-3 text-center">
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              stu.attendanceRate >= 80
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : 'bg-rose-50 text-rose-700 border border-rose-200'
-                            }`}
-                          >
-                            {stu.attendanceRate >= 80 ? 'มีสิทธิ์สอบ' : 'เสี่ยง มส.'}
-                          </span>
+                          {stu.totalDays === 0 ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                              ยังไม่ได้เช็คชื่อ
+                            </span>
+                          ) : (
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                stu.attendanceRate >= 80
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : 'bg-rose-50 text-rose-700 border border-rose-200'
+                              }`}
+                            >
+                              {stu.attendanceRate >= 80 ? 'มีสิทธิ์สอบ' : 'เสี่ยง มส.'}
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -1721,7 +1747,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                       }`}
                     >
                       <div className="font-bold text-sm">
-                        {hasRecords ? `${summary.attendanceRate}%` : '100%'}
+                        {hasRecords ? `${summary.attendanceRate}%` : '-'}
                       </div>
                       <div
                         className={`text-[10px] font-semibold ${

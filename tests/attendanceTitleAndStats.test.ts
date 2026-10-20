@@ -102,5 +102,47 @@ describe('Classroom Attendance - Student Title Parsing & 80% Attendance Stats', 
       expect(result.isEligibleForExam).toBe(false);
       expect(result.isAtRisk).toBe(true);
     });
+
+    it('returns zero totalAssemblyDays and 0 average rate when no course records exist', () => {
+      const summary = attendanceCorrelationService.getCourseCumulativeStats('ศ23101', 'room-3-1', [
+        { code: '10001', name: 'นายธนภัทร คงเกิด' },
+        { code: '10002', name: 'นางสาวนงนภัส แสงจันทร์' },
+      ]);
+
+      expect(summary.totalStudents).toBe(2);
+      expect(summary.totalAssemblyDays).toBe(0);
+      expect(summary.averageRate).toBe(0);
+      expect(summary.students[0].totalDays).toBe(0);
+      expect(summary.students[0].attendanceRate).toBe(0);
+      expect(summary.students[1].totalDays).toBe(0);
+      expect(summary.students[1].attendanceRate).toBe(0);
+    });
+  });
+
+  describe('3. Teaching Week Calculation (computeTeachingWeekForDate)', () => {
+    it('correctly calculates teaching week 1 for term starting 19 ต.ค. 2569 on 20 ต.ค. 2569', async () => {
+      const { computeTeachingWeekForDate } = await import('../src/utils/timetableDateUtils');
+      const weekInfo = computeTeachingWeekForDate('2026-10-20', {
+        startDate: '19 ต.ค. 2569',
+        termName: 'ภาคเรียนที่ 2',
+        year: 2569,
+      });
+
+      expect(weekInfo.weekNumber).toBe(1);
+      expect(weekInfo.totalWeeks).toBe(20);
+      expect(weekInfo.isInTerm).toBe(true);
+      expect(weekInfo.termLabel).toBe('ภาคเรียนที่ 2/2569');
+    });
+
+    it('correctly calculates teaching week 2 for 27 ต.ค. 2569', async () => {
+      const { computeTeachingWeekForDate } = await import('../src/utils/timetableDateUtils');
+      const weekInfo = computeTeachingWeekForDate('2026-10-27', {
+        startDate: '19 ต.ค. 2569',
+        termName: 'ภาคเรียนที่ 2',
+        year: 2569,
+      });
+
+      expect(weekInfo.weekNumber).toBe(2);
+    });
   });
 });

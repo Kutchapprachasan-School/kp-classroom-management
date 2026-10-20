@@ -1064,11 +1064,11 @@ export const attendanceCorrelationService = {
 
       // Calculate total conducted days strictly to date (elapsed days)
       const conductedDaysToDate = presentDays + lateDays + absentDays + leaveDays + activityDays;
-      const totalDays = conductedDaysToDate > 0 ? conductedDaysToDate : (records.length > 0 ? records.length : (totalAssemblyDays > 0 ? totalAssemblyDays : 1));
+      const totalDays = conductedDaysToDate > 0 ? conductedDaysToDate : (records.length > 0 ? records.length : totalAssemblyDays);
       const earnedDays = presentDays + lateDays + activityDays;
-      const attendanceRate = totalDays > 0 ? Number(((earnedDays / totalDays) * 100).toFixed(1)) : 100;
+      const attendanceRate = totalDays > 0 ? Number(((earnedDays / totalDays) * 100).toFixed(1)) : 0;
       const statusTag: 'NORMAL' | 'WARNING' | 'CRITICAL' =
-        attendanceRate >= 85 ? 'NORMAL' : attendanceRate >= 80 ? 'WARNING' : 'CRITICAL';
+        totalDays === 0 ? 'NORMAL' : attendanceRate >= 85 ? 'NORMAL' : attendanceRate >= 80 ? 'WARNING' : 'CRITICAL';
 
       students.push({
         studentCode: code,
@@ -1086,10 +1086,11 @@ export const attendanceCorrelationService = {
     });
 
     students.sort((a, b) => a.studentCode.localeCompare(b.studentCode));
+    const studentsWithRecords = students.filter((s) => s.totalDays > 0);
     const averageRate =
-      students.length > 0
-        ? Number((students.reduce((acc, s) => acc + s.attendanceRate, 0) / students.length).toFixed(1))
-        : 100;
+      studentsWithRecords.length > 0
+        ? Number((studentsWithRecords.reduce((acc, s) => acc + s.attendanceRate, 0) / studentsWithRecords.length).toFixed(1))
+        : 0;
 
     return {
       classroomId: targetRoom,
@@ -1258,19 +1259,33 @@ export const attendanceCorrelationService = {
    */
   getCourseCumulativeStats(
     courseCode: string,
-    classroomId: string
+    classroomId: string,
+    enrolledStudents?: Array<{ code: string; name: string }>
   ): ClassroomTermStatsSummary {
     const targetRoom = normalizeClassroomId(classroomId);
     const targetCourse = normalizeCourseCode(courseCode);
+    const activeTerm = academicCalendarService.getActiveTerm();
+    const activeYearStr = activeTerm
+      ? String(activeTerm.year > 2400 ? activeTerm.year - 543 : activeTerm.year)
+      : '2026';
+
     const allRecords = this.getAllPeriodRecords().filter(
       (r) =>
         normalizeClassroomId(r.classroomId) === targetRoom &&
         normalizeCourseCode(r.courseCode) === targetCourse &&
-        academicCalendarService.isDateInActiveTerm(r.date)
+        (academicCalendarService.isDateInActiveTerm(r.date) || r.date.startsWith(activeYearStr))
     );
 
     // Group records by student code
     const studentMap = new Map<string, { name: string; records: PeriodAttendanceRecord[] }>();
+
+    // Seed enrolled students if provided
+    if (enrolledStudents && enrolledStudents.length > 0) {
+      for (const stu of enrolledStudents) {
+        studentMap.set(stu.code, { name: stu.name, records: [] });
+      }
+    }
+
     for (const r of allRecords) {
       if (!studentMap.has(r.studentCode)) {
         studentMap.set(r.studentCode, { name: r.studentName, records: [] });
@@ -1300,9 +1315,9 @@ export const attendanceCorrelationService = {
       const conductedDaysToDate = presentDays + lateDays + absentDays + leaveDays + activityDays;
       const totalDays = conductedDaysToDate;
       const earnedDays = presentDays + lateDays + activityDays;
-      const attendanceRate = totalDays > 0 ? Number(((earnedDays / totalDays) * 100).toFixed(1)) : 100.0;
+      const attendanceRate = totalDays > 0 ? Number(((earnedDays / totalDays) * 100).toFixed(1)) : 0;
       const statusTag: 'NORMAL' | 'WARNING' | 'CRITICAL' =
-        totalDays === 0 || attendanceRate >= 85 ? 'NORMAL' : attendanceRate >= 80 ? 'WARNING' : 'CRITICAL';
+        totalDays === 0 ? 'NORMAL' : attendanceRate >= 85 ? 'NORMAL' : attendanceRate >= 80 ? 'WARNING' : 'CRITICAL';
 
       students.push({
         studentCode: code,
@@ -1320,13 +1335,14 @@ export const attendanceCorrelationService = {
     });
 
     students.sort((a, b) => a.studentCode.localeCompare(b.studentCode));
+    const studentsWithRecords = students.filter((s) => s.totalDays > 0);
     const averageRate =
-      students.length > 0
-        ? Number((students.reduce((acc, s) => acc + s.attendanceRate, 0) / students.length).toFixed(1))
-        : 100;
+      studentsWithRecords.length > 0
+        ? Number((studentsWithRecords.reduce((acc, s) => acc + s.attendanceRate, 0) / studentsWithRecords.length).toFixed(1))
+        : 0;
 
     const maxConductedDays = students.length > 0 ? Math.max(...students.map((s) => s.totalDays)) : 0;
-    const totalTeachingDaysToDate = maxConductedDays > 0 ? maxConductedDays : 1;
+    const totalTeachingDaysToDate = maxConductedDays;
 
     return {
       classroomId: targetRoom,
