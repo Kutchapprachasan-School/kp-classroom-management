@@ -13,6 +13,7 @@ import { coursesCurriculumService } from './coursesCurriculumService.ts';
 import { studentService } from './studentService.ts';
 import { classroomService } from './classroomService.ts';
 import { authService } from './authService.ts';
+import { sgsRosterAndSubmissionService } from './sgsRosterAndSubmissionService.ts';
 
 export interface TeachingSubjectInfo {
   code: string;
@@ -263,11 +264,110 @@ export const teacherCourseAssignmentService = {
   getGradingQueue(): GradingQueueItem[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_QUEUE);
-      if (raw) {
-        const parsed: GradingQueueItem[] = JSON.parse(raw);
-        // เรียง FIFO (เก่าสุด / ส่งก่อน อยู่บนสุด)
-        return parsed.sort((a, b) => a.submittedTimestamp - b.submittedTimestamp);
+      const savedItems: GradingQueueItem[] = raw ? JSON.parse(raw) : [];
+      const savedMap = new Map<string, GradingQueueItem>();
+      savedItems.forEach((it) => {
+        if (it.id) savedMap.set(it.id, it);
+        if (it.assignmentId && it.studentCode) {
+          savedMap.set(`${it.assignmentId}_${it.studentCode}`, it);
+        }
+      });
+
+      // ดึงงานที่ส่งจริงจาก sgsRosterAndSubmissionService (Cloudflare R2 / Online Submissions)
+      const realSubs = sgsRosterAndSubmissionService.getSubmissions();
+      const termAssignments = sgsRosterAndSubmissionService.getTermAssignments();
+      const allRoster = sgsRosterAndSubmissionService.getSgsRoster();
+      const studentMap = new Map<string, any>();
+      allRoster.forEach((st) => {
+        if (st.studentCode) studentMap.set(st.studentCode.trim(), st);
+      });
+
+      const mergedQueue: GradingQueueItem[] = [];
+      const handledKeys = new Set<string>();
+
+      // 1. นำงานที่นักเรียนส่งจริงเข้ามาในคิว
+      realSubs.forEach((sub, idx) => {
+        const pairKey = `${sub.assignmentId}_${sub.studentCode}`;
+        handledKeys.add(pairKey);
+        handledKeys.add(sub.assignmentId);
+
+        const savedMatch = savedMap.get(pairKey) || savedMap.get(`q_${pairKey}`);
+        const asg = termAssignments.find((a) => a.id === sub.assignmentId);
+        const stu = studentMap.get(sub.studentCode.trim());
+
+        const isGraded = sub.status === 'GRADED' || (savedMatch && savedMatch.status === 'GRADED');
+        const score = sub.score !== null && sub.score !== undefined ? sub.score : savedMatch?.score ?? null;
+        const feedback = sub.teacherFeedback || savedMatch?.teacherFeedback || '';
+
+        // แยก Channel
+        let channel: SubmissionChannelType = 'IMAGE_UPLOAD';
+        let platform: 'CANVA' | 'GOOGLE_DOCS' | 'GOOGLE_DRIVE' | 'FIGMA' | 'YOUTUBE' | 'OTHER' | undefined = undefined;
+
+        if (sub.externalLinkUrl) {
+          channel = 'LINK_URL';
+          const urlLower = sub.externalLinkUrl.toLowerCase();
+          if (urlLower.includes('canva.com')) platform = 'CANVA';
+          else if (urlLower.includes('docs.google.com')) platform = 'GOOGLE_DOCS';
+          else if (urlLower.includes('drive.google.com')) platform = 'GOOGLE_DRIVE';
+          else if (urlLower.includes('figma.com')) platform = 'FIGMA';
+          else if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be')) platform = 'YOUTUBE';
+          else platform = 'OTHER';
+        } else if (sub.r2ObjectKey?.endsWith('.pdf') || (sub.workAttachmentLabel && sub.workAttachmentLabel.toLowerCase().includes('.pdf'))) {
+          channel = 'PDF_UPLOAD';
+        }
+
+        const cleanFileName = sub.r2ObjectKey ? sub.r2ObjectKey.split('/').pop() : undefined;
+
+        const queueItem: GradingQueueItem = {
+          id: savedMatch?.id || `q_${pairKey}`,
+          queueNo: savedMatch?.queueNo || idx + 1,
+          subjectCode: asg?.courseCode || savedMatch?.subjectCode || 'ท23102',
+          subjectName: asg?.courseName || savedMatch?.subjectName || 'รายวิชา',
+          classroom: stu?.classroom || savedMatch?.classroom || 'ม.3/1',
+          seatNo: stu?.sgsSeatNo ?? stu?.no ?? savedMatch?.seatNo ?? idx + 1,
+          studentCode: sub.studentCode,
+          studentName: stu?.studentName || stu?.fullName || savedMatch?.studentName || sub.studentCode,
+          assignmentId: sub.assignmentId,
+          assignmentTitle: asg?.title || sub.workTitle || savedMatch?.assignmentTitle || 'ชิ้นงานที่มอบหมาย',
+          sgsUnit: asg?.sgsUnitLabel || asg?.unitTitle || savedMatch?.sgsUnit || 'คะแนนเก็บระหว่างภาค',
+          maxScore: asg?.maxScore || savedMatch?.maxScore || 10,
+          submittedAtText: sub.submittedAt || savedMatch?.submittedAtText || 'ส่งเมื่อสักครู่',
+          submittedTimestamp: savedMatch?.submittedTimestamp || Date.now() - idx * 60000,
+          submissionChannel: savedMatch?.submissionChannel || channel,
+          filePreviewUrl: savedMatch?.filePreviewUrl || (sub.r2ObjectKey ? `https://storage.kps.ac.th/${sub.r2ObjectKey.replace('r2://', '')}` : undefined),
+          fileName: savedMatch?.fileName || cleanFileName,
+          externalLinkUrl: sub.externalLinkUrl || savedMatch?.externalLinkUrl,
+          externalPlatform: platform || savedMatch?.externalPlatform,
+          status: isGraded ? 'GRADED' : 'PENDING_REVIEW',
+          score,
+          teacherFeedback: feedback,
+          gradedAtText: savedMatch?.gradedAtText,
+          studentAvatarUrl: savedMatch?.studentAvatarUrl || (stu as any)?.avatarUrl,
+        };
+
+        mergedQueue.push(queueItem);
+      });
+
+      // 2. นำงานที่อยู่ใน savedItems แต่ไม่ได้อยู่ใน realSubs (ถ้ามี) เข้ามา
+      savedItems.forEach((it) => {
+        const pairKey = `${it.assignmentId}_${it.studentCode}`;
+        if (!handledKeys.has(pairKey) && !handledKeys.has(it.id)) {
+          mergedQueue.push(it);
+        }
+      });
+
+      // หาก Clean Slate Active และไม่มีข้อมูลจริง ให้ส่งค่าว่าง []
+      if (mergedQueue.length === 0 && cleanSlateService.isCleanSlateActive()) {
+        return [];
       }
+
+      // เรียงลำดับ: งานที่ยังไม่ตรวจ (PENDING_REVIEW) มาก่อน เรียง FIFO ตาม submittedTimestamp (เก่าสุดอยู่บน)
+      return mergedQueue.sort((a, b) => {
+        if (a.status !== b.status) {
+          return a.status === 'PENDING_REVIEW' ? -1 : 1;
+        }
+        return a.submittedTimestamp - b.submittedTimestamp;
+      });
     } catch {
       // fallback
     }
@@ -288,20 +388,32 @@ export const teacherCourseAssignmentService = {
     feedback: string
   ): { updatedQueue: GradingQueueItem[]; nextPendingItem: GradingQueueItem | null } {
     const list = this.getGradingQueue();
+    let targetItem: GradingQueueItem | null = null;
     const updated = list.map((item) => {
-      if (item.id === queueId) {
-        return {
+      if (item.id === queueId || item.id === `q_${queueId}`) {
+        targetItem = {
           ...item,
           status: 'GRADED' as const,
           score,
           teacherFeedback: feedback.trim(),
           gradedAtText: 'วันนี้ ' + new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
         };
+        return targetItem;
       }
       return item;
     });
 
     this.saveGradingQueue(updated);
+
+    // ซิงก์คะแนนกลับไปยัง sgsRosterAndSubmissionService แบบสองทาง
+    if (targetItem && (targetItem as GradingQueueItem).assignmentId && (targetItem as GradingQueueItem).studentCode) {
+      sgsRosterAndSubmissionService.gradeSubmission(
+        (targetItem as GradingQueueItem).assignmentId,
+        (targetItem as GradingQueueItem).studentCode,
+        score,
+        'GRADED'
+      );
+    }
 
     // หางานถัดไปที่ยังรอตรวจ (FIFO)
     const nextPending = updated.find((it) => it.status === 'PENDING_REVIEW') || null;

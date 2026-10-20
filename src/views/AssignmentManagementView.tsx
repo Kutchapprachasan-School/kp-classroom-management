@@ -16,11 +16,14 @@ import {
   Trash2,
   X,
   ClipboardList,
+  Download,
+  Sparkles,
 } from 'lucide-react';
 import {
   sgsRosterAndSubmissionService,
   type FourScorePart,
   type TermAssignmentConfig,
+  type SgsStudentRecord,
 } from '../services/sgsRosterAndSubmissionService';
 import {
   teacherCourseAssignmentService,
@@ -66,7 +69,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
   const [selectedRoom, setSelectedRoom] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<'ALL' | 'PENDING' | 'GRADED'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activeSectionTab, setActiveSectionTab] = useState<'SUBMISSIONS' | 'ASSIGNED_LIST'>(
+  const [activeSectionTab, setActiveSectionTab] = useState<'ASSIGNED_LIST' | 'SUBMISSIONS' | 'SCORE_MATRIX'>(
     'ASSIGNED_LIST'
   );
 
@@ -109,6 +112,24 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
   const [formSelectedRooms, setFormSelectedRooms] = useState<string[]>([]);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
+  // รองรับการสั่งงานรายจุดประสงค์ / รายหน่วย (Auto-division / Unit Score)
+  const [formAssignmentMode, setFormAssignmentMode] = useState<'DIRECT' | 'UNIT_BUNDLE'>('DIRECT');
+  const [formUnitTitle, setFormUnitTitle] = useState('');
+  const [formUnitMaxScore, setFormUnitMaxScore] = useState<number>(10);
+  const [formScoringMethod, setFormScoringMethod] = useState<'SUBMISSION_COUNT_RATIO' | 'RAW_SCORE_AVERAGE'>('SUBMISSION_COUNT_RATIO');
+  const [formTotalTasksInUnit, setFormTotalTasksInUnit] = useState<number>(5);
+  const [formAutoRoundUp, setFormAutoRoundUp] = useState<boolean>(true);
+
+  // Quick Inline Matrix cell editing state
+  const [editingCell, setEditingCell] = useState<{
+    studentCode: string;
+    studentName: string;
+    assignmentId: string;
+    assignmentTitle: string;
+    maxScore: number;
+    currentScore: number | null;
+  } | null>(null);
+
   const currentFormSubject = useMemo(
     () =>
       subjectsList.find((s) => s.courseCode === formCourseCode) ||
@@ -131,6 +152,14 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     [currentFormSubject.courseCode]
   );
 
+  // Existing unit titles for quick selection in create modal
+  const existingCourseUnits = useMemo(() => {
+    const list = termAssignments
+      .filter((a) => a.courseCode === formCourseCode && a.unitTitle)
+      .map((a) => a.unitTitle as string);
+    return Array.from(new Set(list));
+  }, [termAssignments, formCourseCode]);
+
   const handleOpenCreateModal = () => {
     const initialCourse =
       selectedSubjectCode !== 'ALL'
@@ -149,6 +178,12 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
           ? [currentFormSubjectRooms[0]]
           : []
     );
+    setFormAssignmentMode('DIRECT');
+    setFormUnitTitle('');
+    setFormUnitMaxScore(10);
+    setFormScoringMethod('SUBMISSION_COUNT_RATIO');
+    setFormTotalTasksInUnit(5);
+    setFormAutoRoundUp(true);
     setIsCreateModalOpen(true);
   };
 
@@ -180,6 +215,21 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       courseCode: currentFormSubject.courseCode,
       courseName: currentFormSubject.courseName,
       targetClassrooms: targetRooms,
+      unitId:
+        formAssignmentMode === 'UNIT_BUNDLE' && formUnitTitle.trim()
+          ? `unit-${formUnitTitle.trim().toLowerCase().replace(/\s+/g, '-')}`
+          : undefined,
+      unitTitle: formAssignmentMode === 'UNIT_BUNDLE' ? formUnitTitle.trim() : undefined,
+      unitMaxScore:
+        formAssignmentMode === 'UNIT_BUNDLE'
+          ? Math.max(1, Number(formUnitMaxScore) || 10)
+          : undefined,
+      scoringMethod: formAssignmentMode === 'UNIT_BUNDLE' ? formScoringMethod : 'DIRECT_SCORE',
+      totalTasksInUnit:
+        formAssignmentMode === 'UNIT_BUNDLE'
+          ? Math.max(1, Number(formTotalTasksInUnit) || 1)
+          : undefined,
+      autoRoundUp: formAutoRoundUp,
     });
 
     refreshTermAssignments();
@@ -216,15 +266,181 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     setTimeout(() => setToastMsg(null), 3200);
   };
 
+  // Data for Section C: Assignment Breakdown Matrix (ตารางแจกแจงคะแนนตามงานที่มอบหมาย)
+  const matrixClassroom = useMemo(() => {
+    if (selectedRoom !== 'ALL') return selectedRoom;
+    return availableFilterRooms[0] || 'ม.3/1';
+  }, [selectedRoom, availableFilterRooms]);
+
+  const [matrixStudents, setMatrixStudents] = useState<SgsStudentRecord[]>([]);
+
+  const refreshMatrixStudents = useCallback(() => {
+    const list = sgsRosterAndSubmissionService.getSgsRoster(matrixClassroom);
+    setMatrixStudents(list.filter((s) => s.transferState !== 'TRANSFERRED_OUT'));
+  }, [matrixClassroom]);
+
+  useEffect(() => {
+    refreshMatrixStudents();
+  }, [refreshMatrixStudents]);
+
+  const matrixAssignments = useMemo(() => {
+    const code = selectedSubjectCode === 'ALL' ? undefined : selectedSubjectCode;
+    return sgsRosterAndSubmissionService.getTermAssignments(code, matrixClassroom);
+  }, [selectedSubjectCode, matrixClassroom, termAssignments]);
+
+  const allSubmissions = useMemo(() => {
+    return sgsRosterAndSubmissionService.getSubmissions();
+  }, [queueItems]);
+
+  const matrixUnits = useMemo(() => {
+    const unitMap = new Map<
+      string,
+      {
+        id: string;
+        title: string;
+        maxScore: number;
+        scoringMethod: 'SUBMISSION_COUNT_RATIO' | 'RAW_SCORE_AVERAGE';
+        totalTasks: number;
+        autoRoundUp: boolean;
+        assignments: TermAssignmentConfig[];
+      }
+    >();
+    const independent: TermAssignmentConfig[] = [];
+
+    matrixAssignments.forEach((asg) => {
+      const uKey = asg.unitId || (asg.scoringMethod && asg.scoringMethod !== 'DIRECT_SCORE' ? asg.unitTitle : undefined);
+      if (uKey && asg.scoringMethod && asg.scoringMethod !== 'DIRECT_SCORE') {
+        const existing = unitMap.get(uKey) || {
+          id: asg.unitId || uKey,
+          title: asg.unitTitle || uKey,
+          maxScore: asg.unitMaxScore ?? 10,
+          scoringMethod: (asg.scoringMethod as any) || 'SUBMISSION_COUNT_RATIO',
+          totalTasks: asg.totalTasksInUnit || 0,
+          autoRoundUp: asg.autoRoundUp ?? true,
+          assignments: [] as TermAssignmentConfig[],
+        };
+        existing.assignments.push(asg);
+        if (asg.totalTasksInUnit && asg.totalTasksInUnit > existing.totalTasks) {
+          existing.totalTasks = asg.totalTasksInUnit;
+        }
+        unitMap.set(uKey, existing);
+      } else {
+        independent.push(asg);
+      }
+    });
+
+    unitMap.forEach((u) => {
+      if (u.totalTasks <= 0) u.totalTasks = u.assignments.length;
+    });
+
+    return {
+      unitList: Array.from(unitMap.values()),
+      independentList: independent,
+    };
+  }, [matrixAssignments]);
+
+  const handleBulkGradeClassroom = () => {
+    sgsRosterAndSubmissionService.bulkGradeAllSubmitted();
+    setQueueItems(teacherCourseAssignmentService.getGradingQueue());
+    refreshMatrixStudents();
+    showToast('⚡ ให้คะแนนเต็มทุกคนที่ส่งงานแล้วในห้องนี้เรียบร้อยแล้ว');
+  };
+
+  const handleExportMatrixCsv = () => {
+    if (matrixStudents.length === 0) {
+      showToast('ไม่มีข้อมูลนักเรียนสำหรับส่งออก');
+      return;
+    }
+    const headers = ['เลขที่', 'รหัสนักเรียน', 'ชื่อ-นามสกุล', 'ห้องเรียน'];
+    matrixUnits.unitList.forEach((u) => {
+      u.assignments.forEach((asg) => {
+        headers.push(`"${u.title} - ${asg.title} (${asg.maxScore} คะแนน)"`);
+      });
+      headers.push(`"สรุปคะแนน: ${u.title} (เต็ม ${u.maxScore})"`);
+    });
+    matrixUnits.independentList.forEach((asg) => {
+      headers.push(`"${asg.title} (${asg.maxScore} คะแนน)"`);
+    });
+    headers.push('คะแนนรวมทุกงาน');
+
+    const rows = matrixStudents.map((stu) => {
+      const row = [
+        stu.sgsSeatNo,
+        `"${stu.studentCode}"`,
+        `"${stu.studentName}"`,
+        `"${stu.classroom || matrixClassroom}"`,
+      ];
+      let totalEarned = 0;
+      matrixUnits.unitList.forEach((u) => {
+        let submittedInUnit = 0;
+        let earnedInUnit = 0;
+        let maxInUnit = 0;
+        u.assignments.forEach((asg) => {
+          const sub = allSubmissions.find((s) => s.assignmentId === asg.id && s.studentCode === stu.studentCode);
+          const score = sub?.score ?? (sub?.status === 'SUBMITTED_PENDING' ? asg.maxScore : 0);
+          if (sub && sub.status !== 'MISSING') {
+            submittedInUnit += 1;
+            earnedInUnit += score;
+          }
+          maxInUnit += asg.maxScore;
+          row.push(sub ? (sub.score !== null ? String(sub.score) : 'รอตรวจ') : 'ยังไม่ส่ง');
+        });
+
+        let uScore = 0;
+        if (u.scoringMethod === 'SUBMISSION_COUNT_RATIO') {
+          const clamped = Math.min(u.totalTasks, Math.max(0, submittedInUnit));
+          const raw = u.totalTasks > 0 ? (clamped / u.totalTasks) * u.maxScore : 0;
+          uScore = u.autoRoundUp
+            ? (Math.round((raw - Math.floor(raw)) * 100) / 100 >= 0.5 ? Math.ceil(raw) : Math.floor(raw))
+            : Math.round(raw * 10) / 10;
+        } else {
+          const ratio = maxInUnit > 0 ? earnedInUnit / maxInUnit : 0;
+          const raw = ratio * u.maxScore;
+          uScore = u.autoRoundUp
+            ? (Math.round((raw - Math.floor(raw)) * 100) / 100 >= 0.5 ? Math.ceil(raw) : Math.floor(raw))
+            : Math.round(raw * 10) / 10;
+        }
+        totalEarned += uScore;
+        row.push(String(uScore));
+      });
+
+      matrixUnits.independentList.forEach((asg) => {
+        const sub = allSubmissions.find((s) => s.assignmentId === asg.id && s.studentCode === stu.studentCode);
+        const score = sub?.score ?? 0;
+        totalEarned += score;
+        row.push(sub ? (sub.score !== null ? String(sub.score) : 'รอตรวจ') : 'ยังไม่ส่ง');
+      });
+
+      row.push(String(totalEarned));
+      return row.join(',');
+    });
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ตารางแจกแจงคะแนน_${selectedSubjectCode}_${matrixClassroom}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('✓ ดาวน์โหลดไฟล์ตารางแจกแจงคะแนนสำเร็จ');
+  };
+
   useEffect(() => {
     const handleQueueUpdate = () => {
       setQueueItems([...teacherCourseAssignmentService.getGradingQueue()]);
+      refreshTermAssignments();
+      refreshMatrixStudents();
     };
     window.addEventListener('kp-grading-queue-updated', handleQueueUpdate);
+    window.addEventListener('kp-sgs-roster-updated', handleQueueUpdate);
+    window.addEventListener('kps-data-sync-event', handleQueueUpdate);
     return () => {
       window.removeEventListener('kp-grading-queue-updated', handleQueueUpdate);
+      window.removeEventListener('kp-sgs-roster-updated', handleQueueUpdate);
+      window.removeEventListener('kps-data-sync-event', handleQueueUpdate);
     };
-  }, []);
+  }, [refreshTermAssignments, refreshMatrixStudents]);
 
   // Filtered Submissions
   const filteredSubmissions = useMemo(() => {
@@ -362,8 +578,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
          ==================================================================== */}
       <div className="bg-white rounded-[18px] border border-[#E6EEF7] p-4 shadow-[0_4px_16px_rgba(40,90,140,0.06)] space-y-3.5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          {/* 2 Mode Tabs */}
-          <div className="flex items-center bg-[#F2F7FC] p-1 rounded-2xl border border-[#E6EEF7] self-start">
+          {/* 3 Mode Tabs */}
+          <div className="flex flex-wrap items-center bg-[#F2F7FC] p-1 rounded-2xl border border-[#E6EEF7] self-start gap-1">
             <button
               type="button"
               onClick={() => setActiveSectionTab('ASSIGNED_LIST')}
@@ -385,6 +601,18 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
               }`}
             >
               2. คิวตรวจงานที่ส่งเข้ามา ({stats.pending} รอตรวจ)
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveSectionTab('SCORE_MATRIX')}
+              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeSectionTab === 'SCORE_MATRIX'
+                  ? 'bg-white text-[#3B82F6] shadow-xs border border-[#BFDBFE]/60'
+                  : 'text-[#6B7C93] hover:text-[#163A66]'
+              }`}
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>3. ตารางแจกแจงคะแนนตามงานที่มอบหมาย</span>
             </button>
           </div>
 
@@ -778,6 +1006,519 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       )}
 
       {/* ====================================================================
+          SECTION C: ตารางแจกแจงคะแนนตามงานที่มอบหมาย (Assignment Score Breakdown Matrix)
+         ==================================================================== */}
+      {activeSectionTab === 'SCORE_MATRIX' && (
+        <div className="bg-white rounded-[18px] border border-[#E6EEF7] p-4 sm:p-5 shadow-[0_4px_16px_rgba(40,90,140,0.06)] space-y-4">
+          {/* Top toolbar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm sm:text-base font-bold text-[#163A66]">
+                  ตารางแจกแจงคะแนนตามงานที่มอบหมาย (ห้อง {matrixClassroom})
+                </h2>
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#EFF6FF] text-[#3B82F6] border border-[#BFDBFE]">
+                  {matrixStudents.length} นักเรียน • {matrixAssignments.length} ชิ้นงาน
+                </span>
+              </div>
+              <p className="text-xs text-[#6B7C93] mt-0.5">
+                แจกแจงคะแนนรายชิ้นงานและคะแนนรวมตามรายหน่วย/จุดประสงค์ (คลิกที่ช่องคะแนนเพื่อตรวจ/แก้ไขด่วน)
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleBulkGradeClassroom}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold cursor-pointer transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                <span>ให้คะแนนเต็มทุกคนที่ส่งงานแล้ว</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExportMatrixCsv}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-[#163A66] cursor-pointer transition-colors"
+              >
+                <Download className="w-3.5 h-3.5 text-[#3B82F6]" />
+                <span>ส่งออกตาราง (CSV/Excel)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleOpenCreateModal}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-semibold cursor-pointer transition-colors shadow-xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>สั่งงานเพิ่ม</span>
+              </button>
+            </div>
+          </div>
+
+          {/* If no assignments or students */}
+          {matrixStudents.length === 0 ? (
+            <div className="py-12 text-center bg-[#F7FAFF] rounded-2xl border border-dashed border-[#BFDBFE] space-y-2">
+              <BookOpen className="w-8 h-8 text-[#3B82F6] mx-auto opacity-70" />
+              <p className="text-sm font-bold text-[#163A66]">
+                ไม่พบรายชื่อนักเรียนในห้อง {matrixClassroom}
+              </p>
+              <p className="text-xs text-[#6B7C93]">
+                กรุณาเลือกห้องเรียนอื่นในตัวกรองด้านบน หรือซิงก์รายชื่อนักเรียน
+              </p>
+            </div>
+          ) : matrixAssignments.length === 0 ? (
+            <div className="py-12 text-center bg-[#F7FAFF] rounded-2xl border border-dashed border-[#BFDBFE] space-y-2">
+              <BookOpen className="w-8 h-8 text-[#3B82F6] mx-auto opacity-70" />
+              <p className="text-sm font-bold text-[#163A66]">
+                ยังไม่มีชิ้นงานที่มอบหมายในห้อง {matrixClassroom}
+              </p>
+              <p className="text-xs text-[#6B7C93]">
+                กดปุ่ม "สั่งงานใหม่" เพื่อสร้างภาระงานเดี่ยว หรือภาระงานสะสมรายหน่วย
+              </p>
+              <button
+                type="button"
+                onClick={handleOpenCreateModal}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-semibold cursor-pointer mt-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>สั่งงานชิ้นแรก</span>
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Desktop Matrix Table (with frozen student columns) */}
+              <div className="hidden md:block overflow-x-auto border border-[#E6EEF7] rounded-2xl">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    {/* Header Row 1: Groups */}
+                    <tr className="bg-[#F2F7FC] text-[#163A66] border-b border-[#E6EEF7]">
+                      <th className="p-2.5 font-bold sticky left-0 bg-[#F2F7FC] z-20 w-12 text-center border-r border-[#E6EEF7]">
+                        เลขที่
+                      </th>
+                      <th className="p-2.5 font-bold sticky left-12 bg-[#F2F7FC] z-20 w-24 border-r border-[#E6EEF7]">
+                        รหัส
+                      </th>
+                      <th className="p-2.5 font-bold sticky left-36 bg-[#F2F7FC] z-20 w-48 border-r border-[#E6EEF7]">
+                        ชื่อ-สกุล
+                      </th>
+
+                      {/* Units Groups */}
+                      {matrixUnits.unitList.map((u) => (
+                        <th
+                          key={u.id}
+                          colSpan={u.assignments.length + 1}
+                          className="p-2.5 font-bold text-center border-r border-[#BFDBFE] bg-[#EFF6FF] text-[#1D4ED8]"
+                        >
+                          <div className="flex items-center justify-center gap-1.5">
+                            <Layers className="w-3.5 h-3.5 text-[#3B82F6]" />
+                            <span>{u.title}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white text-[#1D4ED8] border border-[#BFDBFE]">
+                              เต็ม {u.maxScore} คะแนน • {u.totalTasks} งาน
+                            </span>
+                          </div>
+                        </th>
+                      ))}
+
+                      {/* Independent Tasks */}
+                      {matrixUnits.independentList.length > 0 && (
+                        <th
+                          colSpan={matrixUnits.independentList.length}
+                          className="p-2.5 font-bold text-center border-r border-[#E6EEF7] bg-slate-100 text-[#163A66]"
+                        >
+                          ชิ้นงานเดี่ยวปกติ ({matrixUnits.independentList.length} ชิ้น)
+                        </th>
+                      )}
+
+                      {/* Grand Total */}
+                      <th className="p-2.5 font-bold text-center bg-[#FEF3C7] text-[#92400E] w-24">
+                        รวมทุกงาน
+                      </th>
+                    </tr>
+
+                    {/* Header Row 2: Individual Columns */}
+                    <tr className="bg-[#F8FAFC] text-[#6B7C93] border-b border-[#E6EEF7] text-[11px]">
+                      <th className="p-2 sticky left-0 bg-[#F8FAFC] z-20 border-r border-[#E6EEF7] text-center">-</th>
+                      <th className="p-2 sticky left-12 bg-[#F8FAFC] z-20 border-r border-[#E6EEF7] text-center">-</th>
+                      <th className="p-2 sticky left-36 bg-[#F8FAFC] z-20 border-r border-[#E6EEF7]">นักเรียน</th>
+
+                      {/* Unit assignments + unit summary column */}
+                      {matrixUnits.unitList.map((u) => (
+                        <React.Fragment key={`subcols-${u.id}`}>
+                          {u.assignments.map((asg) => (
+                            <th
+                              key={asg.id}
+                              className="p-2 border-r border-slate-200 min-w-[90px] text-center"
+                              title={`${asg.title} (เต็ม ${asg.maxScore} คะแนน)`}
+                            >
+                              <div className="truncate font-semibold text-[#163A66] max-w-[110px] mx-auto">
+                                {asg.title}
+                              </div>
+                              <span className="text-[10px] text-[#94A3B8]">
+                                ({asg.maxScore} คะแนน)
+                              </span>
+                            </th>
+                          ))}
+                          {/* Unit Total Column */}
+                          <th className="p-2 border-r border-[#BFDBFE] bg-[#DBEAFE]/50 font-bold text-center text-[#1D4ED8] min-w-[85px]">
+                            สรุป {u.title.split(':')[0] || 'หน่วย'}
+                          </th>
+                        </React.Fragment>
+                      ))}
+
+                      {/* Independent assignments */}
+                      {matrixUnits.independentList.map((asg) => (
+                        <th
+                          key={asg.id}
+                          className="p-2 border-r border-slate-200 min-w-[90px] text-center"
+                          title={`${asg.title} (เต็ม ${asg.maxScore} คะแนน)`}
+                        >
+                          <div className="truncate font-semibold text-[#163A66] max-w-[110px] mx-auto">
+                            {asg.title}
+                          </div>
+                          <span className="text-[10px] text-[#94A3B8]">
+                            ({asg.maxScore} คะแนน)
+                          </span>
+                        </th>
+                      ))}
+
+                      {/* Grand Total */}
+                      <th className="p-2 text-center font-bold text-[#92400E] bg-[#FEF3C7]/60">
+                        คะแนนสุทธิ
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-[#E6EEF7]">
+                    {matrixStudents.map((stu) => {
+                      let grandTotal = 0;
+
+                      return (
+                        <tr
+                          key={stu.studentCode}
+                          className="hover:bg-blue-50/30 transition-colors"
+                        >
+                          {/* Seat No */}
+                          <td className="p-2.5 font-bold text-center sticky left-0 bg-white z-10 border-r border-[#E6EEF7] text-[#163A66]">
+                            {stu.sgsSeatNo}
+                          </td>
+                          {/* Code */}
+                          <td className="p-2.5 sticky left-12 bg-white z-10 border-r border-[#E6EEF7] font-mono text-[11px] text-[#6B7C93]">
+                            {stu.studentCode}
+                          </td>
+                          {/* Name */}
+                          <td className="p-2.5 sticky left-36 bg-white z-10 border-r border-[#E6EEF7] font-semibold text-[#163A66]">
+                            <div className="truncate max-w-[180px]">{stu.studentName}</div>
+                          </td>
+
+                          {/* Unit tasks */}
+                          {matrixUnits.unitList.map((u) => {
+                            let submittedInUnit = 0;
+                            let earnedInUnit = 0;
+                            let maxInUnit = 0;
+
+                            const taskCells = u.assignments.map((asg) => {
+                              const sub = allSubmissions.find(
+                                (s) => s.assignmentId === asg.id && s.studentCode === stu.studentCode
+                              );
+                              const isSubmitted = sub && sub.status !== 'MISSING';
+                              const isGraded = sub?.status === 'GRADED';
+                              const score = sub?.score;
+
+                              if (isSubmitted) {
+                                submittedInUnit += 1;
+                                earnedInUnit += score ?? asg.maxScore;
+                              }
+                              maxInUnit += asg.maxScore;
+
+                              return (
+                                <td
+                                  key={`cell-${stu.studentCode}-${asg.id}`}
+                                  onClick={() =>
+                                    setEditingCell({
+                                      studentCode: stu.studentCode,
+                                      studentName: stu.studentName,
+                                      assignmentId: asg.id,
+                                      assignmentTitle: asg.title,
+                                      maxScore: asg.maxScore,
+                                      currentScore: score ?? null,
+                                    })
+                                  }
+                                  className="p-1.5 border-r border-slate-200 text-center cursor-pointer hover:bg-blue-100/40 transition-colors"
+                                >
+                                  {isGraded ? (
+                                    <span className="inline-block px-2 py-0.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      {score}
+                                    </span>
+                                  ) : isSubmitted ? (
+                                    <span className="inline-block px-1.5 py-0.5 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                      รอตรวจ
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-300 font-bold hover:text-[#3B82F6]">
+                                      -
+                                    </span>
+                                  )}
+                                </td>
+                              );
+                            });
+
+                            // Calculate Unit score
+                            let uScore = 0;
+                            if (u.scoringMethod === 'SUBMISSION_COUNT_RATIO') {
+                              const clamped = Math.min(u.totalTasks, Math.max(0, submittedInUnit));
+                              const raw = u.totalTasks > 0 ? (clamped / u.totalTasks) * u.maxScore : 0;
+                              uScore = u.autoRoundUp
+                                ? (Math.round((raw - Math.floor(raw)) * 100) / 100 >= 0.5 ? Math.ceil(raw) : Math.floor(raw))
+                                : Math.round(raw * 10) / 10;
+                            } else {
+                              const ratio = maxInUnit > 0 ? earnedInUnit / maxInUnit : 0;
+                              const raw = ratio * u.maxScore;
+                              uScore = u.autoRoundUp
+                                ? (Math.round((raw - Math.floor(raw)) * 100) / 100 >= 0.5 ? Math.ceil(raw) : Math.floor(raw))
+                                : Math.round(raw * 10) / 10;
+                            }
+                            grandTotal += uScore;
+
+                            return (
+                              <React.Fragment key={`cells-group-${stu.studentCode}-${u.id}`}>
+                                {taskCells}
+                                {/* Unit summary cell */}
+                                <td className="p-1.5 border-r border-[#BFDBFE] bg-[#EFF6FF]/60 text-center font-bold text-[#1D4ED8]">
+                                  <div className="flex flex-col items-center justify-center">
+                                    <span className="text-xs font-extrabold">{uScore}</span>
+                                    <span className="text-[9px] text-[#6B7C93]">
+                                      ({submittedInUnit}/{u.totalTasks} งาน)
+                                    </span>
+                                  </div>
+                                </td>
+                              </React.Fragment>
+                            );
+                          })}
+
+                          {/* Independent tasks */}
+                          {matrixUnits.independentList.map((asg) => {
+                            const sub = allSubmissions.find(
+                              (s) => s.assignmentId === asg.id && s.studentCode === stu.studentCode
+                            );
+                            const isSubmitted = sub && sub.status !== 'MISSING';
+                            const isGraded = sub?.status === 'GRADED';
+                            const score = sub?.score ?? 0;
+                            grandTotal += isGraded ? score : 0;
+
+                            return (
+                              <td
+                                key={`indep-${stu.studentCode}-${asg.id}`}
+                                onClick={() =>
+                                  setEditingCell({
+                                    studentCode: stu.studentCode,
+                                    studentName: stu.studentName,
+                                    assignmentId: asg.id,
+                                    assignmentTitle: asg.title,
+                                    maxScore: asg.maxScore,
+                                    currentScore: sub?.score ?? null,
+                                  })
+                                }
+                                className="p-1.5 border-r border-slate-200 text-center cursor-pointer hover:bg-blue-100/40 transition-colors"
+                              >
+                                {isGraded ? (
+                                  <span className="inline-block px-2 py-0.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    {score}
+                                  </span>
+                                ) : isSubmitted ? (
+                                  <span className="inline-block px-1.5 py-0.5 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                    รอตรวจ
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300 font-bold hover:text-[#3B82F6]">
+                                    -
+                                  </span>
+                                )}
+                              </td>
+                            );
+                          })}
+
+                          {/* Grand Total */}
+                          <td className="p-2 text-center font-bold text-sm bg-[#FEF3C7]/40 text-[#92400E]">
+                            {grandTotal}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile View: Cards per student (Pillar 8 & 9: Zero horizontal scroll trap on mobile!) */}
+              <div className="md:hidden space-y-3">
+                {matrixStudents.map((stu) => {
+                  let grandTotal = 0;
+
+                  return (
+                    <div
+                      key={`mob-${stu.studentCode}`}
+                      className="p-4 rounded-2xl border border-[#E6EEF7] bg-white shadow-xs space-y-3"
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="w-7 h-7 rounded-xl bg-[#EFF6FF] text-[#3B82F6] font-bold text-xs flex items-center justify-center">
+                            {stu.sgsSeatNo}
+                          </span>
+                          <div>
+                            <p className="text-sm font-bold text-[#163A66]">{stu.studentName}</p>
+                            <p className="text-[11px] text-[#6B7C93] font-mono">รหัส {stu.studentCode}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Units in mobile card */}
+                      <div className="space-y-2.5">
+                        {matrixUnits.unitList.map((u) => {
+                          let submittedInUnit = 0;
+                          let earnedInUnit = 0;
+                          let maxInUnit = 0;
+
+                          const chips = u.assignments.map((asg) => {
+                            const sub = allSubmissions.find(
+                              (s) => s.assignmentId === asg.id && s.studentCode === stu.studentCode
+                            );
+                            const isSubmitted = sub && sub.status !== 'MISSING';
+                            const isGraded = sub?.status === 'GRADED';
+                            const score = sub?.score;
+                            if (isSubmitted) {
+                              submittedInUnit += 1;
+                              earnedInUnit += score ?? asg.maxScore;
+                            }
+                            maxInUnit += asg.maxScore;
+
+                            return (
+                              <button
+                                key={`mob-chip-${asg.id}`}
+                                type="button"
+                                onClick={() =>
+                                  setEditingCell({
+                                    studentCode: stu.studentCode,
+                                    studentName: stu.studentName,
+                                    assignmentId: asg.id,
+                                    assignmentTitle: asg.title,
+                                    maxScore: asg.maxScore,
+                                    currentScore: score ?? null,
+                                  })
+                                }
+                                className={`px-2 py-1 rounded-lg text-xs font-semibold border flex items-center gap-1 cursor-pointer ${
+                                  isGraded
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    : isSubmitted
+                                      ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                      : 'bg-slate-50 text-slate-400 border-slate-200'
+                                }`}
+                              >
+                                <span>{asg.title}</span>
+                                <span className="font-bold">
+                                  {isGraded ? `${score}` : isSubmitted ? 'รอตรวจ' : '-'}
+                                </span>
+                              </button>
+                            );
+                          });
+
+                          let uScore = 0;
+                          if (u.scoringMethod === 'SUBMISSION_COUNT_RATIO') {
+                            const clamped = Math.min(u.totalTasks, Math.max(0, submittedInUnit));
+                            const raw = u.totalTasks > 0 ? (clamped / u.totalTasks) * u.maxScore : 0;
+                            uScore = u.autoRoundUp
+                              ? (Math.round((raw - Math.floor(raw)) * 100) / 100 >= 0.5 ? Math.ceil(raw) : Math.floor(raw))
+                              : Math.round(raw * 10) / 10;
+                          } else {
+                            const ratio = maxInUnit > 0 ? earnedInUnit / maxInUnit : 0;
+                            const raw = ratio * u.maxScore;
+                            uScore = u.autoRoundUp
+                              ? (Math.round((raw - Math.floor(raw)) * 100) / 100 >= 0.5 ? Math.ceil(raw) : Math.floor(raw))
+                              : Math.round(raw * 10) / 10;
+                          }
+                          grandTotal += uScore;
+
+                          return (
+                            <div
+                              key={`mob-unit-${u.id}`}
+                              className="p-3 rounded-xl bg-[#F7FAFF] border border-[#E6EEF7] space-y-2"
+                            >
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="font-bold text-[#163A66]">{u.title}</span>
+                                <span className="px-2 py-0.5 rounded-lg font-bold bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE]">
+                                  {uScore} / {u.maxScore} คะแนน (ส่ง {submittedInUnit}/{u.totalTasks})
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">{chips}</div>
+                            </div>
+                          );
+                        })}
+
+                        {/* Independent tasks in mobile */}
+                        {matrixUnits.independentList.length > 0 && (
+                          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                            <span className="text-xs font-bold text-[#163A66] block">
+                              ชิ้นงานเดี่ยว
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {matrixUnits.independentList.map((asg) => {
+                                const sub = allSubmissions.find(
+                                  (s) => s.assignmentId === asg.id && s.studentCode === stu.studentCode
+                                );
+                                const isSubmitted = sub && sub.status !== 'MISSING';
+                                const isGraded = sub?.status === 'GRADED';
+                                const score = sub?.score ?? 0;
+                                grandTotal += isGraded ? score : 0;
+
+                                return (
+                                  <button
+                                    key={`mob-indep-${asg.id}`}
+                                    type="button"
+                                    onClick={() =>
+                                      setEditingCell({
+                                        studentCode: stu.studentCode,
+                                        studentName: stu.studentName,
+                                        assignmentId: asg.id,
+                                        assignmentTitle: asg.title,
+                                        maxScore: asg.maxScore,
+                                        currentScore: sub?.score ?? null,
+                                      })
+                                    }
+                                    className={`px-2 py-1 rounded-lg text-xs font-semibold border flex items-center gap-1 cursor-pointer ${
+                                      isGraded
+                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                        : isSubmitted
+                                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                          : 'bg-slate-50 text-slate-400 border-slate-200'
+                                    }`}
+                                  >
+                                    <span>{asg.title}</span>
+                                    <span className="font-bold">
+                                      {isGraded ? `${score}` : isSubmitted ? 'รอตรวจ' : '-'}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                        <span className="font-semibold text-[#6B7C93]">คะแนนรวมทุกงาน:</span>
+                        <span className="text-sm font-bold text-[#92400E] px-2.5 py-0.5 rounded-lg bg-[#FEF3C7] border border-[#FDE68A]">
+                          {grandTotal} คะแนน
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ====================================================================
           MODAL 1: สั่งงานใหม่ (เลือกได้ทั้ง "ทุกห้องในรายวิชา" หรือ "เฉพาะห้องที่เลือก")
          ==================================================================== */}
       {isCreateModalOpen && (
@@ -840,11 +1581,175 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
               />
             </div>
 
-            {/* 3. ส่วนคะแนน 4 ส่วน + คะแนนเต็ม + กำหนดส่ง */}
+            {/* โหมดการคิดคะแนน: งานเดี่ยว vs งานสะสมรายหน่วย/จุดประสงค์ */}
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-[#163A66]">
+                3. รูปแบบการคิดคะแนน *
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormAssignmentMode('DIRECT')}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    formAssignmentMode === 'DIRECT'
+                      ? 'border-[#3B82F6] bg-[#EFF6FF] text-[#163A66]'
+                      : 'border-slate-200 bg-white text-[#6B7C93]'
+                  }`}
+                >
+                  <p className="text-xs font-bold">ชิ้นงานเดี่ยวปกติ</p>
+                  <p className="text-[10px] opacity-80 mt-0.5">คิดคะแนนตรงตามชิ้นงานนี้</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFormAssignmentMode('UNIT_BUNDLE')}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    formAssignmentMode === 'UNIT_BUNDLE'
+                      ? 'border-[#3B82F6] bg-[#EFF6FF] text-[#163A66]'
+                      : 'border-slate-200 bg-white text-[#6B7C93]'
+                  }`}
+                >
+                  <p className="text-xs font-bold flex items-center gap-1">
+                    <Layers className="w-3.5 h-3.5 text-[#3B82F6]" />
+                    <span>งานรายหน่วย / จุดประสงค์</span>
+                  </p>
+                  <p className="text-[10px] opacity-80 mt-0.5">รวมหลายงานเป็น 1 หน่วย (หารเฉลี่ย/สัดส่วน)</p>
+                </button>
+              </div>
+
+              {formAssignmentMode === 'UNIT_BUNDLE' && (
+                <div className="p-3.5 rounded-2xl bg-[#F7FAFF] border border-[#BFDBFE] space-y-3 animate-fade-in text-xs">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                      ชื่อหน่วยการเรียนรู้ / จุดประสงค์ *
+                    </label>
+                    <input
+                      type="text"
+                      required={formAssignmentMode === 'UNIT_BUNDLE'}
+                      value={formUnitTitle}
+                      onChange={(e) => setFormUnitTitle(e.target.value)}
+                      placeholder="เช่น หน่วยที่ 1: ทัศนธาตุและงานปั้น หรือ จุดประสงค์ที่ 1"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-[#163A66]"
+                      list="existingUnitsDatalist"
+                    />
+                    {existingCourseUnits.length > 0 && (
+                      <datalist id="existingUnitsDatalist">
+                        {existingCourseUnits.map((u) => (
+                          <option key={u} value={u} />
+                        ))}
+                      </datalist>
+                    )}
+                    {existingCourseUnits.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                        <span className="text-[10px] text-[#6B7C93]">หน่วยที่มีอยู่แล้ว:</span>
+                        {existingCourseUnits.map((u) => (
+                          <button
+                            key={u}
+                            type="button"
+                            onClick={() => setFormUnitTitle(u)}
+                            className="text-[10px] px-2 py-0.5 rounded-lg bg-white border border-[#BFDBFE] text-[#3B82F6] hover:bg-[#EFF6FF] cursor-pointer"
+                          >
+                            {u}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                        คะแนนเต็มประจำหน่วย
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={formUnitMaxScore}
+                        onChange={(e) => setFormUnitMaxScore(Number(e.target.value) || 10)}
+                        className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-[#163A66]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                        จำนวนงานทั้งหมดในหน่วย
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={formTotalTasksInUnit}
+                        onChange={(e) => setFormTotalTasksInUnit(Number(e.target.value) || 5)}
+                        className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-[#163A66]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                      วิธีคิดคะแนนประจำหน่วย:
+                    </label>
+                    <div className="space-y-1.5">
+                      <label className="flex items-start gap-2 p-2 rounded-xl bg-white border border-slate-200 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="scoringMethod"
+                          value="SUBMISSION_COUNT_RATIO"
+                          checked={formScoringMethod === 'SUBMISSION_COUNT_RATIO'}
+                          onChange={() => setFormScoringMethod('SUBMISSION_COUNT_RATIO')}
+                          className="mt-0.5 text-[#3B82F6]"
+                        />
+                        <div>
+                          <span className="font-bold text-[#163A66] block">
+                            เก็บสัดส่วนการส่งงาน (คะแนนความรับผิดชอบ)
+                          </span>
+                          <span className="text-[11px] text-[#6B7C93]">
+                            สั่ง {formTotalTasksInUnit} งาน เต็ม {formUnitMaxScore} คะแนน ➔ ส่ง 1 งานได้ {(formUnitMaxScore / formTotalTasksInUnit).toFixed(1)} คะแนน
+                          </span>
+                        </div>
+                      </label>
+
+                      <label className="flex items-start gap-2 p-2 rounded-xl bg-white border border-slate-200 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="scoringMethod"
+                          value="RAW_SCORE_AVERAGE"
+                          checked={formScoringMethod === 'RAW_SCORE_AVERAGE'}
+                          onChange={() => setFormScoringMethod('RAW_SCORE_AVERAGE')}
+                          className="mt-0.5 text-[#3B82F6]"
+                        />
+                        <div>
+                          <span className="font-bold text-[#163A66] block">
+                            หารเฉลี่ยคะแนนดิบของงานทั้งหมดในหน่วย
+                          </span>
+                          <span className="text-[11px] text-[#6B7C93]">
+                            นำคะแนนที่ได้จากทุกงานในหน่วยมารวมแล้วเทียบเป็นสัดส่วนเต็ม {formUnitMaxScore} คะแนน
+                          </span>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200">
+                    <span className="text-xs font-semibold text-[#163A66]">
+                      ปัดเศษทศนิยม &gt;= 0.5 ขึ้นอัตโนมัติ
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={formAutoRoundUp}
+                      onChange={(e) => setFormAutoRoundUp(e.target.checked)}
+                      className="w-4 h-4 text-[#3B82F6] rounded cursor-pointer"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 4. ส่วนคะแนน 4 ส่วน + คะแนนเต็ม + กำหนดส่ง */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-[#163A66] mb-1">
-                  3. เก็บเข้าส่วนคะแนนใดของ ปพ.5 *
+                  4. เก็บเข้าส่วนคะแนนใดของ ปพ.5 *
                 </label>
                 <select
                   value={formScorePart}
@@ -1090,6 +1995,113 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         fileName={previewItem?.fileName}
         platform={previewItem?.platform}
       />
+
+      {/* Modal Quick Grade Single Cell */}
+      {editingCell && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-[22px] border border-[#E6EEF7] max-w-sm w-full p-5 shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div>
+                <h3 className="text-sm font-bold text-[#163A66]">
+                  บันทึกคะแนน: {editingCell.studentName}
+                </h3>
+                <p className="text-xs text-[#3B82F6] font-semibold">{editingCell.assignmentTitle}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingCell(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-[#6B7C93]">
+                คะแนนที่ได้ (เต็ม {editingCell.maxScore} คะแนน)
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  max={editingCell.maxScore}
+                  defaultValue={editingCell.currentScore ?? editingCell.maxScore}
+                  id="cellScoreInput"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+                />
+              </div>
+
+              {/* Quick Score Preset Buttons */}
+              <div className="flex items-center gap-1.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById('cellScoreInput') as HTMLInputElement;
+                    if (el) el.value = String(editingCell.maxScore);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 cursor-pointer"
+                >
+                  เต็ม ({editingCell.maxScore})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById('cellScoreInput') as HTMLInputElement;
+                    if (el) el.value = String(Math.round(editingCell.maxScore / 2));
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold hover:bg-blue-100 cursor-pointer"
+                >
+                  ครึ่ง ({Math.round(editingCell.maxScore / 2)})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById('cellScoreInput') as HTMLInputElement;
+                    if (el) el.value = '0';
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold hover:bg-slate-200 cursor-pointer"
+                >
+                  0
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setEditingCell(null)}
+                className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-[#6B7C93] hover:bg-slate-50 cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const el = document.getElementById('cellScoreInput') as HTMLInputElement;
+                  const val = el ? Number(el.value) : editingCell.maxScore;
+                  sgsRosterAndSubmissionService.gradeSubmission(
+                    editingCell.assignmentId,
+                    editingCell.studentCode,
+                    val,
+                    'GRADED'
+                  );
+                  teacherCourseAssignmentService.submitGrade(
+                    `q_${editingCell.assignmentId}_${editingCell.studentCode}`,
+                    val,
+                    'บันทึกคะแนนจากตารางแจกแจง'
+                  );
+                  setEditingCell(null);
+                  refreshMatrixStudents();
+                  showToast(`✓ บันทึก ${editingCell.studentName}: ${val}/${editingCell.maxScore} คะแนน`);
+                }}
+                className="px-4 py-1.5 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-semibold cursor-pointer shadow-xs"
+              >
+                บันทึกคะแนน
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -31,6 +31,50 @@ const CLASSROOM_COLUMNS = 'id, name, gradeLevel, roomNumber, adviser, status, up
 const STUDENT_VIEW_COLUMNS =
   'id, studentCode, code, name, title, first_name, last_name, gender, status, classroom_id, seat_no, parent_phone, parent_name, updated_at';
 
+export function resolveRoomCandidates(classroomId: string): string[] {
+  const set = new Set<string>();
+  const trimmed = (classroomId || '').trim();
+  if (!trimmed) return [];
+  set.add(trimmed);
+
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const raw = localStorage.getItem('cls_classrooms_data');
+      if (raw) {
+        const rooms = JSON.parse(raw);
+        if (Array.isArray(rooms)) {
+          for (const r of rooms) {
+            if (
+              r.id === trimmed ||
+              r.name === trimmed ||
+              r.roomNumber === trimmed ||
+              (r.name && r.name.replace(/\s+/g, '') === trimmed.replace(/\s+/g, ''))
+            ) {
+              if (r.id) set.add(r.id);
+              if (r.name) set.add(r.name);
+              if (r.roomNumber) set.add(r.roomNumber);
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const mThai = trimmed.match(/^ม\.?\s*(\d+)\s*\/\s*(\d+)$/);
+  if (mThai) {
+    set.add(`room-${mThai[1]}-${mThai[2]}`);
+    set.add(`ม.${mThai[1]}/${mThai[2]}`);
+  }
+  const mRoom = trimmed.match(/^room-(\d+)-(\d+)$/);
+  if (mRoom) {
+    set.add(`ม.${mRoom[1]}/${mRoom[2]}`);
+  }
+
+  return Array.from(set);
+}
+
 function mapStudentViewToCached(s: any, fallbackRoomId: string): CachedStudent {
   const gender: 'MALE' | 'FEMALE' = s.gender === 'FEMALE' ? 'FEMALE' : 'MALE';
   const seatNo = Number(s.seat_no || 0);
@@ -173,8 +217,15 @@ export const masterDataService = {
   ): Promise<CachedStudent[]> {
     if (!classroomId) return [];
 
-    if (!forceRefresh && memoryStudentsByRoom.has(classroomId)) {
-      return memoryStudentsByRoom.get(classroomId)!;
+    const candidates = resolveRoomCandidates(classroomId);
+
+    if (!forceRefresh) {
+      for (const c of candidates) {
+        if (memoryStudentsByRoom.has(c)) {
+          const found = memoryStudentsByRoom.get(c)!;
+          if (found && found.length > 0) return found;
+        }
+      }
     }
 
     const scopeKey = `students_${classroomId}`;
@@ -183,10 +234,15 @@ export const masterDataService = {
 
     const task = (async (): Promise<CachedStudent[]> => {
       try {
-        const [cachedStudents, syncMeta] = await Promise.all([
-          localCacheDb.getStudentsByClassroom(classroomId),
-          localCacheDb.getSyncMeta(scopeKey),
-        ]);
+        let cachedStudents: CachedStudent[] = [];
+        for (const c of candidates) {
+          const list = await localCacheDb.getStudentsByClassroom(c);
+          if (list && list.length > 0) {
+            cachedStudents = list;
+            break;
+          }
+        }
+        const syncMeta = await localCacheDb.getSyncMeta(scopeKey);
 
         const now = Date.now();
         const isCacheFresh =
@@ -196,20 +252,24 @@ export const masterDataService = {
           now - syncMeta.lastCheckedMs < MASTER_DATA_TTL_MS;
 
         if (isCacheFresh) {
-          memoryStudentsByRoom.set(classroomId, cachedStudents);
+          for (const c of candidates) {
+            memoryStudentsByRoom.set(c, cachedStudents);
+          }
           return cachedStudents;
         }
 
         if (!isSupabaseConfigured) {
-          memoryStudentsByRoom.set(classroomId, cachedStudents);
+          for (const c of candidates) {
+            memoryStudentsByRoom.set(c, cachedStudents);
+          }
           return cachedStudents;
         }
 
-        // L3 Delta Sync จาก Supabase/Neon View 'students'
+        // L3 Delta Sync จาก Supabase/Neon View 'students' โดยค้นหาครอบคลุมทุกรหัสแทนกัน (UUID, room-X-Y, ชื่อภาษาไทย)
         let query = supabase
           .from('students')
           .select(STUDENT_VIEW_COLUMNS)
-          .eq('classroom_id', classroomId);
+          .in('classroom_id', candidates);
 
         if (cachedStudents.length > 0 && syncMeta?.lastSyncedIso) {
           query = query.gt('updated_at', syncMeta.lastSyncedIso);
@@ -239,17 +299,39 @@ export const masterDataService = {
           lastCheckedMs: now,
         });
 
-        const finalStudents =
-          deltaStudents && deltaStudents.length > 0
-            ? await localCacheDb.getStudentsByClassroom(classroomId)
-            : cachedStudents;
+        let finalStudents: CachedStudent[] = [];
+        if (deltaStudents && deltaStudents.length > 0) {
+          for (const c of candidates) {
+            const list = await localCacheDb.getStudentsByClassroom(c);
+            if (list && list.length > 0) {
+              finalStudents = list;
+              break;
+            }
+          }
+          if (finalStudents.length === 0) {
+            finalStudents = deltaStudents.map((s: any) => mapStudentViewToCached(s, classroomId));
+          }
+        } else {
+          finalStudents = cachedStudents;
+        }
 
-        memoryStudentsByRoom.set(classroomId, finalStudents);
+        for (const c of candidates) {
+          memoryStudentsByRoom.set(c, finalStudents);
+        }
         return finalStudents;
       } catch (err) {
         console.warn(`[masterDataService] โหลดนักเรียนห้อง ${classroomId} จากเซิร์ฟเวอร์ไม่สำเร็จ ใช้ข้อมูลออฟไลน์:`, err);
-        const fallback = await localCacheDb.getStudentsByClassroom(classroomId);
-        memoryStudentsByRoom.set(classroomId, fallback);
+        let fallback: CachedStudent[] = [];
+        for (const c of candidates) {
+          const list = await localCacheDb.getStudentsByClassroom(c);
+          if (list && list.length > 0) {
+            fallback = list;
+            break;
+          }
+        }
+        for (const c of candidates) {
+          memoryStudentsByRoom.set(c, fallback);
+        }
         return fallback;
       } finally {
         inFlightRequests.delete(scopeKey);

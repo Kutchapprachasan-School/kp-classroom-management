@@ -7,6 +7,7 @@
 
 import { cleanSlateService } from './cleanSlateService.ts';
 import { studentService, formatClassroomLabel } from './studentService.ts';
+import { resolveRoomCandidates } from './masterDataService.ts';
 import { isGrade1SgsStudentCode } from '../config/m1SgsLookup';
 
 export type StudentTransferState = 'ACTIVE' | 'TRANSFERRED_IN' | 'TRANSFERRED_OUT';
@@ -87,6 +88,11 @@ export interface SgsStudentRecord {
   courseScores?: Record<string, StudentCourseScoreEntry>;
 }
 
+export type ScoringMethodType =
+  | 'DIRECT_SCORE'            // คะแนนตรงรายชิ้น (เช่น ชิ้นนี้เต็ม 10 คะแนน)
+  | 'SUBMISSION_COUNT_RATIO'  // เก็บสัดส่วนจำนวนงานที่ส่ง (คะแนนการส่งงาน: มี N งาน หาร N คูณคะแนนเต็มหน่วย เช่น 5 งาน งานละ 2 คะแนน)
+  | 'RAW_SCORE_AVERAGE';      // เฉลี่ยคะแนนดิบของงานทั้งหมดในหน่วย
+
 export interface TermAssignmentItem {
   id: string;
   orderNo: number;
@@ -105,6 +111,14 @@ export interface TermAssignmentItem {
   dueDate: string;
   // Q3-A: งานบังคับ / ตัวชี้วัดต้องรู้ (ถ้าไม่ส่งติด "ร" ทันที และเมื่อตรวจให้คะแนนแล้วปลด "ร" อัตโนมัติ)
   isRequiredForPass?: boolean;
+
+  // รองรับการสั่งงานรายหน่วย / รายจุดประสงค์ และเฉลี่ยคะแนนสะสม (Auto-division / Unit Score)
+  unitId?: string;               // รหัสกลุ่มหน่วย เช่น 'unit-1', 'obj-1'
+  unitTitle?: string;            // ชื่อหน่วย/จุดประสงค์ เช่น 'หน่วยที่ 1: ทัศนธาตุและการออกแบบ'
+  unitMaxScore?: number;         // คะแนนเต็มของหน่วย เช่น 10 คะแนน
+  scoringMethod?: ScoringMethodType; // วิธีคำนวณคะแนนหน่วย
+  totalTasksInUnit?: number;     // จำนวนงานทั้งหมดในหน่วย (เช่น 5 งาน หรือ 10 งาน)
+  autoRoundUp?: boolean;         // สวิตช์ปัดเศษทศนิยม >= 0.5 ขึ้นอัตโนมัติ
 }
 
 export type TermAssignmentConfig = TermAssignmentItem;
@@ -304,9 +318,16 @@ export const sgsRosterAndSubmissionService = {
 
       if (savedList.length > 0) {
         if (classroomId) {
-          let filtered = savedList.filter(
-            (s) => s.classroom === classroomId || s.classroom === formatted
-          );
+          const roomCandidates = resolveRoomCandidates(classroomId);
+          let filtered = savedList.filter((s) => {
+            if (!s || !s.classroom) return false;
+            return (
+              roomCandidates.includes(s.classroom) ||
+              s.classroom === classroomId ||
+              s.classroom === formatted ||
+              formatClassroomLabel(s.classroom) === formatted
+            );
+          });
           if (isNonGrade1) {
             filtered = filtered.filter((s) => !isGrade1SgsStudentCode(s.studentCode));
           }
@@ -670,6 +691,12 @@ export const sgsRosterAndSubmissionService = {
     maxScore: number;
     dueDate: string;
     isRequiredForPass?: boolean;
+    unitId?: string;
+    unitTitle?: string;
+    unitMaxScore?: number;
+    scoringMethod?: ScoringMethodType;
+    totalTasksInUnit?: number;
+    autoRoundUp?: boolean;
   }): TermAssignmentItem[] {
     const list = this.getTermAssignments();
     const part: FourScorePart =
@@ -710,6 +737,12 @@ export const sgsRosterAndSubmissionService = {
       }),
       dueDate: payload.dueDate || 'ไม่ระบุกำหนดส่ง',
       isRequiredForPass: payload.isRequiredForPass ?? false,
+      unitId: payload.unitId,
+      unitTitle: payload.unitTitle?.trim(),
+      unitMaxScore: payload.unitMaxScore !== undefined ? Number(payload.unitMaxScore) : undefined,
+      scoringMethod: payload.scoringMethod || 'DIRECT_SCORE',
+      totalTasksInUnit: payload.totalTasksInUnit !== undefined ? Number(payload.totalTasksInUnit) : undefined,
+      autoRoundUp: payload.autoRoundUp ?? true,
     };
     const updated = [...list, newItem];
     localStorage.setItem(STORAGE_KEY_TERM_ASSIGNMENTS, JSON.stringify(updated));
@@ -734,6 +767,9 @@ export const sgsRosterAndSubmissionService = {
     localStorage.setItem(STORAGE_KEY_WORK_SUBMISSIONS, JSON.stringify(list));
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('kp-copilot-updated'));
+      window.dispatchEvent(new CustomEvent('kp-grading-queue-updated'));
+      window.dispatchEvent(new Event('kp-sgs-roster-updated'));
+      window.dispatchEvent(new CustomEvent('kps-data-sync-event', { detail: { type: 'submissions-updated' } }));
     }
     return list;
   },
@@ -893,7 +929,23 @@ export const sgsRosterAndSubmissionService = {
     let pendingReviewCount = 0;
     const missingMandatoryTitles: string[] = [];
 
+    // แยกงานเดี่ยว (direct) กับงานที่จัดกลุ่มรายหน่วย/จุดประสงค์ (unit-based)
+    const unitGroups = new Map<string, TermAssignmentItem[]>();
+    const directAssignments: TermAssignmentItem[] = [];
+
     for (const asg of assignments) {
+      const uKey = asg.unitId || (asg.scoringMethod && asg.scoringMethod !== 'DIRECT_SCORE' ? asg.unitTitle : undefined);
+      if (uKey && asg.scoringMethod && asg.scoringMethod !== 'DIRECT_SCORE') {
+        const group = unitGroups.get(uKey) || [];
+        group.push(asg);
+        unitGroups.set(uKey, group);
+      } else {
+        directAssignments.push(asg);
+      }
+    }
+
+    // 1. คำนวณชิ้นงานเดี่ยวปกติ
+    for (const asg of directAssignments) {
       const sub = subs.find((s) => s.assignmentId === asg.id);
       if (
         sub &&
@@ -929,6 +981,83 @@ export const sgsRosterAndSubmissionService = {
         }
       }
     }
+
+    // 2. คำนวณงานกลุ่มรายหน่วย/รายจุดประสงค์ (เช่น 5 งาน หาร 5, 10 งาน หาร 10 เป็นคะแนนการส่งงาน)
+    unitGroups.forEach((unitTasks) => {
+      const first = unitTasks[0];
+      const unitMax = first.unitMaxScore ?? 10;
+      const totalTasks = first.totalTasksInUnit && first.totalTasksInUnit > 0
+        ? first.totalTasksInUnit
+        : unitTasks.length;
+      const autoRoundUp = first.autoRoundUp ?? true;
+      const part: FourScorePart = first.scorePart || (first.sgsUnit === 'u1' ? 'PRE_MIDTERM' : 'POST_MIDTERM');
+      const sgsUnit = first.sgsUnit;
+
+      let submittedInUnit = 0;
+      let rawEarnedSum = 0;
+      let rawMaxSum = 0;
+
+      for (const asg of unitTasks) {
+        const sub = subs.find((s) => s.assignmentId === asg.id);
+        if (
+          sub &&
+          (sub.status === 'GRADED' ||
+            sub.status === 'SUBMITTED_PENDING' ||
+            sub.status === 'EXEMPT_TRANSFERRED')
+        ) {
+          submittedCount += 1;
+          submittedInUnit += 1;
+          if (sub.status === 'SUBMITTED_PENDING') {
+            pendingReviewCount += 1;
+          }
+          const earned =
+            sub.score !== null && sub.score !== undefined
+              ? sub.score
+              : sub.status === 'SUBMITTED_PENDING'
+              ? asg.maxScore
+              : 0;
+          rawEarnedSum += earned;
+          rawMaxSum += asg.maxScore;
+        } else {
+          missingCount += 1;
+          if (asg.isRequiredForPass) {
+            missingMandatoryTitles.push(asg.title || `งานที่ ${asg.orderNo}`);
+          }
+        }
+      }
+
+      let calculatedUnitScore = 0;
+      if (first.scoringMethod === 'SUBMISSION_COUNT_RATIO') {
+        const clampedTasks = Math.min(totalTasks, Math.max(0, submittedInUnit));
+        const raw = totalTasks > 0 ? (clampedTasks / totalTasks) * unitMax : 0;
+        if (autoRoundUp) {
+          const floor = Math.floor(raw);
+          const dec = Math.round((raw - floor) * 100) / 100;
+          calculatedUnitScore = dec >= 0.5 ? Math.ceil(raw) : floor;
+        } else {
+          calculatedUnitScore = Math.round(raw * 10) / 10;
+        }
+      } else if (first.scoringMethod === 'RAW_SCORE_AVERAGE') {
+        const ratio = rawMaxSum > 0 ? rawEarnedSum / rawMaxSum : 0;
+        const raw = ratio * unitMax;
+        if (autoRoundUp) {
+          const floor = Math.floor(raw);
+          const dec = Math.round((raw - floor) * 100) / 100;
+          calculatedUnitScore = dec >= 0.5 ? Math.ceil(raw) : floor;
+        } else {
+          calculatedUnitScore = Math.round(raw * 10) / 10;
+        }
+      }
+
+      if (sgsUnit === 'u1') u1 += calculatedUnitScore;
+      if (sgsUnit === 'u2') u2 += calculatedUnitScore;
+      if (sgsUnit === 'u3') u3 += calculatedUnitScore;
+
+      if (part === 'PRE_MIDTERM') preFromWorks += calculatedUnitScore;
+      else if (part === 'MIDTERM') midFromWorks += calculatedUnitScore;
+      else if (part === 'POST_MIDTERM') postFromWorks += calculatedUnitScore;
+      else if (part === 'FINAL') finalFromWorks += calculatedUnitScore;
+    });
 
     // ถ้านักเรียนย้ายเข้าใหม่ มีคะแนนโอนหน่วยที่ 1
     if (

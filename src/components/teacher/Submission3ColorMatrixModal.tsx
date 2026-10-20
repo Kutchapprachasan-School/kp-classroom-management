@@ -70,12 +70,12 @@ export const Submission3ColorMatrixModal: React.FC<Submission3ColorMatrixModalPr
   const [matrixSearch, setMatrixSearch] = useState<string>('');
 
   const roster: SgsStudentRecord[] = useMemo(() => {
-    return sgsRosterAndSubmissionService.getSgsRoster();
-  }, []);
+    return sgsRosterAndSubmissionService.getSgsRoster(selectedRoom);
+  }, [selectedRoom]);
 
   const termAssignments: TermAssignmentItem[] = useMemo(() => {
-    return sgsRosterAndSubmissionService.getTermAssignments();
-  }, []);
+    return sgsRosterAndSubmissionService.getTermAssignments(selectedSubjectCode, selectedRoom);
+  }, [selectedSubjectCode, selectedRoom]);
 
   const [submissions, setSubmissions] = useState<StudentWorkSubmission[]>(() =>
     sgsRosterAndSubmissionService.getSubmissions()
@@ -84,7 +84,6 @@ export const Submission3ColorMatrixModal: React.FC<Submission3ColorMatrixModalPr
   const activeStudents = useMemo(() => {
     return roster.filter((s) => {
       if (s.transferState === 'TRANSFERRED_OUT') return false;
-      if (selectedRoom && s.classroom !== selectedRoom) return false;
       if (matrixSearch.trim()) {
         const q = matrixSearch.toLowerCase();
         return (
@@ -95,7 +94,7 @@ export const Submission3ColorMatrixModal: React.FC<Submission3ColorMatrixModalPr
       }
       return true;
     });
-  }, [roster, selectedRoom, matrixSearch]);
+  }, [roster, matrixSearch]);
 
   const matrixStats = useMemo(() => {
     let missingTotal = 0;

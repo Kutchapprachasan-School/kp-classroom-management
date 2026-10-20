@@ -2,7 +2,7 @@ import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase.
 import { StudentCreateSchema, type StudentCreateInput } from './types.ts';
 import { attendanceCorrelationService } from './attendanceCorrelationService.ts';
 import { activityAuditLogService } from './activityAuditLogService.ts';
-import { masterDataService } from './masterDataService.ts';
+import { masterDataService, resolveRoomCandidates } from './masterDataService.ts';
 import { localCacheDb } from './localCacheDb.ts';
 
 import { isGrade1SgsStudentCode, getM1SgsStudentInfo } from '../config/m1SgsLookup.ts';
@@ -179,62 +179,25 @@ function relocateMisplacedM1Students(misplaced: StudentRecord[]): void {
 
 const getLocalStudents = (classroomId: string): StudentRecord[] => {
   if (!classroomId) return [];
-  const isGrade1Room = classroomId.includes('1-') || classroomId.includes('1/');
+  const candidates = resolveRoomCandidates(classroomId);
+  const isGrade1Room = candidates.some((c) => c.includes('1-') || c.includes('1/'));
 
+  // 1. ตรวจสอบใน localStorage ตามรหัสแทนกันทุกตัว
   if (typeof localStorage !== 'undefined') {
-    const raw = localStorage.getItem(`${STORAGE_PREFIX}${classroomId}`);
-    if (raw !== null) {
-      try {
-        let parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          // หากเป็นห้องที่ไม่ใช่ ม.1 (เช่น room-3-1) แต่มีนักเรียน ม.1 ปะปนอยู่ ให้ทำการ sanitize อัตโนมัติทันที
-          if (!isGrade1Room && parsed.some((s: StudentRecord) => isGrade1SgsStudentCode(s.code || s.id))) {
-            const misplaced = parsed.filter((s: StudentRecord) => isGrade1SgsStudentCode(s.code || s.id));
-            parsed = parsed.filter((s: StudentRecord) => !isGrade1SgsStudentCode(s.code || s.id));
-            localStorage.setItem(`${STORAGE_PREFIX}${classroomId}`, JSON.stringify(parsed));
-            const altKey = getAlternateRoomKey(classroomId);
-            if (altKey) {
-              localStorage.setItem(`${STORAGE_PREFIX}${altKey}`, JSON.stringify(parsed));
-            }
-            inMemoryStudentCache[classroomId] = parsed;
-            relocateMisplacedM1Students(misplaced);
-          } else if (isGrade1Room && parsed.some((s: StudentRecord) => s.code && /^16\d{3}$/.test(s.code) && !isGrade1SgsStudentCode(s.code))) {
-            // หากเป็นห้อง ม.1 ให้ล้างนักเรียน 16xxx ที่ไม่ใช่ ม.1 จริง (ป้องกันการหลุดเข้ามาทับซ้อน)
-            parsed = parsed.filter(
-              (s: StudentRecord) => !(s.code && /^16\d{3}$/.test(s.code) && !isGrade1SgsStudentCode(s.code))
-            );
-            const seen = new Set<string>();
-            parsed = parsed.filter((s: StudentRecord) => {
-              const k = s.code || s.id;
-              if (seen.has(k)) return false;
-              seen.add(k);
-              return true;
-            });
-            localStorage.setItem(`${STORAGE_PREFIX}${classroomId}`, JSON.stringify(parsed));
-            const altKey = getAlternateRoomKey(classroomId);
-            if (altKey) {
-              localStorage.setItem(`${STORAGE_PREFIX}${altKey}`, JSON.stringify(parsed));
-            }
-            inMemoryStudentCache[classroomId] = parsed;
-          }
-          return parsed;
-        }
-      } catch {
-        // fallback
-      }
-    }
-    const altKey = getAlternateRoomKey(classroomId);
-    if (altKey) {
-      const altRaw = localStorage.getItem(`${STORAGE_PREFIX}${altKey}`);
-      if (altRaw !== null) {
+    for (const c of candidates) {
+      const raw = localStorage.getItem(`${STORAGE_PREFIX}${c}`);
+      if (raw !== null) {
         try {
-          let parsed = JSON.parse(altRaw);
-          if (Array.isArray(parsed)) {
+          let parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            // หากเป็นห้องที่ไม่ใช่ ม.1 แต่มีนักเรียน ม.1 ปะปนอยู่ ให้ทำการ sanitize
             if (!isGrade1Room && parsed.some((s: StudentRecord) => isGrade1SgsStudentCode(s.code || s.id))) {
               const misplaced = parsed.filter((s: StudentRecord) => isGrade1SgsStudentCode(s.code || s.id));
               parsed = parsed.filter((s: StudentRecord) => !isGrade1SgsStudentCode(s.code || s.id));
-              localStorage.setItem(`${STORAGE_PREFIX}${altKey}`, JSON.stringify(parsed));
-              inMemoryStudentCache[altKey] = parsed;
+              for (const cand of candidates) {
+                localStorage.setItem(`${STORAGE_PREFIX}${cand}`, JSON.stringify(parsed));
+                inMemoryStudentCache[cand] = parsed;
+              }
               relocateMisplacedM1Students(misplaced);
             } else if (isGrade1Room && parsed.some((s: StudentRecord) => s.code && /^16\d{3}$/.test(s.code) && !isGrade1SgsStudentCode(s.code))) {
               parsed = parsed.filter(
@@ -247,8 +210,10 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
                 seen.add(k);
                 return true;
               });
-              localStorage.setItem(`${STORAGE_PREFIX}${altKey}`, JSON.stringify(parsed));
-              inMemoryStudentCache[altKey] = parsed;
+              for (const cand of candidates) {
+                localStorage.setItem(`${STORAGE_PREFIX}${cand}`, JSON.stringify(parsed));
+                inMemoryStudentCache[cand] = parsed;
+              }
             }
             return parsed;
           }
@@ -258,36 +223,24 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
       }
     }
   }
-  if (classroomId in inMemoryStudentCache) {
-    let cached = inMemoryStudentCache[classroomId];
-    if (!isGrade1Room && cached.some((s) => isGrade1SgsStudentCode(s.code || s.id))) {
-      cached = cached.filter((s) => !isGrade1SgsStudentCode(s.code || s.id));
-      inMemoryStudentCache[classroomId] = cached;
-    } else if (isGrade1Room && cached.some((s) => s.code && /^16\d{3}$/.test(s.code) && !isGrade1SgsStudentCode(s.code))) {
-      cached = cached.filter((s) => !(s.code && /^16\d{3}$/.test(s.code) && !isGrade1SgsStudentCode(s.code)));
-      inMemoryStudentCache[classroomId] = cached;
+
+  // 2. ตรวจสอบใน inMemoryStudentCache
+  for (const c of candidates) {
+    if (c in inMemoryStudentCache && inMemoryStudentCache[c]?.length > 0) {
+      let cached = inMemoryStudentCache[c];
+      if (!isGrade1Room && cached.some((s) => isGrade1SgsStudentCode(s.code || s.id))) {
+        cached = cached.filter((s) => !isGrade1SgsStudentCode(s.code || s.id));
+        inMemoryStudentCache[c] = cached;
+      }
+      return cached;
     }
-    return cached;
-  }
-  const alt = getAlternateRoomKey(classroomId);
-  if (alt && alt in inMemoryStudentCache) {
-    let cached = inMemoryStudentCache[alt];
-    if (!isGrade1Room && cached.some((s) => isGrade1SgsStudentCode(s.code || s.id))) {
-      cached = cached.filter((s) => !isGrade1SgsStudentCode(s.code || s.id));
-      inMemoryStudentCache[alt] = cached;
-    }
-    return cached;
   }
 
-  // Check L1 memory in masterDataService
-  const masterL1 = masterDataService.getCachedStudentsSync(classroomId);
-  if (masterL1 && masterL1.length > 0) {
-    return masterL1 as StudentRecord[];
-  }
-  if (alt) {
-    const masterAltL1 = masterDataService.getCachedStudentsSync(alt);
-    if (masterAltL1 && masterAltL1.length > 0) {
-      return masterAltL1 as StudentRecord[];
+  // 3. ตรวจสอบใน L1 memory masterDataService
+  for (const c of candidates) {
+    const masterL1 = masterDataService.getCachedStudentsSync(c);
+    if (masterL1 && masterL1.length > 0) {
+      return masterL1 as StudentRecord[];
     }
   }
 
@@ -296,18 +249,17 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
 
 const saveLocalStudents = (classroomId: string, items: StudentRecord[]) => {
   if (!classroomId) return;
-  inMemoryStudentCache[classroomId] = items;
-  const altKey = getAlternateRoomKey(classroomId);
-  if (altKey) {
-    inMemoryStudentCache[altKey] = items;
+  const candidates = resolveRoomCandidates(classroomId);
+
+  for (const c of candidates) {
+    inMemoryStudentCache[c] = items;
   }
   // L2 IndexedDB persistence
   localCacheDb.putStudents(items as any).catch(() => {});
 
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(`${STORAGE_PREFIX}${classroomId}`, JSON.stringify(items));
-    if (altKey) {
-      localStorage.setItem(`${STORAGE_PREFIX}${altKey}`, JSON.stringify(items));
+    for (const c of candidates) {
+      localStorage.setItem(`${STORAGE_PREFIX}${c}`, JSON.stringify(items));
     }
     try {
       window.dispatchEvent(new CustomEvent('kps-students-updated', { detail: { classroomId } }));
