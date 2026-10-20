@@ -1350,6 +1350,8 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                         ? `วันหยุด: ${day.holidayName || (day.dayOfMonth === 13 ? 'วันนวมินทรมหาราช' : 'วันปิยมหาราช')}`
                         : isWeekend
                         ? 'วันหยุดสุดสัปดาห์ (เสาร์-อาทิตย์)'
+                        : day.isTermBreak
+                        ? 'ช่วงปิดเทอม (นอกภาคเรียน)'
                         : isChecked
                         ? 'สอนแล้ว (บันทึกเวลาเรียนแล้ว)'
                         : 'ยังไม่ได้เช็คชื่อ'
@@ -1359,6 +1361,8 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                         ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-300'
                         : isHoliday
                         ? 'bg-rose-100 text-rose-700 font-black border border-rose-200 hover:bg-rose-200'
+                        : day.isTermBreak
+                        ? 'bg-amber-100/70 text-amber-900 border border-amber-200/80 hover:bg-amber-200/70'
                         : isChecked
                         ? 'bg-emerald-100/90 text-emerald-800 hover:bg-emerald-200 font-bold'
                         : isWeekend
@@ -1389,6 +1393,10 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                 <span>ยังไม่เช็ค</span>
               </div>
               <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
+                <span>ช่วงปิดเทอม</span>
+              </div>
+              <div className="flex items-center gap-1.5 col-span-2">
                 <div className="w-2.5 h-2.5 rounded-full bg-rose-200 border border-rose-300 shrink-0" />
                 <span>วันหยุด / เสาร์-อาทิตย์</span>
               </div>

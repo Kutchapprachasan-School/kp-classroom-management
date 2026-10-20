@@ -188,6 +188,8 @@ export interface AssemblyCalendarDayInfo {
   isHoliday?: boolean;
   isWeekend?: boolean;
   holidayName?: string;
+  isInTerm?: boolean;
+  isTermBreak?: boolean;
   totalStudents: number;
   presentCount: number;
   lateCount: number;
@@ -1191,10 +1193,18 @@ export const attendanceCorrelationService = {
       const isPastOrToday = dateStr <= referenceDate;
       const isToday = dateStr === referenceDate;
 
+      // ตรวจสอบภาคเรียนและวันหยุดทางการ
+      const isInTerm = academicCalendarService.isDateInActiveTerm(dateStr);
+      const isTermBreak = !isInTerm && isWeekday;
+
       // Detect official holidays (e.g. October 13 King Bhumibol Day, October 23 Chulalongkorn Day)
-      let isHoliday = false;
-      let holidayName = '';
-      if (month === 10) {
+      const holidays = academicCalendarService.getHolidays().filter((h) => h.isActive);
+      const holidayMatch = holidays.find(
+        (h) => academicCalendarService.parseThaiDateToIso(h.date) === dateStr
+      );
+      let isHoliday = Boolean(holidayMatch);
+      let holidayName = holidayMatch ? holidayMatch.name : '';
+      if (!isHoliday && month === 10) {
         if (day === 13) {
           isHoliday = true;
           holidayName = 'วันนวมินทรมหาราช';
@@ -1227,6 +1237,8 @@ export const attendanceCorrelationService = {
         isWeekend,
         isHoliday,
         holidayName,
+        isInTerm,
+        isTermBreak,
         isChecked,
         isToday,
         isPastOrToday,

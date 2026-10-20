@@ -551,6 +551,30 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
     });
   };
 
+  const handleAutoCalc20WeeksEdit = () => {
+    if (!editTermForm.startDate.trim()) {
+      showToast('⚠️ กรุณาระบุวันเริ่มเรียนก่อนคำนวณวันปิดเรียน');
+      return;
+    }
+    const calculated = academicCalendarService.calculate20WeeksEndDate(editTermForm.startDate.trim());
+    if (calculated) {
+      setEditTermForm((prev) => ({ ...prev, endDate: calculated }));
+      showToast(`✓ คำนวณวันปิดภาคเรียนครบ 20 สัปดาห์ (${calculated}) เรียบร้อย`);
+    }
+  };
+
+  const handleAutoCalc20WeeksNew = () => {
+    if (!newTermForm.startDate.trim()) {
+      showToast('⚠️ กรุณาระบุวันเปิดภาคเรียนก่อนคำนวณวันปิดภาคเรียน');
+      return;
+    }
+    const calculated = academicCalendarService.calculate20WeeksEndDate(newTermForm.startDate.trim());
+    if (calculated) {
+      setNewTermForm((prev) => ({ ...prev, endDate: calculated }));
+      showToast(`✓ คำนวณวันปิดภาคเรียนครบ 20 สัปดาห์ (${calculated}) เรียบร้อย`);
+    }
+  };
+
   const handleSaveEditTerm = (termId: string) => {
     if (!editTermForm.year || !editTermForm.startDate.trim() || !editTermForm.endDate.trim()) {
       showToast('⚠️ กรุณากรอกปีการศึกษา วันเริ่มเรียน และวันปิดเรียนให้ครบถ้วน');
@@ -2108,8 +2132,22 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                     />
                   </div>
                   <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-bold text-slate-700">
+                        วันปิดภาคเรียน:
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleAutoCalc20WeeksNew}
+                        disabled={!newTermForm.startDate}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="คำนวณวันสิ้นสุดอัตโนมัติ นับ 20 สัปดาห์จากวันเปิดภาคเรียน"
+                      >
+                        <Sparkles className="w-3 h-3 text-amber-500" />
+                        <span>⚡ คำนวณ 20 สัปดาห์</span>
+                      </button>
+                    </div>
                     <ThaiMiniDatePicker
-                      label="วันปิดภาคเรียน:"
                       value={newTermForm.endDate}
                       onChange={(thaiDate) => setNewTermForm({ ...newTermForm, endDate: thaiDate })}
                       placeholder="เช่น 15 มี.ค. 2570"
@@ -2207,8 +2245,22 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                         />
                       </div>
                       <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[11px] font-bold text-slate-700">
+                            วันปิดเรียน (วันสิ้นสุดภาคเรียน):
+                          </label>
+                          <button
+                            type="button"
+                            onClick={handleAutoCalc20WeeksEdit}
+                            disabled={!editTermForm.startDate}
+                            className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="คำนวณวันสิ้นสุดอัตโนมัติ นับ 20 สัปดาห์จากวันเริ่มเรียน"
+                          >
+                            <Sparkles className="w-3 h-3 text-amber-500" />
+                            <span>⚡ คำนวณ 20 สัปดาห์</span>
+                          </button>
+                        </div>
                         <ThaiMiniDatePicker
-                          label="วันปิดเรียน (วันสิ้นสุดภาคเรียน):"
                           value={editTermForm.endDate}
                           onChange={(thaiDate) => setEditTermForm({ ...editTermForm, endDate: thaiDate })}
                           placeholder="เช่น 15 มี.ค. 2570"

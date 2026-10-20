@@ -60,6 +60,7 @@ import {
   getMatrixStorageKey,
 } from '../services/calendarEventStorageService';
 import { authService } from '../services/authService';
+import { attendanceCorrelationService } from '../services/attendanceCorrelationService';
 
 import {
   type TimetableColorTheme,
@@ -292,7 +293,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
 
   void onDeepNavigate;
 
-  const weekInfo = useMemo(() => computeWeekInfo(weekOffset), [weekOffset]);
+  const weekInfo = useMemo(() => computeWeekInfo(weekOffset, activeTerm), [weekOffset, activeTerm]);
 
   const todayDayKey = getBangkokDayName();
   const todayTeachingSlots = useMemo(() => {
@@ -1087,6 +1088,9 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                       >
                         <div className="flex flex-col items-center">
                           <span>{dayObj.key}</span>
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            {dayObj.dateLabel}
+                          </span>
                           {isToday && (
                             <span className="text-[10px] bg-blue-600 text-white px-2 py-0.2 rounded-full font-bold mt-0.5">
                               วันนี้
@@ -1372,7 +1376,16 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                 const dayNum = i - firstDayOfWeek + 1;
                 const isValid = dayNum >= 1 && dayNum <= daysInMonth;
                 const colIndex = i % 7;
-                const isSchoolDay = colIndex >= 1 && colIndex <= 5 && isValid;
+                const thisDateIso = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                const isInActiveTerm = academicCalendarService.isDateInActiveTerm(thisDateIso);
+                const holidays = academicCalendarService.getHolidays().filter((h) => h.isActive);
+                const holidayMatch = holidays.find(
+                  (h) => academicCalendarService.parseThaiDateToIso(h.date) === thisDateIso
+                );
+                const isHoliday = Boolean(holidayMatch);
+                const isWeekendDay = colIndex === 0 || colIndex === 6;
+                const isSchoolDay = !isWeekendDay && isValid;
+                const isTermBreak = isSchoolDay && !isInActiveTerm;
 
                 if (!isValid) {
                   return <div key={i} className="h-22 bg-slate-50/30 rounded-2xl border border-slate-100/50" />;
@@ -1388,7 +1401,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
 
                 // Determine Day of Week Name
                 const WEEKDAY_KEYS = ['', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', ''];
-                const dayKey = isSchoolDay ? WEEKDAY_KEYS[colIndex] : '';
+                const dayKey = isSchoolDay && !isTermBreak && !isHoliday ? WEEKDAY_KEYS[colIndex] : '';
                 const scheduledSlots = dayKey
                   ? matrixSlots.filter(
                       (s) =>
@@ -1403,12 +1416,23 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                   : [];
                 const classCount = scheduledSlots.length;
                 const hasClasses = classCount > 0;
-                const isAllChecked = hasClasses && scheduledSlots.every((s) => s.status === 'CHECKED');
 
-                // Visual styling logic: Green = checked, Red = unchecked past/today, Gray = waiting (ONLY on days with classes)
+                // ตรวจสอบจากประวัติการเช็คชื่อจริงใน attendanceCorrelationService
+                const dateRecords = attendanceCorrelationService
+                  .getAllPeriodRecords()
+                  .filter((r) => r.date === thisDateIso);
+                const isAllChecked =
+                  hasClasses &&
+                  (dateRecords.length > 0 || scheduledSlots.every((s) => s.status === 'CHECKED'));
+
+                // Visual styling logic: Green = checked, Red = unchecked past, Amber = term break
                 let cellBorderBg = 'border-slate-100 bg-slate-50/60 opacity-60';
                 if (isToday) {
                   cellBorderBg = 'border-blue-500 bg-blue-50/50 shadow-xs ring-1 ring-blue-300';
+                } else if (isTermBreak) {
+                  cellBorderBg = 'border-amber-200/70 bg-amber-50/40 hover:bg-amber-100/50';
+                } else if (isHoliday) {
+                  cellBorderBg = 'border-rose-200/70 bg-rose-50/40';
                 } else if (isSchoolDay) {
                   if (hasClasses) {
                     if (isPast) {
@@ -1451,7 +1475,22 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                       )}
                     </div>
 
-                    {isSchoolDay ? (
+                    {isTermBreak ? (
+                      <div className="space-y-1">
+                        <span className="inline-block text-[9px] font-bold text-amber-800 bg-amber-100/90 border border-amber-300 px-1.5 py-0.2 rounded-md">
+                          ช่วงปิดเทอม
+                        </span>
+                      </div>
+                    ) : isHoliday ? (
+                      <div className="space-y-1">
+                        <span
+                          className="inline-block text-[9px] font-bold text-rose-800 bg-rose-100/90 border border-rose-300 px-1.5 py-0.2 rounded-md truncate max-w-full"
+                          title={holidayMatch?.name || 'วันหยุดพิเศษ'}
+                        >
+                          {holidayMatch?.name || 'วันหยุดพิเศษ'}
+                        </span>
+                      </div>
+                    ) : isSchoolDay ? (
                       hasClasses ? (
                         <div className="space-y-1">
                           <div className="text-[10px] font-bold text-slate-700">
@@ -1473,8 +1512,8 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                                 ✓ เช็คแล้ว
                               </span>
                             ) : (
-                              <span className="inline-block text-[9px] font-extrabold text-rose-800 bg-rose-100 border border-rose-300 px-1.5 py-0.2 rounded-md">
-                                ⚠️ ยังไม่เช็ค
+                              <span className="inline-block text-[9px] font-extrabold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.2 rounded-md">
+                                ⚠️ รอเช็คชื่อ
                               </span>
                             )
                           ) : (

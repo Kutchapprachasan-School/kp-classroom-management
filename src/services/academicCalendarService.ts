@@ -87,6 +87,48 @@ export function parseThaiDateToIso(str: string): string {
   return trimmed;
 }
 
+/**
+ * คำนวณวันปิดภาคเรียนอัตโนมัติ (ครบ 20 สัปดาห์การเรียนการสอนตามมาตรฐาน สพฐ.)
+ * จากวันเริ่มเรียน (วันเปิดภาคเรียน)
+ * เช่น วันเริ่ม 19 ต.ค. 2569 -> วันศุกร์สัปดาห์ที่ 20 คือ 5 มี.ค. 2570
+ */
+export function calculate20WeeksEndDate(
+  startDateThaiOrIso: string,
+  mode: 'FRIDAY' | 'SUNDAY' = 'FRIDAY'
+): string {
+  const iso = parseThaiDateToIso(startDateThaiOrIso);
+  if (!iso) return '';
+  const parts = iso.split('-');
+  if (parts.length < 3) return '';
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[2], 10);
+  const startDate = new Date(y, m, d);
+
+  // หาวันจันทร์ของสัปดาห์ที่ 1
+  const dayOfWeek = startDate.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  const diffToMonday = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
+  const startMonday = new Date(startDate);
+  startMonday.setDate(startDate.getDate() + diffToMonday);
+
+  const targetDate = new Date(startMonday);
+  if (mode === 'FRIDAY') {
+    // วันศุกร์ของสัปดาห์ที่ 20 = startMonday + (19 สัปดาห์) + 4 วัน
+    targetDate.setDate(startMonday.getDate() + 19 * 7 + 4);
+  } else {
+    // วันอาทิตย์สิ้นสุดสัปดาห์ที่ 20 = startMonday + (19 สัปดาห์) + 6 วัน
+    targetDate.setDate(startMonday.getDate() + 19 * 7 + 6);
+  }
+
+  const endDay = targetDate.getDate();
+  const endMonthKey = Object.keys(THAI_MONTH_SHORT_MAP).find(
+    (key) => parseInt(THAI_MONTH_SHORT_MAP[key], 10) === targetDate.getMonth() + 1
+  ) || 'มี.ค.';
+  const endYearBe = targetDate.getFullYear() + 543;
+
+  return `${endDay} ${endMonthKey} ${endYearBe}`;
+}
+
 const DEFAULT_TERMS: AcademicTermRecord[] = [
   {
     id: 't-2569-2',
@@ -226,9 +268,14 @@ const DEFAULT_WEEKEND_MAKEUP_DAYS: WeekendMakeupDayRecord[] = [
   },
 ];
 
+let inMemoryCalendarConfig: AcademicCalendarConfig | null = null;
+
 export const academicCalendarService = {
   // อ่านการตั้งค่าทั้งหมด
   getConfig(): AcademicCalendarConfig {
+    if (inMemoryCalendarConfig) {
+      return inMemoryCalendarConfig;
+    }
     if (typeof window === 'undefined') {
       return {
         terms: DEFAULT_TERMS,
@@ -293,12 +340,18 @@ export const academicCalendarService = {
       }),
     };
 
+    inMemoryCalendarConfig = next;
+
     if (typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEY_CALENDAR_CONFIG, JSON.stringify(next));
       window.dispatchEvent(new CustomEvent(ACADEMIC_CALENDAR_EVENT, { detail: next }));
     }
 
     return next;
+  },
+
+  parseThaiDateToIso(str: string): string {
+    return parseThaiDateToIso(str);
   },
 
   // ===================== ภาคเรียน & ปีการศึกษา =====================
@@ -310,6 +363,13 @@ export const academicCalendarService = {
   getActiveTerm(): AcademicTermRecord {
     const terms = this.getTerms();
     return terms.find((t) => t.isActive) || terms[0] || DEFAULT_TERMS[0];
+  },
+
+  /**
+   * คำนวณวันปิดภาคเรียนอัตโนมัติ (ครบ 20 สัปดาห์) จากวันเริ่มเรียน
+   */
+  calculate20WeeksEndDate(startDateThaiOrIso: string, mode: 'FRIDAY' | 'SUNDAY' = 'FRIDAY'): string {
+    return calculate20WeeksEndDate(startDateThaiOrIso, mode);
   },
 
   /**

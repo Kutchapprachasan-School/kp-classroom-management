@@ -1,6 +1,8 @@
 // src/utils/timetableDateUtils.ts
 // Date calculation helpers and constants for Teacher Timetable matching Mockup Parity
 
+import { academicCalendarService } from '../services/academicCalendarService.ts';
+
 export type TimetableColorTheme =
   | 'pink'
   | 'teal'
@@ -126,18 +128,48 @@ export const formatThaiDateShort = (dateStrOrObj?: string | Date): string => {
   }).format(d);
 };
 
-export const computeWeekInfo = (offset: number): ComputedWeekInfo => {
-  // Base semester instructional duration is 20 weeks
-  // Anchor current week at week 16
-  const baseWeek = 16;
+export const computeWeekInfo = (
+  offset: number = 0,
+  activeTermParam?: { startDate: string; semesterNo?: number; termName?: string } | null
+): ComputedWeekInfo => {
   const totalWeeks = 20;
-  const weekNumber = Math.min(totalWeeks, Math.max(1, baseWeek + offset));
-  const effectiveOffset = weekNumber - baseWeek;
 
-  // Base anchor Monday: 29 Sep 2026 (2569 BE) - corresponds to week 16
-  const baseMonday = new Date(2026, 8, 29); // 0-indexed month 8 = September
-  const startMonday = new Date(baseMonday);
-  startMonday.setDate(baseMonday.getDate() + effectiveOffset * 7);
+  // อ่านภาคเรียนปัจจุบันจากพารามิเตอร์หรือ academicCalendarService
+  const term = activeTermParam ?? academicCalendarService.getActiveTerm();
+  const startIso = term ? academicCalendarService.parseThaiDateToIso(term.startDate) : '';
+
+  let termStartMonday: Date;
+  if (startIso && /^\d{4}-\d{2}-\d{2}$/.test(startIso)) {
+    const [sYear, sMonth, sDay] = startIso.split('-').map(Number);
+    const startDate = new Date(sYear, sMonth - 1, sDay);
+    const dayOfW = startDate.getDay(); // 0 = Sun, 1 = Mon
+    const diffToMon = (dayOfW === 0 ? -6 : 1) - dayOfW;
+    termStartMonday = new Date(startDate);
+    termStartMonday.setDate(startDate.getDate() + diffToMon);
+    termStartMonday.setHours(0, 0, 0, 0);
+  } else {
+    // Fallback: 19 ต.ค. 2569
+    termStartMonday = new Date(2026, 9, 19);
+  }
+
+  // วันปัจจุบันในเขตเวลาไทย (Bangkok)
+  const todayBangkok = getBangkokNow();
+  todayBangkok.setHours(0, 0, 0, 0);
+
+  // คำนวณสัปดาห์ปัจจุบันของภาคเรียน
+  const diffDays = Math.floor(
+    (todayBangkok.getTime() - termStartMonday.getTime()) / (1000 * 60 * 60 * 24)
+  );
+  const currentWeek = diffDays < 0 ? 1 : Math.floor(diffDays / 7) + 1;
+  const clampedCurrentWeek = Math.min(totalWeeks, Math.max(1, currentWeek));
+
+  // สัปดาห์เป้าหมายหลังบวก offset
+  const weekNumber = Math.min(totalWeeks, Math.max(1, clampedCurrentWeek + offset));
+  const effectiveOffsetWeeks = weekNumber - 1;
+
+  // วันจันทร์และวันอาทิตย์ของสัปดาห์เป้าหมาย
+  const startMonday = new Date(termStartMonday);
+  startMonday.setDate(termStartMonday.getDate() + effectiveOffsetWeeks * 7);
 
   const endSunday = new Date(startMonday);
   endSunday.setDate(startMonday.getDate() + 6);
@@ -157,15 +189,18 @@ export const computeWeekInfo = (offset: number): ComputedWeekInfo => {
     'ศุกร์',
   ];
 
-  const currentBangkokDay = getBangkokDayName();
-
   const days: WeekDayInfo[] = dayKeys.map((key, i) => {
     const cur = new Date(startMonday);
     cur.setDate(startMonday.getDate() + i);
+    const isToday =
+      cur.getFullYear() === todayBangkok.getFullYear() &&
+      cur.getMonth() === todayBangkok.getMonth() &&
+      cur.getDate() === todayBangkok.getDate();
+
     return {
       key,
       dateLabel: formatThaiDate(cur),
-      isToday: effectiveOffset === 0 && key === currentBangkokDay,
+      isToday,
     };
   });
 
