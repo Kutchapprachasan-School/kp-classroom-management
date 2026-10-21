@@ -457,6 +457,42 @@ export const teacherCourseAssignmentService = {
     return { updatedQueue: updated, nextPendingItem: nextPending };
   },
 
+  returnSubmission(
+    queueId: string,
+    reason: string,
+    feedback?: string
+  ): { updatedQueue: GradingQueueItem[]; nextPendingItem: GradingQueueItem | null } {
+    const list = this.getGradingQueue();
+    let targetItem: GradingQueueItem | null = null;
+    const note = `[ส่งงานกลับเนื่องจาก: ${reason}] ${feedback || ''}`.trim();
+    const updated = list.map((item) => {
+      if (item.id === queueId || item.id === `q_${queueId}`) {
+        targetItem = {
+          ...item,
+          status: 'RETURNED' as any,
+          score: null,
+          teacherFeedback: note,
+        };
+        return targetItem;
+      }
+      return item;
+    });
+
+    this.saveGradingQueue(updated);
+
+    if (targetItem && (targetItem as GradingQueueItem).assignmentId && (targetItem as GradingQueueItem).studentCode) {
+      sgsRosterAndSubmissionService.returnSubmissionForRevision(
+        (targetItem as GradingQueueItem).assignmentId,
+        (targetItem as GradingQueueItem).studentCode,
+        reason,
+        feedback
+      );
+    }
+
+    const nextPending = updated.find((it) => it.status === 'PENDING_REVIEW') || null;
+    return { updatedQueue: updated, nextPendingItem: nextPending };
+  },
+
   // ==========================================================================
   // Assignment Bundle Methods (สั่งงานรวม & เฉลี่ยคะแนนอัตโนมัติ)
   // ==========================================================================

@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Trash2,
   ExternalLink,
+  AlertCircle,
 } from 'lucide-react';
 import { gamificationService } from '../services/gamificationService';
 import { sgsRosterAndSubmissionService, type FourScorePart } from '../services/sgsRosterAndSubmissionService';
@@ -33,6 +34,9 @@ export interface ExtendedStudentQuestItem extends StudentQuestItem {
   scorePartLabel?: string;
   isRequiredForPass?: boolean;
   description?: string;
+  isReturnedForRevision?: boolean;
+  returnReason?: string;
+  teacherFeedback?: string;
 }
 
 interface StudentMissionsViewProps {
@@ -128,8 +132,10 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
 
       const sgsQuests: ExtendedStudentQuestItem[] = termAssignments.map((asg) => {
         const sub = allSubmissions.find((s) => s.assignmentId === asg.id && s.studentCode === studentCode);
+        const isReturnedForRevision = sub?.status === 'RETURNED_REVISION';
         const isSubmitted =
           !!sub &&
+          !isReturnedForRevision &&
           (sub.status === 'SUBMITTED_PENDING' ||
             sub.status === 'GRADED' ||
             sub.status === 'EXEMPT_TRANSFERRED');
@@ -151,6 +157,8 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
           statusLabel:
             sub?.status === 'GRADED'
               ? 'ตรวจแล้ว'
+              : isReturnedForRevision
+              ? 'ครูส่งกลับให้แก้ไข'
               : isSubmitted
               ? 'ส่งแล้ว (รอตรวจ)'
               : 'รอส่งงาน',
@@ -158,6 +166,9 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
           scorePartLabel: partLabel,
           isRequiredForPass: asg.isRequiredForPass,
           description: asg.description,
+          isReturnedForRevision,
+          returnReason: sub?.returnReason,
+          teacherFeedback: sub?.teacherFeedback,
         };
       });
 
@@ -487,9 +498,16 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                         ⭐ งานบังคับ (ไม่ส่งติด ร)
                       </span>
                     )}
-                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-semibold">
-                      {quest.statusLabel}
-                    </span>
+                    {quest.isReturnedForRevision ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-100 text-amber-850 border border-amber-300 font-bold flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 text-amber-600" />
+                        <span>ขอให้แก้ไข: {quest.returnReason || 'โปรดปรับปรุงผลงาน'}</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-semibold">
+                        {quest.statusLabel}
+                      </span>
+                    )}
                   </div>
                   <h4 className="font-bold text-[#163A66] text-sm">
                     {quest.title}
@@ -531,7 +549,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                   }}
                   className="px-4 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1 cursor-pointer"
                 >
-                  <span>{quest.status === 'PENDING' ? 'ส่งงาน' : 'ดูงาน'}</span>
+                  <span>{quest.isReturnedForRevision ? 'แก้ไขและส่งใหม่' : quest.status === 'PENDING' ? 'ส่งงาน' : 'ดูงาน'}</span>
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -933,6 +951,19 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
               </div>
             ) : (
             <form onSubmit={handleSubmit} className="space-y-4 text-xs font-sans">
+              {selectedQuest.isReturnedForRevision && (
+                <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-300 text-amber-900 space-y-1.5">
+                  <div className="flex items-center gap-2 font-bold text-xs sm:text-sm text-amber-800">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>คุณครูส่งงานกลับมาให้แก้ไข: {selectedQuest.returnReason || 'ขอให้ปรับปรุงผลงาน'}</span>
+                  </div>
+                  {selectedQuest.teacherFeedback && (
+                    <p className="text-xs bg-white/90 p-2.5 rounded-xl border border-amber-200 text-amber-800 font-medium">
+                      คำแนะนำจากคุณครู: &ldquo;{selectedQuest.teacherFeedback}&rdquo;
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="space-y-4">
                 {/* 1. File Upload Section */}
                 <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">

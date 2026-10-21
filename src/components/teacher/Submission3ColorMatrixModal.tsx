@@ -56,18 +56,34 @@ export const Submission3ColorMatrixModal: React.FC<Submission3ColorMatrixModalPr
   });
 
   const currentSubjectInfo = useMemo(() => {
-    return (
-      teachingSubjects.find((s) => s.code === selectedSubjectCode) ||
-      teachingSubjects[0] || null
-    );
-  }, [selectedSubjectCode, teachingSubjects]);
+    const found = teachingSubjects.find((s) => s.code === selectedSubjectCode);
+    if (found) return found;
+    return {
+      code: selectedSubjectCode,
+      name: selectedSubjectCode,
+      classrooms: defaultRoom ? [defaultRoom] : ['ม.1/1'],
+    };
+  }, [selectedSubjectCode, teachingSubjects, defaultRoom]);
 
   const [selectedRoom, setSelectedRoom] = useState<string>(() => {
-    if (defaultRoom && currentSubjectInfo?.classrooms?.includes(defaultRoom)) {
-      return defaultRoom;
-    }
+    if (defaultRoom) return defaultRoom;
     return currentSubjectInfo?.classrooms?.[0] || '';
   });
+
+  const availableRooms = useMemo(() => {
+    const set = new Set<string>();
+    if (currentSubjectInfo?.classrooms) {
+      currentSubjectInfo.classrooms.forEach((r) => set.add(r));
+    }
+    if (defaultRoom) set.add(defaultRoom);
+    if (selectedRoom) set.add(selectedRoom);
+    return Array.from(set);
+  }, [currentSubjectInfo, defaultRoom, selectedRoom]);
+
+  React.useEffect(() => {
+    if (defaultSubjectCode) setSelectedSubjectCode(defaultSubjectCode);
+    if (defaultRoom) setSelectedRoom(defaultRoom);
+  }, [defaultSubjectCode, defaultRoom, isOpen]);
   const [matrixSearch, setMatrixSearch] = useState<string>('');
 
   const roster: SgsStudentRecord[] = useMemo(() => {
@@ -201,7 +217,7 @@ export const Submission3ColorMatrixModal: React.FC<Submission3ColorMatrixModalPr
                 onChange={(e) => setSelectedRoom(e.target.value)}
                 className="bg-transparent text-xs font-bold text-slate-900 focus:outline-none cursor-pointer"
               >
-                {currentSubjectInfo.classrooms.map((rm) => (
+                {availableRooms.map((rm) => (
                   <option key={rm} value={rm}>
                     ห้อง {rm}
                   </option>
@@ -211,7 +227,7 @@ export const Submission3ColorMatrixModal: React.FC<Submission3ColorMatrixModalPr
 
             {/* Quick Room Buttons */}
             <div className="inline-flex rounded-xl bg-slate-200/70 p-0.5 text-xs font-bold">
-              {currentSubjectInfo.classrooms.map((rm) => (
+              {availableRooms.map((rm) => (
                 <button
                   key={rm}
                   type="button"

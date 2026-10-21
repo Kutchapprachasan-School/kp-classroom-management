@@ -133,7 +133,18 @@ export type SubmissionCellStatus =
   | 'GRADED'
   | 'SUBMITTED_PENDING'
   | 'MISSING'
-  | 'EXEMPT_TRANSFERRED';
+  | 'EXEMPT_TRANSFERRED'
+  | 'RETURNED_REVISION';
+
+export const RETURN_SUBMISSION_REASONS = [
+  'ไฟล์แนบไม่สมบูรณ์ / ไม่สามารถเปิดไฟล์ได้',
+  'งานยังไม่ครบถ้วนตามข้อกำหนดของชิ้นงาน',
+  'รูปภาพหรือเอกสารไม่ชัดเจน / ข้อมูลตกหล่น',
+  'ต้องการให้ปรับปรุงเนื้อหาและส่งใหม่อีกครั้ง',
+  'ส่งไฟล์ผิดวิชาหรือผิดชิ้นงาน',
+  'ตรวจพบเนื้อหาซ้ำซ้อนหรือคัดลอกผลงาน',
+  'อื่นๆ (ระบุเหตุผลด้วยตนเอง)',
+] as const;
 
 export interface StudentWorkSubmission {
   assignmentId: string;
@@ -144,6 +155,8 @@ export interface StudentWorkSubmission {
   workTitle?: string;
   workAttachmentLabel?: string;
   teacherFeedback?: string;
+  returnReason?: string;
+  returnedAt?: string;
   // Cloudflare R2 Storage & Lifecycle fields
   r2ObjectKey?: string;
   originalSizeKb?: number;
@@ -723,6 +736,61 @@ export const sgsRosterAndSubmissionService = {
     return list;
   },
 
+  updateTermAssignment(
+    assignmentId: string,
+    updates: Partial<TermAssignmentItem>
+  ): TermAssignmentItem[] {
+    const list = this.getTermAssignments();
+    const targetItem = list.find((i) => i.id === assignmentId);
+    const targetUnitId = targetItem?.unitId;
+    const targetUnitTitle = targetItem?.unitTitle;
+
+    const updated = list.map((item) => {
+      const isTarget = item.id === assignmentId;
+      const isSameUnit = Boolean(
+        !isTarget &&
+        ((targetUnitId && item.unitId === targetUnitId) ||
+         (targetUnitTitle && item.unitTitle === targetUnitTitle && item.courseCode === targetItem?.courseCode))
+      );
+
+      if (!isTarget && !isSameUnit) return item;
+
+      if (isSameUnit) {
+        // ซิงค์ข้อมูลระดับหน่วยกับงานอื่นในหน่วยเดียวกัน
+        return {
+          ...item,
+          unitTitle: updates.unitTitle !== undefined ? updates.unitTitle?.trim() : item.unitTitle,
+          unitMaxScore: updates.unitMaxScore !== undefined ? Number(updates.unitMaxScore) : item.unitMaxScore,
+          totalTasksInUnit: updates.totalTasksInUnit !== undefined ? Number(updates.totalTasksInUnit) : item.totalTasksInUnit,
+          scoringMethod: updates.scoringMethod !== undefined ? updates.scoringMethod : item.scoringMethod,
+          autoRoundUp: updates.autoRoundUp !== undefined ? updates.autoRoundUp : item.autoRoundUp,
+          scorePart: updates.scorePart !== undefined ? updates.scorePart : item.scorePart,
+        };
+      }
+
+      return {
+        ...item,
+        ...updates,
+        title: updates.title !== undefined ? updates.title.trim() : item.title,
+        maxScore: updates.maxScore !== undefined ? Number(updates.maxScore) : item.maxScore,
+        unitTitle: updates.unitTitle !== undefined ? updates.unitTitle?.trim() : item.unitTitle,
+        unitMaxScore: updates.unitMaxScore !== undefined ? Number(updates.unitMaxScore) : item.unitMaxScore,
+        totalTasksInUnit: updates.totalTasksInUnit !== undefined ? Number(updates.totalTasksInUnit) : item.totalTasksInUnit,
+        dueDate: updates.dueDate !== undefined ? updates.dueDate : item.dueDate,
+        targetClassrooms: updates.targetClassrooms !== undefined ? updates.targetClassrooms : item.targetClassrooms,
+        scorePart: updates.scorePart !== undefined ? updates.scorePart : item.scorePart,
+        scoringMethod: updates.scoringMethod !== undefined ? updates.scoringMethod : item.scoringMethod,
+        autoRoundUp: updates.autoRoundUp !== undefined ? updates.autoRoundUp : item.autoRoundUp,
+      };
+    });
+    localStorage.setItem(STORAGE_KEY_TERM_ASSIGNMENTS, JSON.stringify(updated));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('kp-sgs-roster-updated'));
+      window.dispatchEvent(new CustomEvent('kp-copilot-updated'));
+    }
+    return updated;
+  },
+
   addTermAssignment(payload: {
     title: string;
     description?: string;
@@ -762,7 +830,7 @@ export const sgsRosterAndSubmissionService = {
       payload.sgsUnit || (part === 'PRE_MIDTERM' || part === 'MIDTERM' ? 'u1' : 'u2');
 
     const newItem: TermAssignmentItem = {
-      id: `asg-${Date.now()}`,
+      id: `asg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       orderNo: list.length + 1,
       title: payload.title.trim(),
       description: payload.description?.trim(),
@@ -891,7 +959,8 @@ export const sgsRosterAndSubmissionService = {
     assignmentId: string,
     studentCode: string,
     score: number | null,
-    status: SubmissionCellStatus = 'GRADED'
+    status: SubmissionCellStatus = 'GRADED',
+    teacherFeedback?: string
   ): StudentWorkSubmission[] {
     const subs = this.getSubmissions();
     const idx = subs.findIndex(
@@ -904,6 +973,7 @@ export const sgsRosterAndSubmissionService = {
             score,
             status: score === null ? 'MISSING' : status,
             submittedAt: subs[idx].submittedAt || 'ครูตรวจบันทึกคะแนน',
+            teacherFeedback: teacherFeedback !== undefined ? teacherFeedback : subs[idx].teacherFeedback,
           }
         : {
             assignmentId,
@@ -912,6 +982,50 @@ export const sgsRosterAndSubmissionService = {
             status: score === null ? 'MISSING' : status,
             submittedAt: 'ครูตรวจบันทึกคะแนน',
             workTitle: 'ส่งงานหน้าชั้นเรียน / ส่งซ่อมแก้ ร',
+            teacherFeedback,
+          };
+
+    const updated =
+      idx !== -1
+        ? subs.map((item, i) => (i === idx ? nextItem : item))
+        : [...subs, nextItem];
+
+    return this.saveSubmissions(updated);
+  },
+
+  // ส่งงานกลับให้นักเรียนแก้ไข (Request Resubmission) พร้อมระบุเหตุผล
+  returnSubmissionForRevision(
+    assignmentId: string,
+    studentCode: string,
+    reason: string,
+    teacherFeedback?: string
+  ): StudentWorkSubmission[] {
+    const subs = this.getSubmissions();
+    const idx = subs.findIndex(
+      (s) => s.assignmentId === assignmentId && s.studentCode === studentCode
+    );
+    const nowIso = new Date().toISOString();
+    const formattedNote = `[ส่งงานกลับเนื่องจาก: ${reason}] ${teacherFeedback || ''}`.trim();
+
+    const nextItem: StudentWorkSubmission =
+      idx !== -1
+        ? {
+            ...subs[idx],
+            status: 'RETURNED_REVISION',
+            score: null,
+            returnReason: reason,
+            returnedAt: nowIso,
+            teacherFeedback: formattedNote,
+          }
+        : {
+            assignmentId,
+            studentCode,
+            status: 'RETURNED_REVISION',
+            score: null,
+            returnReason: reason,
+            returnedAt: nowIso,
+            teacherFeedback: formattedNote,
+            workTitle: 'งานที่ส่งกลับเพื่อแก้ไข',
           };
 
     const updated =

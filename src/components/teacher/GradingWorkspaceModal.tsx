@@ -15,7 +15,10 @@ import {
 } from 'lucide-react';
 import type { GradingQueueItem } from '../../services/teacherCourseAssignmentService';
 import { studentService, formatClassroomLabel } from '../../services/studentService';
-import { sgsRosterAndSubmissionService } from '../../services/sgsRosterAndSubmissionService';
+import {
+  sgsRosterAndSubmissionService,
+  RETURN_SUBMISSION_REASONS,
+} from '../../services/sgsRosterAndSubmissionService';
 import {
   FEEDBACK_STRAND_CATALOG,
   detectFeedbackStrand,
@@ -34,6 +37,7 @@ interface GradingWorkspaceModalProps {
   currentItem: GradingQueueItem | null;
   allItems: GradingQueueItem[];
   onSaveGrade: (itemId: string, score: number, feedback: string) => void;
+  onReturnSubmission?: (itemId: string, reason: string, note: string) => void;
   onSelectQueueItem: (item: GradingQueueItem) => void;
 }
 
@@ -43,12 +47,16 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
   currentItem,
   allItems,
   onSaveGrade,
+  onReturnSubmission,
   onSelectQueueItem,
 }) => {
   const [scoreInput, setScoreInput] = useState<string>('');
   const [feedbackInput, setFeedbackInput] = useState<string>('');
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [imgError, setImgError] = useState<boolean>(false);
+  const [isReturningWork, setIsReturningWork] = useState<boolean>(false);
+  const [returnReason, setReturnReason] = useState<string>(RETURN_SUBMISSION_REASONS[0]);
+  const [customReturnNote, setCustomReturnNote] = useState<string>('');
 
   // Feedback Stickers Catalog State
   const [selectedStrand, setSelectedStrand] = useState<FeedbackStrandId>(() => {
@@ -624,6 +632,86 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
                 </div>
               </div>
 
+              {/* Panel: ส่งงานกลับเนื่องจาก... (Request Revision) */}
+              {isReturningWork ? (
+                <div className="p-3.5 rounded-2xl bg-amber-50/90 border border-amber-200/90 space-y-2.5 animate-fade-in text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-amber-900 flex items-center gap-1.5 text-xs">
+                      <span>↩️</span>
+                      <span>ส่งงานกลับให้นักเรียนแก้ไข (Request Resubmission)</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsReturningWork(false)}
+                      className="p-1 rounded-md text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      ส่งงานกลับ เนื่องจาก: *
+                    </label>
+                    <select
+                      value={returnReason}
+                      onChange={(e) => setReturnReason(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                    >
+                      {RETURN_SUBMISSION_REASONS.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      คำแนะนำเพิ่มเติมถึงนักเรียน (ถ้ามี):
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="เช่น ช่วยเพิ่มข้อ 3-5 หรือแนบรูปที่สว่างกว่านี้..."
+                      value={customReturnNote}
+                      onChange={(e) => setCustomReturnNote(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-xl border border-amber-200 bg-white text-xs text-slate-800 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!currentItem) return;
+                        if (onReturnSubmission) {
+                          onReturnSubmission(currentItem.id, returnReason, customReturnNote);
+                        } else {
+                          sgsRosterAndSubmissionService.returnSubmissionForRevision(
+                            currentItem.assignmentId,
+                            currentItem.studentCode,
+                            returnReason,
+                            customReturnNote
+                          );
+                        }
+                        setIsReturningWork(false);
+                        setCustomReturnNote('');
+                      }}
+                      className="flex-1 py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer text-center"
+                    >
+                      ยืนยันส่งงานกลับ ↩️
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsReturningWork(false)}
+                      className="py-2 px-3 rounded-xl bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 font-bold text-xs transition-colors cursor-pointer"
+                    >
+                      ยกเลิก
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
               {/* Action Buttons */}
               <div className="pt-2 flex flex-col gap-2">
                 <button
@@ -633,6 +721,17 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
                   <Check className="w-5 h-5" />
                   <span>บันทึกคะแนน & ตรวจคนถัดไป ➔</span>
                 </button>
+
+                {!isReturningWork && (
+                  <button
+                    type="button"
+                    onClick={() => setIsReturningWork(true)}
+                    className="w-full py-2.5 px-4 rounded-xl border border-amber-300 bg-amber-50/80 hover:bg-amber-100 text-amber-900 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <span>↩️</span>
+                    <span>ส่งงานกลับให้นักเรียนแก้ไข</span>
+                  </button>
+                )}
 
                 <button
                   type="button"

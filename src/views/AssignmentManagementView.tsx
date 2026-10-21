@@ -14,6 +14,7 @@ import {
   Plus,
   HelpCircle,
   Trash2,
+  Edit3,
   X,
   ClipboardList,
   Download,
@@ -99,8 +100,11 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     refreshTermAssignments();
   }, [refreshTermAssignments]);
 
-  // 3. Create New Assignment Modal State
+  // 3. Create & Edit Assignment Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState<TermAssignmentConfig | null>(null);
+  const [matrixModalDefaultSubject, setMatrixModalDefaultSubject] = useState<string | undefined>(undefined);
+  const [matrixModalDefaultRoom, setMatrixModalDefaultRoom] = useState<string | undefined>(undefined);
   const [formCourseCode, setFormCourseCode] = useState<string>(
     () => subjectsList[0]?.courseCode || 'ท23102'
   );
@@ -119,6 +123,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
   const [formUnitTitle, setFormUnitTitle] = useState('');
   const [formUnitMaxScore, setFormUnitMaxScore] = useState<number>(10);
   const [formScoringMethod, setFormScoringMethod] = useState<'SUBMISSION_COUNT_RATIO' | 'RAW_SCORE_AVERAGE'>('SUBMISSION_COUNT_RATIO');
+  const [formIsDynamicTasks, setFormIsDynamicTasks] = useState<boolean>(true);
   const [formTotalTasksInUnit, setFormTotalTasksInUnit] = useState<number>(5);
   const [formAutoRoundUp, setFormAutoRoundUp] = useState<boolean>(true);
 
@@ -162,30 +167,85 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     return Array.from(new Set(list));
   }, [termAssignments, formCourseCode]);
 
-  const handleOpenCreateModal = () => {
+  const handleOpenCreateModal = (prefill?: {
+    courseCode?: string;
+    unitTitle?: string;
+    unitMaxScore?: number;
+    scorePart?: FourScorePart;
+    scoringMethod?: 'SUBMISSION_COUNT_RATIO' | 'RAW_SCORE_AVERAGE';
+    totalTasksInUnit?: number;
+    isDynamicTasks?: boolean;
+    targetClassrooms?: string[];
+  }) => {
+    setEditingAssignment(null);
     const initialCourse =
-      selectedSubjectCode !== 'ALL'
+      prefill?.courseCode ||
+      (selectedSubjectCode !== 'ALL'
         ? selectedSubjectCode
-        : subjectsList[0]?.courseCode || 'ท23102';
+        : subjectsList[0]?.courseCode || 'ท23102');
     setFormCourseCode(initialCourse);
     setFormTitle('');
-    setFormScorePart('PRE_MIDTERM');
+    setFormScorePart(prefill?.scorePart || 'PRE_MIDTERM');
     setFormMaxScore(10);
     setFormDueDate(getBangkokTodayString());
-    setFormScopeMode('ALL_SUBJECT_ROOMS');
+    setFormScopeMode(
+      prefill?.targetClassrooms && prefill.targetClassrooms.length > 0
+        ? 'SELECTED_ROOMS'
+        : 'ALL_SUBJECT_ROOMS'
+    );
     setFormSelectedRooms(
-      selectedRoom !== 'ALL'
+      prefill?.targetClassrooms ||
+      (selectedRoom !== 'ALL'
         ? [selectedRoom]
         : currentFormSubjectRooms[0]
           ? [currentFormSubjectRooms[0]]
-          : []
+          : [])
     );
-    setFormAssignmentMode('DIRECT');
-    setFormUnitTitle('');
-    setFormUnitMaxScore(10);
-    setFormScoringMethod('SUBMISSION_COUNT_RATIO');
-    setFormTotalTasksInUnit(5);
+    if (prefill?.unitTitle) {
+      setFormAssignmentMode('UNIT_BUNDLE');
+      setFormUnitTitle(prefill.unitTitle);
+      setFormUnitMaxScore(prefill.unitMaxScore ?? 10);
+      setFormScoringMethod(prefill.scoringMethod || 'SUBMISSION_COUNT_RATIO');
+      setFormIsDynamicTasks(prefill.isDynamicTasks ?? true);
+      setFormTotalTasksInUnit(prefill.totalTasksInUnit && prefill.totalTasksInUnit > 0 ? prefill.totalTasksInUnit : 5);
+    } else {
+      setFormAssignmentMode('DIRECT');
+      setFormUnitTitle('');
+      setFormUnitMaxScore(10);
+      setFormScoringMethod('SUBMISSION_COUNT_RATIO');
+      setFormIsDynamicTasks(true);
+      setFormTotalTasksInUnit(5);
+    }
     setFormAutoRoundUp(true);
+    setIsCreateModalOpen(true);
+  };
+
+  const handleOpenEditModal = (assign: TermAssignmentConfig) => {
+    setEditingAssignment(assign);
+    setFormCourseCode(assign.courseCode || subjectsList[0]?.courseCode || 'ท23102');
+    setFormTitle(assign.title);
+    setFormScorePart(assign.scorePart || 'PRE_MIDTERM');
+    setFormMaxScore(assign.maxScore || 10);
+    setFormDueDate(assign.dueDate || getBangkokTodayString());
+    setFormScopeMode(
+      assign.targetClassrooms && assign.targetClassrooms.length > 0
+        ? 'SELECTED_ROOMS'
+        : 'ALL_SUBJECT_ROOMS'
+    );
+    setFormSelectedRooms(assign.targetClassrooms || []);
+    const isUnit = Boolean(
+      assign.unitTitle ||
+      (assign.scoringMethod && assign.scoringMethod !== 'DIRECT_SCORE')
+    );
+    setFormAssignmentMode(isUnit ? 'UNIT_BUNDLE' : 'DIRECT');
+    setFormUnitTitle(assign.unitTitle || '');
+    setFormUnitMaxScore(assign.unitMaxScore ?? 10);
+    setFormScoringMethod((assign.scoringMethod as any) || 'SUBMISSION_COUNT_RATIO');
+    setFormIsDynamicTasks(!assign.totalTasksInUnit || assign.totalTasksInUnit <= 0);
+    setFormTotalTasksInUnit(
+      assign.totalTasksInUnit && assign.totalTasksInUnit > 0 ? assign.totalTasksInUnit : 5
+    );
+    setFormAutoRoundUp(assign.autoRoundUp ?? true);
     setIsCreateModalOpen(true);
   };
 
@@ -207,41 +267,76 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       FINAL: 'FINAL',
     };
 
-    sgsRosterAndSubmissionService.addTermAssignment({
-      title: formTitle.trim(),
-      unitKey: partToUnitMap[formScorePart],
-      scorePart: formScorePart,
-      maxScore: Math.max(1, Number(formMaxScore) || 10),
-      indicatorCode: SCORE_PART_LABELS[formScorePart].label,
-      dueDate: formDueDate || getBangkokTodayString(),
-      courseCode: currentFormSubject.courseCode,
-      courseName: currentFormSubject.courseName,
-      targetClassrooms: targetRooms,
-      unitId:
-        formAssignmentMode === 'UNIT_BUNDLE' && formUnitTitle.trim()
-          ? `unit-${formUnitTitle.trim().toLowerCase().replace(/\s+/g, '-')}`
-          : undefined,
-      unitTitle: formAssignmentMode === 'UNIT_BUNDLE' ? formUnitTitle.trim() : undefined,
-      unitMaxScore:
-        formAssignmentMode === 'UNIT_BUNDLE'
-          ? Math.max(1, Number(formUnitMaxScore) || 10)
-          : undefined,
-      scoringMethod: formAssignmentMode === 'UNIT_BUNDLE' ? formScoringMethod : 'DIRECT_SCORE',
-      totalTasksInUnit:
-        formAssignmentMode === 'UNIT_BUNDLE'
-          ? Math.max(1, Number(formTotalTasksInUnit) || 1)
-          : undefined,
-      autoRoundUp: formAutoRoundUp,
-    });
+    const finalTotalTasks =
+      formAssignmentMode === 'UNIT_BUNDLE'
+        ? formIsDynamicTasks
+          ? 0
+          : Math.max(1, Number(formTotalTasksInUnit) || 1)
+        : undefined;
 
-    refreshTermAssignments();
-    setIsCreateModalOpen(false);
-    setActiveSectionTab('ASSIGNED_LIST');
-    showToast(
-      `✓ สั่งงาน "${formTitle.trim()}" (${SCORE_PART_LABELS[formScorePart].label}) ให้ ${
-        targetRooms.length > 1 ? `ทุกห้อง (${targetRooms.length} ห้อง)` : targetRooms[0] || 'ห้องเรียน'
-      } เรียบร้อยแล้ว`
-    );
+    if (editingAssignment) {
+      sgsRosterAndSubmissionService.updateTermAssignment(editingAssignment.id, {
+        title: formTitle.trim(),
+        unitKey: partToUnitMap[formScorePart],
+        scorePart: formScorePart,
+        maxScore: Math.max(1, Number(formMaxScore) || 10),
+        indicatorCode: SCORE_PART_LABELS[formScorePart].label,
+        dueDate: formDueDate || getBangkokTodayString(),
+        courseCode: currentFormSubject.courseCode,
+        courseName: currentFormSubject.courseName,
+        targetClassrooms: targetRooms,
+        unitId:
+          formAssignmentMode === 'UNIT_BUNDLE' && formUnitTitle.trim()
+            ? `unit-${formUnitTitle.trim().toLowerCase().replace(/\s+/g, '-')}`
+            : undefined,
+        unitTitle: formAssignmentMode === 'UNIT_BUNDLE' ? formUnitTitle.trim() : undefined,
+        unitMaxScore:
+          formAssignmentMode === 'UNIT_BUNDLE'
+            ? Math.max(1, Number(formUnitMaxScore) || 10)
+            : undefined,
+        scoringMethod: formAssignmentMode === 'UNIT_BUNDLE' ? formScoringMethod : 'DIRECT_SCORE',
+        totalTasksInUnit: finalTotalTasks,
+        autoRoundUp: formAutoRoundUp,
+      });
+
+      refreshTermAssignments();
+      setIsCreateModalOpen(false);
+      setEditingAssignment(null);
+      showToast(`✓ บันทึกการแก้ไขชิ้นงาน "${formTitle.trim()}" เรียบร้อยแล้ว`);
+    } else {
+      sgsRosterAndSubmissionService.addTermAssignment({
+        title: formTitle.trim(),
+        unitKey: partToUnitMap[formScorePart],
+        scorePart: formScorePart,
+        maxScore: Math.max(1, Number(formMaxScore) || 10),
+        indicatorCode: SCORE_PART_LABELS[formScorePart].label,
+        dueDate: formDueDate || getBangkokTodayString(),
+        courseCode: currentFormSubject.courseCode,
+        courseName: currentFormSubject.courseName,
+        targetClassrooms: targetRooms,
+        unitId:
+          formAssignmentMode === 'UNIT_BUNDLE' && formUnitTitle.trim()
+            ? `unit-${formUnitTitle.trim().toLowerCase().replace(/\s+/g, '-')}`
+            : undefined,
+        unitTitle: formAssignmentMode === 'UNIT_BUNDLE' ? formUnitTitle.trim() : undefined,
+        unitMaxScore:
+          formAssignmentMode === 'UNIT_BUNDLE'
+            ? Math.max(1, Number(formUnitMaxScore) || 10)
+            : undefined,
+        scoringMethod: formAssignmentMode === 'UNIT_BUNDLE' ? formScoringMethod : 'DIRECT_SCORE',
+        totalTasksInUnit: finalTotalTasks,
+        autoRoundUp: formAutoRoundUp,
+      });
+
+      refreshTermAssignments();
+      setIsCreateModalOpen(false);
+      setActiveSectionTab('ASSIGNED_LIST');
+      showToast(
+        `✓ สั่งงาน "${formTitle.trim()}" (${SCORE_PART_LABELS[formScorePart].label}) ให้ ${
+          targetRooms.length > 1 ? `ทุกห้อง (${targetRooms.length} ห้อง)` : targetRooms[0] || 'ห้องเรียน'
+        } เรียบร้อยแล้ว`
+      );
+    }
   };
 
   // 4. Secondary Modals State
@@ -268,6 +363,77 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3200);
   };
+
+  // จัดกลุ่มชิ้นงานตามหน่วยการเรียนรู้ / จุดประสงค์ เพื่อไม่ให้หน้าจอรกรุงรัง (Group by Unit)
+  const groupedAssignedCards = useMemo(() => {
+    const filtered = termAssignments.filter((a) => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.trim().toLowerCase();
+      return (
+        a.title.toLowerCase().includes(q) ||
+        (a.unitTitle && a.unitTitle.toLowerCase().includes(q))
+      );
+    });
+
+    const unitMap = new Map<
+      string,
+      {
+        unitKey: string;
+        unitTitle: string;
+        unitMaxScore: number;
+        courseCode: string;
+        courseName: string;
+        scorePart: FourScorePart;
+        scoringMethod: 'SUBMISSION_COUNT_RATIO' | 'RAW_SCORE_AVERAGE';
+        totalTasksInUnit: number;
+        autoRoundUp: boolean;
+        targetClassrooms: string[];
+        tasks: TermAssignmentConfig[];
+      }
+    >();
+    const independent: TermAssignmentConfig[] = [];
+
+    filtered.forEach((assign) => {
+      const isUnit = Boolean(
+        assign.unitTitle ||
+        (assign.scoringMethod && assign.scoringMethod !== 'DIRECT_SCORE')
+      );
+
+      if (isUnit && assign.unitTitle) {
+        const uKey =
+          assign.unitId || `${assign.courseCode || 'all'}:::${assign.unitTitle}`;
+        const existing = unitMap.get(uKey) || {
+          unitKey: uKey,
+          unitTitle: assign.unitTitle,
+          unitMaxScore: assign.unitMaxScore ?? 10,
+          courseCode: assign.courseCode || '',
+          courseName: assign.courseName || '',
+          scorePart: assign.scorePart || 'PRE_MIDTERM',
+          scoringMethod: (assign.scoringMethod as any) || 'SUBMISSION_COUNT_RATIO',
+          totalTasksInUnit: assign.totalTasksInUnit || 0,
+          autoRoundUp: assign.autoRoundUp ?? true,
+          targetClassrooms: assign.targetClassrooms || [],
+          tasks: [] as TermAssignmentConfig[],
+        };
+        existing.tasks.push(assign);
+        if (assign.totalTasksInUnit && assign.totalTasksInUnit > existing.totalTasksInUnit) {
+          existing.totalTasksInUnit = assign.totalTasksInUnit;
+        }
+        if (assign.targetClassrooms && assign.targetClassrooms.length > 0 && existing.targetClassrooms.length === 0) {
+          existing.targetClassrooms = assign.targetClassrooms;
+        }
+        unitMap.set(uKey, existing);
+      } else {
+        independent.push(assign);
+      }
+    });
+
+    return {
+      units: Array.from(unitMap.values()),
+      independent,
+      totalCount: filtered.length,
+    };
+  }, [termAssignments, searchQuery]);
 
   // Data for Section C: Assignment Breakdown Matrix (ตารางแจกแจงคะแนนตามงานที่มอบหมาย)
   const matrixClassroom = useMemo(() => {
@@ -543,6 +709,50 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     }
   };
 
+  const handleReturnSubmission = (itemId: string, reason: string, note?: string) => {
+    const targetItem = queueItems.find((i) => i.id === itemId);
+    if (!targetItem) return;
+
+    teacherCourseAssignmentService.returnSubmission(itemId, reason, note);
+    sgsRosterAndSubmissionService.returnSubmissionForRevision(
+      targetItem.assignmentId,
+      targetItem.studentCode,
+      reason,
+      note
+    );
+
+    setQueueItems(teacherCourseAssignmentService.getGradingQueue());
+    showToast(`✓ ส่งงานกลับให้ ${targetItem.studentName} แก้ไขเรียบร้อยแล้ว (${reason})`);
+
+    const nextInFilter = filteredSubmissions.find(
+      (i) => i.id !== itemId && i.status === 'PENDING_REVIEW'
+    );
+    if (nextInFilter) {
+      setGradingModalItem(nextInFilter);
+    } else {
+      setGradingModalItem(null);
+    }
+  };
+
+  const handleOpenCheckMatrix = (courseCode?: string, targetRooms?: string[]) => {
+    const roomToUse =
+      (targetRooms && targetRooms.length > 0 ? targetRooms[0] : undefined) ||
+      (selectedRoom !== 'ALL' ? selectedRoom : availableFilterRooms[0] || 'ม.1/1');
+    const courseToUse =
+      courseCode ||
+      (selectedSubjectCode !== 'ALL' ? selectedSubjectCode : subjectsList[0]?.courseCode || 'ท23102');
+
+    if (courseToUse) {
+      setSelectedSubjectCode(courseToUse);
+      setMatrixModalDefaultSubject(courseToUse);
+    }
+    if (roomToUse) {
+      setSelectedRoom(roomToUse);
+      setMatrixModalDefaultRoom(roomToUse);
+    }
+    setIs3ColorMatrixOpen(true);
+  };
+
   const handleStartFirstPending = () => {
     const firstPending =
       filteredSubmissions.find((i) => i.status === 'PENDING_REVIEW') || filteredSubmissions[0];
@@ -593,7 +803,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
           <button
             type="button"
-            onClick={handleOpenCreateModal}
+            onClick={() => handleOpenCreateModal()}
             className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs sm:text-sm font-semibold shadow-xs transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -769,7 +979,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
             </div>
             <button
               type="button"
-              onClick={handleOpenCreateModal}
+              onClick={() => handleOpenCreateModal()}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-semibold cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -777,7 +987,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
             </button>
           </div>
 
-          {termAssignments.length === 0 ? (
+          {groupedAssignedCards.totalCount === 0 ? (
             <div className="py-12 px-4 text-center bg-[#F7FAFF] rounded-2xl border border-dashed border-[#BFDBFE] space-y-3">
               <div className="w-12 h-12 rounded-2xl bg-[#EFF6FF] text-[#3B82F6] flex items-center justify-center mx-auto">
                 <BookOpen className="w-6 h-6" />
@@ -790,7 +1000,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
               </div>
               <button
                 type="button"
-                onClick={handleOpenCreateModal}
+                onClick={() => handleOpenCreateModal()}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-semibold shadow-xs cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
@@ -798,91 +1008,252 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {termAssignments
-                .filter((a) => {
-                  if (!searchQuery.trim()) return true;
-                  return a.title.toLowerCase().includes(searchQuery.trim().toLowerCase());
-                })
-                .map((assign) => {
-                  const partKey: FourScorePart =
-                    assign.scorePart ||
-                    (assign.unitKey === 'MIDTERM'
-                      ? 'MIDTERM'
-                      : assign.unitKey === 'FINAL'
-                        ? 'FINAL'
-                        : assign.unitKey === 'U2' || assign.unitKey === 'U3'
-                          ? 'POST_MIDTERM'
-                          : 'PRE_MIDTERM');
-                  const partMeta = SCORE_PART_LABELS[partKey];
-                  const roomsText =
-                    assign.targetClassrooms && assign.targetClassrooms.length > 0
-                      ? assign.targetClassrooms.length > 4
-                        ? `ทุกห้องที่เลือก (${assign.targetClassrooms.length} ห้อง: ${assign.targetClassrooms.slice(0, 3).join(', ')}...)`
-                        : `ห้อง ${assign.targetClassrooms.join(', ')}`
-                      : 'ทุกห้องในรายวิชา';
-
-                  return (
-                    <div
-                      key={assign.id}
-                      className="p-4 rounded-2xl border border-[#E6EEF7] bg-[#F7FAFF]/60 hover:bg-white hover:border-[#BFDBFE] transition-all flex flex-col justify-between gap-3"
-                    >
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <span
-                            className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold border ${partMeta.cls}`}
-                          >
-                            {partMeta.label}
-                          </span>
-                          <span className="text-xs font-bold text-[#163A66]">
-                            เต็ม {assign.maxScore} คะแนน
-                          </span>
-                        </div>
-
-                        <h3 className="text-sm font-bold text-[#163A66]">{assign.title}</h3>
-
-                        <div className="text-xs text-[#6B7C93] space-y-0.5">
-                          <p>
-                            วิชา:{' '}
-                            <span className="font-semibold text-[#163A66]">
-                              {assign.courseCode || 'ทุกวิชา'} {assign.courseName || ''}
-                            </span>
-                          </p>
-                          <p>
-                            กลุ่มเป้าหมาย:{' '}
-                            <span className="font-semibold text-[#3B82F6]">{roomsText}</span>
-                          </p>
-                          <p>กำหนดส่ง: {assign.dueDate}</p>
-                        </div>
+            <div className="space-y-4">
+              {/* 1. การ์ดหน่วยคะแนนรวม (Unit Bundles) จัดกลุ่มงานย่อยไว้ในกล่องเดียว ไม่รกตา */}
+              {groupedAssignedCards.units.map((unit) => (
+                <div
+                  key={unit.unitKey}
+                  className="rounded-[20px] border-2 border-[#BFDBFE] bg-white p-4 sm:p-5 shadow-[0_4px_16px_rgba(40,90,140,0.06)] space-y-4"
+                >
+                  {/* Unit Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-blue-100">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-[#EFF6FF] text-[#3B82F6] border border-[#BFDBFE] flex items-center gap-1">
+                          <Layers className="w-3.5 h-3.5" />
+                          <span>หน่วยเก็บคะแนนรวม</span>
+                        </span>
+                        <span
+                          className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold border ${SCORE_PART_LABELS[unit.scorePart].cls}`}
+                        >
+                          {SCORE_PART_LABELS[unit.scorePart].label}
+                        </span>
+                        <span className="text-xs font-bold text-[#163A66] bg-slate-100 px-2.5 py-0.5 rounded-lg">
+                          เต็ม {unit.unitMaxScore} คะแนน
+                        </span>
                       </div>
-
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-200/70">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (assign.courseCode) setSelectedSubjectCode(assign.courseCode);
-                            setIs3ColorMatrixOpen(true);
-                          }}
-                          className="text-xs font-semibold text-[#3B82F6] hover:underline cursor-pointer"
-                        >
-                          เช็คส่งงาน / ให้คะแนน →
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            sgsRosterAndSubmissionService.deleteTermAssignment(assign.id);
-                            refreshTermAssignments();
-                            showToast(`ลบชิ้นงาน "${assign.title}" เรียบร้อยแล้ว`);
-                          }}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
-                          title="ลบชิ้นงาน"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                      <h3 className="text-base font-bold text-[#163A66]">{unit.unitTitle}</h3>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#6B7C93]">
+                        <span>
+                          วิชา: <strong className="text-[#163A66]">{unit.courseCode} {unit.courseName}</strong>
+                        </span>
+                        <span>•</span>
+                        <span>
+                          วิธีคิด: {unit.scoringMethod === 'SUBMISSION_COUNT_RATIO' ? 'สัดส่วนการส่งงาน' : 'หารเฉลี่ยคะแนนดิบ'}
+                        </span>
+                        <span>•</span>
+                        <span className="text-[#3B82F6] font-semibold">
+                          {unit.totalTasksInUnit > 0
+                            ? `กำหนดไว้ ${unit.totalTasksInUnit} งาน (สั่งแล้ว ${unit.tasks.length} งาน)`
+                            : `ไม่จำกัดจำนวนงานล่วงหน้า (นับตามจริง ${unit.tasks.length} งาน)`}
+                        </span>
                       </div>
                     </div>
-                  );
-                })}
+
+                    {/* Unit Actions */}
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleOpenCreateModal({
+                            courseCode: unit.courseCode,
+                            unitTitle: unit.unitTitle,
+                            unitMaxScore: unit.unitMaxScore,
+                            scorePart: unit.scorePart,
+                            scoringMethod: unit.scoringMethod,
+                            totalTasksInUnit: unit.totalTasksInUnit,
+                            isDynamicTasks: unit.totalTasksInUnit === 0,
+                            targetClassrooms: unit.targetClassrooms,
+                          })
+                        }
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#EFF6FF] hover:bg-[#DBEAFE] text-[#3B82F6] text-xs font-bold border border-[#BFDBFE] cursor-pointer transition-colors"
+                        title="เพิ่มชิ้นงานใหม่ลงในหน่วยคะแนนนี้"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ สั่งงานเพิ่มในหน่วยนี้</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCheckMatrix(unit.courseCode, unit.targetClassrooms)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-bold cursor-pointer transition-colors shadow-xs"
+                      >
+                        <span>เช็คส่งงาน / รวมคะแนน →</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Sub-tasks in this Unit */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-[#6B7C93] px-1">
+                      <span>ชิ้นงานย่อยในหน่วยนี้ ({unit.tasks.length} ชิ้นงาน)</span>
+                      <span className="text-[11px] text-slate-400">นำคะแนนหรือการส่งมารวมเป็นคะแนนหน่วยอัตโนมัติ</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      {unit.tasks.map((task, idx) => {
+                        const roomsText =
+                          task.targetClassrooms && task.targetClassrooms.length > 0
+                            ? task.targetClassrooms.join(', ')
+                            : 'ทุกห้อง';
+                        return (
+                          <div
+                            key={task.id}
+                            className="p-3 rounded-xl border border-slate-200/90 bg-[#F8FAFC] hover:bg-white hover:border-[#BFDBFE] transition-all flex flex-col justify-between gap-2.5"
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[11px] font-bold text-slate-500">
+                                  งานที่ {idx + 1}
+                                </span>
+                                <span className="text-[11px] font-bold text-[#163A66]">
+                                  เต็ม {task.maxScore} คะแนน
+                                </span>
+                              </div>
+                              <h4 className="text-xs font-bold text-[#163A66] line-clamp-2">
+                                {task.title}
+                              </h4>
+                              <div className="text-[11px] text-[#6B7C93] space-y-0.5">
+                                <p>ห้อง: <span className="font-semibold text-slate-700">{roomsText}</span></p>
+                                <p>ส่งภายใน: {task.dueDate}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-200/70">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenCheckMatrix(task.courseCode, task.targetClassrooms)}
+                                className="text-[11px] font-bold text-[#3B82F6] hover:underline cursor-pointer"
+                              >
+                                เช็คส่งงาน →
+                              </button>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditModal(task)}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-[#3B82F6] hover:bg-blue-50 cursor-pointer"
+                                  title="แก้ไขชิ้นงานนี้"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    sgsRosterAndSubmissionService.deleteTermAssignment(task.id);
+                                    refreshTermAssignments();
+                                    showToast(`ลบชิ้นงาน "${task.title}" เรียบร้อยแล้ว`);
+                                  }}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                                  title="ลบชิ้นงานนี้"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* 2. ชิ้นงานเดี่ยวอิสระ (Independent Assignments) */}
+              {groupedAssignedCards.independent.length > 0 && (
+                <div className="space-y-2">
+                  {groupedAssignedCards.units.length > 0 && (
+                    <h4 className="text-xs font-bold text-[#163A66] px-1 pt-2">
+                      ชิ้นงานเดี่ยวอิสระ (คิดคะแนนแยกรายชิ้น)
+                    </h4>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {groupedAssignedCards.independent.map((assign) => {
+                      const partKey: FourScorePart =
+                        assign.scorePart ||
+                        (assign.unitKey === 'MIDTERM'
+                          ? 'MIDTERM'
+                          : assign.unitKey === 'FINAL'
+                            ? 'FINAL'
+                            : assign.unitKey === 'U2' || assign.unitKey === 'U3'
+                              ? 'POST_MIDTERM'
+                              : 'PRE_MIDTERM');
+                      const partMeta = SCORE_PART_LABELS[partKey];
+                      const roomsText =
+                        assign.targetClassrooms && assign.targetClassrooms.length > 0
+                          ? assign.targetClassrooms.length > 4
+                            ? `ทุกห้องที่เลือก (${assign.targetClassrooms.length} ห้อง: ${assign.targetClassrooms.slice(0, 3).join(', ')}...)`
+                            : `ห้อง ${assign.targetClassrooms.join(', ')}`
+                          : 'ทุกห้องในรายวิชา';
+
+                      return (
+                        <div
+                          key={assign.id}
+                          className="p-4 rounded-2xl border border-[#E6EEF7] bg-[#F7FAFF]/60 hover:bg-white hover:border-[#BFDBFE] transition-all flex flex-col justify-between gap-3 shadow-xs"
+                        >
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <span
+                                className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold border ${partMeta.cls}`}
+                              >
+                                {partMeta.label}
+                              </span>
+                              <span className="text-xs font-bold text-[#163A66]">
+                                เต็ม {assign.maxScore} คะแนน
+                              </span>
+                            </div>
+
+                            <h3 className="text-sm font-bold text-[#163A66]">{assign.title}</h3>
+
+                            <div className="text-xs text-[#6B7C93] space-y-0.5">
+                              <p>
+                                วิชา:{' '}
+                                <span className="font-semibold text-[#163A66]">
+                                  {assign.courseCode || 'ทุกวิชา'} {assign.courseName || ''}
+                                </span>
+                              </p>
+                              <p>
+                                กลุ่มเป้าหมาย:{' '}
+                                <span className="font-semibold text-[#3B82F6]">{roomsText}</span>
+                              </p>
+                              <p>กำหนดส่ง: {assign.dueDate}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-200/70">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenCheckMatrix(assign.courseCode, assign.targetClassrooms)}
+                              className="text-xs font-semibold text-[#3B82F6] hover:underline cursor-pointer"
+                            >
+                              เช็คส่งงาน / ให้คะแนน →
+                            </button>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditModal(assign)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-[#3B82F6] hover:bg-blue-50 cursor-pointer"
+                                title="แก้ไขชิ้นงาน"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  sgsRosterAndSubmissionService.deleteTermAssignment(assign.id);
+                                  refreshTermAssignments();
+                                  showToast(`ลบชิ้นงาน "${assign.title}" เรียบร้อยแล้ว`);
+                                }}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                                title="ลบชิ้นงาน"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1129,7 +1500,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
               <button
                 type="button"
-                onClick={handleOpenCreateModal}
+                onClick={() => handleOpenCreateModal()}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-semibold cursor-pointer transition-colors shadow-xs"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -1211,7 +1582,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
               </p>
               <button
                 type="button"
-                onClick={handleOpenCreateModal}
+                onClick={() => handleOpenCreateModal()}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-semibold cursor-pointer mt-2"
               >
                 <Plus className="w-4 h-4" />
@@ -1743,10 +2114,12 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-base sm:text-lg font-bold text-[#163A66]">
-                  สั่งงาน / มอบหมายภาระงานใหม่
+                  {editingAssignment ? 'แก้ไขชิ้นงาน / ภาระงาน' : 'สั่งงาน / มอบหมายภาระงานใหม่'}
                 </h3>
                 <p className="text-xs text-[#6B7C93]">
-                  เชื่อมคะแนนเข้ากับสมุดคะแนน ปพ.5 อัตโนมัติ
+                  {editingAssignment
+                    ? `แก้ไขรายละเอียดของ "${editingAssignment.title}"`
+                    : 'เชื่อมคะแนนเข้ากับสมุดคะแนน ปพ.5 อัตโนมัติ'}
                 </p>
               </div>
               <button
@@ -1869,7 +2242,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="block text-xs font-semibold text-[#163A66] mb-1">
                         คะแนนเต็มประจำหน่วย
@@ -1887,15 +2260,39 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                       <label className="block text-xs font-semibold text-[#163A66] mb-1">
                         จำนวนงานทั้งหมดในหน่วย
                       </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={50}
-                        value={formTotalTasksInUnit}
-                        onChange={(e) => setFormTotalTasksInUnit(Number(e.target.value) || 5)}
-                        className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-[#163A66]"
-                      />
+                      {formIsDynamicTasks ? (
+                        <div className="w-full px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50/70 text-xs font-semibold text-[#3B82F6] flex items-center justify-between">
+                          <span>คำนวณตามงานจริงที่สั่ง</span>
+                          <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">Dynamic</span>
+                        </div>
+                      ) : (
+                        <input
+                          type="number"
+                          min={1}
+                          max={50}
+                          value={formTotalTasksInUnit}
+                          onChange={(e) => setFormTotalTasksInUnit(Number(e.target.value) || 5)}
+                          className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-[#163A66]"
+                        />
+                      )}
                     </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200">
+                    <div>
+                      <span className="text-xs font-bold text-[#163A66] block">
+                        ไม่กำหนดจำนวนงานล่วงหน้า (Dynamic Tasks)
+                      </span>
+                      <span className="text-[11px] text-[#6B7C93]">
+                        ระบบจะนับและหารเฉลี่ยอัตโนมัติตามจำนวนชิ้นงานจริงที่สั่งในหน่วยนี้
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={formIsDynamicTasks}
+                      onChange={(e) => setFormIsDynamicTasks(e.target.checked)}
+                      className="w-4 h-4 text-[#3B82F6] rounded cursor-pointer shrink-0"
+                    />
                   </div>
 
                   <div>
@@ -1917,7 +2314,9 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                             เก็บสัดส่วนการส่งงาน (คะแนนความรับผิดชอบ)
                           </span>
                           <span className="text-[11px] text-[#6B7C93]">
-                            สั่ง {formTotalTasksInUnit} งาน เต็ม {formUnitMaxScore} คะแนน ➔ ส่ง 1 งานได้ {(formUnitMaxScore / formTotalTasksInUnit).toFixed(1)} คะแนน
+                            {formIsDynamicTasks
+                              ? `นับงานที่ส่งจริงเทียบกับงานทั้งหมดที่สั่งในหน่วยนี้ แล้วเทียบเป็นเต็ม ${formUnitMaxScore} คะแนน`
+                              : `สั่ง ${formTotalTasksInUnit} งาน เต็ม ${formUnitMaxScore} คะแนน ➔ ส่ง 1 งานได้ ${(formUnitMaxScore / formTotalTasksInUnit).toFixed(1)} คะแนน`}
                           </span>
                         </div>
                       </label>
@@ -2096,7 +2495,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                 type="submit"
                 className="px-4 py-2 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-semibold shadow-xs cursor-pointer"
               >
-                บันทึกและสั่งงาน
+                {editingAssignment ? 'บันทึกการแก้ไข' : 'บันทึกและสั่งงาน'}
               </button>
             </div>
           </form>
@@ -2164,6 +2563,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         currentItem={gradingModalItem}
         allItems={filteredSubmissions}
         onSaveGrade={handleSaveGrade}
+        onReturnSubmission={handleReturnSubmission}
         onSelectQueueItem={(item) => setGradingModalItem(item)}
       />
 
@@ -2171,18 +2571,26 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         isOpen={isSgsMatrixOpen}
         onClose={() => setIsSgsMatrixOpen(false)}
         defaultSubjectCode={
-          selectedSubjectCode === 'ALL' ? subjectsList[0]?.courseCode || 'ท23102' : selectedSubjectCode
+          matrixModalDefaultSubject ||
+          (selectedSubjectCode === 'ALL' ? subjectsList[0]?.courseCode || 'ท23102' : selectedSubjectCode)
         }
-        defaultRoom={selectedRoom === 'ALL' ? availableFilterRooms[0] || 'ม.1/1' : selectedRoom}
+        defaultRoom={
+          matrixModalDefaultRoom ||
+          (selectedRoom === 'ALL' ? availableFilterRooms[0] || 'ม.1/1' : selectedRoom)
+        }
       />
 
       <Submission3ColorMatrixModal
         isOpen={is3ColorMatrixOpen}
         onClose={() => setIs3ColorMatrixOpen(false)}
         defaultSubjectCode={
-          selectedSubjectCode === 'ALL' ? subjectsList[0]?.courseCode || 'ท23102' : selectedSubjectCode
+          matrixModalDefaultSubject ||
+          (selectedSubjectCode === 'ALL' ? subjectsList[0]?.courseCode || 'ท23102' : selectedSubjectCode)
         }
-        defaultRoom={selectedRoom === 'ALL' ? availableFilterRooms[0] || 'ม.1/1' : selectedRoom}
+        defaultRoom={
+          matrixModalDefaultRoom ||
+          (selectedRoom === 'ALL' ? availableFilterRooms[0] || 'ม.1/1' : selectedRoom)
+        }
         onOpenPreview={(preview) => setPreviewItem(preview)}
         onGradeQuick={(_asgId, _stuCode, _max) => {
           showToast('✓ บันทึกสถานะส่งงานเรียบร้อยแล้ว');
