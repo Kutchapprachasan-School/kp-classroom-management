@@ -5,7 +5,6 @@ import {
   Eye,
   Check,
   BookOpen,
-  CheckSquare,
   Search,
   Layers,
   FileSpreadsheet,
@@ -40,9 +39,7 @@ import {
   type GradingQueueItem,
 } from '../services/teacherCourseAssignmentService';
 import { ArtworkPreviewModal } from '../components/teacher/ArtworkPreviewModal';
-import { SgsClassroomMatrixModal } from '../components/teacher/SgsClassroomMatrixModal';
 import { Submission3ColorMatrixModal } from '../components/teacher/Submission3ColorMatrixModal';
-import { AssignmentBundlesModal } from '../components/teacher/AssignmentBundlesModal';
 import { GradingWorkspaceModal } from '../components/teacher/GradingWorkspaceModal';
 import { getBangkokTodayString } from '../utils/timetableDateUtils';
 
@@ -471,9 +468,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
   // 4. Secondary Modals State
   const [gradingModalItem, setGradingModalItem] = useState<GradingQueueItem | null>(null);
-  const [isSgsMatrixOpen, setIsSgsMatrixOpen] = useState<boolean>(false);
   const [is3ColorMatrixOpen, setIs3ColorMatrixOpen] = useState<boolean>(false);
-  const [isBundlesModalOpen, setIsBundlesModalOpen] = useState<boolean>(false);
 
   const [previewItem, setPreviewItem] = useState<{
     title: string;
@@ -982,34 +977,6 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
               <span>3. ตารางแจกแจงคะแนนตามงานที่มอบหมาย</span>
-            </button>
-          </div>
-
-          {/* Secondary Quick Tools */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsSgsMatrixOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-[#163A66] cursor-pointer"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-[#3B82F6]" />
-              <span>ตารางคะแนนรายห้อง</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIs3ColorMatrixOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-[#163A66] cursor-pointer"
-            >
-              <CheckSquare className="w-3.5 h-3.5 text-emerald-600" />
-              <span>เช็คการส่งงาน 3 สี</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsBundlesModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-[#163A66] cursor-pointer"
-            >
-              <Layers className="w-3.5 h-3.5 text-[#3B82F6]" />
-              <span>รวมคะแนน/หารเฉลี่ย</span>
             </button>
           </div>
         </div>
@@ -3071,19 +3038,6 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         onSelectQueueItem={(item) => setGradingModalItem(item)}
       />
 
-      <SgsClassroomMatrixModal
-        isOpen={isSgsMatrixOpen}
-        onClose={() => setIsSgsMatrixOpen(false)}
-        defaultSubjectCode={
-          matrixModalDefaultSubject ||
-          (selectedSubjectCode === 'ALL' ? subjectsList[0]?.courseCode || 'ท23102' : selectedSubjectCode)
-        }
-        defaultRoom={
-          matrixModalDefaultRoom ||
-          (selectedRoom === 'ALL' ? availableFilterRooms[0] || 'ม.1/1' : selectedRoom)
-        }
-      />
-
       <Submission3ColorMatrixModal
         isOpen={is3ColorMatrixOpen}
         onClose={() => setIs3ColorMatrixOpen(false)}
@@ -3099,12 +3053,6 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         onGradeQuick={(_asgId, _stuCode, _max) => {
           showToast('✓ บันทึกสถานะส่งงานเรียบร้อยแล้ว');
         }}
-      />
-
-      <AssignmentBundlesModal
-        isOpen={isBundlesModalOpen}
-        onClose={() => setIsBundlesModalOpen(false)}
-        onShowToast={showToast}
       />
 
       <ArtworkPreviewModal
