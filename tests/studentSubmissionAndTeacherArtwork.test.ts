@@ -131,56 +131,61 @@ describe('Student Submission & Teacher Artwork Display Fixes', () => {
   });
 
   it('sanitizes legacy storage.kps.ac.th or r2:// URLs and recovers real cached WebP base64', () => {
-    const fakeDomainUrl = 'https://storage.kps.ac.th/kp-classroom-submissions/term2/m3-1/asg-legacy-99/45105_art.webp';
-    const realBase64 = 'data:image/webp;base64,UklGRtppAABXRUJQVlA4WAoAAAAgAAAAugMAxwMASUNDUMgBAAAAAAHI';
+    r2StorageService.configure({ workerUrl: '', uploadSecret: '', publicUrl: '' });
+    try {
+      const fakeDomainUrl = 'https://storage.kps.ac.th/kp-classroom-submissions/term2/m3-1/asg-legacy-99/45105_art.webp';
+      const realBase64 = 'data:image/webp;base64,UklGRtppAABXRUJQVlA4WAoAAAAgAAAAugMAxwMASUNDUMgBAAAAAAHI';
 
-    // Store fake URL in submission list
-    localStorage.setItem(
-      'kp_work_submissions_v1',
-      JSON.stringify([
-        {
-          assignmentId: 'asg-legacy-99',
-          studentCode: '45105',
-          status: 'SUBMITTED_PENDING',
-          workTitle: 'งานศิลปะ',
-          fileDataUrl: fakeDomainUrl,
-          r2ObjectKey: 'r2://kp-classroom-submissions/term2/m3-1/asg-legacy-99/45105_art.webp',
-        },
-      ])
-    );
+      // Store fake URL in submission list
+      localStorage.setItem(
+        'kp_work_submissions_v1',
+        JSON.stringify([
+          {
+            assignmentId: 'asg-legacy-99',
+            studentCode: '45105',
+            status: 'SUBMITTED_PENDING',
+            workTitle: 'งานศิลปะ',
+            fileDataUrl: fakeDomainUrl,
+            r2ObjectKey: 'r2://kp-classroom-submissions/term2/m3-1/asg-legacy-99/45105_art.webp',
+          },
+        ])
+      );
 
-    // Store real base64 in separate scoped key
-    localStorage.setItem('kp_sub_file_asg-legacy-99_45105', realBase64);
+      // Store real base64 in separate scoped key
+      localStorage.setItem('kp_sub_file_asg-legacy-99_45105', realBase64);
 
-    // Also simulate legacy item in grading queue
-    localStorage.setItem(
-      'kp_grading_queue_items',
-      JSON.stringify([
-        {
-          id: 'q_asg-legacy-99_45105',
-          assignmentId: 'asg-legacy-99',
-          studentCode: '45105',
-          status: 'PENDING_REVIEW',
-          filePreviewUrl: fakeDomainUrl,
-        },
-      ])
-    );
+      // Also simulate legacy item in grading queue
+      localStorage.setItem(
+        'kp_grading_queue_items',
+        JSON.stringify([
+          {
+            id: 'q_asg-legacy-99_45105',
+            assignmentId: 'asg-legacy-99',
+            studentCode: '45105',
+            status: 'PENDING_REVIEW',
+            filePreviewUrl: fakeDomainUrl,
+          },
+        ])
+      );
 
-    // 1. getSubmissions() must filter out fake URL and hydrate with real base64
-    const subs = sgsRosterAndSubmissionService.getSubmissions();
-    const sub = subs.find((s) => s.assignmentId === 'asg-legacy-99' && s.studentCode === '45105');
-    expect(sub?.fileDataUrl).toBe(realBase64);
-    expect(sub?.fileDataUrl).not.toContain('storage.kps.ac.th');
+      // 1. getSubmissions() must filter out fake URL and hydrate with real base64
+      const subs = sgsRosterAndSubmissionService.getSubmissions();
+      const sub = subs.find((s) => s.assignmentId === 'asg-legacy-99' && s.studentCode === '45105');
+      expect(sub?.fileDataUrl).toBe(realBase64);
+      expect(sub?.fileDataUrl).not.toContain('storage.kps.ac.th');
 
-    // 2. getSubmissionFileUrl() must return realBase64
-    const fetchedFile = sgsRosterAndSubmissionService.getSubmissionFileUrl('asg-legacy-99', '45105');
-    expect(fetchedFile).toBe(realBase64);
+      // 2. getSubmissionFileUrl() must return realBase64
+      const fetchedFile = sgsRosterAndSubmissionService.getSubmissionFileUrl('asg-legacy-99', '45105');
+      expect(fetchedFile).toBe(realBase64);
 
-    // 3. teacherCourseAssignmentService.getGradingQueue() must sanitize filePreviewUrl
-    const queue = teacherCourseAssignmentService.getGradingQueue();
-    const queueItem = queue.find((q) => q.assignmentId === 'asg-legacy-99' && q.studentCode === '45105');
-    expect(queueItem?.filePreviewUrl).toBe(realBase64);
-    expect(queueItem?.filePreviewUrl).not.toContain('storage.kps.ac.th');
+      // 3. teacherCourseAssignmentService.getGradingQueue() must sanitize filePreviewUrl
+      const queue = teacherCourseAssignmentService.getGradingQueue();
+      const queueItem = queue.find((q) => q.assignmentId === 'asg-legacy-99' && q.studentCode === '45105');
+      expect(queueItem?.filePreviewUrl).toBe(realBase64);
+      expect(queueItem?.filePreviewUrl).not.toContain('storage.kps.ac.th');
+    } finally {
+      r2StorageService.resetConfig();
+    }
   });
 
   it('correctly maps pending assignments for student dashboard according to submission status', () => {
