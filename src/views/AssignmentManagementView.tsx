@@ -21,6 +21,15 @@ import {
   FileText,
   Upload,
   Paperclip,
+  Calendar,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  SlidersHorizontal,
+  MoreVertical,
+  BarChart2,
+  Send,
+  RefreshCw,
 } from 'lucide-react';
 import {
   sgsRosterAndSubmissionService,
@@ -41,7 +50,12 @@ import {
 import { ArtworkPreviewModal } from '../components/teacher/ArtworkPreviewModal';
 import { Submission3ColorMatrixModal } from '../components/teacher/Submission3ColorMatrixModal';
 import { GradingWorkspaceModal } from '../components/teacher/GradingWorkspaceModal';
-import { getBangkokTodayString } from '../utils/timetableDateUtils';
+import {
+  getBangkokTodayString,
+  formatThaiDateFull,
+  formatThaiDateShort,
+} from '../utils/timetableDateUtils';
+import { academicCalendarService } from '../services/academicCalendarService';
 
 export type QuickFilterMode = 'ALL' | 'MISSING_OR_R' | 'PENDING_REVIEW';
 
@@ -77,6 +91,38 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
   const [activeSectionTab, setActiveSectionTab] = useState<'ASSIGNED_LIST' | 'SUBMISSIONS' | 'SCORE_MATRIX'>(
     'ASSIGNED_LIST'
   );
+
+  // Modern SaaS Header & Filter States (Design System)
+  const activeCalendarTerm = useMemo(() => {
+    return academicCalendarService.getActiveTerm();
+  }, []);
+
+  const [selectedTerm, setSelectedTerm] = useState<string>(() => {
+    return activeCalendarTerm
+      ? `${activeCalendarTerm.semesterNo}/${activeCalendarTerm.year}`
+      : '2/2569';
+  });
+
+  const [selectedGradeLevel, setSelectedGradeLevel] = useState<string>('ALL');
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<'ALL' | 'PENDING_SCORE' | 'IN_PROGRESS' | 'GRADED'>('ALL');
+  const [selectedScorePart, setSelectedScorePart] = useState<string>('ALL');
+  const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState<boolean>(false);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 10;
+  const [openMeatballMenuId, setOpenMeatballMenuId] = useState<string | null>(null);
+  const [expandedUnitKeys, setExpandedUnitKeys] = useState<Set<string>>(new Set());
+
+  // Auto close meatballs dropdown when clicking anywhere outside
+  useEffect(() => {
+    const handleClickOutside = () => setOpenMeatballMenuId(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const todayThaiFull = useMemo(() => {
+    const full = formatThaiDateFull(new Date());
+    return full.replace(/(\d{4})$/, 'พ.ศ. $1');
+  }, []);
 
   // Classrooms available for the selected subject filter
   const availableFilterRooms = useMemo(() => {
@@ -490,77 +536,6 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     setTimeout(() => setToastMsg(null), 3200);
   };
 
-  // จัดกลุ่มชิ้นงานตามหน่วยการเรียนรู้ / จุดประสงค์ เพื่อไม่ให้หน้าจอรกรุงรัง (Group by Unit)
-  const groupedAssignedCards = useMemo(() => {
-    const filtered = termAssignments.filter((a) => {
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.trim().toLowerCase();
-      return (
-        a.title.toLowerCase().includes(q) ||
-        (a.unitTitle && a.unitTitle.toLowerCase().includes(q))
-      );
-    });
-
-    const unitMap = new Map<
-      string,
-      {
-        unitKey: string;
-        unitTitle: string;
-        unitMaxScore: number;
-        courseCode: string;
-        courseName: string;
-        scorePart: FourScorePart;
-        scoringMethod: 'SUBMISSION_COUNT_RATIO' | 'RAW_SCORE_AVERAGE';
-        totalTasksInUnit: number;
-        autoRoundUp: boolean;
-        targetClassrooms: string[];
-        tasks: TermAssignmentConfig[];
-      }
-    >();
-    const independent: TermAssignmentConfig[] = [];
-
-    filtered.forEach((assign) => {
-      const isUnit = Boolean(
-        assign.unitTitle ||
-        (assign.scoringMethod && assign.scoringMethod !== 'DIRECT_SCORE')
-      );
-
-      if (isUnit && assign.unitTitle) {
-        const uKey =
-          assign.unitId || `${assign.courseCode || 'all'}:::${assign.unitTitle}`;
-        const existing = unitMap.get(uKey) || {
-          unitKey: uKey,
-          unitTitle: assign.unitTitle,
-          unitMaxScore: assign.unitMaxScore ?? 10,
-          courseCode: assign.courseCode || '',
-          courseName: assign.courseName || '',
-          scorePart: assign.scorePart || 'PRE_MIDTERM',
-          scoringMethod: (assign.scoringMethod as any) || 'SUBMISSION_COUNT_RATIO',
-          totalTasksInUnit: assign.totalTasksInUnit || 0,
-          autoRoundUp: assign.autoRoundUp ?? true,
-          targetClassrooms: assign.targetClassrooms || [],
-          tasks: [] as TermAssignmentConfig[],
-        };
-        existing.tasks.push(assign);
-        if (assign.totalTasksInUnit && assign.totalTasksInUnit > existing.totalTasksInUnit) {
-          existing.totalTasksInUnit = assign.totalTasksInUnit;
-        }
-        if (assign.targetClassrooms && assign.targetClassrooms.length > 0 && existing.targetClassrooms.length === 0) {
-          existing.targetClassrooms = assign.targetClassrooms;
-        }
-        unitMap.set(uKey, existing);
-      } else {
-        independent.push(assign);
-      }
-    });
-
-    return {
-      units: Array.from(unitMap.values()),
-      independent,
-      totalCount: filtered.length,
-    };
-  }, [termAssignments, searchQuery]);
-
   // Data for Section C: Assignment Breakdown Matrix (ตารางแจกแจงคะแนนตามงานที่มอบหมาย)
   const matrixClassroom = useMemo(() => {
     if (selectedRoom !== 'ALL') return selectedRoom;
@@ -611,7 +586,406 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
   const allSubmissions = useMemo(() => {
     return sgsRosterAndSubmissionService.getSubmissions();
-  }, [queueItems]);
+  }, [queueItems, termAssignments]);
+
+  const classroomStudentCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    allSystemClassrooms.forEach((r) => {
+      map[r] = studentService.countStudents(r) || sgsRosterAndSubmissionService.getSgsRoster(r).length || 0;
+    });
+    return map;
+  }, [allSystemClassrooms]);
+
+  const enrichedAssignmentCards = useMemo(() => {
+    const unitMap = new Map<
+      string,
+      {
+        key: string;
+        unitId: string;
+        unitTitle: string;
+        courseCode: string;
+        courseName: string;
+        scorePart: FourScorePart;
+        unitMaxScore: number;
+        targetClassrooms: string[];
+        academicYearTerm?: string;
+        tasks: TermAssignmentConfig[];
+      }
+    >();
+
+    const standaloneList: TermAssignmentConfig[] = [];
+
+    termAssignments.forEach((assign) => {
+      const isUnit = Boolean(
+        assign.unitTitle ||
+        (assign.scoringMethod && assign.scoringMethod !== 'DIRECT_SCORE')
+      );
+
+      if (isUnit && assign.unitTitle) {
+        const uKey = assign.unitId || `${assign.courseCode || 'all'}:::${assign.unitTitle}`;
+        const existing = unitMap.get(uKey) || {
+          key: uKey,
+          unitId: assign.unitId || uKey,
+          unitTitle: assign.unitTitle,
+          courseCode: assign.courseCode || '',
+          courseName: assign.courseName || '',
+          scorePart: assign.scorePart || 'PRE_MIDTERM',
+          unitMaxScore: assign.unitMaxScore ?? 10,
+          targetClassrooms: assign.targetClassrooms || [],
+          academicYearTerm: assign.academicYearTerm,
+          tasks: [],
+        };
+        existing.tasks.push(assign);
+        if (assign.targetClassrooms && assign.targetClassrooms.length > 0 && existing.targetClassrooms.length === 0) {
+          existing.targetClassrooms = assign.targetClassrooms;
+        }
+        unitMap.set(uKey, existing);
+      } else {
+        standaloneList.push(assign);
+      }
+    });
+
+    const result: {
+      id: string;
+      key: string;
+      isUnitBundle: boolean;
+      unitId?: string;
+      unitTitle?: string;
+      title: string;
+      displayTitle: string;
+      courseCode: string;
+      courseName: string;
+      scorePart: FourScorePart;
+      maxScore: number;
+      dueDate: string;
+      targetClassrooms: string[];
+      totalStudents: number;
+      submittedCount: number;
+      gradedCount: number;
+      pendingReviewCount: number;
+      displayStatus: 'PENDING_SCORE' | 'IN_PROGRESS' | 'GRADED';
+      progressCount: number;
+      progressPercent: number;
+      subTasks: TermAssignmentConfig[];
+      rawAssignment?: TermAssignmentConfig;
+      academicYearTerm?: string;
+    }[] = [];
+
+    unitMap.forEach((u) => {
+      const targetRooms =
+        u.targetClassrooms && u.targetClassrooms.length > 0
+          ? u.targetClassrooms
+          : selectedRoom !== 'ALL'
+          ? [selectedRoom]
+          : availableFilterRooms;
+
+      const totalStudents = targetRooms.reduce((sum, r) => {
+        if (r === 'ALL') return sum;
+        return sum + (classroomStudentCounts[r] || 0);
+      }, 0);
+
+      const taskIds = new Set(u.tasks.map((t) => t.id));
+      const unitSubs = allSubmissions.filter((s) => taskIds.has(s.assignmentId));
+
+      const studentCodes = new Set(unitSubs.map((s) => s.studentCode));
+      let fullyGradedStudents = 0;
+      let submittedStudents = 0;
+
+      studentCodes.forEach((stuCode) => {
+        const stuSubs = unitSubs.filter((s) => s.studentCode === stuCode);
+        const isAnySubmitted = stuSubs.some((s) => s.status !== 'MISSING');
+        const isAllGraded =
+          u.tasks.length > 0 &&
+          u.tasks.every((t) =>
+            stuSubs.some(
+              (s) => s.assignmentId === t.id && (s.status === 'GRADED' || (s.score !== null && s.score !== undefined))
+            )
+          );
+        if (isAnySubmitted) submittedStudents += 1;
+        if (isAllGraded) fullyGradedStudents += 1;
+      });
+
+      const pendingReviewCount = unitSubs.filter(
+        (s) => s.status === 'SUBMITTED_PENDING' || (s.status !== 'GRADED' && s.score === null)
+      ).length;
+
+      let displayStatus: 'PENDING_SCORE' | 'IN_PROGRESS' | 'GRADED' = 'PENDING_SCORE';
+      if (totalStudents > 0) {
+        if (fullyGradedStudents >= totalStudents) {
+          displayStatus = 'GRADED';
+        } else if (fullyGradedStudents > 0 || submittedStudents > 0 || pendingReviewCount > 0) {
+          displayStatus = 'IN_PROGRESS';
+        } else {
+          displayStatus = 'PENDING_SCORE';
+        }
+      } else {
+        if (fullyGradedStudents > 0 && pendingReviewCount === 0) {
+          displayStatus = 'GRADED';
+        } else if (submittedStudents > 0) {
+          displayStatus = 'IN_PROGRESS';
+        } else {
+          displayStatus = 'PENDING_SCORE';
+        }
+      }
+
+      const progressCount = fullyGradedStudents > 0 ? fullyGradedStudents : submittedStudents;
+      const progressPercent =
+        totalStudents > 0
+          ? Math.min(100, Math.round((progressCount / totalStudents) * 100))
+          : progressCount > 0
+          ? 100
+          : 0;
+
+      const sortedDueDates = u.tasks
+        .map((t) => t.dueDate)
+        .filter(Boolean)
+        .sort();
+      const latestDueDate =
+        sortedDueDates[sortedDueDates.length - 1] || u.tasks[0]?.dueDate || getBangkokTodayString();
+
+      const displayTitle =
+        u.tasks.length === 1
+          ? `${u.unitTitle} เรื่อง ${u.tasks[0].title}`
+          : `${u.unitTitle} (รวม ${u.tasks.length} ชิ้นงาน)`;
+
+      result.push({
+        id: u.tasks[0]?.id || u.key,
+        key: u.key,
+        isUnitBundle: true,
+        unitId: u.unitId,
+        unitTitle: u.unitTitle,
+        title: u.unitTitle,
+        displayTitle,
+        courseCode: u.courseCode,
+        courseName: u.courseName,
+        scorePart: u.scorePart,
+        maxScore: u.unitMaxScore,
+        dueDate: latestDueDate,
+        targetClassrooms: u.targetClassrooms,
+        totalStudents,
+        submittedCount: submittedStudents,
+        gradedCount: fullyGradedStudents,
+        pendingReviewCount,
+        displayStatus,
+        progressCount,
+        progressPercent,
+        subTasks: u.tasks,
+        academicYearTerm: u.academicYearTerm,
+      });
+    });
+
+    standaloneList.forEach((assign) => {
+      const targetRooms =
+        assign.targetClassrooms && assign.targetClassrooms.length > 0
+          ? assign.targetClassrooms
+          : selectedRoom !== 'ALL'
+          ? [selectedRoom]
+          : availableFilterRooms;
+
+      const totalStudents = targetRooms.reduce((sum, r) => {
+        if (r === 'ALL') return sum;
+        return sum + (classroomStudentCounts[r] || 0);
+      }, 0);
+
+      const subs = allSubmissions.filter((s) => s.assignmentId === assign.id);
+      const gradedCount = subs.filter(
+        (s) => s.status === 'GRADED' || (s.score !== null && s.score !== undefined)
+      ).length;
+      const submittedCount = subs.filter(
+        (s) => s.status === 'SUBMITTED_PENDING' || s.status === 'GRADED' || (s.score !== null && s.score !== undefined)
+      ).length;
+      const pendingReviewCount = subs.filter(
+        (s) => s.status === 'SUBMITTED_PENDING' || (s.status !== 'GRADED' && s.score === null)
+      ).length;
+
+      let displayStatus: 'PENDING_SCORE' | 'IN_PROGRESS' | 'GRADED' = 'PENDING_SCORE';
+      if (totalStudents > 0) {
+        if (gradedCount >= totalStudents) {
+          displayStatus = 'GRADED';
+        } else if (gradedCount > 0 || submittedCount > 0 || pendingReviewCount > 0) {
+          displayStatus = 'IN_PROGRESS';
+        } else {
+          displayStatus = 'PENDING_SCORE';
+        }
+      } else {
+        if (gradedCount > 0 && pendingReviewCount === 0) {
+          displayStatus = 'GRADED';
+        } else if (submittedCount > 0) {
+          displayStatus = 'IN_PROGRESS';
+        } else {
+          displayStatus = 'PENDING_SCORE';
+        }
+      }
+
+      const progressCount = gradedCount > 0 ? gradedCount : submittedCount;
+      const progressPercent =
+        totalStudents > 0
+          ? Math.min(100, Math.round((progressCount / totalStudents) * 100))
+          : progressCount > 0
+          ? 100
+          : 0;
+
+      result.push({
+        id: assign.id,
+        key: assign.id,
+        isUnitBundle: false,
+        title: assign.title,
+        displayTitle: assign.title,
+        courseCode: assign.courseCode || '',
+        courseName: assign.courseName || '',
+        scorePart: assign.scorePart || 'PRE_MIDTERM',
+        maxScore: assign.maxScore || 10,
+        dueDate: assign.dueDate || getBangkokTodayString(),
+        targetClassrooms: assign.targetClassrooms || [],
+        totalStudents,
+        submittedCount,
+        gradedCount,
+        pendingReviewCount,
+        displayStatus,
+        progressCount,
+        progressPercent,
+        subTasks: [assign],
+        rawAssignment: assign,
+        academicYearTerm: assign.academicYearTerm,
+      });
+    });
+
+    return result;
+  }, [termAssignments, allSubmissions, classroomStudentCounts, selectedRoom, availableFilterRooms]);
+
+  const filteredAssignmentCards = useMemo(() => {
+    return enrichedAssignmentCards.filter((item) => {
+      if (selectedTerm !== 'ALL') {
+        if (item.academicYearTerm && item.academicYearTerm !== selectedTerm) {
+          return false;
+        }
+      }
+
+      if (selectedGradeLevel !== 'ALL') {
+        const cleanLvl = selectedGradeLevel.replace('ม.', '');
+        const matchRoom = item.targetClassrooms.some(
+          (r) => r.startsWith(selectedGradeLevel) || r.includes(cleanLvl)
+        );
+        const matchCode = item.courseCode.includes(cleanLvl);
+        if (!matchRoom && !matchCode && item.targetClassrooms.length > 0) {
+          return false;
+        }
+      }
+
+      if (selectedSubjectCode !== 'ALL') {
+        if (item.courseCode !== selectedSubjectCode) {
+          return false;
+        }
+      }
+
+      if (selectedRoom !== 'ALL') {
+        const normSelected = formatClassroomLabel(selectedRoom);
+        const hasRoom = item.targetClassrooms.some(
+          (r) => r === selectedRoom || formatClassroomLabel(r) === normSelected
+        );
+        if (!hasRoom && item.targetClassrooms.length > 0) {
+          return false;
+        }
+      }
+
+      if (selectedScorePart !== 'ALL') {
+        if (item.scorePart !== selectedScorePart) {
+          return false;
+        }
+      }
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchTitle = item.displayTitle.toLowerCase().includes(q);
+        const matchCourse =
+          item.courseCode.toLowerCase().includes(q) || item.courseName.toLowerCase().includes(q);
+        const matchRooms = item.targetClassrooms.some((r) => r.toLowerCase().includes(q));
+        if (!matchTitle && !matchCourse && !matchRooms) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [
+    enrichedAssignmentCards,
+    selectedTerm,
+    selectedGradeLevel,
+    selectedSubjectCode,
+    selectedRoom,
+    selectedScorePart,
+    searchQuery,
+  ]);
+
+  const assignmentSummaryStats = useMemo(() => {
+    const total = filteredAssignmentCards.length;
+    const inProgress = filteredAssignmentCards.filter((i) => i.displayStatus === 'IN_PROGRESS').length;
+    const graded = filteredAssignmentCards.filter((i) => i.displayStatus === 'GRADED').length;
+    const pendingScore = filteredAssignmentCards.filter((i) => i.displayStatus === 'PENDING_SCORE').length;
+    return { total, inProgress, graded, pendingScore };
+  }, [filteredAssignmentCards]);
+
+  const statusFilteredCards = useMemo(() => {
+    if (selectedStatusFilter === 'ALL') return filteredAssignmentCards;
+    return filteredAssignmentCards.filter((i) => i.displayStatus === selectedStatusFilter);
+  }, [filteredAssignmentCards, selectedStatusFilter]);
+
+  const totalCardPages = Math.max(1, Math.ceil(statusFilteredCards.length / pageSize));
+  const displayedAssignmentCards = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return statusFilteredCards.slice(start, start + pageSize);
+  }, [statusFilteredCards, currentPage, pageSize]);
+
+  const toggleUnitExpand = (key: string) => {
+    setExpandedUnitKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const handleRowPrimaryAction = (item: typeof enrichedAssignmentCards[0]) => {
+    if (item.displayStatus === 'GRADED') {
+      handleOpenCheckMatrix(item.courseCode, item.targetClassrooms);
+      return;
+    }
+
+    const targetId = item.isUnitBundle ? (item.subTasks[0]?.id || item.id) : item.id;
+    const pendingQueueItem = queueItems.find(
+      (q) => (q.assignmentId === targetId || item.subTasks.some((t) => t.id === q.assignmentId)) && q.status === 'PENDING_REVIEW'
+    );
+
+    if (pendingQueueItem) {
+      setGradingModalItem(pendingQueueItem);
+    } else {
+      handleOpenCheckMatrix(item.courseCode, item.targetClassrooms);
+    }
+  };
+
+  const handleDeleteAssignmentRow = (item: typeof enrichedAssignmentCards[0]) => {
+    if (confirm(`คุณต้องการลบชิ้นงาน "${item.displayTitle}" ใช่หรือไม่?`)) {
+      if (item.isUnitBundle && item.subTasks.length > 0) {
+        item.subTasks.forEach((t) => sgsRosterAndSubmissionService.deleteTermAssignment(t.id));
+      } else {
+        sgsRosterAndSubmissionService.deleteTermAssignment(item.id);
+      }
+      refreshTermAssignments();
+      showToast(`✓ ลบชิ้นงาน "${item.displayTitle}" เรียบร้อยแล้ว`);
+    }
+  };
+
+  const formatDueDateThai = (dateStr?: string) => {
+    if (!dateStr) return '-';
+    try {
+      return formatThaiDateShort(dateStr);
+    } catch {
+      return dateStr;
+    }
+  };
 
   const matrixUnits = useMemo(() => {
     const unitMap = new Map<
@@ -916,465 +1290,866 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       )}
 
       {/* ====================================================================
-          1. COMPACT HEADER + PROMINENT "+ สั่งงานใหม่" CTA (ไม่มีข้อความรกตา)
+          1. HEADER (Design System: Modern SaaS + Date/Term Pill + CTA)
          ==================================================================== */}
-      <div className="bg-white rounded-[18px] border border-[#E6EEF7] p-4 sm:p-5 shadow-[0_4px_16px_rgba(40,90,140,0.06)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="bg-white rounded-[18px] border border-[#E6EEF7] p-4 sm:p-5 shadow-[0_4px_16px_rgba(40,90,140,0.06)] flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        {/* Left: Icon + Title + Subtitle */}
         <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-[#EFF6FF] border border-[#BFDBFE] flex items-center justify-center text-[#3B82F6] shrink-0">
-            <ClipboardList className="w-5 h-5" />
+          <div className="w-12 h-12 rounded-2xl bg-[#EFF6FF] border border-[#BFDBFE] flex items-center justify-center text-[#3B82F6] shrink-0">
+            <ClipboardList className="w-6 h-6" />
           </div>
           <div>
             <h1 className="text-lg sm:text-xl font-bold text-[#163A66]">
               การสั่งงานและตรวจงาน (เชื่อมสมุดคะแนน ปพ.5)
             </h1>
-            <p className="text-xs sm:text-sm text-[#6B7C93]">
-              สั่งงานรายห้องหรือทุกห้องในรายวิชา และตรวจให้คะแนนเข้า 4 ส่วนของ ปพ.5 อัตโนมัติ
+            <p className="text-xs sm:text-sm text-[#6B7C93] mt-0.5">
+              สั่งงานรายห้องหรือทุกห้องในรายวิชา และตรวจให้คะแนนทั้ง 4 ส่วนของ ปพ.5 อัตโนมัติ
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsHelpModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-[#6B7C93] hover:text-[#163A66] cursor-pointer"
-          >
-            <HelpCircle className="w-4 h-4 text-[#3B82F6]" />
-            <span>วิธีใช้งาน</span>
-          </button>
+        {/* Right: Date & Academic Term Pill + CTA Button */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-3 bg-white px-3.5 py-2 rounded-2xl border border-[#E6EEF7] shadow-xs">
+            <div className="w-9 h-9 rounded-xl bg-[#EFF6FF] text-[#3B82F6] flex items-center justify-center shrink-0 border border-[#BFDBFE]/60">
+              <Calendar className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-xs sm:text-sm font-bold text-[#163A66]">
+                {todayThaiFull}
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-[#6B7C93]">
+                <span>ภาคเรียนที่ {selectedTerm}</span>
+                <span className="px-1.5 py-0.2 rounded-md bg-blue-50 text-[#3B82F6] text-[10px] font-bold border border-blue-200">
+                  Active
+                </span>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
+              </div>
+            </div>
+          </div>
 
           <button
             type="button"
             onClick={() => handleOpenCreateModal()}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs sm:text-sm font-semibold shadow-xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs sm:text-sm font-bold shadow-xs transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>สั่งงานใหม่</span>
+            <span>+ สั่งงานใหม่</span>
           </button>
         </div>
       </div>
 
-      {/* ====================================================================
-          2. FILTER BAR + MODE SWITCHER (ชิ้นงานที่สั่งไว้ vs คิวตรวจงานที่นักเรียนส่ง)
-         ==================================================================== */}
-      <div className="bg-white rounded-[18px] border border-[#E6EEF7] p-4 shadow-[0_4px_16px_rgba(40,90,140,0.06)] space-y-3.5">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          {/* 3 Mode Tabs */}
-          <div className="flex flex-wrap items-center bg-[#F2F7FC] p-1 rounded-2xl border border-[#E6EEF7] self-start gap-1">
-            <button
-              type="button"
-              onClick={() => setActiveSectionTab('ASSIGNED_LIST')}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                activeSectionTab === 'ASSIGNED_LIST'
-                  ? 'bg-white text-[#3B82F6] shadow-xs border border-[#BFDBFE]/60'
-                  : 'text-[#6B7C93] hover:text-[#163A66]'
-              }`}
-            >
-              1. ชิ้นงานที่สั่งไว้ ({groupedAssignedCards.totalCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveSectionTab('SUBMISSIONS')}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                activeSectionTab === 'SUBMISSIONS'
-                  ? 'bg-white text-[#3B82F6] shadow-xs border border-[#BFDBFE]/60'
-                  : 'text-[#6B7C93] hover:text-[#163A66]'
-              }`}
-            >
-              2. คิวตรวจงานที่ส่งเข้ามา ({stats.pending} รอตรวจ)
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveSectionTab('SCORE_MATRIX')}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeSectionTab === 'SCORE_MATRIX'
-                  ? 'bg-white text-[#3B82F6] shadow-xs border border-[#BFDBFE]/60'
-                  : 'text-[#6B7C93] hover:text-[#163A66]'
-              }`}
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>3. ตารางแจกแจงคะแนนตามงานที่มอบหมาย</span>
-            </button>
-          </div>
+      {/* Mode Switcher Tabs + Help Button */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center bg-[#F2F7FC] p-1 rounded-2xl border border-[#E6EEF7] gap-1">
+          <button
+            type="button"
+            onClick={() => setActiveSectionTab('ASSIGNED_LIST')}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              activeSectionTab === 'ASSIGNED_LIST'
+                ? 'bg-white text-[#3B82F6] shadow-xs border border-[#BFDBFE]/60'
+                : 'text-[#6B7C93] hover:text-[#163A66]'
+            }`}
+          >
+            1. รายการงานสั่งสอน ({enrichedAssignmentCards.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSectionTab('SUBMISSIONS')}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              activeSectionTab === 'SUBMISSIONS'
+                ? 'bg-white text-[#3B82F6] shadow-xs border border-[#BFDBFE]/60'
+                : 'text-[#6B7C93] hover:text-[#163A66]'
+            }`}
+          >
+            2. คิวตรวจงานที่ส่งเข้ามา ({stats.pending} รอตรวจ)
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSectionTab('SCORE_MATRIX')}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeSectionTab === 'SCORE_MATRIX'
+                ? 'bg-white text-[#3B82F6] shadow-xs border border-[#BFDBFE]/60'
+                : 'text-[#6B7C93] hover:text-[#163A66]'
+            }`}
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>3. ตารางแจกแจงคะแนน ปพ.5</span>
+          </button>
         </div>
 
-        {/* Filters Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end pt-2 border-t border-slate-100">
-          {/* Subject Filter */}
-          <div className="lg:col-span-4">
-            <label className="text-[11px] font-semibold text-[#6B7C93] block mb-1">
-              กรองตามรายวิชา:
-            </label>
-            <select
-              value={selectedSubjectCode}
-              onChange={(e) => {
-                setSelectedSubjectCode(e.target.value);
-                setSelectedRoom('ALL');
-              }}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm font-semibold text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
-            >
-              <option value="ALL">ทุกรายวิชา ({subjectsList.length} วิชา)</option>
-              {subjectsList.map((subj) => (
-                <option key={subj.courseCode} value={subj.courseCode}>
-                  {subj.courseCode} — {subj.courseName}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Dynamic Real Classroom Filter (No hardcoded ม.3/1!) */}
-          <div className="lg:col-span-3">
-            <label className="text-[11px] font-semibold text-[#6B7C93] block mb-1">
-              กรองตามห้องเรียน:
-            </label>
-            <select
-              value={selectedRoom}
-              onChange={(e) => setSelectedRoom(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm font-semibold text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
-            >
-              <option value="ALL">ทุกห้องเรียน ({availableFilterRooms.length} ห้อง)</option>
-              {availableFilterRooms.map((room) => (
-                <option key={room} value={room}>
-                  ห้อง {room}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Search */}
-          <div className="lg:col-span-3">
-            <label className="text-[11px] font-semibold text-[#6B7C93] block mb-1">
-              ค้นหาชื่องาน / ชื่อนักเรียน:
-            </label>
-            <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="พิมพ์คำค้นหา..."
-                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
-              />
-            </div>
-          </div>
-
-          {/* Reset */}
-          <div className="lg:col-span-2">
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedSubjectCode('ALL');
-                setSelectedRoom('ALL');
-                setSelectedStatus('ALL');
-                setSearchQuery('');
-              }}
-              className="w-full py-2 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-[#6B7C93] text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>ล้างตัวกรอง</span>
-            </button>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => setIsHelpModalOpen(true)}
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-[#6B7C93] hover:text-[#163A66] cursor-pointer"
+        >
+          <HelpCircle className="w-4 h-4 text-[#3B82F6]" />
+          <span>วิธีใช้งาน</span>
+        </button>
       </div>
 
       {/* ====================================================================
-          SECTION A: รายการชิ้นงานที่ครูสั่งไว้ (เชื่อม 4 ส่วนของ ปพ.5)
+          SECTION A: รายการงานสั่งสอน (Modern Premium SaaS View)
          ==================================================================== */}
       {activeSectionTab === 'ASSIGNED_LIST' && (
-        <div className="bg-white rounded-[18px] border border-[#E6EEF7] p-4 sm:p-5 shadow-[0_4px_16px_rgba(40,90,140,0.06)] space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm sm:text-base font-bold text-[#163A66]">
-                ชิ้นงานที่สั่งไว้แล้ว ({groupedAssignedCards.totalCount} รายการ)
-              </h2>
-              <p className="text-xs text-[#6B7C93]">
-                แสดงหมวดคะแนน 4 ส่วน (ก่อนกลางภาค / กลางภาค / หลังกลางภาค / ปลายภาค) และห้องเรียนที่ได้รับมอบหมาย
-              </p>
+        <div className="space-y-4">
+          {/* Top 4 Summary Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            {/* Card 1: งานทั้งหมด */}
+            <div
+              onClick={() => {
+                setSelectedStatusFilter('ALL');
+                setCurrentPage(1);
+              }}
+              className={`p-4 rounded-[18px] border bg-white shadow-[0_4px_16px_rgba(40,90,140,0.06)] flex items-center gap-3.5 cursor-pointer transition-all ${
+                selectedStatusFilter === 'ALL'
+                  ? 'border-[#3B82F6] ring-2 ring-[#3B82F6]/20 bg-blue-50/20'
+                  : 'border-[#E6EEF7] hover:border-[#BFDBFE]'
+              }`}
+            >
+              <div className="w-12 h-12 rounded-2xl bg-[#EFF6FF] text-[#3B82F6] flex items-center justify-center shrink-0 border border-[#BFDBFE]/60">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-xs text-[#6B7C93] font-medium">งานทั้งหมด</div>
+                <div className="text-xl sm:text-2xl font-bold text-[#163A66] leading-tight">
+                  {assignmentSummaryStats.total}
+                </div>
+                <div className="text-[11px] text-[#94A3B8]">รายการ</div>
+              </div>
             </div>
+
+            {/* Card 2: กำลังดำเนินการ */}
+            <div
+              onClick={() => {
+                setSelectedStatusFilter('IN_PROGRESS');
+                setCurrentPage(1);
+              }}
+              className={`p-4 rounded-[18px] border bg-white shadow-[0_4px_16px_rgba(40,90,140,0.06)] flex items-center gap-3.5 cursor-pointer transition-all ${
+                selectedStatusFilter === 'IN_PROGRESS'
+                  ? 'border-[#3B82F6] ring-2 ring-[#3B82F6]/20 bg-blue-50/20'
+                  : 'border-[#E6EEF7] hover:border-[#BFDBFE]'
+              }`}
+            >
+              <div className="w-12 h-12 rounded-2xl bg-[#EFF6FF] text-[#3B82F6] flex items-center justify-center shrink-0 border border-[#BFDBFE]/60">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-xs text-[#6B7C93] font-medium">กำลังดำเนินการ</div>
+                <div className="text-xl sm:text-2xl font-bold text-[#163A66] leading-tight">
+                  {assignmentSummaryStats.inProgress}
+                </div>
+                <div className="text-[11px] text-[#94A3B8]">รายการ</div>
+              </div>
+            </div>
+
+            {/* Card 3: ตรวจแล้ว */}
+            <div
+              onClick={() => {
+                setSelectedStatusFilter('GRADED');
+                setCurrentPage(1);
+              }}
+              className={`p-4 rounded-[18px] border bg-white shadow-[0_4px_16px_rgba(40,90,140,0.06)] flex items-center gap-3.5 cursor-pointer transition-all ${
+                selectedStatusFilter === 'GRADED'
+                  ? 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/20'
+                  : 'border-[#E6EEF7] hover:border-[#A7F3D0]'
+              }`}
+            >
+              <div className="w-12 h-12 rounded-2xl bg-[#ECFDF5] text-[#10B981] flex items-center justify-center shrink-0 border border-[#A7F3D0]/60">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-xs text-[#6B7C93] font-medium">ตรวจแล้ว</div>
+                <div className="text-xl sm:text-2xl font-bold text-[#163A66] leading-tight">
+                  {assignmentSummaryStats.graded}
+                </div>
+                <div className="text-[11px] text-[#94A3B8]">รายการ</div>
+              </div>
+            </div>
+
+            {/* Card 4: รอส่งคะแนน */}
+            <div
+              onClick={() => {
+                setSelectedStatusFilter('PENDING_SCORE');
+                setCurrentPage(1);
+              }}
+              className={`p-4 rounded-[18px] border bg-white shadow-[0_4px_16px_rgba(40,90,140,0.06)] flex items-center gap-3.5 cursor-pointer transition-all ${
+                selectedStatusFilter === 'PENDING_SCORE'
+                  ? 'border-rose-400 ring-2 ring-rose-400/20 bg-rose-50/20'
+                  : 'border-[#E6EEF7] hover:border-[#FECACA]'
+              }`}
+            >
+              <div className="w-12 h-12 rounded-2xl bg-[#F5F3FF] text-[#8B5CF6] flex items-center justify-center shrink-0 border border-[#DDD6FE]/60">
+                <BookOpen className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-xs text-[#6B7C93] font-medium">รอส่งคะแนน</div>
+                <div className="text-xl sm:text-2xl font-bold text-[#163A66] leading-tight">
+                  {assignmentSummaryStats.pendingScore}
+                </div>
+                <div className="text-[11px] text-[#94A3B8]">รายการ</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Status Filter Tabs */}
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => handleOpenCreateModal()}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-semibold cursor-pointer"
+              onClick={() => {
+                setSelectedStatusFilter('ALL');
+                setCurrentPage(1);
+              }}
+              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                selectedStatusFilter === 'ALL'
+                  ? 'bg-[#3B82F6] text-white shadow-xs'
+                  : 'bg-white text-[#6B7C93] hover:text-[#163A66] border border-[#E6EEF7]'
+              }`}
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>สั่งงานเพิ่ม</span>
+              ทั้งหมด ({assignmentSummaryStats.total})
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedStatusFilter('PENDING_SCORE');
+                setCurrentPage(1);
+              }}
+              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                selectedStatusFilter === 'PENDING_SCORE'
+                  ? 'bg-[#3B82F6] text-white shadow-xs'
+                  : 'bg-white text-[#6B7C93] hover:text-[#163A66] border border-[#E6EEF7]'
+              }`}
+            >
+              รอส่งคะแนน ({assignmentSummaryStats.pendingScore})
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedStatusFilter('IN_PROGRESS');
+                setCurrentPage(1);
+              }}
+              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                selectedStatusFilter === 'IN_PROGRESS'
+                  ? 'bg-[#3B82F6] text-white shadow-xs'
+                  : 'bg-white text-[#6B7C93] hover:text-[#163A66] border border-[#E6EEF7]'
+              }`}
+            >
+              กำลังตรวจ ({assignmentSummaryStats.inProgress})
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedStatusFilter('GRADED');
+                setCurrentPage(1);
+              }}
+              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                selectedStatusFilter === 'GRADED'
+                  ? 'bg-[#3B82F6] text-white shadow-xs'
+                  : 'bg-white text-[#6B7C93] hover:text-[#163A66] border border-[#E6EEF7]'
+              }`}
+            >
+              ตรวจแล้ว ({assignmentSummaryStats.graded})
             </button>
           </div>
 
-          {groupedAssignedCards.totalCount === 0 ? (
-            <div className="py-12 px-4 text-center bg-[#F7FAFF] rounded-2xl border border-dashed border-[#BFDBFE] space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-[#EFF6FF] text-[#3B82F6] flex items-center justify-center mx-auto">
-                <BookOpen className="w-6 h-6" />
+          {/* Filter Bar (ภาคเรียน, ระดับชั้น, รายวิชา, ค้นหา, ตัวกรองเพิ่มเติม) */}
+          <div className="bg-white rounded-[18px] border border-[#E6EEF7] p-4 shadow-[0_4px_16px_rgba(40,90,140,0.06)] space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+              {/* Term Filter */}
+              <div className="lg:col-span-2">
+                <label className="text-[11px] font-semibold text-[#6B7C93] block mb-1">
+                  ภาคเรียน
+                </label>
+                <select
+                  value={selectedTerm}
+                  onChange={(e) => {
+                    setSelectedTerm(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm font-semibold text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+                >
+                  <option value="2/2569">2/2569</option>
+                  <option value="1/2569">1/2569</option>
+                  <option value="ALL">ทุกภาคเรียน</option>
+                </select>
               </div>
-              <div>
-                <p className="text-sm font-bold text-[#163A66]">ยังไม่มีชิ้นงานที่สั่งในหมวดนี้</p>
-                <p className="text-xs text-[#6B7C93] mt-0.5">
-                  กดปุ่ม "สั่งงานใหม่" เพื่อมอบหมายงานให้ทุกห้องในรายวิชา หรือเฉพาะห้องที่เลือก
-                </p>
+
+              {/* Grade Level Filter */}
+              <div className="lg:col-span-2">
+                <label className="text-[11px] font-semibold text-[#6B7C93] block mb-1">
+                  ระดับชั้น
+                </label>
+                <select
+                  value={selectedGradeLevel}
+                  onChange={(e) => {
+                    setSelectedGradeLevel(e.target.value);
+                    setSelectedRoom('ALL');
+                    setCurrentPage(1);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm font-semibold text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+                >
+                  <option value="ALL">ทุกระดับชั้น</option>
+                  <option value="ม.1">มัธยมศึกษาปีที่ 1 (ม.1)</option>
+                  <option value="ม.2">มัธยมศึกษาปีที่ 2 (ม.2)</option>
+                  <option value="ม.3">มัธยมศึกษาปีที่ 3 (ม.3)</option>
+                  <option value="ม.4">มัธยมศึกษาปีที่ 4 (ม.4)</option>
+                  <option value="ม.5">มัธยมศึกษาปีที่ 5 (ม.5)</option>
+                  <option value="ม.6">มัธยมศึกษาปีที่ 6 (ม.6)</option>
+                </select>
               </div>
+
+              {/* Subject Filter */}
+              <div className="lg:col-span-3">
+                <label className="text-[11px] font-semibold text-[#6B7C93] block mb-1">
+                  รายวิชา
+                </label>
+                <select
+                  value={selectedSubjectCode}
+                  onChange={(e) => {
+                    setSelectedSubjectCode(e.target.value);
+                    setSelectedRoom('ALL');
+                    setCurrentPage(1);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm font-semibold text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+                >
+                  <option value="ALL">ทุกวิชา</option>
+                  {subjectsList.map((subj) => (
+                    <option key={subj.courseCode} value={subj.courseCode}>
+                      {subj.courseCode} — {subj.courseName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Search */}
+              <div className="lg:col-span-3">
+                <label className="text-[11px] font-semibold text-[#6B7C93] block mb-1">
+                  ค้นหาชื่องาน / รายวิชา:
+                </label>
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    placeholder="ค้นหาชื่อหน่วย / รายวิชา / รหัสงาน..."
+                    className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+                  />
+                </div>
+              </div>
+
+              {/* More Filters Toggle */}
+              <div className="lg:col-span-2">
+                <button
+                  type="button"
+                  onClick={() => setIsMoreFiltersOpen(!isMoreFiltersOpen)}
+                  className={`w-full py-2 px-3 rounded-xl border text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                    isMoreFiltersOpen || selectedRoom !== 'ALL' || selectedScorePart !== 'ALL'
+                      ? 'border-[#3B82F6] bg-[#EFF6FF] text-[#3B82F6]'
+                      : 'border-slate-200 bg-white hover:bg-slate-50 text-[#6B7C93]'
+                  }`}
+                >
+                  <SlidersHorizontal className="w-4 h-4" />
+                  <span>ตัวกรองเพิ่มเติม</span>
+                  {(selectedRoom !== 'ALL' || selectedScorePart !== 'ALL') && (
+                    <span className="w-2 h-2 rounded-full bg-[#3B82F6]" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Expandable Extra Filters Row */}
+            {isMoreFiltersOpen && (
+              <div className="pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3 animate-fade-in">
+                <div>
+                  <label className="text-[11px] font-semibold text-[#6B7C93] block mb-1">
+                    ห้องเรียน:
+                  </label>
+                  <select
+                    value={selectedRoom}
+                    onChange={(e) => {
+                      setSelectedRoom(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm font-semibold text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+                  >
+                    <option value="ALL">ทุกห้องเรียน ({availableFilterRooms.length} ห้อง)</option>
+                    {availableFilterRooms.map((room) => (
+                      <option key={room} value={room}>
+                        ห้อง {room}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-[#6B7C93] block mb-1">
+                    ส่วนคะแนน ปพ.5:
+                  </label>
+                  <select
+                    value={selectedScorePart}
+                    onChange={(e) => {
+                      setSelectedScorePart(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm font-semibold text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+                  >
+                    <option value="ALL">ทุกส่วนคะแนน (4 ส่วน)</option>
+                    <option value="PRE_MIDTERM">คะแนนก่อนกลางภาค</option>
+                    <option value="MIDTERM">คะแนนกลางภาค</option>
+                    <option value="POST_MIDTERM">คะแนนหลังกลางภาค</option>
+                    <option value="FINAL">คะแนนปลายภาค</option>
+                  </select>
+                </div>
+
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedSubjectCode('ALL');
+                      setSelectedRoom('ALL');
+                      setSelectedGradeLevel('ALL');
+                      setSelectedScorePart('ALL');
+                      setSelectedStatusFilter('ALL');
+                      setSearchQuery('');
+                      setCurrentPage(1);
+                    }}
+                    className="w-full py-2 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-[#6B7C93] text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>ล้างตัวกรองทั้งหมด</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Main Card Container: รายการงานสั่งสอน */}
+          <div className="bg-white rounded-[18px] border border-[#E6EEF7] p-4 sm:p-5 shadow-[0_4px_16px_rgba(40,90,140,0.06)] space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#EFF6FF] text-[#3B82F6] flex items-center justify-center shrink-0 border border-[#BFDBFE]/60">
+                  <ClipboardList className="w-4 h-4" />
+                </div>
+                <h2 className="text-sm sm:text-base font-bold text-[#163A66]">
+                  รายการงานสั่งสอน ({statusFilteredCards.length} รายการ)
+                </h2>
+              </div>
+
               <button
                 type="button"
                 onClick={() => handleOpenCreateModal()}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-semibold shadow-xs cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-semibold cursor-pointer shadow-2xs"
               >
-                <Plus className="w-4 h-4" />
-                <span>สั่งงานใหม่ทันที</span>
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ สั่งงานเพิ่ม</span>
               </button>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {/* 1. การ์ดหน่วยคะแนนรวม (Unit Bundles) จัดกลุ่มงานย่อยไว้ในกล่องเดียว ไม่รกตา */}
-              {groupedAssignedCards.units.map((unit) => (
-                <div
-                  key={unit.unitKey}
-                  className="rounded-[20px] border-2 border-[#BFDBFE] bg-white p-4 sm:p-5 shadow-[0_4px_16px_rgba(40,90,140,0.06)] space-y-4"
-                >
-                  {/* Unit Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-blue-100">
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-[#EFF6FF] text-[#3B82F6] border border-[#BFDBFE] flex items-center gap-1">
-                          <Layers className="w-3.5 h-3.5" />
-                          <span>หน่วยเก็บคะแนนรวม</span>
-                        </span>
-                        <span
-                          className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold border ${SCORE_PART_LABELS[unit.scorePart].cls}`}
-                        >
-                          {SCORE_PART_LABELS[unit.scorePart].label}
-                        </span>
-                        <span className="text-xs font-bold text-[#163A66] bg-slate-100 px-2.5 py-0.5 rounded-lg">
-                          เต็ม {unit.unitMaxScore} คะแนน
-                        </span>
-                      </div>
-                      <h3 className="text-base font-bold text-[#163A66]">{unit.unitTitle}</h3>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#6B7C93]">
-                        <span>
-                          วิชา: <strong className="text-[#163A66]">{unit.courseCode} {unit.courseName}</strong>
-                        </span>
-                        <span>•</span>
-                        <span>
-                          วิธีคิด: {unit.scoringMethod === 'SUBMISSION_COUNT_RATIO' ? 'สัดส่วนการส่งงาน' : 'หารเฉลี่ยคะแนนดิบ'}
-                        </span>
-                        <span>•</span>
-                        <span className="text-[#3B82F6] font-semibold">
-                          {unit.totalTasksInUnit > 0
-                            ? `กำหนดไว้ ${unit.totalTasksInUnit} งาน (สั่งแล้ว ${unit.tasks.length} งาน)`
-                            : `ไม่จำกัดจำนวนงานล่วงหน้า (นับตามจริง ${unit.tasks.length} งาน)`}
-                        </span>
-                      </div>
-                    </div>
 
-                    {/* Unit Actions */}
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleOpenCreateModal({
-                            courseCode: unit.courseCode,
-                            unitTitle: unit.unitTitle,
-                            unitId: unit.unitKey,
-                            unitMaxScore: unit.unitMaxScore,
-                            scorePart: unit.scorePart,
-                            scoringMethod: unit.scoringMethod,
-                            totalTasksInUnit: unit.totalTasksInUnit,
-                            isDynamicTasks: unit.totalTasksInUnit === 0,
-                            targetClassrooms: unit.targetClassrooms,
-                            isAddingToExistingUnit: true,
-                          })
-                        }
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#EFF6FF] hover:bg-[#DBEAFE] text-[#3B82F6] text-xs font-bold border border-[#BFDBFE] cursor-pointer transition-colors"
-                        title="เพิ่มชิ้นงานใหม่ลงในหน่วยคะแนนนี้"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>+ สั่งงานเพิ่มในหน่วยนี้</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenCheckMatrix(unit.courseCode, unit.targetClassrooms)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-bold cursor-pointer transition-colors shadow-xs"
-                      >
-                        <span>เช็คส่งงาน / รวมคะแนน →</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Sub-tasks in this Unit */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs font-semibold text-[#6B7C93] px-1">
-                      <span>ชิ้นงานย่อยในหน่วยนี้ ({unit.tasks.length} ชิ้นงาน)</span>
-                      <span className="text-[11px] text-slate-400">นำคะแนนหรือการส่งมารวมเป็นคะแนนหน่วยอัตโนมัติ</span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                      {unit.tasks.map((task, idx) => {
-                        const roomsText =
-                          task.targetClassrooms && task.targetClassrooms.length > 0
-                            ? task.targetClassrooms.join(', ')
-                            : 'ทุกห้อง';
-                        return (
-                          <div
-                            key={task.id}
-                            className="p-3 rounded-xl border border-slate-200/90 bg-[#F8FAFC] hover:bg-white hover:border-[#BFDBFE] transition-all flex flex-col justify-between gap-2.5"
-                          >
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-[11px] font-bold text-slate-500">
-                                  งานที่ {idx + 1}
-                                </span>
-                                <span className="text-[11px] font-bold text-[#163A66]">
-                                  เต็ม {task.maxScore} คะแนน
-                                </span>
-                              </div>
-                              <h4 className="text-xs font-bold text-[#163A66] line-clamp-2">
-                                {task.title}
-                              </h4>
-                              <div className="text-[11px] text-[#6B7C93] space-y-0.5">
-                                <p>ห้อง: <span className="font-semibold text-slate-700">{roomsText}</span></p>
-                                <p>ส่งภายใน: {task.dueDate}</p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center justify-between pt-2 border-t border-slate-200/70">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenCheckMatrix(task.courseCode, task.targetClassrooms)}
-                                className="text-[11px] font-bold text-[#3B82F6] hover:underline cursor-pointer"
-                              >
-                                เช็คส่งงาน →
-                              </button>
-                              <div className="flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEditModal(task)}
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-[#3B82F6] hover:bg-blue-50 cursor-pointer"
-                                  title="แก้ไขชิ้นงานนี้"
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    sgsRosterAndSubmissionService.deleteTermAssignment(task.id);
-                                    refreshTermAssignments();
-                                    showToast(`ลบชิ้นงาน "${task.title}" เรียบร้อยแล้ว`);
-                                  }}
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
-                                  title="ลบชิ้นงานนี้"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+            {/* Empty State */}
+            {displayedAssignmentCards.length === 0 ? (
+              <div className="py-12 px-4 text-center bg-[#F7FAFF] rounded-2xl border border-dashed border-[#BFDBFE] space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-[#EFF6FF] text-[#3B82F6] flex items-center justify-center mx-auto">
+                  <BookOpen className="w-6 h-6" />
                 </div>
-              ))}
+                <div>
+                  <p className="text-sm font-bold text-[#163A66]">ยังไม่มีรายการสั่งงานในเงื่อนไขนี้</p>
+                  <p className="text-xs text-[#6B7C93] mt-0.5">
+                    {termAssignments.length === 0
+                      ? 'กดปุ่ม "+ สั่งงานใหม่" เพื่อมอบหมายงานให้นักเรียนในรายวิชา'
+                      : 'ลองปรับเปลี่ยนตัวกรอง หรือกด "ล้างตัวกรอง" เพื่อดูรายการงานทั้งหมด'}
+                  </p>
+                </div>
+                <div className="flex items-center justify-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenCreateModal()}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-semibold shadow-xs cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>สั่งงานใหม่ทันที</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {displayedAssignmentCards.map((item) => {
+                  const partMeta = SCORE_PART_LABELS[item.scorePart] || SCORE_PART_LABELS.PRE_MIDTERM;
+                  const roomsText =
+                    item.targetClassrooms && item.targetClassrooms.length > 0
+                      ? item.targetClassrooms.join(', ')
+                      : 'ทุกห้อง';
 
-              {/* 2. ชิ้นงานเดี่ยวอิสระ (Independent Assignments) */}
-              {groupedAssignedCards.independent.length > 0 && (
-                <div className="space-y-2">
-                  {groupedAssignedCards.units.length > 0 && (
-                    <h4 className="text-xs font-bold text-[#163A66] px-1 pt-2">
-                      ชิ้นงานเดี่ยวอิสระ (คิดคะแนนแยกรายชิ้น)
-                    </h4>
-                  )}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {groupedAssignedCards.independent.map((assign) => {
-                      const partKey: FourScorePart =
-                        assign.scorePart ||
-                        (assign.unitKey === 'MIDTERM'
-                          ? 'MIDTERM'
-                          : assign.unitKey === 'FINAL'
-                            ? 'FINAL'
-                            : assign.unitKey === 'U2' || assign.unitKey === 'U3'
-                              ? 'POST_MIDTERM'
-                              : 'PRE_MIDTERM');
-                      const partMeta = SCORE_PART_LABELS[partKey];
-                      const roomsText =
-                        assign.targetClassrooms && assign.targetClassrooms.length > 0
-                          ? assign.targetClassrooms.length > 4
-                            ? `ทุกห้องที่เลือก (${assign.targetClassrooms.length} ห้อง: ${assign.targetClassrooms.slice(0, 3).join(', ')}...)`
-                            : `ห้อง ${assign.targetClassrooms.join(', ')}`
-                          : 'ทุกห้องในรายวิชา';
+                  const isMenuOpen = openMeatballMenuId === item.id;
+                  const isExpanded = expandedUnitKeys.has(item.key);
 
-                      return (
-                        <div
-                          key={assign.id}
-                          className="p-4 rounded-2xl border border-[#E6EEF7] bg-[#F7FAFF]/60 hover:bg-white hover:border-[#BFDBFE] transition-all flex flex-col justify-between gap-3 shadow-xs"
-                        >
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between gap-2">
+                  return (
+                    <div
+                      key={item.key}
+                      className="relative bg-white rounded-2xl border border-[#E6EEF7] hover:border-[#BFDBFE] p-4 sm:p-5 transition-all shadow-2xs space-y-3"
+                    >
+                      {/* Left indicator bar */}
+                      <div
+                        className={`absolute left-0 top-3 bottom-3 w-1.5 rounded-r ${
+                          item.displayStatus === 'GRADED'
+                            ? 'bg-emerald-500'
+                            : item.displayStatus === 'IN_PROGRESS'
+                            ? 'bg-[#3B82F6]'
+                            : 'bg-rose-500'
+                        }`}
+                      />
+
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pl-2">
+                        {/* Left Column: Status Badge + Title + Course / Room metadata */}
+                        <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                          {/* Status Pill Badge */}
+                          {item.displayStatus === 'GRADED' && (
+                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0] flex items-center gap-1.5 shrink-0">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981]" />
+                              <span>ตรวจแล้ว</span>
+                            </span>
+                          )}
+                          {item.displayStatus === 'IN_PROGRESS' && (
+                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE] flex items-center gap-1.5 shrink-0">
+                              <span className="w-2 h-2 rounded-full bg-[#3B82F6] animate-pulse" />
+                              <span>กำลังตรวจ</span>
+                            </span>
+                          )}
+                          {item.displayStatus === 'PENDING_SCORE' && (
+                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA] flex items-center gap-1.5 shrink-0">
+                              <Clock className="w-3.5 h-3.5 text-[#EF4444]" />
+                              <span>รอส่งคะแนน</span>
+                            </span>
+                          )}
+
+                          <div className="min-w-0 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
                               <span
-                                className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold border ${partMeta.cls}`}
+                                className={`w-2 h-2 rounded-full shrink-0 ${
+                                  item.displayStatus === 'GRADED'
+                                    ? 'bg-emerald-500'
+                                    : item.displayStatus === 'IN_PROGRESS'
+                                    ? 'bg-[#3B82F6]'
+                                    : 'bg-rose-500'
+                                }`}
+                              />
+                              <h3 className="text-sm sm:text-base font-bold text-[#163A66] break-words">
+                                {item.displayTitle}
+                              </h3>
+                              {item.isUnitBundle && item.subTasks.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleUnitExpand(item.key)}
+                                  className="px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-slate-100 hover:bg-blue-50 text-[#6B7C93] hover:text-[#3B82F6] flex items-center gap-1 cursor-pointer transition-colors"
+                                >
+                                  <span>{item.subTasks.length} งานย่อย</span>
+                                  <ChevronDown
+                                    className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                  />
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-[#6B7C93]">
+                              <span>
+                                วิชา: <strong className="text-[#163A66]">{item.courseCode} {item.courseName}</strong>
+                              </span>
+                              <span>|</span>
+                              <span className="font-medium text-[#163A66]">
+                                {roomsText}
+                              </span>
+                              <span
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${partMeta.cls}`}
                               >
                                 {partMeta.label}
                               </span>
-                              <span className="text-xs font-bold text-[#163A66]">
-                                เต็ม {assign.maxScore} คะแนน
-                              </span>
-                            </div>
-
-                            <h3 className="text-sm font-bold text-[#163A66]">{assign.title}</h3>
-
-                            <div className="text-xs text-[#6B7C93] space-y-0.5">
-                              <p>
-                                วิชา:{' '}
-                                <span className="font-semibold text-[#163A66]">
-                                  {assign.courseCode || 'ทุกวิชา'} {assign.courseName || ''}
-                                </span>
-                              </p>
-                              <p>
-                                กลุ่มเป้าหมาย:{' '}
-                                <span className="font-semibold text-[#3B82F6]">{roomsText}</span>
-                              </p>
-                              <p>กำหนดส่ง: {assign.dueDate}</p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-between pt-2 border-t border-slate-200/70">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenCheckMatrix(assign.courseCode, assign.targetClassrooms)}
-                              className="text-xs font-semibold text-[#3B82F6] hover:underline cursor-pointer"
-                            >
-                              เช็คส่งงาน / ให้คะแนน →
-                            </button>
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditModal(assign)}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-[#3B82F6] hover:bg-blue-50 cursor-pointer"
-                                title="แก้ไขชิ้นงาน"
-                              >
-                                <Edit3 className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  sgsRosterAndSubmissionService.deleteTermAssignment(assign.id);
-                                  refreshTermAssignments();
-                                  showToast(`ลบชิ้นงาน "${assign.title}" เรียบร้อยแล้ว`);
-                                }}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
-                                title="ลบชิ้นงาน"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
                             </div>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
+
+                        {/* Middle Stats Columns */}
+                        <div className="flex flex-wrap items-center gap-4 sm:gap-6 shrink-0 text-xs">
+                          {/* Due Date */}
+                          <div className="min-w-[100px]">
+                            <div className="text-[11px] text-[#94A3B8] flex items-center gap-1 mb-0.5">
+                              <Calendar className="w-3 h-3 text-slate-400" />
+                              <span>กำหนดส่ง</span>
+                            </div>
+                            <div className="text-xs sm:text-sm font-semibold text-[#163A66] flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-slate-400" />
+                              <span>{formatDueDateThai(item.dueDate)}</span>
+                            </div>
+                          </div>
+
+                          {/* Max Score */}
+                          <div className="min-w-[80px]">
+                            <div className="text-[11px] text-[#94A3B8] mb-0.5">คะแนนเต็ม</div>
+                            <div className="text-xs sm:text-sm font-bold text-[#163A66]">
+                              {item.maxScore} คะแนน
+                            </div>
+                          </div>
+
+                          {/* Submission Progress */}
+                          <div className="min-w-[120px] sm:min-w-[140px]">
+                            <div className="text-[11px] text-[#94A3B8] flex items-center justify-between mb-0.5">
+                              <span>ส่งคะแนนแล้ว</span>
+                              <span className="font-bold text-[#163A66]">
+                                {item.progressCount}/{item.totalStudents} คน
+                              </span>
+                            </div>
+                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-300 ${
+                                  item.progressPercent === 100
+                                    ? 'bg-emerald-500'
+                                    : item.progressPercent > 0
+                                    ? 'bg-[#3B82F6]'
+                                    : 'bg-transparent'
+                                }`}
+                                style={{ width: `${item.progressPercent}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right Action & Meatball Menu */}
+                        <div className="flex items-center gap-2 self-end lg:self-center shrink-0 relative">
+                          {item.displayStatus === 'GRADED' && (
+                            <button
+                              type="button"
+                              onClick={() => handleRowPrimaryAction(item)}
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-[#E2E8F0] text-[#3B82F6] text-xs sm:text-sm font-bold transition-all shadow-2xs cursor-pointer"
+                            >
+                              <BarChart2 className="w-4 h-4 text-[#3B82F6]" />
+                              <span>ดูผลคะแนน</span>
+                            </button>
+                          )}
+
+                          {item.displayStatus === 'IN_PROGRESS' && (
+                            <button
+                              type="button"
+                              onClick={() => handleRowPrimaryAction(item)}
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#EFF6FF] hover:bg-[#DBEAFE] border border-[#BFDBFE] text-[#3B82F6] text-xs sm:text-sm font-bold transition-all shadow-2xs cursor-pointer"
+                            >
+                              <RefreshCw className="w-4 h-4 text-[#3B82F6]" />
+                              <span>กำลังตรวจ</span>
+                            </button>
+                          )}
+
+                          {item.displayStatus === 'PENDING_SCORE' &&
+                            (item.submittedCount > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => handleRowPrimaryAction(item)}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs sm:text-sm font-bold transition-all shadow-xs cursor-pointer"
+                              >
+                                <Eye className="w-4 h-4" />
+                                <span>ตรวจงาน</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleRowPrimaryAction(item)}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-blue-50 border border-blue-200 text-[#3B82F6] text-xs sm:text-sm font-bold transition-all shadow-2xs cursor-pointer"
+                              >
+                                <Send className="w-3.5 h-3.5 text-[#3B82F6]" />
+                                <span>สั่งงาน / ส่งคะแนน</span>
+                              </button>
+                            ))}
+
+                          {/* Meatballs menu */}
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMeatballMenuId(isMenuOpen ? null : item.id);
+                              }}
+                              className="p-2 rounded-xl text-slate-400 hover:text-[#163A66] hover:bg-slate-100 transition-colors cursor-pointer"
+                              title="เมนูเพิ่มเติม"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+
+                            {isMenuOpen && (
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute right-0 top-10 z-40 w-52 bg-white rounded-2xl border border-[#E6EEF7] shadow-xl py-1.5 text-xs font-semibold animate-scale-in"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMeatballMenuId(null);
+                                    if (item.rawAssignment) {
+                                      handleOpenEditModal(item.rawAssignment);
+                                    } else if (item.subTasks[0]) {
+                                      handleOpenEditModal(item.subTasks[0]);
+                                    }
+                                  }}
+                                  className="w-full px-3.5 py-2 text-left hover:bg-slate-50 flex items-center gap-2 text-[#163A66] cursor-pointer"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5 text-[#3B82F6]" />
+                                  <span>แก้ไขงาน</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMeatballMenuId(null);
+                                    handleOpenCreateModal({
+                                      courseCode: item.courseCode,
+                                      unitTitle: item.unitTitle,
+                                      unitId: item.unitId,
+                                      unitMaxScore: item.maxScore,
+                                      scorePart: item.scorePart,
+                                      targetClassrooms: item.targetClassrooms,
+                                      isAddingToExistingUnit: true,
+                                    });
+                                  }}
+                                  className="w-full px-3.5 py-2 text-left hover:bg-slate-50 flex items-center gap-2 text-[#163A66] cursor-pointer"
+                                >
+                                  <Plus className="w-3.5 h-3.5 text-[#3B82F6]" />
+                                  <span>สั่งงานย่อยเพิ่มในหน่วยนี้</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMeatballMenuId(null);
+                                    handleOpenCheckMatrix(item.courseCode, item.targetClassrooms);
+                                  }}
+                                  className="w-full px-3.5 py-2 text-left hover:bg-slate-50 flex items-center gap-2 text-[#163A66] cursor-pointer"
+                                >
+                                  <FileSpreadsheet className="w-3.5 h-3.5 text-[#3B82F6]" />
+                                  <span>ดูตารางคะแนน 3 สี ปพ.5</span>
+                                </button>
+
+                                <div className="my-1 border-t border-slate-100" />
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMeatballMenuId(null);
+                                    handleDeleteAssignmentRow(item);
+                                  }}
+                                  className="w-full px-3.5 py-2 text-left hover:bg-rose-50 flex items-center gap-2 text-rose-600 cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>ลบงาน</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Expanded Sub-tasks (if unit expanded) */}
+                      {isExpanded && item.isUnitBundle && item.subTasks.length > 0 && (
+                        <div className="mt-3 pl-4 sm:pl-8 pr-2 py-3 bg-[#F7FAFF] rounded-xl border border-blue-100/70 space-y-2">
+                          <div className="text-[11px] font-bold text-[#6B7C93] mb-1">
+                            รายการงานย่อยในหน่วยนี้ ({item.subTasks.length} งาน):
+                          </div>
+                          {item.subTasks.map((task, tIdx) => {
+                            const taskSubs = allSubmissions.filter((s) => s.assignmentId === task.id);
+                            const taskGraded = taskSubs.filter(
+                              (s) => s.status === 'GRADED' || (s.score !== null && s.score !== undefined)
+                            ).length;
+                            const taskSubmitted = taskSubs.filter((s) => s.status !== 'MISSING').length;
+                            return (
+                              <div
+                                key={task.id}
+                                className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="w-5 h-5 rounded-full bg-blue-50 text-[#3B82F6] font-bold flex items-center justify-center text-[10px]">
+                                    {tIdx + 1}
+                                  </span>
+                                  <span className="font-semibold text-[#163A66]">{task.title}</span>
+                                  <span className="text-[11px] text-[#6B7C93]">
+                                    (เต็ม {task.maxScore} คะแนน • กำหนดส่ง {formatDueDateThai(task.dueDate)})
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-[11px] text-[#6B7C93]">
+                                    ส่งแล้ว:{' '}
+                                    <strong className="text-[#163A66]">
+                                      {taskSubmitted}/{item.totalStudents}
+                                    </strong>{' '}
+                                    (ตรวจแล้ว {taskGraded})
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditModal(task)}
+                                    className="p-1 rounded-lg text-slate-400 hover:text-[#3B82F6] hover:bg-blue-50"
+                                    title="แก้ไขงานย่อย"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Pagination Footer */}
+            {statusFilteredCards.length > 0 && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 text-xs text-[#6B7C93]">
+                <div>
+                  แสดง{' '}
+                  {statusFilteredCards.length === 0
+                    ? 0
+                    : (currentPage - 1) * pageSize + 1}{' '}
+                  - {Math.min(currentPage * pageSize, statusFilteredCards.length)} จาก{' '}
+                  {statusFilteredCards.length} รายการ
                 </div>
-              )}
-            </div>
-          )}
+                <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                  <button
+                    type="button"
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                    title="หน้าก่อนหน้า"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                  {Array.from({ length: totalCardPages }).map((_, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setCurrentPage(i + 1)}
+                      className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        currentPage === i + 1
+                          ? 'bg-[#3B82F6] text-white shadow-xs'
+                          : 'border border-slate-200 bg-white text-[#6B7C93] hover:text-[#163A66] hover:bg-slate-50'
+                      }`}
+                    >
+                      {i + 1}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    disabled={currentPage >= totalCardPages}
+                    onClick={() => setCurrentPage((p) => Math.min(totalCardPages, p + 1))}
+                    className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                    title="หน้าถัดไป"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
-
       {/* ====================================================================
           SECTION B: คิวตรวจงานที่นักเรียนส่งเข้ามา (FIFO Submissions Queue)
          ==================================================================== */}

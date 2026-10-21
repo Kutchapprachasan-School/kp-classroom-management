@@ -131,6 +131,7 @@ export interface TermAssignmentItem {
   scoringMethod?: ScoringMethodType; // วิธีคำนวณคะแนนหน่วย
   totalTasksInUnit?: number;     // จำนวนงานทั้งหมดในหน่วย (เช่น 5 งาน หรือ 10 งาน)
   autoRoundUp?: boolean;         // สวิตช์ปัดเศษทศนิยม >= 0.5 ขึ้นอัตโนมัติ
+  academicYearTerm?: string;     // ภาคเรียน/ปีการศึกษา เช่น '2/2569'
 }
 
 export type TermAssignmentConfig = TermAssignmentItem;
