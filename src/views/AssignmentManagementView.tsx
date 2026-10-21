@@ -47,6 +47,7 @@ import {
   getAllAvailableClassroomLabels,
   type GradingQueueItem,
 } from '../services/teacherCourseAssignmentService';
+import { r2StorageService } from '../services/r2StorageService';
 import { ArtworkPreviewModal } from '../components/teacher/ArtworkPreviewModal';
 import { Submission3ColorMatrixModal } from '../components/teacher/Submission3ColorMatrixModal';
 import { GradingWorkspaceModal } from '../components/teacher/GradingWorkspaceModal';
@@ -673,10 +674,10 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
     unitMap.forEach((u) => {
       const targetRooms =
-        u.targetClassrooms && u.targetClassrooms.length > 0
-          ? u.targetClassrooms
-          : selectedRoom !== 'ALL'
+        selectedRoom !== 'ALL'
           ? [selectedRoom]
+          : u.targetClassrooms && u.targetClassrooms.length > 0 && !u.targetClassrooms.includes('ALL')
+          ? u.targetClassrooms
           : availableFilterRooms;
 
       const totalStudents = targetRooms.reduce((sum, r) => {
@@ -685,7 +686,16 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       }, 0);
 
       const taskIds = new Set(u.tasks.map((t) => t.id));
-      const unitSubs = allSubmissions.filter((s) => taskIds.has(s.assignmentId));
+      const roomStudentCodes =
+        selectedRoom !== 'ALL'
+          ? new Set(sgsRosterAndSubmissionService.getSgsRoster(selectedRoom).map((s) => s.studentCode))
+          : null;
+
+      const unitSubs = allSubmissions.filter((s) => {
+        if (!taskIds.has(s.assignmentId)) return false;
+        if (roomStudentCodes && !roomStudentCodes.has(s.studentCode)) return false;
+        return true;
+      });
 
       const studentCodes = new Set(unitSubs.map((s) => s.studentCode));
       let fullyGradedStudents = 0;
@@ -776,10 +786,10 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
     standaloneList.forEach((assign) => {
       const targetRooms =
-        assign.targetClassrooms && assign.targetClassrooms.length > 0
-          ? assign.targetClassrooms
-          : selectedRoom !== 'ALL'
+        selectedRoom !== 'ALL'
           ? [selectedRoom]
+          : assign.targetClassrooms && assign.targetClassrooms.length > 0 && !assign.targetClassrooms.includes('ALL')
+          ? assign.targetClassrooms
           : availableFilterRooms;
 
       const totalStudents = targetRooms.reduce((sum, r) => {
@@ -787,7 +797,16 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         return sum + (classroomStudentCounts[r] || 0);
       }, 0);
 
-      const subs = allSubmissions.filter((s) => s.assignmentId === assign.id);
+      const roomStudentCodes =
+        selectedRoom !== 'ALL'
+          ? new Set(sgsRosterAndSubmissionService.getSgsRoster(selectedRoom).map((s) => s.studentCode))
+          : null;
+
+      const subs = allSubmissions.filter((s) => {
+        if (s.assignmentId !== assign.id) return false;
+        if (roomStudentCodes && !roomStudentCodes.has(s.studentCode)) return false;
+        return true;
+      });
       const gradedCount = subs.filter(
         (s) => s.status === 'GRADED' || (s.score !== null && s.score !== undefined)
       ).length;
@@ -970,9 +989,16 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     if (confirm(`คุณต้องการลบชิ้นงาน "${item.displayTitle}" ใช่หรือไม่?`)) {
       if (item.isUnitBundle && item.subTasks.length > 0) {
         item.subTasks.forEach((t) => sgsRosterAndSubmissionService.deleteTermAssignment(t.id));
+        if (item.id) {
+          sgsRosterAndSubmissionService.deleteTermAssignment(item.id);
+        }
+        if (item.unitId) {
+          sgsRosterAndSubmissionService.deleteTermAssignment(item.unitId);
+        }
       } else {
         sgsRosterAndSubmissionService.deleteTermAssignment(item.id);
       }
+      setQueueItems([...teacherCourseAssignmentService.getGradingQueue()]);
       refreshTermAssignments();
       showToast(`✓ ลบชิ้นงาน "${item.displayTitle}" เรียบร้อยแล้ว`);
     }
@@ -2301,13 +2327,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                               item.studentCode,
                               item.fileName
                             );
-                            const cleanPreview =
-                              item.filePreviewUrl &&
-                              !item.filePreviewUrl.includes('storage.kps.ac.th') &&
-                              !item.filePreviewUrl.startsWith('r2://')
-                                ? item.filePreviewUrl
-                                : undefined;
-                            const fileUrl = cachedFile || cleanPreview;
+                            const resolvedR2 = r2StorageService.resolvePublicViewUrl(item.filePreviewUrl);
+                            const fileUrl = cachedFile || resolvedR2 || item.filePreviewUrl;
                             setPreviewItem({
                               title: item.assignmentTitle,
                               studentName: displayName,

@@ -178,6 +178,7 @@ export interface StudentWorkSubmission {
   externalLinkUrl?: string;
   fileDataUrl?: string;
   academicYearTerm?: string;
+  classroom?: string;
   isR2FilePurged?: boolean;
 }
 
@@ -742,10 +743,62 @@ export const sgsRosterAndSubmissionService = {
   },
 
   deleteTermAssignment(assignmentId: string): TermAssignmentItem[] {
-    const list = this.getTermAssignments().filter((item) => item.id !== assignmentId);
+    const originalList = this.getTermAssignments();
+    const targetItem = originalList.find((i) => i.id === assignmentId || i.unitId === assignmentId);
+    const affectedIds = new Set<string>([assignmentId]);
+    if (targetItem?.unitId && targetItem.unitId === assignmentId) {
+      // If deleting the entire unit bundle
+      originalList.forEach((it) => {
+        if (it.unitId === targetItem.unitId) affectedIds.add(it.id);
+      });
+    }
+
+    const list = originalList.filter((item) => !affectedIds.has(item.id) && item.unitId !== assignmentId);
     localStorage.setItem(STORAGE_KEY_TERM_ASSIGNMENTS, JSON.stringify(list));
+
+    // Cascade delete related submissions
+    try {
+      const allSubs = this.getSubmissions();
+      const nextSubs = allSubs.filter((s) => !affectedIds.has(s.assignmentId));
+      this.saveSubmissions(nextSubs);
+    } catch (e) {
+      console.warn('[deleteTermAssignment] Error cascade deleting submissions:', e);
+    }
+
+    // Cascade delete local file caches and grading queue items
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (!k) continue;
+          affectedIds.forEach((id) => {
+            if (k.startsWith(`kp_sub_file_${id}_`) || k.includes(id)) {
+              keysToRemove.push(k);
+            }
+          });
+        }
+        keysToRemove.forEach((k) => localStorage.removeItem(k));
+
+        // Purge from grading queue
+        const rawQueue = localStorage.getItem('kp_grading_queue_v2');
+        if (rawQueue) {
+          const queueItems = JSON.parse(rawQueue);
+          if (Array.isArray(queueItems)) {
+            const nextQueue = queueItems.filter((q: any) => !affectedIds.has(q.assignmentId));
+            localStorage.setItem('kp_grading_queue_v2', JSON.stringify(nextQueue));
+          }
+        }
+      } catch (e) {
+        console.warn('[deleteTermAssignment] Error cleaning up file cache/queue:', e);
+      }
+    }
+
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('kp-sgs-roster-updated'));
+      window.dispatchEvent(new CustomEvent('kp-grading-queue-updated'));
+      window.dispatchEvent(new CustomEvent('kp-copilot-updated'));
+      window.dispatchEvent(new CustomEvent('kps-data-sync-event', { detail: { type: 'submissions-updated' } }));
     }
     return list;
   },
@@ -2146,9 +2199,10 @@ export const sgsRosterAndSubmissionService = {
         (sub.workAttachmentLabel && sub.workAttachmentLabel.includes('.pdf'));
       const ext = isPdf ? 'pdf' : 'webp';
       const cleanFileName = `${sub.studentCode}_submission.${ext}`;
+      const cleanRoom = (sub.classroom || 'all').toLowerCase().replace(/\s+/g, '').replace('/', '-');
       const r2Key = r2StorageService.buildSubmissionKey({
         term: sub.academicYearTerm || term,
-        classroom: 'm3-1',
+        classroom: cleanRoom,
         assignmentId: sub.assignmentId,
         studentCode: sub.studentCode,
         fileName: cleanFileName,

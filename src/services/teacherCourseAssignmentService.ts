@@ -301,6 +301,14 @@ export const teacherCourseAssignmentService = {
 
       // 1. นำงานที่นักเรียนส่งจริงเข้ามาในคิว
       realSubs.forEach((sub, idx) => {
+        // กรองงานที่ถูกลบออกจากระบบไปแล้ว (Orphan Submissions)
+        if (termAssignments.length > 0 && sub.assignmentId) {
+          const asgExists = termAssignments.some(
+            (a) => a.id === sub.assignmentId || a.unitId === sub.assignmentId
+          );
+          if (!asgExists) return;
+        }
+
         const pairKey = `${sub.assignmentId}_${sub.studentCode}`;
         handledKeys.add(pairKey);
         handledKeys.add(sub.assignmentId);
@@ -314,6 +322,24 @@ export const teacherCourseAssignmentService = {
         const isGraded = sub.status === 'GRADED' || (savedMatch && savedMatch.status === 'GRADED');
         const score = sub.score !== null && sub.score !== undefined ? sub.score : savedMatch?.score ?? null;
         const feedback = sub.teacherFeedback || savedMatch?.teacherFeedback || '';
+
+        // แก้ไขชื่องาน: ป้องกัน 'งานที่ 0' และรวมชื่อหน่วยการเรียนรู้ให้ชัดเจน
+        let effectiveAssignmentTitle = asg?.title || sub.workTitle || savedMatch?.assignmentTitle || 'ชิ้นงานที่มอบหมาย';
+        if (effectiveAssignmentTitle.trim() === 'งานที่ 0') {
+          if (asg?.unitTitle) {
+            effectiveAssignmentTitle = asg.unitTitle;
+          } else {
+            effectiveAssignmentTitle = `งานที่ ${asg?.orderNo && asg.orderNo > 0 ? asg.orderNo : idx + 1}`;
+          }
+        } else if (asg?.unitTitle && !effectiveAssignmentTitle.includes(asg.unitTitle)) {
+          effectiveAssignmentTitle = `${asg.unitTitle} • ${effectiveAssignmentTitle}`;
+        }
+
+        // แก้ไขคะแนนเต็ม: กรณีหน่วยคะแนนรวม (Unit Bundle) ให้ใช้ unitMaxScore แทน maxScore 1 ชิ้น
+        const effectiveMaxScore =
+          asg?.unitMaxScore && asg.unitMaxScore > (asg.maxScore || 1)
+            ? asg.unitMaxScore
+            : asg?.maxScore || savedMatch?.maxScore || 10;
 
         // แยก Channel
         let channel: SubmissionChannelType = 'IMAGE_UPLOAD';
@@ -387,9 +413,9 @@ export const teacherCourseAssignmentService = {
           studentCode: subCode,
           studentName: realStudentName,
           assignmentId: sub.assignmentId,
-          assignmentTitle: asg?.title || sub.workTitle || savedMatch?.assignmentTitle || 'ชิ้นงานที่มอบหมาย',
+          assignmentTitle: effectiveAssignmentTitle,
           sgsUnit: asg?.sgsUnitLabel || asg?.unitTitle || savedMatch?.sgsUnit || 'คะแนนเก็บระหว่างภาค',
-          maxScore: asg?.maxScore || savedMatch?.maxScore || 10,
+          maxScore: effectiveMaxScore,
           submittedAtText: formatSubmissionTimestamp(sub.submittedAt || subTimestamp),
           submittedTimestamp: subTimestamp,
           submissionChannel: savedMatch?.submissionChannel || channel,

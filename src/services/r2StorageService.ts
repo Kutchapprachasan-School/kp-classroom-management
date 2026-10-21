@@ -36,7 +36,11 @@ export const r2StorageService = {
       return runtimeConfig.workerUrl.trim().replace(/\/+$/, '');
     }
     const env = getEnvObj();
-    const val = env.VITE_R2_WORKER_URL || (typeof process !== 'undefined' && process.env?.VITE_R2_WORKER_URL) || '';
+    const val =
+      env.VITE_R2_WORKER_URL ||
+      (typeof process !== 'undefined' && process.env?.VITE_R2_WORKER_URL) ||
+      (typeof window !== 'undefined' && window.localStorage?.getItem('kp_r2_worker_url')) ||
+      'https://kps-r2-storage.kps-school.workers.dev';
     return String(val).trim().replace(/\/+$/, '');
   },
 
@@ -45,7 +49,11 @@ export const r2StorageService = {
       return runtimeConfig.publicUrl.trim().replace(/\/+$/, '');
     }
     const env = getEnvObj();
-    const pub = env.VITE_R2_PUBLIC_URL || (typeof process !== 'undefined' && process.env?.VITE_R2_PUBLIC_URL) || '';
+    const pub =
+      env.VITE_R2_PUBLIC_URL ||
+      (typeof process !== 'undefined' && process.env?.VITE_R2_PUBLIC_URL) ||
+      (typeof window !== 'undefined' && window.localStorage?.getItem('kp_r2_public_url')) ||
+      '';
     if (pub && String(pub).trim()) {
       return String(pub).trim().replace(/\/+$/, '');
     }
@@ -57,7 +65,11 @@ export const r2StorageService = {
       return runtimeConfig.uploadSecret.trim();
     }
     const env = getEnvObj();
-    const val = env.VITE_R2_UPLOAD_SECRET || (typeof process !== 'undefined' && process.env?.VITE_R2_UPLOAD_SECRET) || '';
+    const val =
+      env.VITE_R2_UPLOAD_SECRET ||
+      (typeof process !== 'undefined' && process.env?.VITE_R2_UPLOAD_SECRET) ||
+      (typeof window !== 'undefined' && window.localStorage?.getItem('kp_r2_upload_secret')) ||
+      'KP_school';
     return String(val).trim();
   },
 
@@ -229,9 +241,9 @@ export const r2StorageService = {
     const workerBase = this.getWorkerUrl();
     const activeBase = publicBase || workerBase;
 
-    // แปลง r2://kp-classroom-submissions/... เป็น https://...
-    if (trimmed.startsWith('r2://')) {
-      const keyWithoutScheme = trimmed.replace(/^r2:\/\//, '');
+    // แปลง r2://kp-classroom-submissions/... หรือ raw object key เป็น https://...
+    if (trimmed.startsWith('r2://') || (!trimmed.startsWith('http://') && !trimmed.startsWith('https://'))) {
+      const keyWithoutScheme = trimmed.replace(/^r2:\/\//, '').replace(/^\/+/, '');
       return `${activeBase}/${encodeURI(keyWithoutScheme)}`;
     }
 

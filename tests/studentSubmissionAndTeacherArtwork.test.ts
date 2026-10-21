@@ -347,4 +347,73 @@ describe('Student Submission & Teacher Artwork Display Fixes', () => {
       r2StorageService.resetConfig();
     }
   });
+
+  it('cascade deletes related submissions and clears file caches when deleting an assignment', () => {
+    // 1. Add an assignment
+    sgsRosterAndSubmissionService.addTermAssignment({
+      title: 'งานที่ต้องลบ',
+      maxScore: 10,
+      dueDate: '2026-10-31',
+    });
+    const assignments = sgsRosterAndSubmissionService.getTermAssignments();
+    const asg = assignments[assignments.length - 1];
+
+    // 2. Submit student work
+    const sampleDataUrl = 'data:image/webp;base64,UklGRkAAAABXRUJQVlA4IDQAAADwAQCdASoBAAEAAQAcJaACdLoAAP7/2QAA';
+    sgsRosterAndSubmissionService.submitStudentWorkToR2({
+      assignmentId: asg.id,
+      studentCode: '55001',
+      workTitle: 'งานที่ต้องลบ',
+      fileDataUrl: sampleDataUrl,
+    });
+
+    expect(sgsRosterAndSubmissionService.getSubmissions().some((s) => s.assignmentId === asg.id)).toBe(true);
+
+    // 3. Delete the assignment
+    sgsRosterAndSubmissionService.deleteTermAssignment(asg.id);
+
+    // 4. Verify assignment is deleted
+    expect(sgsRosterAndSubmissionService.getTermAssignments().some((a) => a.id === asg.id)).toBe(false);
+
+    // 5. Verify submissions are cascade deleted
+    expect(sgsRosterAndSubmissionService.getSubmissions().some((s) => s.assignmentId === asg.id)).toBe(false);
+
+    // 6. Verify grading queue has no orphan items for this assignment
+    const queue = teacherCourseAssignmentService.getGradingQueue();
+    expect(queue.some((q) => q.assignmentId === asg.id)).toBe(false);
+  });
+
+  it('normalizes "งานที่ 0" and enriches unit max score in grading queue', () => {
+    // 1. Add a unit bundle assignment with maxScore 1 (count ratio) but unitMaxScore 25
+    sgsRosterAndSubmissionService.addTermAssignment({
+      title: 'งานที่ 0',
+      unitTitle: 'บทที่ 7 เรื่อง การแนะนำครอบครัว',
+      unitMaxScore: 25,
+      maxScore: 1,
+      scoringMethod: 'SUBMISSION_COUNT_RATIO',
+      dueDate: '2026-10-31',
+    });
+    const assignments = sgsRosterAndSubmissionService.getTermAssignments();
+    const asg = assignments[assignments.length - 1];
+
+    // 2. Submit student work
+    sgsRosterAndSubmissionService.submitStudentWorkToR2({
+      assignmentId: asg.id,
+      studentCode: '66001',
+      workTitle: 'งานที่ 0',
+      externalLinkUrl: 'https://canva.com/design/test',
+    });
+
+    // 3. Check grading queue item
+    const queue = teacherCourseAssignmentService.getGradingQueue();
+    const item = queue.find((q) => q.assignmentId === asg.id && q.studentCode === '66001');
+    expect(item).toBeDefined();
+
+    // Verify title is not left as 'งานที่ 0'
+    expect(item?.assignmentTitle).not.toBe('งานที่ 0');
+    expect(item?.assignmentTitle).toContain('บทที่ 7');
+
+    // Verify maxScore uses unitMaxScore (25) rather than 1
+    expect(item?.maxScore).toBe(25);
+  });
 });

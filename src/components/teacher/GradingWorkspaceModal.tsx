@@ -139,11 +139,7 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
       )
     : undefined;
   const cleanPreview = currentItem?.filePreviewUrl
-    ? (r2StorageService.isConfigured()
-        ? r2StorageService.resolvePublicViewUrl(currentItem.filePreviewUrl)
-        : (!currentItem.filePreviewUrl.includes('storage.kps.ac.th') && !currentItem.filePreviewUrl.startsWith('r2://')
-            ? currentItem.filePreviewUrl
-            : undefined))
+    ? r2StorageService.resolvePublicViewUrl(currentItem.filePreviewUrl) || currentItem.filePreviewUrl
     : undefined;
   const effectiveFileUrl = localOverrideFileUrl || cachedFile || cleanPreview;
 

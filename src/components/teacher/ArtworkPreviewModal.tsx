@@ -12,6 +12,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { sgsRosterAndSubmissionService } from '../../services/sgsRosterAndSubmissionService';
+import { r2StorageService } from '../../services/r2StorageService';
 
 export interface ArtworkPreviewModalProps {
   isOpen: boolean;
@@ -68,14 +69,14 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
     setRotation(0);
   };
 
-  // ถ้า url เป็นโดเมนจำลอง storage.kps.ac.th หรือ r2:// ให้ดึงไฟล์จริง base64 ที่เก็บไว้
-  let resolvedFileUrl = url;
-  if (resolvedFileUrl && (resolvedFileUrl.includes('storage.kps.ac.th') || resolvedFileUrl.startsWith('r2://'))) {
-    const match = resolvedFileUrl.match(/(asg-[^/]+)\/([^_/]+)_/);
+  // แก้ไขการแปลง URL ของ R2 / Storage ให้เปิดดูรูปได้จริงจากทุกเครื่อง
+  let resolvedFileUrl = r2StorageService.resolvePublicViewUrl(url) || url;
+  if (!resolvedFileUrl || resolvedFileUrl.startsWith('r2://')) {
+    const match = url?.match(/(asg-[^/]+)\/([^_/]+)_/);
     const targetAsgId = match ? match[1] : assignmentId;
     const targetStuCode = match ? match[2] : studentCode;
     const cached = sgsRosterAndSubmissionService.getSubmissionFileUrl(targetAsgId, targetStuCode, fileName);
-    resolvedFileUrl = cached || undefined;
+    resolvedFileUrl = cached || resolvedFileUrl;
   }
 
   // หากไม่มี resolvedFileUrl ให้ลองดึงไฟล์จากแคชด้วย assignmentId, studentCode, fileName
