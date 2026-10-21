@@ -8,6 +8,7 @@ import {
   Search,
   Sparkles,
   CheckCircle2,
+  ChevronDown,
 } from 'lucide-react';
 import {
   sgsRosterAndSubmissionService,
@@ -42,6 +43,16 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
   );
   const [matrixPartFilter, setMatrixPartFilter] = useState<'ALL' | 'PRE_MIDTERM' | 'POST_MIDTERM'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [expandedStudentCodes, setExpandedStudentCodes] = useState<Set<string>>(new Set());
+
+  const toggleStudentExpand = (code: string) => {
+    setExpandedStudentCodes((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
+  };
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const showToast = (msg: string) => {
@@ -516,8 +527,151 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto border border-[#E6EEF7] rounded-2xl">
-            <table className="w-full text-left border-collapse text-xs">
+          <>
+            {/* Mobile Stacked Card View (Pillar 8 & 9 - Zero Horizontal Scroll) */}
+            <div className="block md:hidden space-y-3">
+              {filteredStudents.map((stu, sIdx) => {
+                const stuSubs = allSubmissions.filter((s) => s.studentCode === stu.studentCode);
+                const preMidtermEarned = matrixAssignments
+                  .filter((a) => !a.scorePart || a.scorePart === 'PRE_MIDTERM')
+                  .reduce((sum, a) => {
+                    const sub = stuSubs.find((s) => s.assignmentId === a.id);
+                    return sum + (sub && sub.score !== null ? Number(sub.score) : 0);
+                  }, 0);
+
+                const allEarned = matrixAssignments.reduce((sum, a) => {
+                  const sub = stuSubs.find((s) => s.assignmentId === a.id);
+                  return sum + (sub && sub.score !== null ? Number(sub.score) : 0);
+                }, 0);
+
+                const isExpanded = expandedStudentCodes.has(stu.studentCode);
+
+                return (
+                  <div
+                    key={`mobile-stu-${stu.studentCode}`}
+                    className="bg-white rounded-2xl border border-[#E6EEF7] shadow-2xs p-3.5 space-y-2.5 transition-all"
+                  >
+                    {/* Header: Identity + Total Chips */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 font-bold text-xs flex items-center justify-center shrink-0 border border-blue-200">
+                          {stu.sgsSeatNo ?? stu.no ?? sIdx + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <h4 className="text-xs font-bold text-[#163A66] truncate">
+                            {stu.studentName}
+                          </h4>
+                          <span className="text-[10px] font-mono text-slate-400">
+                            {stu.studentCode}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="text-right">
+                          <div className="text-[10px] text-slate-400 font-medium">รวมทุกงาน</div>
+                          <div className="text-xs font-extrabold text-[#92400E] bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                            {allEarned}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Pre-midterm score badge */}
+                    <div className="flex items-center justify-between bg-[#F8FAFC] rounded-xl px-2.5 py-1.5 text-[11px]">
+                      <span className="text-[#6B7C93] font-medium">
+                        ก่อนกลางภาค (เต็ม {matrixCourseWeights.preMidterm}):
+                      </span>
+                      <span className="font-bold text-blue-700">
+                        {preMidtermEarned} คะแนน
+                      </span>
+                    </div>
+
+                    {/* Expand/Collapse Toggle Button (min 44px touch target) */}
+                    <button
+                      type="button"
+                      onClick={() => toggleStudentExpand(stu.studentCode)}
+                      className="w-full min-h-[44px] py-2 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-slate-200/80"
+                    >
+                      <span>
+                        {isExpanded
+                          ? 'ซ่อนคะแนนรายชิ้น'
+                          : `ดูคะแนนรายชิ้น (${matrixAssignments.length} ชิ้น)`}
+                      </span>
+                      <ChevronDown
+                        className={`w-4 h-4 transition-transform duration-200 ${
+                          isExpanded ? 'rotate-180 text-blue-600' : 'text-slate-400'
+                        }`}
+                      />
+                    </button>
+
+                    {/* Expandable Assignment List with Tap-to-Edit */}
+                    {isExpanded && (
+                      <div className="pt-2 border-t border-slate-100 space-y-2 animate-fade-in">
+                        <p className="text-[10px] text-slate-400 font-medium">
+                          แตะที่แถบชิ้นงานเพื่อบันทึกหรือแก้ไขคะแนน:
+                        </p>
+                        {matrixAssignments.map((assign) => {
+                          const sub = stuSubs.find((s) => s.assignmentId === assign.id);
+                          const hasScore =
+                            sub && sub.score !== null && sub.score !== undefined;
+
+                          return (
+                            <button
+                              key={`mob-asg-${assign.id}`}
+                              type="button"
+                              onClick={() =>
+                                handleOpenInlineEdit(
+                                  stu.studentCode,
+                                  stu.studentName,
+                                  assign,
+                                  hasScore ? sub.score : null
+                                )
+                              }
+                              className={`w-full min-h-[44px] p-2.5 rounded-xl border flex items-center justify-between text-left transition-all cursor-pointer ${
+                                hasScore
+                                  ? 'bg-emerald-50/50 border-emerald-200 hover:bg-emerald-50'
+                                  : sub?.status === 'SUBMITTED_PENDING'
+                                  ? 'bg-amber-50/50 border-amber-200 hover:bg-amber-50'
+                                  : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                              }`}
+                            >
+                              <div className="min-w-0 flex-1 pr-2">
+                                <div className="text-xs font-bold text-[#163A66] truncate">
+                                  {assign.title}
+                                </div>
+                                <div className="text-[10px] text-slate-400 mt-0.5">
+                                  {assign.sgsUnitLabel || 'ก่อนกลางภาค'} • เต็ม {assign.maxScore} คะแนน
+                                </div>
+                              </div>
+                              <div className="shrink-0 flex items-center gap-1.5">
+                                {hasScore ? (
+                                  <span className="px-2 py-1 rounded-lg bg-emerald-100 text-emerald-800 font-black text-xs">
+                                    {sub.score} / {assign.maxScore}
+                                  </span>
+                                ) : sub?.status === 'SUBMITTED_PENDING' ? (
+                                  <span className="px-2 py-1 rounded-lg bg-amber-100 text-amber-800 font-bold text-xs flex items-center gap-1">
+                                    ⏳ รอตรวจ
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-1 rounded-lg bg-slate-200 text-slate-500 font-bold text-xs">
+                                    ยังไม่มีคะแนน
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto border border-[#E6EEF7] rounded-2xl">
+              <table className="w-full text-left border-collapse text-xs">
               <thead>
                 {/* Header Row 1: Groups */}
                 <tr className="bg-[#F2F7FC] text-[#163A66] border-b border-[#E6EEF7]">
@@ -735,7 +889,8 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
               </tbody>
             </table>
           </div>
-        )}
+        </>
+      )}
       </div>
 
       {/* 4. Quick Inline Score Edit Modal */}

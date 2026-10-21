@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Home,
   BookOpen,
@@ -14,6 +14,8 @@ import {
   School,
 } from 'lucide-react';
 import type { TeacherViewKey } from '../layout/TeacherSidebar';
+import { authService } from '../../services/authService';
+import { messagingService, CHAT_GROUPS_EVENT } from '../../services/messagingService';
 
 interface TeacherMobileMoreMenuScreenProps {
   onNavigate: (view: TeacherViewKey) => void;
@@ -27,11 +29,36 @@ interface TeacherMobileMoreMenuScreenProps {
 export const TeacherMobileMoreMenuScreen: React.FC<TeacherMobileMoreMenuScreenProps> = ({
   onNavigate,
   onLogout,
-  teacherName = 'ครูผู้สอน',
-  department = 'ครู',
-  avatarUrl = '/images/teacher/teacher_avatar.png',
+  teacherName: propTeacherName,
+  department: propDepartment,
+  avatarUrl: propAvatarUrl,
   currentActiveItem = 'grading',
 }) => {
+  const currentUser = authService.getCurrentUser();
+  const teacherName = propTeacherName || currentUser?.name || 'ครูผู้สอน';
+  const department =
+    propDepartment ||
+    currentUser?.subjectGroup ||
+    currentUser?.position ||
+    (currentUser?.role === 'ADMIN' ? 'ผู้ดูแลระบบ' : 'กลุ่มสาระการเรียนรู้');
+  const avatarUrl = propAvatarUrl || currentUser?.avatarUrl || '/images/teacher/teacher_avatar.png';
+
+  const [unreadMessages, setUnreadMessages] = useState<number>(() =>
+    messagingService.getTotalUnreadCount()
+  );
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setUnreadMessages(messagingService.getTotalUnreadCount());
+    };
+    window.addEventListener(CHAT_GROUPS_EVENT, handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener(CHAT_GROUPS_EVENT, handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
   interface MenuItem {
     id: string;
     label: string;
@@ -51,22 +78,25 @@ export const TeacherMobileMoreMenuScreen: React.FC<TeacherMobileMoreMenuScreenPr
     },
     {
       id: 'grading',
-      label: 'ตรวจงาน / สอน',
+      label: 'คิวตรวจงานนักเรียน',
       icon: BookOpen,
-      viewKey: 'mobile-grading-list',
-      isActive: currentActiveItem === 'grading' || currentActiveItem === 'assignments', // Matching screenshot active blue highlight!
+      viewKey: 'grading-queue',
+      isActive:
+        currentActiveItem === 'grading' ||
+        currentActiveItem === 'assignments' ||
+        currentActiveItem === 'grading-queue',
     },
     {
       id: 'students',
-      label: 'นักเรียน',
+      label: 'รายชื่อนักเรียน (Roster)',
       icon: Users,
       viewKey: 'roster',
     },
     {
       id: 'scores',
-      label: 'ผลการเรียน',
+      label: 'ผลการเรียน ปพ.5 (Score Matrix)',
       icon: BarChart2,
-      viewKey: 'mobile-room-scores',
+      viewKey: 'score-matrix',
     },
     {
       id: 'lessons',
@@ -76,32 +106,32 @@ export const TeacherMobileMoreMenuScreen: React.FC<TeacherMobileMoreMenuScreenPr
     },
     {
       id: 'evaluations',
-      label: 'ประเมิน / แบบฟอร์ม',
+      label: 'คลังข้อสอบ / ประเมิน',
       icon: ClipboardCheck,
       viewKey: 'exams',
     },
     {
       id: 'calendar',
-      label: 'ปฏิทินกิจกรรม',
+      label: 'ปฏิทินปีการศึกษา',
       icon: CalendarDays,
-      viewKey: 'mobile-calendar',
+      viewKey: 'academic-year',
     },
     {
       id: 'messages',
-      label: 'ข้อความ',
+      label: 'ข้อความสื่อสาร',
       icon: MessageSquare,
       viewKey: 'messages',
-      badge: 3,
+      badge: unreadMessages > 0 ? unreadMessages : undefined,
     },
     {
       id: 'school-info',
-      label: 'ข้อมูลโรงเรียน',
+      label: 'ข้อมูลโรงเรียนและบัญชี',
       icon: School,
-      viewKey: 'mobile-school-info',
+      viewKey: 'accounts',
     },
     {
       id: 'settings',
-      label: 'ตั้งค่า',
+      label: 'ตั้งค่าระบบ',
       icon: Settings,
       viewKey: 'settings',
     },
@@ -163,7 +193,7 @@ export const TeacherMobileMoreMenuScreen: React.FC<TeacherMobileMoreMenuScreenPr
               {/* Right: Badge or Arrow Chevron */}
               <div className="flex items-center gap-2 shrink-0">
                 {item.badge !== undefined && (
-                  <span className="w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center leading-none">
+                  <span className="min-w-5 h-5 px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center leading-none">
                     {item.badge}
                   </span>
                 )}
