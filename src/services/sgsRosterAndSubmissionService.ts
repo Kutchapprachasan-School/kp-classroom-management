@@ -93,11 +93,23 @@ export type ScoringMethodType =
   | 'SUBMISSION_COUNT_RATIO'  // เก็บสัดส่วนจำนวนงานที่ส่ง (คะแนนการส่งงาน: มี N งาน หาร N คูณคะแนนเต็มหน่วย เช่น 5 งาน งานละ 2 คะแนน)
   | 'RAW_SCORE_AVERAGE';      // เฉลี่ยคะแนนดิบของงานทั้งหมดในหน่วย
 
+export interface AssignmentAttachment {
+  id: string;
+  name: string;
+  type: 'PDF' | 'IMAGE' | 'LINK' | 'DOCUMENT';
+  url?: string;
+  fileDataUrl?: string;
+  size?: string;
+  source: 'LESSON_PLAN' | 'UPLOAD' | 'LINK';
+  lessonPlanTitle?: string;
+}
+
 export interface TermAssignmentItem {
   id: string;
   orderNo: number;
   title: string;
   description?: string;
+  attachments?: AssignmentAttachment[];
   courseCode?: string;
   courseName?: string;
   unitKey?: 'U1' | 'U2' | 'U3' | 'MIDTERM' | 'FINAL' | string;
@@ -772,6 +784,8 @@ export const sgsRosterAndSubmissionService = {
         ...item,
         ...updates,
         title: updates.title !== undefined ? updates.title.trim() : item.title,
+        description: updates.description !== undefined ? updates.description : item.description,
+        attachments: updates.attachments !== undefined ? updates.attachments : item.attachments,
         maxScore: updates.maxScore !== undefined ? Number(updates.maxScore) : item.maxScore,
         unitTitle: updates.unitTitle !== undefined ? updates.unitTitle?.trim() : item.unitTitle,
         unitMaxScore: updates.unitMaxScore !== undefined ? Number(updates.unitMaxScore) : item.unitMaxScore,
@@ -794,6 +808,7 @@ export const sgsRosterAndSubmissionService = {
   addTermAssignment(payload: {
     title: string;
     description?: string;
+    attachments?: AssignmentAttachment[];
     courseCode?: string;
     courseName?: string;
     targetClassrooms?: string[];
@@ -834,6 +849,7 @@ export const sgsRosterAndSubmissionService = {
       orderNo: list.length + 1,
       title: payload.title.trim(),
       description: payload.description?.trim(),
+      attachments: payload.attachments || [],
       courseCode: payload.courseCode,
       targetClassrooms:
         payload.targetClassrooms && payload.targetClassrooms.length > 0

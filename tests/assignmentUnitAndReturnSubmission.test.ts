@@ -217,4 +217,57 @@ describe('Assignment Unit Grouping, Dynamic Tasks & Return Submission', () => {
     const tasksM11 = sgsRosterAndSubmissionService.getTermAssignments('ญ32202', 'ม.1/1');
     expect(tasksM11.length).toBe(0);
   });
+
+  it('persists assignment description and study material attachments properly', () => {
+    sgsRosterAndSubmissionService.addTermAssignment({
+      title: 'ใบงานที่ 3: สารประกอบอินทรีย์',
+      description: 'ให้นักเรียนศึกษาโครงสร้างเคมีจากเอกสารแนบ และตอบคำถามท้ายบทข้อ 1-5',
+      courseCode: 'ว32201',
+      courseName: 'เคมี 2',
+      targetClassrooms: ['ม.5/1'],
+      attachments: [
+        {
+          id: 'lp-chem-1',
+          name: 'เอกสารประกอบการสอน_เคมีอินทรีย์.pdf',
+          type: 'PDF',
+          url: 'https://cdn.school.ac.th/chem-lp-1.pdf',
+          size: '1.2 MB',
+          source: 'LESSON_PLAN',
+          lessonPlanTitle: 'แผนการจัดการเรียนรู้ที่ 5 สารประกอบไฮโดรคาร์บอน',
+        },
+        {
+          id: 'upload-img-1',
+          name: 'ตัวอย่างโครงสร้างลิวอิส.png',
+          type: 'IMAGE',
+          fileDataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+          size: '45 KB',
+          source: 'UPLOAD',
+        },
+      ],
+      maxScore: 10,
+    });
+
+    const tasks = sgsRosterAndSubmissionService.getTermAssignments('ว32201');
+    expect(tasks.length).toBe(1);
+    expect(tasks[0].description).toContain('ให้นักเรียนศึกษาโครงสร้างเคมี');
+    expect(tasks[0].attachments).toBeDefined();
+    expect(tasks[0].attachments?.length).toBe(2);
+    expect(tasks[0].attachments?.[0].source).toBe('LESSON_PLAN');
+    expect(tasks[0].attachments?.[0].type).toBe('PDF');
+    expect(tasks[0].attachments?.[1].source).toBe('UPLOAD');
+    expect(tasks[0].attachments?.[1].fileDataUrl).toContain('data:image/png');
+
+    // Test update attachments and description
+    sgsRosterAndSubmissionService.updateTermAssignment(tasks[0].id, {
+      description: 'แก้ไขคำชี้แจง: ให้ทำเฉพาะข้อ 1-3 เท่านั้น',
+      attachments: [
+        tasks[0].attachments![0], // Keep PDF only
+      ],
+    });
+
+    const updated = sgsRosterAndSubmissionService.getTermAssignments('ว32201');
+    expect(updated[0].description).toBe('แก้ไขคำชี้แจง: ให้ทำเฉพาะข้อ 1-3 เท่านั้น');
+    expect(updated[0].attachments?.length).toBe(1);
+    expect(updated[0].attachments?.[0].name).toBe('เอกสารประกอบการสอน_เคมีอินทรีย์.pdf');
+  });
 });

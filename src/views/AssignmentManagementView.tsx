@@ -19,6 +19,9 @@ import {
   ClipboardList,
   Download,
   Sparkles,
+  FileText,
+  Upload,
+  Paperclip,
 } from 'lucide-react';
 import {
   sgsRosterAndSubmissionService,
@@ -26,7 +29,9 @@ import {
   type FourScorePart,
   type TermAssignmentConfig,
   type SgsStudentRecord,
+  type AssignmentAttachment,
 } from '../services/sgsRosterAndSubmissionService';
+import { coursesCurriculumService } from '../services/coursesCurriculumService';
 import { studentService, formatClassroomLabel } from '../services/studentService';
 import {
   teacherCourseAssignmentService,
@@ -127,6 +132,12 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
   const [formTotalTasksInUnit, setFormTotalTasksInUnit] = useState<number>(5);
   const [formAutoRoundUp, setFormAutoRoundUp] = useState<boolean>(true);
 
+  // สั่งงานเพิ่มในหน่วยย่อย (ไม่ต้องแก้รายละเอียดหน่วย) & รายละเอียดงาน & สื่อการสอน
+  const [isAddingToExistingUnit, setIsAddingToExistingUnit] = useState<boolean>(false);
+  const [formUnitId, setFormUnitId] = useState<string>('');
+  const [formDescription, setFormDescription] = useState<string>('');
+  const [formAttachments, setFormAttachments] = useState<AssignmentAttachment[]>([]);
+
   // Quick Inline Matrix cell editing state
   const [editingCell, setEditingCell] = useState<{
     studentCode: string;
@@ -167,17 +178,126 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     return Array.from(new Set(list));
   }, [termAssignments, formCourseCode]);
 
+  // สื่อการสอนและแผนการสอนที่มีอยู่ในระบบ (cls_lesson_plans_v1 & coursesCurriculumService)
+  const availableLessonPlanFiles = useMemo(() => {
+    const list: {
+      id: string;
+      name: string;
+      type: 'PDF' | 'IMAGE' | 'LINK' | 'DOCUMENT';
+      size?: string;
+      url?: string;
+      lessonPlanTitle: string;
+      courseCode?: string;
+    }[] = [];
+
+    // 1. จากระบบแผนการสอน (cls_lesson_plans_v1)
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem('cls_lesson_plans_v1') : null;
+      if (raw) {
+        const plans = JSON.parse(raw);
+        if (Array.isArray(plans)) {
+          plans.forEach((p: any) => {
+            if (!formCourseCode || p.courseCode === formCourseCode || !p.courseCode) {
+              if (Array.isArray(p.files)) {
+                p.files.forEach((f: any) => {
+                  list.push({
+                    id: f.id || `lp-${Math.random()}`,
+                    name: f.name || 'เอกสารแผนการสอน',
+                    type: f.type === 'PDF' || String(f.name).toLowerCase().endsWith('.pdf') ? 'PDF' : 'DOCUMENT',
+                    size: f.size || '',
+                    url: f.url,
+                    lessonPlanTitle: p.displayTitle || p.titleTh || p.titleJa || 'แผนการสอน',
+                    courseCode: p.courseCode,
+                  });
+                });
+              }
+            }
+          });
+        }
+      }
+    } catch {}
+
+    // 2. จากระบบหลักสูตร (coursesCurriculumService)
+    try {
+      const allCurricula = coursesCurriculumService.getCourses();
+      const targetCourse = allCurricula.find((c) => c.code === formCourseCode);
+      if (targetCourse && Array.isArray(targetCourse.units)) {
+        targetCourse.units.forEach((u) => {
+          if (Array.isArray(u.mediaItems)) {
+            u.mediaItems.forEach((m) => {
+              list.push({
+                id: m.id,
+                name: m.title || 'เอกสารประกอบการเรียน',
+                type: m.fileType === 'PDF' || String(m.title).toLowerCase().endsWith('.pdf') ? 'PDF' : 'DOCUMENT',
+                size: m.fileSize || '',
+                url: m.fileUrl || m.externalUrl,
+                lessonPlanTitle: u.title,
+                courseCode: targetCourse.code,
+              });
+            });
+          }
+        });
+      }
+    } catch {}
+
+    return list;
+  }, [formCourseCode]);
+
+  const handleTeacherFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    const isImage = file.type.startsWith('image/');
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const newAtt: AssignmentAttachment = {
+        id: `upload-${Date.now()}`,
+        name: file.name,
+        type: isPdf ? 'PDF' : isImage ? 'IMAGE' : 'DOCUMENT',
+        fileDataUrl: result,
+        size: `${Math.round(file.size / 1024)} KB`,
+        source: 'UPLOAD',
+      };
+      setFormAttachments((prev) => [...prev, newAtt]);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleAddLessonPlanAttachment = (lpFile: typeof availableLessonPlanFiles[0]) => {
+    if (formAttachments.some((a) => a.name === lpFile.name)) return;
+    const newAtt: AssignmentAttachment = {
+      id: `lp-${Date.now()}-${lpFile.id}`,
+      name: lpFile.name,
+      type: lpFile.type,
+      url: lpFile.url,
+      size: lpFile.size,
+      source: 'LESSON_PLAN',
+      lessonPlanTitle: lpFile.lessonPlanTitle,
+    };
+    setFormAttachments((prev) => [...prev, newAtt]);
+  };
+
   const handleOpenCreateModal = (prefill?: {
     courseCode?: string;
     unitTitle?: string;
+    unitId?: string;
     unitMaxScore?: number;
     scorePart?: FourScorePart;
     scoringMethod?: 'SUBMISSION_COUNT_RATIO' | 'RAW_SCORE_AVERAGE';
     totalTasksInUnit?: number;
     isDynamicTasks?: boolean;
     targetClassrooms?: string[];
+    isAddingToExistingUnit?: boolean;
   }) => {
     setEditingAssignment(null);
+    setIsAddingToExistingUnit(prefill?.isAddingToExistingUnit ?? false);
+    setFormUnitId(prefill?.unitId || '');
+    setFormDescription('');
+    setFormAttachments([]);
     const initialCourse =
       prefill?.courseCode ||
       (selectedSubjectCode !== 'ALL'
@@ -222,6 +342,10 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
   const handleOpenEditModal = (assign: TermAssignmentConfig) => {
     setEditingAssignment(assign);
+    setIsAddingToExistingUnit(false);
+    setFormUnitId(assign.unitId || '');
+    setFormDescription(assign.description || '');
+    setFormAttachments(assign.attachments || []);
     setFormCourseCode(assign.courseCode || subjectsList[0]?.courseCode || 'ท23102');
     setFormTitle(assign.title);
     setFormScorePart(assign.scorePart || 'PRE_MIDTERM');
@@ -277,6 +401,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     if (editingAssignment) {
       sgsRosterAndSubmissionService.updateTermAssignment(editingAssignment.id, {
         title: formTitle.trim(),
+        description: formDescription.trim() || undefined,
+        attachments: formAttachments,
         unitKey: partToUnitMap[formScorePart],
         scorePart: formScorePart,
         maxScore: Math.max(1, Number(formMaxScore) || 10),
@@ -287,7 +413,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         targetClassrooms: targetRooms,
         unitId:
           formAssignmentMode === 'UNIT_BUNDLE' && formUnitTitle.trim()
-            ? `unit-${formUnitTitle.trim().toLowerCase().replace(/\s+/g, '-')}`
+            ? formUnitId || `unit-${formUnitTitle.trim().toLowerCase().replace(/\s+/g, '-')}`
             : undefined,
         unitTitle: formAssignmentMode === 'UNIT_BUNDLE' ? formUnitTitle.trim() : undefined,
         unitMaxScore:
@@ -302,10 +428,13 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       refreshTermAssignments();
       setIsCreateModalOpen(false);
       setEditingAssignment(null);
+      setIsAddingToExistingUnit(false);
       showToast(`✓ บันทึกการแก้ไขชิ้นงาน "${formTitle.trim()}" เรียบร้อยแล้ว`);
     } else {
       sgsRosterAndSubmissionService.addTermAssignment({
         title: formTitle.trim(),
+        description: formDescription.trim() || undefined,
+        attachments: formAttachments,
         unitKey: partToUnitMap[formScorePart],
         scorePart: formScorePart,
         maxScore: Math.max(1, Number(formMaxScore) || 10),
@@ -316,7 +445,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         targetClassrooms: targetRooms,
         unitId:
           formAssignmentMode === 'UNIT_BUNDLE' && formUnitTitle.trim()
-            ? `unit-${formUnitTitle.trim().toLowerCase().replace(/\s+/g, '-')}`
+            ? formUnitId || `unit-${formUnitTitle.trim().toLowerCase().replace(/\s+/g, '-')}`
             : undefined,
         unitTitle: formAssignmentMode === 'UNIT_BUNDLE' ? formUnitTitle.trim() : undefined,
         unitMaxScore:
@@ -330,11 +459,12 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
       refreshTermAssignments();
       setIsCreateModalOpen(false);
+      setIsAddingToExistingUnit(false);
       setActiveSectionTab('ASSIGNED_LIST');
       showToast(
-        `✓ สั่งงาน "${formTitle.trim()}" (${SCORE_PART_LABELS[formScorePart].label}) ให้ ${
-          targetRooms.length > 1 ? `ทุกห้อง (${targetRooms.length} ห้อง)` : targetRooms[0] || 'ห้องเรียน'
-        } เรียบร้อยแล้ว`
+        isAddingToExistingUnit
+          ? `✓ เพิ่มงาน "${formTitle.trim()}" ในหน่วย "${formUnitTitle}" เรียบร้อยแล้ว`
+          : `✓ สั่งงาน "${formTitle.trim()}" (${SCORE_PART_LABELS[formScorePart].label}) เรียบร้อยแล้ว`
       );
     }
   };
@@ -1058,12 +1188,14 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                           handleOpenCreateModal({
                             courseCode: unit.courseCode,
                             unitTitle: unit.unitTitle,
+                            unitId: unit.unitKey,
                             unitMaxScore: unit.unitMaxScore,
                             scorePart: unit.scorePart,
                             scoringMethod: unit.scoringMethod,
                             totalTasksInUnit: unit.totalTasksInUnit,
                             isDynamicTasks: unit.totalTasksInUnit === 0,
                             targetClassrooms: unit.targetClassrooms,
+                            isAddingToExistingUnit: true,
                           })
                         }
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#EFF6FF] hover:bg-[#DBEAFE] text-[#3B82F6] text-xs font-bold border border-[#BFDBFE] cursor-pointer transition-colors"
@@ -2114,12 +2246,29 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
             {/* Modal Header (ตรึงแน่นอยู่ด้านบน ไม่ถูกเลื่อนหาย) */}
             <div className="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white rounded-t-[22px]">
               <div>
-                <h3 className="text-base sm:text-lg font-bold text-[#163A66]">
-                  {editingAssignment ? 'แก้ไขชิ้นงาน / ภาระงาน' : 'สั่งงาน / มอบหมายภาระงานใหม่'}
+                <h3 className="text-base sm:text-lg font-bold text-[#163A66] flex items-center gap-2">
+                  {editingAssignment ? (
+                    <>
+                      <Edit3 className="w-5 h-5 text-[#3B82F6]" />
+                      <span>แก้ไขชิ้นงาน / ภาระงาน</span>
+                    </>
+                  ) : isAddingToExistingUnit ? (
+                    <>
+                      <Layers className="w-5 h-5 text-[#3B82F6]" />
+                      <span>สั่งงานเพิ่มในหน่วยการเรียนรู้</span>
+                    </>
+                  ) : (
+                    <>
+                      <ClipboardList className="w-5 h-5 text-[#3B82F6]" />
+                      <span>สั่งงาน / มอบหมายภาระงานใหม่</span>
+                    </>
+                  )}
                 </h3>
-                <p className="text-xs text-[#6B7C93]">
+                <p className="text-xs text-[#6B7C93] mt-0.5">
                   {editingAssignment
                     ? `แก้ไขรายละเอียดของ "${editingAssignment.title}"`
+                    : isAddingToExistingUnit
+                    ? `เพิ่มชิ้นงานย่อยลงในหน่วย "${formUnitTitle}" (ระบบจะรวมคะแนนตามเกณฑ์ของหน่วยอัตโนมัติ)`
                     : 'เชื่อมคะแนนเข้ากับสมุดคะแนน ปพ.5 อัตโนมัติ'}
                 </p>
               </div>
@@ -2134,358 +2283,702 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
             {/* Scrollable Form Body (เลื่อนดูข้อมูลได้สะดวก ไม่ตกขอบจอ) */}
             <div className="px-5 sm:px-6 py-4 overflow-y-auto flex-1 space-y-4">
-              {/* 1. เลือกรายวิชา */}
-              <div>
-                <label className="block text-xs font-semibold text-[#163A66] mb-1">
-                  1. รายวิชาที่ต้องการสั่งงาน *
-                </label>
-                <select
-                  value={formCourseCode}
-                  onChange={(e) => {
-                    setFormCourseCode(e.target.value);
-                    setFormSelectedRooms([]);
-                  }}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-[#163A66]"
-                >
-                  {subjectsList.map((subj) => (
-                    <option key={subj.courseCode} value={subj.courseCode}>
-                      {subj.courseCode} — {subj.courseName}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* ====================================================================
+                  CASE 1: สั่งงานเพิ่มในหน่วยย่อยที่มีอยู่แล้ว (ล็อคข้อมูลหน่วย ไม่ให้แก้รายละเอียดหน่วย)
+                 ==================================================================== */}
+              {isAddingToExistingUnit ? (
+                <>
+                  {/* กล่องสรุปข้อมูลหน่วยการเรียนรู้ (อ่านได้อย่างเดียว ไม่ต้องแก้) */}
+                  <div className="p-3.5 rounded-2xl bg-[#EFF6FF] border border-[#BFDBFE] space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-[#163A66]">
+                        <Layers className="w-4 h-4 text-[#3B82F6]" />
+                        <span>หน่วยการเรียนรู้: {formUnitTitle}</span>
+                      </div>
+                      <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-[#3B82F6] text-white font-bold">
+                        ผูกเข้าหน่วยนี้
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] text-[#6B7C93] pt-1.5 border-t border-blue-200/60">
+                      <div>
+                        <span className="block text-slate-400">วิชา:</span>
+                        <span className="font-semibold text-[#163A66]">{formCourseCode}</span>
+                      </div>
+                      <div>
+                        <span className="block text-slate-400">ส่วนคะแนน ปพ.5:</span>
+                        <span className="font-semibold text-[#163A66]">
+                          {SCORE_PART_LABELS[formScorePart]?.label || formScorePart}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-slate-400">คะแนนเต็มหน่วย:</span>
+                        <span className="font-semibold text-[#163A66]">{formUnitMaxScore} คะแนน</span>
+                      </div>
+                      <div className="col-span-2 sm:col-span-3">
+                        <span className="block text-slate-400">เกณฑ์คิดคะแนน:</span>
+                        <span className="font-semibold text-[#163A66]">
+                          {formScoringMethod === 'SUBMISSION_COUNT_RATIO'
+                            ? formIsDynamicTasks
+                              ? 'สัดส่วนการส่งงาน (Dynamic Tasks - คำนวณตามจำนวนงานจริงที่สั่ง)'
+                              : `สัดส่วนการส่งงาน (เต็ม ${formTotalTasksInUnit} งาน)`
+                            : 'หารเฉลี่ยคะแนนดิบของทุกงานในหน่วย'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
 
-            {/* 2. ชื่องาน */}
-            <div>
-              <label className="block text-xs font-semibold text-[#163A66] mb-1">
-                2. ชื่อชิ้นงาน / การบ้าน / การสอบย่อย *
-              </label>
-              <input
-                type="text"
-                required
-                value={formTitle}
-                onChange={(e) => setFormTitle(e.target.value)}
-                placeholder="เช่น ใบงานที่ 1, สอบเก็บคะแนนก่อนกลางภาค"
-                className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
-              />
-            </div>
-
-            {/* โหมดการคิดคะแนน: งานเดี่ยว vs งานสะสมรายหน่วย/จุดประสงค์ */}
-            <div className="space-y-2">
-              <label className="block text-xs font-semibold text-[#163A66]">
-                3. รูปแบบการคิดคะแนน *
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setFormAssignmentMode('DIRECT')}
-                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                    formAssignmentMode === 'DIRECT'
-                      ? 'border-[#3B82F6] bg-[#EFF6FF] text-[#163A66]'
-                      : 'border-slate-200 bg-white text-[#6B7C93]'
-                  }`}
-                >
-                  <p className="text-xs font-bold">ชิ้นงานเดี่ยวปกติ</p>
-                  <p className="text-[10px] opacity-80 mt-0.5">คิดคะแนนตรงตามชิ้นงานนี้</p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setFormAssignmentMode('UNIT_BUNDLE')}
-                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                    formAssignmentMode === 'UNIT_BUNDLE'
-                      ? 'border-[#3B82F6] bg-[#EFF6FF] text-[#163A66]'
-                      : 'border-slate-200 bg-white text-[#6B7C93]'
-                  }`}
-                >
-                  <p className="text-xs font-bold flex items-center gap-1">
-                    <Layers className="w-3.5 h-3.5 text-[#3B82F6]" />
-                    <span>งานรายหน่วย / จุดประสงค์</span>
-                  </p>
-                  <p className="text-[10px] opacity-80 mt-0.5">รวมหลายงานเป็น 1 หน่วย (หารเฉลี่ย/สัดส่วน)</p>
-                </button>
-              </div>
-
-              {formAssignmentMode === 'UNIT_BUNDLE' && (
-                <div className="p-3.5 rounded-2xl bg-[#F7FAFF] border border-[#BFDBFE] space-y-3 animate-fade-in text-xs">
+                  {/* 1. ชื่องานที่สั่งเพิ่ม */}
                   <div>
                     <label className="block text-xs font-semibold text-[#163A66] mb-1">
-                      ชื่อหน่วยการเรียนรู้ / จุดประสงค์ *
+                      1. ชื่องาน / ภาระงานที่สั่งเพิ่ม *
                     </label>
                     <input
                       type="text"
-                      required={formAssignmentMode === 'UNIT_BUNDLE'}
-                      value={formUnitTitle}
-                      onChange={(e) => setFormUnitTitle(e.target.value)}
-                      placeholder="เช่น หน่วยที่ 1: ทัศนธาตุและงานปั้น หรือ จุดประสงค์ที่ 1"
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-[#163A66]"
-                      list="existingUnitsDatalist"
+                      required
+                      value={formTitle}
+                      onChange={(e) => setFormTitle(e.target.value)}
+                      placeholder="เช่น ใบงานที่ 2 การวิเคราะห์บทละคร, แบบฝึกหัดทัศนธาตุ"
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
                     />
-                    {existingCourseUnits.length > 0 && (
-                      <datalist id="existingUnitsDatalist">
-                        {existingCourseUnits.map((u) => (
-                          <option key={u} value={u} />
-                        ))}
-                      </datalist>
-                    )}
-                    {existingCourseUnits.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                        <span className="text-[10px] text-[#6B7C93]">หน่วยที่มีอยู่แล้ว:</span>
-                        {existingCourseUnits.map((u) => (
-                          <button
-                            key={u}
-                            type="button"
-                            onClick={() => setFormUnitTitle(u)}
-                            className="text-[10px] px-2 py-0.5 rounded-lg bg-white border border-[#BFDBFE] text-[#3B82F6] hover:bg-[#EFF6FF] cursor-pointer"
-                          >
-                            {u}
-                          </button>
-                        ))}
+                  </div>
+
+                  {/* 2. รายละเอียดของงาน / คำชี้แจง / โจทย์ */}
+                  <div>
+                    <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                      2. รายละเอียดของงาน / คำชี้แจง / คำสั่งสำหรับนักเรียน
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={formDescription}
+                      onChange={(e) => setFormDescription(e.target.value)}
+                      placeholder="ระบุคำชี้แจง รายละเอียด คำถาม หรือแนวทางการทำชิ้นงานนี้ให้นักเรียนศึกษา..."
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6] leading-relaxed"
+                    />
+                  </div>
+
+                  {/* 3. สื่อการสอนและเอกสารสำหรับนักเรียน */}
+                  <div className="p-3.5 rounded-2xl bg-[#F7FAFF] border border-[#BFDBFE] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-[#163A66] flex items-center gap-1.5">
+                        <Paperclip className="w-3.5 h-3.5 text-[#3B82F6]" />
+                        <span>3. สื่อการสอนและเอกสารสำหรับนักเรียน</span>
+                      </label>
+                      <span className="text-[10px] text-slate-400">
+                        ให้นักเรียนศึกษาหรือดูตัวอย่าง
+                      </span>
+                    </div>
+
+                    {/* เลือกจากแผนการสอนที่มีอยู่ */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-[#6B7C93] mb-1">
+                        📁 เลือกไฟล์จากแผนการสอนที่บันทึกไว้ในระบบ:
+                      </label>
+                      {availableLessonPlanFiles.length > 0 ? (
+                        <select
+                          defaultValue=""
+                          onChange={(e) => {
+                            const f = availableLessonPlanFiles.find((item) => item.id === e.target.value);
+                            if (f) {
+                              handleAddLessonPlanAttachment(f);
+                              e.target.value = '';
+                            }
+                          }}
+                          className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-medium text-[#163A66]"
+                        >
+                          <option value="" disabled>-- เลือกไฟล์จากแผนการสอน ({availableLessonPlanFiles.length} ไฟล์) --</option>
+                          {availableLessonPlanFiles.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              [{f.type}] {f.name} {f.lessonPlanTitle ? `(${f.lessonPlanTitle})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <p className="text-[11px] text-slate-400 italic bg-white p-2 rounded-xl border border-slate-100">
+                          ยังไม่มีไฟล์แผนการสอนที่ผูกกับวิชานี้ (สามารถอัปโหลดภาพหรือ PDF ด้านล่างได้โดยตรง)
+                        </p>
+                      )}
+                    </div>
+
+                    {/* อัปโหลดตัวอย่างเป็นภาพ หรือ PDF */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-[#6B7C93] mb-1">
+                        🖼️ หรือ อัปโหลดตัวอย่างเป็นภาพ หรือ PDF:
+                      </label>
+                      <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-[#3B82F6] bg-white hover:bg-blue-50/50 text-[#3B82F6] text-xs font-semibold cursor-pointer transition-colors">
+                        <Upload className="w-4 h-4 text-[#3B82F6]" />
+                        <span>คลิกเพื่ออัปโหลดไฟล์ (ภาพ JPG/PNG หรือเอกสาร PDF)</span>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={handleTeacherFileUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+
+                    {/* รายการไฟล์แนบที่เลือกแล้ว */}
+                    {formAttachments.length > 0 && (
+                      <div className="space-y-1.5 pt-1">
+                        <span className="text-[11px] font-bold text-[#163A66] block">
+                          ไฟล์ที่แนบแล้ว ({formAttachments.length} รายการ):
+                        </span>
+                        <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                          {formAttachments.map((att) => (
+                            <div
+                              key={att.id}
+                              className="p-2 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-2 shadow-2xs"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                {att.type === 'PDF' ? (
+                                  <FileText className="w-4 h-4 text-rose-500 shrink-0" />
+                                ) : att.type === 'IMAGE' ? (
+                                  <Eye className="w-4 h-4 text-blue-500 shrink-0" />
+                                ) : (
+                                  <Paperclip className="w-4 h-4 text-slate-500 shrink-0" />
+                                )}
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-slate-800 truncate" title={att.name}>
+                                    {att.name}
+                                  </p>
+                                  <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                                    {att.size && <span>{att.size}</span>}
+                                    {att.source === 'LESSON_PLAN' ? (
+                                      <span className="text-blue-600 font-semibold bg-blue-50 px-1 rounded">จากแผนการสอน</span>
+                                    ) : (
+                                      <span className="text-emerald-600 font-semibold bg-emerald-50 px-1 rounded">อัปโหลดใหม่</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setFormAttachments((prev) => prev.filter((a) => a.id !== att.id))}
+                                className="p-1 rounded-lg text-rose-500 hover:bg-rose-50 cursor-pointer"
+                                title="ลบไฟล์แนบนี้"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {/* 4. คะแนนเต็มของชิ้นงานนี้ & กำหนดส่ง */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-[#163A66] mb-1">
-                        คะแนนเต็มประจำหน่วย
+                        4. คะแนนเต็มของชิ้นงานนี้
                       </label>
                       <input
                         type="number"
                         min={1}
                         max={100}
-                        value={formUnitMaxScore}
-                        onChange={(e) => setFormUnitMaxScore(Number(e.target.value) || 10)}
-                        className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-[#163A66]"
+                        value={formMaxScore}
+                        onChange={(e) => setFormMaxScore(Number(e.target.value) || 10)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-[#163A66]"
                       />
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        {formScoringMethod === 'SUBMISSION_COUNT_RATIO'
+                          ? 'คิดคะแนนตามสัดส่วนการส่งของหน่วย'
+                          : 'นำไปเฉลี่ยกับงานอื่นในหน่วย'}
+                      </p>
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-[#163A66] mb-1">
-                        จำนวนงานทั้งหมดในหน่วย
+                        กำหนดส่ง
                       </label>
-                      {formIsDynamicTasks ? (
-                        <div className="w-full px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50/70 text-xs font-semibold text-[#3B82F6] flex items-center justify-between">
-                          <span>คำนวณตามงานจริงที่สั่ง</span>
-                          <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">Dynamic</span>
-                        </div>
+                      <input
+                        type="date"
+                        value={formDueDate}
+                        onChange={(e) => setFormDueDate(e.target.value)}
+                        className="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-xs text-[#163A66]"
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* ====================================================================
+                    CASE 2: สั่งงานแบบปกติ หรือ สร้างหน่วยใหม่ (แสดงฟอร์มครบถ้วน)
+                   ==================================================================== */
+                <>
+                  {/* 1. เลือกรายวิชา */}
+                  <div>
+                    <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                      1. รายวิชาที่ต้องการสั่งงาน *
+                    </label>
+                    <select
+                      value={formCourseCode}
+                      onChange={(e) => {
+                        setFormCourseCode(e.target.value);
+                        setFormSelectedRooms([]);
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-[#163A66]"
+                    >
+                      {subjectsList.map((subj) => (
+                        <option key={subj.courseCode} value={subj.courseCode}>
+                          {subj.courseCode} — {subj.courseName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 2. ชื่องาน */}
+                  <div>
+                    <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                      2. ชื่อชิ้นงาน / การบ้าน / การสอบย่อย *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formTitle}
+                      onChange={(e) => setFormTitle(e.target.value)}
+                      placeholder="เช่น ใบงานที่ 1, สอบเก็บคะแนนก่อนกลางภาค"
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+                    />
+                  </div>
+
+                  {/* 3. รายละเอียดของงาน / คำชี้แจง / โจทย์ */}
+                  <div>
+                    <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                      3. รายละเอียดของงาน / คำชี้แจง / คำสั่งสำหรับนักเรียน
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={formDescription}
+                      onChange={(e) => setFormDescription(e.target.value)}
+                      placeholder="ระบุคำชี้แจง คำถาม สิ่งที่ต้องทำ หรือแนวทางการทำชิ้นงานนี้ให้นักเรียนศึกษา..."
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6] leading-relaxed"
+                    />
+                  </div>
+
+                  {/* 4. สื่อการสอนและเอกสารสำหรับนักเรียน */}
+                  <div className="p-3.5 rounded-2xl bg-[#F7FAFF] border border-[#BFDBFE] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-[#163A66] flex items-center gap-1.5">
+                        <Paperclip className="w-3.5 h-3.5 text-[#3B82F6]" />
+                        <span>4. สื่อการสอนและเอกสารสำหรับนักเรียน</span>
+                      </label>
+                      <span className="text-[10px] text-slate-400">
+                        ให้นักเรียนศึกษาหรือดูตัวอย่าง
+                      </span>
+                    </div>
+
+                    {/* เลือกจากแผนการสอนที่มีอยู่ */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-[#6B7C93] mb-1">
+                        📁 เลือกไฟล์จากแผนการสอนที่บันทึกไว้ในระบบ:
+                      </label>
+                      {availableLessonPlanFiles.length > 0 ? (
+                        <select
+                          defaultValue=""
+                          onChange={(e) => {
+                            const f = availableLessonPlanFiles.find((item) => item.id === e.target.value);
+                            if (f) {
+                              handleAddLessonPlanAttachment(f);
+                              e.target.value = '';
+                            }
+                          }}
+                          className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-medium text-[#163A66]"
+                        >
+                          <option value="" disabled>-- เลือกไฟล์จากแผนการสอน ({availableLessonPlanFiles.length} ไฟล์) --</option>
+                          {availableLessonPlanFiles.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              [{f.type}] {f.name} {f.lessonPlanTitle ? `(${f.lessonPlanTitle})` : ''}
+                            </option>
+                          ))}
+                        </select>
                       ) : (
+                        <p className="text-[11px] text-slate-400 italic bg-white p-2 rounded-xl border border-slate-100">
+                          ยังไม่มีไฟล์แผนการสอนที่ผูกกับวิชานี้ (สามารถอัปโหลดภาพหรือ PDF ด้านล่างได้โดยตรง)
+                        </p>
+                      )}
+                    </div>
+
+                    {/* อัปโหลดตัวอย่างเป็นภาพ หรือ PDF */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-[#6B7C93] mb-1">
+                        🖼️ หรือ อัปโหลดตัวอย่างเป็นภาพ หรือ PDF:
+                      </label>
+                      <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-[#3B82F6] bg-white hover:bg-blue-50/50 text-[#3B82F6] text-xs font-semibold cursor-pointer transition-colors">
+                        <Upload className="w-4 h-4 text-[#3B82F6]" />
+                        <span>คลิกเพื่ออัปโหลดไฟล์ (ภาพ JPG/PNG หรือเอกสาร PDF)</span>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={handleTeacherFileUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+
+                    {/* รายการไฟล์แนบที่เลือกแล้ว */}
+                    {formAttachments.length > 0 && (
+                      <div className="space-y-1.5 pt-1">
+                        <span className="text-[11px] font-bold text-[#163A66] block">
+                          ไฟล์ที่แนบแล้ว ({formAttachments.length} รายการ):
+                        </span>
+                        <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                          {formAttachments.map((att) => (
+                            <div
+                              key={att.id}
+                              className="p-2 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-2 shadow-2xs"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                {att.type === 'PDF' ? (
+                                  <FileText className="w-4 h-4 text-rose-500 shrink-0" />
+                                ) : att.type === 'IMAGE' ? (
+                                  <Eye className="w-4 h-4 text-blue-500 shrink-0" />
+                                ) : (
+                                  <Paperclip className="w-4 h-4 text-slate-500 shrink-0" />
+                                )}
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-slate-800 truncate" title={att.name}>
+                                    {att.name}
+                                  </p>
+                                  <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                                    {att.size && <span>{att.size}</span>}
+                                    {att.source === 'LESSON_PLAN' ? (
+                                      <span className="text-blue-600 font-semibold bg-blue-50 px-1 rounded">จากแผนการสอน</span>
+                                    ) : (
+                                      <span className="text-emerald-600 font-semibold bg-emerald-50 px-1 rounded">อัปโหลดใหม่</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setFormAttachments((prev) => prev.filter((a) => a.id !== att.id))}
+                                className="p-1 rounded-lg text-rose-500 hover:bg-rose-50 cursor-pointer"
+                                title="ลบไฟล์แนบนี้"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 5. โหมดการคิดคะแนน: งานเดี่ยว vs งานสะสมรายหน่วย/จุดประสงค์ */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold text-[#163A66]">
+                      5. รูปแบบการคิดคะแนน *
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormAssignmentMode('DIRECT')}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                          formAssignmentMode === 'DIRECT'
+                            ? 'border-[#3B82F6] bg-[#EFF6FF] text-[#163A66]'
+                            : 'border-slate-200 bg-white text-[#6B7C93]'
+                        }`}
+                      >
+                        <p className="text-xs font-bold">ชิ้นงานเดี่ยวปกติ</p>
+                        <p className="text-[10px] opacity-80 mt-0.5">คิดคะแนนตรงตามชิ้นงานนี้</p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setFormAssignmentMode('UNIT_BUNDLE')}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                          formAssignmentMode === 'UNIT_BUNDLE'
+                            ? 'border-[#3B82F6] bg-[#EFF6FF] text-[#163A66]'
+                            : 'border-slate-200 bg-white text-[#6B7C93]'
+                        }`}
+                      >
+                        <p className="text-xs font-bold flex items-center gap-1">
+                          <Layers className="w-3.5 h-3.5 text-[#3B82F6]" />
+                          <span>งานรายหน่วย / จุดประสงค์</span>
+                        </p>
+                        <p className="text-[10px] opacity-80 mt-0.5">รวมหลายงานเป็น 1 หน่วย (หารเฉลี่ย/สัดส่วน)</p>
+                      </button>
+                    </div>
+
+                    {formAssignmentMode === 'UNIT_BUNDLE' && (
+                      <div className="p-3.5 rounded-2xl bg-[#F7FAFF] border border-[#BFDBFE] space-y-3 animate-fade-in text-xs">
+                        <div>
+                          <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                            ชื่อหน่วยการเรียนรู้ / จุดประสงค์ *
+                          </label>
+                          <input
+                            type="text"
+                            required={formAssignmentMode === 'UNIT_BUNDLE'}
+                            value={formUnitTitle}
+                            onChange={(e) => setFormUnitTitle(e.target.value)}
+                            placeholder="เช่น หน่วยที่ 1: ทัศนธาตุและงานปั้น หรือ จุดประสงค์ที่ 1"
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-[#163A66]"
+                            list="existingUnitsDatalist"
+                          />
+                          {existingCourseUnits.length > 0 && (
+                            <datalist id="existingUnitsDatalist">
+                              {existingCourseUnits.map((u) => (
+                                <option key={u} value={u} />
+                              ))}
+                            </datalist>
+                          )}
+                          {existingCourseUnits.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                              <span className="text-[10px] text-[#6B7C93]">หน่วยที่มีอยู่แล้ว:</span>
+                              {existingCourseUnits.map((u) => (
+                                <button
+                                  key={u}
+                                  type="button"
+                                  onClick={() => setFormUnitTitle(u)}
+                                  className="text-[10px] px-2 py-0.5 rounded-lg bg-white border border-[#BFDBFE] text-[#3B82F6] hover:bg-[#EFF6FF] cursor-pointer"
+                                >
+                                  {u}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                              คะแนนเต็มประจำหน่วย
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={100}
+                              value={formUnitMaxScore}
+                              onChange={(e) => setFormUnitMaxScore(Number(e.target.value) || 10)}
+                              className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-[#163A66]"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                              จำนวนงานทั้งหมดในหน่วย
+                            </label>
+                            {formIsDynamicTasks ? (
+                              <div className="w-full px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50/70 text-xs font-semibold text-[#3B82F6] flex items-center justify-between">
+                                <span>คำนวณตามงานจริงที่สั่ง</span>
+                                <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">Dynamic</span>
+                              </div>
+                            ) : (
+                              <input
+                                type="number"
+                                min={1}
+                                max={50}
+                                value={formTotalTasksInUnit}
+                                onChange={(e) => setFormTotalTasksInUnit(Number(e.target.value) || 5)}
+                                className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-[#163A66]"
+                              />
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200">
+                          <div>
+                            <span className="text-xs font-bold text-[#163A66] block">
+                              ไม่กำหนดจำนวนงานล่วงหน้า (Dynamic Tasks)
+                            </span>
+                            <span className="text-[11px] text-[#6B7C93]">
+                              ระบบจะนับและหารเฉลี่ยอัตโนมัติตามจำนวนชิ้นงานจริงที่สั่งในหน่วยนี้
+                            </span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={formIsDynamicTasks}
+                            onChange={(e) => setFormIsDynamicTasks(e.target.checked)}
+                            className="w-4 h-4 text-[#3B82F6] rounded cursor-pointer shrink-0"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                            วิธีคิดคะแนนประจำหน่วย:
+                          </label>
+                          <div className="space-y-1.5">
+                            <label className="flex items-start gap-2 p-2 rounded-xl bg-white border border-slate-200 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="scoringMethod"
+                                value="SUBMISSION_COUNT_RATIO"
+                                checked={formScoringMethod === 'SUBMISSION_COUNT_RATIO'}
+                                onChange={() => setFormScoringMethod('SUBMISSION_COUNT_RATIO')}
+                                className="mt-0.5 text-[#3B82F6]"
+                              />
+                              <div>
+                                <span className="font-bold text-[#163A66] block">
+                                  เก็บสัดส่วนการส่งงาน (คะแนนความรับผิดชอบ)
+                                </span>
+                                <span className="text-[11px] text-[#6B7C93]">
+                                  {formIsDynamicTasks
+                                    ? `นับงานที่ส่งจริงเทียบกับงานทั้งหมดที่สั่งในหน่วยนี้ แล้วเทียบเป็นเต็ม ${formUnitMaxScore} คะแนน`
+                                    : `สั่ง ${formTotalTasksInUnit} งาน เต็ม ${formUnitMaxScore} คะแนน ➔ ส่ง 1 งานได้ ${(formUnitMaxScore / formTotalTasksInUnit).toFixed(1)} คะแนน`}
+                                </span>
+                              </div>
+                            </label>
+
+                            <label className="flex items-start gap-2 p-2 rounded-xl bg-white border border-slate-200 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="scoringMethod"
+                                value="RAW_SCORE_AVERAGE"
+                                checked={formScoringMethod === 'RAW_SCORE_AVERAGE'}
+                                onChange={() => setFormScoringMethod('RAW_SCORE_AVERAGE')}
+                                className="mt-0.5 text-[#3B82F6]"
+                              />
+                              <div>
+                                <span className="font-bold text-[#163A66] block">
+                                  หารเฉลี่ยคะแนนดิบของงานทั้งหมดในหน่วย
+                                </span>
+                                <span className="text-[11px] text-[#6B7C93]">
+                                  นำคะแนนที่ได้จากทุกงานในหน่วยมารวมแล้วเทียบเป็นสัดส่วนเต็ม {formUnitMaxScore} คะแนน
+                                </span>
+                              </div>
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200">
+                          <span className="text-xs font-semibold text-[#163A66]">
+                            ปัดเศษทศนิยม &gt;= 0.5 ขึ้นอัตโนมัติ
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={formAutoRoundUp}
+                            onChange={(e) => setFormAutoRoundUp(e.target.checked)}
+                            className="w-4 h-4 text-[#3B82F6] rounded cursor-pointer"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 6. ส่วนคะแนน 4 ส่วน + คะแนนเต็ม + กำหนดส่ง */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                        6. เก็บเข้าส่วนคะแนนใดของ ปพ.5 *
+                      </label>
+                      <select
+                        value={formScorePart}
+                        onChange={(e) => setFormScorePart(e.target.value as FourScorePart)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-[#163A66]"
+                      >
+                        <option value="PRE_MIDTERM">
+                          ก่อนกลางภาค (เต็ม {currentFormCourseWeights.preMidterm})
+                        </option>
+                        <option value="MIDTERM">
+                          กลางภาค (เต็ม {currentFormCourseWeights.midterm})
+                        </option>
+                        <option value="POST_MIDTERM">
+                          หลังกลางภาค (เต็ม {currentFormCourseWeights.postMidterm})
+                        </option>
+                        <option value="FINAL">
+                          ปลายภาค (เต็ม {currentFormCourseWeights.final})
+                        </option>
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                          คะแนนเต็ม
+                        </label>
                         <input
                           type="number"
                           min={1}
-                          max={50}
-                          value={formTotalTasksInUnit}
-                          onChange={(e) => setFormTotalTasksInUnit(Number(e.target.value) || 5)}
-                          className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-[#163A66]"
+                          max={100}
+                          value={formMaxScore}
+                          onChange={(e) => setFormMaxScore(Number(e.target.value) || 10)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-[#163A66]"
                         />
-                      )}
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                          กำหนดส่ง
+                        </label>
+                        <input
+                          type="date"
+                          value={formDueDate}
+                          onChange={(e) => setFormDueDate(e.target.value)}
+                          className="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-xs text-[#163A66]"
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200">
-                    <div>
-                      <span className="text-xs font-bold text-[#163A66] block">
-                        ไม่กำหนดจำนวนงานล่วงหน้า (Dynamic Tasks)
-                      </span>
-                      <span className="text-[11px] text-[#6B7C93]">
-                        ระบบจะนับและหารเฉลี่ยอัตโนมัติตามจำนวนชิ้นงานจริงที่สั่งในหน่วยนี้
-                      </span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={formIsDynamicTasks}
-                      onChange={(e) => setFormIsDynamicTasks(e.target.checked)}
-                      className="w-4 h-4 text-[#3B82F6] rounded cursor-pointer shrink-0"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-[#163A66] mb-1">
-                      วิธีคิดคะแนนประจำหน่วย:
+                  {/* 7. เลือกห้องเรียน: ทุกห้องในรายวิชา หรือ เฉพาะห้องที่เลือก */}
+                  <div className="space-y-2 pt-1">
+                    <label className="block text-xs font-semibold text-[#163A66]">
+                      7. ห้องเรียนที่ได้รับมอบหมาย:
                     </label>
-                    <div className="space-y-1.5">
-                      <label className="flex items-start gap-2 p-2 rounded-xl bg-white border border-slate-200 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="scoringMethod"
-                          value="SUBMISSION_COUNT_RATIO"
-                          checked={formScoringMethod === 'SUBMISSION_COUNT_RATIO'}
-                          onChange={() => setFormScoringMethod('SUBMISSION_COUNT_RATIO')}
-                          className="mt-0.5 text-[#3B82F6]"
-                        />
-                        <div>
-                          <span className="font-bold text-[#163A66] block">
-                            เก็บสัดส่วนการส่งงาน (คะแนนความรับผิดชอบ)
-                          </span>
-                          <span className="text-[11px] text-[#6B7C93]">
-                            {formIsDynamicTasks
-                              ? `นับงานที่ส่งจริงเทียบกับงานทั้งหมดที่สั่งในหน่วยนี้ แล้วเทียบเป็นเต็ม ${formUnitMaxScore} คะแนน`
-                              : `สั่ง ${formTotalTasksInUnit} งาน เต็ม ${formUnitMaxScore} คะแนน ➔ ส่ง 1 งานได้ ${(formUnitMaxScore / formTotalTasksInUnit).toFixed(1)} คะแนน`}
-                          </span>
-                        </div>
-                      </label>
-
-                      <label className="flex items-start gap-2 p-2 rounded-xl bg-white border border-slate-200 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="scoringMethod"
-                          value="RAW_SCORE_AVERAGE"
-                          checked={formScoringMethod === 'RAW_SCORE_AVERAGE'}
-                          onChange={() => setFormScoringMethod('RAW_SCORE_AVERAGE')}
-                          className="mt-0.5 text-[#3B82F6]"
-                        />
-                        <div>
-                          <span className="font-bold text-[#163A66] block">
-                            หารเฉลี่ยคะแนนดิบของงานทั้งหมดในหน่วย
-                          </span>
-                          <span className="text-[11px] text-[#6B7C93]">
-                            นำคะแนนที่ได้จากทุกงานในหน่วยมารวมแล้วเทียบเป็นสัดส่วนเต็ม {formUnitMaxScore} คะแนน
-                          </span>
-                        </div>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200">
-                    <span className="text-xs font-semibold text-[#163A66]">
-                      ปัดเศษทศนิยม &gt;= 0.5 ขึ้นอัตโนมัติ
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={formAutoRoundUp}
-                      onChange={(e) => setFormAutoRoundUp(e.target.checked)}
-                      className="w-4 h-4 text-[#3B82F6] rounded cursor-pointer"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* 4. ส่วนคะแนน 4 ส่วน + คะแนนเต็ม + กำหนดส่ง */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-[#163A66] mb-1">
-                  4. เก็บเข้าส่วนคะแนนใดของ ปพ.5 *
-                </label>
-                <select
-                  value={formScorePart}
-                  onChange={(e) => setFormScorePart(e.target.value as FourScorePart)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-[#163A66]"
-                >
-                  <option value="PRE_MIDTERM">
-                    ก่อนกลางภาค (เต็ม {currentFormCourseWeights.preMidterm})
-                  </option>
-                  <option value="MIDTERM">
-                    กลางภาค (เต็ม {currentFormCourseWeights.midterm})
-                  </option>
-                  <option value="POST_MIDTERM">
-                    หลังกลางภาค (เต็ม {currentFormCourseWeights.postMidterm})
-                  </option>
-                  <option value="FINAL">
-                    ปลายภาค (เต็ม {currentFormCourseWeights.final})
-                  </option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-semibold text-[#163A66] mb-1">
-                    คะแนนเต็ม
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={formMaxScore}
-                    onChange={(e) => setFormMaxScore(Number(e.target.value) || 10)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-[#163A66]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[#163A66] mb-1">
-                    กำหนดส่ง
-                  </label>
-                  <input
-                    type="date"
-                    value={formDueDate}
-                    onChange={(e) => setFormDueDate(e.target.value)}
-                    className="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-xs text-[#163A66]"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* 5. เลือกห้องเรียน: ทุกห้องในรายวิชา หรือ เฉพาะห้องที่เลือก */}
-            <div className="space-y-2 pt-1">
-              <label className="block text-xs font-semibold text-[#163A66]">
-                5. ห้องเรียนที่ได้รับมอบหมาย:
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setFormScopeMode('ALL_SUBJECT_ROOMS')}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                    formScopeMode === 'ALL_SUBJECT_ROOMS'
-                      ? 'border-[#3B82F6] bg-[#EFF6FF] text-[#163A66]'
-                      : 'border-slate-200 bg-white text-[#6B7C93]'
-                  }`}
-                >
-                  <p className="text-xs font-bold">
-                    สั่งทุกห้องในรายวิชานี้ ({currentFormSubjectRooms.length} ห้อง)
-                  </p>
-                  <p className="text-[11px] opacity-80 mt-0.5">
-                    สั่งครั้งเดียวใช้กับทุกห้องที่เรียนวิชานี้
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFormScopeMode('SELECTED_ROOMS');
-                    if (formSelectedRooms.length === 0 && currentFormSubjectRooms[0]) {
-                      setFormSelectedRooms([currentFormSubjectRooms[0]]);
-                    }
-                  }}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                    formScopeMode === 'SELECTED_ROOMS'
-                      ? 'border-[#3B82F6] bg-[#EFF6FF] text-[#163A66]'
-                      : 'border-slate-200 bg-white text-[#6B7C93]'
-                  }`}
-                >
-                  <p className="text-xs font-bold">เลือกเฉพาะห้องเรียน</p>
-                  <p className="text-[11px] opacity-80 mt-0.5">
-                    ติ๊กเลือกเฉพาะห้องที่ต้องการสั่งงาน
-                  </p>
-                </button>
-              </div>
-
-              {formScopeMode === 'SELECTED_ROOMS' && (
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
-                  {currentFormSubjectRooms.map((room) => {
-                    const checked = formSelectedRooms.includes(room);
-                    return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <button
-                        key={room}
                         type="button"
-                        onClick={() => {
-                          setFormSelectedRooms((prev) =>
-                            checked ? prev.filter((r) => r !== room) : [...prev, room]
-                          );
-                        }}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer ${
-                          checked
-                            ? 'bg-[#3B82F6] text-white border-[#3B82F6]'
-                            : 'bg-white text-[#6B7C93] border-slate-200'
+                        onClick={() => setFormScopeMode('ALL_SUBJECT_ROOMS')}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                          formScopeMode === 'ALL_SUBJECT_ROOMS'
+                            ? 'border-[#3B82F6] bg-[#EFF6FF] text-[#163A66]'
+                            : 'border-slate-200 bg-white text-[#6B7C93]'
                         }`}
                       >
-                        {checked && <Check className="w-3 h-3" />}
-                        <span>{room}</span>
+                        <p className="text-xs font-bold">
+                          สั่งทุกห้องในรายวิชานี้ ({currentFormSubjectRooms.length} ห้อง)
+                        </p>
+                        <p className="text-[11px] opacity-80 mt-0.5">
+                          สั่งครั้งเดียวใช้กับทุกห้องที่เรียนวิชานี้
+                        </p>
                       </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
 
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormScopeMode('SELECTED_ROOMS');
+                          if (formSelectedRooms.length === 0 && currentFormSubjectRooms[0]) {
+                            setFormSelectedRooms([currentFormSubjectRooms[0]]);
+                          }
+                        }}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                          formScopeMode === 'SELECTED_ROOMS'
+                            ? 'border-[#3B82F6] bg-[#EFF6FF] text-[#163A66]'
+                            : 'border-slate-200 bg-white text-[#6B7C93]'
+                        }`}
+                      >
+                        <p className="text-xs font-bold">เลือกเฉพาะห้องเรียน</p>
+                        <p className="text-[11px] opacity-80 mt-0.5">
+                          ติ๊กเลือกเฉพาะห้องที่ต้องการสั่งงาน
+                        </p>
+                      </button>
+                    </div>
+
+                    {formScopeMode === 'SELECTED_ROOMS' && (
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
+                        {currentFormSubjectRooms.map((room) => {
+                          const checked = formSelectedRooms.includes(room);
+                          return (
+                            <button
+                              key={room}
+                              type="button"
+                              onClick={() => {
+                                setFormSelectedRooms((prev) =>
+                                  checked ? prev.filter((r) => r !== room) : [...prev, room]
+                                );
+                              }}
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer ${
+                                checked
+                                  ? 'bg-[#3B82F6] text-white border-[#3B82F6]'
+                                  : 'bg-white text-[#6B7C93] border-slate-200'
+                              }`}
+                            >
+                              {checked && <Check className="w-3 h-3" />}
+                              <span>{room}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
             {/* End of Scrollable Form Body */}
 
@@ -2502,7 +2995,11 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                 type="submit"
                 className="px-5 py-2 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-semibold shadow-xs cursor-pointer transition-colors"
               >
-                {editingAssignment ? 'บันทึกการแก้ไข' : 'บันทึกและสั่งงาน'}
+                {editingAssignment
+                  ? 'บันทึกการแก้ไข'
+                  : isAddingToExistingUnit
+                  ? 'บันทึกและสั่งงานเพิ่มในหน่วยนี้'
+                  : 'บันทึกและสั่งงาน'}
               </button>
             </div>
           </form>
