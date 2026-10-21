@@ -309,7 +309,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
 
     // If records are empty in storage, load actual enrolled students from studentService
     if (pRecords.length === 0) {
-      const enrolledStudents = studentService.getStudents(selectedClassroom);
+      const enrolledStudents = studentService.getStudents(selectedClassroom).sort((a, b) => Number(a.no || 999) - Number(b.no || 999));
       if (enrolledStudents && enrolledStudents.length > 0) {
         const seeded: PeriodAttendanceRecord[] = enrolledStudents.map((stu) => ({
           id: `per-${selectedDate.replace(/-/g, '')}-${selectedCourse}-${stu.code}`,
@@ -566,15 +566,21 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
 
   // Filtered Records based on Search and Tab
   const filteredRecords = useMemo(() => {
-    return periodRecords.filter((rec) => {
-      const matchSearch =
-        searchQuery.trim() === '' ||
-        rec.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        rec.studentCode.includes(searchQuery.trim());
+    return periodRecords
+      .filter((rec) => {
+        const matchSearch =
+          searchQuery.trim() === '' ||
+          rec.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          rec.studentCode.includes(searchQuery.trim());
 
-      const matchStatus = statusFilter === 'ALL' || rec.status === statusFilter;
-      return matchSearch && matchStatus;
-    });
+        const matchStatus = statusFilter === 'ALL' || rec.status === statusFilter;
+        return matchSearch && matchStatus;
+      })
+      .sort((a, b) => {
+        const seatA = Number((a as any).seatNo ?? studentService.findStudentByCode(a.studentCode)?.student.no ?? 999);
+        const seatB = Number((b as any).seatNo ?? studentService.findStudentByCode(b.studentCode)?.student.no ?? 999);
+        return seatA - seatB;
+      });
   }, [periodRecords, searchQuery, statusFilter]);
 
   const formatDateThai = (dateStr: string) => {
@@ -1034,7 +1040,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                         >
                           {/* เลขที่ */}
                           <td className="py-3 px-3 text-center text-slate-500 font-bold">
-                            {index + 1}
+                            {(stu as any).seatNo ?? studentService.findStudentByCode(stu.studentCode)?.student.no ?? index + 1}
                           </td>
 
                           {/* รหัสประจำตัว */}
@@ -1193,7 +1199,7 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-xs font-extrabold flex items-center justify-center">
-                            {index + 1}
+                            {(stu as any).seatNo ?? studentService.findStudentByCode(stu.studentCode)?.student.no ?? index + 1}
                           </span>
                           <button
                             type="button"

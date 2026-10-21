@@ -279,7 +279,11 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
   const refreshMatrixStudents = useCallback(() => {
     const list = sgsRosterAndSubmissionService.getSgsRoster(matrixClassroom);
-    setMatrixStudents(list.filter((s) => s.transferState !== 'TRANSFERRED_OUT'));
+    setMatrixStudents(
+      list
+        .filter((s) => s.transferState !== 'TRANSFERRED_OUT')
+        .sort((a, b) => Number(a.sgsSeatNo ?? a.no ?? 999) - Number(b.sgsSeatNo ?? b.no ?? 999))
+    );
   }, [matrixClassroom]);
 
   useEffect(() => {

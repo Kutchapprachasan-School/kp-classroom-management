@@ -199,10 +199,17 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
                 inMemoryStudentCache[cand] = parsed;
               }
               relocateMisplacedM1Students(misplaced);
-            } else if (isGrade1Room && parsed.some((s: StudentRecord) => s.code && /^16\d{3}$/.test(s.code) && !isGrade1SgsStudentCode(s.code))) {
-              parsed = parsed.filter(
-                (s: StudentRecord) => !(s.code && /^16\d{3}$/.test(s.code) && !isGrade1SgsStudentCode(s.code))
-              );
+            } else if (isGrade1Room) {
+              const beforeLen = parsed.length;
+              // กรองนักเรียนที่ไม่ใช่ ม.1 ออก (เช่น คำนำหน้า ม.ปลาย 'นาย', 'นางสาว' หรือรหัสนักเรียนรุ่นก่อน)
+              parsed = parsed.filter((s: StudentRecord) => {
+                const name = (s.name || '').trim();
+                const code = (s.code || s.id || '').trim();
+                if (name.startsWith('นาย') || name.startsWith('นางสาว') || name.startsWith('น.ส.')) return false;
+                if (/^(12|13|14|15)\d{3}$/.test(code)) return false;
+                if (/^16\d{3}$/.test(code) && !isGrade1SgsStudentCode(code)) return false;
+                return true;
+              });
               const seen = new Set<string>();
               parsed = parsed.filter((s: StudentRecord) => {
                 const k = s.code || s.id;
@@ -210,11 +217,15 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
                 seen.add(k);
                 return true;
               });
-              for (const cand of candidates) {
-                localStorage.setItem(`${STORAGE_PREFIX}${cand}`, JSON.stringify(parsed));
-                inMemoryStudentCache[cand] = parsed;
+              parsed.sort((a: StudentRecord, b: StudentRecord) => Number(a.no || 999) - Number(b.no || 999));
+              if (parsed.length !== beforeLen) {
+                for (const cand of candidates) {
+                  localStorage.setItem(`${STORAGE_PREFIX}${cand}`, JSON.stringify(parsed));
+                  inMemoryStudentCache[cand] = parsed;
+                }
               }
             }
+            parsed.sort((a: StudentRecord, b: StudentRecord) => Number(a.no || 999) - Number(b.no || 999));
             return parsed;
           }
         } catch {
@@ -249,17 +260,18 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
 
 const saveLocalStudents = (classroomId: string, items: StudentRecord[]) => {
   if (!classroomId) return;
+  const sortedItems = [...items].sort((a, b) => Number(a.no || 999) - Number(b.no || 999));
   const candidates = resolveRoomCandidates(classroomId);
 
   for (const c of candidates) {
-    inMemoryStudentCache[c] = items;
+    inMemoryStudentCache[c] = sortedItems;
   }
   // L2 IndexedDB persistence
-  localCacheDb.putStudents(items as any).catch(() => {});
+  localCacheDb.putStudents(sortedItems as any).catch(() => {});
 
   if (typeof localStorage !== 'undefined') {
     for (const c of candidates) {
-      localStorage.setItem(`${STORAGE_PREFIX}${c}`, JSON.stringify(items));
+      localStorage.setItem(`${STORAGE_PREFIX}${c}`, JSON.stringify(sortedItems));
     }
     try {
       window.dispatchEvent(new CustomEvent('kps-students-updated', { detail: { classroomId } }));
@@ -513,8 +525,11 @@ export const studentService = {
     try {
       const students = await masterDataService.getStudentsByRoom(classroomId, forceRefresh);
       if (students && students.length > 0) {
-        saveLocalStudents(classroomId, students as StudentRecord[]);
-        return students as StudentRecord[];
+        const sorted = (students as StudentRecord[]).sort(
+          (a, b) => Number(a.no || 999) - Number(b.no || 999)
+        );
+        saveLocalStudents(classroomId, sorted);
+        return sorted;
       }
     } catch (err) {
       console.warn('[studentService] masterDataService fallback to local students:', err);
@@ -807,10 +822,15 @@ export const studentService = {
       };
     });
 
-    const combined = [
-      ...current.filter((c) => !newItems.some((n) => n.code === c.code)),
-      ...newItems,
-    ].sort((a, b) => a.no - b.no);
+    // หากเป็นการนำเข้าบัญชีรายชื่อห้องเรียนขนาดเต็ม (เช่น ไฟล์ SGS >= 15 คน)
+    // ให้แทนที่รายชื่อห้องเรียนด้วยชุดข้อมูลใหม่ที่ถูกต้อง แทนที่จะนำเข้าต่อท้ายขยะข้อมูลเก่า
+    const isFullRosterImport = newItems.length >= 15;
+    const combined = isFullRosterImport
+      ? newItems.sort((a, b) => Number(a.no || 999) - Number(b.no || 999))
+      : [
+          ...current.filter((c) => !newItems.some((n) => n.code === c.code)),
+          ...newItems,
+        ].sort((a, b) => Number(a.no || 999) - Number(b.no || 999));
     saveLocalStudents(classroomId, combined);
 
     if (isSupabaseConfigured) {

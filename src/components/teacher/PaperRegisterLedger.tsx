@@ -144,9 +144,11 @@ function buildInitialRows(selectedRoom?: string, periods: PeriodDef[] = []): Stu
       ? students
       : sgsRosterAndSubmissionService.getSgsRoster(selectedRoom);
 
-  const baseList = isNonGrade1
-    ? rawList.filter((st: any) => !isGrade1SgsStudentCode(st.code || st.studentCode || st.id || ''))
-    : rawList;
+  const baseList = (
+    isNonGrade1
+      ? rawList.filter((st: any) => !isGrade1SgsStudentCode(st.code || st.studentCode || st.id || ''))
+      : rawList
+  ).sort((a: any, b: any) => Number(a.no ?? a.sgsSeatNo ?? 999) - Number(b.no ?? b.sgsSeatNo ?? 999));
 
   return baseList.map((st: any, idx: number) => {
     const studentCode = st.code || st.studentCode || st.id;

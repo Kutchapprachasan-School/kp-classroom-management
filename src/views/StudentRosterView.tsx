@@ -78,7 +78,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
 
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortOption, setSortOption] = useState<SortOption>('name-asc');
+  const [sortOption, setSortOption] = useState<SortOption>('no-asc');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [genderFilter, setGenderFilter] = useState<GenderFilter>('ALL');
   const [studyGroupFilter, setStudyGroupFilter] = useState<StudyGroupFilter>('ALL');
@@ -235,10 +235,11 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
       if ((!list || list.length === 0) && fallbackName && fallbackName !== classroomId) {
         list = await studentService.getByClassroom(fallbackName);
       }
-      setStudents(list || []);
-      setOriginalStudentsOrder(list || []);
+      const sorted = (list || []).sort((a, b) => Number(a.no ?? 999) - Number(b.no ?? 999));
+      setStudents(sorted);
+      setOriginalStudentsOrder(sorted);
       setHasUnsavedReorder(false);
-      setNewStudentNo((list?.length || 0) + 1);
+      setNewStudentNo((sorted.length || 0) + 1);
       setCurrentPage(1);
     } finally {
       setIsLoading(false);
@@ -318,19 +319,19 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
       })
       .sort((a, b) => {
         if (sortOption === 'name-asc') return a.name.localeCompare(b.name, 'th');
-        if (sortOption === 'no-asc') return a.no - b.no;
+        if (sortOption === 'no-asc') return Number(a.no || 999) - Number(b.no || 999);
         if (sortOption === 'gender-male-first') {
           if (a.gender === 'MALE' && b.gender !== 'MALE') return -1;
           if (a.gender !== 'MALE' && b.gender === 'MALE') return 1;
-          return a.no - b.no;
+          return Number(a.no || 999) - Number(b.no || 999);
         }
         if (sortOption === 'gender-female-first') {
           if (a.gender === 'FEMALE' && b.gender !== 'FEMALE') return -1;
           if (a.gender !== 'FEMALE' && b.gender === 'FEMALE') return 1;
-          return a.no - b.no;
+          return Number(a.no || 999) - Number(b.no || 999);
         }
         if (sortOption === 'score-desc') return b.score - a.score;
-        return a.no - b.no;
+        return Number(a.no || 999) - Number(b.no || 999);
       });
   }, [students, searchTerm, genderFilter, statusFilter, studyGroupFilter, sortOption, studentAttendanceMap, selectedClass]);
 

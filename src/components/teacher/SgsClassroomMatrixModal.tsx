@@ -67,19 +67,21 @@ export const SgsClassroomMatrixModal: React.FC<SgsClassroomMatrixModalProps> = (
   }, []);
 
   const filteredStudents = useMemo(() => {
-    return roster.filter((stu) => {
-      if (stu.transferState === 'TRANSFERRED_OUT') return false;
-      if (selectedRoom && stu.classroom !== selectedRoom) return false;
-      if (searchTerm.trim()) {
-        const q = searchTerm.toLowerCase();
-        return (
-          stu.studentName.toLowerCase().includes(q) ||
-          stu.studentCode.includes(q) ||
-          String(stu.sgsSeatNo) === q
-        );
-      }
-      return true;
-    });
+    return roster
+      .filter((stu) => {
+        if (stu.transferState === 'TRANSFERRED_OUT') return false;
+        if (selectedRoom && stu.classroom !== selectedRoom) return false;
+        if (searchTerm.trim()) {
+          const q = searchTerm.toLowerCase();
+          return (
+            stu.studentName.toLowerCase().includes(q) ||
+            stu.studentCode.includes(q) ||
+            String(stu.sgsSeatNo) === q
+          );
+        }
+        return true;
+      })
+      .sort((a, b) => Number(a.sgsSeatNo ?? a.no ?? 999) - Number(b.sgsSeatNo ?? b.no ?? 999));
   }, [roster, selectedRoom, searchTerm]);
 
   // Total max score across all term assignments

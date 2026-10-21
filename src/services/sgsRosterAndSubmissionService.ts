@@ -354,7 +354,7 @@ export const sgsRosterAndSubmissionService = {
             submissions: saved?.submissions || {},
           };
           return enrichRecord(baseRec, idx);
-        });
+        }).sort((a, b) => Number(a.sgsSeatNo ?? a.no ?? 999) - Number(b.sgsSeatNo ?? b.no ?? 999));
       }
 
       if (savedList.length > 0) {
@@ -372,9 +372,13 @@ export const sgsRosterAndSubmissionService = {
           if (isNonGrade1) {
             filtered = filtered.filter((s) => !isGrade1SgsStudentCode(s.studentCode));
           }
-          return filtered.map((s, idx) => enrichRecord(s, idx));
+          return filtered
+            .map((s, idx) => enrichRecord(s, idx))
+            .sort((a, b) => Number(a.sgsSeatNo ?? a.no ?? 999) - Number(b.sgsSeatNo ?? b.no ?? 999));
         }
-        return savedList.map((s, idx) => enrichRecord(s, idx));
+        return savedList
+          .map((s, idx) => enrichRecord(s, idx))
+          .sort((a, b) => Number(a.sgsSeatNo ?? a.no ?? 999) - Number(b.sgsSeatNo ?? b.no ?? 999));
       }
 
       return [];

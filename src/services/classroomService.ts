@@ -61,9 +61,9 @@ export const getLocalClassrooms = (): ClassroomRosterItem[] => {
       try {
         const byId = studentService.getStudents(c.id).length;
         const byName = studentService.getStudents(c.name).length;
-        const realCount = Math.max(byId, byName);
-        if (realCount > 0 || typeof localStorage !== 'undefined') {
-          studentCount = realCount;
+        // หากมีจำนวนนักเรียนจากฐานข้อมูลหลัก (> 0) ห้ามใช้ตัวเลขจาก local cache ที่อาจบวมทับโดยเด็ดขาด
+        if (studentCount === 0) {
+          studentCount = byId > 0 && byName > 0 ? Math.min(byId, byName) : Math.max(byId, byName);
         }
       } catch {
         // ignore
@@ -234,7 +234,7 @@ export const classroomService = {
                 try {
                   const byId = studentService.getStudents(item.id).length;
                   const byName = studentService.getStudents(item.name).length;
-                  const realCount = Math.max(byId, byName);
+                  const realCount = byId > 0 && byName > 0 ? Math.min(byId, byName) : Math.max(byId, byName);
                   if (realCount > 0) {
                     studentCount = realCount;
                   }

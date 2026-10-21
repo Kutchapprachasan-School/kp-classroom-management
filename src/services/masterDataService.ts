@@ -252,6 +252,7 @@ export const masterDataService = {
           now - syncMeta.lastCheckedMs < MASTER_DATA_TTL_MS;
 
         if (isCacheFresh) {
+          cachedStudents.sort((a, b) => Number(a.no ?? a.number ?? 999) - Number(b.no ?? b.number ?? 999));
           for (const c of candidates) {
             memoryStudentsByRoom.set(c, cachedStudents);
           }
@@ -259,6 +260,7 @@ export const masterDataService = {
         }
 
         if (!isSupabaseConfigured) {
+          cachedStudents.sort((a, b) => Number(a.no ?? a.number ?? 999) - Number(b.no ?? b.number ?? 999));
           for (const c of candidates) {
             memoryStudentsByRoom.set(c, cachedStudents);
           }
@@ -315,6 +317,7 @@ export const masterDataService = {
           finalStudents = cachedStudents;
         }
 
+        finalStudents.sort((a, b) => Number(a.no ?? a.number ?? 999) - Number(b.no ?? b.number ?? 999));
         for (const c of candidates) {
           memoryStudentsByRoom.set(c, finalStudents);
         }
@@ -329,6 +332,7 @@ export const masterDataService = {
             break;
           }
         }
+        fallback.sort((a, b) => Number(a.no ?? a.number ?? 999) - Number(b.no ?? b.number ?? 999));
         for (const c of candidates) {
           memoryStudentsByRoom.set(c, fallback);
         }

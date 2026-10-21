@@ -83,18 +83,20 @@ export const Submission3ColorMatrixModal: React.FC<Submission3ColorMatrixModalPr
   );
 
   const activeStudents = useMemo(() => {
-    return roster.filter((s) => {
-      if (s.transferState === 'TRANSFERRED_OUT') return false;
-      if (matrixSearch.trim()) {
-        const q = matrixSearch.toLowerCase();
-        return (
-          s.studentName.toLowerCase().includes(q) ||
-          s.studentCode.includes(q) ||
-          String(s.sgsSeatNo) === q
-        );
-      }
-      return true;
-    });
+    return roster
+      .filter((s) => {
+        if (s.transferState === 'TRANSFERRED_OUT') return false;
+        if (matrixSearch.trim()) {
+          const q = matrixSearch.toLowerCase();
+          return (
+            s.studentName.toLowerCase().includes(q) ||
+            s.studentCode.includes(q) ||
+            String(s.sgsSeatNo) === q
+          );
+        }
+        return true;
+      })
+      .sort((a, b) => Number(a.sgsSeatNo ?? a.no ?? 999) - Number(b.sgsSeatNo ?? b.no ?? 999));
   }, [roster, matrixSearch]);
 
   const matrixStats = useMemo(() => {

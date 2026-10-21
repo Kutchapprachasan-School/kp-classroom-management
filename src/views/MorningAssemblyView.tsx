@@ -172,7 +172,7 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
     }
 
     // โหลดรายชื่อจริงจาก studentService (หากไม่มีนักเรียนให้เป็น empty state)
-    const enrolledStudents = studentService.getStudents(selectedClassroom);
+    const enrolledStudents = studentService.getStudents(selectedClassroom).sort((a, b) => Number(a.no || 999) - Number(b.no || 999));
     if (enrolledStudents && enrolledStudents.length > 0) {
       const initialRoster: MorningAssemblyRecord[] = enrolledStudents.map((stu: any) => ({
         id: `morning-${selectedDate}-${stu.code}`,
@@ -357,14 +357,20 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
 
   // Filtered records for table/cards view
   const filteredRecords = useMemo(() => {
-    return records.filter((rec) => {
-      const matchSearch =
-        searchQuery.trim() === '' ||
-        rec.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        rec.studentCode.includes(searchQuery.trim());
-      const matchStatus = statusFilter === 'ALL' || rec.status === statusFilter;
-      return matchSearch && matchStatus;
-    });
+    return records
+      .filter((rec) => {
+        const matchSearch =
+          searchQuery.trim() === '' ||
+          rec.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          rec.studentCode.includes(searchQuery.trim());
+        const matchStatus = statusFilter === 'ALL' || rec.status === statusFilter;
+        return matchSearch && matchStatus;
+      })
+      .sort((a, b) => {
+        const seatA = Number((a as any).seatNo ?? studentService.findStudentByCode(a.studentCode)?.student.no ?? 999);
+        const seatB = Number((b as any).seatNo ?? studentService.findStudentByCode(b.studentCode)?.student.no ?? 999);
+        return seatA - seatB;
+      });
   }, [records, searchQuery, statusFilter]);
 
   // Mini-Calendar Days computation bounded strictly by active term
@@ -903,7 +909,7 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
                         }`}
                       >
                         <td className="py-3 px-4 text-center font-bold text-slate-500">
-                          {index + 1}
+                          {(record as any).seatNo ?? studentService.findStudentByCode(record.studentCode)?.student.no ?? index + 1}
                         </td>
 
                         <td className="py-3 px-4 font-mono font-bold text-slate-600">
@@ -999,7 +1005,7 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
                       onClick={() => setPersonalStatsStudent(record)}
                       className="text-left font-black text-slate-900 text-sm hover:text-blue-600 cursor-pointer"
                     >
-                      {index + 1}. {record.studentName}
+                      {((record as any).seatNo ?? studentService.findStudentByCode(record.studentCode)?.student.no ?? index + 1)}. {record.studentName}
                     </button>
                     <div className="flex items-center gap-1.5">
                       <span className="font-mono text-xs text-slate-400 font-bold">
