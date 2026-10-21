@@ -344,8 +344,18 @@ export const Submission3ColorMatrixModal: React.FC<Submission3ColorMatrixModalPr
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const cachedFile = sgsRosterAndSubmissionService.getSubmissionFileUrl(asg.id, stu.studentCode);
-                                  const fileUrl = sub?.fileDataUrl || cachedFile;
+                                  const cachedFile = sgsRosterAndSubmissionService.getSubmissionFileUrl(
+                                    asg.id,
+                                    stu.studentCode,
+                                    sub?.workAttachmentLabel || sub?.workTitle
+                                  );
+                                  const cleanSubFile =
+                                    sub?.fileDataUrl &&
+                                    !sub.fileDataUrl.includes('storage.kps.ac.th') &&
+                                    !sub.fileDataUrl.startsWith('r2://')
+                                      ? sub.fileDataUrl
+                                      : undefined;
+                                  const fileUrl = cleanSubFile || cachedFile;
                                   const linkUrl = sub?.externalLinkUrl;
                                   const isCanva = (sub?.workTitle || '').includes('Canva') || (linkUrl || '').includes('canva.com');
                                   const isDrive = Boolean((linkUrl || '').includes('drive.google.com') || (linkUrl || '').includes('docs.google.com'));

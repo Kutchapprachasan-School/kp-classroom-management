@@ -13,8 +13,10 @@ if (typeof (globalThis as any).localStorage === 'undefined') {
     clear: () => {
       Object.keys(store).forEach((k) => delete store[k]);
     },
-    length: 0,
-    key: () => null,
+    get length() {
+      return Object.keys(store).length;
+    },
+    key: (i: number) => Object.keys(store)[i] || null,
   };
 }
 
@@ -241,5 +243,40 @@ describe('Student Submission & Teacher Artwork Display Fixes', () => {
     expect(pending[0].id).toBe('asg-dash-1');
     expect(submitted.length).toBe(1);
     expect(submitted[0].id).toBe('asg-dash-2');
+  });
+
+  it('resolves submission file by student code and filename even if assignmentId differs or is missing', () => {
+    const sampleWebP = 'data:image/webp;base64,UklGRtppAABXRUJQSample15984';
+    // Student submitted under asg-original-101
+    sgsRosterAndSubmissionService.submitStudentWorkToR2({
+      assignmentId: 'asg-original-101',
+      studentCode: '15984',
+      workTitle: 'แบบฝึกหัดบทที่ 7',
+      fileName: 'Screenshot_20261021_133246_SamsungNotes.png',
+      fileDataUrl: sampleWebP,
+    });
+
+    // 1. Direct match with original assignment id
+    expect(sgsRosterAndSubmissionService.getSubmissionFileUrl('asg-original-101', '15984')).toBe(sampleWebP);
+
+    // 2. Lookup with DIFFERENT assignment id but matching studentCode and fileName
+    const resolvedByFile = sgsRosterAndSubmissionService.getSubmissionFileUrl(
+      'asg-different-999',
+      '15984',
+      '15984_Screenshot_20261021_133246_SamsungNotes.webp'
+    );
+    expect(resolvedByFile).toBe(sampleWebP);
+
+    // 3. Lookup with NO assignment id (undefined) and only studentCode and fileName
+    const resolvedNoAsg = sgsRosterAndSubmissionService.getSubmissionFileUrl(
+      undefined,
+      '15984',
+      'Screenshot_20261021_133246_SamsungNotes.webp'
+    );
+    expect(resolvedNoAsg).toBe(sampleWebP);
+
+    // 4. Lookup by studentCode scan alone when only studentCode is known
+    const resolvedByStudent = sgsRosterAndSubmissionService.getSubmissionFileUrl(undefined, '15984');
+    expect(resolvedByStudent).toBe(sampleWebP);
   });
 });

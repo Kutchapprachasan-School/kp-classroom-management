@@ -2296,7 +2296,11 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                         <button
                           type="button"
                           onClick={() => {
-                            const cachedFile = sgsRosterAndSubmissionService.getSubmissionFileUrl(item.assignmentId, item.studentCode);
+                            const cachedFile = sgsRosterAndSubmissionService.getSubmissionFileUrl(
+                              item.assignmentId,
+                              item.studentCode,
+                              item.fileName
+                            );
                             const cleanPreview =
                               item.filePreviewUrl &&
                               !item.filePreviewUrl.includes('storage.kps.ac.th') &&

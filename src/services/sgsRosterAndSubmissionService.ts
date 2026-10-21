@@ -902,7 +902,12 @@ export const sgsRosterAndSubmissionService = {
             fileUrl = undefined;
           }
           if (!fileUrl) {
-            const cachedUrl = this.getSubmissionFileUrl(sub.assignmentId, sub.studentCode);
+            const cleanFileName = sub.r2ObjectKey ? sub.r2ObjectKey.split('/').pop() : undefined;
+            const cachedUrl = this.getSubmissionFileUrl(
+              sub.assignmentId,
+              sub.studentCode,
+              cleanFileName || sub.workAttachmentLabel
+            );
             if (cachedUrl) {
               return { ...sub, fileDataUrl: cachedUrl };
             }
@@ -1731,24 +1736,136 @@ export const sgsRosterAndSubmissionService = {
     return '\uFEFF' + [header.join(','), ...rows].join('\n');
   },
 
-  // ดึง Data URL ไฟล์ชิ้นงานจริงที่นักเรียนอัปโหลดไว้ (ถ้ามี)
-  getSubmissionFileUrl(assignmentId: string, studentCode: string): string | undefined {
+  // ดึง Data URL ไฟล์ชิ้นงานจริงที่นักเรียนอัปโหลดไว้ (ถ้ามี) รองรับการจับคู่หลากหลายมิติ
+  getSubmissionFileUrl(
+    assignmentId?: string,
+    studentCode?: string,
+    fileName?: string
+  ): string | undefined {
     if (typeof localStorage === 'undefined') return undefined;
     try {
-      const cleanAsg = String(assignmentId).trim();
-      const cleanStu = String(studentCode).trim();
-      const val =
-        localStorage.getItem(`kp_sub_file_${cleanAsg}_${cleanStu}`) ||
-        localStorage.getItem(`kp_sub_file_${assignmentId}_${studentCode}`) ||
-        undefined;
-      if (
-        val &&
-        !val.startsWith('https://storage.kps.ac.th') &&
-        !val.startsWith('http://storage.kps.ac.th') &&
-        !val.startsWith('r2://')
-      ) {
-        return val;
+      const cleanAsg = assignmentId ? String(assignmentId).trim() : '';
+      const cleanStu = studentCode ? String(studentCode).trim() : '';
+      const cleanFile = fileName ? String(fileName).trim() : '';
+
+      const isValidDataUrl = (val: any): boolean => {
+        if (!val || typeof val !== 'string') return false;
+        if (
+          val.startsWith('https://storage.kps.ac.th') ||
+          val.startsWith('http://storage.kps.ac.th') ||
+          val.startsWith('r2://')
+        ) {
+          return false;
+        }
+        return (
+          val.startsWith('data:') ||
+          val.startsWith('blob:') ||
+          val.startsWith('http://') ||
+          val.startsWith('https://')
+        );
+      };
+
+      // 1. ตรวจสอบคีย์ตรง kp_sub_file_${cleanAsg}_${cleanStu}
+      if (cleanAsg && cleanStu) {
+        const direct1 = localStorage.getItem(`kp_sub_file_${cleanAsg}_${cleanStu}`);
+        if (isValidDataUrl(direct1)) return direct1!;
+
+        const direct2 = localStorage.getItem(`kp_sub_file_${assignmentId}_${studentCode}`);
+        if (isValidDataUrl(direct2)) return direct2!;
+
+        if (typeof sessionStorage !== 'undefined') {
+          const sess = sessionStorage.getItem(`kp_sub_file_${cleanAsg}_${cleanStu}`);
+          if (isValidDataUrl(sess)) return sess!;
+        }
       }
+
+      // 2. ตรวจสอบคีย์ที่บันทึกตามชื่อไฟล์ (fileName) หรือรหัสนักเรียน + ชื่อไฟล์
+      if (cleanFile) {
+        const fileKey = localStorage.getItem(`kp_sub_file_${cleanFile}`);
+        if (isValidDataUrl(fileKey)) return fileKey!;
+
+        if (cleanStu) {
+          const stuFileKey = localStorage.getItem(`kp_sub_file_${cleanStu}_${cleanFile}`);
+          if (isValidDataUrl(stuFileKey)) return stuFileKey!;
+        }
+      }
+
+      // 3. สแกนคีย์ทั้งหมดใน localStorage ที่ขึ้นต้นด้วย kp_sub_file_
+      try {
+        const matchingKeys: { key: string; score: number; value: string }[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('kp_sub_file_')) {
+            const val = localStorage.getItem(k);
+            if (isValidDataUrl(val)) {
+              let score = 0;
+              if (cleanStu && (k.endsWith(`_${cleanStu}`) || k.includes(`_${cleanStu}_`) || k.includes(cleanStu))) {
+                score += 10;
+              }
+              if (cleanAsg && k.includes(cleanAsg)) {
+                score += 20;
+              }
+              if (cleanFile && k.includes(cleanFile)) {
+                score += 15;
+              }
+              if (score > 0) {
+                matchingKeys.push({ key: k, score, value: val! });
+              }
+            }
+          }
+        }
+        if (matchingKeys.length > 0) {
+          matchingKeys.sort((a, b) => b.score - a.score);
+          return matchingKeys[0].value;
+        }
+      } catch (scanErr) {
+        console.warn('Scan localStorage keys error', scanErr);
+      }
+
+      // 4. ค้นหา Fallback ใน kp_work_submissions_v2 / v1
+      try {
+        const rawSubs =
+          localStorage.getItem(STORAGE_KEY_WORK_SUBMISSIONS) ||
+          localStorage.getItem('kp_work_submissions_v1');
+        if (rawSubs) {
+          const parsedList: StudentWorkSubmission[] = JSON.parse(rawSubs);
+          const found = parsedList.find((s) => {
+            if (!s) return false;
+            const matchStu = cleanStu ? s.studentCode === cleanStu : true;
+            const matchAsg = cleanAsg ? s.assignmentId === cleanAsg : true;
+            const matchFile = cleanFile
+              ? s.workAttachmentLabel?.includes(cleanFile) || s.r2ObjectKey?.includes(cleanFile)
+              : true;
+            return matchStu && (matchAsg || matchFile);
+          });
+          if (found?.fileDataUrl && isValidDataUrl(found.fileDataUrl)) {
+            return found.fileDataUrl;
+          }
+        }
+      } catch (subErr) {
+        console.warn('Fallback search in submissions error', subErr);
+      }
+
+      // 5. ค้นหา Fallback ใน kp_grading_queue_v2
+      try {
+        const rawQueue = localStorage.getItem('kp_grading_queue_v2');
+        if (rawQueue) {
+          const queueList: any[] = JSON.parse(rawQueue);
+          const foundQ = queueList.find((q) => {
+            if (!q) return false;
+            const matchStu = cleanStu ? q.studentCode === cleanStu : true;
+            const matchAsg = cleanAsg ? q.assignmentId === cleanAsg : true;
+            const matchFile = cleanFile ? q.fileName?.includes(cleanFile) : true;
+            return matchStu && (matchAsg || matchFile);
+          });
+          if (foundQ?.filePreviewUrl && isValidDataUrl(foundQ.filePreviewUrl)) {
+            return foundQ.filePreviewUrl;
+          }
+        }
+      } catch (qErr) {
+        console.warn('Fallback search in grading queue error', qErr);
+      }
+
       return undefined;
     } catch {
       return undefined;
@@ -1789,6 +1906,13 @@ export const sgsRosterAndSubmissionService = {
         const cleanAsg = String(payload.assignmentId).trim();
         const cleanStu = String(payload.studentCode).trim();
         localStorage.setItem(`kp_sub_file_${cleanAsg}_${cleanStu}`, payload.fileDataUrl);
+        if (cleanFileName) {
+          localStorage.setItem(`kp_sub_file_${cleanFileName}`, payload.fileDataUrl);
+          localStorage.setItem(`kp_sub_file_${cleanStu}_${cleanFileName}`, payload.fileDataUrl);
+        }
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.setItem(`kp_sub_file_${cleanAsg}_${cleanStu}`, payload.fileDataUrl);
+        }
       } catch (e) {
         console.warn('Could not cache submission file preview URL', e);
       }

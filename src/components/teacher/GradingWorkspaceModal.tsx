@@ -12,7 +12,9 @@ import {
   MessageSquare,
   Plus,
   Layers,
+  Upload,
 } from 'lucide-react';
+import { ArtworkPreviewModal } from './ArtworkPreviewModal';
 import type { GradingQueueItem } from '../../services/teacherCourseAssignmentService';
 import { studentService, formatClassroomLabel } from '../../services/studentService';
 import {
@@ -54,6 +56,8 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
   const [feedbackInput, setFeedbackInput] = useState<string>('');
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [imgError, setImgError] = useState<boolean>(false);
+  const [localOverrideFileUrl, setLocalOverrideFileUrl] = useState<string | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState<boolean>(false);
   const [isReturningWork, setIsReturningWork] = useState<boolean>(false);
   const [returnReason, setReturnReason] = useState<string>(RETURN_SUBMISSION_REASONS[0]);
   const [customReturnNote, setCustomReturnNote] = useState<string>('');
@@ -88,6 +92,7 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
       setFeedbackInput(currentItem.teacherFeedback || '');
       setZoomLevel(100);
       setImgError(false);
+      setLocalOverrideFileUrl(null);
 
       // Auto-detect strand or restore preferred strand for teacher's major subject
       const preferred = getTeacherPreferredStrand();
@@ -126,7 +131,11 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
   };
 
   const cachedFile = currentItem
-    ? sgsRosterAndSubmissionService.getSubmissionFileUrl(currentItem.assignmentId, currentItem.studentCode)
+    ? sgsRosterAndSubmissionService.getSubmissionFileUrl(
+        currentItem.assignmentId,
+        currentItem.studentCode,
+        currentItem.fileName
+      )
     : undefined;
   const cleanPreview =
     currentItem?.filePreviewUrl &&
@@ -134,7 +143,7 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
     !currentItem.filePreviewUrl.startsWith('r2://')
       ? currentItem.filePreviewUrl
       : undefined;
-  const effectiveFileUrl = cachedFile || cleanPreview;
+  const effectiveFileUrl = localOverrideFileUrl || cachedFile || cleanPreview;
 
   const isImage = Boolean(
     effectiveFileUrl?.startsWith('data:image/') ||
@@ -278,22 +287,70 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
             <div className="flex-1 mt-3 rounded-2xl border border-slate-200 bg-slate-900/5 flex items-center justify-center overflow-auto p-2 min-h-[280px]">
               {isImage ? (
                 !imgError && effectiveFileUrl ? (
-                  <img
-                    src={effectiveFileUrl}
-                    alt={currentItem.assignmentTitle}
-                    onError={() => setImgError(true)}
-                    style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'center' }}
-                    className="max-h-[55vh] w-auto object-contain rounded-xl transition-transform duration-150 shadow-md"
-                  />
+                  <div className="relative group max-h-[55vh] flex items-center justify-center">
+                    <img
+                      src={effectiveFileUrl}
+                      alt={currentItem.assignmentTitle}
+                      onError={() => setImgError(true)}
+                      style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'center' }}
+                      className="max-h-[55vh] w-auto object-contain rounded-xl transition-transform duration-150 shadow-md cursor-pointer"
+                      onClick={() => setIsPreviewOpen(true)}
+                      title="คลิกเพื่อดูภาพเต็มจอ"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsPreviewOpen(true)}
+                      className="absolute bottom-2 right-2 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-900 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg backdrop-blur-xs transition-opacity cursor-pointer"
+                      title="เปิดดูภาพเต็มจอ"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-teal-300" />
+                      <span>เปิดดูเต็มจอ ↗</span>
+                    </button>
+                  </div>
                 ) : (
-                  <div className="p-8 text-center space-y-3 bg-blue-50/50 rounded-2xl w-full">
-                    <span className="text-4xl">📁</span>
-                    <h4 className="text-sm font-bold text-slate-800">
+                  <div className="p-6 sm:p-8 text-center space-y-3 bg-blue-50/50 rounded-2xl w-full max-w-md border border-blue-100">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mx-auto text-2xl shadow-2xs">
+                      🖼️
+                    </div>
+                    <span className="inline-block px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-bold">
+                      ไฟล์ผลงานภาพ ({currentItem.submissionChannel || 'รูปภาพ'})
+                    </span>
+                    <h4 className="text-sm font-bold text-slate-800 break-all">
                       {currentItem.fileName || 'ไฟล์ผลงานนักเรียน'}
                     </h4>
                     <p className="text-xs text-slate-500">
                       ชิ้นงานที่ส่งของ {resolvedName}
                     </p>
+                    <div className="pt-2">
+                      <label className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>เลือกรูปภาพจากเครื่องเพื่อดูพรีวิว</span>
+                        <input
+                          type="file"
+                          accept="image/*,.pdf"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (!f) return;
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                              const res = ev.target?.result as string;
+                              if (res) {
+                                setImgError(false);
+                                setLocalOverrideFileUrl(res);
+                                try {
+                                  localStorage.setItem(`kp_sub_file_${currentItem.assignmentId}_${currentItem.studentCode}`, res);
+                                  if (currentItem.fileName) {
+                                    localStorage.setItem(`kp_sub_file_${currentItem.fileName}`, res);
+                                  }
+                                } catch {}
+                              }
+                            };
+                            reader.readAsDataURL(f);
+                          }}
+                        />
+                      </label>
+                    </div>
                   </div>
                 )
               ) : isPdf ? (
@@ -751,6 +808,24 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
           </div>
         </div>
       </div>
+
+      {isPreviewOpen && (
+        <ArtworkPreviewModal
+          isOpen={isPreviewOpen}
+          onClose={() => setIsPreviewOpen(false)}
+          title={currentItem.assignmentTitle}
+          studentName={resolvedName}
+          studentCode={currentItem.studentCode}
+          assignmentId={currentItem.assignmentId}
+          classroom={resolvedRoom}
+          seatNo={typeof resolvedSeat === 'number' ? resolvedSeat : undefined}
+          type={isPdf ? 'PDF' : 'IMAGE'}
+          url={effectiveFileUrl || currentItem.externalLinkUrl}
+          externalLinkUrl={currentItem.externalLinkUrl}
+          fileName={currentItem.fileName}
+          platform={currentItem.externalPlatform}
+        />
+      )}
     </div>
   );
 };

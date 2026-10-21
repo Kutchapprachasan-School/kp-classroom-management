@@ -74,17 +74,13 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
     const match = resolvedFileUrl.match(/(asg-[^/]+)\/([^_/]+)_/);
     const targetAsgId = match ? match[1] : assignmentId;
     const targetStuCode = match ? match[2] : studentCode;
-    if (targetAsgId && targetStuCode) {
-      const cached = sgsRosterAndSubmissionService.getSubmissionFileUrl(targetAsgId, targetStuCode);
-      resolvedFileUrl = cached || undefined;
-    } else {
-      resolvedFileUrl = undefined;
-    }
+    const cached = sgsRosterAndSubmissionService.getSubmissionFileUrl(targetAsgId, targetStuCode, fileName);
+    resolvedFileUrl = cached || undefined;
   }
 
-  // หากไม่มี resolvedFileUrl แต่มี assignmentId และ studentCode ให้ลองดึงไฟล์จากแคช
-  if (!resolvedFileUrl && assignmentId && studentCode) {
-    resolvedFileUrl = sgsRosterAndSubmissionService.getSubmissionFileUrl(assignmentId, studentCode);
+  // หากไม่มี resolvedFileUrl ให้ลองดึงไฟล์จากแคชด้วย assignmentId, studentCode, fileName
+  if (!resolvedFileUrl) {
+    resolvedFileUrl = sgsRosterAndSubmissionService.getSubmissionFileUrl(assignmentId, studentCode, fileName);
   }
 
   // แยกแยะระหว่าง URL ของไฟล์ (ภาพ/PDF) กับลิงก์ภายนอก (Canva/Google Drive)
@@ -699,10 +695,10 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                     )}
                   </div>
 
-                  {(effectiveFileUrl || url) && (
+                  {effectiveFileUrl ? (
                     <div className="pt-2">
                       <a
-                        href={effectiveFileUrl || url}
+                        href={effectiveFileUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition-colors shadow-md w-full"
@@ -711,7 +707,19 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                         <span>เปิดไฟล์ต้นฉบับในแท็บใหม่ ↗</span>
                       </a>
                     </div>
-                  )}
+                  ) : effectiveLinkUrl ? (
+                    <div className="pt-2">
+                      <a
+                        href={effectiveLinkUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition-colors shadow-md w-full"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        <span>เปิดดูชิ้นงานจากลิงก์แนบ ↗</span>
+                      </a>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>

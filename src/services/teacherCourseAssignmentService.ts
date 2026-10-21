@@ -350,7 +350,13 @@ export const teacherCourseAssignmentService = {
             ? savedMatch.filePreviewUrl
             : undefined;
 
-        const cachedDirectUrl = sgsRosterAndSubmissionService.getSubmissionFileUrl(sub.assignmentId, subCode);
+        const effectiveFileName = savedMatch?.fileName || cleanFileName || sub.workAttachmentLabel;
+
+        const cachedDirectUrl = sgsRosterAndSubmissionService.getSubmissionFileUrl(
+          sub.assignmentId,
+          subCode,
+          effectiveFileName
+        );
 
         const realFileUrl =
           (sub.fileDataUrl && !sub.fileDataUrl.includes('storage.kps.ac.th') && !sub.fileDataUrl.startsWith('r2://')
@@ -403,7 +409,15 @@ export const teacherCourseAssignmentService = {
             const exists = termAssignments.some((a) => a.id === it.assignmentId);
             if (!exists) return;
           }
-          mergedQueue.push(it);
+          // Rehydrate filePreviewUrl if missing or contains storage.kps.ac.th
+          let previewUrl = it.filePreviewUrl;
+          if (!previewUrl || previewUrl.includes('storage.kps.ac.th') || previewUrl.startsWith('r2://')) {
+            previewUrl = sgsRosterAndSubmissionService.getSubmissionFileUrl(it.assignmentId, it.studentCode, it.fileName);
+          }
+          mergedQueue.push({
+            ...it,
+            filePreviewUrl: previewUrl,
+          });
         }
       });
 

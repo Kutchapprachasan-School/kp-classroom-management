@@ -1128,6 +1128,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                           reader.onload = (event) => {
                             const resultStr = event.target?.result as string;
                             if (!resultStr) return;
+                            setSelectedFileDataUrl(resultStr); // สำรองค่าทันทีเพื่อป้องกันค่าว่างหากกดส่งทันที
                             if (f.type.startsWith('image/')) {
                               const img = new window.Image();
                               img.onload = () => {
@@ -1151,16 +1152,15 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                                   if (ctx) {
                                     ctx.drawImage(img, 0, 0, w, h);
                                     setSelectedFileDataUrl(canvas.toDataURL('image/webp', 0.82));
-                                  } else {
-                                    setSelectedFileDataUrl(resultStr);
                                   }
                                 } catch {
-                                  setSelectedFileDataUrl(resultStr);
+                                  // คงค่า resultStr เดิม
                                 }
                               };
+                              img.onerror = () => {
+                                setSelectedFileDataUrl(resultStr);
+                              };
                               img.src = resultStr;
-                            } else {
-                              setSelectedFileDataUrl(resultStr);
                             }
                           };
                           reader.readAsDataURL(f);
