@@ -2103,15 +2103,16 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       )}
 
       {/* ====================================================================
-          MODAL 1: สั่งงานใหม่ (เลือกได้ทั้ง "ทุกห้องในรายวิชา" หรือ "เฉพาะห้องที่เลือก")
+          MODAL 1: สั่งงานใหม่ / แก้ไขชิ้นงาน (โครงสร้างมี Header/Footer ตรึงแน่น และเนื้อหาเลื่อนได้ ไม่ตกขอบจอ)
          ==================================================================== */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <form
             onSubmit={handleCreateAssignmentSubmit}
-            className="bg-white rounded-[22px] border border-[#E6EEF7] max-w-lg w-full p-5 sm:p-6 shadow-xl space-y-4"
+            className="bg-white rounded-[22px] border border-[#E6EEF7] max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl my-auto animate-scale-in"
           >
-            <div className="flex items-center justify-between">
+            {/* Modal Header (ตรึงแน่นอยู่ด้านบน ไม่ถูกเลื่อนหาย) */}
+            <div className="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white rounded-t-[22px]">
               <div>
                 <h3 className="text-base sm:text-lg font-bold text-[#163A66]">
                   {editingAssignment ? 'แก้ไขชิ้นงาน / ภาระงาน' : 'สั่งงาน / มอบหมายภาระงานใหม่'}
@@ -2131,26 +2132,28 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
               </button>
             </div>
 
-            {/* 1. เลือกรายวิชา */}
-            <div>
-              <label className="block text-xs font-semibold text-[#163A66] mb-1">
-                1. รายวิชาที่ต้องการสั่งงาน *
-              </label>
-              <select
-                value={formCourseCode}
-                onChange={(e) => {
-                  setFormCourseCode(e.target.value);
-                  setFormSelectedRooms([]);
-                }}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-[#163A66]"
-              >
-                {subjectsList.map((subj) => (
-                  <option key={subj.courseCode} value={subj.courseCode}>
-                    {subj.courseCode} — {subj.courseName}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Scrollable Form Body (เลื่อนดูข้อมูลได้สะดวก ไม่ตกขอบจอ) */}
+            <div className="px-5 sm:px-6 py-4 overflow-y-auto flex-1 space-y-4">
+              {/* 1. เลือกรายวิชา */}
+              <div>
+                <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                  1. รายวิชาที่ต้องการสั่งงาน *
+                </label>
+                <select
+                  value={formCourseCode}
+                  onChange={(e) => {
+                    setFormCourseCode(e.target.value);
+                    setFormSelectedRooms([]);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-[#163A66]"
+                >
+                  {subjectsList.map((subj) => (
+                    <option key={subj.courseCode} value={subj.courseCode}>
+                      {subj.courseCode} — {subj.courseName}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
             {/* 2. ชื่องาน */}
             <div>
@@ -2411,10 +2414,10 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
               </div>
             </div>
 
-            {/* 4. เลือกห้องเรียน: ทุกห้องในรายวิชา หรือ เฉพาะห้องที่เลือก */}
+            {/* 5. เลือกห้องเรียน: ทุกห้องในรายวิชา หรือ เฉพาะห้องที่เลือก */}
             <div className="space-y-2 pt-1">
               <label className="block text-xs font-semibold text-[#163A66]">
-                4. ห้องเรียนที่ได้รับมอบหมาย:
+                5. ห้องเรียนที่ได้รับมอบหมาย:
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button
@@ -2483,17 +2486,21 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            </div>
+            {/* End of Scrollable Form Body */}
+
+            {/* Modal Footer (ตรึงแน่นอยู่ด้านล่าง เห็นปุ่มบันทึกและยกเลิกชัดเจนเสมอ) */}
+            <div className="px-5 sm:px-6 py-3.5 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0 bg-slate-50/80 rounded-b-[22px]">
               <button
                 type="button"
                 onClick={() => setIsCreateModalOpen(false)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-[#6B7C93] hover:bg-slate-50 cursor-pointer"
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-[#6B7C93] hover:bg-slate-100 cursor-pointer transition-colors"
               >
                 ยกเลิก
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-semibold shadow-xs cursor-pointer"
+                className="px-5 py-2 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-semibold shadow-xs cursor-pointer transition-colors"
               >
                 {editingAssignment ? 'บันทึกการแก้ไข' : 'บันทึกและสั่งงาน'}
               </button>
@@ -2506,8 +2513,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
           MODAL 2: วิธีใช้งาน (ซ่อนคำอธิบายไว้ในปุ่ม ⓘ)
          ==================================================================== */}
       {isHelpModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-[22px] border border-[#E6EEF7] max-w-md w-full p-5 sm:p-6 shadow-xl space-y-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-[22px] border border-[#E6EEF7] max-w-md w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 shadow-xl space-y-4 my-auto">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <HelpCircle className="w-5 h-5 text-[#3B82F6]" />
@@ -2620,8 +2627,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
       {/* Modal Quick Grade Single Cell */}
       {editingCell && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-[22px] border border-[#E6EEF7] max-w-sm w-full p-5 shadow-xl space-y-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-[22px] border border-[#E6EEF7] max-w-sm w-full max-h-[90vh] overflow-y-auto p-5 shadow-xl space-y-4 my-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <div>
                 <h3 className="text-sm font-bold text-[#163A66]">
