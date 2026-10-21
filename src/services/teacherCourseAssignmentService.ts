@@ -347,7 +347,7 @@ export const teacherCourseAssignmentService = {
           sub.fileDataUrl ||
           sgsRosterAndSubmissionService.getSubmissionFileUrl(sub.assignmentId, subCode) ||
           savedMatch?.filePreviewUrl ||
-          (sub.r2ObjectKey ? `https://storage.kps.ac.th/${sub.r2ObjectKey.replace('r2://', '')}` : undefined);
+          undefined;
 
         const subTimestamp =
           sub.submittedAt && !isNaN(new Date(sub.submittedAt).getTime())

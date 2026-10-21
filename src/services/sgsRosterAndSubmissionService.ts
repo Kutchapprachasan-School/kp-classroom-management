@@ -797,7 +797,19 @@ export const sgsRosterAndSubmissionService = {
   getSubmissions(): StudentWorkSubmission[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_WORK_SUBMISSIONS);
-      if (raw) return JSON.parse(raw);
+      if (raw) {
+        const list: StudentWorkSubmission[] = JSON.parse(raw);
+        // Hydrate fileDataUrl if not present in item but present in separate scoped key
+        return list.map((sub) => {
+          if (!sub.fileDataUrl) {
+            const cachedUrl = this.getSubmissionFileUrl(sub.assignmentId, sub.studentCode);
+            if (cachedUrl) {
+              return { ...sub, fileDataUrl: cachedUrl };
+            }
+          }
+          return sub;
+        });
+      }
       return [];
     } catch {
       return [];
@@ -805,7 +817,40 @@ export const sgsRosterAndSubmissionService = {
   },
 
   saveSubmissions(list: StudentWorkSubmission[]): StudentWorkSubmission[] {
-    localStorage.setItem(STORAGE_KEY_WORK_SUBMISSIONS, JSON.stringify(list));
+    try {
+      // Ensure fileDataUrls are safely cached in individual scoped keys
+      list.forEach((sub) => {
+        if (sub.fileDataUrl && sub.fileDataUrl.startsWith('data:')) {
+          try {
+            const cleanAsg = String(sub.assignmentId).trim();
+            const cleanStu = String(sub.studentCode).trim();
+            localStorage.setItem(`kp_sub_file_${cleanAsg}_${cleanStu}`, sub.fileDataUrl);
+          } catch (e) {
+            console.warn('Could not cache submission file separately', e);
+          }
+        }
+      });
+
+      // Strip large dataUrls from monolithic array to prevent 5MB localStorage quota exhaustion
+      const compactList = list.map((sub) => {
+        if (sub.fileDataUrl && sub.fileDataUrl.length > 250) {
+          const { fileDataUrl, ...rest } = sub;
+          return rest as StudentWorkSubmission;
+        }
+        return sub;
+      });
+
+      localStorage.setItem(STORAGE_KEY_WORK_SUBMISSIONS, JSON.stringify(compactList));
+    } catch (err) {
+      console.warn('saveSubmissions fallback to minimal payload', err);
+      try {
+        const minimalList = list.map(({ fileDataUrl, ...rest }) => rest as StudentWorkSubmission);
+        localStorage.setItem(STORAGE_KEY_WORK_SUBMISSIONS, JSON.stringify(minimalList));
+      } catch (e2) {
+        console.error('saveSubmissions quota exceeded completely', e2);
+      }
+    }
+
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('kp-copilot-updated'));
       window.dispatchEvent(new CustomEvent('kp-grading-queue-updated'));
@@ -1544,7 +1589,13 @@ export const sgsRosterAndSubmissionService = {
   getSubmissionFileUrl(assignmentId: string, studentCode: string): string | undefined {
     if (typeof localStorage === 'undefined') return undefined;
     try {
-      return localStorage.getItem(`kp_sub_file_${assignmentId}_${studentCode}`) || undefined;
+      const cleanAsg = String(assignmentId).trim();
+      const cleanStu = String(studentCode).trim();
+      return (
+        localStorage.getItem(`kp_sub_file_${cleanAsg}_${cleanStu}`) ||
+        localStorage.getItem(`kp_sub_file_${assignmentId}_${studentCode}`) ||
+        undefined
+      );
     } catch {
       return undefined;
     }
@@ -1581,20 +1632,25 @@ export const sgsRosterAndSubmissionService = {
     // เก็บไฟล์ภาพจริงเข้า LocalStorage แยกคีย์เพื่อไม่ให้ล้นโควต้าอาร์เรย์หลัก
     if (payload.fileDataUrl && typeof localStorage !== 'undefined') {
       try {
-        localStorage.setItem(
-          `kp_sub_file_${payload.assignmentId}_${payload.studentCode}`,
-          payload.fileDataUrl
-        );
+        const cleanAsg = String(payload.assignmentId).trim();
+        const cleanStu = String(payload.studentCode).trim();
+        localStorage.setItem(`kp_sub_file_${cleanAsg}_${cleanStu}`, payload.fileDataUrl);
       } catch (e) {
         console.warn('Could not cache submission file preview URL', e);
       }
     }
 
-    const attachmentLabel = cleanFileName
-      ? `☁️ R2: ${cleanFileName} (บีบอัดเหลือ ${compKb} KB จาก ${(origKb / 1024).toFixed(1)} MB)`
-      : payload.externalLinkUrl
-      ? `🔗 ลิงก์แนบ: ${payload.externalLinkUrl}`
-      : 'ส่งงานออนไลน์';
+    const hasFile = Boolean(cleanFileName || payload.fileDataUrl);
+    const hasLink = Boolean(payload.externalLinkUrl && payload.externalLinkUrl.trim());
+
+    let attachmentLabel = 'ส่งงานออนไลน์';
+    if (hasFile && hasLink) {
+      attachmentLabel = `☁️ R2: ${cleanFileName || 'รูปภาพ'} + 🔗 ลิงก์แนบ`;
+    } else if (hasFile) {
+      attachmentLabel = `☁️ R2: ${cleanFileName || 'รูปภาพ'} (${compKb > 0 ? `บีบอัดเหลือ ${compKb} KB` : 'ไฟล์แนบ'})`;
+    } else if (hasLink) {
+      attachmentLabel = `🔗 ลิงก์แนบ: ${payload.externalLinkUrl}`;
+    }
 
     const existingScore = idx !== -1 ? subs[idx].score : null;
     const existingSubmittedAt = idx !== -1 ? subs[idx].submittedAt : undefined;

@@ -27,8 +27,9 @@ interface Submission3ColorMatrixModalProps {
     studentCode?: string;
     classroom?: string;
     seatNo?: number;
-    type: 'IMAGE' | 'PDF' | 'LINK';
+    type?: 'IMAGE' | 'PDF' | 'LINK';
     url?: string;
+    externalLinkUrl?: string;
     fileName?: string;
     platform?: 'CANVA' | 'GOOGLE_DOCS' | 'GOOGLE_DRIVE' | 'YOUTUBE' | 'FIGMA' | 'OTHER';
   }) => void;
@@ -325,8 +326,12 @@ export const Submission3ColorMatrixModal: React.FC<Submission3ColorMatrixModalPr
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const isCanva = (sub?.workTitle || '').includes('Canva');
-                                  const isPdf = (sub?.workTitle || '').endsWith('.pdf');
+                                  const cachedFile = sgsRosterAndSubmissionService.getSubmissionFileUrl(asg.id, stu.studentCode);
+                                  const fileUrl = sub?.fileDataUrl || cachedFile;
+                                  const linkUrl = sub?.externalLinkUrl;
+                                  const isCanva = (sub?.workTitle || '').includes('Canva') || (linkUrl || '').includes('canva.com');
+                                  const isDrive = Boolean((linkUrl || '').includes('drive.google.com') || (linkUrl || '').includes('docs.google.com'));
+                                  const isPdf = (sub?.workTitle || '').endsWith('.pdf') || (fileUrl || '').includes('.pdf');
                                   if (onOpenPreview) {
                                     onOpenPreview({
                                       title: asg.title,
@@ -334,10 +339,11 @@ export const Submission3ColorMatrixModal: React.FC<Submission3ColorMatrixModalPr
                                       studentCode: stu.studentCode,
                                       classroom: selectedRoom,
                                       seatNo: stu.sgsSeatNo,
-                                      type: isCanva ? 'LINK' : isPdf ? 'PDF' : 'IMAGE',
-                                      url: isCanva ? 'https://www.canva.com/design/DAFkutchap-art3/view' : undefined,
+                                      type: isPdf ? 'PDF' : fileUrl ? 'IMAGE' : isCanva || isDrive ? 'LINK' : 'IMAGE',
+                                      url: fileUrl || linkUrl,
+                                      externalLinkUrl: linkUrl,
                                       fileName: sub?.workTitle || `${asg.title}_${stu.studentName}`,
-                                      platform: isCanva ? 'CANVA' : undefined,
+                                      platform: isDrive ? 'GOOGLE_DRIVE' : isCanva ? 'CANVA' : undefined,
                                     });
                                   }
                                 }}

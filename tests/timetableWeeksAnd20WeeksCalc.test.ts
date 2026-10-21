@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   academicCalendarService,
   calculate20WeeksEndDate,
@@ -30,6 +30,9 @@ describe('Timetable Week Calculation & 20-Week Auto End Date', () => {
 
   describe('2. computeWeekInfo (Dynamic Week Number & Dates Aligned with Active Term)', () => {
     beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-10-20T10:00:00'));
+
       // Set active term to Term 2 (starts 19 ต.ค. 2569)
       const config = academicCalendarService.getConfig();
       const updatedTerms = config.terms.map((t) => ({
@@ -39,6 +42,10 @@ describe('Timetable Week Calculation & 20-Week Auto End Date', () => {
         endDate: '26 มี.ค. 2570',
       }));
       academicCalendarService.saveConfig({ terms: updatedTerms });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
     });
 
     it('correctly calculates Week 1 for Term 2 starting 19 ต.ค. 2569', () => {

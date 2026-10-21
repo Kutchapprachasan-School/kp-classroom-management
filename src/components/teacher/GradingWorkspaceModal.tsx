@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { GradingQueueItem } from '../../services/teacherCourseAssignmentService';
 import { studentService, formatClassroomLabel } from '../../services/studentService';
+import { sgsRosterAndSubmissionService } from '../../services/sgsRosterAndSubmissionService';
 import {
   FEEDBACK_STRAND_CATALOG,
   detectFeedbackStrand,
@@ -116,8 +117,21 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
     onSaveGrade(currentItem.id, num, feedbackInput);
   };
 
-  const isImage = currentItem.submissionChannel === 'IMAGE_UPLOAD' || (currentItem.fileName || '').match(/\.(jpg|jpeg|png|webp)$/i);
-  const isPdf = currentItem.submissionChannel === 'PDF_UPLOAD' || (currentItem.fileName || '').endsWith('.pdf');
+  const cachedFile = currentItem
+    ? sgsRosterAndSubmissionService.getSubmissionFileUrl(currentItem.assignmentId, currentItem.studentCode)
+    : undefined;
+  const effectiveFileUrl = currentItem?.filePreviewUrl || cachedFile;
+
+  const isImage = Boolean(
+    effectiveFileUrl?.startsWith('data:image/') ||
+    currentItem.submissionChannel === 'IMAGE_UPLOAD' ||
+    (currentItem.fileName || '').match(/\.(jpg|jpeg|png|webp|gif|svg)$/i)
+  );
+  const isPdf = Boolean(
+    currentItem.submissionChannel === 'PDF_UPLOAD' ||
+    (currentItem.fileName || '').endsWith('.pdf') ||
+    (effectiveFileUrl && effectiveFileUrl.toLowerCase().includes('.pdf'))
+  );
 
   // ตรวจสอบและดึงชื่อจริง ชั้น เลขที่ของนักเรียน
   const resolvedStu = currentItem ? studentService.findStudentByCode(currentItem.studentCode) : null;
@@ -204,12 +218,23 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden bg-slate-100/50">
           {/* Left Pane (7/12 on desktop): Work Viewer */}
           <div className="lg:col-span-7 p-4 sm:p-5 flex flex-col overflow-y-auto border-r border-slate-200 bg-white">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2 min-w-0">
                 <span className="text-xs font-bold text-slate-700">ไฟล์ผลงาน:</span>
                 <span className="text-xs font-bold text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 truncate max-w-xs">
                   {currentItem.fileName || 'ผลงานนักเรียน'}
                 </span>
+                {currentItem.externalLinkUrl && (
+                  <a
+                    href={currentItem.externalLinkUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-teal-50 text-teal-800 border border-teal-200 text-[11px] font-bold hover:bg-teal-100 transition-colors"
+                  >
+                    <ExternalLink className="w-3 h-3 text-teal-600" />
+                    <span>เปิดลิงก์แนบ ↗</span>
+                  </a>
+                )}
               </div>
 
               {isImage && (
@@ -238,9 +263,9 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
             {/* Viewer Display */}
             <div className="flex-1 mt-3 rounded-2xl border border-slate-200 bg-slate-900/5 flex items-center justify-center overflow-auto p-2 min-h-[280px]">
               {isImage ? (
-                !imgError && currentItem.filePreviewUrl ? (
+                !imgError && effectiveFileUrl ? (
                   <img
-                    src={currentItem.filePreviewUrl}
+                    src={effectiveFileUrl}
                     alt={currentItem.assignmentTitle}
                     onError={() => setImgError(true)}
                     style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'center' }}
@@ -258,17 +283,17 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
                   </div>
                 )
               ) : isPdf ? (
-                !imgError && currentItem.filePreviewUrl ? (
-                  currentItem.filePreviewUrl.toLowerCase().includes('.pdf') ? (
+                !imgError && effectiveFileUrl ? (
+                  effectiveFileUrl.toLowerCase().includes('.pdf') ? (
                     <iframe
-                      src={`${currentItem.filePreviewUrl}#toolbar=0`}
+                      src={`${effectiveFileUrl}#toolbar=0`}
                       title={currentItem.fileName}
                       onError={() => setImgError(true)}
                       className="w-full h-[52vh] rounded-xl border border-slate-200 bg-white shadow-sm"
                     />
                   ) : (
                     <img
-                      src={currentItem.filePreviewUrl}
+                      src={effectiveFileUrl}
                       alt={currentItem.assignmentTitle}
                       onError={() => setImgError(true)}
                       style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'center' }}
@@ -289,9 +314,9 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
                         เอกสารผลงานของ {resolvedName}
                       </p>
                     </div>
-                    {currentItem.filePreviewUrl && (
+                    {effectiveFileUrl && (
                       <a
-                        href={currentItem.filePreviewUrl}
+                        href={effectiveFileUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors cursor-pointer"

@@ -256,8 +256,9 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     studentCode?: string;
     classroom?: string;
     seatNo?: number;
-    type: 'IMAGE' | 'PDF' | 'LINK';
+    type?: 'IMAGE' | 'PDF' | 'LINK';
     url?: string;
+    externalLinkUrl?: string;
     fileName?: string;
     platform?: 'CANVA' | 'GOOGLE_DOCS' | 'GOOGLE_DRIVE' | 'YOUTUBE' | 'FIGMA' | 'OTHER';
   } | null>(null);
@@ -1028,19 +1029,22 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                       <div className="flex flex-wrap items-center gap-2">
                         <button
                           type="button"
-                          onClick={() =>
+                          onClick={() => {
+                            const cachedFile = sgsRosterAndSubmissionService.getSubmissionFileUrl(item.assignmentId, item.studentCode);
+                            const fileUrl = item.filePreviewUrl || cachedFile;
                             setPreviewItem({
                               title: item.assignmentTitle,
                               studentName: displayName,
                               studentCode: item.studentCode,
                               classroom: displayRoom,
                               seatNo: typeof displaySeat === 'number' ? displaySeat : item.seatNo,
-                              type: isPdf ? 'PDF' : isLink ? 'LINK' : 'IMAGE',
-                              url: item.filePreviewUrl || item.externalLinkUrl,
+                              type: isPdf ? 'PDF' : fileUrl ? 'IMAGE' : isLink ? 'LINK' : 'IMAGE',
+                              url: fileUrl || item.externalLinkUrl,
+                              externalLinkUrl: item.externalLinkUrl,
                               fileName: item.fileName,
                               platform: isDrive ? 'GOOGLE_DRIVE' : item.externalPlatform,
-                            })
-                          }
+                            });
+                          }}
                           className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-[#163A66] flex items-center gap-1.5 cursor-pointer"
                         >
                           <Eye className="w-3.5 h-3.5 text-[#3B82F6]" />
@@ -2197,6 +2201,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         seatNo={previewItem?.seatNo}
         type={previewItem?.type || 'IMAGE'}
         url={previewItem?.url}
+        externalLinkUrl={previewItem?.externalLinkUrl}
         fileName={previewItem?.fileName}
         platform={previewItem?.platform}
       />

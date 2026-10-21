@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   ExternalLink,
@@ -20,8 +20,9 @@ export interface ArtworkPreviewModalProps {
   studentCode?: string;
   classroom?: string;
   seatNo?: number;
-  type: 'IMAGE' | 'PDF' | 'LINK';
+  type?: 'IMAGE' | 'PDF' | 'LINK';
   url?: string;
+  externalLinkUrl?: string;
   fileName?: string;
   platform?: 'CANVA' | 'GOOGLE_DOCS' | 'GOOGLE_DRIVE' | 'YOUTUBE' | 'FIGMA' | 'OTHER';
 }
@@ -36,14 +37,23 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
   seatNo = 2,
   type,
   url,
+  externalLinkUrl,
   fileName = 'ผลงานนักเรียน',
-  platform = 'CANVA',
+  platform,
 }) => {
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [rotation, setRotation] = useState<number>(0);
   const [pdfPage, setPdfPage] = useState<number>(1);
   const [imgLoadError, setImgLoadError] = useState<boolean>(false);
   const [reminderSent, setReminderSent] = useState<boolean>(false);
+
+  useEffect(() => {
+    setImgLoadError(false);
+    setZoomLevel(100);
+    setRotation(0);
+    setPdfPage(1);
+    setReminderSent(false);
+  }, [isOpen, url, externalLinkUrl]);
 
   if (!isOpen) return null;
 
@@ -55,16 +65,40 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
     setRotation(0);
   };
 
+  // แยกแยะระหว่าง URL ของไฟล์ (ภาพ/PDF) กับลิงก์ภายนอก (Canva/Google Drive)
+  const effectiveLinkUrl =
+    externalLinkUrl ||
+    (url && (url.startsWith('http://') || url.startsWith('https://')) && !url.match(/\.(jpg|jpeg|png|webp|gif|svg|pdf)$/i)
+      ? url
+      : undefined);
+
+  const effectiveFileUrl =
+    url &&
+    (url.startsWith('data:') ||
+      url.startsWith('blob:') ||
+      url.match(/\.(jpg|jpeg|png|webp|gif|svg|pdf)$/i) ||
+      !effectiveLinkUrl)
+      ? url
+      : undefined;
+
   // ตรวจสอบนามสกุลไฟล์และประเภท
   const lowerFile = (fileName || '').toLowerCase();
-  const isJpg = lowerFile.endsWith('.jpg') || lowerFile.endsWith('.jpeg');
-  const isPng = lowerFile.endsWith('.png');
-  const isPdf = type === 'PDF' || lowerFile.endsWith('.pdf');
+  const isJpg = lowerFile.endsWith('.jpg') || lowerFile.endsWith('.jpeg') || (effectiveFileUrl || '').startsWith('data:image/jpeg');
+  const isPng = lowerFile.endsWith('.png') || (effectiveFileUrl || '').startsWith('data:image/png');
+  const isWebp = lowerFile.endsWith('.webp') || (effectiveFileUrl || '').startsWith('data:image/webp');
+  const isPdf = type === 'PDF' || lowerFile.endsWith('.pdf') || (effectiveFileUrl && effectiveFileUrl.toLowerCase().includes('.pdf'));
   const isGoogleDrive = Boolean(
     platform === 'GOOGLE_DRIVE' ||
-      (url && (url.includes('drive.google.com') || url.includes('docs.google.com')))
+      (effectiveLinkUrl && (effectiveLinkUrl.includes('drive.google.com') || effectiveLinkUrl.includes('docs.google.com')))
   );
-  const isLink = type === 'LINK' || (url && url.includes('canva.com')) || isGoogleDrive;
+  const isCanva = Boolean(
+    platform === 'CANVA' || (effectiveLinkUrl && effectiveLinkUrl.includes('canva.com'))
+  );
+
+  // กำหนดว่ามีภาพหรือ PDF ที่พร้อมแสดงผลหรือไม่
+  const showImage = Boolean(effectiveFileUrl && !isPdf);
+  const showPdf = Boolean(effectiveFileUrl && isPdf);
+  const showOnlyLink = Boolean(!showImage && !showPdf && effectiveLinkUrl);
 
   const handleSendPermissionReminder = () => {
     setReminderSent(true);
@@ -81,11 +115,11 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
         <div className="px-5 py-3.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-white shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-teal-500/20 border border-teal-400/30 flex items-center justify-center text-teal-400">
-              {isPdf ? (
+              {showPdf ? (
                 <FileText className="w-5 h-5 text-rose-400" />
               ) : isGoogleDrive ? (
                 <span className="text-xl">📁</span>
-              ) : isLink ? (
+              ) : isCanva ? (
                 <Palette className="w-5 h-5 text-[#00C4CC]" />
               ) : (
                 <Palette className="w-5 h-5 text-teal-400" />
@@ -97,17 +131,19 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                   {title}
                 </span>
                 <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-slate-800 text-slate-300 border border-slate-700">
-                  {isPdf
+                  {showPdf
                     ? 'PDF DOCUMENT'
                     : isGoogleDrive
                     ? 'GOOGLE DRIVE'
-                    : isLink
-                    ? (platform || 'CANVA')
-                    : isJpg
-                    ? 'JPG IMAGE'
-                    : isPng
-                    ? 'PNG IMAGE'
-                    : 'IMAGE'}
+                    : isCanva
+                    ? 'CANVA PROJECT'
+                    : showImage
+                    ? isJpg
+                      ? 'JPG IMAGE'
+                      : isPng
+                      ? 'PNG IMAGE'
+                      : 'IMAGE'
+                    : 'SUBMISSION'}
                 </span>
               </div>
               <p className="text-xs text-slate-400 font-medium">
@@ -117,9 +153,9 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {url && (
+            {(effectiveFileUrl || effectiveLinkUrl) && (
               <a
-                href={url}
+                href={effectiveFileUrl || effectiveLinkUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-colors"
@@ -182,7 +218,7 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
           </div>
 
           {/* PDF Page Navigation */}
-          {isPdf && (
+          {showPdf && (
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-slate-400 font-bold">
                 เอกสารหน้าที่:
@@ -212,11 +248,11 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
           )}
 
           {/* Canva / Platform Notice */}
-          {isLink && (
+          {isCanva && (
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#00C4CC] animate-pulse" />
               <span className="text-[11px] font-bold text-[#00C4CC]">
-                {platform === 'CANVA' ? 'Canva Live Poster Preview' : 'Interactive Web Preview'}
+                Canva Project Link
               </span>
             </div>
           )}
@@ -225,11 +261,32 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
         {/* ================================================================== */}
         {/* PREVIEW CANVAS AREA (Scrollable, Zoomable, Rotatable) */}
         {/* ================================================================== */}
-        <div className="flex-1 overflow-auto p-4 sm:p-6 flex items-center justify-center bg-slate-950/95 relative select-none">
+        <div className="flex-1 overflow-auto p-4 sm:p-6 flex flex-col items-center justify-center bg-slate-950/95 relative select-none">
+          {/* External Link Notice Banner when file (Image/PDF) is shown along with an external link */}
+          {(showImage || showPdf) && effectiveLinkUrl && (
+            <div className="w-full max-w-3xl mb-4 px-4 py-2.5 bg-slate-900 border border-slate-700/90 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs shadow-lg shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-base">{isGoogleDrive ? '📁' : isCanva ? '🎨' : '🔗'}</span>
+                <span className="text-slate-300 font-semibold truncate max-w-sm sm:max-w-md">
+                  ลิงก์ผลงานแนบเพิ่มเติม: <span className="text-teal-300 font-bold">{effectiveLinkUrl}</span>
+                </span>
+              </div>
+              <a
+                href={effectiveLinkUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shrink-0 shadow-sm"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>เปิดดูลิงก์แนบ ↗</span>
+              </a>
+            </div>
+          )}
+
           {/* ================================================================ */}
-          {/* 1. CANVA / EXTERNAL LINK PREVIEW */}
+          {/* 1. CANVA / EXTERNAL LINK PREVIEW (เมื่อไม่มีไฟล์ภาพ/PDF) */}
           {/* ================================================================ */}
-          {isLink ? (
+          {showOnlyLink ? (
             <div
               className="transition-transform duration-200 origin-center max-w-3xl w-full"
               style={{
@@ -262,7 +319,7 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                   <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1">
                     <span className="text-[11px] text-slate-400 font-semibold block">ลิงก์โฟลเดอร์ปลายทาง:</span>
                     <p className="font-mono text-xs text-emerald-300 break-all select-all">
-                      {url}
+                      {effectiveLinkUrl || url}
                     </p>
                   </div>
 
@@ -280,7 +337,7 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                   {/* Pre-Flight Actions */}
                   <div className="space-y-2 pt-2 border-t border-slate-800">
                     <a
-                      href={url}
+                      href={effectiveLinkUrl || url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 transition-colors shadow-md"
@@ -325,83 +382,85 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                     </span>
                   </div>
 
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#00C4CC] hover:bg-[#00b2b8] text-white text-[11px] font-black transition-colors"
-                  >
-                    <span>เปิดใน Canva ต้นฉบับ ↗</span>
-                  </a>
-                </div>
-
-                {/* Canva Artwork Presentation */}
-                <div className="bg-slate-950 p-6 sm:p-10 text-white min-h-[420px] flex flex-col justify-between items-center text-center relative overflow-hidden border border-slate-800">
-                  <div className="max-w-md w-full space-y-4 my-auto">
-                    <div className="w-16 h-16 rounded-2xl bg-[#00C4CC]/20 border border-[#00C4CC]/40 text-[#00C4CC] mx-auto flex items-center justify-center text-2xl font-black">
-                      🎨
-                    </div>
-                    <div>
-                      <span className="inline-block px-3 py-1 rounded-full bg-[#00C4CC]/10 text-[#00C4CC] border border-[#00C4CC]/30 text-xs font-bold uppercase mb-2">
-                        Canva Project Link
-                      </span>
-                      <h2 className="text-xl font-bold text-white">
-                        {title}
-                      </h2>
-                      <p className="text-xs text-slate-400 mt-1">
-                        ผลงานของ {studentName} (เลขที่ {seatNo} • ห้อง {classroom} • รหัส {studentCode})
-                      </p>
-                    </div>
-
-                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 break-all text-left">
-                      <p className="text-[11px] text-slate-500 font-semibold mb-1">ลิงก์ชิ้นงานที่ส่ง:</p>
+                    {(effectiveLinkUrl || url) && (
                       <a
-                        href={url}
+                        href={effectiveLinkUrl || url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[#00C4CC] hover:underline"
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#00C4CC] hover:bg-[#00b2b8] text-white text-[11px] font-black transition-colors"
                       >
-                        {url || 'ไม่มีลิงก์แนบ'}
-                      </a>
-                    </div>
-
-                    {url && (
-                      <a
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#00C4CC] hover:bg-[#00b2b8] text-white text-xs font-bold transition-colors shadow-lg w-full"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        <span>เปิดดูชิ้นงานใน Canva ต้นฉบับ ↗</span>
+                        <span>เปิดใน Canva ต้นฉบับ ↗</span>
                       </a>
                     )}
                   </div>
+
+                  {/* Canva Artwork Presentation */}
+                  <div className="bg-slate-950 p-6 sm:p-10 text-white min-h-[420px] flex flex-col justify-between items-center text-center relative overflow-hidden border border-slate-800">
+                    <div className="max-w-md w-full space-y-4 my-auto">
+                      <div className="w-16 h-16 rounded-2xl bg-[#00C4CC]/20 border border-[#00C4CC]/40 text-[#00C4CC] mx-auto flex items-center justify-center text-2xl font-black">
+                        🎨
+                      </div>
+                      <div>
+                        <span className="inline-block px-3 py-1 rounded-full bg-[#00C4CC]/10 text-[#00C4CC] border border-[#00C4CC]/30 text-xs font-bold uppercase mb-2">
+                          Canva Project Link
+                        </span>
+                        <h2 className="text-xl font-bold text-white">
+                          {title}
+                        </h2>
+                        <p className="text-xs text-slate-400 mt-1">
+                          ผลงานของ {studentName} (เลขที่ {seatNo} • ห้อง {classroom} • รหัส {studentCode})
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 break-all text-left">
+                        <p className="text-[11px] text-slate-500 font-semibold mb-1">ลิงก์ชิ้นงานที่ส่ง:</p>
+                        <a
+                          href={effectiveLinkUrl || url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#00C4CC] hover:underline"
+                        >
+                          {effectiveLinkUrl || url || 'ไม่มีลิงก์แนบ'}
+                        </a>
+                      </div>
+
+                      {(effectiveLinkUrl || url) && (
+                        <a
+                          href={effectiveLinkUrl || url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#00C4CC] hover:bg-[#00b2b8] text-white text-xs font-bold transition-colors shadow-lg w-full"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          <span>เปิดดูชิ้นงานใน Canva ต้นฉบับ ↗</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
               )}
             </div>
-          ) : isPdf ? (
+          ) : showPdf ? (
             /* ============================================================== */
             /* 2. REAL PDF EMBED OR MULTI-PAGE DOCUMENT PREVIEW             */
             /* ============================================================== */
-            url && !imgLoadError ? (
+            effectiveFileUrl && !imgLoadError ? (
               <div
                 className="transition-transform duration-200 origin-center max-w-4xl w-full flex items-center justify-center"
                 style={{
                   transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
                 }}
               >
-                {url.toLowerCase().includes('.pdf') ? (
+                {effectiveFileUrl.toLowerCase().includes('.pdf') ? (
                   <iframe
-                    src={`${url}#toolbar=0`}
+                    src={`${effectiveFileUrl}#toolbar=0`}
                     title={title}
                     onError={() => setImgLoadError(true)}
                     className="w-full h-[74vh] rounded-2xl border border-slate-700 bg-white shadow-2xl"
                   />
                 ) : (
                   <img
-                    src={url}
+                    src={effectiveFileUrl}
                     alt={fileName || 'เอกสารผลงาน PDF'}
                     onError={() => setImgLoadError(true)}
                     className="max-w-full max-h-[72vh] object-contain rounded-2xl shadow-2xl border border-slate-700/60 bg-slate-900"
@@ -575,9 +634,9 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                 transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
               }}
             >
-              {!imgLoadError && url ? (
+              {!imgLoadError && effectiveFileUrl ? (
                 <img
-                  src={url}
+                  src={effectiveFileUrl}
                   alt={fileName || 'ผลงานนักเรียน'}
                   onError={() => setImgLoadError(true)}
                   className="max-w-full max-h-[72vh] object-contain rounded-2xl shadow-2xl border border-slate-700/60 bg-slate-900"
@@ -590,7 +649,7 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                   </div>
                   <div className="space-y-1">
                     <span className="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-700">
-                      {isJpg ? 'ไฟล์ภาพ JPG' : isPng ? 'ไฟล์ภาพ PNG' : 'ไฟล์ภาพชิ้นงาน'}
+                      {isJpg ? 'ไฟล์ภาพ JPG' : isPng ? 'ไฟล์ภาพ PNG' : isWebp ? 'ไฟล์ภาพ WebP' : 'ไฟล์ภาพชิ้นงาน'}
                     </span>
                     <h3 className="text-base sm:text-lg font-bold text-white break-all">
                       {fileName || 'ไฟล์ผลงานนักเรียน'}
@@ -616,10 +675,10 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                     )}
                   </div>
 
-                  {url && (
+                  {(effectiveFileUrl || url) && (
                     <div className="pt-2">
                       <a
-                        href={url}
+                        href={effectiveFileUrl || url}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition-colors shadow-md w-full"
