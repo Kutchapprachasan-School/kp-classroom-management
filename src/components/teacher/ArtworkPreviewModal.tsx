@@ -11,6 +11,7 @@ import {
   Palette,
   CheckCircle2,
 } from 'lucide-react';
+import { sgsRosterAndSubmissionService } from '../../services/sgsRosterAndSubmissionService';
 
 export interface ArtworkPreviewModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ export interface ArtworkPreviewModalProps {
   title: string;
   studentName: string;
   studentCode?: string;
+  assignmentId?: string;
   classroom?: string;
   seatNo?: number;
   type?: 'IMAGE' | 'PDF' | 'LINK';
@@ -33,6 +35,7 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
   title,
   studentName,
   studentCode = '45102',
+  assignmentId,
   classroom = 'ม.3/1',
   seatNo = 2,
   type,
@@ -65,20 +68,41 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
     setRotation(0);
   };
 
+  // ถ้า url เป็นโดเมนจำลอง storage.kps.ac.th หรือ r2:// ให้ดึงไฟล์จริง base64 ที่เก็บไว้
+  let resolvedFileUrl = url;
+  if (resolvedFileUrl && (resolvedFileUrl.includes('storage.kps.ac.th') || resolvedFileUrl.startsWith('r2://'))) {
+    const match = resolvedFileUrl.match(/(asg-[^/]+)\/([^_/]+)_/);
+    const targetAsgId = match ? match[1] : assignmentId;
+    const targetStuCode = match ? match[2] : studentCode;
+    if (targetAsgId && targetStuCode) {
+      const cached = sgsRosterAndSubmissionService.getSubmissionFileUrl(targetAsgId, targetStuCode);
+      resolvedFileUrl = cached || undefined;
+    } else {
+      resolvedFileUrl = undefined;
+    }
+  }
+
+  // หากไม่มี resolvedFileUrl แต่มี assignmentId และ studentCode ให้ลองดึงไฟล์จากแคช
+  if (!resolvedFileUrl && assignmentId && studentCode) {
+    resolvedFileUrl = sgsRosterAndSubmissionService.getSubmissionFileUrl(assignmentId, studentCode);
+  }
+
   // แยกแยะระหว่าง URL ของไฟล์ (ภาพ/PDF) กับลิงก์ภายนอก (Canva/Google Drive)
   const effectiveLinkUrl =
     externalLinkUrl ||
-    (url && (url.startsWith('http://') || url.startsWith('https://')) && !url.match(/\.(jpg|jpeg|png|webp|gif|svg|pdf)$/i)
-      ? url
+    (resolvedFileUrl &&
+      (resolvedFileUrl.startsWith('http://') || resolvedFileUrl.startsWith('https://')) &&
+      !resolvedFileUrl.match(/\.(jpg|jpeg|png|webp|gif|svg|pdf)$/i)
+      ? resolvedFileUrl
       : undefined);
 
   const effectiveFileUrl =
-    url &&
-    (url.startsWith('data:') ||
-      url.startsWith('blob:') ||
-      url.match(/\.(jpg|jpeg|png|webp|gif|svg|pdf)$/i) ||
+    resolvedFileUrl &&
+    (resolvedFileUrl.startsWith('data:') ||
+      resolvedFileUrl.startsWith('blob:') ||
+      resolvedFileUrl.match(/\.(jpg|jpeg|png|webp|gif|svg|pdf)$/i) ||
       !effectiveLinkUrl)
-      ? url
+      ? resolvedFileUrl
       : undefined;
 
   // ตรวจสอบนามสกุลไฟล์และประเภท

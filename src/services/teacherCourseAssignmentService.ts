@@ -342,11 +342,22 @@ export const teacherCourseAssignmentService = {
         const realSeatNo =
           foundInService?.student.no ?? stu?.sgsSeatNo ?? stu?.no ?? savedMatch?.seatNo ?? (idx + 1);
 
-        // ดึงไฟล์รูปภาพจริง Data URL ที่อัปโหลดไว้
+        // ดึงไฟล์รูปภาพจริง Data URL ที่อัปโหลดไว้ (กรอง URL ปลอมที่ไม่สามารถเปิดได้ออก)
+        const cleanSavedUrl =
+          savedMatch?.filePreviewUrl &&
+          !savedMatch.filePreviewUrl.includes('storage.kps.ac.th') &&
+          !savedMatch.filePreviewUrl.startsWith('r2://')
+            ? savedMatch.filePreviewUrl
+            : undefined;
+
+        const cachedDirectUrl = sgsRosterAndSubmissionService.getSubmissionFileUrl(sub.assignmentId, subCode);
+
         const realFileUrl =
-          sub.fileDataUrl ||
-          sgsRosterAndSubmissionService.getSubmissionFileUrl(sub.assignmentId, subCode) ||
-          savedMatch?.filePreviewUrl ||
+          (sub.fileDataUrl && !sub.fileDataUrl.includes('storage.kps.ac.th') && !sub.fileDataUrl.startsWith('r2://')
+            ? sub.fileDataUrl
+            : undefined) ||
+          cachedDirectUrl ||
+          cleanSavedUrl ||
           undefined;
 
         const subTimestamp =

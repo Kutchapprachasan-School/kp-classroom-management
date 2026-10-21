@@ -884,18 +884,29 @@ export const sgsRosterAndSubmissionService = {
 
   getSubmissions(): StudentWorkSubmission[] {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY_WORK_SUBMISSIONS);
+      const raw =
+        localStorage.getItem(STORAGE_KEY_WORK_SUBMISSIONS) ||
+        localStorage.getItem('kp_work_submissions_v1');
       if (raw) {
         const list: StudentWorkSubmission[] = JSON.parse(raw);
         // Hydrate fileDataUrl if not present in item but present in separate scoped key
         return list.map((sub) => {
-          if (!sub.fileDataUrl) {
+          let fileUrl = sub.fileDataUrl;
+          if (
+            fileUrl &&
+            (fileUrl.startsWith('https://storage.kps.ac.th') ||
+              fileUrl.startsWith('http://storage.kps.ac.th') ||
+              fileUrl.startsWith('r2://'))
+          ) {
+            fileUrl = undefined;
+          }
+          if (!fileUrl) {
             const cachedUrl = this.getSubmissionFileUrl(sub.assignmentId, sub.studentCode);
             if (cachedUrl) {
               return { ...sub, fileDataUrl: cachedUrl };
             }
           }
-          return sub;
+          return { ...sub, fileDataUrl: fileUrl };
         });
       }
       return [];
@@ -1725,11 +1736,19 @@ export const sgsRosterAndSubmissionService = {
     try {
       const cleanAsg = String(assignmentId).trim();
       const cleanStu = String(studentCode).trim();
-      return (
+      const val =
         localStorage.getItem(`kp_sub_file_${cleanAsg}_${cleanStu}`) ||
         localStorage.getItem(`kp_sub_file_${assignmentId}_${studentCode}`) ||
-        undefined
-      );
+        undefined;
+      if (
+        val &&
+        !val.startsWith('https://storage.kps.ac.th') &&
+        !val.startsWith('http://storage.kps.ac.th') &&
+        !val.startsWith('r2://')
+      ) {
+        return val;
+      }
+      return undefined;
     } catch {
       return undefined;
     }

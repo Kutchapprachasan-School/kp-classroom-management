@@ -28,6 +28,9 @@ import {
 import { gamificationService } from '../../services/gamificationService';
 import { bellScheduleService } from '../../services/bellScheduleService';
 import { TEACHER_SUBJECTS_LIST } from '../../services/teacherCourseAssignmentService';
+import { sgsRosterAndSubmissionService } from '../../services/sgsRosterAndSubmissionService';
+import { coursesCurriculumService } from '../../services/coursesCurriculumService';
+import { authService } from '../../services/authService';
 import {
   gachaService,
   BUDDY_CHANGED_EVENT,
@@ -57,7 +60,9 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
   onOpenAssignment,
   currentUser,
 }) => {
-  const studentRoom = formatClassroomLabel(currentUser?.classroomName || currentUser?.classroomId) || 'ม.3/1';
+  const effectiveUser = currentUser || authService.getCurrentUser();
+  const studentCode = effectiveUser?.studentCode || '45101';
+  const studentRoom = formatClassroomLabel(effectiveUser?.classroomName || effectiveUser?.classroomId) || 'ม.3/1';
   const bellConfig = bellScheduleService.getConfig();
 
   const [quests, setQuests] = useState<StudentQuestItem[]>([]);
@@ -72,13 +77,83 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
     gachaService.getActiveBuddy()
   );
   const [expInfo, setExpInfo] = useState<StudentExpCalculation>(() =>
-    calculateStudentExp(currentUser?.id, currentUser?.studentCode)
+    calculateStudentExp(effectiveUser?.id, effectiveUser?.studentCode)
   );
   const [isBuddySelectorOpen, setIsBuddySelectorOpen] = useState(false);
 
+  const loadRealQuests = async () => {
+    try {
+      const termAssignments = sgsRosterAndSubmissionService.getTermAssignments(undefined, studentRoom);
+      const allCourses = coursesCurriculumService.getCourses();
+      const allSubmissions = sgsRosterAndSubmissionService.getSubmissions();
+
+      const realQuests: StudentQuestItem[] = termAssignments.map((asg) => {
+        const sub = allSubmissions.find(
+          (s) => s.assignmentId === asg.id && s.studentCode === studentCode
+        );
+        const isReturnedForRevision = sub?.status === 'RETURNED_REVISION';
+        const isSubmitted =
+          !!sub &&
+          !isReturnedForRevision &&
+          (sub.status === 'SUBMITTED_PENDING' ||
+            sub.status === 'GRADED' ||
+            sub.status === 'EXEMPT_TRANSFERRED');
+
+        const course = allCourses.find((c) => c.code === asg.courseCode);
+        const subjectTitle = course
+          ? `${course.name} · ${course.code}`
+          : asg.courseCode || 'วิชาทั่วไป';
+
+        return {
+          id: asg.id,
+          subjectTitle,
+          title: asg.title,
+          dueDateText: asg.dueDate ? `ส่งภายใน ${asg.dueDate}` : 'ไม่ระบุกำหนดส่ง',
+          maxScore: asg.maxScore || 10,
+          xpReward: (asg.maxScore || 10) * 3,
+          status: isSubmitted ? ('SUBMITTED' as const) : ('PENDING' as const),
+          statusLabel:
+            sub?.status === 'GRADED'
+              ? 'ตรวจแล้ว'
+              : isReturnedForRevision
+              ? 'ครูส่งกลับให้แก้ไข'
+              : isSubmitted
+              ? 'ส่งแล้ว (รอตรวจ)'
+              : 'รอส่งงาน',
+        };
+      });
+
+      if (realQuests.length > 0) {
+        setQuests(realQuests);
+      } else {
+        const data = await gamificationService.getQuests();
+        setQuests(data);
+      }
+    } catch (err) {
+      console.warn('Failed to load real student assignments for dashboard', err);
+      const data = await gamificationService.getQuests();
+      setQuests(data);
+    }
+  };
+
   useEffect(() => {
-    gamificationService.getQuests().then(setQuests);
-  }, []);
+    loadRealQuests();
+    const handleUpdate = () => {
+      loadRealQuests();
+    };
+    window.addEventListener('kp-sgs-roster-updated', handleUpdate);
+    window.addEventListener('kp-copilot-updated', handleUpdate);
+    window.addEventListener('kp-grading-queue-updated', handleUpdate);
+    window.addEventListener('kps-data-sync-event', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('kp-sgs-roster-updated', handleUpdate);
+      window.removeEventListener('kp-copilot-updated', handleUpdate);
+      window.removeEventListener('kp-grading-queue-updated', handleUpdate);
+      window.removeEventListener('kps-data-sync-event', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, [studentRoom, studentCode]);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -94,7 +169,7 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
       setActiveBuddy(gachaService.getActiveBuddy());
     };
     const handleExpUpdate = () => {
-      setExpInfo(calculateStudentExp(currentUser?.id, currentUser?.studentCode));
+      setExpInfo(calculateStudentExp(effectiveUser?.id, effectiveUser?.studentCode));
     };
     window.addEventListener(BUDDY_CHANGED_EVENT, handleBuddyUpdate);
     window.addEventListener(STUDENT_EXP_EVENT, handleExpUpdate);
@@ -104,7 +179,7 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
       window.removeEventListener(STUDENT_EXP_EVENT, handleExpUpdate);
       window.removeEventListener('kp-copilot-updated', handleExpUpdate);
     };
-  }, [currentUser?.id, currentUser?.studentCode]);
+  }, [effectiveUser?.id, effectiveUser?.studentCode]);
 
   const pendingQuests = quests.filter((q) => q.status === 'PENDING');
   const enrolledSubjects = TEACHER_SUBJECTS_LIST.filter((s) =>

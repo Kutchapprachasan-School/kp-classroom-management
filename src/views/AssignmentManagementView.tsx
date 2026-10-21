@@ -474,6 +474,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     title: string;
     studentName: string;
     studentCode?: string;
+    assignmentId?: string;
     classroom?: string;
     seatNo?: number;
     type?: 'IMAGE' | 'PDF' | 'LINK';
@@ -1505,11 +1506,18 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                           type="button"
                           onClick={() => {
                             const cachedFile = sgsRosterAndSubmissionService.getSubmissionFileUrl(item.assignmentId, item.studentCode);
-                            const fileUrl = item.filePreviewUrl || cachedFile;
+                            const cleanPreview =
+                              item.filePreviewUrl &&
+                              !item.filePreviewUrl.includes('storage.kps.ac.th') &&
+                              !item.filePreviewUrl.startsWith('r2://')
+                                ? item.filePreviewUrl
+                                : undefined;
+                            const fileUrl = cachedFile || cleanPreview;
                             setPreviewItem({
                               title: item.assignmentTitle,
                               studentName: displayName,
                               studentCode: item.studentCode,
+                              assignmentId: item.assignmentId,
                               classroom: displayRoom,
                               seatNo: typeof displaySeat === 'number' ? displaySeat : item.seatNo,
                               type: isPdf ? 'PDF' : fileUrl ? 'IMAGE' : isLink ? 'LINK' : 'IMAGE',
@@ -3061,6 +3069,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         title={previewItem?.title || 'ผลงานนักเรียน'}
         studentName={previewItem?.studentName || ''}
         studentCode={previewItem?.studentCode}
+        assignmentId={previewItem?.assignmentId}
         classroom={previewItem?.classroom || availableFilterRooms[0] || 'ม.1/1'}
         seatNo={previewItem?.seatNo}
         type={previewItem?.type || 'IMAGE'}

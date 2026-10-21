@@ -126,4 +126,120 @@ describe('Student Submission & Teacher Artwork Display Fixes', () => {
     // Must NOT contain fake unreachable domain
     expect(item?.filePreviewUrl).not.toContain('storage.kps.ac.th');
   });
+
+  it('sanitizes legacy storage.kps.ac.th or r2:// URLs and recovers real cached WebP base64', () => {
+    const fakeDomainUrl = 'https://storage.kps.ac.th/kp-classroom-submissions/term2/m3-1/asg-legacy-99/45105_art.webp';
+    const realBase64 = 'data:image/webp;base64,UklGRtppAABXRUJQVlA4WAoAAAAgAAAAugMAxwMASUNDUMgBAAAAAAHI';
+
+    // Store fake URL in submission list
+    localStorage.setItem(
+      'kp_work_submissions_v1',
+      JSON.stringify([
+        {
+          assignmentId: 'asg-legacy-99',
+          studentCode: '45105',
+          status: 'SUBMITTED_PENDING',
+          workTitle: 'งานศิลปะ',
+          fileDataUrl: fakeDomainUrl,
+          r2ObjectKey: 'r2://kp-classroom-submissions/term2/m3-1/asg-legacy-99/45105_art.webp',
+        },
+      ])
+    );
+
+    // Store real base64 in separate scoped key
+    localStorage.setItem('kp_sub_file_asg-legacy-99_45105', realBase64);
+
+    // Also simulate legacy item in grading queue
+    localStorage.setItem(
+      'kp_grading_queue_items',
+      JSON.stringify([
+        {
+          id: 'q_asg-legacy-99_45105',
+          assignmentId: 'asg-legacy-99',
+          studentCode: '45105',
+          status: 'PENDING_REVIEW',
+          filePreviewUrl: fakeDomainUrl,
+        },
+      ])
+    );
+
+    // 1. getSubmissions() must filter out fake URL and hydrate with real base64
+    const subs = sgsRosterAndSubmissionService.getSubmissions();
+    const sub = subs.find((s) => s.assignmentId === 'asg-legacy-99' && s.studentCode === '45105');
+    expect(sub?.fileDataUrl).toBe(realBase64);
+    expect(sub?.fileDataUrl).not.toContain('storage.kps.ac.th');
+
+    // 2. getSubmissionFileUrl() must return realBase64
+    const fetchedFile = sgsRosterAndSubmissionService.getSubmissionFileUrl('asg-legacy-99', '45105');
+    expect(fetchedFile).toBe(realBase64);
+
+    // 3. teacherCourseAssignmentService.getGradingQueue() must sanitize filePreviewUrl
+    const queue = teacherCourseAssignmentService.getGradingQueue();
+    const queueItem = queue.find((q) => q.assignmentId === 'asg-legacy-99' && q.studentCode === '45105');
+    expect(queueItem?.filePreviewUrl).toBe(realBase64);
+    expect(queueItem?.filePreviewUrl).not.toContain('storage.kps.ac.th');
+  });
+
+  it('correctly maps pending assignments for student dashboard according to submission status', () => {
+    // Create assignments targeted to ม.3/1
+    localStorage.setItem(
+      'kp_term_assignments_v2',
+      JSON.stringify([
+        {
+          id: 'asg-dash-1',
+          title: 'วาดภาพสีน้ำระบายบรรยากาศ',
+          targetClassrooms: ['ม.3/1'],
+          maxScore: 10,
+          courseCode: 'ศ23101',
+          dueDate: '25 ต.ค. 2569',
+        },
+        {
+          id: 'asg-dash-2',
+          title: 'การออกแบบตราสัญลักษณ์',
+          targetClassrooms: ['ALL'],
+          maxScore: 15,
+          courseCode: 'ศ23101',
+          dueDate: '30 ต.ค. 2569',
+        },
+      ])
+    );
+
+    // Student 45101 submitted asg-dash-2, but asg-dash-1 is still pending
+    localStorage.setItem(
+      'kp_work_submissions_v2',
+      JSON.stringify([
+        {
+          assignmentId: 'asg-dash-2',
+          studentCode: '45101',
+          status: 'SUBMITTED_PENDING',
+          workTitle: 'การออกแบบตราสัญลักษณ์',
+        },
+      ])
+    );
+
+    const termAsgs = sgsRosterAndSubmissionService.getTermAssignments(undefined, 'ม.3/1');
+    expect(termAsgs.length).toBe(2);
+
+    const subs = sgsRosterAndSubmissionService.getSubmissions();
+    const mapped = termAsgs.map((asg) => {
+      const sub = subs.find((s) => s.assignmentId === asg.id && s.studentCode === '45101');
+      const isSubmitted =
+        !!sub &&
+        sub.status !== 'RETURNED_REVISION' &&
+        (sub.status === 'SUBMITTED_PENDING' || sub.status === 'GRADED' || sub.status === 'EXEMPT_TRANSFERRED');
+      return {
+        id: asg.id,
+        title: asg.title,
+        status: isSubmitted ? 'SUBMITTED' : 'PENDING',
+      };
+    });
+
+    const pending = mapped.filter((m) => m.status === 'PENDING');
+    const submitted = mapped.filter((m) => m.status === 'SUBMITTED');
+
+    expect(pending.length).toBe(1);
+    expect(pending[0].id).toBe('asg-dash-1');
+    expect(submitted.length).toBe(1);
+    expect(submitted[0].id).toBe('asg-dash-2');
+  });
 });

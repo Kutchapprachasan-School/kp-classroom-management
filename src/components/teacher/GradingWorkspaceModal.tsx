@@ -128,7 +128,13 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
   const cachedFile = currentItem
     ? sgsRosterAndSubmissionService.getSubmissionFileUrl(currentItem.assignmentId, currentItem.studentCode)
     : undefined;
-  const effectiveFileUrl = currentItem?.filePreviewUrl || cachedFile;
+  const cleanPreview =
+    currentItem?.filePreviewUrl &&
+    !currentItem.filePreviewUrl.includes('storage.kps.ac.th') &&
+    !currentItem.filePreviewUrl.startsWith('r2://')
+      ? currentItem.filePreviewUrl
+      : undefined;
+  const effectiveFileUrl = cachedFile || cleanPreview;
 
   const isImage = Boolean(
     effectiveFileUrl?.startsWith('data:image/') ||
