@@ -22,6 +22,7 @@ if (typeof (globalThis as any).localStorage === 'undefined') {
 
 import { sgsRosterAndSubmissionService } from '../src/services/sgsRosterAndSubmissionService';
 import { teacherCourseAssignmentService } from '../src/services/teacherCourseAssignmentService';
+import { r2StorageService } from '../src/services/r2StorageService';
 
 describe('Student Submission & Teacher Artwork Display Fixes', () => {
   beforeEach(() => {
@@ -278,5 +279,21 @@ describe('Student Submission & Teacher Artwork Display Fixes', () => {
     // 4. Lookup by studentCode scan alone when only studentCode is known
     const resolvedByStudent = sgsRosterAndSubmissionService.getSubmissionFileUrl(undefined, '15984');
     expect(resolvedByStudent).toBe(sampleWebP);
+  });
+
+  it('verifies r2StorageService key building and public URL resolution', () => {
+    const key = r2StorageService.buildSubmissionKey({
+      term: '2/2569',
+      classroom: 'ม.5/4',
+      assignmentId: 'asg-unit-7',
+      studentCode: '15984',
+      fileName: 'homework.png',
+    });
+
+    expect(key).toBe('kp-classroom-submissions/2-2569/ม.5-4/asg-unit-7/15984_homework.webp');
+
+    // Test resolving r2:// scheme
+    const resolved = r2StorageService.resolvePublicViewUrl(`r2://${key}`);
+    expect(resolved).toBeDefined();
   });
 });

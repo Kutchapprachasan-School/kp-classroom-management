@@ -9,6 +9,7 @@ import { cleanSlateService } from './cleanSlateService.ts';
 import { studentService, formatClassroomLabel } from './studentService.ts';
 import { resolveRoomCandidates } from './masterDataService.ts';
 import { isGrade1SgsStudentCode } from '../config/m1SgsLookup';
+import { r2StorageService } from './r2StorageService.ts';
 
 export type StudentTransferState = 'ACTIVE' | 'TRANSFERRED_IN' | 'TRANSFERRED_OUT';
 export type StudentGender = 'MALE' | 'FEMALE';
@@ -890,17 +891,29 @@ export const sgsRosterAndSubmissionService = {
         localStorage.getItem('kp_work_submissions_v1');
       if (raw) {
         const list: StudentWorkSubmission[] = JSON.parse(raw);
-        // Hydrate fileDataUrl if not present in item but present in separate scoped key
+        // Hydrate fileDataUrl if not present in item but present in separate scoped key or Cloudflare R2
         return list.map((sub) => {
           let fileUrl = sub.fileDataUrl;
+
+          // ถ้ามี R2 Worker Configured และมี URL/Key ของ R2 ให้แปลงเป็น URL ที่เปิดดูได้จริง
+          if (r2StorageService.isConfigured() && (fileUrl || sub.r2ObjectKey)) {
+            const resolvedR2 = r2StorageService.resolvePublicViewUrl(fileUrl || sub.r2ObjectKey);
+            if (resolvedR2 && (resolvedR2.startsWith('http://') || resolvedR2.startsWith('https://'))) {
+              return { ...sub, fileDataUrl: resolvedR2 };
+            }
+          }
+
+          // หาก R2 ยังไม่ configured และ URL เป็นโดเมนหลอกที่เข้าไม่ได้ ให้กรองออกเพื่อให้ดึงจาก local cache
           if (
             fileUrl &&
+            !r2StorageService.isConfigured() &&
             (fileUrl.startsWith('https://storage.kps.ac.th') ||
               fileUrl.startsWith('http://storage.kps.ac.th') ||
               fileUrl.startsWith('r2://'))
           ) {
             fileUrl = undefined;
           }
+
           if (!fileUrl) {
             const cleanFileName = sub.r2ObjectKey ? sub.r2ObjectKey.split('/').pop() : undefined;
             const cachedUrl = this.getSubmissionFileUrl(
@@ -1872,6 +1885,54 @@ export const sgsRosterAndSubmissionService = {
     }
   },
 
+  // อัปโหลดไฟล์งานนักเรียนขึ้น Cloudflare R2 แบบ Async (รออัปโหลดเสร็จสมบูรณ์)
+  async submitStudentWorkToR2Async(payload: {
+    assignmentId: string;
+    studentCode: string;
+    workTitle: string;
+    fileName?: string;
+    originalSizeKb?: number;
+    compressedSizeKb?: number;
+    externalLinkUrl?: string;
+    fileDataUrl?: string;
+    academicYearTerm?: string;
+    classroom?: string;
+  }): Promise<StudentWorkSubmission[]> {
+    let finalFileUrl = payload.fileDataUrl;
+    const term = payload.academicYearTerm || '1/2569';
+    const cleanFileName = payload.fileName
+      ? payload.fileName.replace(/\.(jpg|jpeg|png|heic)$/i, '.webp')
+      : undefined;
+
+    if (cleanFileName && payload.fileDataUrl && r2StorageService.isConfigured()) {
+      const r2Key = r2StorageService.buildSubmissionKey({
+        term,
+        classroom: payload.classroom,
+        assignmentId: payload.assignmentId,
+        studentCode: payload.studentCode,
+        fileName: cleanFileName,
+      });
+
+      try {
+        const uploadRes = await r2StorageService.uploadFile(
+          r2Key,
+          payload.fileDataUrl,
+          cleanFileName.endsWith('.pdf') ? 'application/pdf' : 'image/webp'
+        );
+        if (uploadRes.success && uploadRes.url) {
+          finalFileUrl = uploadRes.url;
+        }
+      } catch (err) {
+        console.warn('[R2 Upload] Async upload failed, keeping local fallback', err);
+      }
+    }
+
+    return this.submitStudentWorkToR2({
+      ...payload,
+      fileDataUrl: finalFileUrl,
+    });
+  },
+
   // อัปโหลดไฟล์งานนักเรียนขึ้น Cloudflare R2 (บีบอัดรูป WebP อัตโนมัติ + รองรับแนบลิงก์เสริม Google Drive/Canva)
   submitStudentWorkToR2(payload: {
     assignmentId: string;
@@ -1883,6 +1944,7 @@ export const sgsRosterAndSubmissionService = {
     externalLinkUrl?: string;
     fileDataUrl?: string;
     academicYearTerm?: string;
+    classroom?: string;
   }): StudentWorkSubmission[] {
     const subs = this.getSubmissions();
     const idx = subs.findIndex(
@@ -1895,12 +1957,20 @@ export const sgsRosterAndSubmissionService = {
       ? payload.fileName.replace(/\.(jpg|jpeg|png|heic)$/i, '.webp')
       : undefined;
     const r2Key = cleanFileName
-      ? `r2://kp-classroom-submissions/${term.replace('/', '-')}/m3-1/${payload.assignmentId}/${payload.studentCode}_${cleanFileName}`
+      ? (r2StorageService.isConfigured()
+          ? r2StorageService.buildSubmissionKey({
+              term,
+              classroom: payload.classroom,
+              assignmentId: payload.assignmentId,
+              studentCode: payload.studentCode,
+              fileName: cleanFileName,
+            })
+          : `r2://kp-classroom-submissions/${term.replace('/', '-')}/m3-1/${payload.assignmentId}/${payload.studentCode}_${cleanFileName}`)
       : undefined;
     const origKb = payload.originalSizeKb ?? (cleanFileName ? 4250 : 0);
     const compKb = payload.compressedSizeKb ?? (cleanFileName ? 148 : 0);
 
-    // เก็บไฟล์ภาพจริงเข้า LocalStorage แยกคีย์เพื่อไม่ให้ล้นโควต้าอาร์เรย์หลัก
+    // เก็บไฟล์ภาพจริงเข้า LocalStorage แยกคีย์เพื่อไม่ให้ล้นโควต้าอาร์เรย์หลัก (เป็น Offline Backup)
     if (payload.fileDataUrl && typeof localStorage !== 'undefined') {
       try {
         const cleanAsg = String(payload.assignmentId).trim();
@@ -1938,6 +2008,38 @@ export const sgsRosterAndSubmissionService = {
       existingSubmittedAt && !existingSubmittedAt.includes('เพิ่งส่งเมื่อสักครู่')
         ? existingSubmittedAt
         : nowIso;
+
+    // Background R2 Upload if synchronous method was called and R2 is configured
+    if (
+      r2Key &&
+      payload.fileDataUrl &&
+      payload.fileDataUrl.startsWith('data:') &&
+      r2StorageService.isConfigured()
+    ) {
+      r2StorageService
+        .uploadFile(
+          r2Key,
+          payload.fileDataUrl,
+          cleanFileName?.endsWith('.pdf') ? 'application/pdf' : 'image/webp'
+        )
+        .then((res) => {
+          if (res.success && res.url) {
+            const currentSubs = this.getSubmissions();
+            const targetIdx = currentSubs.findIndex(
+              (s) => s.assignmentId === payload.assignmentId && s.studentCode === payload.studentCode
+            );
+            if (targetIdx !== -1) {
+              currentSubs[targetIdx] = {
+                ...currentSubs[targetIdx],
+                fileDataUrl: res.url,
+                r2ObjectKey: res.key,
+              };
+              this.saveSubmissions(currentSubs);
+            }
+          }
+        })
+        .catch((e) => console.warn('[R2 Background Upload]', e));
+    }
 
     const nextItem: StudentWorkSubmission = {
       ...(idx !== -1 ? subs[idx] : {}),

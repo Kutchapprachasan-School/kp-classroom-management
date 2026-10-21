@@ -258,7 +258,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
         );
       }
 
-      sgsRosterAndSubmissionService.submitStudentWorkToR2({
+      await sgsRosterAndSubmissionService.submitStudentWorkToR2Async({
         assignmentId: selectedQuest.id,
         studentCode,
         workTitle: selectedQuest.title,
@@ -268,6 +268,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
         fileDataUrl: selectedFileDataUrl || undefined,
         externalLinkUrl: hasLink ? trimmedLink : undefined,
         academicYearTerm,
+        classroom: studentRoom,
       });
 
       if (hasFile && hasLink) {

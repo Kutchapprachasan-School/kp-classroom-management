@@ -91,6 +91,7 @@ class CloudDataService {
     // Exclude device-local session keys, internal telemetry, supabase tokens
     if (
       CloudDataService.LOCAL_SESSION_KEYS.has(key) ||
+      key.startsWith('kp_sub_file_') || // Large local binary caches stay in R2, never uploaded to Postgres!
       key.startsWith('sb-') ||
       key.startsWith('supabase.') ||
       key.startsWith('__') ||
