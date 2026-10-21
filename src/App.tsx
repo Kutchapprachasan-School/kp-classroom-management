@@ -8,6 +8,8 @@ import { CrossClassSarView } from './views/CrossClassSarView';
 import { EndTermReadinessView } from './views/EndTermReadinessView';
 import { ExamManagementView } from './views/ExamManagementView';
 import { AssignmentManagementView } from './views/AssignmentManagementView';
+import { GradingQueueView } from './views/GradingQueueView';
+import { ScoreMatrixPrapanView } from './views/ScoreMatrixPrapanView';
 import { CoursesCurriculumView } from './views/CoursesCurriculumView';
 import { LessonPlansView } from './views/LessonPlansView';
 import { ClassroomManagementView } from './views/ClassroomManagementView';
@@ -368,8 +370,12 @@ export const App: React.FC = () => {
         return 'เช็คชื่อเข้าเรียน (Classroom Attendance)';
       case 'exams':
         return 'จัดการสอบ/เก็บคะแนน (Exam Management)';
+      case 'grading-queue':
+        return 'คิวตรวจงานนักเรียน (SpeedGrader)';
       case 'assignments':
-        return 'ตรวจงาน';
+        return 'การสั่งงานและมอบหมายภาระงาน';
+      case 'score-matrix':
+        return 'สมุดบันทึกคะแนน ปพ.5 (Gradebook Matrix)';
       case 'readiness':
         return 'ส่งเกรด SGS';
       case 'sar':
@@ -761,10 +767,23 @@ export const App: React.FC = () => {
 
               {currentView === 'exams' && <ExamManagementView />}
 
+              {currentView === 'grading-queue' && (
+                <GradingQueueView
+                  onNavigate={(view) => setCurrentView(view)}
+                />
+              )}
+
               {currentView === 'assignments' && (
                 <AssignmentManagementView
                   initialQuickFilter={deepLinkAssignmentFilter}
                   initialHighlightBanner={deepLinkBanner}
+                  onNavigate={(view) => setCurrentView(view)}
+                />
+              )}
+
+              {currentView === 'score-matrix' && (
+                <ScoreMatrixPrapanView
+                  onNavigate={(view) => setCurrentView(view)}
                 />
               )}
 

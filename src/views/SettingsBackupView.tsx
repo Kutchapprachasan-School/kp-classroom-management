@@ -838,6 +838,47 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                     </span>
                   </div>
                 </div>
+
+                {/* Card 5: พื้นที่จัดเก็บ Cloudflare R2 & สำรองข้อมูล */}
+                <div
+                  onClick={() => setActiveModalKey('backup')}
+                  className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer active:scale-[0.99]"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                        <Cloud className="w-5 h-5 stroke-[2.2]" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-bold text-slate-900 truncate">
+                          สำรองข้อมูล & พื้นที่ Cloudflare R2
+                        </h3>
+                        <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
+                          จัดเก็บผลงานนักเรียน ซิงก์ไฟล์ และสำรองข้อมูล
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-blue-600 flex items-center shrink-0">
+                      จัดการ <ChevronRight className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 font-medium">
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                        r2StorageService.isConfigured()
+                          ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                          : 'text-amber-800 bg-amber-50 border-amber-200'
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          r2StorageService.isConfigured() ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                        }`}
+                      ></span>
+                      {r2StorageService.isConfigured() ? '✓ R2 เชื่อมต่อแล้ว (100 TB)' : '⚠️ รอตั้งค่า R2'}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

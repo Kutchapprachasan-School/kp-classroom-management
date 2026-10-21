@@ -27,6 +27,8 @@ import {
   PanelLeftClose,
   Sparkles,
   Users,
+  CheckCircle2,
+  FileSpreadsheet,
 } from 'lucide-react';
 import {
   getSchoolSettings,
@@ -56,7 +58,9 @@ export type TeacherViewKey =
   | 'morning-assembly'
   | 'classroom-attendance'
   | 'exams'
+  | 'grading-queue'
   | 'assignments'
+  | 'score-matrix'
   | 'readiness'
   | 'sar'
   | 'home-visit'
@@ -289,15 +293,25 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       title: 'การสอน & วัดผล',
       items: [
         {
-          key: 'assignments',
-          label: 'ภาระงาน / สอน',
-          icon: Book2Regular,
+          key: 'grading-queue',
+          label: 'คิวตรวจงาน',
+          icon: CheckCircle2,
           ...(pendingAssignmentsCount > 0
             ? {
                 badge: String(pendingAssignmentsCount),
                 badgeStyle: 'bg-rose-500 text-white font-extrabold',
               }
             : {}),
+        },
+        {
+          key: 'assignments',
+          label: 'การสั่งงาน / ภาระงาน',
+          icon: Book2Regular,
+        },
+        {
+          key: 'score-matrix',
+          label: 'สมุดคะแนน ปพ.5',
+          icon: FileSpreadsheet,
         },
         {
           key: 'class-overview',

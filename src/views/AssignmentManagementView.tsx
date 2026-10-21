@@ -57,12 +57,14 @@ import {
   formatThaiDateShort,
 } from '../utils/timetableDateUtils';
 import { academicCalendarService } from '../services/academicCalendarService';
+import type { TeacherViewKey } from '../components/layout/TeacherSidebar';
 
 export type QuickFilterMode = 'ALL' | 'MISSING_OR_R' | 'PENDING_REVIEW';
 
 interface AssignmentManagementViewProps {
   initialQuickFilter?: QuickFilterMode;
   initialHighlightBanner?: string | null;
+  onNavigate?: (view: TeacherViewKey) => void;
 }
 
 const SCORE_PART_LABELS: Record<FourScorePart, { label: string; cls: string }> = {
@@ -75,6 +77,7 @@ const SCORE_PART_LABELS: Record<FourScorePart, { label: string; cls: string }> =
 export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> = ({
   initialQuickFilter: _initialQuickFilter = 'ALL',
   initialHighlightBanner: _initialHighlightBanner = null,
+  onNavigate,
 }) => {
   // 1. Dynamic Subjects & Real Classrooms
   const subjectsList = useMemo(() => getDynamicTeachingSubjects(), []);
@@ -1381,7 +1384,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
           </button>
           <button
             type="button"
-            onClick={() => setActiveSectionTab('SUBMISSIONS')}
+            onClick={() => { if (onNavigate) { onNavigate('grading-queue'); } else { setActiveSectionTab('SUBMISSIONS'); } }}
             className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
               activeSectionTab === 'SUBMISSIONS'
                 ? 'bg-white text-[#3B82F6] shadow-xs border border-[#BFDBFE]/60'
@@ -1392,7 +1395,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
           </button>
           <button
             type="button"
-            onClick={() => setActiveSectionTab('SCORE_MATRIX')}
+            onClick={() => { if (onNavigate) { onNavigate('score-matrix'); } else { setActiveSectionTab('SCORE_MATRIX'); } }}
             className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               activeSectionTab === 'SCORE_MATRIX'
                 ? 'bg-white text-[#3B82F6] shadow-xs border border-[#BFDBFE]/60'

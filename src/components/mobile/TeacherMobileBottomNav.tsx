@@ -36,6 +36,8 @@ export const TeacherMobileBottomNav: React.FC<TeacherMobileBottomNavProps> = ({
 
   const isHomeActive = currentView === 'home';
   const isTasksActive =
+    currentView === 'grading-queue' ||
+    currentView === 'score-matrix' ||
     currentView === 'mobile-grading-list' ||
     currentView === 'mobile-all-tasks' ||
     currentView === 'assignments' ||
@@ -81,7 +83,7 @@ export const TeacherMobileBottomNav: React.FC<TeacherMobileBottomNavProps> = ({
           {/* 2. งาน */}
           <button
             type="button"
-            onClick={() => onNavigate('mobile-grading-list')}
+            onClick={() => onNavigate('grading-queue')}
             className={`w-full flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
               isTasksActive
                 ? 'text-blue-600 bg-blue-50/70 font-extrabold'
@@ -167,7 +169,7 @@ export const TeacherMobileBottomNav: React.FC<TeacherMobileBottomNavProps> = ({
         {/* 2. งาน */}
         <button
           type="button"
-          onClick={() => onNavigate('mobile-grading-list')}
+          onClick={() => onNavigate('grading-queue')}
           className={`w-full flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
             isTasksActive
               ? 'text-blue-600 bg-blue-50/70 font-extrabold'
