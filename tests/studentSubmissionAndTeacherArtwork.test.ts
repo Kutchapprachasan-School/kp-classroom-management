@@ -296,4 +296,50 @@ describe('Student Submission & Teacher Artwork Display Fixes', () => {
     const resolved = r2StorageService.resolvePublicViewUrl(`r2://${key}`);
     expect(resolved).toBeDefined();
   });
+
+  it('detects local unsynced submissions and syncs them to R2', async () => {
+    // Seed a local submission with Base64
+    const sampleDataUrl = 'data:image/webp;base64,UklGRkAAAABXRUJQVlA4IDQAAADwAQCdASoBAAEAAQAcJaACdLoAAP7/2QAA';
+    sgsRosterAndSubmissionService.submitStudentWorkToR2({
+      assignmentId: 'asg-sync-test',
+      studentCode: '99001',
+      workTitle: 'งานศิลปะที่ยังไม่ได้ซิงก์',
+      fileName: 'drawing.png',
+      fileDataUrl: sampleDataUrl,
+    });
+
+    const unsyncedCount = sgsRosterAndSubmissionService.getLocalUnsyncedSubmissionsCount();
+    expect(unsyncedCount).toBeGreaterThanOrEqual(1);
+
+    // Configure R2 for testing
+    const originalFetch = globalThis.fetch;
+    r2StorageService.configure({
+      workerUrl: 'https://kps-r2-worker.surasit-classroom.workers.dev',
+      uploadSecret: 'test-secret',
+      publicUrl: 'https://storage.kps.ac.th',
+    });
+
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      return {
+        ok: true,
+        status: 200,
+        text: async () => 'OK',
+        json: async () => ({ success: true }),
+      } as any;
+    }) as any;
+
+    try {
+      const syncResult = await sgsRosterAndSubmissionService.syncLocalSubmissionsToR2();
+      expect(syncResult.success).toBe(true);
+      expect(syncResult.syncedCount).toBeGreaterThanOrEqual(1);
+
+      // Verify the submission now has an HTTP(S) URL
+      const subs = sgsRosterAndSubmissionService.getSubmissions();
+      const updatedSub = subs.find((s) => s.studentCode === '99001' && s.assignmentId === 'asg-sync-test');
+      expect(updatedSub?.fileDataUrl).toContain('https://');
+    } finally {
+      globalThis.fetch = originalFetch;
+      r2StorageService.resetConfig();
+    }
+  });
 });

@@ -99,6 +99,8 @@ import {
 } from '../services/teacherBannerService';
 
 import { sgsExportService, type SgsSnapshotRecord } from '../services/sgsExportService';
+import { r2StorageService } from '../services/r2StorageService';
+import { sgsRosterAndSubmissionService } from '../services/sgsRosterAndSubmissionService';
 import { TEACHER_SUBJECTS_LIST } from '../services/teacherCourseAssignmentService';
 import { classroomService } from '../services/classroomService';
 import { cleanSlateService } from '../services/cleanSlateService';
@@ -225,8 +227,12 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
   );
   const [adminBannerModalKey, setAdminBannerModalKey] = useState<TeacherBannerKey | null>(null);
 
-  // Backups & Snapshots
+  // Backups & Snapshots & R2 Sync
   const [snapshots, setSnapshots] = useState<SgsSnapshotRecord[]>([]);
+  const [isSyncingR2, setIsSyncingR2] = useState<boolean>(false);
+  const [unsyncedCount, setUnsyncedCount] = useState<number>(() =>
+    sgsRosterAndSubmissionService.getLocalUnsyncedSubmissionsCount()
+  );
 
   // Classrooms & Advisors
   const [classrooms, setClassrooms] = useState<ClassroomRosterItem[]>([]);
@@ -278,6 +284,9 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
   useEffect(() => {
     if (activeModalKey === 'notifications') {
       setPhoneNotiPermission(phoneNotificationService.getPermissionState());
+    }
+    if (activeModalKey === 'backup') {
+      setUnsyncedCount(sgsRosterAndSubmissionService.getLocalUnsyncedSubmissionsCount());
     }
   }, [activeModalKey]);
 
@@ -3215,28 +3224,105 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         saveButtonText="💾 สร้าง Snapshot สำรองข้อมูลทันที"
       >
         <div className="space-y-4">
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-extrabold text-slate-900">Cloudflare R2 Workspace Storage</h3>
-                <p className="text-xs text-slate-500">พื้นที่จัดเก็บผลงานนักเรียนและเอกสารโรงเรียน (โควตา 100 TB)</p>
+                <p className="text-xs text-slate-500">พื้นที่จัดเก็บผลงานนักเรียนและเอกสารโรงเรียน (Zero-Egress Pillar 6)</p>
               </div>
-              <span className="px-3 py-1 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold">
-                ✓ เชื่อมต่อสมบูรณ์
+              <span
+                className={`px-3 py-1 rounded-xl text-xs font-bold ${
+                  r2StorageService.isConfigured()
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-amber-100 text-amber-800'
+                }`}
+              >
+                {r2StorageService.isConfigured() ? '✓ เชื่อมต่อสมบูรณ์' : '⚠️ รอตั้งค่า .env'}
               </span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-[11px] font-bold text-slate-500 block">พื้นที่ใช้ไป:</span>
-                <span className="text-base font-extrabold text-slate-900">1.24 GB</span>
+
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1.5 font-sans">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <span className="text-slate-500 font-medium">Worker Endpoint:</span>
+                <span className="font-mono text-[11px] text-slate-800 break-all">
+                  {r2StorageService.getWorkerUrl() || 'ยังไม่ได้ระบุ VITE_R2_WORKER_URL'}
+                </span>
               </div>
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-[11px] font-bold text-slate-500 block">ไฟล์ทั้งหมด:</span>
-                <span className="text-base font-extrabold text-slate-900">1,482 ไฟล์</span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-t border-slate-200/60 pt-1.5">
+                <span className="text-slate-500 font-medium">Public Domain:</span>
+                <span className="font-mono text-[11px] text-slate-800 break-all">
+                  {r2StorageService.getPublicUrl() || 'https://storage.kps.ac.th'}
+                </span>
               </div>
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-[11px] font-bold text-slate-500 block">สำรองล่าสุด:</span>
-                <span className="text-base font-extrabold text-slate-900">วันนี้ 09:30 น.</span>
+            </div>
+
+            {/* การซิงก์และแปลงไฟล์ส่งงานเก่า (Local to Cloudflare R2 Migration) */}
+            <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-200 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h4 className="text-xs font-bold text-blue-950">
+                      🚀 ซิงก์ไฟล์งานเก่าทั้งหมดในเครื่องขึ้น Cloudflare R2
+                    </h4>
+                    {unsyncedCount > 0 ? (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-extrabold">
+                        {unsyncedCount} รายการรอซิงก์
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-extrabold">
+                        ✓ ครบถ้วนแล้ว
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-blue-900/80 leading-relaxed">
+                    ไฟล์งานที่นักเรียนเคยส่งไว้ก่อนหน้านี้ในเครื่องนี้ (Base64 WebP ใน LocalStorage) จะถูกอัปโหลดขึ้น Cloudflare R2 และเปลี่ยนเป็น Public URL ถาวร เพื่อให้อาจารย์และนักเรียนสามารถเปิดดูรูปภาพ/ไฟล์ได้จากทุกเครื่อง ทุกอุปกรณ์ โดยไม่มีปัญหา Egress Limit
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 border-t border-blue-200/60">
+                <span className="text-xs text-blue-900 font-medium">
+                  {unsyncedCount === 0
+                    ? '✓ ไฟล์ผลงานในเครื่องนี้ทั้งหมดเชื่อมต่อกับ R2 เรียบร้อยแล้ว'
+                    : `มีผลงานนักเรียน ${unsyncedCount} รายการในเครื่องนี้ที่พร้อมซิงก์`}
+                </span>
+                <button
+                  type="button"
+                  disabled={isSyncingR2 || !r2StorageService.isConfigured()}
+                  onClick={async () => {
+                    setIsSyncingR2(true);
+                    try {
+                      const res = await sgsRosterAndSubmissionService.syncLocalSubmissionsToR2();
+                      if (res.success) {
+                        showToast(`✓ ซิงก์ไฟล์ขึ้น Cloudflare R2 สำเร็จ ${res.syncedCount} ไฟล์`);
+                        setUnsyncedCount(sgsRosterAndSubmissionService.getLocalUnsyncedSubmissionsCount());
+                      } else {
+                        showToast(res.error || 'ซิงก์ไม่สำเร็จ กรุณาตรวจสอบการตั้งค่า');
+                      }
+                    } catch (e) {
+                      showToast('เกิดข้อผิดพลาดในการซิงก์ไฟล์');
+                    } finally {
+                      setIsSyncingR2(false);
+                    }
+                  }}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer ${
+                    isSyncingR2 || !r2StorageService.isConfigured()
+                      ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white'
+                  }`}
+                >
+                  {isSyncingR2 ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>กำลังซิงก์ไฟล์ขึ้น R2...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Cloud className="w-4 h-4" />
+                      <span>ซิงก์ไฟล์ขึ้น Cloudflare R2 ทันที</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>

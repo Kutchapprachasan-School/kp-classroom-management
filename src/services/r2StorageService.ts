@@ -2,12 +2,17 @@
 // Cloudflare R2 Object Storage Client for Student Submissions & School Documents
 // Follows Pillar 6: R2-Only Storage for All Assets & Documents
 
-const env =
-  typeof import.meta !== 'undefined' && (import.meta as any).env
-    ? (import.meta as any).env
-    : typeof globalThis !== 'undefined' && (globalThis as any).process?.env
-    ? (globalThis as any).process.env
-    : {};
+let runtimeConfig: { workerUrl?: string; publicUrl?: string; uploadSecret?: string } = {};
+
+const getEnvObj = (): Record<string, any> => {
+  if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
+    return (import.meta as any).env;
+  }
+  if (typeof globalThis !== 'undefined' && (globalThis as any).process?.env) {
+    return (globalThis as any).process.env;
+  }
+  return {};
+};
 
 export interface R2UploadResult {
   success: boolean;
@@ -18,21 +23,42 @@ export interface R2UploadResult {
 }
 
 export const r2StorageService = {
+  configure(config: { workerUrl?: string; publicUrl?: string; uploadSecret?: string }) {
+    runtimeConfig = { ...runtimeConfig, ...config };
+  },
+
+  resetConfig() {
+    runtimeConfig = {};
+  },
+
   getWorkerUrl(): string {
-    const val = env.VITE_R2_WORKER_URL || '';
-    return val.trim().replace(/\/+$/, '');
+    if (runtimeConfig.workerUrl !== undefined) {
+      return runtimeConfig.workerUrl.trim().replace(/\/+$/, '');
+    }
+    const env = getEnvObj();
+    const val = env.VITE_R2_WORKER_URL || (typeof process !== 'undefined' && process.env?.VITE_R2_WORKER_URL) || '';
+    return String(val).trim().replace(/\/+$/, '');
   },
 
   getPublicUrl(): string {
-    const pub = env.VITE_R2_PUBLIC_URL || '';
-    if (pub && pub.trim()) {
-      return pub.trim().replace(/\/+$/, '');
+    if (runtimeConfig.publicUrl !== undefined) {
+      return runtimeConfig.publicUrl.trim().replace(/\/+$/, '');
+    }
+    const env = getEnvObj();
+    const pub = env.VITE_R2_PUBLIC_URL || (typeof process !== 'undefined' && process.env?.VITE_R2_PUBLIC_URL) || '';
+    if (pub && String(pub).trim()) {
+      return String(pub).trim().replace(/\/+$/, '');
     }
     return this.getWorkerUrl();
   },
 
   getUploadSecret(): string {
-    return (env.VITE_R2_UPLOAD_SECRET || '').trim();
+    if (runtimeConfig.uploadSecret !== undefined) {
+      return runtimeConfig.uploadSecret.trim();
+    }
+    const env = getEnvObj();
+    const val = env.VITE_R2_UPLOAD_SECRET || (typeof process !== 'undefined' && process.env?.VITE_R2_UPLOAD_SECRET) || '';
+    return String(val).trim();
   },
 
   isConfigured(): boolean {

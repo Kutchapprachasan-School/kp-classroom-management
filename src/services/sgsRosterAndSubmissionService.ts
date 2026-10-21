@@ -2070,6 +2070,118 @@ export const sgsRosterAndSubmissionService = {
     return this.saveSubmissions(updated);
   },
 
+  // ตรวจสอบจำนวนงานที่เคยส่งไว้ในเครื่อง (Base64/Local cache) แต่ยังไม่ได้ซิงก์ขึ้น Cloudflare R2
+  getLocalUnsyncedSubmissionsCount(): number {
+    const subs = this.getSubmissions();
+    return subs.filter((s) => {
+      const isAlreadyRemote =
+        s.fileDataUrl &&
+        (s.fileDataUrl.startsWith('http://') || s.fileDataUrl.startsWith('https://')) &&
+        !s.fileDataUrl.startsWith('data:');
+      if (isAlreadyRemote) return false;
+      const cached = this.getSubmissionFileUrl(
+        s.assignmentId,
+        s.studentCode,
+        s.r2ObjectKey ? s.r2ObjectKey.split('/').pop() : undefined
+      );
+      return Boolean(cached || (s.fileDataUrl && s.fileDataUrl.startsWith('data:')));
+    }).length;
+  },
+
+  // ซิงก์ไฟล์งานนักเรียนที่แคชไว้ในเครื่อง (Base64) ขึ้น Cloudflare R2 อัตโนมัติ (1-Click Migration)
+  async syncLocalSubmissionsToR2(): Promise<{
+    success: boolean;
+    syncedCount: number;
+    totalEligible: number;
+    error?: string;
+  }> {
+    if (!r2StorageService.isConfigured()) {
+      return {
+        success: false,
+        syncedCount: 0,
+        totalEligible: 0,
+        error: 'ยังไม่ได้ตั้งค่า Cloudflare R2 Worker หรือ Upload Secret ในระบบ (.env หรือการตั้งค่า)',
+      };
+    }
+
+    const subs = this.getSubmissions();
+    const candidates = subs.filter((s) => {
+      const isAlreadyRemote =
+        s.fileDataUrl &&
+        (s.fileDataUrl.startsWith('http://') || s.fileDataUrl.startsWith('https://')) &&
+        !s.fileDataUrl.startsWith('data:');
+      if (isAlreadyRemote) return false;
+      const cached = this.getSubmissionFileUrl(
+        s.assignmentId,
+        s.studentCode,
+        s.r2ObjectKey ? s.r2ObjectKey.split('/').pop() : undefined
+      );
+      return Boolean(cached || (s.fileDataUrl && s.fileDataUrl.startsWith('data:')));
+    });
+
+    if (candidates.length === 0) {
+      return {
+        success: true,
+        syncedCount: 0,
+        totalEligible: 0,
+      };
+    }
+
+    let syncedCount = 0;
+    const term = '1/2569';
+
+    for (const sub of candidates) {
+      const base64Data =
+        (sub.fileDataUrl && sub.fileDataUrl.startsWith('data:') ? sub.fileDataUrl : null) ||
+        this.getSubmissionFileUrl(
+          sub.assignmentId,
+          sub.studentCode,
+          sub.r2ObjectKey ? sub.r2ObjectKey.split('/').pop() : undefined
+        );
+
+      if (!base64Data) continue;
+
+      const isPdf =
+        base64Data.startsWith('data:application/pdf') ||
+        (sub.workAttachmentLabel && sub.workAttachmentLabel.includes('.pdf'));
+      const ext = isPdf ? 'pdf' : 'webp';
+      const cleanFileName = `${sub.studentCode}_submission.${ext}`;
+      const r2Key = r2StorageService.buildSubmissionKey({
+        term: sub.academicYearTerm || term,
+        classroom: 'm3-1',
+        assignmentId: sub.assignmentId,
+        studentCode: sub.studentCode,
+        fileName: cleanFileName,
+      });
+
+      try {
+        const uploadRes = await r2StorageService.uploadFile(
+          r2Key,
+          base64Data,
+          isPdf ? 'application/pdf' : 'image/webp'
+        );
+
+        if (uploadRes.success && uploadRes.url) {
+          sub.fileDataUrl = uploadRes.url;
+          sub.r2ObjectKey = uploadRes.key;
+          syncedCount++;
+        }
+      } catch (err) {
+        console.warn(`[SyncLocalSubmissionsToR2] Failed for ${sub.studentCode}:`, err);
+      }
+    }
+
+    if (syncedCount > 0) {
+      this.saveSubmissions(subs);
+    }
+
+    return {
+      success: true,
+      syncedCount,
+      totalEligible: candidates.length,
+    };
+  },
+
   // คำนวณสถิติพื้นที่ Cloudflare R2 (จำนวนไฟล์, พื้นที่จริงหลังบีบอัด WebP, พื้นที่ที่ประหยัดได้ และไฟล์ที่พร้อมลบท้ายปี)
   getR2StorageStats(): {
     activeFileCount: number;

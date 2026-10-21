@@ -21,6 +21,7 @@ import {
   sgsRosterAndSubmissionService,
   RETURN_SUBMISSION_REASONS,
 } from '../../services/sgsRosterAndSubmissionService';
+import { r2StorageService } from '../../services/r2StorageService';
 import {
   FEEDBACK_STRAND_CATALOG,
   detectFeedbackStrand,
@@ -137,12 +138,13 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
         currentItem.fileName
       )
     : undefined;
-  const cleanPreview =
-    currentItem?.filePreviewUrl &&
-    !currentItem.filePreviewUrl.includes('storage.kps.ac.th') &&
-    !currentItem.filePreviewUrl.startsWith('r2://')
-      ? currentItem.filePreviewUrl
-      : undefined;
+  const cleanPreview = currentItem?.filePreviewUrl
+    ? (r2StorageService.isConfigured()
+        ? r2StorageService.resolvePublicViewUrl(currentItem.filePreviewUrl)
+        : (!currentItem.filePreviewUrl.includes('storage.kps.ac.th') && !currentItem.filePreviewUrl.startsWith('r2://')
+            ? currentItem.filePreviewUrl
+            : undefined))
+    : undefined;
   const effectiveFileUrl = localOverrideFileUrl || cachedFile || cleanPreview;
 
   const isImage = Boolean(
@@ -333,7 +335,7 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
                             const f = e.target.files?.[0];
                             if (!f) return;
                             const reader = new FileReader();
-                            reader.onload = (ev) => {
+                            reader.onload = async (ev) => {
                               const res = ev.target?.result as string;
                               if (res) {
                                 setImgError(false);
@@ -344,6 +346,35 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
                                     localStorage.setItem(`kp_sub_file_${currentItem.fileName}`, res);
                                   }
                                 } catch {}
+
+                                // อัปโหลดขึ้น Cloudflare R2 ทันทีหาก R2 พร้อมใช้งาน
+                                if (r2StorageService.isConfigured()) {
+                                  try {
+                                    const cleanFileName = f.name || currentItem.fileName || `${currentItem.studentCode}_submission.webp`;
+                                    const r2Key = r2StorageService.buildSubmissionKey({
+                                      term: currentItem.academicYearTerm || '1/2569',
+                                      classroom: currentItem.classroom,
+                                      assignmentId: currentItem.assignmentId,
+                                      studentCode: currentItem.studentCode,
+                                      fileName: cleanFileName,
+                                    });
+                                    const uploadRes = await r2StorageService.uploadFile(r2Key, f, f.type);
+                                    if (uploadRes.success && uploadRes.url) {
+                                      setLocalOverrideFileUrl(uploadRes.url);
+                                      const subs = sgsRosterAndSubmissionService.getSubmissions();
+                                      const targetIdx = subs.findIndex(
+                                        (s) => s.assignmentId === currentItem.assignmentId && s.studentCode === currentItem.studentCode
+                                      );
+                                      if (targetIdx !== -1) {
+                                        subs[targetIdx].fileDataUrl = uploadRes.url;
+                                        subs[targetIdx].r2ObjectKey = uploadRes.key;
+                                        sgsRosterAndSubmissionService.saveSubmissions(subs);
+                                      }
+                                    }
+                                  } catch (err) {
+                                    console.warn('[GradingWorkspaceModal] Direct R2 upload failed:', err);
+                                  }
+                                }
                               }
                             };
                             reader.readAsDataURL(f);

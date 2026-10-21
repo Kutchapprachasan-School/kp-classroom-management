@@ -14,6 +14,7 @@ import { studentService, formatClassroomLabel } from './studentService.ts';
 import { classroomService } from './classroomService.ts';
 import { authService } from './authService.ts';
 import { sgsRosterAndSubmissionService, formatSubmissionTimestamp } from './sgsRosterAndSubmissionService.ts';
+import { r2StorageService } from './r2StorageService.ts';
 
 export interface TeachingSubjectInfo {
   code: string;
@@ -145,6 +146,7 @@ export interface GradingQueueItem {
   teacherFeedback?: string;
   gradedAtText?: string;
   studentAvatarUrl?: string;
+  academicYearTerm?: string;
 }
 
 // ============================================================================
@@ -285,6 +287,18 @@ export const teacherCourseAssignmentService = {
       const mergedQueue: GradingQueueItem[] = [];
       const handledKeys = new Set<string>();
 
+      // ตัวแปลง URL ให้เปิดดูรูปได้จริง (รองรับทั้ง R2 Worker URL และ Local Fallback)
+      const resolveFileUrl = (rawUrl?: string): string | undefined => {
+        if (!rawUrl) return undefined;
+        if (r2StorageService.isConfigured()) {
+          return r2StorageService.resolvePublicViewUrl(rawUrl);
+        }
+        if (rawUrl.includes('storage.kps.ac.th') || rawUrl.startsWith('r2://')) {
+          return undefined;
+        }
+        return rawUrl;
+      };
+
       // 1. นำงานที่นักเรียนส่งจริงเข้ามาในคิว
       realSubs.forEach((sub, idx) => {
         const pairKey = `${sub.assignmentId}_${sub.studentCode}`;
@@ -342,13 +356,7 @@ export const teacherCourseAssignmentService = {
         const realSeatNo =
           foundInService?.student.no ?? stu?.sgsSeatNo ?? stu?.no ?? savedMatch?.seatNo ?? (idx + 1);
 
-        // ดึงไฟล์รูปภาพจริง Data URL ที่อัปโหลดไว้ (กรอง URL ปลอมที่ไม่สามารถเปิดได้ออก)
-        const cleanSavedUrl =
-          savedMatch?.filePreviewUrl &&
-          !savedMatch.filePreviewUrl.includes('storage.kps.ac.th') &&
-          !savedMatch.filePreviewUrl.startsWith('r2://')
-            ? savedMatch.filePreviewUrl
-            : undefined;
+        const cleanSavedUrl = resolveFileUrl(savedMatch?.filePreviewUrl);
 
         const effectiveFileName = savedMatch?.fileName || cleanFileName || sub.workAttachmentLabel;
 
@@ -359,9 +367,7 @@ export const teacherCourseAssignmentService = {
         );
 
         const realFileUrl =
-          (sub.fileDataUrl && !sub.fileDataUrl.includes('storage.kps.ac.th') && !sub.fileDataUrl.startsWith('r2://')
-            ? sub.fileDataUrl
-            : undefined) ||
+          resolveFileUrl(sub.fileDataUrl) ||
           cachedDirectUrl ||
           cleanSavedUrl ||
           undefined;
@@ -396,6 +402,7 @@ export const teacherCourseAssignmentService = {
           teacherFeedback: feedback,
           gradedAtText: savedMatch?.gradedAtText,
           studentAvatarUrl: savedMatch?.studentAvatarUrl || (stu as any)?.avatarUrl || (foundInService?.student as any)?.avatarUrl,
+          academicYearTerm: sub.academicYearTerm || '1/2569',
         };
 
         mergedQueue.push(queueItem);
@@ -410,8 +417,8 @@ export const teacherCourseAssignmentService = {
             if (!exists) return;
           }
           // Rehydrate filePreviewUrl if missing or contains storage.kps.ac.th
-          let previewUrl = it.filePreviewUrl;
-          if (!previewUrl || previewUrl.includes('storage.kps.ac.th') || previewUrl.startsWith('r2://')) {
+          let previewUrl = resolveFileUrl(it.filePreviewUrl);
+          if (!previewUrl) {
             previewUrl = sgsRosterAndSubmissionService.getSubmissionFileUrl(it.assignmentId, it.studentCode, it.fileName);
           }
           mergedQueue.push({
