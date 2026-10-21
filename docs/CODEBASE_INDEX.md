@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 21/10/2569 16:54:40 | รวมทั้งหมด 204 ไฟล์*
+*อัปเดตล่าสุด: 21/10/2569 17:09:55 | รวมทั้งหมด 204 ไฟล์*
 
 ---
 
@@ -14,7 +14,7 @@
 | :--- | :---: | :--- |
 | [src/views/AcademicTermsView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/AcademicTermsView.tsx) | 2081 | `ActivityCategory` (L50), `CalendarLegendColor` (L52), `CalendarEventItem` (L54), `AcademicTermsView` (L282) |
 | [src/views/AdminExecutiveDashboardView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/AdminExecutiveDashboardView.tsx) | 312 | `AdminExecutiveDashboardView` (L39) |
-| [src/views/AssignmentManagementView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/AssignmentManagementView.tsx) | 3191 | `QuickFilterMode` (L46), `AssignmentManagementView` (L60) |
+| [src/views/AssignmentManagementView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/AssignmentManagementView.tsx) | 3207 | `QuickFilterMode` (L46), `AssignmentManagementView` (L60) |
 | [src/views/ClassroomAttendanceView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomAttendanceView.tsx) | 1885 | `ClassroomAttendanceViewProps` (L56), `TeacherCourseOption` (L61), `ClassroomAttendanceView` (L85) |
 | [src/views/ClassroomManagementView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomManagementView.tsx) | 1523 | `ImportPreviewRow` (L51), `ClassroomManagementView` (L63) |
 | [src/views/ClassroomsRosterView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomsRosterView.tsx) | 2088 | `ClassroomsRosterView` (L62) |
@@ -216,7 +216,7 @@
 | [src/services/teacherBannerService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/teacherBannerService.ts) | 294 | `TeacherBannerKey` (L7), `TeacherBannerItem` (L9), `TEACHER_BANNERS_EVENT` (L29), `DEFAULT_TEACHER_BANNERS` (L31), `teacherBannerService` (L85) |
 | [src/services/teacherCalendarTodoService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/teacherCalendarTodoService.ts) | 448 | `DayWorkStatus` (L3), `DayTaskDetail` (L5), `CalendarDayStatus` (L17), `DailyTodoItem` (L30), `UpcomingMilestone` (L45), `teacherCalendarTodoService` (L85) |
 | [src/services/teacherCopilotService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/teacherCopilotService.ts) | 810 | `TimeOfDayScenario` (L19), `UrgentPriorityLevel` (L25), `DeepLinkTargetView` (L27), `CrossViewNavigationPayload` (L46), `UrgentTriageItem` (L57), `DailyStepItem` (L73), `GrillMeRoundRecord` (L85), `GRILL_ME_8_ROUNDS_LOG` (L136), `teacherCopilotService` (L292) |
-| [src/services/teacherCourseAssignmentService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/teacherCourseAssignmentService.ts) | 644 | `TeachingSubjectInfo` (L18), `TeachingCourseClassroom` (L30), `getAllAvailableClassroomLabels` (L36), `getDynamicTeachingSubjects` (L54), `TEACHER_SUBJECTS_LIST` (L93), `HOMEROOM_ADVISORY` (L109), `SubmissionChannelType` (L121), `GradingQueueItem` (L123), `StudentBundleProgress` (L153), `AssignmentBundleConfig` (L166) *(+2 รายการ)* |
+| [src/services/teacherCourseAssignmentService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/teacherCourseAssignmentService.ts) | 648 | `TeachingSubjectInfo` (L18), `TeachingCourseClassroom` (L30), `getAllAvailableClassroomLabels` (L36), `getDynamicTeachingSubjects` (L54), `TEACHER_SUBJECTS_LIST` (L93), `HOMEROOM_ADVISORY` (L109), `SubmissionChannelType` (L121), `GradingQueueItem` (L123), `StudentBundleProgress` (L153), `AssignmentBundleConfig` (L166) *(+2 รายการ)* |
 | [src/services/trashService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/trashService.ts) | 197 | `TRASH_SYNC_EVENT` (L7), `trashService` (L27) |
 | [src/services/types.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/types.ts) | 117 | 📌 *CLASSROOM & ROSTER SCHEMAS* (L3), `ClassroomCreateSchema` (L4), `ClassroomCreateInput` (L14), `StudentCreateSchema` (L16), `StudentCreateInput` (L23), 📌 *ASSIGNMENT & EXAM SCHEMAS* (L25), `AssignmentCreateSchema` (L26), `AssignmentCreateInput` (L34), 📌 *SCORE & AUDIT LOG SCHEMAS* (L36), `ScoreUpdateSchema` (L37) *(+17 รายการ)* |
 | [src/services/weeklyQuizService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/weeklyQuizService.ts) | 276 | `parseThaiTermDate` (L35), `QuizWeekInfo` (L46), `computeQuizWeek` (L59), `QuizScoreInput` (L99), `QuizScoreOutput` (L109), `scoreWeeklyQuiz` (L125), `weeklyQuizService` (L159) |

@@ -158,5 +158,32 @@ describe('Teacher Curriculum Isolation & Academic Term Break System', () => {
       expect(keyB).toBe('kp_teacher_matrix_slots_T002');
       expect(keyA).not.toBe(keyB);
     });
+
+    it('accurately identifies term break, holiday, and weekend days in monthly attendance calendar', () => {
+      const monthDays = attendanceCorrelationService.getPeriodCalendarMonthStatus(
+        'TH101',
+        'room-1-1',
+        2026,
+        10,
+        '2026-10-21'
+      );
+
+      // October 13 is King Bhumibol Day (isHoliday = true)
+      const day13 = monthDays.find((d) => d.dayOfMonth === 13);
+      expect(day13?.isHoliday).toBe(true);
+
+      // October 23 is Chulalongkorn Day (isHoliday = true)
+      const day23 = monthDays.find((d) => d.dayOfMonth === 23);
+      expect(day23?.isHoliday).toBe(true);
+
+      // October 3 is Saturday (isWeekend = true)
+      const day3 = monthDays.find((d) => d.dayOfMonth === 3);
+      expect(day3?.isWeekend).toBe(true);
+
+      // October 14 is a Wednesday during term break (isTermBreak = true, isWeekend = false)
+      const day14 = monthDays.find((d) => d.dayOfMonth === 14);
+      expect(day14?.isTermBreak).toBe(true);
+      expect(day14?.isWeekend).toBe(false);
+    });
   });
 });

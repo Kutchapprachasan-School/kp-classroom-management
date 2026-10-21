@@ -395,10 +395,14 @@ export const teacherCourseAssignmentService = {
         mergedQueue.push(queueItem);
       });
 
-      // 2. นำงานที่อยู่ใน savedItems แต่ไม่ได้อยู่ใน realSubs (ถ้ามี) เข้ามา
+      // 2. นำงานที่อยู่ใน savedItems แต่ไม่ได้อยู่ใน realSubs (ถ้ามี) เข้ามา (กรอง ghost queue items ที่ไม่มีใน termAssignments ออก)
       savedItems.forEach((it) => {
         const pairKey = `${it.assignmentId}_${it.studentCode}`;
         if (!handledKeys.has(pairKey) && !handledKeys.has(it.id)) {
+          if (termAssignments.length > 0 && it.assignmentId) {
+            const exists = termAssignments.some((a) => a.id === it.assignmentId);
+            if (!exists) return;
+          }
           mergedQueue.push(it);
         }
       });

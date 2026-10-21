@@ -763,15 +763,38 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     };
   }, [refreshTermAssignments, refreshMatrixStudents]);
 
-  // Filtered Submissions
-  const filteredSubmissions = useMemo(() => {
+  // กรองคิวส่งงานตามรายวิชาและห้องเรียนที่เลือกใน Dropdown (Scoped Queue)
+  const scopedQueue = useMemo(() => {
     return queueItems.filter((item) => {
-      if (selectedSubjectCode !== 'ALL' && item.subjectCode !== selectedSubjectCode) {
-        return false;
+      if (selectedSubjectCode !== 'ALL') {
+        const cleanItemSubj = item.subjectCode?.trim().toUpperCase();
+        const cleanSelectedSubj = selectedSubjectCode?.trim().toUpperCase();
+        if (cleanItemSubj !== cleanSelectedSubj) {
+          return false;
+        }
       }
-      if (selectedRoom !== 'ALL' && item.classroom !== selectedRoom) {
-        return false;
+      if (selectedRoom !== 'ALL') {
+        const normItemRoom = formatClassroomLabel(item.classroom);
+        const normSelectedRoom = formatClassroomLabel(selectedRoom);
+        if (normItemRoom !== normSelectedRoom) {
+          return false;
+        }
       }
+      return true;
+    });
+  }, [queueItems, selectedSubjectCode, selectedRoom]);
+
+  // สถิติยอดงานตามเงื่อนไข Dropdown (ทั้งหมด, รอตรวจ, ตรวจแล้ว)
+  const stats = useMemo(() => {
+    const total = scopedQueue.length;
+    const pending = scopedQueue.filter((i) => i.status === 'PENDING_REVIEW').length;
+    const graded = scopedQueue.filter((i) => i.status === 'GRADED').length;
+    return { total, pending, graded };
+  }, [scopedQueue]);
+
+  // Filtered Submissions (ตามแท็บสถานะและคำค้นหา)
+  const filteredSubmissions = useMemo(() => {
+    return scopedQueue.filter((item) => {
       if (selectedStatus === 'PENDING' && item.status !== 'PENDING_REVIEW') {
         return false;
       }
@@ -790,14 +813,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       }
       return true;
     });
-  }, [queueItems, selectedSubjectCode, selectedRoom, selectedStatus, searchQuery]);
-
-  const stats = useMemo(() => {
-    const total = queueItems.length;
-    const pending = queueItems.filter((i) => i.status === 'PENDING_REVIEW').length;
-    const graded = queueItems.filter((i) => i.status === 'GRADED').length;
-    return { total, pending, graded };
-  }, [queueItems]);
+  }, [scopedQueue, selectedStatus, searchQuery]);
 
   const handleSaveGrade = (itemId: string, score: number, feedback: string) => {
     const targetItem = queueItems.find((i) => i.id === itemId);
@@ -954,7 +970,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                   : 'text-[#6B7C93] hover:text-[#163A66]'
               }`}
             >
-              1. ชิ้นงานที่สั่งไว้ ({termAssignments.length})
+              1. ชิ้นงานที่สั่งไว้ ({groupedAssignedCards.totalCount})
             </button>
             <button
               type="button"
@@ -1069,7 +1085,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-sm sm:text-base font-bold text-[#163A66]">
-                ชิ้นงานที่สั่งไว้แล้ว ({termAssignments.length} รายการ)
+                ชิ้นงานที่สั่งไว้แล้ว ({groupedAssignedCards.totalCount} รายการ)
               </h2>
               <p className="text-xs text-[#6B7C93]">
                 แสดงหมวดคะแนน 4 ส่วน (ก่อนกลางภาค / กลางภาค / หลังกลางภาค / ปลายภาค) และห้องเรียนที่ได้รับมอบหมาย
@@ -1411,7 +1427,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
               </div>
             ) : (
               <div className="divide-y divide-slate-100">
-                {filteredSubmissions.map((item) => {
+                {filteredSubmissions.map((item, idx) => {
                   const isGraded = item.status === 'GRADED';
                   const isPdf =
                     item.submissionChannel === 'PDF_UPLOAD' ||
@@ -1464,7 +1480,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                     >
                       <div className="flex items-start gap-3">
                         <span className="w-7 h-7 rounded-xl bg-slate-100 text-[#6B7C93] font-bold text-xs flex items-center justify-center shrink-0">
-                          {item.queueNo}
+                          {idx + 1}
                         </span>
                         <div>
                           <div className="flex flex-wrap items-center gap-2">

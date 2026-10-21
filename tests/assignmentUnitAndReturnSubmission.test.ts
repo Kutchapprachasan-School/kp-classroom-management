@@ -270,4 +270,59 @@ describe('Assignment Unit Grouping, Dynamic Tasks & Return Submission', () => {
     expect(updated[0].attachments?.length).toBe(1);
     expect(updated[0].attachments?.[0].name).toBe('เอกสารประกอบการสอน_เคมีอินทรีย์.pdf');
   });
+
+  it('correctly filters grading queue and computes stats according to selected course and classroom dropdowns', () => {
+    // 1. Create assignments for two different courses
+    const asgThai = sgsRosterAndSubmissionService.addTermAssignment({
+      courseCode: 'ท23102',
+      title: 'แบบฝึกหัดภาษาไทย',
+      scorePart: 'PRE_MIDTERM',
+      maxScore: 10,
+      targetClassrooms: ['ม.3/1'],
+    });
+
+    const asgAntiCorruption = sgsRosterAndSubmissionService.addTermAssignment({
+      courseCode: 'ส30206',
+      title: 'งานที่ 1 วินัยและความซื่อสัตย์',
+      scorePart: 'PRE_MIDTERM',
+      maxScore: 30,
+      targetClassrooms: ['ม.6/1'],
+    });
+
+    // 2. Submit works: 12 submissions for Thai and 1 submission for Anti-Corruption
+    const thaiId = asgThai.find((a) => a.courseCode === 'ท23102')!.id;
+    const antiId = asgAntiCorruption.find((a) => a.courseCode === 'ส30206')!.id;
+
+    for (let i = 1; i <= 12; i++) {
+      sgsRosterAndSubmissionService.submitStudentWorkToR2({
+        assignmentId: thaiId,
+        studentCode: `400${i}`,
+        workTitle: `แบบฝึกหัดภาษาไทย คนที่ ${i}`,
+      });
+    }
+
+    sgsRosterAndSubmissionService.submitStudentWorkToR2({
+      assignmentId: antiId,
+      studentCode: '14561',
+      workTitle: 'งานที่ 1 วินัยและความซื่อสัตย์',
+    });
+
+    // 3. Verify total queue in service has 13 items
+    const allQueue = teacherCourseAssignmentService.getGradingQueue();
+    expect(allQueue.length).toBe(13);
+
+    // 4. Scoped queue for ส30206 should have EXACTLY 1 item, not 13
+    const scopedAntiCorruption = allQueue.filter(
+      (item) => item.subjectCode?.trim().toUpperCase() === 'ส30206'
+    );
+    expect(scopedAntiCorruption.length).toBe(1);
+    expect(scopedAntiCorruption[0].studentCode).toBe('14561');
+    expect(scopedAntiCorruption[0].assignmentTitle).toContain('วินัยและความซื่อสัตย์');
+
+    // 5. Scoped queue for ท23102 should have 12 items
+    const scopedThai = allQueue.filter(
+      (item) => item.subjectCode?.trim().toUpperCase() === 'ท23102'
+    );
+    expect(scopedThai.length).toBe(12);
+  });
 });

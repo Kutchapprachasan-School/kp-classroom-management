@@ -1340,13 +1340,13 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
 
             {/* Calendar Grid (อา - ส) */}
             <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-bold pb-1">
-              <span className="text-rose-500 font-extrabold">อา</span>
+              <span className="text-purple-600 font-extrabold">อา</span>
               <span className="text-slate-400">จ</span>
               <span className="text-slate-400">อ</span>
               <span className="text-slate-400">พ</span>
               <span className="text-slate-400">พฤ</span>
               <span className="text-slate-400">ศ</span>
-              <span className="text-rose-500 font-extrabold">ส</span>
+              <span className="text-purple-600 font-extrabold">ส</span>
             </div>
 
             <div className="grid grid-cols-7 gap-1">
@@ -1381,16 +1381,16 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                     className={`h-8 w-8 mx-auto rounded-full text-xs font-extrabold flex items-center justify-center transition-all cursor-pointer ${
                       isSelected
                         ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-300'
-                        : isHoliday
-                        ? 'bg-rose-100 text-rose-700 font-black border border-rose-200 hover:bg-rose-200'
-                        : day.isTermBreak
-                        ? 'bg-amber-100/70 text-amber-900 border border-amber-200/80 hover:bg-amber-200/70'
                         : isChecked
                         ? 'bg-emerald-100/90 text-emerald-800 hover:bg-emerald-200 font-bold'
+                        : day.isTermBreak
+                        ? 'text-slate-400 bg-slate-100/70 border border-slate-200/60 hover:bg-slate-200/60 font-semibold'
+                        : isHoliday
+                        ? 'bg-purple-100 text-purple-800 font-black border border-purple-200 hover:bg-purple-200'
                         : isWeekend
-                        ? 'bg-rose-50/70 text-rose-500 hover:bg-rose-100/70'
+                        ? 'bg-purple-50/80 text-purple-600 border border-purple-100 hover:bg-purple-100 font-semibold'
                         : day.isPastOrToday && day.isWeekday
-                        ? 'bg-rose-100/90 text-rose-700 hover:bg-rose-200'
+                        ? 'bg-rose-100/90 text-rose-700 border border-rose-300 hover:bg-rose-200 font-black'
                         : 'text-slate-400 hover:bg-slate-100'
                     }`}
                   >
@@ -1415,11 +1415,11 @@ export const ClassroomAttendanceView: React.FC<ClassroomAttendanceViewProps> = (
                 <span>ยังไม่เช็ค</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
+                <div className="w-2.5 h-2.5 rounded-full bg-slate-300 border border-slate-400 shrink-0" />
                 <span>ช่วงปิดเทอม</span>
               </div>
               <div className="flex items-center gap-1.5 col-span-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-rose-200 border border-rose-300 shrink-0" />
+                <div className="w-2.5 h-2.5 rounded-full bg-purple-300 border border-purple-400 shrink-0" />
                 <span>วันหยุด / เสาร์-อาทิตย์</span>
               </div>
             </div>
