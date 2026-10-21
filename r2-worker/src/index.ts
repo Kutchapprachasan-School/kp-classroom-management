@@ -24,7 +24,14 @@ export default {
 
     // 1. เปิดดูรูปภาพหรือดาวน์โหลดไฟล์ (GET)
     if (request.method === "GET") {
-      const object = await env.R2_BUCKET.get(key);
+      let object = await env.R2_BUCKET.get(key);
+      if (!object && key.startsWith("kp-classroom-submissions/")) {
+        const strippedKey = key.replace(/^kp-classroom-submissions\//, "");
+        object = await env.R2_BUCKET.get(strippedKey);
+      } else if (!object && !key.startsWith("kp-classroom-submissions/")) {
+        object = await env.R2_BUCKET.get(`kp-classroom-submissions/${key}`);
+      }
+
       if (!object) {
         return new Response("File Not Found", { status: 404, headers: corsHeaders });
       }

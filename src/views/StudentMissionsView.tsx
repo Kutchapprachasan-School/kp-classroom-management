@@ -28,6 +28,7 @@ import {
 } from '../services/sgsRosterAndSubmissionService';
 import { coursesCurriculumService } from '../services/coursesCurriculumService';
 import { behaviorService } from '../services/behaviorService';
+import { r2StorageService } from '../services/r2StorageService';
 import { validateGoogleDriveUrl } from '../utils/googleDriveUtils';
 import type { StudentQuestItem, StudentLeaderboardEntry } from '../types/viewModels';
 import { authService, type AuthUser } from '../services/authService';
@@ -91,6 +92,13 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
       setHasCompletedWeekly(true);
     }
   }, [existingQuizResult]);
+
+  useEffect(() => {
+    // ซิงค์ไฟล์งานที่เคยส่งไว้ในเครื่องนี้ขึ้น Cloudflare R2 อัตโนมัติเมื่อเปิดหน้ารายการงาน
+    if (r2StorageService.isConfigured()) {
+      sgsRosterAndSubmissionService.syncLocalSubmissionsToR2().catch(() => {});
+    }
+  }, []);
 
   // Real student XP calculation
   const myExp = React.useMemo(() => {

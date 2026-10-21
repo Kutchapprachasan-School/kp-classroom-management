@@ -10,6 +10,7 @@ import { studentService, formatClassroomLabel } from './studentService.ts';
 import { resolveRoomCandidates } from './masterDataService.ts';
 import { isGrade1SgsStudentCode } from '../config/m1SgsLookup';
 import { r2StorageService } from './r2StorageService.ts';
+import { cloudDataService } from './cloudDataService.ts';
 
 export type StudentTransferState = 'ACTIVE' | 'TRANSFERRED_IN' | 'TRANSFERRED_OUT';
 export type StudentGender = 'MALE' | 'FEMALE';
@@ -2126,19 +2127,39 @@ export const sgsRosterAndSubmissionService = {
   // ตรวจสอบจำนวนงานที่เคยส่งไว้ในเครื่อง (Base64/Local cache) แต่ยังไม่ได้ซิงก์ขึ้น Cloudflare R2
   getLocalUnsyncedSubmissionsCount(): number {
     const subs = this.getSubmissions();
-    return subs.filter((s) => {
-      const isAlreadyRemote =
-        s.fileDataUrl &&
-        (s.fileDataUrl.startsWith('http://') || s.fileDataUrl.startsWith('https://')) &&
-        !s.fileDataUrl.startsWith('data:');
-      if (isAlreadyRemote) return false;
+    let count = 0;
+    subs.forEach((s) => {
       const cached = this.getSubmissionFileUrl(
         s.assignmentId,
         s.studentCode,
         s.r2ObjectKey ? s.r2ObjectKey.split('/').pop() : undefined
       );
-      return Boolean(cached || (s.fileDataUrl && s.fileDataUrl.startsWith('data:')));
-    }).length;
+      if (cached && cached.startsWith('data:')) {
+        count++;
+      } else if (s.fileDataUrl && s.fileDataUrl.startsWith('data:')) {
+        count++;
+      }
+    });
+
+    if (typeof localStorage !== 'undefined') {
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('kp_sub_file_')) {
+            const val = localStorage.getItem(k);
+            if (val && val.startsWith('data:')) {
+              const isAlreadyCounted = subs.some((s) => k.includes(s.assignmentId) && k.includes(s.studentCode));
+              if (!isAlreadyCounted) {
+                count++;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Error counting local unsynced files', e);
+      }
+    }
+    return count;
   },
 
   // ซิงก์ไฟล์งานนักเรียนที่แคชไว้ในเครื่อง (Base64) ขึ้น Cloudflare R2 อัตโนมัติ (1-Click Migration)
@@ -2159,11 +2180,6 @@ export const sgsRosterAndSubmissionService = {
 
     const subs = this.getSubmissions();
     const candidates = subs.filter((s) => {
-      const isAlreadyRemote =
-        s.fileDataUrl &&
-        (s.fileDataUrl.startsWith('http://') || s.fileDataUrl.startsWith('https://')) &&
-        !s.fileDataUrl.startsWith('data:');
-      if (isAlreadyRemote) return false;
       const cached = this.getSubmissionFileUrl(
         s.assignmentId,
         s.studentCode,
@@ -2171,14 +2187,6 @@ export const sgsRosterAndSubmissionService = {
       );
       return Boolean(cached || (s.fileDataUrl && s.fileDataUrl.startsWith('data:')));
     });
-
-    if (candidates.length === 0) {
-      return {
-        success: true,
-        syncedCount: 0,
-        totalEligible: 0,
-      };
-    }
 
     let syncedCount = 0;
     const term = '1/2569';
@@ -2192,7 +2200,7 @@ export const sgsRosterAndSubmissionService = {
           sub.r2ObjectKey ? sub.r2ObjectKey.split('/').pop() : undefined
         );
 
-      if (!base64Data) continue;
+      if (!base64Data || !base64Data.startsWith('data:')) continue;
 
       const isPdf =
         base64Data.startsWith('data:application/pdf') ||
@@ -2225,14 +2233,69 @@ export const sgsRosterAndSubmissionService = {
       }
     }
 
+    // ซิงค์คีย์อิสระใน LocalStorage ที่มี kp_sub_file_
+    if (typeof localStorage !== 'undefined') {
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('kp_sub_file_')) {
+            const val = localStorage.getItem(k);
+            if (val && val.startsWith('data:')) {
+              const parts = k.replace('kp_sub_file_', '').split('_');
+              const targetAsg = parts[0] || 'asg-general';
+              const targetStu = parts[1] || 'student';
+              const r2Key = `kp-classroom-submissions/2-2569/all/${targetAsg}/${targetStu}_work.webp`;
+              try {
+                const upRes = await r2StorageService.uploadFile(r2Key, val, 'image/webp');
+                if (upRes.success && upRes.url) {
+                  syncedCount++;
+                  const matchSub = subs.find((s) => s.assignmentId === targetAsg && s.studentCode === targetStu);
+                  if (matchSub) {
+                    matchSub.fileDataUrl = upRes.url;
+                    matchSub.r2ObjectKey = upRes.key;
+                  }
+                }
+              } catch (uErr) {
+                console.warn(`[SyncLocalSubmissionsToR2] Failed for key ${k}:`, uErr);
+              }
+            }
+          }
+        }
+      } catch (scanErr) {
+        console.warn('Scan localStorage for unsynced files error', scanErr);
+      }
+    }
+
     if (syncedCount > 0) {
       this.saveSubmissions(subs);
+
+      // อัปเดต URL ใน kp_grading_queue_v2 ให้ตรงกับ Cloudflare R2
+      try {
+        const rawQueue = typeof localStorage !== 'undefined' ? localStorage.getItem('kp_grading_queue_v2') : null;
+        if (rawQueue) {
+          const queue: any[] = JSON.parse(rawQueue);
+          let queueUpdated = false;
+          queue.forEach((q) => {
+            const matchSub = subs.find((s) => s.assignmentId === q.assignmentId && s.studentCode === q.studentCode);
+            if (matchSub?.fileDataUrl && matchSub.fileDataUrl.startsWith('http')) {
+              q.filePreviewUrl = matchSub.fileDataUrl;
+              queueUpdated = true;
+            }
+          });
+          if (queueUpdated && typeof localStorage !== 'undefined') {
+            localStorage.setItem('kp_grading_queue_v2', JSON.stringify(queue));
+            cloudDataService.saveCloudKey('kp_grading_queue_v2', queue).catch(() => {});
+          }
+        }
+      } catch (qErr) {
+        console.warn('Sync queue preview update error', qErr);
+      }
     }
 
     return {
       success: true,
       syncedCount,
-      totalEligible: candidates.length,
+      totalEligible: Math.max(syncedCount, candidates.length),
     };
   },
 

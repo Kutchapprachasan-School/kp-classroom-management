@@ -10,6 +10,7 @@ import {
   FileText,
   Palette,
   CheckCircle2,
+  Upload,
 } from 'lucide-react';
 import { sgsRosterAndSubmissionService } from '../../services/sgsRosterAndSubmissionService';
 import { r2StorageService } from '../../services/r2StorageService';
@@ -50,6 +51,9 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
   const [pdfPage, setPdfPage] = useState<number>(1);
   const [imgLoadError, setImgLoadError] = useState<boolean>(false);
   const [reminderSent, setReminderSent] = useState<boolean>(false);
+  const [localFallbackUrl, setLocalFallbackUrl] = useState<string | null>(null);
+  const [isUploadingReplacement, setIsUploadingReplacement] = useState<boolean>(false);
+  const [uploadSuccessToast, setUploadSuccessToast] = useState<string | null>(null);
 
   useEffect(() => {
     setImgLoadError(false);
@@ -57,6 +61,8 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
     setRotation(0);
     setPdfPage(1);
     setReminderSent(false);
+    setLocalFallbackUrl(null);
+    setUploadSuccessToast(null);
   }, [isOpen, url, externalLinkUrl]);
 
   if (!isOpen) return null;
@@ -69,19 +75,25 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
     setRotation(0);
   };
 
-  // แก้ไขการแปลง URL ของ R2 / Storage ให้เปิดดูรูปได้จริงจากทุกเครื่อง
-  let resolvedFileUrl = r2StorageService.resolvePublicViewUrl(url) || url;
-  if (!resolvedFileUrl || resolvedFileUrl.startsWith('r2://')) {
-    const match = url?.match(/(asg-[^/]+)\/([^_/]+)_/);
-    const targetAsgId = match ? match[1] : assignmentId;
-    const targetStuCode = match ? match[2] : studentCode;
-    const cached = sgsRosterAndSubmissionService.getSubmissionFileUrl(targetAsgId, targetStuCode, fileName);
-    resolvedFileUrl = cached || resolvedFileUrl;
-  }
+  // ดึงแคชจากเครื่อง (localStorage) เป็นอันดับแรกเพื่อรองรับงานเก่าที่ส่งก่อนเชื่อมต่อ R2
+  const match = url?.match(/(asg-[^/]+)\/([^_/]+)_/);
+  const targetAsgId = match ? match[1] : assignmentId;
+  const targetStuCode = match ? match[2] : studentCode;
+  const cached = sgsRosterAndSubmissionService.getSubmissionFileUrl(targetAsgId, targetStuCode, fileName);
 
-  // หากไม่มี resolvedFileUrl ให้ลองดึงไฟล์จากแคชด้วย assignmentId, studentCode, fileName
-  if (!resolvedFileUrl) {
-    resolvedFileUrl = sgsRosterAndSubmissionService.getSubmissionFileUrl(assignmentId, studentCode, fileName);
+  let resolvedFileUrl =
+    localFallbackUrl ||
+    (cached && cached.startsWith('data:') ? cached : null) ||
+    r2StorageService.resolvePublicViewUrl(url) ||
+    url ||
+    cached;
+
+  // หากพบแคชในเครื่อง แต่ URL ใน R2 ยังไม่มี ให้ซิงก์ขึ้น R2 ในเบื้องหลังอัตโนมัติ
+  if (cached && cached.startsWith('data:') && r2StorageService.isConfigured() && (!url || url.startsWith('r2://'))) {
+    const cleanRoom = (classroom || 'all').toLowerCase().replace(/\s+/g, '').replace('/', '-');
+    const cleanFile = (fileName || `${targetStuCode}_submission.webp`).replace(/\s+/g, '_');
+    const r2Key = `kp-classroom-submissions/2-2569/${cleanRoom}/${targetAsgId || 'asg'}/${targetStuCode || 'stu'}_${cleanFile}`;
+    r2StorageService.uploadFile(r2Key, cached, 'image/webp').catch(() => {});
   }
 
   // แยกแยะระหว่าง URL ของไฟล์ (ภาพ/PDF) กับลิงก์ภายนอก (Canva/Google Drive)
@@ -101,6 +113,65 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
       !effectiveLinkUrl)
       ? resolvedFileUrl
       : undefined;
+
+  const handleImageError = () => {
+    // หาก R2 ตอบ 404 ให้ลองค้นใน localStorage ของเครื่องนี้
+    if (!localFallbackUrl) {
+      const localDirect = sgsRosterAndSubmissionService.getSubmissionFileUrl(targetAsgId, targetStuCode, fileName);
+      if (localDirect && localDirect.startsWith('data:')) {
+        setLocalFallbackUrl(localDirect);
+        setImgLoadError(false);
+        if (r2StorageService.isConfigured()) {
+          const cleanFile = (fileName || `${targetStuCode}_submission.webp`).replace(/\s+/g, '_');
+          const r2Key = `kp-classroom-submissions/2-2569/all/${targetAsgId || 'asg'}/${targetStuCode || 'stu'}_${cleanFile}`;
+          r2StorageService.uploadFile(r2Key, localDirect, 'image/webp').then((res) => {
+            if (res.success && res.url) {
+              setLocalFallbackUrl(res.url);
+            }
+          }).catch(() => {});
+        }
+        return;
+      }
+    }
+    setImgLoadError(true);
+  };
+
+  const handleTeacherUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingReplacement(true);
+    try {
+      const effectiveAsg = targetAsgId || 'asg-general';
+      const effectiveStu = targetStuCode || 'student';
+      const cleanName = `${effectiveStu}_${file.name.replace(/\s+/g, '_')}`;
+      const cleanRoom = (classroom || 'all').toLowerCase().replace(/\s+/g, '').replace('/', '-');
+      const r2Key = `kp-classroom-submissions/2-2569/${cleanRoom}/${effectiveAsg}/${cleanName}`;
+
+      const uploadRes = await r2StorageService.uploadFile(r2Key, file, file.type || 'image/webp');
+      if (uploadRes.success && uploadRes.url) {
+        setLocalFallbackUrl(uploadRes.url);
+        setImgLoadError(false);
+        setUploadSuccessToast('🎉 อัปโหลดไฟล์ผลงานขึ้น Cloudflare R2 เรียบร้อยแล้ว!');
+        setTimeout(() => setUploadSuccessToast(null), 4000);
+
+        sgsRosterAndSubmissionService.submitStudentWorkToR2({
+          assignmentId: effectiveAsg,
+          studentCode: effectiveStu,
+          workTitle: title,
+          fileName: cleanName,
+          fileDataUrl: uploadRes.url,
+          classroom,
+        });
+      } else {
+        alert('อัปโหลดไม่สำเร็จ: ' + (uploadRes.error || 'กรุณาลองใหม่อีกครั้ง'));
+      }
+    } catch (err: any) {
+      alert('เกิดข้อผิดพลาดในการอัปโหลด: ' + err.message);
+    } finally {
+      setIsUploadingReplacement(false);
+    }
+  };
 
   // ตรวจสอบนามสกุลไฟล์และประเภท
   const lowerFile = (fileName || '').toLowerCase();
@@ -659,7 +730,7 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                 <img
                   src={effectiveFileUrl}
                   alt={fileName || 'ผลงานนักเรียน'}
-                  onError={() => setImgLoadError(true)}
+                  onError={handleImageError}
                   className="max-w-full max-h-[72vh] object-contain rounded-2xl shadow-2xl border border-slate-700/60 bg-slate-900"
                 />
               ) : (
@@ -681,12 +752,22 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                   </div>
 
                   <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 text-left space-y-2 text-xs">
-                    {imgLoadError ? (
-                      <div className="text-amber-400 flex items-start gap-2">
-                        <span className="shrink-0">⚠️</span>
-                        <span>
-                          ไม่สามารถแสดงผลตัวอย่างภาพบนเบราว์เซอร์ได้โดยตรง (อาจติดการตั้งค่าสิทธิ์เครือข่าย หรือรูปแบบไฟล์ไม่รองรับการแสดงตัวอย่างในหน้านี้)
-                        </span>
+                    {uploadSuccessToast ? (
+                      <div className="text-emerald-400 flex items-start gap-2 font-bold">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                        <span>{uploadSuccessToast}</span>
+                      </div>
+                    ) : imgLoadError ? (
+                      <div className="text-amber-300 flex items-start gap-2">
+                        <span className="shrink-0 text-base">⚠️</span>
+                        <div className="space-y-1">
+                          <p className="font-bold text-amber-200">
+                            ไม่พบไฟล์บน Cloudflare R2 (404 File Not Found)
+                          </p>
+                          <p className="text-[11px] text-slate-300 leading-relaxed">
+                            เนื่องจากนักเรียนส่งงานนี้ไว้ในเครื่องก่อนเริ่มเปิดใช้งาน Cloudflare R2 หรือเครื่องนักเรียนยังไม่ได้ซิงก์ภาพ คุณครูสามารถเลือกอัปโหลดภาพผลงานแทนนักเรียนได้ทันทีด้านล่างครับ
+                          </p>
+                        </div>
                       </div>
                     ) : (
                       <div className="text-slate-300 flex items-start gap-2">
@@ -696,31 +777,43 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                     )}
                   </div>
 
-                  {effectiveFileUrl ? (
-                    <div className="pt-2">
+                  <div className="pt-2 space-y-2">
+                    <label className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-colors shadow-md w-full cursor-pointer">
+                      <Upload className="w-4 h-4" />
+                      <span>{isUploadingReplacement ? '⏳ กำลังอัปโหลดขึ้น Cloudflare R2...' : '📸 อัปโหลดรูปภาพผลงานแทนนักเรียน'}</span>
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        disabled={isUploadingReplacement}
+                        onChange={handleTeacherUploadFile}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {effectiveFileUrl && !effectiveFileUrl.startsWith('data:') && (
                       <a
                         href={effectiveFileUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition-colors shadow-md w-full"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-colors w-full border border-slate-700"
                       >
-                        <ExternalLink className="w-4 h-4" />
-                        <span>เปิดไฟล์ต้นฉบับในแท็บใหม่ ↗</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>เปิดลิงก์เดิมในแท็บใหม่ ↗</span>
                       </a>
-                    </div>
-                  ) : effectiveLinkUrl ? (
-                    <div className="pt-2">
+                    )}
+
+                    {effectiveLinkUrl && (
                       <a
                         href={effectiveLinkUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition-colors shadow-md w-full"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition-colors shadow-md w-full"
                       >
                         <ExternalLink className="w-4 h-4" />
                         <span>เปิดดูชิ้นงานจากลิงก์แนบ ↗</span>
                       </a>
-                    </div>
-                  ) : null}
+                    )}
+                  </div>
                 </div>
               )}
             </div>
