@@ -133,10 +133,10 @@
 - **[READ:SELECT]** [`src/services/studentEnrollmentService.ts:124`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentEnrollmentService.ts#L124)
 
 #### 🗂️ ตาราง/View: `Assignment` (4 จุดเรียกใช้)
-- **[READ:SELECT]** [`src/services/assignmentService.ts:50`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/assignmentService.ts#L50)
-- **[WRITE:INSERT]** [`src/services/assignmentService.ts:98`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/assignmentService.ts#L98)
-- **[WRITE:UPDATE]** [`src/services/assignmentService.ts:125`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/assignmentService.ts#L125)
-- **[WRITE:DELETE]** [`src/services/assignmentService.ts:151`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/assignmentService.ts#L151)
+- **[READ:SELECT]** [`src/services/assignmentService.ts:74`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/assignmentService.ts#L74)
+- **[WRITE:INSERT]** [`src/services/assignmentService.ts:124`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/assignmentService.ts#L124)
+- **[WRITE:UPDATE]** [`src/services/assignmentService.ts:153`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/assignmentService.ts#L153)
+- **[WRITE:DELETE]** [`src/services/assignmentService.ts:183`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/assignmentService.ts#L183)
 
 #### 🗂️ ตาราง/View: `Attendance` (2 จุดเรียกใช้)
 - **[READ:SELECT]** [`src/services/attendanceService.ts:417`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/attendanceService.ts#L417)
@@ -229,7 +229,7 @@
 
 #### 🗂️ ตาราง/View: `StudentScore` (3 จุดเรียกใช้)
 - **[READ:SELECT]** [`src/services/gradeService.ts:402`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L402)
-- **[WRITE:UPSERT]** [`src/services/gradeService.ts:491`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L491)
+- **[WRITE:UPSERT]** [`src/services/gradeService.ts:495`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L495)
 - **[READ:SELECT]** [`src/services/studentEnrollmentService.ts:112`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentEnrollmentService.ts#L112)
 
 #### 🗂️ ตาราง/View: `SystemSettings` (4 จุดเรียกใช้)

@@ -11,6 +11,37 @@ import { resolveRoomCandidates } from './masterDataService.ts';
 import { isGrade1SgsStudentCode } from '../config/m1SgsLookup';
 import { r2StorageService } from './r2StorageService.ts';
 import { cloudDataService, type UploadProgressInfo } from './cloudDataService.ts';
+import { gradeService } from './gradeService.ts';
+import { resolveStudentIdentity, isSameClassroom } from '../utils/studentIdentityUtils.ts';
+
+/**
+ * ตรวจสอบและจับคู่การส่งงานของนักเรียนเข้ากับ Assignment อย่างแม่นยำ
+ * รองรับทั้ง direct ID match, unitId match, และ Title exact/loose match
+ */
+export function matchSubmissionToAssignment(
+  sub: { assignmentId?: string; workTitle?: string } | null | undefined,
+  asg: { id: string; unitId?: string; title?: string } | null | undefined
+): boolean {
+  if (!sub || !asg) return false;
+  if (sub.assignmentId && sub.assignmentId === asg.id) return true;
+  if (asg.unitId && sub.assignmentId === asg.unitId) return true;
+  if (
+    sub.workTitle &&
+    asg.title &&
+    sub.workTitle.trim().toLowerCase() === asg.title.trim().toLowerCase()
+  ) {
+    return true;
+  }
+  if (
+    sub.workTitle &&
+    asg.title &&
+    (sub.workTitle.toLowerCase().includes(asg.title.toLowerCase()) ||
+      asg.title.toLowerCase().includes(sub.workTitle.toLowerCase()))
+  ) {
+    return true;
+  }
+  return false;
+}
 
 export type StudentTransferState = 'ACTIVE' | 'TRANSFERRED_IN' | 'TRANSFERRED_OUT';
 export type StudentGender = 'MALE' | 'FEMALE';
@@ -172,6 +203,7 @@ export interface StudentWorkSubmission {
   teacherFeedback?: string;
   returnReason?: string;
   returnedAt?: string;
+  isResubmission?: boolean;
   // Cloudflare R2 Storage & Lifecycle fields
   r2ObjectKey?: string;
   originalSizeKb?: number;
@@ -720,9 +752,8 @@ export const sgsRosterAndSubmissionService = {
           item.targetClassrooms.length > 0 &&
           !item.targetClassrooms.includes('ALL')
         ) {
-          const formattedTarget = formatClassroomLabel(classroomId);
           const matchRoom = item.targetClassrooms.some(
-            (r) => r === classroomId || r === formattedTarget || formatClassroomLabel(r) === formattedTarget
+            (r) => isSameClassroom(r, classroomId)
           );
           if (!matchRoom) return false;
         }
@@ -1210,7 +1241,41 @@ export const sgsRosterAndSubmissionService = {
         ? subs.map((item, i) => (i === idx ? nextItem : item))
         : [...subs, nextItem];
 
-    return this.saveSubmissions(updated);
+    const saved = this.saveSubmissions(updated);
+    this.syncScoreToGradeServiceOutbox({
+      studentCode,
+      assignmentId,
+      score,
+    });
+    return saved;
+  },
+
+  // Bridge: ซิงค์คะแนนตรงเข้าสู่ gradeService Outbox (IndexedDB) เพื่อ Push ขึ้นตาราง "StudentScore" บน Neon DB
+  syncScoreToGradeServiceOutbox(params: {
+    studentCode: string;
+    assignmentId: string;
+    courseCode?: string;
+    score: number | null;
+  }): void {
+    try {
+      const roster = this.getSgsRoster();
+      const identity = resolveStudentIdentity(params.studentCode, roster);
+      if (!identity) {
+        console.warn(`[ScoreBridge] Cannot resolve UUID for studentCode: ${params.studentCode}`);
+        return;
+      }
+
+      // บันทึกลง IndexedDB Outbox ผ่าน gradeService เพื่อรอ Push ขึ้นตาราง "StudentScore"
+      gradeService.setScore(
+        identity.studentId,
+        params.assignmentId,
+        params.score
+      ).catch((err) => {
+        console.warn('[ScoreBridge] Error updating score in gradeService:', err);
+      });
+    } catch (e) {
+      console.warn('[ScoreBridge] Unexpected error in syncScoreToGradeServiceOutbox:', e);
+    }
   },
 
   // ส่งงานกลับให้นักเรียนแก้ไข (Request Resubmission) พร้อมระบุเหตุผล
@@ -1370,7 +1435,7 @@ export const sgsRosterAndSubmissionService = {
 
     // 1. คำนวณชิ้นงานเดี่ยวปกติ
     for (const asg of directAssignments) {
-      const sub = subs.find((s) => s.assignmentId === asg.id);
+      const sub = subs.find((s) => matchSubmissionToAssignment(s, asg));
       if (
         sub &&
         (sub.status === 'GRADED' ||
@@ -1422,7 +1487,7 @@ export const sgsRosterAndSubmissionService = {
       let rawMaxSum = 0;
 
       for (const asg of unitTasks) {
-        const sub = subs.find((s) => s.assignmentId === asg.id);
+        const sub = subs.find((s) => matchSubmissionToAssignment(s, asg));
         if (
           sub &&
           (sub.status === 'GRADED' ||
@@ -2177,7 +2242,6 @@ export const sgsRosterAndSubmissionService = {
       attachmentLabel = `🔗 ลิงก์แนบ: ${payload.externalLinkUrl}`;
     }
 
-    const existingScore = idx !== -1 ? subs[idx].score : null;
     const existingSubmittedAt = idx !== -1 ? subs[idx].submittedAt : undefined;
     const nowIso = new Date().toISOString();
     // ถ้าเคยมี submittedAt ที่ถูกต้องแล้วให้ใช้เดิม ถ้าไม่มีหรือเป็นข้อความเดิมให้ใส่เวลาจริงปัจจุบัน
@@ -2218,15 +2282,15 @@ export const sgsRosterAndSubmissionService = {
         .catch((e) => console.warn('[R2 Background Upload]', e));
     }
 
+    const wasReturned = idx !== -1 && subs[idx]?.status === 'RETURNED_REVISION';
+    const isResubmission = wasReturned || Boolean(subs[idx]?.isResubmission);
+
     const nextItem: StudentWorkSubmission = {
       ...(idx !== -1 ? subs[idx] : {}),
       assignmentId: payload.assignmentId,
       studentCode: payload.studentCode,
-      status:
-        existingScore !== null && existingScore !== undefined
-          ? 'GRADED'
-          : 'SUBMITTED_PENDING',
-      score: existingScore,
+      status: 'SUBMITTED_PENDING',
+      score: null,
       submittedAt: finalSubmittedAt,
       workTitle: payload.workTitle || 'ส่งชิ้นงานผ่านระบบออนไลน์',
       workAttachmentLabel: attachmentLabel,
@@ -2237,12 +2301,45 @@ export const sgsRosterAndSubmissionService = {
       fileDataUrl: payload.fileDataUrl,
       academicYearTerm: term,
       isR2FilePurged: false,
+      isResubmission,
     };
 
     const updated =
       idx !== -1
         ? subs.map((item, i) => (i === idx ? nextItem : item))
         : [...subs, nextItem];
+
+    // อัปเดตคิวตรวจงานครู (kp_grading_queue_v2) ให้เด้งกลับมาเป็น PENDING_REVIEW ในคิว FIFO ทันที
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const rawQueue = localStorage.getItem('kp_grading_queue_v2');
+        if (rawQueue) {
+          const queueList = JSON.parse(rawQueue);
+          if (Array.isArray(queueList)) {
+            let qUpdated = false;
+            const nextQueue = queueList.map((q: any) => {
+              if (q.assignmentId === payload.assignmentId && q.studentCode === payload.studentCode) {
+                qUpdated = true;
+                return {
+                  ...q,
+                  status: 'PENDING_REVIEW',
+                  submittedTimestamp: Date.now(),
+                  isResubmission: true,
+                  score: null,
+                };
+              }
+              return q;
+            });
+            if (qUpdated) {
+              localStorage.setItem('kp_grading_queue_v2', JSON.stringify(nextQueue));
+              window.dispatchEvent(new CustomEvent('kp-grading-queue-updated'));
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
 
     return this.saveSubmissions(updated);
   },

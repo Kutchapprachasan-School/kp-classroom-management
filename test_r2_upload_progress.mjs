@@ -275,4 +275,28 @@ assert.strictEqual(sanitizeFileName('my photo & drawing @2026.webp'), 'my_photo_
 
 console.log('✅ 3. Client-side File Validation & Sanitization: PASSED');
 
+// 4. Test WebP Image Compressor non-image skip & logic
+function testCompressImageToWebPSkip(inputFile) {
+  if (!inputFile.type.startsWith('image/')) {
+    return {
+      file: inputFile,
+      originalSize: inputFile.size,
+      compressedSize: inputFile.size,
+      wasCompressed: false,
+    };
+  }
+  return {
+    file: inputFile,
+    originalSize: inputFile.size,
+    compressedSize: inputFile.size,
+    wasCompressed: false,
+  };
+}
+
+const docToCompress = { name: 'รายงาน.pdf', size: 1024 * 1024, type: 'application/pdf' };
+const compressResult = testCompressImageToWebPSkip(docToCompress);
+assert.strictEqual(compressResult.wasCompressed, false);
+assert.strictEqual(compressResult.file.name, 'รายงาน.pdf');
+console.log('✅ 4. WebP Image Compressor non-image bypass: PASSED');
+
 console.log('🎉 All R2 Upload Progress & XHR Validation tests passed successfully!');

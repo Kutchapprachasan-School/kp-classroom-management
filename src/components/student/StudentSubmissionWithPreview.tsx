@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   validateSubmissionFile,
   uploadToR2WithProgress,
+  compressImageToWebP,
   type UploadProgressInfo,
 } from '../../services/cloudDataService';
-import { Upload, CheckCircle2, AlertCircle, FileText, ExternalLink, RefreshCw } from 'lucide-react';
+import { Upload, CheckCircle2, AlertCircle, FileText, ExternalLink, RefreshCw, Sparkles } from 'lucide-react';
 
 // ฟังก์ชันแปลงขนาดไฟล์เป็น MB ที่อ่านง่าย
 export function formatFileSizeMB(bytes: number): string {
@@ -32,6 +33,14 @@ export const StudentSubmissionWithPreview: React.FC<StudentSubmissionWithPreview
   const [cleanFileName, setCleanFileName] = useState('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fileTypeCategory, setFileTypeCategory] = useState<'image' | 'pdf' | 'doc' | 'other'>('other');
+
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [compressionInfo, setCompressionInfo] = useState<{
+    wasCompressed: boolean;
+    originalSize: number;
+    compressedSize: number;
+    savedPercent: number;
+  } | null>(null);
 
   const [isUploading, setIsUploading] = useState(false);
   const [progressInfo, setProgressInfo] = useState<UploadProgressInfo>({
@@ -61,6 +70,8 @@ export const StudentSubmissionWithPreview: React.FC<StudentSubmissionWithPreview
     setPreviewUrl(null);
     setCleanFileName('');
     setFileTypeCategory('other');
+    setCompressionInfo(null);
+    setIsCompressing(false);
     setErrorMsg(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -68,48 +79,78 @@ export const StudentSubmissionWithPreview: React.FC<StudentSubmissionWithPreview
   };
 
   // เมื่อนักเรียนเลือกไฟล์จากมือถือหรือคอมพิวเตอร์
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawFile = e.target.files?.[0] || null;
     setUploadedUrl(null);
     setErrorMsg(null);
+    setCompressionInfo(null);
 
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
     }
 
-    if (!file) {
+    if (!rawFile) {
       setSelectedFile(null);
       return;
     }
 
-    // 1. ตรวจสอบขนาดและนามสกุลไฟล์ก่อนสร้าง Preview
-    const validation = validateSubmissionFile(file);
-    if (!validation.valid) {
-      setErrorMsg(validation.error || 'ไฟล์ไม่ผ่านเกณฑ์ที่กำหนด');
+    try {
+      setIsCompressing(true);
+
+      // 1. ถ้านักเรียนเลือกรูปภาพ ให้บีบอัดและแปลงเป็น WebP อัตโนมัติก่อน
+      // (แม้ภาพกล้องสดจะใหญ่ 8-12 MB ก็จะถูกย่อเหลือ ~200-400 KB โดยไม่สูญเสียความคมชัด)
+      const { file: processedFile, originalSize, compressedSize, wasCompressed } =
+        await compressImageToWebP(rawFile, {
+          maxWidthOrHeight: 1920,
+          quality: 0.82,
+        });
+
+      if (wasCompressed) {
+        const savedPercent = Math.max(1, Math.round(((originalSize - compressedSize) / originalSize) * 100));
+        setCompressionInfo({
+          wasCompressed: true,
+          originalSize,
+          compressedSize,
+          savedPercent,
+        });
+      }
+
+      // 2. นำไฟล์ที่ย่อเป็น WebP แล้วไปตรวจขนาดและนามสกุลตามเกณฑ์
+      const validation = validateSubmissionFile(processedFile);
+      if (!validation.valid) {
+        setErrorMsg(validation.error || 'ไฟล์ไม่ผ่านเกณฑ์ที่กำหนด');
+        setSelectedFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        return;
+      }
+
+      // 3. แยกประเภทไฟล์เพื่อเลือกวิธีแสดง Preview (ไม่เปลืองแรมด้วย Object URL)
+      const lowerName = processedFile.name.toLowerCase();
+      const isPdf = processedFile.type === 'application/pdf' || lowerName.endsWith('.pdf');
+      const isImage = validation.category === 'image' || processedFile.type.startsWith('image/');
+
+      if (isImage) {
+        setFileTypeCategory('image');
+        setPreviewUrl(URL.createObjectURL(processedFile));
+      } else if (isPdf) {
+        setFileTypeCategory('pdf');
+        setPreviewUrl(URL.createObjectURL(processedFile));
+      } else {
+        setFileTypeCategory('doc');
+        setPreviewUrl(null);
+      }
+
+      setSelectedFile(processedFile);
+      setCleanFileName(validation.sanitizedName || processedFile.name);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'เกิดข้อผิดพลาดในการประมวลผลไฟล์รูปภาพ');
       setSelectedFile(null);
-      e.target.value = '';
-      return;
+    } finally {
+      setIsCompressing(false);
     }
-
-    // 2. แยกประเภทไฟล์เพื่อเลือกวิธีแสดง Preview (ไม่เปลืองแรมด้วย Object URL)
-    const lowerName = file.name.toLowerCase();
-    const isPdf = file.type === 'application/pdf' || lowerName.endsWith('.pdf');
-    const isImage = validation.category === 'image' || file.type.startsWith('image/');
-
-    if (isImage) {
-      setFileTypeCategory('image');
-      setPreviewUrl(URL.createObjectURL(file));
-    } else if (isPdf) {
-      setFileTypeCategory('pdf');
-      setPreviewUrl(URL.createObjectURL(file));
-    } else {
-      setFileTypeCategory('doc');
-      setPreviewUrl(null);
-    }
-
-    setSelectedFile(file);
-    setCleanFileName(validation.sanitizedName || file.name);
   };
 
   // เปิดดูไฟล์ตัวอย่างแบบเต็มจอในแท็บใหม่
@@ -262,11 +303,29 @@ export const StudentSubmissionWithPreview: React.FC<StudentSubmissionWithPreview
             </div>
           )}
 
+          {/* ป้ายแสดงข้อมูลการบีบอัด WebP */}
+          {compressionInfo?.wasCompressed && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold animate-fade-in">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>
+                ⚡ บีบอัด WebP ลดขนาดจาก {formatFileSizeMB(compressionInfo.originalSize)} เหลือ {formatFileSizeMB(compressionInfo.compressedSize)} (ประหยัด {compressionInfo.savedPercent}%)
+              </span>
+            </div>
+          )}
+
           {/* แถบแสดงชื่อไฟล์และขนาดไฟล์ */}
           <div className="flex items-center justify-between text-xs text-slate-600 px-1 pt-1">
             <span className="truncate font-semibold text-[#163A66] max-w-[70%]">{cleanFileName}</span>
             <span className="shrink-0 font-mono text-slate-400 text-[11px]">{formatFileSizeMB(selectedFile.size)}</span>
           </div>
+        </div>
+      )}
+
+      {/* สถานะกำลังประมวลผลบีบอัดภาพ */}
+      {isCompressing && (
+        <div className="mt-2 p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-xs flex items-center gap-2 animate-pulse">
+          <Sparkles className="w-4 h-4 text-blue-600 animate-spin shrink-0" />
+          <span className="font-semibold">กำลังบีบอัดรูปภาพเป็น WebP คุณภาพสูง...</span>
         </div>
       )}
 

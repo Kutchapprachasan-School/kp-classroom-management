@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import {
   sgsRosterAndSubmissionService,
+  matchSubmissionToAssignment,
   type TermAssignmentConfig,
   type SgsStudentRecord,
   type StudentWorkSubmission,
@@ -248,16 +249,7 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
     stuSubs: StudentWorkSubmission[],
     assign: TermAssignmentConfig
   ) => {
-    return stuSubs.find((s) => {
-      if (s.assignmentId === assign.id) return true;
-      if (assign.unitId && s.assignmentId === assign.unitId) return true;
-      if (s.workTitle && assign.title) {
-        const cleanSub = s.workTitle.trim().toLowerCase();
-        const cleanAsg = assign.title.trim().toLowerCase();
-        return cleanSub === cleanAsg || cleanSub.includes(cleanAsg) || cleanAsg.includes(cleanSub);
-      }
-      return false;
-    });
+    return stuSubs.find((s) => matchSubmissionToAssignment(s, assign));
   };
 
   const handleBulkGradeClassroom = () => {

@@ -686,6 +686,139 @@ export function sanitizeFileName(fileName: string): string {
   return `${cleanBase || 'submission'}${ext}`;
 }
 
+export interface ImageCompressionOptions {
+  maxWidthOrHeight?: number; // ความกว้างหรือสูงสูงสุด (ค่าเริ่มต้น 1920px เหมาะสำหรับตรวจใบงาน)
+  quality?: number;          // คุณภาพ 0.1 - 1.0 (ค่าเริ่มต้น 0.82 คมชัดและไฟล์เล็ก)
+}
+
+export interface CompressionResult {
+  file: File;
+  originalSize: number;
+  compressedSize: number;
+  wasCompressed: boolean;
+}
+
+/**
+ * บีบอัดรูปภาพและแปลงเป็นไฟล์ .webp อัตโนมัติด้วย HTML5 Canvas ฝั่ง Frontend
+ * ช่วยลดขนาดไฟล์ภาพถ่าย 4-8 MB เหลือเพียง ~150-400 KB โดยที่ตัวหนังสือยังคมชัด
+ * หากไม่ใช่ไฟล์รูปภาพ (เช่น PDF/Word) จะคืนค่าไฟล์เดิมกลับไปทันที
+ */
+export async function compressImageToWebP(
+  inputFile: File,
+  options: ImageCompressionOptions = {}
+): Promise<CompressionResult> {
+  const maxDimension = options.maxWidthOrHeight ?? 1920;
+  const quality = options.quality ?? 0.82;
+
+  // 1. ตรวจสอบสภาพแวดล้อมและประเภทไฟล์
+  const isImageMime = inputFile.type.startsWith('image/');
+  const lowerName = inputFile.name.toLowerCase();
+  const isImageExt = ALLOWED_IMAGE_EXTENSIONS.some((ext) => lowerName.endsWith(ext));
+
+  if (typeof window === 'undefined' || typeof document === 'undefined' || (!isImageMime && !isImageExt)) {
+    return {
+      file: inputFile,
+      originalSize: inputFile.size,
+      compressedSize: inputFile.size,
+      wasCompressed: false,
+    };
+  }
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(inputFile);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+
+      let width = img.naturalWidth || img.width;
+      let height = img.naturalHeight || img.height;
+
+      // 2. คำนวณสัดส่วนภาพใหม่หากด้านใดด้านหนึ่งเกิน 1920px (รักษาสัดส่วนภาพเดิม)
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+
+      // 3. วาดภาพลงบน Canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve({
+          file: inputFile,
+          originalSize: inputFile.size,
+          compressedSize: inputFile.size,
+          wasCompressed: false,
+        });
+        return;
+      }
+
+      // เติมพื้นหลังสีขาวเผื่อกรณีนักเรียนส่งไฟล์ PNG พื้นหลังโปร่งใส
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // 4. แปลง Canvas เป็น Blob ชนิด image/webp
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            resolve({
+              file: inputFile,
+              originalSize: inputFile.size,
+              compressedSize: inputFile.size,
+              wasCompressed: false,
+            });
+            return;
+          }
+
+          // เปลี่ยนนามสกุลไฟล์เดิมเป็น .webp
+          const lastDot = inputFile.name.lastIndexOf('.');
+          const baseName = lastDot !== -1 ? inputFile.name.slice(0, lastDot) : inputFile.name;
+          const webpFileName = `${baseName}.webp`;
+
+          const compressedFile = new File([blob], webpFileName, {
+            type: 'image/webp',
+            lastModified: Date.now(),
+          });
+
+          // กรณีไฟล์ที่ย่อแล้วมีขนาดเล็กลงจริง ให้ใช้ไฟล์ WebP ที่ย่อแล้ว
+          const isSmaller = compressedFile.size < inputFile.size;
+          const finalFile = isSmaller ? compressedFile : inputFile;
+
+          resolve({
+            file: finalFile,
+            originalSize: inputFile.size,
+            compressedSize: finalFile.size,
+            wasCompressed: isSmaller,
+          });
+        },
+        'image/webp',
+        quality
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve({
+        file: inputFile,
+        originalSize: inputFile.size,
+        compressedSize: inputFile.size,
+        wasCompressed: false,
+      });
+    };
+
+    img.src = objectUrl;
+  });
+}
+
 /**
  * ตรวจสอบความถูกต้องของไฟล์งานนักเรียนก่อนอัปโหลดขึ้น R2
  */

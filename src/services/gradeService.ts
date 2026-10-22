@@ -457,6 +457,10 @@ export const gradeService = {
     return record;
   },
 
+  async setScore(studentId: string, assignmentId: string, scoreValue: number | null): Promise<StudentScore> {
+    return this.updateStudentScore(studentId, assignmentId, scoreValue);
+  },
+
   scheduleDebouncedFlush() {
     if (flushTimer) clearTimeout(flushTimer);
     flushTimer = setTimeout(() => {

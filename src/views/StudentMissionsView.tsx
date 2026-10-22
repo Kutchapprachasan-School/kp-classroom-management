@@ -23,6 +23,7 @@ import {
 import { gamificationService } from '../services/gamificationService';
 import {
   sgsRosterAndSubmissionService,
+  matchSubmissionToAssignment,
   type FourScorePart,
   type AssignmentAttachment,
 } from '../services/sgsRosterAndSubmissionService';
@@ -36,7 +37,8 @@ import { getSchoolSettings } from '../config/schoolRoles';
 import { weeklyQuizService } from '../services/weeklyQuizService';
 import { calculateStudentExp } from '../services/studentExpService';
 import { formatClassroomLabel } from '../services/studentService';
-import { type UploadProgressInfo, validateSubmissionFile } from '../services/cloudDataService';
+import { resolveStudentIdentity } from '../utils/studentIdentityUtils';
+import { type UploadProgressInfo, validateSubmissionFile, compressImageToWebP } from '../services/cloudDataService';
 import { formatBytes } from '../components/student/StudentSubmissionUploader';
 
 export interface ExtendedStudentQuestItem extends StudentQuestItem {
@@ -56,9 +58,14 @@ interface StudentMissionsViewProps {
 
 export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ currentUser: propUser }) => {
   const currentUser = propUser || authService.getCurrentUser();
-  const studentCode = currentUser?.studentCode || '45101';
-  const studentId = currentUser?.id || 'stu-1';
-  const studentRoom = formatClassroomLabel(currentUser?.classroomName || currentUser?.classroomId) || 'ม.3/1';
+  const identity = React.useMemo(() => {
+    if (!currentUser) return null;
+    return resolveStudentIdentity(currentUser);
+  }, [currentUser]);
+
+  const studentCode = identity?.studentCode || currentUser?.studentCode || '';
+  const studentId = identity?.studentId || currentUser?.id || '';
+  const studentRoom = formatClassroomLabel(currentUser?.classroomName || currentUser?.classroomId || identity?.classroomId) || 'ม.3/1';
   const schoolSettings = getSchoolSettings();
   const academicYearTerm = schoolSettings.academicTerm || '1/2569';
   const [quests, setQuests] = useState<ExtendedStudentQuestItem[]>([]);
@@ -74,6 +81,8 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fileTypeCategory, setFileTypeCategory] = useState<'image' | 'pdf' | 'doc' | 'other'>('other');
   const [fileValidationError, setFileValidationError] = useState<string | null>(null);
+  const [compressionNotice, setCompressionNotice] = useState<string | null>(null);
+  const [isCompressingImage, setIsCompressingImage] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingR2, setIsUploadingR2] = useState(false);
   const [uploadProgressInfo, setUploadProgressInfo] = useState<UploadProgressInfo>({
@@ -108,6 +117,8 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
     setSelectedRawFile(null);
     setFileTypeCategory('other');
     setFileValidationError(null);
+    setCompressionNotice(null);
+    setIsCompressingImage(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -153,10 +164,12 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
   const classroomLeaderboard = React.useMemo(() => {
     const roster = sgsRosterAndSubmissionService.getSgsRoster(studentRoom);
     if (roster.length === 0) return leaderboard;
-    const entries: StudentLeaderboardEntry[] = roster.map((s) => {
+    const entries: Array<StudentLeaderboardEntry & { studentCode?: string; id?: string }> = roster.map((s) => {
       const expCalc = calculateStudentExp(s.studentCode, s.studentCode);
       return {
         rank: 0,
+        studentCode: s.studentCode,
+        id: (s as any).id || `stu-${s.studentCode}`,
         name: s.studentName,
         classroom: studentRoom,
         xp: expCalc.totalXp,
@@ -169,9 +182,15 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
   }, [studentRoom, leaderboard, myExp]);
 
   const myRank = React.useMemo(() => {
-    const foundIdx = classroomLeaderboard.findIndex((e) => e.name === currentUser?.name);
-    return foundIdx >= 0 ? foundIdx + 1 : 1;
-  }, [classroomLeaderboard, currentUser?.name]);
+    if (!studentCode && !studentId) return null;
+    const foundIdx = classroomLeaderboard.findIndex(
+      (e: any) =>
+        (studentCode && e.studentCode === studentCode) ||
+        (studentId && e.id === studentId) ||
+        (currentUser?.name && e.name === currentUser.name)
+    );
+    return foundIdx !== -1 ? foundIdx + 1 : null;
+  }, [classroomLeaderboard, studentCode, studentId, currentUser?.name]);
 
   const getScorePartLabel = (part?: FourScorePart, unit?: string): string => {
     if (part === 'PRE_MIDTERM') return 'ก่อนกลางภาค';
@@ -191,7 +210,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
       const allSubmissions = sgsRosterAndSubmissionService.getSubmissions();
 
       const sgsQuests: ExtendedStudentQuestItem[] = termAssignments.map((asg) => {
-        const sub = allSubmissions.find((s) => s.assignmentId === asg.id && s.studentCode === studentCode);
+        const sub = allSubmissions.find((s) => s.studentCode === studentCode && matchSubmissionToAssignment(s, asg));
         const isReturnedForRevision = sub?.status === 'RETURNED_REVISION';
         const isSubmitted =
           !!sub &&
@@ -277,6 +296,12 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
     e.preventDefault();
     if (!selectedQuest) return;
 
+    if (!studentCode) {
+      setToastMsg('⚠️ ไม่พบข้อมูลรหัสประจำตัวนักเรียน กรุณาตรวจสอบหรือเข้าสู่ระบบใหม่อีกครั้ง');
+      setTimeout(() => setToastMsg(null), 3500);
+      return;
+    }
+
     const trimmedLink = submitLink.trim();
     const hasFile = Boolean(selectedFileDataUrl || selectedFileName);
     const hasLink = Boolean(trimmedLink);
@@ -357,6 +382,8 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
       }
       setFileTypeCategory('other');
       setFileValidationError(null);
+      setCompressionNotice(null);
+      setIsCompressingImage(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -1223,6 +1250,14 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                         </div>
                       )}
 
+                      {/* ป้ายแสดงข้อมูลการบีบอัด WebP */}
+                      {compressionNotice && (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold animate-fade-in">
+                          <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>{compressionNotice}</span>
+                        </div>
+                      )}
+
                       {/* แถบสรุปชื่อไฟล์และขนาด */}
                       <div className="flex items-center justify-between text-xs text-slate-600 px-1 pt-1 border-t border-slate-100">
                         <span className="truncate font-semibold text-[#163A66] max-w-[70%]">{selectedFileName || 'ไฟล์ผลงาน'}</span>
@@ -1242,7 +1277,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                           📷 ถ่ายภาพ หรือ 📁 คลิกเพื่อเลือกไฟล์จากเครื่อง
                         </span>
                         <span className="text-[11px] text-[#6B7C93] mt-0.5 block">
-                          รองรับรูปภาพ (JPG, PNG, WebP ไม่เกิน 5 MB) และเอกสาร (PDF, Word ไม่เกิน 15 MB)
+                          รองรับรูปภาพ (บีบอัด WebP อัตโนมัติ) และเอกสาร (PDF, Word ไม่เกิน 15 MB)
                         </span>
                       </div>
                       <input
@@ -1251,54 +1286,87 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                         accept=".jpg,.jpeg,.png,.webp,.heic,.pdf,.doc,.docx"
                         disabled={isSubmitting || isUploadingR2}
                         className="hidden"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const f = e.target.files?.[0];
                           if (!f) return;
                           setFileValidationError(null);
+                          setCompressionNotice(null);
 
-                          // ตรวจสอบไฟล์ทันที (Client-side File Validation)
-                          const validation = validateSubmissionFile(f);
-                          if (!validation.valid) {
-                            setFileValidationError(validation.error || 'ไฟล์ไม่ถูกต้องตามเกณฑ์');
+                          try {
+                            setIsCompressingImage(true);
+
+                            // 1. ถ้านักเรียนเลือกรูปภาพ ให้บีบอัดและแปลงเป็น WebP อัตโนมัติก่อน
+                            // (แม้ภาพถ่ายกล้องสดจากมือถือจะใหญ่ 6-12 MB ก็จะถูกย่อเหลือ ~200-400 KB ทันที)
+                            const { file: processedFile, originalSize, compressedSize, wasCompressed } =
+                              await compressImageToWebP(f, {
+                                maxWidthOrHeight: 1920,
+                                quality: 0.82,
+                              });
+
+                            if (wasCompressed) {
+                              const savedPercent = Math.max(1, Math.round(((originalSize - compressedSize) / originalSize) * 100));
+                              setCompressionNotice(
+                                `⚡ บีบอัด WebP ลดขนาดจาก ${formatBytes(originalSize)} เหลือ ${formatBytes(compressedSize)} (ประหยัด ${savedPercent}%)`
+                              );
+                            }
+
+                            // 2. ตรวจสอบไฟล์ที่ผ่านการบีบอัดแล้ว (Client-side File Validation)
+                            const validation = validateSubmissionFile(processedFile);
+                            if (!validation.valid) {
+                              setFileValidationError(validation.error || 'ไฟล์ไม่ถูกต้องตามเกณฑ์');
+                              handleClearFile();
+                              return;
+                            }
+
+                            const cleanName = validation.sanitizedName || processedFile.name;
+                            setSelectedRawFile(processedFile);
+                            setSelectedFileName(cleanName);
+                            setUploadProgressInfo({ percent: 0, loadedBytes: 0, totalBytes: processedFile.size });
+
+                            // จัดการ Memory Preview ด้วย URL.createObjectURL(processedFile) (ไม่เปลืองแรมมือถือ)
+                            if (previewUrl) {
+                              URL.revokeObjectURL(previewUrl);
+                            }
+
+                            const lowerName = processedFile.name.toLowerCase();
+                            const isImage = validation.category === 'image' || processedFile.type.startsWith('image/');
+                            const isPdf = processedFile.type === 'application/pdf' || lowerName.endsWith('.pdf');
+
+                            if (isImage) {
+                              setFileTypeCategory('image');
+                              setPreviewUrl(URL.createObjectURL(processedFile));
+                            } else if (isPdf) {
+                              setFileTypeCategory('pdf');
+                              setPreviewUrl(URL.createObjectURL(processedFile));
+                            } else {
+                              setFileTypeCategory('doc');
+                              setPreviewUrl(null);
+                            }
+
+                            // DataUrl สำรองสำหรับการทำงานแบบออฟไลน์
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              const resultStr = event.target?.result as string;
+                              if (resultStr) setSelectedFileDataUrl(resultStr);
+                            };
+                            reader.readAsDataURL(processedFile);
+                          } catch {
+                            setFileValidationError('เกิดข้อผิดพลาดในการประมวลผลไฟล์รูปภาพ');
                             handleClearFile();
-                            return;
+                          } finally {
+                            setIsCompressingImage(false);
                           }
-
-                          const cleanName = validation.sanitizedName || f.name;
-                          setSelectedRawFile(f);
-                          setSelectedFileName(cleanName);
-                          setUploadProgressInfo({ percent: 0, loadedBytes: 0, totalBytes: f.size });
-
-                          // จัดการ Memory Preview ด้วย URL.createObjectURL(f) (ไม่เปลืองแรมมือถือ)
-                          if (previewUrl) {
-                            URL.revokeObjectURL(previewUrl);
-                          }
-
-                          const lowerName = f.name.toLowerCase();
-                          const isImage = validation.category === 'image' || f.type.startsWith('image/');
-                          const isPdf = f.type === 'application/pdf' || lowerName.endsWith('.pdf');
-
-                          if (isImage) {
-                            setFileTypeCategory('image');
-                            setPreviewUrl(URL.createObjectURL(f));
-                          } else if (isPdf) {
-                            setFileTypeCategory('pdf');
-                            setPreviewUrl(URL.createObjectURL(f));
-                          } else {
-                            setFileTypeCategory('doc');
-                            setPreviewUrl(null);
-                          }
-
-                          // DataUrl สำรองสำหรับการทำงานแบบออฟไลน์
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            const resultStr = event.target?.result as string;
-                            if (resultStr) setSelectedFileDataUrl(resultStr);
-                          };
-                          reader.readAsDataURL(f);
                         }}
                       />
                     </label>
+                  )}
+
+                  {/* ป้ายแสดงสถานะกำลังบีบอัดภาพ */}
+                  {isCompressingImage && (
+                    <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-xs flex items-center gap-2 animate-pulse">
+                      <Sparkles className="w-4 h-4 text-blue-600 animate-spin shrink-0" />
+                      <span className="font-semibold">กำลังบีบอัดรูปภาพเป็น WebP คุณภาพสูง...</span>
+                    </div>
                   )}
 
                   {/* กล่องแจ้งเตือนเมื่อไฟล์ไม่ผ่านเกณฑ์การตรวจสอบ */}

@@ -147,6 +147,7 @@ export interface GradingQueueItem {
   gradedAtText?: string;
   studentAvatarUrl?: string;
   academicYearTerm?: string;
+  isResubmission?: boolean;
 }
 
 // ============================================================================
@@ -335,8 +336,9 @@ export const teacherCourseAssignmentService = {
         const stu = studentMap.get(subCode);
         const foundInService = studentService.findStudentByCode(subCode);
 
-        const isGraded = sub.status === 'GRADED' || (savedMatch && savedMatch.status === 'GRADED');
-        const score = sub.score !== null && sub.score !== undefined ? sub.score : savedMatch?.score ?? null;
+        const isResubmission = Boolean(sub.isResubmission || (savedMatch && savedMatch.isResubmission && sub.status === 'SUBMITTED_PENDING'));
+        const isGraded = !isResubmission && (sub.status === 'GRADED' || (savedMatch && savedMatch.status === 'GRADED' && sub.status !== 'SUBMITTED_PENDING'));
+        const score = isGraded ? (sub.score !== null && sub.score !== undefined ? sub.score : savedMatch?.score ?? null) : null;
         const feedback = sub.teacherFeedback || savedMatch?.teacherFeedback || '';
 
         // แก้ไขชื่องาน: ป้องกัน 'งานที่ 0' และรวมชื่อหน่วยการเรียนรู้ให้ชัดเจน
@@ -445,6 +447,7 @@ export const teacherCourseAssignmentService = {
           gradedAtText: savedMatch?.gradedAtText,
           studentAvatarUrl: savedMatch?.studentAvatarUrl || (stu as any)?.avatarUrl || (foundInService?.student as any)?.avatarUrl,
           academicYearTerm: sub.academicYearTerm || '1/2569',
+          isResubmission,
         };
 
         mergedQueue.push(queueItem);
@@ -504,12 +507,18 @@ export const teacherCourseAssignmentService = {
     const list = this.getGradingQueue();
     let targetItem: GradingQueueItem | null = null;
     const updated = list.map((item) => {
-      if (item.id === queueId || item.id === `q_${queueId}`) {
+      const isIdMatch = item.id === queueId || item.id === `q_${queueId}`;
+      const isPairMatch =
+        (queueId.startsWith('q_') && queueId.slice(2) === `${item.assignmentId}_${item.studentCode}`) ||
+        queueId === `${item.assignmentId}_${item.studentCode}`;
+
+      if (isIdMatch || isPairMatch) {
         targetItem = {
           ...item,
           status: 'GRADED' as const,
           score,
           teacherFeedback: feedback.trim(),
+          isResubmission: false,
           gradedAtText: 'วันนี้ ' + new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
         };
         return targetItem;
@@ -527,6 +536,26 @@ export const teacherCourseAssignmentService = {
         score,
         'GRADED'
       );
+    } else {
+      // Fallback parsing for direct pair IDs (e.g. q_asg-1_45101)
+      let asgId: string | undefined;
+      let stuCode: string | undefined;
+      if (queueId.startsWith('q_')) {
+        const parts = queueId.slice(2).split('_');
+        if (parts.length >= 2) {
+          stuCode = parts.pop();
+          asgId = parts.join('_');
+        }
+      } else if (queueId.includes('_')) {
+        const parts = queueId.split('_');
+        if (parts.length >= 2) {
+          stuCode = parts.pop();
+          asgId = parts.join('_');
+        }
+      }
+      if (asgId && stuCode) {
+        sgsRosterAndSubmissionService.gradeSubmission(asgId, stuCode, score, 'GRADED');
+      }
     }
 
     // หางานถัดไปที่ยังรอตรวจ (FIFO)

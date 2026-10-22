@@ -43,7 +43,11 @@ import { academicCalendarService } from '../services/academicCalendarService';
 import { formatClassroomLabel } from '../services/studentService';
 import { coursesCurriculumService, type CourseCurriculumRecord } from '../services/coursesCurriculumService';
 import { getSubjectIcon } from '../config/subjectIcons';
-import { sgsRosterAndSubmissionService, type CourseScoreWeights } from '../services/sgsRosterAndSubmissionService';
+import {
+  sgsRosterAndSubmissionService,
+  matchSubmissionToAssignment,
+  type CourseScoreWeights,
+} from '../services/sgsRosterAndSubmissionService';
 import { studentAffairsCouncilService } from '../services/studentAffairsCouncilService';
 
 interface StudentGradebookViewProps {
@@ -236,7 +240,7 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
     if (assignments.length === 0) return 100;
     const allSubs = sgsRosterAndSubmissionService.getSubmissions();
     const submittedCount = assignments.filter((a) =>
-      allSubs.some((s) => s.assignmentId === a.id && s.studentCode === studentCode)
+      allSubs.some((s) => s.studentCode === studentCode && matchSubmissionToAssignment(s, a))
     ).length;
     return Math.round((submittedCount / assignments.length) * 100);
   }, [studentRoom, studentCode, refreshKey]);

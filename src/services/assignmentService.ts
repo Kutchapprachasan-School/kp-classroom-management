@@ -1,5 +1,26 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase';
 import { AssignmentCreateSchema, type AssignmentCreateInput } from './types';
+import { studentService } from './studentService';
+
+const ALLOWED_ASSIGNMENT_COLUMNS = [
+  'title',
+  'description',
+  'dueDate',
+  'maxScore',
+  'courseId',
+  'classroomId',
+  'sgsUnitId',
+  'status',
+  'updatedAt',
+] as const;
+
+function sanitizeAssignmentUpdatePayload(updates: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(updates).filter(([key]) =>
+      (ALLOWED_ASSIGNMENT_COLUMNS as readonly string[]).includes(key)
+    )
+  );
+}
 
 export interface AssignmentRecord {
   id: string;
@@ -44,6 +65,9 @@ const saveLocalAssignments = (items: AssignmentRecord[]) => {
 export const assignmentService = {
   // READ: Get assignments for classroom
   async getByClassroom(classroomId: string): Promise<AssignmentRecord[]> {
+    const studentCount = studentService.countStudents(classroomId);
+    const resolvedTotal = studentCount > 0 ? studentCount : 0;
+
     if (isSupabaseConfigured) {
       logDbOperation(`SELECT * FROM Assignment WHERE classroomId = ${classroomId}`);
       const { data, error } = await supabase
@@ -62,7 +86,7 @@ export const assignmentService = {
           dueDate: 'ไม่ระบุ',
           maxScore: Number(item.maxScore),
           submittedCount: 0,
-          totalStudents: 23,
+          totalStudents: resolvedTotal,
           isFull: false,
           status: 'ACTIVE',
         }));
@@ -76,6 +100,8 @@ export const assignmentService = {
   async create(classroomId: string, input: AssignmentCreateInput): Promise<AssignmentRecord> {
     const validated = AssignmentCreateSchema.parse(input);
     const newId = `asg-${Date.now()}`;
+    const studentCount = studentService.countStudents(classroomId);
+    const resolvedTotal = studentCount > 0 ? studentCount : 0;
 
     const newAssignment: AssignmentRecord = {
       id: newId,
@@ -88,7 +114,7 @@ export const assignmentService = {
       dueDate: validated.dueDate || 'ไม่ระบุ',
       maxScore: validated.maxScore,
       submittedCount: 0,
-      totalStudents: 23,
+      totalStudents: resolvedTotal,
       isFull: false,
       status: 'ACTIVE',
     };
@@ -121,8 +147,11 @@ export const assignmentService = {
     saveLocalAssignments(current);
 
     if (isSupabaseConfigured) {
-      logDbOperation(`UPDATE Assignment WHERE id = ${id}`, updates);
-      await supabase.from('Assignment').update(updates).eq('id', id);
+      const cleanPayload = sanitizeAssignmentUpdatePayload(updates as Record<string, unknown>);
+      if (Object.keys(cleanPayload).length > 0) {
+        logDbOperation(`UPDATE Assignment WHERE id = ${id}`, cleanPayload);
+        await supabase.from('Assignment').update(cleanPayload).eq('id', id);
+      }
     }
 
     return updated;
@@ -130,9 +159,12 @@ export const assignmentService = {
 
   // CLOSE ASSIGNMENT: Mark missing students as 0
   async closeAssignment(id: string): Promise<AssignmentRecord> {
+    const current = getLocalAssignments();
+    const target = current.find((a) => a.id === id);
+    const count = target ? (studentService.countStudents(target.classroomId) || target.totalStudents) : 0;
     return this.update(id, {
       isFull: true,
-      submittedCount: 23,
+      submittedCount: count,
       status: 'CLOSED',
     });
   },
