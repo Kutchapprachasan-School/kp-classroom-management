@@ -14,7 +14,10 @@ import {
   type TermAssignmentItem,
   type StudentWorkSubmission,
 } from '../../services/sgsRosterAndSubmissionService';
-import { TEACHER_SUBJECTS_LIST } from '../../services/teacherCourseAssignmentService';
+import {
+  getDynamicTeachingSubjects,
+  type TeachingSubjectInfo,
+} from '../../services/teacherCourseAssignmentService';
 
 interface Submission3ColorMatrixModalProps {
   isOpen: boolean;
@@ -44,14 +47,26 @@ export const Submission3ColorMatrixModal: React.FC<Submission3ColorMatrixModalPr
   onOpenPreview,
   onGradeQuick,
 }) => {
-  const teachingSubjects = useMemo(() => {
-    return Array.from(TEACHER_SUBJECTS_LIST);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  React.useEffect(() => {
+    const handleUpdate = () => setRefreshTrigger((prev) => prev + 1);
+    window.addEventListener('kp-sgs-roster-updated', handleUpdate);
+    window.addEventListener('kp-submissions-sync', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('kp-sgs-roster-updated', handleUpdate);
+      window.removeEventListener('kp-submissions-sync', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
   }, []);
 
+  const teachingSubjects = useMemo<TeachingSubjectInfo[]>(() => {
+    return getDynamicTeachingSubjects();
+  }, [refreshTrigger]);
+
   const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>(() => {
-    if (defaultSubjectCode && teachingSubjects.some((s) => s.code === defaultSubjectCode)) {
-      return defaultSubjectCode;
-    }
+    if (defaultSubjectCode) return defaultSubjectCode;
     return teachingSubjects[0]?.code || '';
   });
 
@@ -61,6 +76,8 @@ export const Submission3ColorMatrixModal: React.FC<Submission3ColorMatrixModalPr
     return {
       code: selectedSubjectCode,
       name: selectedSubjectCode,
+      courseCode: selectedSubjectCode,
+      courseName: selectedSubjectCode,
       classrooms: defaultRoom ? [defaultRoom] : ['ม.1/1'],
     };
   }, [selectedSubjectCode, teachingSubjects, defaultRoom]);
@@ -84,19 +101,48 @@ export const Submission3ColorMatrixModal: React.FC<Submission3ColorMatrixModalPr
     if (defaultSubjectCode) setSelectedSubjectCode(defaultSubjectCode);
     if (defaultRoom) setSelectedRoom(defaultRoom);
   }, [defaultSubjectCode, defaultRoom, isOpen]);
+
   const [matrixSearch, setMatrixSearch] = useState<string>('');
 
   const roster: SgsStudentRecord[] = useMemo(() => {
     return sgsRosterAndSubmissionService.getSgsRoster(selectedRoom);
-  }, [selectedRoom]);
+  }, [selectedRoom, refreshTrigger]);
 
   const termAssignments: TermAssignmentItem[] = useMemo(() => {
     return sgsRosterAndSubmissionService.getTermAssignments(selectedSubjectCode, selectedRoom);
-  }, [selectedSubjectCode, selectedRoom]);
+  }, [selectedSubjectCode, selectedRoom, refreshTrigger]);
 
   const [submissions, setSubmissions] = useState<StudentWorkSubmission[]>(() =>
     sgsRosterAndSubmissionService.getSubmissions()
   );
+
+  // Reload submissions fresh whenever modal opens or trigger fires
+  React.useEffect(() => {
+    if (isOpen) {
+      setSubmissions(sgsRosterAndSubmissionService.getSubmissions());
+    }
+  }, [isOpen, refreshTrigger, selectedRoom, selectedSubjectCode]);
+
+  // Robust submission matcher that handles renamed assignments, unit IDs, and title variations
+  const matchSubmission = (stuCode: string, asg: TermAssignmentItem): StudentWorkSubmission | undefined => {
+    const cleanStuCode = String(stuCode).trim();
+    return submissions.find((s) => {
+      if (String(s.studentCode).trim() !== cleanStuCode) return false;
+      // 1. Direct assignment ID match
+      if (s.assignmentId === asg.id) return true;
+      // 2. Unit ID match
+      if (asg.unitId && s.assignmentId === asg.unitId) return true;
+      // 3. Title match fallback (resilient to renamed assignments)
+      if (s.workTitle && asg.title) {
+        const cleanSub = s.workTitle.trim().toLowerCase();
+        const cleanAsg = asg.title.trim().toLowerCase();
+        if (cleanSub === cleanAsg || cleanSub.includes(cleanAsg) || cleanAsg.includes(cleanSub)) {
+          return true;
+        }
+      }
+      return false;
+    });
+  };
 
   const activeStudents = useMemo(() => {
     return roster
@@ -122,9 +168,7 @@ export const Submission3ColorMatrixModal: React.FC<Submission3ColorMatrixModalPr
 
     activeStudents.forEach((stu) => {
       termAssignments.forEach((asg) => {
-        const sub = submissions.find(
-          (s) => s.assignmentId === asg.id && s.studentCode === stu.studentCode
-        );
+        const sub = matchSubmission(stu.studentCode, asg);
         if (!sub || sub.status === 'MISSING') {
           missingTotal++;
         } else if (sub.status === 'SUBMITTED_PENDING') {
@@ -317,9 +361,7 @@ export const Submission3ColorMatrixModal: React.FC<Submission3ColorMatrixModalPr
 
                       {/* Assignment Cells (3 Colors strictly) */}
                       {termAssignments.map((asg) => {
-                        const sub = submissions.find(
-                          (s) => s.assignmentId === asg.id && s.studentCode === stu.studentCode
-                        );
+                        const sub = matchSubmission(stu.studentCode, asg);
                         const isMissing = !sub || sub.status === 'MISSING';
                         const isPending = sub?.status === 'SUBMITTED_PENDING';
 

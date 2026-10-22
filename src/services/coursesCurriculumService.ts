@@ -7,6 +7,7 @@
 import { academicCalendarService } from './academicCalendarService.ts';
 import { activityAuditLogService } from './activityAuditLogService.ts';
 import { authService } from './authService.ts';
+import { sgsRosterAndSubmissionService } from './sgsRosterAndSubmissionService.ts';
 
 export type MediaType = 'DOCUMENT' | 'WORKSHEET' | 'EXAM_QUIZ' | 'VIDEO' | 'LINK';
 
@@ -199,6 +200,22 @@ class CoursesCurriculumService {
     const previous = { ...all[index] };
     all[index] = { ...all[index], ...data };
     this.save();
+
+    // Cascade course code/name updates to all term assignments and grading queues
+    if (
+      (data.code && data.code !== previous.code) ||
+      (data.name && data.name !== previous.name)
+    ) {
+      try {
+        sgsRosterAndSubmissionService.cascadeCourseUpdate(
+          previous.code,
+          data.code || previous.code,
+          data.name || previous.name
+        );
+      } catch (err) {
+        console.warn('[coursesCurriculumService] Cascade course update warning:', err);
+      }
+    }
 
     try {
       const changedFields: string[] = [];

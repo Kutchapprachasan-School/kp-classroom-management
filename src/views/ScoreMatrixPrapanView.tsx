@@ -14,6 +14,7 @@ import {
   sgsRosterAndSubmissionService,
   type TermAssignmentConfig,
   type SgsStudentRecord,
+  type StudentWorkSubmission,
 } from '../services/sgsRosterAndSubmissionService';
 import {
   getDynamicTeachingSubjects,
@@ -241,6 +242,22 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
 
     showToast(`✓ บันทึกคะแนนของ ${editingCell.studentName} เรียบร้อยแล้ว`);
     setEditingCell(null);
+  };
+
+  const matchSubmissionForStudent = (
+    stuSubs: StudentWorkSubmission[],
+    assign: TermAssignmentConfig
+  ) => {
+    return stuSubs.find((s) => {
+      if (s.assignmentId === assign.id) return true;
+      if (assign.unitId && s.assignmentId === assign.unitId) return true;
+      if (s.workTitle && assign.title) {
+        const cleanSub = s.workTitle.trim().toLowerCase();
+        const cleanAsg = assign.title.trim().toLowerCase();
+        return cleanSub === cleanAsg || cleanSub.includes(cleanAsg) || cleanAsg.includes(cleanSub);
+      }
+      return false;
+    });
   };
 
   const handleBulkGradeClassroom = () => {
@@ -535,12 +552,12 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
                 const preMidtermEarned = matrixAssignments
                   .filter((a) => !a.scorePart || a.scorePart === 'PRE_MIDTERM')
                   .reduce((sum, a) => {
-                    const sub = stuSubs.find((s) => s.assignmentId === a.id);
+                    const sub = matchSubmissionForStudent(stuSubs, a);
                     return sum + (sub && sub.score !== null ? Number(sub.score) : 0);
                   }, 0);
 
                 const allEarned = matrixAssignments.reduce((sum, a) => {
-                  const sub = stuSubs.find((s) => s.assignmentId === a.id);
+                  const sub = matchSubmissionForStudent(stuSubs, a);
                   return sum + (sub && sub.score !== null ? Number(sub.score) : 0);
                 }, 0);
 
@@ -612,7 +629,7 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
                           แตะที่แถบชิ้นงานเพื่อบันทึกหรือแก้ไขคะแนน:
                         </p>
                         {matrixAssignments.map((assign) => {
-                          const sub = stuSubs.find((s) => s.assignmentId === assign.id);
+                          const sub = matchSubmissionForStudent(stuSubs, assign);
                           const hasScore =
                             sub && sub.score !== null && sub.score !== undefined;
 
@@ -782,12 +799,12 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
                   const preMidtermEarned = matrixAssignments
                     .filter((a) => !a.scorePart || a.scorePart === 'PRE_MIDTERM')
                     .reduce((sum, a) => {
-                      const sub = stuSubs.find((s) => s.assignmentId === a.id);
+                      const sub = matchSubmissionForStudent(stuSubs, a);
                       return sum + (sub && sub.score !== null ? Number(sub.score) : 0);
                     }, 0);
 
                   const allEarned = matrixAssignments.reduce((sum, a) => {
-                    const sub = stuSubs.find((s) => s.assignmentId === a.id);
+                    const sub = matchSubmissionForStudent(stuSubs, a);
                     return sum + (sub && sub.score !== null ? Number(sub.score) : 0);
                   }, 0);
 
@@ -809,7 +826,7 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
                         return (
                           <React.Fragment key={`cell-u-${u.id}`}>
                             {u.assignments.map((assign) => {
-                              const sub = stuSubs.find((s) => s.assignmentId === assign.id);
+                              const sub = matchSubmissionForStudent(stuSubs, assign);
                               const hasScore = sub && sub.score !== null && sub.score !== undefined;
                               if (hasScore) unitSum += Number(sub.score);
 
@@ -846,7 +863,7 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
 
                       {/* Independent Tasks */}
                       {matrixUnits.independentList.map((assign) => {
-                        const sub = stuSubs.find((s) => s.assignmentId === assign.id);
+                        const sub = matchSubmissionForStudent(stuSubs, assign);
                         const hasScore = sub && sub.score !== null && sub.score !== undefined;
 
                         return (

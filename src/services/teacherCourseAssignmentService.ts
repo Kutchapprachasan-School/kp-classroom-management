@@ -304,7 +304,14 @@ export const teacherCourseAssignmentService = {
         // กรองงานที่ถูกลบออกจากระบบไปแล้ว (Orphan Submissions)
         if (termAssignments.length > 0 && sub.assignmentId) {
           const asgExists = termAssignments.some(
-            (a) => a.id === sub.assignmentId || a.unitId === sub.assignmentId
+            (a) =>
+              a.id === sub.assignmentId ||
+              (a.unitId && a.unitId === sub.assignmentId) ||
+              (sub.workTitle && a.title && (
+                sub.workTitle.trim().toLowerCase() === a.title.trim().toLowerCase() ||
+                sub.workTitle.includes(a.title) ||
+                a.title.includes(sub.workTitle)
+              ))
           );
           if (!asgExists) return;
         }
@@ -314,7 +321,16 @@ export const teacherCourseAssignmentService = {
         handledKeys.add(sub.assignmentId);
 
         const savedMatch = savedMap.get(pairKey) || savedMap.get(`q_${pairKey}`);
-        const asg = termAssignments.find((a) => a.id === sub.assignmentId);
+        const asg = termAssignments.find(
+          (a) =>
+            a.id === sub.assignmentId ||
+            (a.unitId && a.unitId === sub.assignmentId) ||
+            (sub.workTitle && a.title && (
+              sub.workTitle.trim().toLowerCase() === a.title.trim().toLowerCase() ||
+              sub.workTitle.includes(a.title) ||
+              a.title.includes(sub.workTitle)
+            ))
+        );
         const subCode = sub.studentCode.trim();
         const stu = studentMap.get(subCode);
         const foundInService = studentService.findStudentByCode(subCode);

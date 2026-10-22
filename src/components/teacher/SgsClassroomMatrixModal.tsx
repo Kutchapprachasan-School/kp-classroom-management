@@ -72,15 +72,15 @@ export const SgsClassroomMatrixModal: React.FC<SgsClassroomMatrixModalProps> = (
 
   const roster: SgsStudentRecord[] = useMemo(() => {
     return sgsRosterAndSubmissionService.getSgsRoster();
-  }, []);
+  }, [selectedRoom, isOpen]);
 
   const termAssignments: TermAssignmentItem[] = useMemo(() => {
     return sgsRosterAndSubmissionService.getTermAssignments();
-  }, []);
+  }, [isOpen]);
 
   const submissions: StudentWorkSubmission[] = useMemo(() => {
     return sgsRosterAndSubmissionService.getSubmissions();
-  }, []);
+  }, [isOpen]);
 
   const filteredStudents = useMemo(() => {
     return roster
@@ -265,9 +265,18 @@ export const SgsClassroomMatrixModal: React.FC<SgsClassroomMatrixModalProps> = (
                           {stu.studentName}
                         </td>
                         {termAssignments.map((asg) => {
-                          const sub = submissions.find(
-                            (s) => s.assignmentId === asg.id && s.studentCode === stu.studentCode
-                          );
+                          const cleanStuCode = String(stu.studentCode).trim();
+                          const sub = submissions.find((s) => {
+                            if (String(s.studentCode).trim() !== cleanStuCode) return false;
+                            if (s.assignmentId === asg.id) return true;
+                            if (asg.unitId && s.assignmentId === asg.unitId) return true;
+                            if (s.workTitle && asg.title) {
+                              const cleanSub = s.workTitle.trim().toLowerCase();
+                              const cleanAsg = asg.title.trim().toLowerCase();
+                              return cleanSub === cleanAsg || cleanSub.includes(cleanAsg) || cleanAsg.includes(cleanSub);
+                            }
+                            return false;
+                          });
                           const score = sub?.score ?? (sub?.status === 'GRADED' ? asg.maxScore : null);
                           if (score !== null && score !== undefined) {
                             studentTotalScore += score;

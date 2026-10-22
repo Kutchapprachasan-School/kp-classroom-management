@@ -416,4 +416,70 @@ describe('Student Submission & Teacher Artwork Display Fixes', () => {
     // Verify maxScore uses unitMaxScore (25) rather than 1
     expect(item?.maxScore).toBe(25);
   });
+
+  it('retains student submissions and grading queue items when assignment title or course code is changed', () => {
+    // 1. Create an assignment
+    sgsRosterAndSubmissionService.addTermAssignment({
+      title: 'ใบงานวาดภาพ',
+      courseCode: 'ศ21101',
+      courseName: 'ทัศนศิลป์ 1',
+      targetClassrooms: ['ม.1/1'],
+      maxScore: 10,
+      dueDate: '2026-11-15',
+    });
+    const assignments = sgsRosterAndSubmissionService.getTermAssignments('ศ21101', 'ม.1/1');
+    const asg = assignments.find((a) => a.title === 'ใบงานวาดภาพ')!;
+    expect(asg).toBeDefined();
+
+    // 2. Student submits work
+    sgsRosterAndSubmissionService.submitStudentWorkToR2({
+      assignmentId: asg.id,
+      studentCode: '55001',
+      workTitle: 'ใบงานวาดภาพ',
+      fileDataUrl: 'data:image/webp;base64,UklGRvAAAABXRUJQVlA4',
+      fileName: 'drawing.png',
+    });
+
+    // Verify submission exists
+    const beforeSubs = sgsRosterAndSubmissionService.getSubmissions();
+    expect(beforeSubs.some((s) => s.assignmentId === asg.id && s.studentCode === '55001')).toBe(true);
+
+    // 3. Teacher renames the assignment title
+    sgsRosterAndSubmissionService.updateTermAssignment(asg.id, {
+      title: 'ใบงานที่ 1: การวาดภาพระบายสีสร้างสรรค์',
+      maxScore: 15,
+    });
+
+    // 4. Verify assignment has new title
+    const updatedAsgs = sgsRosterAndSubmissionService.getTermAssignments('ศ21101', 'ม.1/1');
+    const updatedAsg = updatedAsgs.find((a) => a.id === asg.id);
+    expect(updatedAsg?.title).toBe('ใบงานที่ 1: การวาดภาพระบายสีสร้างสรรค์');
+    expect(updatedAsg?.maxScore).toBe(15);
+
+    // 5. Verify submission STILL exists and workTitle was cascade updated
+    const afterSubs = sgsRosterAndSubmissionService.getSubmissions();
+    const matchedSub = afterSubs.find((s) => s.assignmentId === asg.id && s.studentCode === '55001');
+    expect(matchedSub).toBeDefined();
+    expect(matchedSub?.workTitle).toBe('ใบงานที่ 1: การวาดภาพระบายสีสร้างสรรค์');
+
+    // 6. Verify grading queue retains item with new title and new max score
+    const queue = teacherCourseAssignmentService.getGradingQueue();
+    const queueItem = queue.find((q) => q.assignmentId === asg.id && q.studentCode === '55001');
+    expect(queueItem).toBeDefined();
+    expect(queueItem?.assignmentTitle).toBe('ใบงานที่ 1: การวาดภาพระบายสีสร้างสรรค์');
+    expect(queueItem?.maxScore).toBe(15);
+
+    // 7. Teacher changes course code from ศ21101 to ศ21102
+    sgsRosterAndSubmissionService.cascadeCourseUpdate('ศ21101', 'ศ21102', 'ทัศนศิลป์ 2');
+
+    // 8. Verify getTermAssignments with new course code finds the assignment
+    const newCourseAsgs = sgsRosterAndSubmissionService.getTermAssignments('ศ21102', 'ม.1/1');
+    expect(newCourseAsgs.some((a) => a.id === asg.id)).toBe(true);
+
+    // 9. Verify grading queue reflects the new course code
+    const queueAfterCourseChange = teacherCourseAssignmentService.getGradingQueue();
+    const updatedQueueItem = queueAfterCourseChange.find((q) => q.assignmentId === asg.id && q.studentCode === '55001');
+    expect(updatedQueueItem).toBeDefined();
+    expect(updatedQueueItem?.subjectCode).toBe('ศ21102');
+  });
 });

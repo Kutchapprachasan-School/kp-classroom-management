@@ -398,12 +398,13 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     setFormScorePart(assign.scorePart || 'PRE_MIDTERM');
     setFormMaxScore(assign.maxScore || 10);
     setFormDueDate(assign.dueDate || getBangkokTodayString());
-    setFormScopeMode(
-      assign.targetClassrooms && assign.targetClassrooms.length > 0
-        ? 'SELECTED_ROOMS'
-        : 'ALL_SUBJECT_ROOMS'
+    const isTargetSpecific = Boolean(
+      assign.targetClassrooms &&
+      assign.targetClassrooms.length > 0 &&
+      !assign.targetClassrooms.includes('ALL')
     );
-    setFormSelectedRooms(assign.targetClassrooms || []);
+    setFormScopeMode(isTargetSpecific ? 'SELECTED_ROOMS' : 'ALL_SUBJECT_ROOMS');
+    setFormSelectedRooms(isTargetSpecific ? assign.targetClassrooms || [] : []);
     const isUnit = Boolean(
       assign.unitTitle ||
       (assign.scoringMethod && assign.scoringMethod !== 'DIRECT_SCORE')
@@ -426,7 +427,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
     const targetRooms =
       formScopeMode === 'ALL_SUBJECT_ROOMS'
-        ? currentFormSubjectRooms
+        ? (editingAssignment?.targetClassrooms?.includes('ALL') ? ['ALL'] : currentFormSubjectRooms)
         : formSelectedRooms.length > 0
           ? formSelectedRooms
           : currentFormSubjectRooms.slice(0, 1);
@@ -445,6 +446,13 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
           : Math.max(1, Number(formTotalTasksInUnit) || 1)
         : undefined;
 
+    const effectiveCourseCode =
+      formCourseCode || editingAssignment?.courseCode || currentFormSubject.courseCode;
+    const effectiveCourseName =
+      subjectsList.find((s) => s.courseCode === effectiveCourseCode)?.courseName ||
+      editingAssignment?.courseName ||
+      currentFormSubject.courseName;
+
     if (editingAssignment) {
       sgsRosterAndSubmissionService.updateTermAssignment(editingAssignment.id, {
         title: formTitle.trim(),
@@ -455,8 +463,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         maxScore: Math.max(1, Number(formMaxScore) || 10),
         indicatorCode: SCORE_PART_LABELS[formScorePart].label,
         dueDate: formDueDate || getBangkokTodayString(),
-        courseCode: currentFormSubject.courseCode,
-        courseName: currentFormSubject.courseName,
+        courseCode: effectiveCourseCode,
+        courseName: effectiveCourseName,
         targetClassrooms: targetRooms,
         unitId:
           formAssignmentMode === 'UNIT_BUNDLE' && formUnitTitle.trim()

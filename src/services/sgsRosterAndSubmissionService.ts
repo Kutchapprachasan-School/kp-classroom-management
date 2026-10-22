@@ -706,8 +706,12 @@ export const sgsRosterAndSubmissionService = {
       const raw = localStorage.getItem(STORAGE_KEY_TERM_ASSIGNMENTS);
       const list: TermAssignmentItem[] = raw ? JSON.parse(raw) : [];
       return list.filter((item) => {
-        if (courseCode && courseCode !== 'ALL' && item.courseCode && item.courseCode !== courseCode) {
-          return false;
+        if (courseCode && courseCode !== 'ALL') {
+          const cleanParam = courseCode.trim().toUpperCase();
+          const cleanItem = (item.courseCode || '').trim().toUpperCase();
+          if (cleanItem && cleanItem !== cleanParam && !item.courseName?.includes(courseCode)) {
+            return false;
+          }
         }
         if (
           classroomId &&
@@ -854,11 +858,127 @@ export const sgsRosterAndSubmissionService = {
       };
     });
     localStorage.setItem(STORAGE_KEY_TERM_ASSIGNMENTS, JSON.stringify(updated));
+
+    // Cascade update related submissions & grading queue items when assignment is renamed or updated
+    try {
+      const subs = this.getSubmissions();
+      let subsChanged = false;
+      const nextSubs = subs.map((sub) => {
+        const isMatch =
+          sub.assignmentId === assignmentId ||
+          (targetUnitId && sub.assignmentId === targetUnitId) ||
+          (targetItem?.title && sub.workTitle && sub.workTitle.trim() === targetItem.title.trim());
+
+        if (isMatch) {
+          subsChanged = true;
+          return {
+            ...sub,
+            assignmentId, // ensure normalized assignment ID
+            workTitle: updates.title !== undefined ? updates.title.trim() : sub.workTitle,
+          };
+        }
+        return sub;
+      });
+
+      if (subsChanged) {
+        this.saveSubmissions(nextSubs);
+      }
+
+      // Also cascade to teacher grading queue in localStorage
+      ['kp_grading_queue_v2', 'cls_teacher_grading_queue_v2'].forEach((queueKey) => {
+        const raw = localStorage.getItem(queueKey);
+        if (raw) {
+          const qList = JSON.parse(raw);
+          if (Array.isArray(qList)) {
+            let qChanged = false;
+            const nextQ = qList.map((q: any) => {
+              const isMatch =
+                q.assignmentId === assignmentId ||
+                (targetItem?.title && q.assignmentTitle && q.assignmentTitle.trim() === targetItem.title.trim());
+
+              if (isMatch) {
+                qChanged = true;
+                return {
+                  ...q,
+                  assignmentId,
+                  assignmentTitle: updates.title !== undefined ? updates.title.trim() : q.assignmentTitle,
+                  subjectCode: updates.courseCode !== undefined ? updates.courseCode : q.subjectCode,
+                  subjectName: updates.courseName !== undefined ? updates.courseName : q.subjectName,
+                  maxScore: updates.maxScore !== undefined ? Number(updates.maxScore) : q.maxScore,
+                };
+              }
+              return q;
+            });
+            if (qChanged) {
+              localStorage.setItem(queueKey, JSON.stringify(nextQ));
+            }
+          }
+        }
+      });
+    } catch (err) {
+      console.warn('[updateTermAssignment] Cascade update warning:', err);
+    }
+
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('kp-sgs-roster-updated'));
       window.dispatchEvent(new CustomEvent('kp-copilot-updated'));
+      window.dispatchEvent(new CustomEvent('kp-grading-queue-updated'));
     }
     return updated;
+  },
+
+  // Cascade course code / name changes across all term assignments and grading queues
+  cascadeCourseUpdate(oldCourseCode: string, newCourseCode: string, newCourseName?: string): void {
+    if (!oldCourseCode || !newCourseCode) return;
+    try {
+      const allAsg = this.getTermAssignments();
+      let asgChanged = false;
+      const nextAsg = allAsg.map((a) => {
+        if (a.courseCode?.trim().toUpperCase() === oldCourseCode.trim().toUpperCase()) {
+          asgChanged = true;
+          return {
+            ...a,
+            courseCode: newCourseCode.trim(),
+            courseName: newCourseName?.trim() || a.courseName,
+          };
+        }
+        return a;
+      });
+      if (asgChanged) {
+        localStorage.setItem(STORAGE_KEY_TERM_ASSIGNMENTS, JSON.stringify(nextAsg));
+      }
+
+      ['kp_grading_queue_v2', 'cls_teacher_grading_queue_v2'].forEach((queueKey) => {
+        const raw = localStorage.getItem(queueKey);
+        if (raw) {
+          const qList = JSON.parse(raw);
+          if (Array.isArray(qList)) {
+            let qChanged = false;
+            const nextQ = qList.map((q: any) => {
+              if (q.subjectCode?.trim().toUpperCase() === oldCourseCode.trim().toUpperCase()) {
+                qChanged = true;
+                return {
+                  ...q,
+                  subjectCode: newCourseCode.trim(),
+                  subjectName: newCourseName?.trim() || q.subjectName,
+                };
+              }
+              return q;
+            });
+            if (qChanged) {
+              localStorage.setItem(queueKey, JSON.stringify(nextQ));
+            }
+          }
+        }
+      });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('kp-sgs-roster-updated'));
+        window.dispatchEvent(new CustomEvent('kp-grading-queue-updated'));
+      }
+    } catch (err) {
+      console.warn('[cascadeCourseUpdate] Error updating course codes in assignments:', err);
+    }
   },
 
   addTermAssignment(payload: {
