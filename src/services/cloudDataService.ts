@@ -643,3 +643,207 @@ class CloudDataService {
 }
 
 export const cloudDataService = new CloudDataService();
+
+export interface FileValidationResult {
+  valid: boolean;
+  error?: string;
+  sanitizedName?: string;
+  category?: 'image' | 'document';
+}
+
+// ตั้งค่าขนาดไฟล์สูงสุดที่อนุญาต (Client-side & Server-side Safeguard)
+export const MAX_IMAGE_SIZE_MB = 5;
+export const MAX_DOC_SIZE_MB = 15;
+
+// นามสกุลและ MIME Type ที่อนุญาตสำหรับงานนักเรียน
+export const ALLOWED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.heic'];
+export const ALLOWED_DOC_EXTENSIONS = ['.pdf', '.doc', '.docx'];
+
+export const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+];
+
+/**
+ * ทำความสะอาดชื่อไฟล์ ลบช่องว่างและอักขระพิเศษ แต่เก็บภาษาไทย ตัวเลข และจุดนามสกุลไฟล์ไว้
+ */
+export function sanitizeFileName(fileName: string): string {
+  const lastDotIndex = fileName.lastIndexOf('.');
+  const ext = lastDotIndex !== -1 ? fileName.slice(lastDotIndex).toLowerCase() : '';
+  const baseName = lastDotIndex !== -1 ? fileName.slice(0, lastDotIndex) : fileName;
+
+  // แทนที่ช่องว่างด้วย _ และลบอักขระพิเศษที่อาจทำให้ URL มีปัญหา
+  const cleanBase = baseName
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9ก-๙_\-]/g, '');
+
+  return `${cleanBase || 'submission'}${ext}`;
+}
+
+/**
+ * ตรวจสอบความถูกต้องของไฟล์งานนักเรียนก่อนอัปโหลดขึ้น R2
+ */
+export function validateSubmissionFile(file: File): FileValidationResult {
+  if (!file) {
+    return { valid: false, error: 'กรุณาเลือกไฟล์ที่ต้องการส่ง' };
+  }
+
+  // 1. ตรวจสอบไฟล์เสียหรือไฟล์ว่าง (0 Bytes)
+  if (file.size === 0) {
+    return { valid: false, error: 'ไฟล์ที่เลือกไม่มีข้อมูล (ขนาด 0 KB) กรุณาเลือกไฟล์ใหม่' };
+  }
+
+  // 2. ดึงนามสกุลไฟล์มาตรวจสอบ
+  const lastDot = file.name.lastIndexOf('.');
+  const ext = lastDot !== -1 ? file.name.slice(lastDot).toLowerCase() : '';
+
+  const isImageExt = ALLOWED_IMAGE_EXTENSIONS.includes(ext);
+  const isDocExt = ALLOWED_DOC_EXTENSIONS.includes(ext);
+
+  if (!isImageExt && !isDocExt) {
+    return {
+      valid: false,
+      error: `ไม่รองรับไฟล์นามสกุล "${ext || 'ไม่ทราบชนิด'}" (อนุญาตเฉพาะรูปภาพ JPG, PNG, WebP และเอกสาร PDF, Word เท่านั้น)`,
+    };
+  }
+
+  // 3. ตรวจสอบ MIME Type ป้องกันการเปลี่ยนนามสกุลไฟล์หลอก (เช่น เอาไฟล์ .exe มาเปลี่ยนชื่อเป็น .jpg)
+  if (file.type && !ALLOWED_MIME_TYPES.includes(file.type)) {
+    return {
+      valid: false,
+      error: `รูปแบบข้อมูลของไฟล์ (${file.type}) ไม่ถูกต้องหรือไม่ปลอดภัย`,
+    };
+  }
+
+  // 4. ตรวจสอบขนาดไฟล์ตามประเภท
+  const fileSizeMB = file.size / (1024 * 1024);
+
+  if (isImageExt && fileSizeMB > MAX_IMAGE_SIZE_MB) {
+    return {
+      valid: false,
+      error: `ไฟล์รูปภาพมีขนาดใหญ่เกินไป (${fileSizeMB.toFixed(2)} MB) กรุณาใช้รูปภาพขนาดไม่เกิน ${MAX_IMAGE_SIZE_MB} MB`,
+    };
+  }
+
+  if (isDocExt && fileSizeMB > MAX_DOC_SIZE_MB) {
+    return {
+      valid: false,
+      error: `ไฟล์เอกสารมีขนาดใหญ่เกินไป (${fileSizeMB.toFixed(2)} MB) กรุณาใช้ไฟล์ขนาดไม่เกิน ${MAX_DOC_SIZE_MB} MB`,
+    };
+  }
+
+  return {
+    valid: true,
+    sanitizedName: sanitizeFileName(file.name),
+    category: isImageExt ? 'image' : 'document',
+  };
+}
+
+export interface UploadProgressInfo {
+  percent: number;      // เปอร์เซ็นต์ 0 - 100
+  loadedBytes: number;  // จำนวนไบต์ที่ส่งไปแล้ว
+  totalBytes: number;   // ขนาดไฟล์ทั้งหมด
+}
+
+/**
+ * อัปโหลดไฟล์เดียวขึ้น Cloudflare R2 พร้อมติดตามเปอร์เซ็นต์แบบเรียลไทม์ (XMLHttpRequest)
+ */
+export function uploadToR2WithProgress(
+  r2Key: string,
+  file: File | Blob,
+  onProgress?: (info: UploadProgressInfo) => void
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const workerUrl = (
+      (typeof import.meta !== 'undefined' && import.meta.env?.VITE_R2_WORKER_URL) ||
+      (typeof window !== 'undefined' && window.localStorage?.getItem('kp_r2_worker_url')) ||
+      'https://kps-r2-storage.kps-school.workers.dev'
+    )?.replace(/\/+$/, '');
+
+    const publicUrl = (
+      (typeof import.meta !== 'undefined' && import.meta.env?.VITE_R2_PUBLIC_URL) ||
+      (typeof window !== 'undefined' && window.localStorage?.getItem('kp_r2_public_url')) ||
+      workerUrl
+    )?.replace(/\/+$/, '');
+
+    const uploadSecret = (
+      (typeof import.meta !== 'undefined' && import.meta.env?.VITE_R2_UPLOAD_SECRET) ||
+      (typeof window !== 'undefined' && window.localStorage?.getItem('kp_r2_upload_secret')) ||
+      'KP_school'
+    );
+
+    if (!workerUrl || !uploadSecret) {
+      reject(new Error('ยังไม่ได้ตั้งค่า VITE_R2_WORKER_URL หรือ VITE_R2_UPLOAD_SECRET'));
+      return;
+    }
+
+    const cleanKey = r2Key
+      .replace(/^r2:\/\/kp-classroom-submissions\//, '')
+      .replace(/^https?:\/\/[^/]+\//, '')
+      .replace(/^\/+/, '');
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', `${workerUrl}/${encodeURI(cleanKey)}`, true);
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    xhr.setRequestHeader('X-Custom-Auth-Key', uploadSecret);
+
+    // ดักจับความคืบหน้าขณะส่งข้อมูลขาขึ้น (Upload)
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && onProgress) {
+        const percent = Math.round((event.loaded / event.total) * 100);
+        onProgress({
+          percent,
+          loadedBytes: event.loaded,
+          totalBytes: event.total,
+        });
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        // คืนค่าลิงก์จริงสำหรับให้ครูเปิดดูข้ามเครื่อง
+        resolve(`${publicUrl}/${encodeURI(cleanKey)}`);
+      } else {
+        reject(new Error(`อัปโหลดไม่สำเร็จ (รหัส ${xhr.status}): ${xhr.responseText}`));
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error('การเชื่อมต่อขัดข้อง กรุณาตรวจสอบสัญญาณอินเทอร์เน็ตแล้วลองใหม่อีกครั้ง'));
+    };
+
+    xhr.send(file);
+  });
+}
+
+/**
+ * กรณีนักเรียนแนบหลายไฟล์ในงานเดียว คำนวณเปอร์เซ็นต์รวมทุกไฟล์
+ */
+export async function uploadMultipleFilesWithProgress(
+  items: { r2Key: string; file: File | Blob }[],
+  onTotalProgress?: (percent: number, currentFileIndex: number, totalFiles: number) => void
+): Promise<string[]> {
+  const uploadedUrls: string[] = [];
+  const totalFiles = items.length;
+
+  for (let i = 0; i < totalFiles; i++) {
+    const { r2Key, file } = items[i];
+    const url = await uploadToR2WithProgress(r2Key, file, ({ percent }) => {
+      if (onTotalProgress) {
+        // คำนวณเปอร์เซ็นต์เฉลี่ยรวมทุกไฟล์
+        const overallPercent = Math.round((i * 100 + percent) / totalFiles);
+        onTotalProgress(overallPercent, i + 1, totalFiles);
+      }
+    });
+    uploadedUrls.push(url);
+  }
+
+  return uploadedUrls;
+}
+

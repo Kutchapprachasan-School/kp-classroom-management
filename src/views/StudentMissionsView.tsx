@@ -13,12 +13,12 @@ import {
   Check,
   ClipboardCheck,
   ChevronRight,
-  Trash2,
   ExternalLink,
   AlertCircle,
   Paperclip,
   Eye,
   BookOpen,
+  RefreshCw,
 } from 'lucide-react';
 import { gamificationService } from '../services/gamificationService';
 import {
@@ -36,6 +36,8 @@ import { getSchoolSettings } from '../config/schoolRoles';
 import { weeklyQuizService } from '../services/weeklyQuizService';
 import { calculateStudentExp } from '../services/studentExpService';
 import { formatClassroomLabel } from '../services/studentService';
+import { type UploadProgressInfo, validateSubmissionFile } from '../services/cloudDataService';
+import { formatBytes } from '../components/student/StudentSubmissionUploader';
 
 export interface ExtendedStudentQuestItem extends StudentQuestItem {
   scorePart?: FourScorePart;
@@ -65,10 +67,52 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
   const [selectedQuest, setSelectedQuest] = useState<ExtendedStudentQuestItem | null>(null);
   const [isEditingSubmission, setIsEditingSubmission] = useState(false);
   const [submitLink, setSubmitLink] = useState('');
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [selectedFileName, setSelectedFileName] = useState('');
   const [selectedFileDataUrl, setSelectedFileDataUrl] = useState<string | null>(null);
+  const [selectedRawFile, setSelectedRawFile] = useState<File | Blob | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [fileTypeCategory, setFileTypeCategory] = useState<'image' | 'pdf' | 'doc' | 'other'>('other');
+  const [fileValidationError, setFileValidationError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingR2, setIsUploadingR2] = useState(false);
+  const [uploadProgressInfo, setUploadProgressInfo] = useState<UploadProgressInfo>({
+    percent: 0,
+    loadedBytes: 0,
+    totalBytes: 0,
+  });
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  // คืนค่าหน่วยความจำ (Memory Cleanup) ทุกครั้งที่เปลี่ยนไฟล์หรือปิดหน้าเว็บ เพื่อไม่ให้กินแรมมือถือ
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  const handleOpenFullscreenPreview = () => {
+    if (previewUrl) {
+      window.open(previewUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const handleClearFile = () => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPreviewUrl(null);
+    setSelectedFileName('');
+    setSelectedFileDataUrl(null);
+    setSelectedRawFile(null);
+    setFileTypeCategory('other');
+    setFileValidationError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    setUploadProgressInfo({ percent: 0, loadedBytes: 0, totalBytes: 0 });
+  };
 
   // Real Weekly Quiz State (connected to 40-week bank)
   const weekInfo = weeklyQuizService.getCurrentWeekInfo();
@@ -253,6 +297,15 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
     }
 
     setIsSubmitting(true);
+    if (hasFile) {
+      setIsUploadingR2(true);
+      setUploadProgressInfo({
+        percent: 0,
+        loadedBytes: 0,
+        totalBytes: selectedRawFile ? selectedRawFile.size : (selectedFileDataUrl ? Math.round(selectedFileDataUrl.length * 0.75) : 0),
+      });
+    }
+
     try {
       try {
         await gamificationService.submitQuest(selectedQuest.id, trimmedLink, studentId);
@@ -274,9 +327,13 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
         originalSizeKb: selectedFileDataUrl ? Math.round(selectedFileDataUrl.length / 1024) : 0,
         compressedSizeKb: selectedFileDataUrl ? Math.round(selectedFileDataUrl.length / 1365) : 0,
         fileDataUrl: selectedFileDataUrl || undefined,
+        fileBlob: selectedRawFile || undefined,
         externalLinkUrl: hasLink ? trimmedLink : undefined,
         academicYearTerm,
         classroom: studentRoom,
+        onProgress: (info) => {
+          setUploadProgressInfo(info);
+        },
       });
 
       if (hasFile && hasLink) {
@@ -293,9 +350,21 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
       setSubmitLink('');
       setSelectedFileName('');
       setSelectedFileDataUrl(null);
+      setSelectedRawFile(null);
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(null);
+      }
+      setFileTypeCategory('other');
+      setFileValidationError(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      setUploadProgressInfo({ percent: 0, loadedBytes: 0, totalBytes: 0 });
       setIsEditingSubmission(false);
     } finally {
       setIsSubmitting(false);
+      setIsUploadingR2(false);
     }
   };
 
@@ -1069,46 +1138,102 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                     </span>
                   </div>
 
-                  {selectedFileDataUrl ? (
-                    /* Display Selected File Preview */
-                    <div className="p-3 bg-white rounded-xl border border-teal-200 flex items-center justify-between gap-3 shadow-2xs">
-                      <div className="flex items-center gap-3 min-w-0">
-                        {selectedFileDataUrl.startsWith('data:image/') ? (
-                          <img
-                            src={selectedFileDataUrl}
-                            alt="Preview"
-                            className="w-14 h-14 object-cover rounded-xl border border-slate-200 shadow-2xs shrink-0"
-                          />
-                        ) : (
-                          <div className="w-14 h-14 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center shrink-0">
-                            <FileText className="w-6 h-6 text-rose-500" />
-                          </div>
+                  {selectedRawFile || previewUrl || selectedFileDataUrl ? (
+                    /* Display Selected File Preview (RAM optimized via ObjectURL) */
+                    <div className="space-y-3 bg-white p-3.5 rounded-2xl border border-blue-200/80 shadow-2xs animate-fade-in">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[#163A66] flex items-center gap-1.5">
+                          <span>🖼️ ตรวจสอบตัวอย่างไฟล์ก่อนส่ง</span>
+                        </span>
+                        {!isSubmitting && !isUploadingR2 && (
+                          <button
+                            type="button"
+                            onClick={handleClearFile}
+                            className="text-xs font-semibold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer transition-colors p-1 rounded-lg hover:bg-rose-50"
+                            title="ลบไฟล์และเลือกใหม่"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            <span>เปลี่ยนไฟล์ / ลบออก</span>
+                          </button>
                         )}
-                        <div className="min-w-0">
-                          <p className="font-bold text-slate-800 text-xs truncate max-w-xs">
-                            {selectedFileName || 'ไฟล์ที่เลือก'}
-                          </p>
-                          <p className="text-[11px] text-teal-700 font-semibold mt-0.5">
-                            ✓ บีบอัด WebP เหลือ ~{Math.round(selectedFileDataUrl.length / 1365)} KB พร้อมส่ง
-                          </p>
-                        </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedFileName('');
-                          setSelectedFileDataUrl(null);
-                        }}
-                        className="p-2 rounded-xl text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors cursor-pointer shrink-0"
-                        title="ลบไฟล์และเลือกใหม่"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {/* 1. กรณีเป็นไฟล์รูปภาพ: แสดง Image Preview */}
+                      {fileTypeCategory === 'image' && (previewUrl || selectedFileDataUrl) && (
+                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-900/5 shadow-2xs">
+                          <img
+                            src={previewUrl || selectedFileDataUrl || ''}
+                            alt="ตัวอย่างผลงานนักเรียน"
+                            className="mx-auto max-h-64 w-full object-contain p-1.5"
+                          />
+                          <div className="border-t border-slate-200/80 bg-slate-50 px-3 py-2 flex items-center justify-between">
+                            <span className="text-[11px] text-slate-500 font-medium">ภาพไม่เบลอ ไม่กลับหัว พร้อมส่ง</span>
+                            {previewUrl && (
+                              <button
+                                type="button"
+                                onClick={handleOpenFullscreenPreview}
+                                className="text-xs font-bold text-[#3B82F6] hover:text-[#2563EB] flex items-center gap-1 cursor-pointer"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                <span>ขยายดูภาพขนาดเต็ม</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 2. กรณีเป็นไฟล์ PDF: แสดง PDF Preview ใน iframe พร้อมปุ่มเปิดเต็มจอ */}
+                      {fileTypeCategory === 'pdf' && previewUrl && (
+                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs">
+                          <iframe
+                            src={previewUrl}
+                            title="ตัวอย่างไฟล์ PDF"
+                            className="h-64 w-full border-0"
+                          />
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/80 bg-slate-50 px-3 py-2">
+                            <span className="text-[11px] text-slate-500">
+                              หากมือถือไม่แสดงพรีวิว กดปุ่มเปิดดูได้ครับ
+                            </span>
+                            <button
+                              type="button"
+                              onClick={handleOpenFullscreenPreview}
+                              className="shrink-0 rounded-xl bg-blue-50 border border-blue-200 px-3 py-1.5 text-xs font-bold text-[#3B82F6] hover:bg-blue-100 flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              <span>📄 เปิดดู PDF เต็มจอ</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 3. กรณีเป็นไฟล์ Word (.doc, .docx): แสดงการ์ดข้อมูลเอกสาร */}
+                      {fileTypeCategory === 'doc' && (
+                        <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50/40 p-3.5 shadow-2xs">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 border border-blue-200 text-lg font-black text-[#3B82F6]">
+                            W
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs font-bold text-[#163A66]">
+                              ไฟล์เอกสาร Microsoft Word
+                            </p>
+                            <p className="text-[11px] text-[#6B7C93]">
+                              พร้อมสำหรับอัปโหลดขึ้น Cloudflare R2
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* แถบสรุปชื่อไฟล์และขนาด */}
+                      <div className="flex items-center justify-between text-xs text-slate-600 px-1 pt-1 border-t border-slate-100">
+                        <span className="truncate font-semibold text-[#163A66] max-w-[70%]">{selectedFileName || 'ไฟล์ผลงาน'}</span>
+                        <span className="shrink-0 font-mono text-slate-400 text-[11px]">
+                          {selectedRawFile ? formatBytes(selectedRawFile.size) : (selectedFileDataUrl ? `~${Math.round(selectedFileDataUrl.length / 1365)} KB` : '')}
+                        </span>
+                      </div>
                     </div>
                   ) : (
                     /* File Upload Dropzone */
-                    <label className="block p-5 bg-white border-2 border-dashed border-slate-300 hover:border-[#3B82F6] rounded-2xl text-center space-y-2 cursor-pointer transition-colors group">
+                    <label className={`block p-5 bg-white border-2 border-dashed border-slate-300 hover:border-[#3B82F6] rounded-2xl text-center space-y-2 cursor-pointer transition-colors group ${isSubmitting || isUploadingR2 ? 'opacity-50 pointer-events-none' : ''}`}>
                       <div className="w-10 h-10 rounded-full bg-blue-50 text-[#3B82F6] group-hover:scale-110 flex items-center justify-center mx-auto transition-transform">
                         <Upload className="w-5 h-5" />
                       </div>
@@ -1117,65 +1242,71 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                           📷 ถ่ายภาพ หรือ 📁 คลิกเพื่อเลือกไฟล์จากเครื่อง
                         </span>
                         <span className="text-[11px] text-[#6B7C93] mt-0.5 block">
-                          รองรับรูปภาพ (JPG, PNG, WebP) และเอกสาร PDF (ระบบจะบีบอัดไฟล์ให้อัตโนมัติ)
+                          รองรับรูปภาพ (JPG, PNG, WebP ไม่เกิน 5 MB) และเอกสาร (PDF, Word ไม่เกิน 15 MB)
                         </span>
                       </div>
                       <input
+                        ref={fileInputRef}
                         type="file"
-                        accept="image/*,.pdf"
+                        accept=".jpg,.jpeg,.png,.webp,.heic,.pdf,.doc,.docx"
+                        disabled={isSubmitting || isUploadingR2}
                         className="hidden"
                         onChange={(e) => {
                           const f = e.target.files?.[0];
                           if (!f) return;
-                          if (/\.(mp4|mov|avi|mkv|webm)$/i.test(f.name)) {
-                            setToastMsg('🚫 ระบบไม่อนุญาตให้อัปโหลดวิดีโอเข้า R2 กรุณาส่งเป็นลิงก์ Canva หรือ Google Drive ด้านล่างแทนครับ');
-                            setTimeout(() => setToastMsg(null), 4000);
+                          setFileValidationError(null);
+
+                          // ตรวจสอบไฟล์ทันที (Client-side File Validation)
+                          const validation = validateSubmissionFile(f);
+                          if (!validation.valid) {
+                            setFileValidationError(validation.error || 'ไฟล์ไม่ถูกต้องตามเกณฑ์');
+                            handleClearFile();
                             return;
                           }
-                          setSelectedFileName(f.name);
+
+                          const cleanName = validation.sanitizedName || f.name;
+                          setSelectedRawFile(f);
+                          setSelectedFileName(cleanName);
+                          setUploadProgressInfo({ percent: 0, loadedBytes: 0, totalBytes: f.size });
+
+                          // จัดการ Memory Preview ด้วย URL.createObjectURL(f) (ไม่เปลืองแรมมือถือ)
+                          if (previewUrl) {
+                            URL.revokeObjectURL(previewUrl);
+                          }
+
+                          const lowerName = f.name.toLowerCase();
+                          const isImage = validation.category === 'image' || f.type.startsWith('image/');
+                          const isPdf = f.type === 'application/pdf' || lowerName.endsWith('.pdf');
+
+                          if (isImage) {
+                            setFileTypeCategory('image');
+                            setPreviewUrl(URL.createObjectURL(f));
+                          } else if (isPdf) {
+                            setFileTypeCategory('pdf');
+                            setPreviewUrl(URL.createObjectURL(f));
+                          } else {
+                            setFileTypeCategory('doc');
+                            setPreviewUrl(null);
+                          }
+
+                          // DataUrl สำรองสำหรับการทำงานแบบออฟไลน์
                           const reader = new FileReader();
                           reader.onload = (event) => {
                             const resultStr = event.target?.result as string;
-                            if (!resultStr) return;
-                            setSelectedFileDataUrl(resultStr); // สำรองค่าทันทีเพื่อป้องกันค่าว่างหากกดส่งทันที
-                            if (f.type.startsWith('image/')) {
-                              const img = new window.Image();
-                              img.onload = () => {
-                                try {
-                                  const canvas = document.createElement('canvas');
-                                  const maxDim = 1200;
-                                  let w = img.width;
-                                  let h = img.height;
-                                  if (w > maxDim || h > maxDim) {
-                                    if (w > h) {
-                                      h = Math.round((h * maxDim) / w);
-                                      w = maxDim;
-                                    } else {
-                                      w = Math.round((w * maxDim) / h);
-                                      h = maxDim;
-                                    }
-                                  }
-                                  canvas.width = w;
-                                  canvas.height = h;
-                                  const ctx = canvas.getContext('2d');
-                                  if (ctx) {
-                                    ctx.drawImage(img, 0, 0, w, h);
-                                    setSelectedFileDataUrl(canvas.toDataURL('image/webp', 0.82));
-                                  }
-                                } catch {
-                                  // คงค่า resultStr เดิม
-                                }
-                              };
-                              img.onerror = () => {
-                                setSelectedFileDataUrl(resultStr);
-                              };
-                              img.src = resultStr;
-                            }
+                            if (resultStr) setSelectedFileDataUrl(resultStr);
                           };
                           reader.readAsDataURL(f);
                         }}
                       />
                     </label>
+                  )}
+
+                  {/* กล่องแจ้งเตือนเมื่อไฟล์ไม่ผ่านเกณฑ์การตรวจสอบ */}
+                  {fileValidationError && (
+                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2 animate-fade-in">
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span className="font-medium">{fileValidationError}</span>
+                    </div>
                   )}
                 </div>
 
@@ -1272,6 +1403,35 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                   </div>
                 </div>
 
+                {/* Real-time R2 Upload Progress Bar */}
+                {isUploadingR2 && (
+                  <div className="p-3.5 bg-blue-50/80 rounded-2xl border border-blue-200 space-y-2 animate-fade-in">
+                    <div className="flex justify-between items-center text-xs font-semibold text-slate-700">
+                      <span className="flex items-center gap-1.5 text-[#163A66]">
+                        <Upload className="w-3.5 h-3.5 text-[#3B82F6] animate-bounce" />
+                        <span>กำลังส่งงานขึ้น Cloudflare R2...</span>
+                      </span>
+                      <span className="font-bold text-[#3B82F6]">{uploadProgressInfo.percent}%</span>
+                    </div>
+
+                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200/70">
+                      <div
+                        className={`h-full rounded-full transition-all duration-150 ease-out ${
+                          uploadProgressInfo.percent === 100 ? 'bg-emerald-500' : 'bg-[#3B82F6]'
+                        }`}
+                        style={{ width: `${uploadProgressInfo.percent}%` }}
+                      />
+                    </div>
+
+                    <div className="flex justify-between text-[11px] text-[#94A3B8]">
+                      <span className="truncate max-w-[200px] text-slate-500">{selectedFileName || 'ไฟล์ผลงาน'}</span>
+                      <span className="font-mono">
+                        {formatBytes(uploadProgressInfo.loadedBytes)} / {formatBytes(uploadProgressInfo.totalBytes)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Status Notice */}
                 <div className="p-3 bg-blue-50/80 rounded-xl border border-blue-200/80 text-blue-900 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
@@ -1299,20 +1459,26 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
+                  disabled={isSubmitting || isUploadingR2}
                   onClick={() => {
                     setSelectedQuest(null);
                     setIsEditingSubmission(false);
                   }}
-                  className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold cursor-pointer transition-colors"
+                  className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   ยกเลิก
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || (!selectedFileDataUrl && !submitLink.trim())}
+                  disabled={isSubmitting || isUploadingR2 || Boolean(fileValidationError) || (!selectedFileDataUrl && !submitLink.trim())}
                   className="px-6 py-2 bg-[#3B82F6] hover:bg-[#2563EB] disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-xl font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
                 >
-                  {isSubmitting ? (
+                  {isUploadingR2 ? (
+                    <span className="flex items-center gap-1.5">
+                      <Upload className="w-3.5 h-3.5 animate-spin" />
+                      <span>กำลังอัปโหลด ({uploadProgressInfo.percent}%)...</span>
+                    </span>
+                  ) : isSubmitting ? (
                     <span>กำลังส่งงาน...</span>
                   ) : (
                     <>

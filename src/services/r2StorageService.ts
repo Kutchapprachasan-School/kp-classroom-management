@@ -2,6 +2,10 @@
 // Cloudflare R2 Object Storage Client for Student Submissions & School Documents
 // Follows Pillar 6: R2-Only Storage for All Assets & Documents
 
+import { uploadToR2WithProgress, type UploadProgressInfo } from './cloudDataService';
+
+export type { UploadProgressInfo };
+
 let runtimeConfig: { workerUrl?: string; publicUrl?: string; uploadSecret?: string } = {};
 
 const getEnvObj = (): Record<string, any> => {
@@ -195,6 +199,47 @@ export const r2StorageService = {
         key,
         url: '',
         error: err.message || 'Network error',
+      };
+    }
+  },
+
+  /**
+   * อัปโหลดไฟล์ Binary พร้อม Callback ความคืบหน้า (Upload Progress 0-100%)
+   */
+  async uploadFileWithProgress(
+    key: string,
+    body: Blob | File | string,
+    onProgress?: (info: UploadProgressInfo) => void
+  ): Promise<R2UploadResult> {
+    try {
+      let uploadPayload: Blob | File;
+      if (typeof body === 'string') {
+        if (body.startsWith('data:')) {
+          uploadPayload = this.dataUrlToBlob(body).blob;
+        } else {
+          uploadPayload = new Blob([body], { type: 'application/octet-stream' });
+        }
+      } else {
+        uploadPayload = body;
+      }
+
+      const cleanKey = key.startsWith('/') ? key.slice(1) : key;
+      const publicUrl = await uploadToR2WithProgress(cleanKey, uploadPayload, onProgress);
+      const sizeKb = Math.round(uploadPayload.size / 1024);
+
+      return {
+        success: true,
+        key: cleanKey,
+        url: publicUrl,
+        sizeKb,
+      };
+    } catch (err: any) {
+      console.error('[R2StorageService] Progress upload failed:', err);
+      return {
+        success: false,
+        key,
+        url: '',
+        error: err.message || 'Upload failed',
       };
     }
   },

@@ -10,7 +10,7 @@ import { studentService, formatClassroomLabel } from './studentService.ts';
 import { resolveRoomCandidates } from './masterDataService.ts';
 import { isGrade1SgsStudentCode } from '../config/m1SgsLookup';
 import { r2StorageService } from './r2StorageService.ts';
-import { cloudDataService } from './cloudDataService.ts';
+import { cloudDataService, type UploadProgressInfo } from './cloudDataService.ts';
 
 export type StudentTransferState = 'ACTIVE' | 'TRANSFERRED_IN' | 'TRANSFERRED_OUT';
 export type StudentGender = 'MALE' | 'FEMALE';
@@ -2059,7 +2059,7 @@ export const sgsRosterAndSubmissionService = {
     }
   },
 
-  // อัปโหลดไฟล์งานนักเรียนขึ้น Cloudflare R2 แบบ Async (รออัปโหลดเสร็จสมบูรณ์)
+  // อัปโหลดไฟล์งานนักเรียนขึ้น Cloudflare R2 แบบ Async พร้อมติดตามความคืบหน้า (Upload Progress 0-100%)
   async submitStudentWorkToR2Async(payload: {
     assignmentId: string;
     studentCode: string;
@@ -2069,8 +2069,10 @@ export const sgsRosterAndSubmissionService = {
     compressedSizeKb?: number;
     externalLinkUrl?: string;
     fileDataUrl?: string;
+    fileBlob?: Blob | File;
     academicYearTerm?: string;
     classroom?: string;
+    onProgress?: (info: UploadProgressInfo) => void;
   }): Promise<StudentWorkSubmission[]> {
     let finalFileUrl = payload.fileDataUrl;
     const term = payload.academicYearTerm || '1/2569';
@@ -2078,7 +2080,7 @@ export const sgsRosterAndSubmissionService = {
       ? payload.fileName.replace(/\.(jpg|jpeg|png|heic)$/i, '.webp')
       : undefined;
 
-    if (cleanFileName && payload.fileDataUrl && r2StorageService.isConfigured()) {
+    if (cleanFileName && (payload.fileBlob || payload.fileDataUrl) && r2StorageService.isConfigured()) {
       const r2Key = r2StorageService.buildSubmissionKey({
         term,
         classroom: payload.classroom,
@@ -2088,10 +2090,11 @@ export const sgsRosterAndSubmissionService = {
       });
 
       try {
-        const uploadRes = await r2StorageService.uploadFile(
+        const uploadPayload = payload.fileBlob || payload.fileDataUrl!;
+        const uploadRes = await r2StorageService.uploadFileWithProgress(
           r2Key,
-          payload.fileDataUrl,
-          cleanFileName.endsWith('.pdf') ? 'application/pdf' : 'image/webp'
+          uploadPayload,
+          payload.onProgress
         );
         if (uploadRes.success && uploadRes.url) {
           finalFileUrl = uploadRes.url;

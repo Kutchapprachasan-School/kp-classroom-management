@@ -48,12 +48,23 @@ export default {
       return new Response("Unauthorized", { status: 401, headers: corsHeaders });
     }
 
-    // 2. อัปโหลดไฟล์งานนักเรียน (PUT)
+    // 2. อัปโหลดไฟล์งานนักเรียน (PUT) พร้อมเช็กขนาดและประเภทไฟล์ฝั่ง Server
     if (request.method === "PUT") {
+      const contentLength = Number(request.headers.get("Content-Length") || "0");
+      const maxBytes = 15 * 1024 * 1024; // จำกัดสูงสุดไม่เกิน 15 MB
+
+      if (contentLength > maxBytes) {
+        return new Response(
+          JSON.stringify({ error: "File too large (Max 15 MB)" }),
+          { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       const contentType = request.headers.get("Content-Type") || "application/octet-stream";
       await env.R2_BUCKET.put(key, request.body, {
         httpMetadata: { contentType },
       });
+
       return new Response(
         JSON.stringify({ success: true, key, url: `${url.origin}/${encodeURI(key)}` }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
