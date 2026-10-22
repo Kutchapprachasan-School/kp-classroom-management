@@ -51,6 +51,8 @@ import { r2StorageService } from '../services/r2StorageService';
 import { ArtworkPreviewModal } from '../components/teacher/ArtworkPreviewModal';
 import { Submission3ColorMatrixModal } from '../components/teacher/Submission3ColorMatrixModal';
 import { GradingWorkspaceModal } from '../components/teacher/GradingWorkspaceModal';
+import { SgsClassroomMatrixModal } from '../components/teacher/SgsClassroomMatrixModal';
+import { AssignmentBundlesModal } from '../components/teacher/AssignmentBundlesModal';
 import {
   getBangkokTodayString,
   formatThaiDateFull,
@@ -526,7 +528,9 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
   // 4. Secondary Modals State
   const [gradingModalItem, setGradingModalItem] = useState<GradingQueueItem | null>(null);
+  const [isSgsMatrixOpen, setIsSgsMatrixOpen] = useState<boolean>(false);
   const [is3ColorMatrixOpen, setIs3ColorMatrixOpen] = useState<boolean>(false);
+  const [isBundlesModalOpen, setIsBundlesModalOpen] = useState<boolean>(false);
 
   const [previewItem, setPreviewItem] = useState<{
     title: string;
@@ -1415,14 +1419,47 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
           </button>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsHelpModalOpen(true)}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-[#6B7C93] hover:text-[#163A66] cursor-pointer"
-        >
-          <HelpCircle className="w-4 h-4 text-[#3B82F6]" />
-          <span>วิธีใช้งาน</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Secondary View Icon Buttons */}
+          <button
+            type="button"
+            onClick={() => setIsSgsMatrixOpen(true)}
+            title="ตารางคะแนนรายห้อง"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-[#163A66] cursor-pointer shadow-xs transition-colors"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-[#3B82F6]" />
+            <span className="hidden sm:inline">ตารางคะแนนรายห้อง</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIs3ColorMatrixOpen(true)}
+            title="เช็คการส่งงาน 3 สี"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-[#163A66] cursor-pointer shadow-xs transition-colors"
+          >
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            <span className="hidden sm:inline">เช็คการส่งงาน 3 สี</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsBundlesModalOpen(true)}
+            title="รวมคะแนน/หารเฉลี่ย"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-[#163A66] cursor-pointer shadow-xs transition-colors"
+          >
+            <Layers className="w-4 h-4 text-purple-500" />
+            <span className="hidden sm:inline">รวมคะแนน/หารเฉลี่ย</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsHelpModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-[#6B7C93] hover:text-[#163A66] cursor-pointer"
+          >
+            <HelpCircle className="w-4 h-4 text-[#3B82F6]" />
+            <span>วิธีใช้งาน</span>
+          </button>
+        </div>
       </div>
 
       {/* ====================================================================
@@ -3888,6 +3925,25 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         onGradeQuick={(_asgId, _stuCode, _max) => {
           showToast('✓ บันทึกสถานะส่งงานเรียบร้อยแล้ว');
         }}
+      />
+
+      <SgsClassroomMatrixModal
+        isOpen={isSgsMatrixOpen}
+        onClose={() => setIsSgsMatrixOpen(false)}
+        defaultSubjectCode={
+          matrixModalDefaultSubject ||
+          (selectedSubjectCode === 'ALL' ? subjectsList[0]?.courseCode || 'ท23102' : selectedSubjectCode)
+        }
+        defaultRoom={
+          matrixModalDefaultRoom ||
+          (selectedRoom === 'ALL' ? availableFilterRooms[0] || 'ม.1/1' : selectedRoom)
+        }
+      />
+
+      <AssignmentBundlesModal
+        isOpen={isBundlesModalOpen}
+        onClose={() => setIsBundlesModalOpen(false)}
+        onShowToast={(msg) => showToast(msg)}
       />
 
       <ArtworkPreviewModal

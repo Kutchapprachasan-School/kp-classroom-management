@@ -483,4 +483,7 @@ const mobileMenuCode = fs.readFileSync('src/components/dashboard/TeacherMoreAcco
 assert.ok(mobileMenuCode.includes("key: 'messages'"), 'TeacherMoreAccountMobileView has messages in navigation menu');
 console.log('  ✓ TeacherMoreAccountMobileView includes messages in navigation');
 
+// Clean up: Restore active term to 1/2569 for subsequent test isolation
+academicCalendarService.setActiveTerm('term-2569-1');
+
 console.log('\n🎉 ALL 32 DEEP VERIFICATION CHECKS PASSED WITH 100% SUCCESS!');

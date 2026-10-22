@@ -12,34 +12,209 @@ import { isGrade1SgsStudentCode } from '../config/m1SgsLookup';
 import { r2StorageService } from './r2StorageService.ts';
 import { cloudDataService, type UploadProgressInfo } from './cloudDataService.ts';
 import { gradeService } from './gradeService.ts';
-import { resolveStudentIdentity, isSameClassroom } from '../utils/studentIdentityUtils.ts';
+
+// ============================================================================
+// 1. IDENTITY, CLASSROOM & SUBMISSION MATCHING HELPERS
+// ============================================================================
+
+export interface RosterIdentityRecord {
+  id: string;          // UUID หรือ 'stu-XXXXX' สำหรับตาราง "StudentScore"
+  studentCode: string; // รหัสประจำตัวนักเรียน 5 หลัก เช่น '45101'
+  name?: string;
+  classroom?: string;
+  classroomId?: string;
+}
+
+export interface SubmissionMatchCandidate {
+  id?: string;
+  assignmentId?: string;
+  unitId?: string;
+  studentCode?: string;
+  studentId?: string;
+  workTitle?: string;
+  status?: string;
+  score?: number | null;
+  maxScore?: number;
+  submittedAt?: string | number;
+  gradedAt?: string | number;
+  feedback?: string;
+}
+
+export interface AssignmentMatchTarget {
+  id: string;
+  unitId?: string;
+  title?: string;
+  courseCode?: string;
+  classroom?: string;
+  classroomId?: string;
+  targetClassrooms?: string[];
+  maxScore?: number;
+  category?: 'FORMATIVE' | 'MIDTERM' | 'FINAL' | string;
+  isRequired?: boolean;
+}
 
 /**
- * ตรวจสอบและจับคู่การส่งงานของนักเรียนเข้ากับ Assignment อย่างแม่นยำ
- * รองรับทั้ง direct ID match, unitId match, และ Title exact/loose match
+ * แปลงชื่อห้องเรียนหลากหลายรูปแบบ ('room-3-1', 'ม. 3 / 1', 'M.3/1') ให้เป็นมาตรฐานเดียวกัน ('ม.3/1')
+ */
+export function normalizeClassroomCode(room?: string | null): string {
+  if (!room) return '';
+  const trimmed = String(room).trim();
+  if (!trimmed) return '';
+
+  // กรณีรหัสภายใน เช่น 'room-3-1' หรือ 'room_3_1' -> 'ม.3/1'
+  const roomCodeMatch = trimmed.match(/^room[-_](\d+)[-_](\d+)$/i);
+  if (roomCodeMatch) {
+    return `ม.${roomCodeMatch[1]}/${roomCodeMatch[2]}`;
+  }
+
+  // กรณี 'M.3/1' หรือ 'm3/1' -> 'ม.3/1'
+  const engMatch = trimmed.match(/^m\.?\s*(\d+)\s*\/\s*(\d+)$/i);
+  if (engMatch) {
+    return `ม.${engMatch[1]}/${engMatch[2]}`;
+  }
+
+  // กรณี 'ม. 3 / 1' หรือ 'ม3/1' -> 'ม.3/1'
+  const thaiMatch = trimmed.match(/^ม\.?\s*(\d+)\s*\/\s*(\d+)$/);
+  if (thaiMatch) {
+    return `ม.${thaiMatch[1]}/${thaiMatch[2]}`;
+  }
+
+  return trimmed.replace(/\s+/g, '').toLowerCase();
+}
+
+/**
+ * เปรียบเทียบห้องเรียน 2 ค่าว่าเป็นห้องเดียวกันหรือไม่ (รองรับทั้งรหัส room-X-Y, ชื่อ ม.X/Y และ UUID)
+ */
+export function isSameClassroom(roomA?: string | null, roomB?: string | null): boolean {
+  if (!roomA || !roomB) return false;
+  if (roomA.trim() === roomB.trim()) return true;
+  return normalizeClassroomCode(roomA) === normalizeClassroomCode(roomB);
+}
+
+/**
+ * ค้นหาและแปลงข้อมูลระบุตัวตนนักเรียนให้ได้ทั้ง studentId (UUID) และ studentCode (5 หลัก)
+ */
+export function resolveStudentIdentity(
+  userOrCode: { id?: string; studentId?: string; studentCode?: string; code?: string } | string | null | undefined,
+  roster?: RosterIdentityRecord[]
+): { studentId: string; studentCode: string; student?: RosterIdentityRecord } | null {
+  if (!userOrCode) return null;
+
+  const targetCode =
+    typeof userOrCode === 'string'
+      ? userOrCode.trim()
+      : (userOrCode.studentCode || (userOrCode as any).code)?.trim();
+  const targetId =
+    typeof userOrCode === 'string'
+      ? userOrCode.trim()
+      : (userOrCode.id || userOrCode.studentId)?.trim();
+
+  if (Array.isArray(roster) && roster.length > 0) {
+    const matched = roster.find(
+      (s) =>
+        (targetCode && s.studentCode === targetCode) ||
+        (targetId && s.id === targetId)
+    );
+
+    if (matched) {
+      return {
+        studentId: matched.id,
+        studentCode: matched.studentCode,
+        student: matched,
+      };
+    }
+  }
+
+  // Fallback to studentService if not in roster
+  if (targetCode) {
+    const found = studentService.findStudentByCode(targetCode);
+    if (found) {
+      const rec: RosterIdentityRecord = {
+        id: found.student.id || targetId || `stu-${targetCode}`,
+        studentCode: targetCode,
+        name: found.student.name,
+        classroom: found.classroomId,
+        classroomId: found.classroomId,
+      };
+      return {
+        studentId: rec.id,
+        studentCode: rec.studentCode,
+        student: rec,
+      };
+    }
+  }
+
+  if (targetId) {
+    const foundById = studentService.findStudentByCode(targetId);
+    if (foundById) {
+      const rec: RosterIdentityRecord = {
+        id: foundById.student.id || targetId,
+        studentCode: foundById.student.code || foundById.student.studentCode || targetId.replace(/^stu-/, ''),
+        name: foundById.student.name,
+        classroom: foundById.classroomId,
+        classroomId: foundById.classroomId,
+      };
+      return {
+        studentId: rec.id,
+        studentCode: rec.studentCode,
+        student: rec,
+      };
+    }
+  }
+
+  if (targetId && targetCode) {
+    return {
+      studentId: targetId,
+      studentCode: targetCode,
+      student: { id: targetId, studentCode: targetCode },
+    };
+  }
+
+  return null;
+}
+
+/**
+ * ตรวจสอบว่า Submission ชิ้นนี้ตรงกับ Assignment เป้าหมายหรือไม่
+ * รองรับการจับคู่ด้วย id ตรงตัว, unitId (งานกลุ่ม/หน่วยการเรียนรู้) และชื่อชิ้นงาน (workTitle)
  */
 export function matchSubmissionToAssignment(
-  sub: { assignmentId?: string; workTitle?: string } | null | undefined,
-  asg: { id: string; unitId?: string; title?: string } | null | undefined
+  sub?: SubmissionMatchCandidate | null,
+  asg?: AssignmentMatchTarget | null
 ): boolean {
   if (!sub || !asg) return false;
-  if (sub.assignmentId && sub.assignmentId === asg.id) return true;
-  if (asg.unitId && sub.assignmentId === asg.unitId) return true;
-  if (
-    sub.workTitle &&
-    asg.title &&
-    sub.workTitle.trim().toLowerCase() === asg.title.trim().toLowerCase()
-  ) {
+
+  // 1. จับคู่ด้วย ID หลักโดยตรง
+  if (sub.assignmentId && asg.id && sub.assignmentId === asg.id) {
     return true;
   }
-  if (
-    sub.workTitle &&
-    asg.title &&
-    (sub.workTitle.toLowerCase().includes(asg.title.toLowerCase()) ||
-      asg.title.toLowerCase().includes(sub.workTitle.toLowerCase()))
-  ) {
+
+  // 2. จับคู่กรณีส่งงานผ่าน Unit ID (เช่น งานประจำหน่วยการเรียนรู้)
+  if (asg.unitId && sub.assignmentId === asg.unitId) {
     return true;
   }
+  if (sub.unitId && asg.id && sub.unitId === asg.id) {
+    return true;
+  }
+  if (asg.unitId && sub.unitId && sub.unitId === asg.unitId) {
+    return true;
+  }
+
+  // 3. จับคู่ด้วยชื่อชิ้นงาน (Fallback กรณี ID เปลี่ยนจากการอิมพอร์ตหรือซิงค์)
+  if (sub.workTitle && asg.title) {
+    const normSubTitle = sub.workTitle.trim().replace(/\s+/g, ' ').toLowerCase();
+    const normAsgTitle = asg.title.trim().replace(/\s+/g, ' ').toLowerCase();
+    if (normSubTitle.length > 0 && normSubTitle === normAsgTitle) {
+      return true;
+    }
+    if (
+      normSubTitle.length > 2 &&
+      normAsgTitle.length > 2 &&
+      (normSubTitle.includes(normAsgTitle) || normAsgTitle.includes(normSubTitle))
+    ) {
+      return true;
+    }
+  }
+
   return false;
 }
 
@@ -156,6 +331,8 @@ export interface TermAssignmentItem {
   dueDate: string;
   // Q3-A: งานบังคับ / ตัวชี้วัดต้องรู้ (ถ้าไม่ส่งติด "ร" ทันที และเมื่อตรวจให้คะแนนแล้วปลด "ร" อัตโนมัติ)
   isRequiredForPass?: boolean;
+  isRequired?: boolean;
+  category?: 'FORMATIVE' | 'MIDTERM' | 'FINAL' | string;
 
   // รองรับการสั่งงานรายหน่วย / รายจุดประสงค์ และเฉลี่ยคะแนนสะสม (Auto-division / Unit Score)
   unitId?: string;               // รหัสกลุ่มหน่วย เช่น 'unit-1', 'obj-1'
@@ -193,14 +370,23 @@ export const RETURN_SUBMISSION_REASONS = [
 ] as const;
 
 export interface StudentWorkSubmission {
+  id?: string;
   assignmentId: string;
+  unitId?: string;
+  courseCode?: string;
   studentCode: string;
+  studentId?: string;
   status: SubmissionCellStatus;
-  score: number | null;
+  score?: number | null;
+  maxScore?: number;
   submittedAt?: string;
+  gradedAt?: string;
   workTitle?: string;
   workAttachmentLabel?: string;
+  fileUrl?: string;
+  note?: string;
   teacherFeedback?: string;
+  feedback?: string;
   returnReason?: string;
   returnedAt?: string;
   isResubmission?: boolean;
@@ -733,30 +919,44 @@ export const sgsRosterAndSubmissionService = {
     return this.saveSgsRoster(roster, 'งานทะเบียน / ครูที่ปรึกษา');
   },
 
-  getTermAssignments(courseCode?: string, classroomId?: string): TermAssignmentItem[] {
+  /**
+   * ดึงรายการชิ้นงานตามรหัสวิชาและห้องเรียน โดยใช้ isSameClassroom เปรียบเทียบแบบ Normalize
+   */
+  getTermAssignments(courseCode?: string, classroomIdOrLabel?: string): TermAssignmentItem[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_TERM_ASSIGNMENTS);
-      const list: TermAssignmentItem[] = raw ? JSON.parse(raw) : [];
-      return list.filter((item) => {
+      const allAssignments: TermAssignmentItem[] = raw ? JSON.parse(raw) : [];
+
+      return allAssignments.filter((asg: any) => {
+        // 1. กรองตามรหัสวิชา (ถ้าระบุมา)
         if (courseCode && courseCode !== 'ALL') {
           const cleanParam = courseCode.trim().toUpperCase();
-          const cleanItem = (item.courseCode || '').trim().toUpperCase();
-          if (cleanItem && cleanItem !== cleanParam && !item.courseName?.includes(courseCode)) {
+          const cleanItem = (asg.courseCode || '').trim().toUpperCase();
+          if (cleanItem && cleanItem !== cleanParam && !asg.courseName?.includes(courseCode)) {
             return false;
           }
         }
-        if (
-          classroomId &&
-          classroomId !== 'ALL' &&
-          item.targetClassrooms &&
-          item.targetClassrooms.length > 0 &&
-          !item.targetClassrooms.includes('ALL')
-        ) {
-          const matchRoom = item.targetClassrooms.some(
-            (r) => isSameClassroom(r, classroomId)
-          );
-          if (!matchRoom) return false;
+
+        // 2. กรองตามห้องเรียน (รองรับทั้ง 'room-3-1', 'ม.3/1', targetClassrooms หรือชิ้นงานส่วนกลางที่ไม่ระบุห้อง)
+        if (classroomIdOrLabel && classroomIdOrLabel !== 'ALL') {
+          if (
+            asg.targetClassrooms &&
+            Array.isArray(asg.targetClassrooms) &&
+            asg.targetClassrooms.length > 0 &&
+            !asg.targetClassrooms.includes('ALL')
+          ) {
+            const matchRoom = asg.targetClassrooms.some((r: string) =>
+              isSameClassroom(r, classroomIdOrLabel)
+            );
+            if (!matchRoom) return false;
+          } else {
+            const targetRoom = asg.classroomId || asg.classroom;
+            if (targetRoom && targetRoom !== 'ALL') {
+              if (!isSameClassroom(targetRoom, classroomIdOrLabel)) return false;
+            }
+          }
         }
+
         return true;
       });
     } catch {
@@ -1205,77 +1405,308 @@ export const sgsRosterAndSubmissionService = {
     }
   },
 
-  // อัปเดตคะแนนรายชิ้น (Inline Matrix หรือ SpeedGrader) -> ถ้าเป็นงานบังคับ เมื่อตรวจปุ๊บจะปลด "ร" อัตโนมัติทันที
-  gradeSubmission(
-    assignmentId: string,
-    studentCode: string,
-    score: number | null,
-    status: SubmissionCellStatus = 'GRADED',
-    teacherFeedback?: string
-  ): StudentWorkSubmission[] {
-    const subs = this.getSubmissions();
-    const idx = subs.findIndex(
-      (s) => s.assignmentId === assignmentId && s.studentCode === studentCode
-    );
-    const nextItem: StudentWorkSubmission =
-      idx !== -1
-        ? {
-            ...subs[idx],
-            score,
-            status: score === null ? 'MISSING' : status,
-            submittedAt: subs[idx].submittedAt || 'ครูตรวจบันทึกคะแนน',
-            teacherFeedback: teacherFeedback !== undefined ? teacherFeedback : subs[idx].teacherFeedback,
-          }
-        : {
-            assignmentId,
-            studentCode,
-            score,
-            status: score === null ? 'MISSING' : status,
-            submittedAt: 'ครูตรวจบันทึกคะแนน',
-            workTitle: 'ส่งงานหน้าชั้นเรียน / ส่งซ่อมแก้ ร',
-            teacherFeedback,
-          };
-
-    const updated =
-      idx !== -1
-        ? subs.map((item, i) => (i === idx ? nextItem : item))
-        : [...subs, nextItem];
-
-    const saved = this.saveSubmissions(updated);
-    this.syncScoreToGradeServiceOutbox({
-      studentCode,
-      assignmentId,
-      score,
-    });
-    return saved;
+  /**
+   * ดึงรายชื่อนักเรียนแบบ RosterIdentityRecord ที่มีทั้ง UUID id และ studentCode
+   */
+  getRoster(classroomId?: string): RosterIdentityRecord[] {
+    const list = this.getSgsRoster(classroomId);
+    return list.map((s) => ({
+      id: (s as any).id || (s as any).studentId || `stu-${s.studentCode}`,
+      studentCode: s.studentCode,
+      name: s.fullName || s.studentName,
+      classroom: s.classroom,
+      classroomId: s.classroom,
+    }));
   },
 
-  // Bridge: ซิงค์คะแนนตรงเข้าสู่ gradeService Outbox (IndexedDB) เพื่อ Push ขึ้นตาราง "StudentScore" บน Neon DB
+  /**
+   * Bridge คะแนนจากระบบ SGS (ที่ใช้ studentCode) ไปยัง gradeService (ที่ใช้ studentId UUID)
+   * เพื่อให้ระบบประมวลผลเลื่อนชั้นและใบ ปพ. ดึงคะแนนจากตาราง "StudentScore" บน Neon DB ได้ถูกต้อง
+   */
   syncScoreToGradeServiceOutbox(params: {
-    studentCode: string;
+    studentCode?: string;
+    studentId?: string;
     assignmentId: string;
-    courseCode?: string;
     score: number | null;
-  }): void {
+  }): boolean {
     try {
-      const roster = this.getSgsRoster();
-      const identity = resolveStudentIdentity(params.studentCode, roster);
-      if (!identity) {
-        console.warn(`[ScoreBridge] Cannot resolve UUID for studentCode: ${params.studentCode}`);
-        return;
+      const roster = this.getRoster() as RosterIdentityRecord[];
+      const identity = resolveStudentIdentity(
+        { id: params.studentId, studentCode: params.studentCode },
+        roster
+      );
+
+      // หากหาใน Roster ปัจจุบันไม่เจอ ให้ใช้ studentId ที่ส่งมา (ถ้ามี) แต่ไม่ใช้ studentCode 5 หลักสวมรอยเป็น UUID
+      const resolvedStudentId = identity?.studentId || params.studentId;
+      if (!resolvedStudentId || !params.assignmentId) {
+        console.warn(
+          `[ScoreBridge] ข้ามการซิงค์คะแนนเนื่องจากไม่พบ UUID ของนักเรียน (studentCode: ${params.studentCode})`
+        );
+        return false;
       }
 
-      // บันทึกลง IndexedDB Outbox ผ่าน gradeService เพื่อรอ Push ขึ้นตาราง "StudentScore"
-      gradeService.setScore(
-        identity.studentId,
-        params.assignmentId,
-        params.score
-      ).catch((err) => {
-        console.warn('[ScoreBridge] Error updating score in gradeService:', err);
-      });
-    } catch (e) {
-      console.warn('[ScoreBridge] Unexpected error in syncScoreToGradeServiceOutbox:', e);
+      const sanitizedScore =
+        typeof params.score === 'number' && !Number.isNaN(params.score)
+          ? params.score
+          : null;
+
+      // ส่งเข้า IndexedDB Outbox ของ gradeService เพื่อเตรียม Push ขึ้น Neon PostgreSQL
+      if (gradeService && typeof gradeService.setScore === 'function') {
+        gradeService.setScore(resolvedStudentId, params.assignmentId, sanitizedScore);
+      }
+
+      // แจ้งเตือน Component อื่นๆ ที่กำลังเปิดดูตารางคะแนนอยู่
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(
+          new CustomEvent('kp:sgs-score-bridged', {
+            detail: {
+              studentId: resolvedStudentId,
+              studentCode: identity?.studentCode || params.studentCode,
+              assignmentId: params.assignmentId,
+              score: sanitizedScore,
+              timestamp: Date.now(),
+            },
+          })
+        );
+      }
+
+      return true;
+    } catch (error) {
+      console.error('[ScoreBridge] เกิดข้อผิดพลาดในการซิงค์คะแนนไปยัง gradeService:', error);
+      return false;
     }
+  },
+
+  /**
+   * ซิงค์สถานะในคิวตรวจงานของครู (kp_grading_queue_v2)
+   * แก้ปัญหา Quick Grade หาคีย์ไม่เจอ และแก้ปัญหางานซ่อม (Resubmission) ไม่เด้งกลับเข้าคิว FIFO
+   */
+  syncGradingQueueItem(params: {
+    assignmentId: string;
+    studentCode: string;
+    studentId?: string;
+    studentName?: string;
+    classroom?: string;
+    courseCode?: string;
+    workTitle?: string;
+    fileUrl?: string;
+    status: 'PENDING_REVIEW' | 'GRADED' | 'RETURNED_REVISION';
+    score?: number | null;
+    feedback?: string;
+    isResubmission?: boolean;
+  }): void {
+    if (typeof localStorage === 'undefined') return;
+
+    try {
+      const rawQueue = localStorage.getItem('kp_grading_queue_v2');
+      const queue: Array<Record<string, any>> = rawQueue ? JSON.parse(rawQueue) : [];
+      const canonicalQueueId = `q_${params.assignmentId}_${params.studentCode}`;
+      const now = Date.now();
+
+      // ค้นหาแบบยืดหยุ่น: เช็คทั้ง ID มาตรฐาน และคู่ (assignmentId + studentCode)
+      const existingIdx = queue.findIndex(
+        (item) =>
+          item.id === canonicalQueueId ||
+          (item.assignmentId === params.assignmentId &&
+            item.studentCode === params.studentCode)
+      );
+
+      if (existingIdx !== -1) {
+        const current = queue[existingIdx];
+        queue[existingIdx] = {
+          ...current,
+          id: current.id || canonicalQueueId,
+          assignmentId: params.assignmentId,
+          studentCode: params.studentCode,
+          studentId: params.studentId || current.studentId,
+          status: params.status,
+          score: params.score !== undefined ? params.score : current.score,
+          feedback: params.feedback !== undefined ? params.feedback : current.feedback,
+          fileUrl: params.fileUrl || current.fileUrl,
+          // หากนักเรียนส่งงานใหม่หรือส่งงานซ่อม ให้รีเซ็ตเวลาส่งเพื่อให้เข้าคิว FIFO รอตรวจของครูทันที
+          submittedTimestamp:
+            params.status === 'PENDING_REVIEW'
+              ? now
+              : current.submittedTimestamp || now,
+          gradedTimestamp:
+            params.status === 'GRADED' ? now : current.gradedTimestamp,
+          isResubmission:
+            params.isResubmission ??
+            (current.status === 'RETURNED' ||
+              current.status === 'RETURNED_REVISION' ||
+              Boolean(current.isResubmission)),
+        };
+      } else if (params.status === 'PENDING_REVIEW' || params.status === 'GRADED') {
+        // กรณีไม่มีในคิวมาก่อน (เช่น ส่งงานครั้งแรก หรือครู Quick Grade จากตารางโดยตรง)
+        queue.push({
+          id: canonicalQueueId,
+          assignmentId: params.assignmentId,
+          studentCode: params.studentCode,
+          studentId: params.studentId,
+          studentName: params.studentName || '',
+          classroom: params.classroom || '',
+          courseCode: params.courseCode || '',
+          workTitle: params.workTitle || '',
+          fileUrl: params.fileUrl || '',
+          status: params.status,
+          score: params.score ?? null,
+          feedback: params.feedback || '',
+          submittedTimestamp: now,
+          gradedTimestamp: params.status === 'GRADED' ? now : undefined,
+          isResubmission: Boolean(params.isResubmission),
+        });
+      }
+
+      localStorage.setItem('kp_grading_queue_v2', JSON.stringify(queue));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kp-grading-queue-updated'));
+      }
+    } catch (err) {
+      console.warn('[GradingQueueSync] ไม่สามารถอัปเดตคิวตรวจงานใน localStorage:', err);
+    }
+  },
+
+  /**
+   * บันทึกผลการตรวจงานและคะแนน (เรียกใช้จากทั้ง GradingQueueView, AssignmentManagementView และ ScoreMatrixPrapanView)
+   */
+  gradeSubmission(
+    submissionIdOrAsgId: string,
+    scoreOrStudentCode: any,
+    feedbackOrScore?: any,
+    optionsOrStatus?: any,
+    extraFeedback?: string
+  ): any {
+    let submissionIdOrKey: string;
+    let score: number | null = null;
+    let feedback: string = '';
+    let options: {
+      studentCode?: string;
+      studentId?: string;
+      assignmentId?: string;
+      unitId?: string;
+      workTitle?: string;
+      maxScore?: number;
+      courseCode?: string;
+    } = {};
+
+    const isLegacyCall =
+      typeof scoreOrStudentCode === 'string' &&
+      (typeof feedbackOrScore === 'number' || feedbackOrScore === null || feedbackOrScore === undefined);
+
+    if (isLegacyCall) {
+      // Convention A: gradeSubmission(assignmentId, studentCode, score, status?, teacherFeedback?)
+      const assignmentId = submissionIdOrAsgId;
+      const studentCode = scoreOrStudentCode;
+      score = feedbackOrScore;
+      submissionIdOrKey = `sub_${assignmentId}_${studentCode}`;
+      feedback = typeof extraFeedback === 'string' ? extraFeedback : (typeof optionsOrStatus === 'string' && optionsOrStatus !== 'GRADED' && optionsOrStatus !== 'MISSING' ? optionsOrStatus : '');
+      options = {
+        assignmentId,
+        studentCode,
+        workTitle: 'ส่งงานหน้าชั้นเรียน / บันทึกคะแนนโดยครูผู้สอน',
+      };
+    } else {
+      // Convention B: gradeSubmission(submissionIdOrKey, score, feedback, options)
+      submissionIdOrKey = submissionIdOrAsgId;
+      score = typeof scoreOrStudentCode === 'number' ? scoreOrStudentCode : (scoreOrStudentCode === null ? null : Number(scoreOrStudentCode) || 0);
+      feedback = typeof feedbackOrScore === 'string' ? feedbackOrScore : '';
+      options = optionsOrStatus || {};
+    }
+
+    const submissions = this.getSubmissions();
+    const roster = this.getRoster() as RosterIdentityRecord[];
+
+    // รองรับการค้นหาทั้งจาก submission.id, คีย์ผสม หรือคู่ (studentCode + assignmentId)
+    let targetIdx = submissions.findIndex((s: any) => s.id === submissionIdOrKey);
+
+    if (targetIdx === -1 && options?.studentCode && options?.assignmentId) {
+      targetIdx = submissions.findIndex(
+        (s: any) =>
+          s.studentCode === options.studentCode &&
+          matchSubmissionToAssignment(s, {
+            id: options.assignmentId!,
+            unitId: options.unitId,
+            title: options.workTitle,
+          })
+      );
+    }
+
+    const nowIso = new Date().toISOString();
+    let updatedSubmission: any;
+
+    if (targetIdx !== -1) {
+      const existing = submissions[targetIdx];
+      const boundedScore =
+        score === null
+          ? null
+          : typeof existing.maxScore === 'number' && existing.maxScore > 0
+          ? Math.min(Math.max(0, score), existing.maxScore)
+          : Math.max(0, score);
+
+      updatedSubmission = {
+        ...existing,
+        score: boundedScore,
+        feedback: feedback || existing.feedback || '',
+        teacherFeedback: feedback || existing.teacherFeedback || '',
+        status: score === null ? 'MISSING' : 'GRADED',
+        gradedAt: nowIso,
+      };
+      submissions[targetIdx] = updatedSubmission;
+    } else if (options?.studentCode && options?.assignmentId) {
+      // กรณีครูกรอกคะแนนผ่าน Quick Grade ในตาราง ปพ.5 โดยที่นักเรียนไม่ได้กดส่งไฟล์ในระบบ
+      const identity = resolveStudentIdentity(
+        { id: options.studentId, studentCode: options.studentCode },
+        roster
+      );
+      const maxScore = options.maxScore ?? 10;
+      const boundedScore = score === null ? null : Math.min(Math.max(0, score), maxScore);
+
+      updatedSubmission = {
+        id: submissionIdOrKey || `sub_${options.assignmentId}_${options.studentCode}`,
+        assignmentId: options.assignmentId,
+        unitId: options.unitId,
+        studentCode: identity?.studentCode || options.studentCode,
+        studentId: identity?.studentId || options.studentId,
+        workTitle: options.workTitle || 'บันทึกคะแนนโดยครูผู้สอน',
+        courseCode: options.courseCode,
+        score: boundedScore,
+        maxScore,
+        feedback,
+        teacherFeedback: feedback,
+        status: score === null ? 'MISSING' : 'GRADED',
+        submittedAt: nowIso,
+        gradedAt: nowIso,
+      };
+      submissions.push(updatedSubmission);
+    } else {
+      console.warn(`[gradeSubmission] ไม่พบรายการส่งงานสำหรับคีย์: ${submissionIdOrKey}`);
+      return isLegacyCall ? submissions : null;
+    }
+
+    // 1. บันทึกลง LocalStorage ของระบบ SGS
+    this.saveSubmissions(submissions);
+
+    // 2. ซิงค์สถานะในคิวตรวจงานของครูให้เป็น GRADED ทันที (ป้องกันคิวค้างสถานะ PENDING_REVIEW)
+    this.syncGradingQueueItem({
+      assignmentId: updatedSubmission.assignmentId,
+      studentCode: updatedSubmission.studentCode,
+      studentId: updatedSubmission.studentId,
+      workTitle: updatedSubmission.workTitle,
+      courseCode: updatedSubmission.courseCode,
+      status: updatedSubmission.status === 'MISSING' ? 'PENDING_REVIEW' : 'GRADED',
+      score: updatedSubmission.score,
+      feedback: updatedSubmission.feedback,
+    });
+
+    // 3. Bridge คะแนนเข้าสู่ gradeService (IndexedDB Outbox -> ตาราง "StudentScore" บน Neon DB)
+    this.syncScoreToGradeServiceOutbox({
+      studentCode: updatedSubmission.studentCode,
+      studentId: updatedSubmission.studentId,
+      assignmentId: updatedSubmission.assignmentId,
+      score: updatedSubmission.score,
+    });
+
+    return isLegacyCall ? submissions : updatedSubmission;
   },
 
   // ส่งงานกลับให้นักเรียนแก้ไข (Request Resubmission) พร้อมระบุเหตุผล
@@ -1341,36 +1772,41 @@ export const sgsRosterAndSubmissionService = {
 
   // คำนวณคะแนน 4 ส่วน (ก่อนกลางภาค, กลางภาค, หลังกลางภาค, ปลายภาค) + รองรับการพิมพ์คะแนนตรงในตาราง ปพ.5
   computeStudentSgsGrades(
-    student: SgsStudentRecord,
+    studentOrCode: SgsStudentRecord | string,
     courseCode?: string,
     classroomId?: string
-  ): {
-    u1: number;
-    u2: number;
-    u3: number;
-    preMidterm: number | '';
-    postMidterm: number | '';
-    isPreMidtermManual: boolean;
-    isPostMidtermManual: boolean;
-    weights: CourseScoreWeights;
-    calculatedAccumulated: number;
-    effectiveAccumulated: number;
-    isManualOverride: boolean;
-    midterm: number | '';
-    final: number | '';
-    total: number;
-    gradeLabel: string;
-    numericGrade: number;
-    autoLevelFromGrade: 0 | 1 | 2 | 3;
-    analyticalThinkingLevel: 0 | 1 | 2 | 3;
-    desiredCharacteristicsLevel: 0 | 1 | 2 | 3;
-    submittedCount: number;
-    totalAssignedCount: number;
-    missingCount: number;
-    pendingReviewCount: number;
-    missingMandatoryTitles: string[];
-    rReasonLabel?: string;
-  } {
+  ): any {
+    const roster = this.getSgsRoster();
+    let student: SgsStudentRecord;
+    if (typeof studentOrCode === 'string') {
+      const found = roster.find((s) => s.studentCode === studentOrCode || (s as any).id === studentOrCode);
+      if (found) {
+        student = found;
+      } else {
+        const identity = resolveStudentIdentity(studentOrCode, this.getRoster());
+        student = {
+          sgsSeatNo: 0,
+          no: 0,
+          studentCode: identity?.studentCode || studentOrCode,
+          studentName: identity?.student?.name || studentOrCode,
+          fullName: identity?.student?.name || studentOrCode,
+          gender: 'MALE',
+          classroom: classroomId || identity?.student?.classroom || '',
+          transferState: 'ACTIVE',
+          attendancePercent: 100,
+          attendanceRate: 1,
+          specialStatus: 'NORMAL',
+          morningStatusLabel: 'มาเรียน',
+          midtermScore: 0,
+          finalScore: 0,
+          desirableCharacteristics: [3, 3, 3, 3, 3, 3, 3, 3],
+          criticalThinking: [3, 3, 3, 3, 3],
+        };
+      }
+    } else {
+      student = studentOrCode;
+    }
+
     const weights = this.getCourseWeights(courseCode);
     const assignments = this.getTermAssignments(courseCode, classroomId || student.classroom);
     const subs = this.getSubmissions().filter(
@@ -1378,7 +1814,27 @@ export const sgsRosterAndSubmissionService = {
     );
 
     if (student.transferState === 'TRANSFERRED_OUT') {
+      const targetRoom = classroomId || student.classroom;
       return {
+        studentId: (student as any).id || (student as any).studentId || `stu-${student.studentCode}`,
+        studentCode: student.studentCode,
+        classroom: normalizeClassroomCode(targetRoom) || targetRoom,
+        courseCode: courseCode || '',
+        formativeScore: 0,
+        formativeMax: 0,
+        midtermScore: 0,
+        midtermMax: 0,
+        finalScore: 0,
+        finalMax: 0,
+        totalScore: 0,
+        totalMax: 0,
+        percentage: 0,
+        grade: 'ย้ายออก',
+        numericGrade: 0,
+        academicStatus: 'ย้ายออก',
+        missingCount: 0,
+        missingAssignments: [],
+        items: [],
         u1: 0,
         u2: 0,
         u3: 0,
@@ -1394,13 +1850,11 @@ export const sgsRosterAndSubmissionService = {
         final: 0,
         total: 0,
         gradeLabel: 'ย้ายออก',
-        numericGrade: 0,
         autoLevelFromGrade: 0,
         analyticalThinkingLevel: 0,
         desiredCharacteristicsLevel: 0,
         submittedCount: 0,
         totalAssignedCount: assignments.length,
-        missingCount: 0,
         pendingReviewCount: 0,
         missingMandatoryTitles: [],
       };
@@ -1690,7 +2144,41 @@ export const sgsRosterAndSubmissionService = {
         ? 1
         : autoLevelFromGrade);
 
+    const targetRoom = classroomId || student.classroom;
+    const missingAssignments = missingMandatoryTitles.map((t) => ({ id: t, title: t }));
+    const items = assignments.map((asg) => {
+      const matched = subs.find((s) => matchSubmissionToAssignment(s, asg));
+      return {
+        assignmentId: asg.id,
+        title: asg.title || asg.id,
+        category: (asg.category || asg.scorePart || 'FORMATIVE').toUpperCase(),
+        score: matched && typeof matched.score === 'number' ? matched.score : 0,
+        maxScore: asg.maxScore,
+        status: matched?.status || 'MISSING',
+        submissionId: matched?.id,
+      };
+    });
+
     return {
+      studentId: (student as any).id || (student as any).studentId || `stu-${student.studentCode}`,
+      studentCode: student.studentCode,
+      classroom: normalizeClassroomCode(targetRoom) || targetRoom,
+      courseCode: courseCode || '',
+      formativeScore: effectiveAccumulated,
+      formativeMax: weights.preMidterm + weights.postMidterm,
+      midtermScore: typeof midtermVal === 'number' ? midtermVal : 0,
+      midtermMax: weights.midterm,
+      finalScore: typeof finalVal === 'number' ? finalVal : 0,
+      finalMax: weights.final,
+      totalScore: total,
+      totalMax: weights.preMidterm + weights.postMidterm + weights.midterm + weights.final,
+      percentage: Number(((total / Math.max(1, weights.preMidterm + weights.postMidterm + weights.midterm + weights.final)) * 100).toFixed(2)),
+      grade: gradeLabel,
+      academicStatus: gradeLabel === 'ร' ? 'ร' : 'ปกติ',
+      missingAssignments,
+      items,
+
+      // Legacy SGS fields for backward compatibility with ScoreMatrixPrapanView and other components
       u1: preVal,
       u2: postVal,
       u3,
@@ -2124,55 +2612,149 @@ export const sgsRosterAndSubmissionService = {
     }
   },
 
-  // อัปโหลดไฟล์งานนักเรียนขึ้น Cloudflare R2 แบบ Async พร้อมติดตามความคืบหน้า (Upload Progress 0-100%)
+  /**
+   * นักเรียนส่งงานหรือส่งงานซ่อม (Resubmission)
+   */
   async submitStudentWorkToR2Async(payload: {
+    studentCode?: string;
+    studentId?: string;
     assignmentId: string;
-    studentCode: string;
+    unitId?: string;
+    courseCode?: string;
     workTitle: string;
+    file?: File | Blob | null;
+    fileBlob?: File | Blob | null;
+    fileUrl?: string;
+    fileDataUrl?: string;
     fileName?: string;
+    note?: string;
+    maxScore?: number;
     originalSizeKb?: number;
     compressedSizeKb?: number;
     externalLinkUrl?: string;
-    fileDataUrl?: string;
-    fileBlob?: Blob | File;
     academicYearTerm?: string;
     classroom?: string;
     onProgress?: (info: UploadProgressInfo) => void;
-  }): Promise<StudentWorkSubmission[]> {
-    let finalFileUrl = payload.fileDataUrl;
+  }): Promise<any> {
+    const roster = this.getRoster() as RosterIdentityRecord[];
+    const identity = resolveStudentIdentity(
+      { id: payload.studentId, studentCode: payload.studentCode },
+      roster
+    );
+
+    // ป้องกันการ Fallback ไปใช้ '45101' โดยเด็ดขาด
+    const verifiedStudentCode = identity?.studentCode || payload.studentCode;
+    const verifiedStudentId = identity?.studentId || payload.studentId;
+
+    if (!verifiedStudentCode) {
+      throw new Error(
+        'ไม่สามารถระบุรหัสนักเรียน (studentCode) ของผู้ส่งงานได้ กรุณาเข้าสู่ระบบใหม่อีกครั้ง'
+      );
+    }
+
+    const submissions = this.getSubmissions();
+    const existingIdx = submissions.findIndex(
+      (s: any) =>
+        s.studentCode === verifiedStudentCode &&
+        matchSubmissionToAssignment(s, {
+          id: payload.assignmentId,
+          unitId: payload.unitId,
+          title: payload.workTitle,
+        })
+    );
+
+    const nowIso = new Date().toISOString();
+    const wasReturned =
+      existingIdx !== -1 &&
+      ((submissions[existingIdx].status as string) === 'RETURNED' ||
+        submissions[existingIdx].status === 'RETURNED_REVISION');
+
+    // อัปโหลดไฟล์ขึ้น R2 (หรือเก็บเฉพาะ Metadata URL หากออฟไลน์ เพื่อไม่ให้ localStorage เต็ม 5MB)
+    let resolvedFileUrl = payload.fileUrl || payload.fileDataUrl || '';
+    const fileToUpload = payload.file || payload.fileBlob;
     const term = payload.academicYearTerm || '1/2569';
     const cleanFileName = payload.fileName
       ? payload.fileName.replace(/\.(jpg|jpeg|png|heic)$/i, '.webp')
       : undefined;
 
-    if (cleanFileName && (payload.fileBlob || payload.fileDataUrl) && r2StorageService.isConfigured()) {
-      const r2Key = r2StorageService.buildSubmissionKey({
-        term,
-        classroom: payload.classroom,
-        assignmentId: payload.assignmentId,
-        studentCode: payload.studentCode,
-        fileName: cleanFileName,
-      });
-
+    if (fileToUpload && r2StorageService.isConfigured()) {
       try {
-        const uploadPayload = payload.fileBlob || payload.fileDataUrl!;
+        const r2Key = r2StorageService.buildSubmissionKey({
+          term,
+          classroom: payload.classroom,
+          assignmentId: payload.assignmentId,
+          studentCode: verifiedStudentCode,
+          fileName: cleanFileName || `work_${verifiedStudentCode}.webp`,
+        });
         const uploadRes = await r2StorageService.uploadFileWithProgress(
           r2Key,
-          uploadPayload,
+          fileToUpload,
           payload.onProgress
         );
         if (uploadRes.success && uploadRes.url) {
-          finalFileUrl = uploadRes.url;
+          resolvedFileUrl = uploadRes.url;
         }
-      } catch (err) {
-        console.warn('[R2 Upload] Async upload failed, keeping local fallback', err);
+      } catch (uploadErr) {
+        console.warn('[R2Upload] อัปโหลดขึ้น R2 ไม่สำเร็จ ใช้ Object URL ชั่วคราวแทนการเก็บ Base64 ก้อนใหญ่ลง localStorage:', uploadErr);
+        if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+          resolvedFileUrl = URL.createObjectURL(fileToUpload);
+        }
       }
+    } else if (fileToUpload && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+      resolvedFileUrl = URL.createObjectURL(fileToUpload);
     }
 
-    return this.submitStudentWorkToR2({
-      ...payload,
-      fileDataUrl: finalFileUrl,
+    const origKb = payload.originalSizeKb ?? (cleanFileName ? 4250 : 0);
+    const compKb = payload.compressedSizeKb ?? (cleanFileName ? 148 : 0);
+
+    const submissionRecord: StudentWorkSubmission = {
+      ...(existingIdx !== -1 ? submissions[existingIdx] : {}),
+      id:
+        existingIdx !== -1
+          ? submissions[existingIdx].id
+          : `sub_${payload.assignmentId}_${verifiedStudentCode}`,
+      assignmentId: payload.assignmentId,
+      unitId: payload.unitId || (existingIdx !== -1 ? submissions[existingIdx].unitId : undefined),
+      courseCode: payload.courseCode || (existingIdx !== -1 ? submissions[existingIdx].courseCode : undefined),
+      studentCode: verifiedStudentCode,
+      studentId: verifiedStudentId,
+      workTitle: payload.workTitle,
+      fileUrl: resolvedFileUrl || (existingIdx !== -1 ? submissions[existingIdx].fileUrl : ''),
+      fileDataUrl: resolvedFileUrl || (existingIdx !== -1 ? submissions[existingIdx].fileDataUrl : ''),
+      externalLinkUrl: payload.externalLinkUrl,
+      note: payload.note ?? '',
+      score: existingIdx !== -1 && submissions[existingIdx].score !== undefined ? submissions[existingIdx].score : null,
+      originalSizeKb: origKb,
+      compressedSizeKb: compKb,
+      maxScore: payload.maxScore ?? (existingIdx !== -1 ? submissions[existingIdx].maxScore : 10),
+      status: 'SUBMITTED_PENDING',
+      isResubmission: wasReturned || existingIdx !== -1,
+      submittedAt: nowIso,
+    };
+
+    if (existingIdx !== -1) {
+      submissions[existingIdx] = submissionRecord;
+    } else {
+      submissions.push(submissionRecord);
+    }
+
+    this.saveSubmissions(submissions);
+
+    // ดันงานเข้าคิวรอตรวจ (kp_grading_queue_v2) พร้อมอัปเดต submittedTimestamp ใหม่ทันที
+    this.syncGradingQueueItem({
+      assignmentId: payload.assignmentId,
+      studentCode: verifiedStudentCode,
+      studentId: verifiedStudentId,
+      studentName: identity?.student?.name,
+      classroom: identity?.student?.classroom,
+      courseCode: payload.courseCode,
+      workTitle: payload.workTitle,
+      fileUrl: submissionRecord.fileUrl,
+      status: 'PENDING_REVIEW',
+      isResubmission: submissionRecord.isResubmission,
     });
+
+    return submissionRecord;
   },
 
   // อัปโหลดไฟล์งานนักเรียนขึ้น Cloudflare R2 (บีบอัดรูป WebP อัตโนมัติ + รองรับแนบลิงก์เสริม Google Drive/Canva)
@@ -2309,37 +2891,15 @@ export const sgsRosterAndSubmissionService = {
         ? subs.map((item, i) => (i === idx ? nextItem : item))
         : [...subs, nextItem];
 
-    // อัปเดตคิวตรวจงานครู (kp_grading_queue_v2) ให้เด้งกลับมาเป็น PENDING_REVIEW ในคิว FIFO ทันที
-    try {
-      if (typeof localStorage !== 'undefined') {
-        const rawQueue = localStorage.getItem('kp_grading_queue_v2');
-        if (rawQueue) {
-          const queueList = JSON.parse(rawQueue);
-          if (Array.isArray(queueList)) {
-            let qUpdated = false;
-            const nextQueue = queueList.map((q: any) => {
-              if (q.assignmentId === payload.assignmentId && q.studentCode === payload.studentCode) {
-                qUpdated = true;
-                return {
-                  ...q,
-                  status: 'PENDING_REVIEW',
-                  submittedTimestamp: Date.now(),
-                  isResubmission: true,
-                  score: null,
-                };
-              }
-              return q;
-            });
-            if (qUpdated) {
-              localStorage.setItem('kp_grading_queue_v2', JSON.stringify(nextQueue));
-              window.dispatchEvent(new CustomEvent('kp-grading-queue-updated'));
-            }
-          }
-        }
-      }
-    } catch {
-      // ignore
-    }
+    // ดันงานเข้าคิวรอตรวจ (kp_grading_queue_v2) ผ่าน syncGradingQueueItem
+    this.syncGradingQueueItem({
+      assignmentId: payload.assignmentId,
+      studentCode: payload.studentCode,
+      workTitle: payload.workTitle,
+      fileUrl: payload.fileDataUrl,
+      status: 'PENDING_REVIEW',
+      isResubmission,
+    });
 
     return this.saveSubmissions(updated);
   },

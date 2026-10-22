@@ -1048,7 +1048,7 @@ assert.strictEqual(earlyPassingSummary.isAtRisk, false);
 console.log('  ✓ Early-term passing boundary verified: 4/5 attended = 80.0% eligible');
 
 // 10.3 Dynamic elapsed teaching days in getCourseCumulativeStats
-const courseStats = attendanceCorrelationService.getCourseCumulativeStats('ญ31201', 'room-3-1');
+const courseStats = attendanceCorrelationService.getCourseCumulativeStats('ศ23101', 'room-3-1');
 assert.ok(courseStats.totalAssemblyDays > 0, 'Must have dynamic elapsed teaching days');
 assert.ok(courseStats.totalAssemblyDays <= 31, 'Must reflect conducted days to date');
 for (const s of courseStats.students) {

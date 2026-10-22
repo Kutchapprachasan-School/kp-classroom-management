@@ -65,7 +65,13 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
 
   const studentCode = identity?.studentCode || currentUser?.studentCode || '';
   const studentId = identity?.studentId || currentUser?.id || '';
-  const studentRoom = formatClassroomLabel(currentUser?.classroomName || currentUser?.classroomId || identity?.classroomId) || 'ม.3/1';
+  const studentRoom =
+    formatClassroomLabel(
+      currentUser?.classroomName ||
+        currentUser?.classroomId ||
+        identity?.student?.classroom ||
+        identity?.student?.classroomId
+    ) || 'ม.3/1';
   const schoolSettings = getSchoolSettings();
   const academicYearTerm = schoolSettings.academicTerm || '1/2569';
   const [quests, setQuests] = useState<ExtendedStudentQuestItem[]>([]);

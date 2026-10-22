@@ -294,7 +294,7 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
       const stuSubs = allSubmissions.filter((s) => s.studentCode === stu.studentCode);
       const assignScores = matrixAssignments.map((a) => {
         const sub = stuSubs.find((s) => s.assignmentId === a.id);
-        return sub && sub.score !== null ? sub.score : 0;
+        return sub && typeof sub.score === 'number' ? sub.score : 0;
       });
 
       const totalEarned = assignScores.reduce((sum, n) => sum + Number(n), 0);
@@ -302,7 +302,7 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
         .filter((a) => !a.scorePart || a.scorePart === 'PRE_MIDTERM')
         .reduce((sum, a) => {
           const sub = stuSubs.find((s) => s.assignmentId === a.id);
-          return sum + (sub && sub.score !== null ? Number(sub.score) : 0);
+          return sum + (sub && typeof sub.score === 'number' ? Number(sub.score) : 0);
         }, 0);
 
       return [
@@ -634,7 +634,7 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
                                   stu.studentCode,
                                   stu.studentName,
                                   assign,
-                                  hasScore ? sub.score : null
+                                  hasScore && typeof sub.score === 'number' ? sub.score : null
                                 )
                               }
                               className={`w-full min-h-[44px] p-2.5 rounded-xl border flex items-center justify-between text-left transition-all cursor-pointer ${
@@ -830,7 +830,7 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
                                       stu.studentCode,
                                       stu.studentName,
                                       assign,
-                                      hasScore ? sub.score : null
+                                      hasScore && typeof sub.score === 'number' ? sub.score : null
                                     )
                                   }
                                   className={`p-2 text-center border-r border-slate-100 cursor-pointer hover:bg-blue-50/50 transition-colors ${
@@ -866,7 +866,7 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
                                 stu.studentCode,
                                 stu.studentName,
                                 assign,
-                                hasScore ? sub.score : null
+                                hasScore && typeof sub.score === 'number' ? sub.score : null
                               )
                             }
                             className={`p-2 text-center border-r border-slate-100 cursor-pointer hover:bg-blue-50/50 transition-colors ${
