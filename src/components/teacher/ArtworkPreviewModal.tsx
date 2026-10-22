@@ -27,6 +27,7 @@ export interface ArtworkPreviewModalProps {
   type?: 'IMAGE' | 'PDF' | 'LINK';
   url?: string;
   externalLinkUrl?: string;
+  textContent?: string;
   fileName?: string;
   platform?: 'CANVA' | 'GOOGLE_DOCS' | 'GOOGLE_DRIVE' | 'YOUTUBE' | 'FIGMA' | 'OTHER';
 }
@@ -43,6 +44,7 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
   type,
   url,
   externalLinkUrl,
+  textContent,
   fileName = 'ผลงานนักเรียน',
   platform,
 }) => {
@@ -268,6 +270,19 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Student Written Text Response Banner */}
+        {textContent && (
+          <div className="px-5 py-3 bg-slate-800/90 border-b border-slate-700/80 text-white shrink-0">
+            <div className="flex items-center gap-2 mb-1.5 text-emerald-400 font-bold text-xs">
+              <FileText className="w-4 h-4" />
+              <span>ข้อความคำตอบที่นักเรียนพิมพ์ส่ง:</span>
+            </div>
+            <p className="text-xs text-slate-200 whitespace-pre-line leading-relaxed bg-slate-900/90 p-3 rounded-xl border border-slate-700 max-h-36 overflow-y-auto">
+              {textContent}
+            </p>
+          </div>
+        )}
 
         {/* Toolbar Bar */}
         <div className="px-4 py-2 bg-slate-950/70 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300 shrink-0">

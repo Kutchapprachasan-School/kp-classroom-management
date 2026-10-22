@@ -141,8 +141,9 @@ export interface GradingQueueItem {
   fileName?: string;
   externalLinkUrl?: string;
   externalPlatform?: 'CANVA' | 'GOOGLE_DOCS' | 'GOOGLE_DRIVE' | 'FIGMA' | 'YOUTUBE' | 'OTHER';
-  status: 'PENDING_REVIEW' | 'GRADED';
+  status: 'PENDING_REVIEW' | 'GRADED' | 'RETURNED' | 'RETURNED_REVISION';
   score?: number | null;
+  textContent?: string;
   teacherFeedback?: string;
   gradedAtText?: string;
   studentAvatarUrl?: string;

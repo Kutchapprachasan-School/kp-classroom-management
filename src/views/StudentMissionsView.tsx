@@ -42,6 +42,8 @@ import { type UploadProgressInfo, validateSubmissionFile, compressImageToWebP } 
 import { formatBytes } from '../components/student/StudentSubmissionUploader';
 
 export interface ExtendedStudentQuestItem extends StudentQuestItem {
+  courseCode?: string;
+  unitId?: string;
   scorePart?: FourScorePart;
   scorePartLabel?: string;
   isRequiredForPass?: boolean;
@@ -80,6 +82,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
   const [selectedQuest, setSelectedQuest] = useState<ExtendedStudentQuestItem | null>(null);
   const [isEditingSubmission, setIsEditingSubmission] = useState(false);
   const [submitLink, setSubmitLink] = useState('');
+  const [submitText, setSubmitText] = useState('');
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [selectedFileName, setSelectedFileName] = useState('');
   const [selectedFileDataUrl, setSelectedFileDataUrl] = useState<string | null>(null);
@@ -233,6 +236,8 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
 
         return {
           id: asg.id,
+          unitId: asg.unitId,
+          courseCode: asg.courseCode,
           subjectTitle,
           title: asg.title,
           dueDateText: asg.dueDate ? `ส่งภายใน ${asg.dueDate}` : 'ไม่ระบุกำหนดส่ง',
@@ -309,11 +314,13 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
     }
 
     const trimmedLink = submitLink.trim();
+    const trimmedText = submitText.trim();
     const hasFile = Boolean(selectedFileDataUrl || selectedFileName);
     const hasLink = Boolean(trimmedLink);
+    const hasText = Boolean(trimmedText);
 
-    if (!hasFile && !hasLink) {
-      setToastMsg('⚠️ กรุณาแนบไฟล์รูปภาพ/เอกสาร หรือวางลิงก์ผลงานอย่างน้อย 1 รายการ');
+    if (!hasFile && !hasLink && !hasText) {
+      setToastMsg('⚠️ กรุณาแนบไฟล์, วางลิงก์ผลงาน หรือพิมพ์ข้อความตอบกลับอย่างน้อย 1 อย่าง');
       setTimeout(() => setToastMsg(null), 3500);
       return;
     }
@@ -352,6 +359,8 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
 
       await sgsRosterAndSubmissionService.submitStudentWorkToR2Async({
         assignmentId: selectedQuest.id,
+        unitId: selectedQuest.unitId,
+        courseCode: selectedQuest.courseCode,
         studentCode,
         workTitle: selectedQuest.title,
         fileName: selectedFileName || (selectedFileDataUrl ? `work_${studentCode}.webp` : undefined),
@@ -360,6 +369,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
         fileDataUrl: selectedFileDataUrl || undefined,
         fileBlob: selectedRawFile || undefined,
         externalLinkUrl: hasLink ? trimmedLink : undefined,
+        textContent: hasText ? trimmedText : undefined,
         academicYearTerm,
         classroom: studentRoom,
         onProgress: (info) => {
@@ -371,14 +381,17 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
         setToastMsg(`🎉 อัปโหลดไฟล์และแนบลิงก์ผลงานสำเร็จ! (+${selectedQuest.xpReward} XP)`);
       } else if (hasFile) {
         setToastMsg(`☁️ อัปโหลดไฟล์ผลงานเข้าสู่ระบบสำเร็จ! (+${selectedQuest.xpReward} XP)`);
-      } else {
+      } else if (hasLink) {
         setToastMsg(`🔗 แนบลิงก์ผลงานสำเร็จ! (+${selectedQuest.xpReward} XP)`);
+      } else {
+        setToastMsg(`📝 ส่งข้อความตอบกลับสำเร็จ! (+${selectedQuest.xpReward} XP)`);
       }
 
       await loadQuests();
       setTimeout(() => setToastMsg(null), 3500);
       setSelectedQuest(null);
       setSubmitLink('');
+      setSubmitText('');
       setSelectedFileName('');
       setSelectedFileDataUrl(null);
       setSelectedRawFile(null);
@@ -1070,6 +1083,19 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                         </div>
                       )}
 
+                      {/* Display Text Answer Preview if student attached text */}
+                      {submission?.textContent && (
+                        <div className="p-3 bg-white rounded-xl border border-emerald-200 space-y-1.5 text-xs">
+                          <span className="text-[11px] font-bold text-slate-700 block flex items-center gap-1">
+                            <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>ข้อความคำตอบที่ส่ง:</span>
+                          </span>
+                          <p className="p-2.5 bg-emerald-50/40 rounded-lg border border-emerald-100 text-slate-800 whitespace-pre-line leading-relaxed">
+                            {submission.textContent}
+                          </p>
+                        </div>
+                      )}
+
                       <div className="bg-white rounded-xl p-3 border border-emerald-100 space-y-1.5 text-xs text-slate-700">
                         <div className="flex items-center justify-between">
                           <span className="text-slate-500">ประเภทการส่ง:</span>
@@ -1082,6 +1108,8 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                               ? submission.externalLinkUrl.includes('canva.com')
                                 ? '🎨 Canva Project'
                                 : '📁 Google Drive'
+                              : submission?.textContent
+                              ? '📝 พิมพ์ข้อความคำตอบ'
                               : 'ส่งงานออนไลน์'}
                           </span>
                         </div>
@@ -1126,7 +1154,16 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                 <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => setIsEditingSubmission(true)}
+                    onClick={() => {
+                      setIsEditingSubmission(true);
+                      const submission = sgsRosterAndSubmissionService
+                        .getSubmissions()
+                        .find((s) => s.assignmentId === selectedQuest.id && s.studentCode === studentCode);
+                      if (submission) {
+                        if (submission.textContent) setSubmitText(submission.textContent);
+                        if (submission.externalLinkUrl) setSubmitLink(submission.externalLinkUrl);
+                      }
+                    }}
                     className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer transition-colors"
                   >
                     ✏️ แก้ไขหรือส่งงานใหม่
@@ -1475,6 +1512,36 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                       return null;
                     })()}
                   </div>
+                </div>
+
+                {/* 3. Text Answer Section (พิมพ์ข้อความตอบกลับ) */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-[#163A66] flex items-center gap-1.5 text-xs sm:text-sm">
+                      <FileText className="w-4 h-4 text-[#10B981]" />
+                      <span>3. พิมพ์ข้อความตอบกลับ / บันทึกคำตอบ (ถ้ามี)</span>
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-medium">ไม่บังคับ</span>
+                  </div>
+                  <textarea
+                    rows={3}
+                    placeholder="พิมพ์คำตอบ คำอธิบายผลงาน หรือข้อความที่ต้องการส่งถึงคุณครูที่นี่..."
+                    value={submitText}
+                    onChange={(e) => setSubmitText(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 focus:border-[#3B82F6] rounded-xl focus:outline-none text-xs text-slate-800 placeholder:text-slate-400 resize-y leading-relaxed"
+                  />
+                  {submitText.trim() && (
+                    <div className="flex items-center justify-between text-[11px] text-slate-400">
+                      <span>ความยาว: {submitText.trim().length} ตัวอักษร</span>
+                      <button
+                        type="button"
+                        onClick={() => setSubmitText('')}
+                        className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        ล้างข้อความ
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Real-time R2 Upload Progress Bar */}

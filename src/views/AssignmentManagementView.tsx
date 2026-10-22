@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   CheckCircle2,
+  AlertCircle,
   Clock,
   Eye,
   Check,
@@ -92,7 +93,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
   const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>('ALL');
   const [selectedRoom, setSelectedRoom] = useState<string>('ALL');
-  const [selectedStatus, setSelectedStatus] = useState<'ALL' | 'PENDING' | 'GRADED'>('ALL');
+  const [selectedStatus, setSelectedStatus] = useState<'ALL' | 'PENDING' | 'RETURNED' | 'GRADED'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeSectionTab, setActiveSectionTab] = useState<'ASSIGNED_LIST' | 'SUBMISSIONS' | 'SCORE_MATRIX'>(
     'ASSIGNED_LIST'
@@ -542,6 +543,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     type?: 'IMAGE' | 'PDF' | 'LINK';
     url?: string;
     externalLinkUrl?: string;
+    textContent?: string;
     fileName?: string;
     platform?: 'CANVA' | 'GOOGLE_DOCS' | 'GOOGLE_DRIVE' | 'YOUTUBE' | 'FIGMA' | 'OTHER';
   } | null>(null);
@@ -1199,18 +1201,26 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     });
   }, [queueItems, selectedSubjectCode, selectedRoom]);
 
-  // สถิติยอดงานตามเงื่อนไข Dropdown (ทั้งหมด, รอตรวจ, ตรวจแล้ว)
+  // สถิติยอดงานตามเงื่อนไข Dropdown (ทั้งหมด, รอตรวจ, ส่งกลับแก้ไข, ตรวจแล้ว)
   const stats = useMemo(() => {
     const total = scopedQueue.length;
     const pending = scopedQueue.filter((i) => i.status === 'PENDING_REVIEW').length;
+    const returned = scopedQueue.filter((i) => i.status === 'RETURNED' || i.status === 'RETURNED_REVISION').length;
     const graded = scopedQueue.filter((i) => i.status === 'GRADED').length;
-    return { total, pending, graded };
+    return { total, pending, returned, graded };
   }, [scopedQueue]);
 
   // Filtered Submissions (ตามแท็บสถานะและคำค้นหา)
   const filteredSubmissions = useMemo(() => {
     return scopedQueue.filter((item) => {
       if (selectedStatus === 'PENDING' && item.status !== 'PENDING_REVIEW') {
+        return false;
+      }
+      if (
+        selectedStatus === 'RETURNED' &&
+        item.status !== 'RETURNED' &&
+        item.status !== 'RETURNED_REVISION'
+      ) {
         return false;
       }
       if (selectedStatus === 'GRADED' && item.status !== 'GRADED') {
@@ -2156,6 +2166,29 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                                   </span>
                                   <button
                                     type="button"
+                                    onClick={() => {
+                                      const pendingQueueItem =
+                                        queueItems.find(
+                                          (q) =>
+                                            q.assignmentId === task.id &&
+                                            q.status === 'PENDING_REVIEW'
+                                        ) ||
+                                        queueItems.find((q) => q.assignmentId === task.id);
+
+                                      if (pendingQueueItem) {
+                                        setGradingModalItem(pendingQueueItem);
+                                      } else {
+                                        handleOpenCheckMatrix(item.courseCode, item.targetClassrooms);
+                                      }
+                                    }}
+                                    className="px-2.5 py-1 rounded-lg bg-blue-50 text-[#3B82F6] hover:bg-blue-100 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
+                                    title="ตรวจงานย่อยนี้"
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    <span>ตรวจงานย่อย</span>
+                                  </button>
+                                  <button
+                                    type="button"
                                     onClick={() => handleOpenEditModal(task)}
                                     className="p-1 rounded-lg text-slate-400 hover:text-[#3B82F6] hover:bg-blue-50"
                                     title="แก้ไขงานย่อย"
@@ -2240,8 +2273,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                 <Play className="w-4 h-4 fill-white" />
                 <span>เริ่มตรวจงานทันที ({stats.pending} งานรอตรวจ)</span>
               </button>
-              <div className="flex items-center gap-1.5">
-                {(['ALL', 'PENDING', 'GRADED'] as const).map((st) => (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {(['ALL', 'PENDING', 'RETURNED', 'GRADED'] as const).map((st) => (
                   <button
                     key={st}
                     type="button"
@@ -2256,7 +2289,9 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                       ? `ทั้งหมด (${stats.total})`
                       : st === 'PENDING'
                         ? `รอตรวจ (${stats.pending})`
-                        : `ตรวจแล้ว (${stats.graded})`}
+                        : st === 'RETURNED'
+                          ? `ส่งกลับแก้ไข (${stats.returned})`
+                          : `ตรวจแล้ว (${stats.graded})`}
                   </button>
                 ))}
               </div>
@@ -2377,6 +2412,16 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                             );
                             const resolvedR2 = r2StorageService.resolvePublicViewUrl(item.filePreviewUrl);
                             const fileUrl = cachedFile || resolvedR2 || item.filePreviewUrl;
+                            const resolvedText =
+                              (item as any).textContent ||
+                              sgsRosterAndSubmissionService
+                                .getSubmissions()
+                                .find(
+                                  (s) =>
+                                    s.assignmentId === item.assignmentId &&
+                                    s.studentCode === item.studentCode
+                                )?.textContent;
+
                             setPreviewItem({
                               title: item.assignmentTitle,
                               studentName: displayName,
@@ -2387,6 +2432,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                               type: isPdf ? 'PDF' : fileUrl ? 'IMAGE' : isLink ? 'LINK' : 'IMAGE',
                               url: fileUrl || item.externalLinkUrl,
                               externalLinkUrl: item.externalLinkUrl,
+                              textContent: resolvedText,
                               fileName: item.fileName,
                               platform: isDrive ? 'GOOGLE_DRIVE' : item.externalPlatform,
                             });
@@ -2400,6 +2446,11 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                         {isGraded ? (
                           <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
                             ✓ {item.score}/{item.maxScore}
+                          </span>
+                        ) : item.status === 'RETURNED' || item.status === 'RETURNED_REVISION' ? (
+                          <span className="px-3 py-1.5 rounded-xl bg-orange-50 text-orange-800 border border-orange-200 text-xs font-bold flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5 text-orange-600" />
+                            <span>ส่งกลับแก้ไข (รอนักเรียนส่งใหม่)</span>
                           </span>
                         ) : (
                           <span className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold flex items-center gap-1">
@@ -3958,6 +4009,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         type={previewItem?.type || 'IMAGE'}
         url={previewItem?.url}
         externalLinkUrl={previewItem?.externalLinkUrl}
+        textContent={previewItem?.textContent}
         fileName={previewItem?.fileName}
         platform={previewItem?.platform}
       />

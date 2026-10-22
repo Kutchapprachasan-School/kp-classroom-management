@@ -249,7 +249,75 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
     stuSubs: StudentWorkSubmission[],
     assign: TermAssignmentConfig
   ) => {
-    return stuSubs.find((s) => matchSubmissionToAssignment(s, assign));
+    return (
+      stuSubs.find((s) => s.assignmentId === assign.id) ||
+      stuSubs.find((s) => matchSubmissionToAssignment(s, assign))
+    );
+  };
+
+  // Helper สำหรับคำนวณคะแนนนักเรียนรายคนอย่างถูกต้อง ไม่บวกซ้ำซ้อน
+  const calculateStudentMatrixScores = (stuSubs: StudentWorkSubmission[]) => {
+    let preMidtermEarned = 0;
+    let grandTotalEarned = 0;
+    const unitScoreMap = new Map<string, number>();
+
+    // 1. คำนวณคะแนนรายหน่วย (ตามสัดส่วน unitMaxScore ไม่ใช่บวกผลรวมดิบทุกงานย่อยให้พุ่งเกินจริง)
+    matrixUnits.unitList.forEach((u) => {
+      let submittedInUnit = 0;
+      let rawEarnedInUnit = 0;
+      let rawMaxInUnit = 0;
+
+      u.assignments.forEach((assign) => {
+        const sub = matchSubmissionForStudent(stuSubs, assign);
+        if (sub && sub.status !== 'MISSING') {
+          submittedInUnit += 1;
+          if (typeof sub.score === 'number') {
+            rawEarnedInUnit += sub.score;
+          }
+        }
+        rawMaxInUnit += assign.maxScore || 10;
+      });
+
+      let calculatedScore = 0;
+      if (u.scoringMethod === 'SUBMISSION_COUNT_RATIO') {
+        const totalTasks = u.totalTasks > 0 ? u.totalTasks : u.assignments.length;
+        const clamped = Math.min(totalTasks, Math.max(0, submittedInUnit));
+        const raw = totalTasks > 0 ? (clamped / totalTasks) * u.maxScore : 0;
+        calculatedScore = Math.round(raw * 10) / 10;
+      } else if (u.scoringMethod === 'RAW_SCORE_AVERAGE') {
+        const ratio = rawMaxInUnit > 0 ? rawEarnedInUnit / rawMaxInUnit : 0;
+        calculatedScore = Math.round(ratio * u.maxScore * 10) / 10;
+      } else {
+        calculatedScore = Math.min(u.maxScore, rawEarnedInUnit);
+      }
+
+      unitScoreMap.set(u.id, calculatedScore);
+      grandTotalEarned += calculatedScore;
+
+      // ตรวจสอบว่าหน่วยนี้จัดอยู่ในช่วงคะแนนก่อนกลางภาคหรือไม่
+      const firstTask = u.assignments[0];
+      const part = firstTask?.scorePart || (firstTask?.sgsUnit === 'u1' ? 'PRE_MIDTERM' : 'POST_MIDTERM');
+      if (part === 'PRE_MIDTERM') {
+        preMidtermEarned += calculatedScore;
+      }
+    });
+
+    // 2. คำนวณชิ้นงานเดี่ยวปกติ
+    matrixUnits.independentList.forEach((assign) => {
+      const sub = matchSubmissionForStudent(stuSubs, assign);
+      if (sub && typeof sub.score === 'number') {
+        grandTotalEarned += sub.score;
+        if (!assign.scorePart || assign.scorePart === 'PRE_MIDTERM') {
+          preMidtermEarned += sub.score;
+        }
+      }
+    });
+
+    return {
+      preMidtermEarned: Math.round(preMidtermEarned * 10) / 10,
+      allEarned: Math.round(grandTotalEarned * 10) / 10,
+      unitScoreMap,
+    };
   };
 
   const handleBulkGradeClassroom = () => {
@@ -297,13 +365,7 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
         return sub && typeof sub.score === 'number' ? sub.score : 0;
       });
 
-      const totalEarned = assignScores.reduce((sum, n) => sum + Number(n), 0);
-      const preMidtermEarned = matrixAssignments
-        .filter((a) => !a.scorePart || a.scorePart === 'PRE_MIDTERM')
-        .reduce((sum, a) => {
-          const sub = stuSubs.find((s) => s.assignmentId === a.id);
-          return sum + (sub && typeof sub.score === 'number' ? Number(sub.score) : 0);
-        }, 0);
+      const { preMidtermEarned, allEarned } = calculateStudentMatrixScores(stuSubs);
 
       return [
         stu.sgsSeatNo ?? stu.no ?? '',
@@ -311,7 +373,7 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
         stu.studentName,
         ...assignScores,
         preMidtermEarned,
-        totalEarned,
+        allEarned,
       ];
     });
 
@@ -541,17 +603,7 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
             <div className="block md:hidden space-y-3">
               {filteredStudents.map((stu, sIdx) => {
                 const stuSubs = allSubmissions.filter((s) => s.studentCode === stu.studentCode);
-                const preMidtermEarned = matrixAssignments
-                  .filter((a) => !a.scorePart || a.scorePart === 'PRE_MIDTERM')
-                  .reduce((sum, a) => {
-                    const sub = matchSubmissionForStudent(stuSubs, a);
-                    return sum + (sub && sub.score !== null ? Number(sub.score) : 0);
-                  }, 0);
-
-                const allEarned = matrixAssignments.reduce((sum, a) => {
-                  const sub = matchSubmissionForStudent(stuSubs, a);
-                  return sum + (sub && sub.score !== null ? Number(sub.score) : 0);
-                }, 0);
+                const { preMidtermEarned, allEarned } = calculateStudentMatrixScores(stuSubs);
 
                 const isExpanded = expandedStudentCodes.has(stu.studentCode);
 
@@ -786,19 +838,7 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
               <tbody className="divide-y divide-slate-100">
                 {filteredStudents.map((stu, sIdx) => {
                   const stuSubs = allSubmissions.filter((s) => s.studentCode === stu.studentCode);
-
-                  // Calculate Pre-Midterm total
-                  const preMidtermEarned = matrixAssignments
-                    .filter((a) => !a.scorePart || a.scorePart === 'PRE_MIDTERM')
-                    .reduce((sum, a) => {
-                      const sub = matchSubmissionForStudent(stuSubs, a);
-                      return sum + (sub && sub.score !== null ? Number(sub.score) : 0);
-                    }, 0);
-
-                  const allEarned = matrixAssignments.reduce((sum, a) => {
-                    const sub = matchSubmissionForStudent(stuSubs, a);
-                    return sum + (sub && sub.score !== null ? Number(sub.score) : 0);
-                  }, 0);
+                  const { preMidtermEarned, allEarned, unitScoreMap } = calculateStudentMatrixScores(stuSubs);
 
                   return (
                     <tr key={stu.studentCode} className="hover:bg-blue-50/20 transition-colors">
@@ -814,13 +854,12 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
 
                       {/* Units */}
                       {matrixUnits.unitList.map((u) => {
-                        let unitSum = 0;
+                        const unitCalculatedScore = unitScoreMap.get(u.id) ?? 0;
                         return (
                           <React.Fragment key={`cell-u-${u.id}`}>
                             {u.assignments.map((assign) => {
                               const sub = matchSubmissionForStudent(stuSubs, assign);
                               const hasScore = sub && sub.score !== null && sub.score !== undefined;
-                              if (hasScore) unitSum += Number(sub.score);
 
                               return (
                                 <td
@@ -847,7 +886,7 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
                               );
                             })}
                             <td className="p-2 text-center border-r border-[#BFDBFE] bg-blue-50/40 font-bold text-blue-900">
-                              {unitSum}
+                              {unitCalculatedScore}
                             </td>
                           </React.Fragment>
                         );
