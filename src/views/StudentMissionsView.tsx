@@ -79,7 +79,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
   const academicYearTerm = schoolSettings.academicTerm || '1/2569';
   const [quests, setQuests] = useState<ExtendedStudentQuestItem[]>([]);
   const [leaderboard, setLeaderboard] = useState<StudentLeaderboardEntry[]>([]);
-  const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'SUBMITTED'>('ALL');
+  const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'RETURNED' | 'SUBMITTED'>('ALL');
   const [selectedQuest, setSelectedQuest] = useState<ExtendedStudentQuestItem | null>(null);
   const [isEditingSubmission, setIsEditingSubmission] = useState(false);
   const [submitLink, setSubmitLink] = useState('');
@@ -297,11 +297,14 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
   }, [studentRoom, studentCode]);
 
   const allCount = quests.length;
-  const pendingCount = quests.filter((q) => q.status === 'PENDING').length;
+  const returnedCount = quests.filter((q) => q.isReturnedForRevision).length;
+  const pendingCount = quests.filter((q) => q.status === 'PENDING' && !q.isReturnedForRevision).length;
   const submittedCount = quests.filter((q) => q.status === 'SUBMITTED').length;
 
   const filteredQuests = quests.filter((q) => {
     if (filter === 'ALL') return true;
+    if (filter === 'RETURNED') return q.isReturnedForRevision;
+    if (filter === 'PENDING') return q.status === 'PENDING' && !q.isReturnedForRevision;
     return q.status === filter;
   });
 
@@ -510,7 +513,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
           </h2>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 bg-[#F8FAFC] p-1.5 rounded-2xl border border-[#E2E8F0]">
+        <div className={`grid ${returnedCount > 0 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-2 bg-[#F8FAFC] p-1.5 rounded-2xl border border-[#E2E8F0]`}>
           <button
             type="button"
             onClick={() => setFilter('ALL')}
@@ -533,6 +536,20 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
           >
             รอส่ง {pendingCount}
           </button>
+          {returnedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setFilter('RETURNED')}
+              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all text-center cursor-pointer flex items-center justify-center gap-1.5 ${
+                filter === 'RETURNED'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300'
+              }`}
+            >
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>ส่งกลับแก้ไข ({returnedCount})</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setFilter('SUBMITTED')}
@@ -549,6 +566,30 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
 
       {/* 4. Assignments List or Empty State */}
       <div className="space-y-3">
+        {returnedCount > 0 && filter !== 'RETURNED' && (
+          <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-xs sm:text-sm font-bold text-amber-900">
+                  มีงานที่ครูส่งกลับให้แก้ไข {returnedCount} รายการ
+                </h4>
+                <p className="text-[11px] text-amber-700 font-medium">
+                  คุณครูได้ตรวจและส่งงานกลับพร้อมคำแนะนำ กรุณาแก้ไขและส่งใหม่เพื่อให้ได้รับคะแนน
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFilter('RETURNED')}
+              className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer shrink-0 shadow-xs self-start sm:self-auto"
+            >
+              ดูงานที่ต้องแก้ไข ({returnedCount})
+            </button>
+          </div>
+        )}
         {filteredQuests.length === 0 ? (
           <div className="bg-white rounded-2xl border border-[#E6EEF7] p-8 sm:p-12 text-center shadow-card space-y-4">
             {/* Custom SVG Illustration: Document Sheet with blue lines, checkmark badge, and sparkles */}
@@ -685,7 +726,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                     setIsEditingSubmission(false);
                     const sub = sgsRosterAndSubmissionService
                       .getSubmissions()
-                      .find((s) => s.assignmentId === quest.id && s.studentCode === studentCode);
+                      .find((s) => s.studentCode === studentCode && matchSubmissionToAssignment(s, quest));
                     if (sub) {
                       setSubmitLink(sub.externalLinkUrl || '');
                       setSelectedFileName(sub.workAttachmentLabel ? sub.workAttachmentLabel.replace('☁️ R2: ', '').split(' ')[0] : '');
@@ -1029,10 +1070,15 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                 {(() => {
                   const submission = sgsRosterAndSubmissionService
                     .getSubmissions()
-                    .find((s) => s.assignmentId === selectedQuest.id && s.studentCode === studentCode);
+                    .find((s) => s.studentCode === studentCode && matchSubmissionToAssignment(s, selectedQuest));
                   const filePreview =
                     submission?.fileDataUrl ||
-                    sgsRosterAndSubmissionService.getSubmissionFileUrl(selectedQuest.id, studentCode);
+                    (submission as any)?.fileUrl ||
+                    sgsRosterAndSubmissionService.getSubmissionFileUrl(
+                      selectedQuest.id,
+                      studentCode,
+                      submission?.workAttachmentLabel ? submission.workAttachmentLabel.replace('☁️ R2: ', '').split(' ')[0] : undefined
+                    );
 
                   return (
                     <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-3">
@@ -1170,7 +1216,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                       setIsEditingSubmission(true);
                       const submission = sgsRosterAndSubmissionService
                         .getSubmissions()
-                        .find((s) => s.assignmentId === selectedQuest.id && s.studentCode === studentCode);
+                        .find((s) => s.studentCode === studentCode && matchSubmissionToAssignment(s, selectedQuest));
                       if (submission) {
                         if (submission.textContent) setSubmitText(submission.textContent);
                         if (submission.externalLinkUrl) setSubmitLink(submission.externalLinkUrl);

@@ -1,10 +1,9 @@
 // test_pipeline_linkage_fixes.mjs
-// Automated verification of the 6 pipeline linkage fixes:
-// Assign -> Submit -> Review -> Grade & Bridge -> Display & Matrices
+// Automated verification of pipeline linkage & detailed submission fixes
 
 import assert from 'assert';
 
-console.log('🧪 Starting pipeline linkage verification tests...\n');
+console.log('🧪 Starting pipeline linkage & submission detail verification tests...\n');
 
 // Mock localStorage
 const store = new Map();
@@ -42,10 +41,7 @@ const mockSubTextOnly = {
   status: 'SUBMITTED_PENDING',
 };
 
-const hasTextOnly = Boolean(mockSubTextOnly.textContent && !mockSubSubHasFile(mockSubTextOnly) && !mockSubTextOnly.externalLinkUrl);
-function mockSubSubHasFile(sub) {
-  return Boolean(sub.fileUrl || sub.fileDataUrl);
-}
+const hasTextOnly = Boolean(mockSubTextOnly.textContent && !mockSubTextOnly.fileUrl && !mockSubTextOnly.fileDataUrl && !mockSubTextOnly.externalLinkUrl);
 assert.strictEqual(hasTextOnly, true, 'Text response should be recognized when no file or link exists');
 console.log('✅ Test 1 Passed: textContent recognition is correct.');
 
@@ -85,8 +81,6 @@ const midFromWorks = 18; // Student earned 18 on midterm exam
 const studentWithDefaultZero = { midtermScore: 0 };
 const courseOverrideEmpty = undefined;
 
-// Old logic had: manualMid = typeof student.midtermScore === 'number' ? student.midtermScore : null -> 0!
-// New logic:
 const manualMidFixed =
   courseOverrideEmpty !== undefined
     ? courseOverrideEmpty
@@ -126,4 +120,70 @@ assert.strictEqual(isSameClassroom('m.3/1', 'ม. 3 / 1'), true, 'm.3/1 should m
 assert.strictEqual(isSameClassroom('room-3-1', 'room-3-2'), false, 'Different rooms should not match');
 console.log('✅ Test 5 Passed: isSameClassroom matches properly.');
 
-console.log('\n🎉 ALL 5 PIPELINE LINKAGE TESTS PASSED SUCCESSFULLY!');
+// Test 6: Detailed Submission attachmentLabel generation
+console.log('Test 6: Detailed Submission attachmentLabel generation...');
+function computeAttachmentLabel({ cleanFileName, resolvedFileUrl, externalLinkUrl, textContent, compKb }) {
+  const hasFile = Boolean(cleanFileName || resolvedFileUrl);
+  const hasLink = Boolean(externalLinkUrl && externalLinkUrl.trim());
+  const hasText = Boolean(textContent && textContent.trim());
+
+  let label = 'ส่งงานออนไลน์';
+  if (hasFile && hasLink) {
+    label = `☁️ R2: ${cleanFileName || 'รูปภาพ'} + 🔗 ลิงก์แนบ`;
+  } else if (hasFile) {
+    label = `☁️ R2: ${cleanFileName || 'รูปภาพ'} (${compKb > 0 ? `บีบอัดเหลือ ${compKb} KB` : 'ไฟล์แนบ'})`;
+  } else if (hasLink && hasText) {
+    label = `🔗 ลิงก์แนบ + 📝 ข้อความตอบกลับ`;
+  } else if (hasLink) {
+    label = `🔗 ลิงก์แนบ: ${externalLinkUrl}`;
+  } else if (hasText) {
+    label = `📝 ข้อความตอบกลับ`;
+  }
+  return label;
+}
+
+assert.strictEqual(
+  computeAttachmentLabel({ cleanFileName: 'drawing.webp', compKb: 120 }),
+  '☁️ R2: drawing.webp (บีบอัดเหลือ 120 KB)'
+);
+assert.strictEqual(
+  computeAttachmentLabel({ textContent: 'ส่งงานตอบคำถามครับ' }),
+  '📝 ข้อความตอบกลับ'
+);
+assert.strictEqual(
+  computeAttachmentLabel({ externalLinkUrl: 'https://canva.com/p/123' }),
+  '🔗 ลิงก์แนบ: https://canva.com/p/123'
+);
+assert.strictEqual(
+  computeAttachmentLabel({ cleanFileName: 'test.webp', externalLinkUrl: 'https://google.com' }),
+  '☁️ R2: test.webp + 🔗 ลิงก์แนบ'
+);
+assert.strictEqual(
+  computeAttachmentLabel({ externalLinkUrl: 'https://canva.com', textContent: 'แนบคำอธิบาย' }),
+  '🔗 ลิงก์แนบ + 📝 ข้อความตอบกลับ'
+);
+console.log('✅ Test 6 Passed: All attachmentLabel variations generated accurately.');
+
+// Test 7: Student filtering with RETURNED tab
+console.log('Test 7: Student filtering with RETURNED tab...');
+const mockQuests = [
+  { id: 'q1', status: 'PENDING', isReturnedForRevision: false },
+  { id: 'q2', status: 'PENDING', isReturnedForRevision: true },
+  { id: 'q3', status: 'SUBMITTED', isReturnedForRevision: false },
+  { id: 'q4', status: 'SUBMITTED', isReturnedForRevision: false },
+];
+
+const returnedCount = mockQuests.filter((q) => q.isReturnedForRevision).length;
+const pendingCount = mockQuests.filter((q) => q.status === 'PENDING' && !q.isReturnedForRevision).length;
+const submittedCount = mockQuests.filter((q) => q.status === 'SUBMITTED').length;
+
+assert.strictEqual(returnedCount, 1, 'Returned count should be 1');
+assert.strictEqual(pendingCount, 1, 'Pending count should be 1 (excluding returned)');
+assert.strictEqual(submittedCount, 2, 'Submitted count should be 2');
+
+const filterReturned = mockQuests.filter((q) => q.isReturnedForRevision);
+assert.strictEqual(filterReturned.length, 1);
+assert.strictEqual(filterReturned[0].id, 'q2');
+console.log('✅ Test 7 Passed: RETURNED filter isolates returned tasks cleanly.');
+
+console.log('\n🎉 ALL 7 PIPELINE & SUBMISSION TESTS PASSED SUCCESSFULLY!');

@@ -168,36 +168,23 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
     showToast(`✓ บันทึกคะแนน (${score} คะแนน) เรียบร้อยแล้ว`);
 
     if (nextPendingItem) {
-      const nextFiltered = filteredSubmissions.find((i) => i.id === nextPendingItem.id);
-      if (nextFiltered) {
-        setGradingModalItem(nextFiltered);
-        return;
-      }
+      setGradingModalItem(nextPendingItem);
+      return;
     }
 
-    const nextInFilter = filteredSubmissions.find(
-      (i) => i.id !== itemId && i.status === 'PENDING_REVIEW'
-    );
-    if (nextInFilter) {
-      setGradingModalItem(nextInFilter);
-    } else {
-      setGradingModalItem(null);
-      showToast('🎉 ตรวจครบทุกชิ้นในคิวนี้เรียบร้อยแล้ว!');
-    }
+    setGradingModalItem(null);
+    showToast('🎉 ตรวจครบทุกชิ้นในคิวนี้เรียบร้อยแล้ว!');
   };
 
   const handleReturnSubmission = (itemId: string, reason: string, note?: string) => {
     const targetItem = queueItems.find((i) => i.id === itemId);
     if (!targetItem) return;
 
-    teacherCourseAssignmentService.returnSubmission(itemId, reason, note);
+    const { nextPendingItem } = teacherCourseAssignmentService.returnSubmission(itemId, reason, note);
     showToast(`✓ ส่งงานกลับให้ ${targetItem.studentName} แก้ไขเรียบร้อยแล้ว (${reason})`);
 
-    const nextInFilter = filteredSubmissions.find(
-      (i) => i.id !== itemId && i.status === 'PENDING_REVIEW'
-    );
-    if (nextInFilter) {
-      setGradingModalItem(nextInFilter);
+    if (nextPendingItem) {
+      setGradingModalItem(nextPendingItem);
     } else {
       setGradingModalItem(null);
     }

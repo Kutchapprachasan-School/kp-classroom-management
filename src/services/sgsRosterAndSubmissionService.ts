@@ -2774,6 +2774,30 @@ export const sgsRosterAndSubmissionService = {
       ? payload.fileName.replace(/\.(jpg|jpeg|png|heic)$/i, '.webp')
       : undefined;
 
+    const hasIncomingFile = Boolean(fileToUpload || payload.fileDataUrl || payload.fileUrl);
+
+    // กรณีผู้เรียนส่งงานโดยไม่มีไฟล์แนบ (เช่น ลบไฟล์เดิมออกแล้วเปลี่ยนมาตอบข้อความหรือลิงก์อย่างเดียว)
+    if (!hasIncomingFile && existingIdx !== -1 && submissions[existingIdx].r2ObjectKey) {
+      const oldKey = submissions[existingIdx].r2ObjectKey;
+      if (oldKey && r2StorageService.isConfigured()) {
+        r2StorageService.deleteFile(oldKey).catch((delErr) => {
+          console.warn('[R2Delete] ลบไฟล์เก่าไม่สำเร็จ:', delErr);
+        });
+      }
+      resolvedR2Key = undefined;
+      resolvedFileUrl = '';
+      if (typeof localStorage !== 'undefined') {
+        try {
+          localStorage.removeItem(`kp_sub_file_${payload.assignmentId}_${verifiedStudentCode}`);
+          if (submissions[existingIdx].workAttachmentLabel) {
+            localStorage.removeItem(`kp_sub_file_${submissions[existingIdx].workAttachmentLabel}`);
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
     if (fileToUpload && r2StorageService.isConfigured()) {
       try {
         // ลบไฟล์เดิมออกจาก Cloudflare R2 เพื่อแทนที่ด้วยไฟล์ใหม่ (ประหยัดพื้นที่จัดเก็บและลดขยะไฟล์เก่า)
@@ -2812,8 +2836,46 @@ export const sgsRosterAndSubmissionService = {
       resolvedFileUrl = URL.createObjectURL(fileToUpload);
     }
 
+    // แคชไฟล์ภาพ / preview URL ลง localStorage เพื่อให้ครูเปิดดูออฟไลน์ได้ทันที
+    if ((payload.fileDataUrl || resolvedFileUrl) && typeof localStorage !== 'undefined') {
+      try {
+        const cleanAsg = String(payload.assignmentId).trim();
+        const cleanStu = String(verifiedStudentCode).trim();
+        const cacheUrl = payload.fileDataUrl || resolvedFileUrl;
+        if (cacheUrl && !cacheUrl.startsWith('blob:')) {
+          localStorage.setItem(`kp_sub_file_${cleanAsg}_${cleanStu}`, cacheUrl);
+          if (cleanFileName) {
+            localStorage.setItem(`kp_sub_file_${cleanFileName}`, cacheUrl);
+            localStorage.setItem(`kp_sub_file_${cleanStu}_${cleanFileName}`, cacheUrl);
+          }
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.setItem(`kp_sub_file_${cleanAsg}_${cleanStu}`, cacheUrl);
+          }
+        }
+      } catch (e) {
+        console.warn('Could not cache submission file preview URL', e);
+      }
+    }
+
     const origKb = payload.originalSizeKb ?? (cleanFileName ? 4250 : 0);
     const compKb = payload.compressedSizeKb ?? (cleanFileName ? 148 : 0);
+
+    const hasFile = Boolean(cleanFileName || (hasIncomingFile && (resolvedFileUrl || payload.fileDataUrl)));
+    const hasLink = Boolean(payload.externalLinkUrl && payload.externalLinkUrl.trim());
+    const hasText = Boolean(payload.textContent && payload.textContent.trim());
+
+    let attachmentLabel = 'ส่งงานออนไลน์';
+    if (hasFile && hasLink) {
+      attachmentLabel = `☁️ R2: ${cleanFileName || 'รูปภาพ'} + 🔗 ลิงก์แนบ`;
+    } else if (hasFile) {
+      attachmentLabel = `☁️ R2: ${cleanFileName || 'รูปภาพ'} (${compKb > 0 ? `บีบอัดเหลือ ${compKb} KB` : 'ไฟล์แนบ'})`;
+    } else if (hasLink && hasText) {
+      attachmentLabel = `🔗 ลิงก์แนบ + 📝 ข้อความตอบกลับ`;
+    } else if (hasLink) {
+      attachmentLabel = `🔗 ลิงก์แนบ: ${payload.externalLinkUrl}`;
+    } else if (hasText) {
+      attachmentLabel = `📝 ข้อความตอบกลับ`;
+    }
 
     const submissionRecord: StudentWorkSubmission = {
       ...(existingIdx !== -1 ? submissions[existingIdx] : {}),
@@ -2827,11 +2889,12 @@ export const sgsRosterAndSubmissionService = {
       studentCode: verifiedStudentCode,
       studentId: verifiedStudentId,
       workTitle: payload.workTitle,
-      fileUrl: resolvedFileUrl || (existingIdx !== -1 ? submissions[existingIdx].fileUrl : ''),
-      fileDataUrl: resolvedFileUrl || (existingIdx !== -1 ? submissions[existingIdx].fileDataUrl : ''),
-      r2ObjectKey: resolvedR2Key,
+      workAttachmentLabel: attachmentLabel,
+      fileUrl: hasIncomingFile ? (resolvedFileUrl || (existingIdx !== -1 ? submissions[existingIdx].fileUrl : '')) : '',
+      fileDataUrl: hasIncomingFile ? (resolvedFileUrl || (existingIdx !== -1 ? submissions[existingIdx].fileDataUrl : '')) : '',
+      r2ObjectKey: hasIncomingFile ? resolvedR2Key : undefined,
       externalLinkUrl: payload.externalLinkUrl,
-      textContent: payload.textContent || (existingIdx !== -1 ? submissions[existingIdx].textContent : undefined),
+      textContent: payload.textContent !== undefined ? payload.textContent : (existingIdx !== -1 ? submissions[existingIdx].textContent : undefined),
       note: payload.note ?? '',
       score: existingIdx !== -1 && submissions[existingIdx].score !== undefined ? submissions[existingIdx].score : null,
       originalSizeKb: origKb,
