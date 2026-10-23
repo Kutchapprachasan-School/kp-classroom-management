@@ -128,19 +128,29 @@ export const AdminGachaSettingsModal: React.FC<AdminGachaSettingsModalProps> = (
         showToast('error', 'กรุณาระบุรหัสนักเรียน');
         return;
       }
+      const foundStudent = studentService.findStudentByCode(sid);
+      const studentLabel = foundStudent?.student?.name ? `${foundStudent.student.name} (${sid})` : sid;
+
       if (grantTickets > 0) gachaAdminService.grantTickets(sid, grantTickets, grantReason);
       if (grantShards > 0) gachaAdminService.grantShards(sid, grantShards, grantReason);
       if (grantBuddyId) gachaAdminService.grantBuddy(sid, grantBuddyId, grantReason);
 
-      showToast('success', `แจกของรางวัลให้นักเรียน ${sid} สำเร็จ`);
+      showToast('success', `แจกของรางวัลให้นักเรียน ${studentLabel} สำเร็จ`);
       setAuditLogs(gachaAdminService.listAuditLogs());
     } else {
       if (!grantClassroomId) {
         showToast('error', 'กรุณาเลือกห้องเรียน');
         return;
       }
-      const studentsInClass: any[] = (classroomService as any).getStudentsByClassroom?.(grantClassroomId) || studentService.getStudents(grantClassroomId) || [];
-      const sids = studentsInClass.map((s: any) => s.id);
+      const targetClassroom = classrooms.find((c: any) => c.id === grantClassroomId || c.name === grantClassroomId);
+      let studentsInClass: any[] = studentService.getStudents(grantClassroomId);
+      if (studentsInClass.length === 0 && targetClassroom?.name) {
+        studentsInClass = studentService.getStudents(targetClassroom.name);
+      }
+      if (studentsInClass.length === 0 && targetClassroom?.id) {
+        studentsInClass = studentService.getStudents(targetClassroom.id);
+      }
+      const sids = studentsInClass.map((s: any) => s.code || s.studentCode || s.id);
       if (sids.length === 0) {
         showToast('error', 'ไม่พบนักเรียนในห้องเรียนนี้');
         return;
@@ -180,14 +190,20 @@ export const AdminGachaSettingsModal: React.FC<AdminGachaSettingsModalProps> = (
         showToast('error', 'กรุณาเลือกห้องเรียนที่ต้องการรีเซ็ต');
         return;
       }
-      const students: any[] = (classroomService as any).getStudentsByClassroom?.(resetClassroomId) || studentService.getStudents(resetClassroomId) || [];
-      const sids = students.map((s: any) => s.id);
+      const targetClassroom = classrooms.find((c: any) => c.id === resetClassroomId || c.name === resetClassroomId);
+      let students: any[] = studentService.getStudents(resetClassroomId);
+      if (students.length === 0 && targetClassroom?.name) {
+        students = studentService.getStudents(targetClassroom.name);
+      }
+      if (students.length === 0 && targetClassroom?.id) {
+        students = studentService.getStudents(targetClassroom.id);
+      }
+      const sids = students.map((s: any) => s.code || s.studentCode || s.id);
       if (sids.length === 0) {
         showToast('error', 'ไม่พบนักเรียนในห้องนี้');
         return;
       }
-      const cls = classrooms.find((c: any) => c.id === resetClassroomId);
-      const cname = cls ? cls.name : resetClassroomId;
+      const cname = targetClassroom ? targetClassroom.name : resetClassroomId;
 
       if (
         !confirm(

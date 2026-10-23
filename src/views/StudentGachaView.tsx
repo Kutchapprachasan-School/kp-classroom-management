@@ -11,6 +11,8 @@ import {
 import {
   gachaService,
   ALL_BUDDIES,
+  BUDDY_CHANGED_EVENT,
+  GACHA_STATE_UPDATED_EVENT,
   getBangkokTodayKey,
   getWeekKey,
   type GachaBuddy,
@@ -64,6 +66,24 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
 
   useEffect(() => {
     reloadState();
+
+    const handleSync = () => {
+      reloadState();
+    };
+
+    window.addEventListener(BUDDY_CHANGED_EVENT, handleSync);
+    window.addEventListener(GACHA_STATE_UPDATED_EVENT, handleSync);
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('kps-cloud-synced', handleSync);
+    window.addEventListener('kps-data-sync-event', handleSync);
+
+    return () => {
+      window.removeEventListener(BUDDY_CHANGED_EVENT, handleSync);
+      window.removeEventListener(GACHA_STATE_UPDATED_EVENT, handleSync);
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('kps-cloud-synced', handleSync);
+      window.removeEventListener('kps-data-sync-event', handleSync);
+    };
   }, []);
 
   const handlePull1 = () => {

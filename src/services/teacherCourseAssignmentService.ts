@@ -13,7 +13,7 @@ import { coursesCurriculumService } from './coursesCurriculumService.ts';
 import { studentService, formatClassroomLabel } from './studentService.ts';
 import { classroomService } from './classroomService.ts';
 import { authService } from './authService.ts';
-import { sgsRosterAndSubmissionService, formatSubmissionTimestamp } from './sgsRosterAndSubmissionService.ts';
+import { sgsRosterAndSubmissionService, formatSubmissionTimestamp, isSameClassroom } from './sgsRosterAndSubmissionService.ts';
 import { r2StorageService } from './r2StorageService.ts';
 
 export interface TeachingSubjectInfo {
@@ -323,19 +323,29 @@ export const teacherCourseAssignmentService = {
         handledKeys.add(sub.assignmentId);
 
         const savedMatch = savedMap.get(pairKey) || savedMap.get(`q_${pairKey}`);
-        const asg = termAssignments.find(
-          (a) =>
-            a.id === sub.assignmentId ||
-            (a.unitId && a.unitId === sub.assignmentId) ||
-            (sub.workTitle && a.title && (
-              sub.workTitle.trim().toLowerCase() === a.title.trim().toLowerCase() ||
-              sub.workTitle.includes(a.title) ||
-              a.title.includes(sub.workTitle)
-            ))
-        );
         const subCode = sub.studentCode.trim();
         const stu = studentMap.get(subCode);
         const foundInService = studentService.findStudentByCode(subCode);
+        const studentRoom = stu?.classroom || foundInService?.classroomId || foundInService?.student.classroomId || sub.classroom || '';
+
+        const asg = termAssignments.find(
+          (a) => {
+            // Classroom guard: ป้องกันงานของห้องอื่น (เช่น 6/3) ไปจับคู่กับนักเรียนห้อง 6/1
+            if (studentRoom && a.targetClassrooms && a.targetClassrooms.length > 0 && !a.targetClassrooms.includes('ALL')) {
+              const matchRoom = a.targetClassrooms.some((r: string) => isSameClassroom(r, studentRoom));
+              if (!matchRoom) return false;
+            }
+            return (
+              a.id === sub.assignmentId ||
+              (a.unitId && a.unitId === sub.assignmentId) ||
+              (sub.workTitle && a.title && (
+                sub.workTitle.trim().toLowerCase() === a.title.trim().toLowerCase() ||
+                sub.workTitle.includes(a.title) ||
+                a.title.includes(sub.workTitle)
+              ))
+            );
+          }
+        );
 
         const isResubmission = Boolean(sub.isResubmission || (savedMatch && savedMatch.isResubmission && sub.status === 'SUBMITTED_PENDING'));
         const isGraded = !isResubmission && (sub.status === 'GRADED' || (savedMatch && savedMatch.status === 'GRADED' && sub.status !== 'SUBMITTED_PENDING'));

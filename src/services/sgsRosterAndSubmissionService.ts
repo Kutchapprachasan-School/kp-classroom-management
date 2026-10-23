@@ -32,6 +32,8 @@ export interface SubmissionMatchCandidate {
   courseCode?: string;
   studentCode?: string;
   studentId?: string;
+  classroom?: string;
+  classroomId?: string;
   workTitle?: string;
   status?: string;
   score?: number | null;
@@ -192,6 +194,24 @@ export function matchSubmissionToAssignment(
     sub.courseCode.trim().toUpperCase() !== asg.courseCode.trim().toUpperCase()
   ) {
     return false;
+  }
+
+  // 0.1 Classroom guard: หากชิ้นงานกำหนดห้องเรียนเฉพาะ (และไม่รวม 'ALL')
+  // ตรวจสอบว่าห้องของนักเรียนตรงกับห้องเป้าหมายของงานหรือไม่ ป้องกันงานของห้องหนึ่งไปโผล่ในอีกห้องหนึ่ง
+  const asgRooms = asg.targetClassrooms || (asg.classroom || asg.classroomId ? [asg.classroom || asg.classroomId!] : []);
+  const subRoom = sub.classroom || sub.classroomId;
+  if (asgRooms.length > 0 && !asgRooms.includes('ALL')) {
+    let effectiveSubRoom = subRoom;
+    if (!effectiveSubRoom && sub.studentCode) {
+      const found = studentService.findStudentByCode(sub.studentCode);
+      if (found) effectiveSubRoom = found.classroomId || found.student.classroomId;
+    }
+    if (effectiveSubRoom) {
+      const isRoomMatch = asgRooms.some((r) => isSameClassroom(r, effectiveSubRoom));
+      if (!isRoomMatch) {
+        return false;
+      }
+    }
   }
 
   // 1. จับคู่ด้วย ID หลักโดยตรง (ความแม่นยำสูงสุด 100%)

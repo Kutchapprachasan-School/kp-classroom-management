@@ -10,6 +10,7 @@ import {
   type GachaRarity,
 } from '../config/gachaStarTable';
 import { gachaConfigService } from './gachaConfigService';
+import { studentService } from './studentService';
 
 export type { GachaRarity };
 
@@ -105,6 +106,7 @@ export interface GachaState {
 
 export const GACHA_STATE_KEY_PREFIX = 'kp_gacha_state:';
 export const BUDDY_CHANGED_EVENT = 'kp_buddy_changed';
+export const GACHA_STATE_UPDATED_EVENT = 'kp-gacha-state-updated';
 const AUTH_USER_STORAGE_KEY = 'cls_current_auth_user';
 export const PREVIEW_STUDENT_ID = 'preview';
 
@@ -634,8 +636,10 @@ export const gachaService = {
     try {
       const raw = localStorage.getItem(AUTH_USER_STORAGE_KEY);
       if (raw) {
-        const user = JSON.parse(raw) as { id?: string; role?: string };
-        if (user?.role === 'STUDENT' && user.id) return user.id;
+        const user = JSON.parse(raw) as { id?: string; studentCode?: string; role?: string };
+        if (user?.role === 'STUDENT') {
+          return user.id || user.studentCode || PREVIEW_STUDENT_ID;
+        }
       }
     } catch {
       // ใช้บัญชี preview
@@ -643,42 +647,124 @@ export const gachaService = {
     return PREVIEW_STUDENT_ID;
   },
 
+  /** ค้นหารหัสที่เชื่อมโยงกันทั้งหมด (UUID, studentCode, stu-XXXXX) เพื่อให้การแจกตั๋วตรงถึงตัวนักเรียนเสมอ */
+  resolveStudentCandidateIds(targetStudentId?: string): string[] {
+    const rawId = (targetStudentId || this.getCurrentStudentId()).trim();
+    if (!rawId) return [PREVIEW_STUDENT_ID];
+    const set = new Set<string>([rawId]);
+
+    // 1. ตรวจสอบข้อมูลจาก Auth Session ปัจจุบัน
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const rawAuth = localStorage.getItem(AUTH_USER_STORAGE_KEY);
+        if (rawAuth) {
+          const user = JSON.parse(rawAuth) as { id?: string; studentCode?: string; role?: string };
+          if (user?.role === 'STUDENT') {
+            const isMatch =
+              user.id === rawId ||
+              user.studentCode === rawId ||
+              `stu-${user.studentCode}` === rawId ||
+              rawId === PREVIEW_STUDENT_ID;
+            if (isMatch) {
+              if (user.id) set.add(user.id);
+              if (user.studentCode) {
+                set.add(user.studentCode);
+                set.add(`stu-${user.studentCode}`);
+              }
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // 2. ตรวจสอบข้อมูลจาก studentService (ค้นหาข้าม UUID และรหัส 5 หลัก)
+    try {
+      const found = studentService.findStudentByCode(rawId);
+      if (found?.student) {
+        if (found.student.id) set.add(found.student.id);
+        if (found.student.code) {
+          set.add(found.student.code);
+          set.add(`stu-${found.student.code}`);
+        }
+        if (found.student.studentCode) {
+          set.add(found.student.studentCode);
+          set.add(`stu-${found.student.studentCode}`);
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    return Array.from(set);
+  },
+
   stateKey(studentId: string): string {
     return `${GACHA_STATE_KEY_PREFIX}${studentId}`;
   },
 
-  /** อ่านสถานะกาชาของนักเรียน (ยังไม่เคยเล่น = ค่าเริ่มต้นตามที่แอดมินตั้ง และยังไม่เขียนลงที่เก็บ) */
+  /** อ่านสถานะกาชาของนักเรียน (ค้นหาทั้งรหัส ID และรหัสประจำตัว เพื่อไม่ให้ตั๋ว/รางวัลที่ได้รับตกหล่น) */
   getState(studentId?: string): GachaState {
     const targetStudentId = studentId || this.getCurrentStudentId();
+    const candidateIds = this.resolveStudentCandidateIds(targetStudentId);
+
     if (typeof localStorage !== 'undefined') {
-      try {
-        const raw = localStorage.getItem(this.stateKey(targetStudentId));
-        if (raw) return normalizeState(JSON.parse(raw), targetStudentId);
-      } catch {
-        // ข้อมูลเสียหาย → เริ่มใหม่
+      for (const cand of candidateIds) {
+        try {
+          const raw = localStorage.getItem(this.stateKey(cand));
+          if (raw) {
+            const parsed = normalizeState(JSON.parse(raw), targetStudentId);
+            // ซิงค์คัดลอกสถานะไปยัง targetStudentId หากค้นพบจากรหัสแฝง
+            if (cand !== targetStudentId) {
+              localStorage.setItem(this.stateKey(targetStudentId), JSON.stringify(parsed));
+            }
+            return parsed;
+          }
+        } catch {
+          // ลองตรวจสอบ candidate ถัดไป
+        }
       }
     }
     return buildInitialState(targetStudentId);
   },
 
   hasStoredState(studentId: string): boolean {
-    return typeof localStorage !== 'undefined' && localStorage.getItem(this.stateKey(studentId)) !== null;
+    if (typeof localStorage === 'undefined') return false;
+    const candidates = this.resolveStudentCandidateIds(studentId);
+    return candidates.some((cand) => localStorage.getItem(this.stateKey(cand)) !== null);
   },
 
   saveState(state: GachaState): void {
     const toSave: GachaState = { ...state, updatedAt: nowIso() };
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(this.stateKey(state.studentId), JSON.stringify(toSave));
+
+      // ซิงค์คัดลอกสถานะไปยัง alias keys ทั้งหมด (เช่น studentCode <-> id) เพื่อให้เข้าถึงได้จากทุกมุมมอง
+      const candidateIds = this.resolveStudentCandidateIds(state.studentId);
+      for (const cand of candidateIds) {
+        if (cand !== state.studentId) {
+          localStorage.setItem(this.stateKey(cand), JSON.stringify({ ...toSave, studentId: cand }));
+        }
+      }
     }
-    if (typeof window !== 'undefined' && state.studentId === this.getCurrentStudentId()) {
+    if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent(BUDDY_CHANGED_EVENT, { detail: toSave }));
+      window.dispatchEvent(new CustomEvent(GACHA_STATE_UPDATED_EVENT, { detail: toSave }));
+      window.dispatchEvent(new CustomEvent('kps-data-sync-event', { detail: { type: 'gacha', studentId: state.studentId } }));
     }
   },
 
   removeState(studentId: string): void {
-    if (typeof localStorage !== 'undefined') localStorage.removeItem(this.stateKey(studentId));
+    if (typeof localStorage !== 'undefined') {
+      const candidates = this.resolveStudentCandidateIds(studentId);
+      for (const cand of candidates) {
+        localStorage.removeItem(this.stateKey(cand));
+      }
+    }
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent(BUDDY_CHANGED_EVENT, { detail: null }));
+      window.dispatchEvent(new CustomEvent(GACHA_STATE_UPDATED_EVENT, { detail: null }));
     }
   },
 

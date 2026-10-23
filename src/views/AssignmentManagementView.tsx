@@ -361,7 +361,9 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     setFormScopeMode(
       prefill?.targetClassrooms && prefill.targetClassrooms.length > 0
         ? 'SELECTED_ROOMS'
-        : 'ALL_SUBJECT_ROOMS'
+        : selectedRoom !== 'ALL'
+          ? 'SELECTED_ROOMS'
+          : 'ALL_SUBJECT_ROOMS'
     );
     setFormSelectedRooms(
       prefill?.targetClassrooms ||
@@ -456,6 +458,13 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       editingAssignment?.courseName ||
       currentFormSubject.courseName;
 
+    const roomSuffix =
+      targetRooms.length === 1 && targetRooms[0] !== 'ALL'
+        ? `-${targetRooms[0].replace(/[^a-zA-Z0-9ก-๙]/g, '')}`
+        : '';
+    const resolvedGeneratedUnitId =
+      formUnitId || `unit-${formUnitTitle.trim().toLowerCase().replace(/\s+/g, '-')}${roomSuffix}`;
+
     if (editingAssignment) {
       sgsRosterAndSubmissionService.updateTermAssignment(editingAssignment.id, {
         title: formTitle.trim(),
@@ -471,7 +480,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         targetClassrooms: targetRooms,
         unitId:
           formAssignmentMode === 'UNIT_BUNDLE' && formUnitTitle.trim()
-            ? formUnitId || `unit-${formUnitTitle.trim().toLowerCase().replace(/\s+/g, '-')}`
+            ? resolvedGeneratedUnitId
             : undefined,
         unitTitle: formAssignmentMode === 'UNIT_BUNDLE' ? formUnitTitle.trim() : undefined,
         unitMaxScore:
@@ -503,7 +512,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         targetClassrooms: targetRooms,
         unitId:
           formAssignmentMode === 'UNIT_BUNDLE' && formUnitTitle.trim()
-            ? formUnitId || `unit-${formUnitTitle.trim().toLowerCase().replace(/\s+/g, '-')}`
+            ? resolvedGeneratedUnitId
             : undefined,
         unitTitle: formAssignmentMode === 'UNIT_BUNDLE' ? formUnitTitle.trim() : undefined,
         unitMaxScore:

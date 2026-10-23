@@ -409,5 +409,29 @@ describe('Gacha Ecosystem Comprehensive Tests', () => {
         expect(gachaService.getState(sid).starShards).toBe(80);
       }
     });
+
+    it('resolves student code and student UUID so granted coupons/tickets are received regardless of query identifier', () => {
+      const studentCode = '55001';
+      const studentUuid = 'usr-stu-cly01';
+
+      // Simulate logged in student with UUID & studentCode
+      localStorage.setItem('cls_current_auth_user', JSON.stringify({
+        id: studentUuid,
+        studentCode: studentCode,
+        role: 'STUDENT',
+      }));
+
+      // Admin grants 5 tickets using studentCode '55001'
+      const grantRes = gachaAdminService.grantTickets(studentCode, 5, 'รางวัลตอบคำถาม');
+      expect(grantRes.ok).toBe(true);
+
+      // Student checks tickets using UUID
+      const stateByUuid = gachaService.getState(studentUuid);
+      expect(stateByUuid.tickets).toBeGreaterThanOrEqual(5);
+
+      // Student checks tickets using getCurrentStudentId()
+      const stateCurrent = gachaService.getState();
+      expect(stateCurrent.tickets).toBeGreaterThanOrEqual(5);
+    });
   });
 });
