@@ -46,6 +46,7 @@ import { getSubjectIcon } from '../config/subjectIcons';
 import {
   sgsRosterAndSubmissionService,
   matchSubmissionToAssignment,
+  resolveStudentIdentity,
   type CourseScoreWeights,
 } from '../services/sgsRosterAndSubmissionService';
 import { studentAffairsCouncilService } from '../services/studentAffairsCouncilService';
@@ -84,7 +85,43 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
 }) => {
   const settings = schoolSettings || getSchoolSettings();
   const studentName = currentUser?.name || 'นักเรียน';
-  const studentRoom = formatClassroomLabel(currentUser?.classroomId);
+
+  const [refreshKey, setRefreshKey] = useState(0);
+  useEffect(() => {
+    const handleUpdate = () => setRefreshKey((k) => k + 1);
+    window.addEventListener('kp-sgs-roster-updated', handleUpdate);
+    window.addEventListener('kp-grading-queue-updated', handleUpdate);
+    window.addEventListener('kp:sgs-score-bridged', handleUpdate);
+    window.addEventListener('kp-copilot-updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('kp-sgs-roster-updated', handleUpdate);
+      window.removeEventListener('kp-grading-queue-updated', handleUpdate);
+      window.removeEventListener('kp:sgs-score-bridged', handleUpdate);
+      window.removeEventListener('kp-copilot-updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
+  const identity = useMemo(() => {
+    const roster = sgsRosterAndSubmissionService.getRoster();
+    return resolveStudentIdentity(
+      {
+        id: currentUser?.id,
+        studentCode: currentUser?.studentCode || (currentUser as any)?.code,
+      },
+      roster
+    );
+  }, [currentUser, refreshKey]);
+
+  const studentCode = identity?.studentCode || currentUser?.studentCode || (currentUser as any)?.code || '';
+  const studentRoom =
+    formatClassroomLabel(
+      currentUser?.classroomName ||
+        currentUser?.classroomId ||
+        identity?.student?.classroom ||
+        identity?.student?.classroomId
+    ) || '';
 
   // 1. Term / Academic Year Selector State
   const terms = academicCalendarService.getTerms();
@@ -100,28 +137,14 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
   // 3. Teacher Evaluation Modal State
   const [evalModalTeacher, setEvalModalTeacher] = useState<SubjectGradeItem | null>(null);
 
-  const [refreshKey, setRefreshKey] = useState(0);
-  useEffect(() => {
-    const handleUpdate = () => setRefreshKey((k) => k + 1);
-    window.addEventListener('kp-sgs-roster-updated', handleUpdate);
-    window.addEventListener('kp-copilot-updated', handleUpdate);
-    window.addEventListener('storage', handleUpdate);
-    return () => {
-      window.removeEventListener('kp-sgs-roster-updated', handleUpdate);
-      window.removeEventListener('kp-copilot-updated', handleUpdate);
-      window.removeEventListener('storage', handleUpdate);
-    };
-  }, []);
-
-  const studentCode = currentUser?.studentCode || 'STD-001';
-
   // Real roster student
   const rosterStudent = useMemo(() => {
+    if (!studentCode && !studentRoom) return null;
     return (
       sgsRosterAndSubmissionService.getSgsRoster(studentRoom).find((s) => s.studentCode === studentCode) || {
         sgsSeatNo: 1,
         studentCode,
-        studentName: currentUser?.name || 'นักเรียน',
+        studentName: currentUser?.name || identity?.student?.name || 'นักเรียน',
         gender: 'MALE' as const,
         classroom: studentRoom,
         transferState: 'ACTIVE' as const,
@@ -131,7 +154,7 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
         finalScore: 0,
       }
     );
-  }, [studentRoom, studentCode, currentUser, refreshKey]);
+  }, [studentRoom, studentCode, currentUser, identity, refreshKey]);
 
   // Dynamic Subjects List (Zero Mock Data: checks coursesCurriculumService and real grades with 4 parts)
   const subjectsList: SubjectGradeItem[] = useMemo(() => {

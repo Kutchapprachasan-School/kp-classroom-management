@@ -128,8 +128,11 @@
 #### 🗂️ ตาราง/View: `Account` (1 จุดเรียกใช้)
 - **[READ:SELECT]** [`src/services/authService.ts:81`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L81)
 
-#### 🗂️ ตาราง/View: `AssessmentColumn` (2 จุดเรียกใช้)
+#### 🗂️ ตาราง/View: `AssessmentColumn` (5 จุดเรียกใช้)
 - **[READ:SELECT]** [`src/services/gradeService.ts:386`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L386)
+- **[WRITE:UPSERT]** [`src/services/gradeService.ts:496`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L496)
+- **[READ:SELECT]** [`src/services/gradeService.ts:542`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L542)
+- **[WRITE:UPSERT]** [`src/services/gradeService.ts:573`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L573)
 - **[READ:SELECT]** [`src/services/studentEnrollmentService.ts:124`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentEnrollmentService.ts#L124)
 
 #### 🗂️ ตาราง/View: `Assignment` (4 จุดเรียกใช้)
@@ -143,9 +146,9 @@
 - **[WRITE:UPSERT]** [`src/services/attendanceService.ts:593`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/attendanceService.ts#L593)
 
 #### 🗂️ ตาราง/View: `BehaviorRecord` (3 จุดเรียกใช้)
-- **[READ:SELECT]** [`src/services/behaviorService.ts:72`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/behaviorService.ts#L72)
-- **[WRITE:INSERT]** [`src/services/behaviorService.ts:116`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/behaviorService.ts#L116)
-- **[WRITE:DELETE]** [`src/services/behaviorService.ts:143`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/behaviorService.ts#L143)
+- **[READ:SELECT]** [`src/services/behaviorService.ts:73`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/behaviorService.ts#L73)
+- **[WRITE:INSERT]** [`src/services/behaviorService.ts:119`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/behaviorService.ts#L119)
+- **[WRITE:DELETE]** [`src/services/behaviorService.ts:151`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/behaviorService.ts#L151)
 
 #### 🗂️ ตาราง/View: `ClassRoom` (8 จุดเรียกใช้)
 - **[READ:SELECT]** [`src/services/classroomService.ts:276`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L276)
@@ -229,7 +232,7 @@
 
 #### 🗂️ ตาราง/View: `StudentScore` (3 จุดเรียกใช้)
 - **[READ:SELECT]** [`src/services/gradeService.ts:402`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L402)
-- **[WRITE:UPSERT]** [`src/services/gradeService.ts:495`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L495)
+- **[WRITE:UPSERT]** [`src/services/gradeService.ts:580`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L580)
 - **[READ:SELECT]** [`src/services/studentEnrollmentService.ts:112`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentEnrollmentService.ts#L112)
 
 #### 🗂️ ตาราง/View: `SystemSettings` (4 จุดเรียกใช้)
@@ -254,8 +257,8 @@
 - **[READ:SELECT]** [`src/services/classroomService.ts:141`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L141)
 
 #### 🗂️ ตาราง/View: `XpTransaction` (2 จุดเรียกใช้)
-- **[WRITE:INSERT]** [`src/services/behaviorService.ts:186`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/behaviorService.ts#L186)
-- **[READ:SELECT]** [`src/services/behaviorService.ts:204`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/behaviorService.ts#L204)
+- **[WRITE:INSERT]** [`src/services/behaviorService.ts:194`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/behaviorService.ts#L194)
+- **[READ:SELECT]** [`src/services/behaviorService.ts:212`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/behaviorService.ts#L212)
 
 ### 4.2 PostgreSQL RPCs ที่เรียกใช้ในระบบจัดการชั้นเรียน
 - **RPC `execute_student_promotion_batch()`**:

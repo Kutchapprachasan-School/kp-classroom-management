@@ -221,7 +221,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
 
       const sgsQuests: ExtendedStudentQuestItem[] = termAssignments.map((asg) => {
         const sub = allSubmissions.find((s) => s.studentCode === studentCode && matchSubmissionToAssignment(s, asg));
-        const isReturnedForRevision = sub?.status === 'RETURNED_REVISION';
+        const isReturnedForRevision = sub?.status === 'RETURNED_REVISION' || (sub?.status as string) === 'RETURNED';
         const isSubmitted =
           !!sub &&
           !isReturnedForRevision &&

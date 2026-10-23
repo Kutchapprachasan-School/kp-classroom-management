@@ -119,7 +119,7 @@ export const HOMEROOM_ADVISORY = {
 // ============================================================================
 // 1. Data Model for FIFO Grading Queue (ใครส่งก่อนอยู่บนสุด)
 // ============================================================================
-export type SubmissionChannelType = 'IMAGE_UPLOAD' | 'PDF_UPLOAD' | 'LINK_URL';
+export type SubmissionChannelType = 'IMAGE_UPLOAD' | 'PDF_UPLOAD' | 'LINK_URL' | 'TEXT_RESPONSE';
 
 export interface GradingQueueItem {
   id: string;
@@ -376,6 +376,8 @@ export const teacherCourseAssignmentService = {
           else platform = 'OTHER';
         } else if (sub.r2ObjectKey?.endsWith('.pdf') || (sub.workAttachmentLabel && sub.workAttachmentLabel.toLowerCase().includes('.pdf'))) {
           channel = 'PDF_UPLOAD';
+        } else if (sub.textContent && !sub.fileUrl && !sub.fileDataUrl) {
+          channel = 'TEXT_RESPONSE';
         }
 
         const cleanFileName = sub.r2ObjectKey ? sub.r2ObjectKey.split('/').pop() : undefined;
@@ -445,6 +447,7 @@ export const teacherCourseAssignmentService = {
           externalPlatform: platform || savedMatch?.externalPlatform,
           status: isGraded ? 'GRADED' : isReturned ? 'RETURNED' : 'PENDING_REVIEW',
           score,
+          textContent: sub.textContent || savedMatch?.textContent,
           teacherFeedback: feedback,
           gradedAtText: savedMatch?.gradedAtText,
           studentAvatarUrl: savedMatch?.studentAvatarUrl || (stu as any)?.avatarUrl || (foundInService?.student as any)?.avatarUrl,

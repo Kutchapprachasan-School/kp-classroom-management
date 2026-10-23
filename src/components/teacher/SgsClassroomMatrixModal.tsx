@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import {
   sgsRosterAndSubmissionService,
+  isSameClassroom,
+  matchSubmissionToAssignment,
   type SgsStudentRecord,
   type TermAssignmentItem,
   type StudentWorkSubmission,
@@ -85,12 +87,15 @@ export const SgsClassroomMatrixModal: React.FC<SgsClassroomMatrixModalProps> = (
   }, [isOpen]);
 
   const roster: SgsStudentRecord[] = useMemo(() => {
-    return sgsRosterAndSubmissionService.getSgsRoster();
+    return sgsRosterAndSubmissionService.getSgsRoster(selectedRoom);
   }, [selectedRoom, isOpen, version]);
 
   const termAssignments: TermAssignmentItem[] = useMemo(() => {
-    return sgsRosterAndSubmissionService.getTermAssignments();
-  }, [isOpen, version]);
+    return sgsRosterAndSubmissionService.getTermAssignments(
+      selectedSubjectCode === 'ALL' ? undefined : selectedSubjectCode,
+      selectedRoom
+    );
+  }, [selectedSubjectCode, selectedRoom, isOpen, version]);
 
   const submissions: StudentWorkSubmission[] = useMemo(() => {
     return sgsRosterAndSubmissionService.getSubmissions();
@@ -100,7 +105,7 @@ export const SgsClassroomMatrixModal: React.FC<SgsClassroomMatrixModalProps> = (
     return roster
       .filter((stu) => {
         if (stu.transferState === 'TRANSFERRED_OUT') return false;
-        if (selectedRoom && stu.classroom !== selectedRoom) return false;
+        if (selectedRoom && !isSameClassroom(stu.classroom, selectedRoom)) return false;
         if (searchTerm.trim()) {
           const q = searchTerm.toLowerCase();
           return (
@@ -280,17 +285,11 @@ export const SgsClassroomMatrixModal: React.FC<SgsClassroomMatrixModalProps> = (
                         </td>
                         {termAssignments.map((asg) => {
                           const cleanStuCode = String(stu.studentCode).trim();
-                          const sub = submissions.find((s) => {
-                            if (String(s.studentCode).trim() !== cleanStuCode) return false;
-                            if (s.assignmentId === asg.id) return true;
-                            if (asg.unitId && s.assignmentId === asg.unitId) return true;
-                            if (s.workTitle && asg.title) {
-                              const cleanSub = s.workTitle.trim().toLowerCase();
-                              const cleanAsg = asg.title.trim().toLowerCase();
-                              return cleanSub === cleanAsg || cleanSub.includes(cleanAsg) || cleanAsg.includes(cleanSub);
-                            }
-                            return false;
-                          });
+                          const sub = submissions.find(
+                            (s) =>
+                              String(s.studentCode).trim() === cleanStuCode &&
+                              matchSubmissionToAssignment(s, asg)
+                          );
                           const score = sub?.score ?? (sub?.status === 'GRADED' ? asg.maxScore : null);
                           if (score !== null && score !== undefined) {
                             studentTotalScore += score;

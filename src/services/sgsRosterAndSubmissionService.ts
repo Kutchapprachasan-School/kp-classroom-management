@@ -1471,8 +1471,17 @@ export const sgsRosterAndSubmissionService = {
         roster
       );
 
-      // หากหาใน Roster ปัจจุบันไม่เจอ ให้ใช้ studentId ที่ส่งมา (ถ้ามี) แต่ไม่ใช้ studentCode 5 หลักสวมรอยเป็น UUID
-      const resolvedStudentId = identity?.studentId || params.studentId;
+      // หากหาใน Roster ปัจจุบันไม่เจอ ให้ค้นหาจาก studentService หรือ studentId ที่ส่งมา
+      let resolvedStudentId = identity?.studentId || params.studentId;
+      if (!resolvedStudentId && params.studentCode) {
+        const foundStu = studentService.findStudentByCode(params.studentCode);
+        if (foundStu?.student?.id) {
+          resolvedStudentId = foundStu.student.id;
+        } else {
+          resolvedStudentId = `stu-${params.studentCode}`;
+        }
+      }
+
       if (!resolvedStudentId || !params.assignmentId) {
         console.warn(
           `[ScoreBridge] ข้ามการซิงค์คะแนนเนื่องจากไม่พบ UUID ของนักเรียน (studentCode: ${params.studentCode})`
@@ -1537,6 +1546,7 @@ export const sgsRosterAndSubmissionService = {
     courseCode?: string;
     workTitle?: string;
     fileUrl?: string;
+    externalLinkUrl?: string;
     textContent?: string;
     status: 'PENDING_REVIEW' | 'GRADED' | 'RETURNED_REVISION' | 'RETURNED';
     score?: number | null;
@@ -1574,6 +1584,7 @@ export const sgsRosterAndSubmissionService = {
           score: params.score !== undefined ? params.score : current.score,
           feedback: params.feedback !== undefined ? params.feedback : current.feedback,
           fileUrl: params.fileUrl || current.fileUrl,
+          externalLinkUrl: params.externalLinkUrl || current.externalLinkUrl,
           textContent: params.textContent || current.textContent,
           // หากนักเรียนส่งงานใหม่หรือส่งงานซ่อม ให้รีเซ็ตเวลาส่งเพื่อให้เข้าคิว FIFO รอตรวจของครูทันที
           submittedTimestamp:
@@ -1600,6 +1611,7 @@ export const sgsRosterAndSubmissionService = {
           courseCode: params.courseCode || '',
           workTitle: params.workTitle || '',
           fileUrl: params.fileUrl || '',
+          externalLinkUrl: params.externalLinkUrl || '',
           textContent: params.textContent || '',
           status: queueStatus,
           score: params.score ?? null,
@@ -2096,12 +2108,16 @@ export const sgsRosterAndSubmissionService = {
     const manualMid =
       courseOverride?.midterm !== undefined
         ? courseOverride.midterm
+        : midFromWorks > 0
+        ? null
         : typeof student.midtermScore === 'number'
         ? student.midtermScore
         : null;
     const manualFinal =
       courseOverride?.final !== undefined
         ? courseOverride.final
+        : finalFromWorks > 0
+        ? null
         : typeof student.finalScore === 'number'
         ? student.finalScore
         : null;
@@ -2846,6 +2862,7 @@ export const sgsRosterAndSubmissionService = {
       courseCode: resolvedCourseCode,
       workTitle: payload.workTitle,
       fileUrl: submissionRecord.fileUrl,
+      externalLinkUrl: payload.externalLinkUrl,
       textContent: payload.textContent,
       status: 'PENDING_REVIEW',
       isResubmission: submissionRecord.isResubmission,

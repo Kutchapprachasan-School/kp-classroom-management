@@ -108,11 +108,15 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
     };
     window.addEventListener('kp-sgs-roster-updated', handleUpdate);
     window.addEventListener('kp-grading-queue-updated', handleUpdate);
+    window.addEventListener('kp:sgs-score-bridged', handleUpdate);
     window.addEventListener('kps-data-sync-event', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
     return () => {
       window.removeEventListener('kp-sgs-roster-updated', handleUpdate);
       window.removeEventListener('kp-grading-queue-updated', handleUpdate);
+      window.removeEventListener('kp:sgs-score-bridged', handleUpdate);
       window.removeEventListener('kps-data-sync-event', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
     };
   }, [refreshTermAssignments, refreshMatrixStudents]);
 
