@@ -13,6 +13,12 @@
 
 import { getBangkokTodayString } from '../utils/timetableDateUtils.ts';
 import { academicCalendarService } from './academicCalendarService.ts';
+import {
+  attendanceService,
+  localAttendanceDb,
+  type AttendanceRecord,
+  type AttendanceStatus,
+} from './attendanceService.ts';
 
 export type AttendanceStatusCode =
   | 'PRESENT'   // มาเรียน / มาแถวปกติ (ได้เวลาเรียน 100%)
@@ -291,6 +297,23 @@ export const defaultMockLeaves: ApprovedStudentLeave[] = [];
 // ----------------------------------------------------
 // Smart Attendance Correlation Engine Service
 // ----------------------------------------------------
+export function mapToAttendanceStatus(code: AttendanceStatusCode): AttendanceStatus {
+  switch (code) {
+    case 'PRESENT':
+      return 'PRESENT';
+    case 'LATE':
+      return 'LATE';
+    case 'LEAVE':
+      return 'LEAVE';
+    case 'ACTIVITY':
+      return 'ACTIVITY';
+    case 'ABSENT':
+    case 'TRUANCY':
+    default:
+      return 'ABSENT';
+  }
+}
+
 export const attendanceCorrelationService = {
   /**
    * Reset all storage to test fixture state (for verification suites)
@@ -397,6 +420,38 @@ export const attendanceCorrelationService = {
     }
 
     writeStorage(STORAGE_KEYS.MORNING_ASSEMBLY, resultList);
+
+    // ✅ Bridge ซิงค์เข้า IndexedDB Outbox ของ attendanceService เพื่อเตรียม Push ขึ้น Neon PostgreSQL
+    // และ Trigger ซิงค์เข้า "StudentMorningAttendance" ของระบบ SMS
+    try {
+      const dirtyAttendanceRecords: AttendanceRecord[] = records.map((rec) => {
+        const studentId = rec.studentId || (rec.studentCode ? `stu-${rec.studentCode}` : 'unknown');
+        const date = rec.date || getBangkokTodayString();
+        const period = 0;
+        return {
+          id: `${studentId}_${date}_${period}`,
+          studentId,
+          classroomId: rec.classroomId || '',
+          date,
+          period,
+          courseId: null,
+          status: mapToAttendanceStatus(rec.status),
+          remark: rec.overrideReason || rec.correlationNote || null,
+          recordedBy: rec.overrideBy || 'ครูที่ปรึกษา',
+          updatedAt: new Date().toISOString(),
+        };
+      });
+
+      if (dirtyAttendanceRecords.length > 0 && localAttendanceDb && typeof localAttendanceDb.stageDirtyRecords === 'function') {
+        void localAttendanceDb.stageDirtyRecords(dirtyAttendanceRecords).then(() => {
+          if (attendanceService && typeof attendanceService.scheduleDebouncedFlush === 'function') {
+            attendanceService.scheduleDebouncedFlush();
+          }
+        });
+      }
+    } catch (syncErr) {
+      console.warn('⚠️ [attendanceCorrelationService] Bridge morning attendance to outbox failed:', syncErr);
+    }
   },
 
   markMorningRecord(
@@ -612,6 +667,37 @@ export const attendanceCorrelationService = {
     }
 
     writeStorage(STORAGE_KEYS.PERIOD_ATTENDANCE, resultList);
+
+    // ✅ Bridge ซิงค์เข้า IndexedDB Outbox ของ attendanceService เพื่อเตรียม Push ขึ้น Neon PostgreSQL
+    try {
+      const dirtyAttendanceRecords: AttendanceRecord[] = records.map((rec) => {
+        const studentId = rec.studentId || (rec.studentCode ? `stu-${rec.studentCode}` : 'unknown');
+        const date = rec.date || getBangkokTodayString();
+        const period = typeof rec.periodNo === 'number' && rec.periodNo > 0 ? rec.periodNo : 1;
+        return {
+          id: `${studentId}_${date}_${period}`,
+          studentId,
+          classroomId: rec.classroomId || '',
+          date,
+          period,
+          courseId: rec.courseCode || null,
+          status: mapToAttendanceStatus(rec.status),
+          remark: rec.overrideReason || rec.correlationNote || null,
+          recordedBy: rec.overrideBy || 'ครูผู้สอน',
+          updatedAt: new Date().toISOString(),
+        };
+      });
+
+      if (dirtyAttendanceRecords.length > 0 && localAttendanceDb && typeof localAttendanceDb.stageDirtyRecords === 'function') {
+        void localAttendanceDb.stageDirtyRecords(dirtyAttendanceRecords).then(() => {
+          if (attendanceService && typeof attendanceService.scheduleDebouncedFlush === 'function') {
+            attendanceService.scheduleDebouncedFlush();
+          }
+        });
+      }
+    } catch (syncErr) {
+      console.warn('⚠️ [attendanceCorrelationService] Bridge period attendance to outbox failed:', syncErr);
+    }
   },
 
   markPeriodRecord(

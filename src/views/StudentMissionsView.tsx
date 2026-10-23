@@ -52,6 +52,7 @@ export interface ExtendedStudentQuestItem extends StudentQuestItem {
   isReturnedForRevision?: boolean;
   returnReason?: string;
   teacherFeedback?: string;
+  earnedScore?: number | null;
 }
 
 interface StudentMissionsViewProps {
@@ -260,6 +261,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
           isReturnedForRevision,
           returnReason: sub?.returnReason,
           teacherFeedback: sub?.teacherFeedback,
+          earnedScore: typeof sub?.score === 'number' ? sub.score : null,
         };
       });
 
@@ -651,13 +653,21 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                   <h4 className="font-bold text-[#163A66] text-sm">
                     {quest.title}
                   </h4>
-                  <div className="flex items-center gap-2 text-xs text-[#6B7C93]">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-[#6B7C93]">
                     <span className="flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5 text-slate-400" />
                       {quest.dueDateText}
                     </span>
                     <span>•</span>
                     <span>เต็ม {quest.maxScore} คะแนน</span>
+                    {typeof quest.earnedScore === 'number' && (
+                      <>
+                        <span>•</span>
+                        <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                          ✓ ได้รับ {quest.earnedScore}/{quest.maxScore} คะแนน
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -680,10 +690,12 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                       setSubmitLink(sub.externalLinkUrl || '');
                       setSelectedFileName(sub.workAttachmentLabel ? sub.workAttachmentLabel.replace('☁️ R2: ', '').split(' ')[0] : '');
                       setSelectedFileDataUrl(sub.fileDataUrl || sgsRosterAndSubmissionService.getSubmissionFileUrl(quest.id, studentCode) || null);
+                      setSubmitText(sub.textContent || '');
                     } else {
                       setSubmitLink('');
                       setSelectedFileName('');
                       setSelectedFileDataUrl(null);
+                      setSubmitText('');
                     }
                   }}
                   className="px-4 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1 cursor-pointer"

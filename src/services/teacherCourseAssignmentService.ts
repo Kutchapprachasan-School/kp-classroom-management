@@ -339,6 +339,7 @@ export const teacherCourseAssignmentService = {
 
         const isResubmission = Boolean(sub.isResubmission || (savedMatch && savedMatch.isResubmission && sub.status === 'SUBMITTED_PENDING'));
         const isGraded = !isResubmission && (sub.status === 'GRADED' || (savedMatch && savedMatch.status === 'GRADED' && sub.status !== 'SUBMITTED_PENDING'));
+        const isReturned = !isResubmission && (sub.status === 'RETURNED_REVISION' || (savedMatch && (savedMatch.status === 'RETURNED' || (savedMatch as any).status === 'RETURNED_REVISION') && sub.status !== 'SUBMITTED_PENDING'));
         const score = isGraded ? (sub.score !== null && sub.score !== undefined ? sub.score : savedMatch?.score ?? null) : null;
         const feedback = sub.teacherFeedback || savedMatch?.teacherFeedback || '';
 
@@ -442,7 +443,7 @@ export const teacherCourseAssignmentService = {
           fileName: savedMatch?.fileName || cleanFileName,
           externalLinkUrl: sub.externalLinkUrl || savedMatch?.externalLinkUrl,
           externalPlatform: platform || savedMatch?.externalPlatform,
-          status: isGraded ? 'GRADED' : 'PENDING_REVIEW',
+          status: isGraded ? 'GRADED' : isReturned ? 'RETURNED' : 'PENDING_REVIEW',
           score,
           teacherFeedback: feedback,
           gradedAtText: savedMatch?.gradedAtText,
@@ -535,7 +536,8 @@ export const teacherCourseAssignmentService = {
         (targetItem as GradingQueueItem).assignmentId,
         (targetItem as GradingQueueItem).studentCode,
         score,
-        'GRADED'
+        'GRADED',
+        feedback
       );
     } else {
       // Fallback parsing for direct pair IDs (e.g. q_asg-1_45101)
@@ -555,7 +557,7 @@ export const teacherCourseAssignmentService = {
         }
       }
       if (asgId && stuCode) {
-        sgsRosterAndSubmissionService.gradeSubmission(asgId, stuCode, score, 'GRADED');
+        sgsRosterAndSubmissionService.gradeSubmission(asgId, stuCode, score, 'GRADED', feedback);
       }
     }
 
@@ -574,7 +576,10 @@ export const teacherCourseAssignmentService = {
     let targetItem: GradingQueueItem | null = null;
     const note = `[ส่งงานกลับเนื่องจาก: ${reason}] ${feedback || ''}`.trim();
     const updated = list.map((item) => {
-      if (item.id === queueId || item.id === `q_${queueId}`) {
+      const isPairMatch =
+        (queueId.startsWith('q_') && queueId.slice(2) === `${item.assignmentId}_${item.studentCode}`) ||
+        queueId === `${item.assignmentId}_${item.studentCode}`;
+      if (item.id === queueId || item.id === `q_${queueId}` || isPairMatch) {
         targetItem = {
           ...item,
           status: 'RETURNED' as any,
@@ -595,6 +600,25 @@ export const teacherCourseAssignmentService = {
         reason,
         feedback
       );
+    } else {
+      let asgId: string | undefined;
+      let stuCode: string | undefined;
+      if (queueId.startsWith('q_')) {
+        const parts = queueId.slice(2).split('_');
+        if (parts.length >= 2) {
+          stuCode = parts.pop();
+          asgId = parts.join('_');
+        }
+      } else if (queueId.includes('_')) {
+        const parts = queueId.split('_');
+        if (parts.length >= 2) {
+          stuCode = parts.pop();
+          asgId = parts.join('_');
+        }
+      }
+      if (asgId && stuCode) {
+        sgsRosterAndSubmissionService.returnSubmissionForRevision(asgId, stuCode, reason, feedback);
+      }
     }
 
     const nextPending = updated.find((it) => it.status === 'PENDING_REVIEW') || null;

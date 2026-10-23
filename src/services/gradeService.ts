@@ -11,7 +11,7 @@
 // 7. OBEC/สพฐ. Compliant Grading: Accumulates raw weights and flags missing midterm/final exams as 'ร'
 // 8. Zero-Egress Upsert: Upserts directly via ON CONFLICT without .select() returning 0 bytes egress
 
-import { supabase } from '../lib/supabase.ts';
+import { supabase, isSupabaseConfigured } from '../lib/supabase.ts';
 
 export interface AssessmentColumn {
   id: string;
@@ -461,6 +461,47 @@ export const gradeService = {
     return this.updateStudentScore(studentId, assignmentId, scoreValue);
   },
 
+  /**
+   * ลงทะเบียนหรืออัปเดต AssessmentColumn ทั้งใน IndexedDB และ Supabase
+   * เพื่อป้องกัน Foreign Key Constraint Error (StudentScore -> AssessmentColumn)
+   */
+  async ensureAssessmentColumn(column: {
+    id: string;
+    courseId: string;
+    classroomId?: string | null;
+    academicYear?: number;
+    semester?: number;
+    title: string;
+    maxScore?: number;
+    weight?: number;
+    category?: 'HW' | 'MIDTERM' | 'FINAL' | 'OTHER';
+  }): Promise<AssessmentColumn> {
+    const colRecord: AssessmentColumn = {
+      id: column.id,
+      courseId: column.courseId || 'GENERAL',
+      classroomId: column.classroomId || null,
+      academicYear: column.academicYear || 2569,
+      semester: column.semester || 1,
+      title: column.title || `ชิ้นงาน ${column.id}`,
+      maxScore: column.maxScore || 10,
+      weight: column.weight || column.maxScore || 10,
+      category: column.category || 'HW',
+      updatedAt: new Date().toISOString(),
+    };
+
+    await localGradeDb.putColumns([colRecord]);
+
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.from('AssessmentColumn').upsert([colRecord], { onConflict: 'id' });
+      } catch (err) {
+        console.warn('⚠️ [gradeService] Could not upsert AssessmentColumn to Supabase:', err);
+      }
+    }
+
+    return colRecord;
+  },
+
   scheduleDebouncedFlush() {
     if (flushTimer) clearTimeout(flushTimer);
     flushTimer = setTimeout(() => {
@@ -492,12 +533,57 @@ export const gradeService = {
       for (let i = 0; i < pending.length; i += BATCH_SIZE) {
         const batch = pending.slice(i, i + BATCH_SIZE);
 
-        const { error } = await supabase.from('StudentScore').upsert(batch, {
-          onConflict: 'studentId,assignmentId',
-          ignoreDuplicates: false,
-        });
+        if (isSupabaseConfigured) {
+          // ✅ ป้องกัน Foreign Key Constraint: ตรวจสอบและสร้าง AssessmentColumn ที่ยังไม่มีอยู่ก่อน
+          const uniqueAsgIds = Array.from(new Set(batch.map((b) => b.assignmentId).filter(Boolean)));
+          if (uniqueAsgIds.length > 0) {
+            try {
+              const { data: existingCols } = await supabase
+                .from('AssessmentColumn')
+                .select('id')
+                .in('id', uniqueAsgIds);
+              const existingSet = new Set((existingCols || []).map((c: any) => c.id));
+              const missingIds = uniqueAsgIds.filter((id) => !existingSet.has(id));
 
-        if (error) throw error;
+              if (missingIds.length > 0) {
+                let termAsgs: any[] = [];
+                try {
+                  const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('kp_sgs_term_assignments') : null;
+                  if (raw) termAsgs = JSON.parse(raw);
+                } catch {
+                  // ignore
+                }
+
+                const colsToInsert = missingIds.map((colId) => {
+                  const asg = termAsgs.find((a: any) => a.id === colId);
+                  return {
+                    id: colId,
+                    courseId: asg?.courseCode || 'GENERAL',
+                    classroomId: asg?.targetClassrooms?.[0] !== 'ALL' ? asg?.targetClassrooms?.[0] : null,
+                    academicYear: 2569,
+                    semester: 1,
+                    title: asg?.title || `ชิ้นงาน (${colId})`,
+                    maxScore: Number(asg?.maxScore) || 10,
+                    weight: Number(asg?.maxScore) || 10,
+                    category: asg?.scorePart === 'MIDTERM' ? 'MIDTERM' : (asg?.scorePart === 'FINAL' ? 'FINAL' : 'HW'),
+                    updatedAt: new Date().toISOString(),
+                  };
+                });
+
+                await supabase.from('AssessmentColumn').upsert(colsToInsert, { onConflict: 'id' });
+              }
+            } catch (colErr) {
+              console.warn('⚠️ [gradeService] ensure AssessmentColumn pre-flight warning:', colErr);
+            }
+          }
+
+          const { error } = await supabase.from('StudentScore').upsert(batch, {
+            onConflict: 'studentId,assignmentId',
+            ignoreDuplicates: false,
+          });
+
+          if (error) throw error;
+        }
 
         // ✅ ลบเฉพาะแถวที่ updatedAt ยังตรงกับชุดที่เพิ่งส่งผ่าน
         await localGradeDb.removeSyncedOutbox(batch);
@@ -555,14 +641,15 @@ export const gradeService = {
       return { totalScore: Number(finalScore.toFixed(2)), grade: 'ร', isIncomplete: true };
     }
 
+    const roundedScore = Math.round(finalScore);
     let grade = '0';
-    if (finalScore >= 80) grade = '4';
-    else if (finalScore >= 75) grade = '3.5';
-    else if (finalScore >= 70) grade = '3';
-    else if (finalScore >= 65) grade = '2.5';
-    else if (finalScore >= 60) grade = '2';
-    else if (finalScore >= 55) grade = '1.5';
-    else if (finalScore >= 50) grade = '1';
+    if (roundedScore >= 80) grade = '4';
+    else if (roundedScore >= 75) grade = '3.5';
+    else if (roundedScore >= 70) grade = '3';
+    else if (roundedScore >= 65) grade = '2.5';
+    else if (roundedScore >= 60) grade = '2';
+    else if (roundedScore >= 55) grade = '1.5';
+    else if (roundedScore >= 50) grade = '1';
     else grade = '0';
 
     return { totalScore: Number(finalScore.toFixed(2)), grade, isIncomplete: false };

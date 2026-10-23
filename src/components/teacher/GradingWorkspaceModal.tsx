@@ -13,6 +13,7 @@ import {
   Plus,
   Layers,
   Upload,
+  Copy,
 } from 'lucide-react';
 import { ArtworkPreviewModal } from './ArtworkPreviewModal';
 import type { GradingQueueItem } from '../../services/teacherCourseAssignmentService';
@@ -81,6 +82,8 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
     void customStickersVersion;
     return getCustomFeedbackStickers(selectedStrand);
   }, [selectedStrand, customStickersVersion]);
+
+  const [copiedText, setCopiedText] = useState(false);
 
   // Sync inputs when item changes
   useEffect(() => {
@@ -153,6 +156,7 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
     (currentItem.fileName || '').endsWith('.pdf') ||
     (effectiveFileUrl && effectiveFileUrl.toLowerCase().includes('.pdf'))
   );
+  const hasText = Boolean(currentItem.textContent && currentItem.textContent.trim().length > 0);
 
   // ตรวจสอบและดึงชื่อจริง ชั้น เลขที่ของนักเรียน
   const resolvedStu = currentItem ? studentService.findStudentByCode(currentItem.studentCode) : null;
@@ -282,7 +286,45 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
             </div>
 
             {/* Viewer Display */}
-            <div className="flex-1 mt-3 rounded-2xl border border-slate-200 bg-slate-900/5 flex items-center justify-center overflow-auto p-2 min-h-[280px]">
+            <div className="flex-1 mt-3 rounded-2xl border border-slate-200 bg-slate-900/5 flex flex-col items-center justify-center overflow-auto p-3 min-h-[280px]">
+              {/* ข้อความคำตอบของนักเรียน (ถ้ามี) */}
+              {hasText && (
+                <div className="w-full max-w-lg p-4 sm:p-5 bg-white border border-blue-200 rounded-2xl shadow-xs space-y-3 text-left mb-3">
+                  <div className="flex items-center justify-between border-b border-blue-100 pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-bold">
+                        ✍️ ข้อความคำตอบของนักเรียน
+                      </span>
+                      <span className="text-xs text-slate-500">({resolvedName})</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(currentItem.textContent || '');
+                        setCopiedText(true);
+                        setTimeout(() => setCopiedText(false), 2000);
+                      }}
+                      className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold cursor-pointer flex items-center gap-1"
+                    >
+                      {copiedText ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="text-emerald-600 font-bold">คัดลอกแล้ว</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>คัดลอกข้อความ</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200 text-sm text-slate-800 font-medium whitespace-pre-wrap leading-relaxed max-h-[35vh] overflow-y-auto select-text">
+                    {currentItem.textContent}
+                  </div>
+                </div>
+              )}
+
               {isImage ? (
                 !imgError && effectiveFileUrl ? (
                   <div className="relative group max-h-[55vh] flex items-center justify-center">
@@ -425,7 +467,7 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
                     )}
                   </div>
                 )
-              ) : (
+              ) : !hasText ? (
                 <div className="p-6 text-center space-y-4 bg-indigo-50/60 border border-indigo-200 rounded-2xl w-full max-w-md">
                   <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mx-auto shadow-sm">
                     <Sparkles className="w-6 h-6 text-cyan-300" />
@@ -453,7 +495,7 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
                     </a>
                   )}
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
 

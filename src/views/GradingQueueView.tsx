@@ -10,6 +10,7 @@ import {
   Sparkles,
   FileSpreadsheet,
   BookOpen,
+  AlertCircle,
 } from 'lucide-react';
 import {
   sgsRosterAndSubmissionService,
@@ -47,7 +48,7 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
     initialSubjectCode || 'ALL'
   );
   const [selectedRoom, setSelectedRoom] = useState<string>(initialRoom || 'ALL');
-  const [selectedStatus, setSelectedStatus] = useState<'ALL' | 'PENDING' | 'GRADED'>('PENDING');
+  const [selectedStatus, setSelectedStatus] = useState<'ALL' | 'PENDING' | 'RETURNED' | 'GRADED'>('PENDING');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Queue Data
@@ -104,14 +105,16 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
   const stats = useMemo(() => {
     const total = scopedQueue.length;
     const pending = scopedQueue.filter((i) => i.status === 'PENDING_REVIEW').length;
+    const returned = scopedQueue.filter((i) => i.status === 'RETURNED' || (i as any).status === 'RETURNED_REVISION').length;
     const graded = scopedQueue.filter((i) => i.status === 'GRADED').length;
-    return { total, pending, graded };
+    return { total, pending, returned, graded };
   }, [scopedQueue]);
 
   // Filtered Items (by status & search)
   const filteredSubmissions = useMemo(() => {
     return scopedQueue.filter((item) => {
       if (selectedStatus === 'PENDING' && item.status !== 'PENDING_REVIEW') return false;
+      if (selectedStatus === 'RETURNED' && item.status !== 'RETURNED' && (item as any).status !== 'RETURNED_REVISION') return false;
       if (selectedStatus === 'GRADED' && item.status !== 'GRADED') return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -341,15 +344,17 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
         </div>
 
         {/* Status Pills */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 self-start sm:self-auto">
-          {(['ALL', 'PENDING', 'GRADED'] as const).map((st) => (
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 self-start sm:self-auto overflow-x-auto">
+          {(['ALL', 'PENDING', 'RETURNED', 'GRADED'] as const).map((st) => (
             <button
               key={st}
               type="button"
               onClick={() => setSelectedStatus(st)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 ${
                 selectedStatus === st
-                  ? 'bg-white text-[#3B82F6] shadow-xs'
+                  ? st === 'RETURNED'
+                    ? 'bg-amber-100 text-amber-900 shadow-xs'
+                    : 'bg-white text-[#3B82F6] shadow-xs'
                   : 'text-[#6B7C93] hover:text-[#163A66]'
               }`}
             >
@@ -357,6 +362,8 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
                 ? `ทั้งหมด (${stats.total})`
                 : st === 'PENDING'
                 ? `รอตรวจ (${stats.pending})`
+                : st === 'RETURNED'
+                ? `ส่งกลับแก้ไข (${stats.returned})`
                 : `ตรวจแล้ว (${stats.graded})`}
             </button>
           ))}
@@ -478,6 +485,11 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
                       <span className="px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center gap-1.5">
                         <Check className="w-3.5 h-3.5" />
                         <span>ตรวจแล้ว ({item.score}/{item.maxScore})</span>
+                      </span>
+                    ) : item.status === 'RETURNED' || (item as any).status === 'RETURNED_REVISION' ? (
+                      <span className="px-3.5 py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-300 text-xs font-bold flex items-center gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                        <span>ส่งกลับแก้ไขแล้ว</span>
                       </span>
                     ) : (
                       <button

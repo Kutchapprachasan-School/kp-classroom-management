@@ -200,12 +200,8 @@ export function matchSubmissionToAssignment(
   }
 
   // หากทั้งคู่มี assignmentId / id ระบุไว้ชัดเจนแล้วไม่ตรงกัน ห้ามจับคู่ข้ามงานย่อยเด็ดขาด
-  // (ป้องกันงานย่อยที่ 2, 3 ในหน่วยเดียวกันแย่งผลงานของงานย่อยที่ 1)
+  // (ป้องกันงานย่อยที่ 2, 3 ในหน่วยเดียวกันแย่งผลงานของงานย่อยที่ 1 หรือคิดคะแนนซ้ำซ้อน)
   if (sub.assignmentId && asg.id && sub.assignmentId !== asg.id) {
-    // ข้อยกเว้น: หากงานหนึ่งเป็นระดับหน่วย (asg.id === asg.unitId หรือ sub.assignmentId === asg.unitId)
-    if (asg.unitId && (sub.assignmentId === asg.unitId || asg.id === asg.unitId)) {
-      return true;
-    }
     return false;
   }
 
@@ -1491,6 +1487,18 @@ export const sgsRosterAndSubmissionService = {
 
       // ส่งเข้า IndexedDB Outbox ของ gradeService เพื่อเตรียม Push ขึ้น Neon PostgreSQL
       if (gradeService && typeof gradeService.setScore === 'function') {
+        // ลงทะเบียนโครงสร้าง AssessmentColumn ล่วงหน้าเพื่อป้องกัน Foreign Key Constraint
+        const targetAsg = this.getTermAssignments().find((a) => a.id === params.assignmentId);
+        if (targetAsg && typeof (gradeService as any).ensureAssessmentColumn === 'function') {
+          void (gradeService as any).ensureAssessmentColumn({
+            id: targetAsg.id,
+            courseId: targetAsg.courseCode || 'GENERAL',
+            classroomId: targetAsg.targetClassrooms?.[0] !== 'ALL' ? targetAsg.targetClassrooms?.[0] : null,
+            title: targetAsg.title,
+            maxScore: targetAsg.maxScore,
+            category: targetAsg.scorePart === 'MIDTERM' ? 'MIDTERM' : targetAsg.scorePart === 'FINAL' ? 'FINAL' : 'HW',
+          });
+        }
         gradeService.setScore(resolvedStudentId, params.assignmentId, sanitizedScore);
       }
 
@@ -2142,6 +2150,8 @@ export const sgsRosterAndSubmissionService = {
       manualFinal !== null ||
       effectiveAccumulated > 0;
 
+    const effectiveTotal = Math.round(total);
+
     if (hasRealAttendance && student.attendancePercent < 80) {
       gradeLabel = 'มส.';
     } else if (missingMandatoryTitles.length > 0) {
@@ -2149,19 +2159,19 @@ export const sgsRosterAndSubmissionService = {
       rReasonLabel = `ค้างงานสำคัญ (${missingMandatoryTitles.join(', ')})`;
     } else if (!hasAnyAssessment && total === 0) {
       gradeLabel = '—';
-    } else if (total >= 80) {
+    } else if (effectiveTotal >= 80) {
       gradeLabel = '4.0';
-    } else if (total >= 75) {
+    } else if (effectiveTotal >= 75) {
       gradeLabel = '3.5';
-    } else if (total >= 70) {
+    } else if (effectiveTotal >= 70) {
       gradeLabel = '3.0';
-    } else if (total >= 65) {
+    } else if (effectiveTotal >= 65) {
       gradeLabel = '2.5';
-    } else if (total >= 60) {
+    } else if (effectiveTotal >= 60) {
       gradeLabel = '2.0';
-    } else if (total >= 55) {
+    } else if (effectiveTotal >= 55) {
       gradeLabel = '1.5';
-    } else if (total >= 50) {
+    } else if (effectiveTotal >= 50) {
       gradeLabel = '1.0';
     }
 

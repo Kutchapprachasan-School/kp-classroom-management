@@ -266,13 +266,18 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
       let submittedInUnit = 0;
       let rawEarnedInUnit = 0;
       let rawMaxInUnit = 0;
+      const seenSubmissionKeys = new Set<string>();
 
       u.assignments.forEach((assign) => {
         const sub = matchSubmissionForStudent(stuSubs, assign);
         if (sub && sub.status !== 'MISSING') {
-          submittedInUnit += 1;
-          if (typeof sub.score === 'number') {
-            rawEarnedInUnit += sub.score;
+          const subKey = sub.id || `${sub.assignmentId}_${sub.studentCode}`;
+          if (!seenSubmissionKeys.has(subKey)) {
+            seenSubmissionKeys.add(subKey);
+            submittedInUnit += 1;
+            if (typeof sub.score === 'number') {
+              rawEarnedInUnit += sub.score;
+            }
           }
         }
         rawMaxInUnit += assign.maxScore || 10;

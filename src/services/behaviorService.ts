@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase';
 import { BehaviorLogCreateSchema, type BehaviorLogCreateInput } from './types';
+import { authService } from './authService';
 
 export interface BehaviorRecord {
   id: string;
@@ -94,16 +95,18 @@ export const behaviorService = {
   },
 
   // CREATE: Add new behavior record
-  async create(input: BehaviorLogCreateInput, author = 'ครูภาสภูมิ'): Promise<BehaviorRecord> {
+  async create(input: BehaviorLogCreateInput, author?: string): Promise<BehaviorRecord> {
     const validated = BehaviorLogCreateSchema.parse(input);
+    const effectiveAuthor = author || authService.getCurrentUser()?.name || 'ครูผู้สอน';
     const newRecord: BehaviorRecord = {
       id: `beh-${Date.now()}`,
       studentName: validated.studentName,
+      studentId: validated.studentId,
       type: validated.type,
       text: validated.text,
       points: validated.points,
       date: new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }),
-      author,
+      author: effectiveAuthor,
     };
 
     const current = getLocalBehaviors();
@@ -116,10 +119,15 @@ export const behaviorService = {
         await supabase.from('BehaviorRecord').insert({
           id: newRecord.id,
           studentId: newRecord.studentId || undefined,
+          academicYear: 2569,
+          sequenceNo: Math.floor(Date.now() / 1000),
           type: newRecord.type === 'POSITIVE' ? 'MERIT' : 'DEMERIT',
           category: 'OTHER',
-          points: newRecord.points,
+          points: parseInt(String(newRecord.points).replace(/[^0-9-]/g, ''), 10) || 0,
+          balanceAfter: 100,
           description: newRecord.text,
+          reportedById: authService.getCurrentUser()?.id || 'usr-teacher-1',
+          incidentTimestamp: new Date().toISOString(),
           businessDate: new Date().toISOString().slice(0, 10),
           createdAt: new Date().toISOString(),
         });

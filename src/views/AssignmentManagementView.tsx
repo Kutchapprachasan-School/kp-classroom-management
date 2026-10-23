@@ -1250,7 +1250,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       targetItem.assignmentId,
       targetItem.studentCode,
       score,
-      'GRADED'
+      'GRADED',
+      feedback
     );
 
     showToast(

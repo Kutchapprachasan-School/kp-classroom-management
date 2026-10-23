@@ -82,6 +82,7 @@ export type RollCallBatchInput = z.infer<typeof RollCallBatchSchema>;
 // ================= BEHAVIOR & XP SCHEMAS =================
 export const BehaviorLogCreateSchema = z.object({
   studentName: z.string().min(1, 'ต้องระบุชื่อนักเรียน'),
+  studentId: z.string().optional(),
   type: z.enum(['POSITIVE', 'NEGATIVE']),
   text: z.string().min(1, 'ต้องระบุรายละเอียดพฤติกรรม'),
   points: z.string().min(1, 'ต้องระบุแต้ม เช่น +5 XP หรือ -2 คะแนน'),

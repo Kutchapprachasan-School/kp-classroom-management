@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   X,
   FileSpreadsheet,
@@ -69,18 +69,32 @@ export const SgsClassroomMatrixModal: React.FC<SgsClassroomMatrixModalProps> = (
     if (defaultRoom) setSelectedRoom(defaultRoom);
   }, [defaultSubjectCode, defaultRoom, isOpen]);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [version, setVersion] = useState<number>(0);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleUpdate = () => setVersion((v) => v + 1);
+    window.addEventListener('kp-sgs-roster-updated', handleUpdate);
+    window.addEventListener('kp-grading-queue-updated', handleUpdate);
+    window.addEventListener('kp:sgs-score-bridged', handleUpdate);
+    return () => {
+      window.removeEventListener('kp-sgs-roster-updated', handleUpdate);
+      window.removeEventListener('kp-grading-queue-updated', handleUpdate);
+      window.removeEventListener('kp:sgs-score-bridged', handleUpdate);
+    };
+  }, [isOpen]);
 
   const roster: SgsStudentRecord[] = useMemo(() => {
     return sgsRosterAndSubmissionService.getSgsRoster();
-  }, [selectedRoom, isOpen]);
+  }, [selectedRoom, isOpen, version]);
 
   const termAssignments: TermAssignmentItem[] = useMemo(() => {
     return sgsRosterAndSubmissionService.getTermAssignments();
-  }, [isOpen]);
+  }, [isOpen, version]);
 
   const submissions: StudentWorkSubmission[] = useMemo(() => {
     return sgsRosterAndSubmissionService.getSubmissions();
-  }, [isOpen]);
+  }, [isOpen, version]);
 
   const filteredStudents = useMemo(() => {
     return roster
@@ -304,21 +318,44 @@ export const SgsClassroomMatrixModal: React.FC<SgsClassroomMatrixModalProps> = (
                           {studentTotalScore} / {totalMaxScore}
                         </td>
 
-                        {/* Approximate Grade */}
+                        {/* Approximate Grade (สพฐ. 8 ระดับ) */}
                         <td className="py-2.5 px-3 text-center">
                           {(() => {
-                            const percent = (studentTotalScore / (totalMaxScore || 1)) * 100;
-                            if (percent >= 80) {
-                              return <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">4.0</span>;
-                            } else if (percent >= 75) {
-                              return <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-bold">3.5</span>;
-                            } else if (percent >= 70) {
-                              return <span className="px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 text-[11px] font-bold">3.0</span>;
-                            } else if (percent >= 60) {
-                              return <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold">2.0</span>;
+                            const roundedPercent = Math.round((studentTotalScore / (totalMaxScore || 1)) * 100);
+                            let gradeLabel = '0';
+                            let badgeStyle = 'bg-rose-100 text-rose-800';
+
+                            if (roundedPercent >= 80) {
+                              gradeLabel = '4';
+                              badgeStyle = 'bg-emerald-100 text-emerald-800';
+                            } else if (roundedPercent >= 75) {
+                              gradeLabel = '3.5';
+                              badgeStyle = 'bg-emerald-50 text-emerald-700';
+                            } else if (roundedPercent >= 70) {
+                              gradeLabel = '3';
+                              badgeStyle = 'bg-blue-100 text-blue-800';
+                            } else if (roundedPercent >= 65) {
+                              gradeLabel = '2.5';
+                              badgeStyle = 'bg-teal-100 text-teal-800';
+                            } else if (roundedPercent >= 60) {
+                              gradeLabel = '2';
+                              badgeStyle = 'bg-cyan-100 text-cyan-800';
+                            } else if (roundedPercent >= 55) {
+                              gradeLabel = '1.5';
+                              badgeStyle = 'bg-amber-100 text-amber-800';
+                            } else if (roundedPercent >= 50) {
+                              gradeLabel = '1';
+                              badgeStyle = 'bg-orange-100 text-orange-800';
                             } else {
-                              return <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-bold">1.0</span>;
+                              gradeLabel = '0';
+                              badgeStyle = 'bg-rose-100 text-rose-800';
                             }
+
+                            return (
+                              <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${badgeStyle}`}>
+                                {gradeLabel}
+                              </span>
+                            );
                           })()}
                         </td>
                       </tr>
