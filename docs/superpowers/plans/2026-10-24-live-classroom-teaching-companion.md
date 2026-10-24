@@ -220,27 +220,36 @@
 
 **Files:**
 - Create: `src/components/live-classroom/GroupGeneratorSubTab.tsx`
-- Test: `tests/liveClassroomEcosystem.test.ts` (ทดสอบตรรกะการแบ่งกลุ่ม เกลี่ยเศษเท่ากัน และคละระดับ Tiers)
+- Test: `tests/liveClassroomEcosystem.test.ts` (ทดสอบตรรกะการแบ่งกลุ่ม เกลี่ยเศษเท่ากัน, คละระดับ Tiers, และการบันทึก/โหลด Group Presets)
 
 **Interfaces:**
-- Consumes: `Student`, `SoundFXEngine`
+- Consumes: `Student`, `SoundFXEngine`, `liveClassroomService`
 - Produces:
   ```typescript
+  export interface GroupPresetItem {
+    id: string;
+    classroomId: string;
+    presetName: string;
+    groupsData: StudentGroup[];
+    createdAt: string;
+  }
   export interface GroupGeneratorSubTabProps {
     students: Student[];
+    classroomId: string;
     isProjectorMode: boolean;
     onGiveRewardGroup: (studentIds: string[], groupName: string) => void;
     onPlaySound: (type: 'tick' | 'coin' | 'fanfare' | 'buzzer', freq?: number) => void;
+    onNotifyToast?: (message: string) => void;
   }
   ```
 
-- [ ] **Step 1: เขียน Unit Test สำหรับ Grouping Algorithms**
-  ทดสอบการแบ่งตามจำนวนกลุ่ม, แบ่งตามจำนวนคน, การเกลี่ยเศษ และการคละ Tiers (high, mid, low)
+- [ ] **Step 1: เขียน Unit Test สำหรับ Grouping Algorithms และ Group Presets**
+  ทดสอบการแบ่งตามจำนวนกลุ่ม, แบ่งตามจำนวนคน, การเกลี่ยเศษ, การคละ Tiers (high, mid, low), และการบันทึก/โหลด Preset
 - [ ] **Step 2: พัฒนา `src/components/live-classroom/GroupGeneratorSubTab.tsx`**
-  รองรับการสุ่มหัวหน้ากลุ่ม 👑, การคลิกสลับสมาชิก 2 คนต่างกลุ่มแบบฉับพลัน (Swap), และปุ่มแจกเหรียญยกกลุ่ม (+1 🪙 ยกกลุ่ม)
+  รองรับการสุ่มหัวหน้ากลุ่ม 👑, การคลิกสลับสมาชิก 2 คนต่างกลุ่มแบบฉับพลัน (Swap), ปุ่มแจกเหรียญยกกลุ่ม (+1 🪙 ยกกลุ่ม), และแผงควบคุม Group Presets (ช่องตั้งชื่อ + ปุ่มบันทึกกลุ่มไว้ใช้ซ้ำ + เมนูดรอปดาวน์เลือกโหลดกลุ่มเดิม)
 - [ ] **Step 3: ตรวจสอบเทสต์ให้ผ่าน**
 - [ ] **Step 4: Commit**
-  `git add src/components/live-classroom/GroupGeneratorSubTab.tsx tests/liveClassroomEcosystem.test.ts && git commit -m "feat: add GroupGeneratorSubTab with balanced grouping and quick swap"`
+  `git add src/components/live-classroom/GroupGeneratorSubTab.tsx tests/liveClassroomEcosystem.test.ts && git commit -m "feat: add GroupGeneratorSubTab with balanced grouping, quick swap, and group presets"`
 
 ---
 
