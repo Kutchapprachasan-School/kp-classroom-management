@@ -27,7 +27,11 @@ import {
   sgsRosterAndSubmissionService,
   type TermAssignmentItem,
 } from '../src/services/sgsRosterAndSubmissionService';
-import { teacherCourseAssignmentService } from '../src/services/teacherCourseAssignmentService';
+import {
+  teacherCourseAssignmentService,
+  getTeacherTaughtClassrooms,
+} from '../src/services/teacherCourseAssignmentService';
+import { coursesCurriculumService } from '../src/services/coursesCurriculumService';
 import { studentService } from '../src/services/studentService';
 
 describe('Assignment Classroom Isolation Tests (6/1 vs 6/3)', () => {
@@ -162,5 +166,55 @@ describe('Assignment Classroom Isolation Tests (6/1 vs 6/3)', () => {
     // Crucial check: assignmentTitle MUST NOT be 6/3's title!
     expect(item.assignmentTitle).toBe('โครงงานวิทยาศาสตร์ ห้อง 6/1');
     expect(item.assignmentTitle).not.toContain('6/3');
+  });
+
+  it('filters gradebook matrix classroom dropdown to only classrooms taught for the selected subject', () => {
+    // Setup 2 courses with specific taught classrooms
+    coursesCurriculumService.createCourse({
+      code: 'ส30206',
+      name: 'ต้านทุจริตศึกษา',
+      strand: 'สังคมศึกษา',
+      level: 'ม.6',
+      credits: 1,
+      periodsPerWeek: 2,
+      academicYear: '2569',
+      term: '1',
+      assignedClassrooms: ['ม.6/1', 'ม.6/3'],
+    });
+
+    coursesCurriculumService.createCourse({
+      code: 'ค21101',
+      name: 'คณิตศาสตร์พื้นฐาน',
+      strand: 'คณิตศาสตร์',
+      level: 'ม.1',
+      credits: 1.5,
+      periodsPerWeek: 3,
+      academicYear: '2569',
+      term: '1',
+      assignedClassrooms: ['ม.1/1', 'ม.1/2'],
+    });
+
+    // 1. For ส30206, dropdown MUST ONLY contain ม.6/1 and ม.6/3, NEVER ม.1/1
+    const roomsAntiCorruption = getTeacherTaughtClassrooms('ส30206');
+    expect(roomsAntiCorruption).toContain('ม.6/1');
+    expect(roomsAntiCorruption).toContain('ม.6/3');
+    expect(roomsAntiCorruption).not.toContain('ม.1/1');
+    expect(roomsAntiCorruption).not.toContain('ม.1/2');
+
+    // 2. For ค21101, dropdown MUST ONLY contain ม.1/1 and ม.1/2, NEVER ม.6/1 or ม.6/3
+    const roomsMath = getTeacherTaughtClassrooms('ค21101');
+    expect(roomsMath).toContain('ม.1/1');
+    expect(roomsMath).toContain('ม.1/2');
+    expect(roomsMath).not.toContain('ม.6/1');
+    expect(roomsMath).not.toContain('ม.6/3');
+
+    // 3. For ALL subjects, returns only taught rooms across these courses
+    const allTaughtRooms = getTeacherTaughtClassrooms('ALL');
+    expect(allTaughtRooms).toContain('ม.6/1');
+    expect(allTaughtRooms).toContain('ม.6/3');
+    expect(allTaughtRooms).toContain('ม.1/1');
+    expect(allTaughtRooms).toContain('ม.1/2');
+    // Random unassigned room must not be in taught list
+    expect(allTaughtRooms).not.toContain('ม.5/5');
   });
 });

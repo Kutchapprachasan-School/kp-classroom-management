@@ -20,7 +20,7 @@ import { studentService, formatClassroomLabel } from '../services/studentService
 import {
   teacherCourseAssignmentService,
   getDynamicTeachingSubjects,
-  getAllAvailableClassroomLabels,
+  getTeacherTaughtClassrooms,
   type GradingQueueItem,
 } from '../services/teacherCourseAssignmentService';
 import { r2StorageService } from '../services/r2StorageService';
@@ -40,14 +40,25 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
   initialRoom,
 }) => {
   const subjectsList = useMemo(() => getDynamicTeachingSubjects(), []);
-  const availableFilterRooms = useMemo(() => getAllAvailableClassroomLabels(), []);
 
   // Filter States
   const [selectedTerm, setSelectedTerm] = useState<string>('ALL');
   const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>(
     initialSubjectCode || 'ALL'
   );
+
+  // กรองเฉพาะห้องเรียนที่สอนจริง
+  const availableFilterRooms = useMemo(() => {
+    return getTeacherTaughtClassrooms(selectedSubjectCode);
+  }, [selectedSubjectCode]);
+
   const [selectedRoom, setSelectedRoom] = useState<string>(initialRoom || 'ALL');
+
+  useEffect(() => {
+    if (selectedRoom !== 'ALL' && availableFilterRooms.length > 0 && !availableFilterRooms.includes(selectedRoom)) {
+      setSelectedRoom('ALL');
+    }
+  }, [availableFilterRooms, selectedRoom]);
   const [selectedStatus, setSelectedStatus] = useState<'ALL' | 'PENDING' | 'RETURNED' | 'GRADED'>('PENDING');
   const [searchQuery, setSearchQuery] = useState<string>('');
 

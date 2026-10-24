@@ -7,6 +7,9 @@ import type { ClassroomRosterItem } from '../types/viewModels';
 import { classroomService } from './classroomService';
 import { sgsRosterAndSubmissionService } from './sgsRosterAndSubmissionService';
 import { gachaService } from './gachaService';
+import { registerClassroomNames, formatClassroomLabel, studentService } from './studentService';
+import { getTeacherTaughtClassrooms } from './teacherCourseAssignmentService';
+import { authService } from './authService';
 
 export type StudentTier = 'high' | 'mid' | 'low';
 
@@ -108,6 +111,7 @@ function getAttendanceStorageKey(classroomId: string, dateKey: string): string {
 export const liveClassroomService = {
   /**
    * โหลดข้อมูลห้องเรียนและนักเรียนจริง 100% (Strict Zero Mock)
+   * กรองเฉพาะห้องเรียนที่ครูผู้สอนคนปัจจุบันสอนจริง (Taught Classrooms)
    */
   async loadClassroomsData(): Promise<LiveClassroomData[]> {
     const rawClassrooms = await classroomService.getAll();
@@ -115,8 +119,54 @@ export const liveClassroomService = {
       return [];
     }
 
-    return rawClassrooms.map((cls: ClassroomRosterItem) => {
-      const roster = sgsRosterAndSubmissionService.getRoster(cls.id);
+    // ลงทะเบียนชื่อห้องเรียนเข้า In-Memory Cache เพื่อให้ resolveRoomCandidates ค้นหาได้ทุกรหัส
+    registerClassroomNames(rawClassrooms);
+
+    // กรองเฉพาะห้องเรียนที่ครูคนนี้สอนจริง (Taught Classrooms)
+    const currentUser = authService.getCurrentUser();
+    const isAdmin = currentUser?.role === 'ADMIN';
+    const taughtClassrooms = getTeacherTaughtClassrooms();
+
+    const filteredClassrooms = rawClassrooms.filter((cls) => {
+      if (isAdmin) return true;
+      if (!taughtClassrooms || taughtClassrooms.length === 0) return true;
+
+      const formattedLabel = formatClassroomLabel(cls.name || cls.id);
+      return (
+        taughtClassrooms.includes(cls.name) ||
+        taughtClassrooms.includes(formattedLabel) ||
+        taughtClassrooms.includes(cls.roomNumber || '') ||
+        taughtClassrooms.includes(cls.id)
+      );
+    });
+
+    const activeRooms = filteredClassrooms.length > 0 ? filteredClassrooms : rawClassrooms;
+
+    return activeRooms.map((cls: ClassroomRosterItem) => {
+      // ดึงรายชื่อนักเรียนจริง โดยค้นหาทั้งจาก cls.id, cls.name และ studentService เพื่อไม่ให้รายชื่อตกหล่น
+      let roster = sgsRosterAndSubmissionService.getRoster(cls.id);
+      if (!roster || roster.length === 0) {
+        roster = sgsRosterAndSubmissionService.getRoster(cls.name);
+      }
+      if (!roster || (roster.length === 0 && cls.roomNumber)) {
+        roster = sgsRosterAndSubmissionService.getRoster(cls.roomNumber);
+      }
+      if (!roster || roster.length === 0) {
+        const directStudents =
+          studentService.getStudents(cls.name) ||
+          studentService.getStudents(cls.id) ||
+          (cls.roomNumber ? studentService.getStudents(cls.roomNumber) : []);
+        if (directStudents && directStudents.length > 0) {
+          roster = directStudents.map((st) => ({
+            id: st.id || `stu-${st.code}`,
+            studentCode: st.code || st.id,
+            name: st.name || `นักเรียน (${st.code})`,
+            classroom: cls.name,
+            classroomId: cls.id,
+          }));
+        }
+      }
+
       const studentIds = roster.map((st) => st.id);
       const attendanceMap = this.getTodayAttendanceMap(cls.id, studentIds);
 
@@ -174,7 +224,7 @@ export const liveClassroomService = {
       return {
         id: cls.id,
         name: cls.name,
-        subject: cls.level ? `${cls.name} (${cls.level})` : 'วิชาเรียน',
+        subject: cls.level ? `${cls.name} (${cls.level})` : `ห้อง ${cls.name}`,
         students,
         initialLedger,
       };

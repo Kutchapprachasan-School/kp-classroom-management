@@ -67,24 +67,90 @@ export const getDynamicTeachingSubjects = (teacherIdOrName?: string): TeachingSu
       3: 'bg-purple-100 text-purple-800 border-purple-300',
       4: 'bg-amber-100 text-amber-800 border-amber-300',
     };
-    return curriculumCourses.map((c, idx) => ({
-      code: c.code,
-      name: c.name,
-      courseCode: c.code,
-      courseName: c.name,
-      termLabel: `${c.term || '2'}/${c.academicYear || '2569'}`,
-      shortName: c.name.length > 15 ? `${c.name.slice(0, 15)}...` : c.name,
-      classrooms:
-        c.assignedClassrooms && c.assignedClassrooms.length > 0
-          ? c.assignedClassrooms
-          : fallbackRooms,
-      credits: Number(c.credits) || 1.0,
-      colorBadge: colorMap[idx % 5] || 'bg-blue-100 text-blue-800 border-blue-300',
-    }));
+    return curriculumCourses.map((c, idx) => {
+      let assigned = Array.isArray(c.assignedClassrooms) ? c.assignedClassrooms.filter(Boolean) : [];
+      if (assigned.length === 0) {
+        // กรอง fallback เฉพาะห้องที่มีระดับชั้นตรงกับวิชา (เช่น ม.6 ไม่เอาห้อง ม.1-ม.5 มาปน)
+        assigned = c.level
+          ? fallbackRooms.filter((r) => r.startsWith(c.level))
+          : fallbackRooms;
+      }
+      return {
+        code: c.code,
+        name: c.name,
+        courseCode: c.code,
+        courseName: c.name,
+        termLabel: `${c.term || '2'}/${c.academicYear || '2569'}`,
+        shortName: c.name.length > 15 ? `${c.name.slice(0, 15)}...` : c.name,
+        classrooms: assigned.map((r) => formatClassroomLabel(r)),
+        credits: Number(c.credits) || 1.0,
+        colorBadge: colorMap[idx % 5] || 'bg-blue-100 text-blue-800 border-blue-300',
+      };
+    });
   }
 
   // หากไม่มีวิชาในหลักสูตร ให้ส่งค่าว่าง [] เพื่อไม่ให้มี fake mock subjects
   return [];
+};
+
+/**
+ * ดึงรายชื่อห้องเรียนที่ครูผู้สอนสอนจริง (Taught Classrooms)
+ * โดยรวบรวมจากรายวิชาทั้งหมดที่ครูได้รับมอบหมายในหลักสูตร
+ * หากระบุ subjectCode จะกรองเฉพาะห้องเรียนของวิชานั้นๆ
+ */
+export const getTeacherTaughtClassrooms = (
+  subjectCode?: string,
+  teacherIdOrName?: string
+): string[] => {
+  const subjects = getDynamicTeachingSubjects(teacherIdOrName);
+
+  if (subjectCode && subjectCode !== 'ALL') {
+    const cleanCode = subjectCode.trim().toUpperCase();
+    const matched = subjects.find(
+      (s) => (s.courseCode || s.code)?.trim().toUpperCase() === cleanCode
+    );
+    if (matched && Array.isArray(matched.classrooms) && matched.classrooms.length > 0) {
+      return Array.from(
+        new Set(matched.classrooms.map((r) => formatClassroomLabel(r)).filter(Boolean))
+      );
+    }
+    // หากไม่พบในหลักสูตร ลองดูจาก Term Assignments ที่มีการสั่งงานไว้สำหรับวิชานี้
+    const asgs = sgsRosterAndSubmissionService.getTermAssignments(subjectCode);
+    const asgRooms = new Set<string>();
+    asgs.forEach((a) => {
+      if (Array.isArray(a.targetClassrooms)) {
+        a.targetClassrooms.forEach((r) => {
+          if (r && r !== 'ALL') asgRooms.add(formatClassroomLabel(r));
+        });
+      }
+      const rawRoom = (a as any).classroom || (a as any).classroomId;
+      if (rawRoom && rawRoom !== 'ALL') {
+        asgRooms.add(formatClassroomLabel(rawRoom));
+      }
+    });
+    if (asgRooms.size > 0) {
+      return Array.from(asgRooms);
+    }
+  }
+
+  // รวบรวมทุกห้องเรียนจากทุกรายวิชาที่ครูสอน
+  const allTaught = new Set<string>();
+  subjects.forEach((s) => {
+    if (Array.isArray(s.classrooms)) {
+      s.classrooms.forEach((r) => {
+        if (r && r !== 'ALL') {
+          allTaught.add(formatClassroomLabel(r));
+        }
+      });
+    }
+  });
+
+  if (allTaught.size > 0) {
+    return Array.from(allTaught);
+  }
+
+  // Fallback สำหรับกรณีที่ยังไม่ได้กำหนดห้องเรียนในหลักสูตรเลย
+  return getAllAvailableClassroomLabels();
 };
 
 /**
@@ -764,6 +830,10 @@ export const teacherCourseAssignmentService = {
 
   getDynamicTeachingSubjects(teacherIdOrName?: string) {
     return getDynamicTeachingSubjects(teacherIdOrName);
+  },
+
+  getTeacherTaughtClassrooms(subjectCode?: string, teacherIdOrName?: string) {
+    return getTeacherTaughtClassrooms(subjectCode, teacherIdOrName);
   },
 
   resetAllDemoData(): void {

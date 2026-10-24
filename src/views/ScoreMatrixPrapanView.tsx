@@ -19,7 +19,7 @@ import {
 } from '../services/sgsRosterAndSubmissionService';
 import {
   getDynamicTeachingSubjects,
-  getAllAvailableClassroomLabels,
+  getTeacherTaughtClassrooms,
 } from '../services/teacherCourseAssignmentService';
 import type { TeacherViewKey } from '../components/layout/TeacherSidebar';
 
@@ -35,14 +35,29 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
   initialRoom,
 }) => {
   const subjectsList = useMemo(() => getDynamicTeachingSubjects(), []);
-  const availableFilterRooms = useMemo(() => getAllAvailableClassroomLabels(), []);
 
   const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>(
     initialSubjectCode || subjectsList[0]?.courseCode || 'ALL'
   );
-  const [selectedRoom, setSelectedRoom] = useState<string>(
-    initialRoom || availableFilterRooms[0] || 'ม.3/1'
-  );
+
+  // กรองเฉพาะห้องเรียนที่ครูสอนจริง (อิงตามรายวิชาที่เลือก หรือทุกห้องที่ครูสอน)
+  const availableFilterRooms = useMemo(() => {
+    return getTeacherTaughtClassrooms(selectedSubjectCode);
+  }, [selectedSubjectCode]);
+
+  const [selectedRoom, setSelectedRoom] = useState<string>(() => {
+    const initialTaught = getTeacherTaughtClassrooms(initialSubjectCode || subjectsList[0]?.courseCode || 'ALL');
+    if (initialRoom && initialTaught.includes(initialRoom)) return initialRoom;
+    return initialTaught[0] || 'ม.1/1';
+  });
+
+  // ซิงค์ selectedRoom อัตโนมัติเมื่อเลือกวิชาใหม่ หากห้องเดิมไม่ได้อยู่ในวิชาที่สอน
+  useEffect(() => {
+    if (availableFilterRooms.length > 0 && !availableFilterRooms.includes(selectedRoom)) {
+      setSelectedRoom(availableFilterRooms[0]);
+    }
+  }, [availableFilterRooms, selectedRoom]);
+
   const [matrixPartFilter, setMatrixPartFilter] = useState<'ALL' | 'PRE_MIDTERM' | 'POST_MIDTERM'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [expandedStudentCodes, setExpandedStudentCodes] = useState<Set<string>>(new Set());
@@ -63,8 +78,10 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
   };
 
   const matrixClassroom = useMemo(() => {
-    if (selectedRoom !== 'ALL') return selectedRoom;
-    return availableFilterRooms[0] || 'ม.3/1';
+    if (selectedRoom && selectedRoom !== 'ALL' && availableFilterRooms.includes(selectedRoom)) {
+      return selectedRoom;
+    }
+    return availableFilterRooms[0] || selectedRoom || 'ม.1/1';
   }, [selectedRoom, availableFilterRooms]);
 
   // Students in class
@@ -498,11 +515,15 @@ export const ScoreMatrixPrapanView: React.FC<ScoreMatrixPrapanViewProps> = ({
               onChange={(e) => setSelectedRoom(e.target.value)}
               className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
             >
-              {availableFilterRooms.map((r) => (
-                <option key={r} value={r}>
-                  ห้อง {r}
-                </option>
-              ))}
+              {availableFilterRooms.length === 0 ? (
+                <option value="">ไม่มีห้องเรียนที่สอน</option>
+              ) : (
+                availableFilterRooms.map((r) => (
+                  <option key={r} value={r}>
+                    ห้อง {r}
+                  </option>
+                ))
+              )}
             </select>
           </div>
 

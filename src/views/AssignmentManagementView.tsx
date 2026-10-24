@@ -45,6 +45,7 @@ import { studentService, formatClassroomLabel } from '../services/studentService
 import {
   teacherCourseAssignmentService,
   getDynamicTeachingSubjects,
+  getTeacherTaughtClassrooms,
   getAllAvailableClassroomLabels,
   type GradingQueueItem,
 } from '../services/teacherCourseAssignmentService';
@@ -131,14 +132,16 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     return full.replace(/(\d{4})$/, 'พ.ศ. $1');
   }, []);
 
-  // Classrooms available for the selected subject filter
+  // Classrooms available for the selected subject filter (เฉพาะห้องที่สอนจริง)
   const availableFilterRooms = useMemo(() => {
-    if (selectedSubjectCode === 'ALL') return allSystemClassrooms;
-    const matched = subjectsList.find((s) => s.courseCode === selectedSubjectCode);
-    return matched?.classrooms && matched.classrooms.length > 0
-      ? matched.classrooms
-      : allSystemClassrooms;
-  }, [selectedSubjectCode, subjectsList, allSystemClassrooms]);
+    return getTeacherTaughtClassrooms(selectedSubjectCode);
+  }, [selectedSubjectCode]);
+
+  useEffect(() => {
+    if (selectedRoom !== 'ALL' && availableFilterRooms.length > 0 && !availableFilterRooms.includes(selectedRoom)) {
+      setSelectedRoom('ALL');
+    }
+  }, [availableFilterRooms, selectedRoom]);
 
   // Term Assignments List (Linked to ปพ.5)
   const [termAssignments, setTermAssignments] = useState<TermAssignmentConfig[]>(() =>
