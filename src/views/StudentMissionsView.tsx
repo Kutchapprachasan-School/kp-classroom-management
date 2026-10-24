@@ -74,7 +74,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
         currentUser?.classroomId ||
         identity?.student?.classroom ||
         identity?.student?.classroomId
-    ) || 'ม.3/1';
+    ) || '';
   const schoolSettings = getSchoolSettings();
   const academicYearTerm = schoolSettings.academicTerm || '1/2569';
   const [quests, setQuests] = useState<ExtendedStudentQuestItem[]>([]);
@@ -175,21 +175,29 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
     const roster = sgsRosterAndSubmissionService.getSgsRoster(studentRoom);
     if (roster.length === 0) return leaderboard;
     const entries: Array<StudentLeaderboardEntry & { studentCode?: string; id?: string }> = roster.map((s) => {
-      const expCalc = calculateStudentExp(s.studentCode, s.studentCode);
+      const isMe =
+        (studentCode && s.studentCode === studentCode) ||
+        (studentId && ((s as any).id === studentId || s.studentCode === studentId)) ||
+        (currentUser?.name && s.studentName === currentUser.name);
+
+      const targetId = isMe ? studentId : ((s as any).id || (s as any).studentId || `stu-${s.studentCode}`);
+      const expCalc = isMe ? myExp : calculateStudentExp(targetId, s.studentCode);
+
       return {
         rank: 0,
         studentCode: s.studentCode,
-        id: (s as any).id || `stu-${s.studentCode}`,
+        id: targetId,
         name: s.studentName,
         classroom: studentRoom,
-        xp: expCalc.totalXp,
+        xp: isMe ? myExp.totalXp : expCalc.totalXp,
         avatarText: s.gender === 'FEMALE' ? '👧' : '👦',
-        streakDays: 0,
+        streakDays: isMe ? (myExp.breakdown?.streakCount || 0) : (expCalc.breakdown?.streakCount || 0),
+        isCurrentUser: Boolean(isMe),
       };
     });
     entries.sort((a, b) => b.xp - a.xp);
     return entries.map((e, idx) => ({ ...e, rank: idx + 1 }));
-  }, [studentRoom, leaderboard, myExp]);
+  }, [studentRoom, leaderboard, myExp, studentCode, studentId, currentUser?.name]);
 
   const myRank = React.useMemo(() => {
     if (!studentCode && !studentId) return null;
@@ -790,7 +798,9 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                   <h3 className="font-bold text-[#163A66] text-base">
                     ชั้นอันดับประจำสัปดาห์
                   </h3>
-                  <p className="text-[11px] text-[#6B7C93]">ห้องเรียน ม.3/1 • Top 5</p>
+                  <p className="text-[11px] text-[#6B7C93]">
+                    ห้องเรียน {studentRoom || 'ประจำชั้น'} • Top 5
+                  </p>
                 </div>
               </div>
               <button
@@ -814,9 +824,13 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
               ) : (
                 classroomLeaderboard.slice(0, 5).map((user) => (
                   <div
-                    key={user.rank}
+                    key={`${user.rank}-${user.name}`}
                     className={`flex items-center justify-between p-3 rounded-xl transition-colors ${
-                      user.rank === 1
+                      user.isCurrentUser
+                        ? user.rank === 1
+                          ? 'bg-amber-50/90 border-2 border-amber-300 ring-2 ring-amber-100'
+                          : 'bg-blue-50/80 border-2 border-blue-300 ring-2 ring-blue-100'
+                        : user.rank === 1
                         ? 'bg-amber-50/70 border border-amber-200/60'
                         : user.rank === 2
                         ? 'bg-slate-50 border border-slate-200/60'
@@ -831,11 +845,18 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                       </span>
                       <span className="text-lg">{user.avatarText || '👤'}</span>
                       <div className="min-w-0">
-                        <p className="text-xs font-bold text-[#163A66] truncate">
-                          {user.name}
-                        </p>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <p className="text-xs font-bold text-[#163A66] truncate">
+                            {user.name}
+                          </p>
+                          {user.isCurrentUser && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold bg-[#EFF6FF] text-[#2563EB] rounded-md border border-[#BFDBFE] shrink-0">
+                              คุณ
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[10px] text-[#6B7C93]">
-                          {user.classroom || studentRoom}
+                          {user.classroom || studentRoom || 'ห้องเรียน'}
                         </p>
                       </div>
                     </div>

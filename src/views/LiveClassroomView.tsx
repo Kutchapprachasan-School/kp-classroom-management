@@ -4,7 +4,8 @@
 // โหลดข้อมูลห้องเรียนและนักเรียนจริง 100% (Strict Zero Mock Data Policy)
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Sparkles, Dices } from 'lucide-react';
+import SparklesRegular from '@mingcute/react/core-regular/sparkles';
+import RandomRegular from '@mingcute/react/core-regular/random';
 import { soundFX } from '../services/soundFXEngine';
 import {
   liveClassroomService,
@@ -111,7 +112,6 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
   // Optimistic Rewards Hook with Offline Queue
   const {
     ledger,
-    setInitialLedger,
     toast,
     isOnline,
     pendingQueueCount,
@@ -132,17 +132,17 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
     async function loadData() {
       setIsLoading(true);
       try {
-        const loaded = await liveClassroomService.loadClassroomsData();
+        const loaded = await liveClassroomService.loadClassroomsData(initialClassroomId);
         if (isMounted) {
           setClassrooms(loaded);
           if (loaded.length > 0) {
-            const initialId =
-              loaded.find((c) => c.id === initialClassroomId)?.id || loaded[0].id;
-            setSelectedClassId(initialId);
-            const found = loaded.find((c) => c.id === initialId);
-            if (found && found.initialLedger) {
-              setInitialLedger(found.initialLedger);
-            }
+            setSelectedClassId((current) => {
+              if (current && loaded.some((c) => c.id === current)) {
+                return current;
+              }
+              const found = loaded.find((c) => c.id === initialClassroomId);
+              return found ? found.id : loaded[0].id;
+            });
           }
         }
       } catch (err) {
@@ -155,15 +155,11 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [initialClassroomId, setInitialLedger]);
+  }, [initialClassroomId]);
 
   // เมื่อครูเปลี่ยนห้องเรียน
   const handleSelectClassroom = (newClassId: string) => {
     setSelectedClassId(newClassId);
-    const target = classrooms.find((c) => c.id === newClassId);
-    if (target && target.initialLedger) {
-      setInitialLedger(target.initialLedger);
-    }
     setSelectedStudent(null);
     setRollingStudent(null);
     setChallengers([]);
@@ -342,8 +338,8 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
   if (classrooms.length === 0) {
     return (
       <div className="min-h-screen bg-[#F7FAFF] p-8 flex flex-col items-center justify-center text-center">
-        <div className="w-16 h-16 rounded-3xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-500 mb-4 shadow-sm">
-          <Dices className="w-8 h-8" />
+        <div className="w-16 h-16 rounded-3xl bg-blue-50 border border-blue-200/80 flex items-center justify-center text-blue-500 mb-4 shadow-sm">
+          <RandomRegular className="w-8 h-8" />
         </div>
         <h2 className="text-xl font-bold text-[#163A66]">ยังไม่พบห้องเรียนในระบบ</h2>
         <p className="text-xs text-slate-500 max-w-sm mt-1 mb-6">
@@ -375,7 +371,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
               : 'bg-emerald-600 border-emerald-500/50 text-white font-extrabold shadow-emerald-600/20'
           }`}
         >
-          <Sparkles className="w-4 h-4 shrink-0" />
+          <SparklesRegular className="w-4 h-4 shrink-0" />
           <span>{toast.message}</span>
         </div>
       )}

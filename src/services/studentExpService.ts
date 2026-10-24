@@ -8,6 +8,7 @@
 import { sgsRosterAndSubmissionService } from './sgsRosterAndSubmissionService';
 import { attendanceCorrelationService } from './attendanceCorrelationService';
 import { gamificationService } from './gamificationService';
+import { studentService } from './studentService';
 
 export const STUDENT_EXP_EVENT = 'kp_student_exp_updated';
 
@@ -37,15 +38,31 @@ export interface StudentExpCalculation {
  * คำนวณแต้ม EXP รวมและระดับเลเวลของนักเรียนจากข้อมูลจริงในระบบ
  */
 export function calculateStudentExp(studentId = 'stu-2', studentCode?: string): StudentExpCalculation {
+  // รวบรวมคีย์ระบุตัวตนทั้งหมดของนักเรียน (Dual-Key: studentId, studentCode, stu-X, UUID)
+  const candidateKeys = new Set<string>();
+  if (studentId) candidateKeys.add(studentId);
+  if (studentCode) candidateKeys.add(studentCode);
+  if (studentId && !studentId.startsWith('stu-')) candidateKeys.add(`stu-${studentId}`);
+  if (studentCode && !studentCode.startsWith('stu-')) candidateKeys.add(`stu-${studentCode}`);
+  if (studentId && studentId.startsWith('stu-')) candidateKeys.add(studentId.replace(/^stu-/, ''));
+  if (studentCode && studentCode.startsWith('stu-')) candidateKeys.add(studentCode.replace(/^stu-/, ''));
+
+  try {
+    const foundStu = studentService.findStudentByCode(studentCode || studentId);
+    if (foundStu?.student?.id) candidateKeys.add(foundStu.student.id);
+    if (foundStu?.student?.code) candidateKeys.add(foundStu.student.code);
+    if (foundStu?.student?.studentCode) candidateKeys.add(foundStu.student.studentCode);
+  } catch {}
 
   // 1. งานที่ส่งจริง (Submissions)
   let assignmentsCount = 0;
   let assignmentsXp = 0;
   try {
     const submissions = sgsRosterAndSubmissionService.getSubmissions();
-    const effectiveCode = studentCode || studentId;
     const studentSubs = submissions.filter(
-      (s) => s.studentCode === effectiveCode || s.studentCode === studentId
+      (s) =>
+        candidateKeys.has(s.studentCode) ||
+        (s.studentId && candidateKeys.has(s.studentId))
     );
 
     studentSubs.forEach((sub) => {
@@ -71,10 +88,11 @@ export function calculateStudentExp(studentId = 'stu-2', studentCode?: string): 
   let periodAttendanceXp = 0;
 
   try {
-    const effectiveCode = studentCode || studentId;
     const morningRecords = attendanceCorrelationService.getAllMorningRecords();
     const studentMorning = morningRecords.filter(
-      (r) => r.studentCode === effectiveCode || r.studentId === studentId
+      (r) =>
+        candidateKeys.has(r.studentCode) ||
+        (r.studentId && candidateKeys.has(r.studentId))
     );
 
     studentMorning.forEach((r) => {
@@ -89,7 +107,9 @@ export function calculateStudentExp(studentId = 'stu-2', studentCode?: string): 
 
     const periodRecords = attendanceCorrelationService.getAllPeriodRecords();
     const studentPeriods = periodRecords.filter(
-      (r) => r.studentCode === effectiveCode || r.studentId === studentId
+      (r) =>
+        candidateKeys.has(r.studentCode) ||
+        (r.studentId && candidateKeys.has(r.studentId))
     );
 
     studentPeriods.forEach((r) => {
@@ -106,7 +126,12 @@ export function calculateStudentExp(studentId = 'stu-2', studentCode?: string): 
   let streakCount = 0;
   let streakXp = 0;
   try {
-    streakCount = gamificationService.getStreak(studentId);
+    for (const cid of candidateKeys) {
+      const count = gamificationService.getStreak(cid);
+      if (count > streakCount) {
+        streakCount = count;
+      }
+    }
     streakXp = streakCount * 20; // 20 XP ต่อวันในสตรีค
   } catch (err) {
     console.warn('[studentExpService] Error reading streak:', err);
@@ -120,7 +145,9 @@ export function calculateStudentExp(studentId = 'stu-2', studentCode?: string): 
       if (raw) {
         const txs = JSON.parse(raw);
         if (Array.isArray(txs)) {
-          const studentTxs = txs.filter((tx: any) => tx.studentId === studentId);
+          const studentTxs = txs.filter((tx: any) =>
+            candidateKeys.has(tx.studentId) || candidateKeys.has(tx.studentCode)
+          );
           behaviorTransactionsXp = studentTxs.reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
         }
       }

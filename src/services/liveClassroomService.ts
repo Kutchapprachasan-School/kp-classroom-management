@@ -8,7 +8,7 @@ import { classroomService } from './classroomService';
 import { sgsRosterAndSubmissionService } from './sgsRosterAndSubmissionService';
 import { gachaService } from './gachaService';
 import { registerClassroomNames, formatClassroomLabel, studentService } from './studentService';
-import { getTeacherTaughtClassrooms } from './teacherCourseAssignmentService';
+import { getTeacherTaughtClassrooms, getDynamicTeachingSubjects } from './teacherCourseAssignmentService';
 import { authService } from './authService';
 
 export type StudentTier = 'high' | 'mid' | 'low';
@@ -113,7 +113,7 @@ export const liveClassroomService = {
    * โหลดข้อมูลห้องเรียนและนักเรียนจริง 100% (Strict Zero Mock)
    * กรองเฉพาะห้องเรียนที่ครูผู้สอนคนปัจจุบันสอนจริง (Taught Classrooms)
    */
-  async loadClassroomsData(): Promise<LiveClassroomData[]> {
+  async loadClassroomsData(requestedClassroomId?: string): Promise<LiveClassroomData[]> {
     const rawClassrooms = await classroomService.getAll();
     if (!rawClassrooms || rawClassrooms.length === 0) {
       return [];
@@ -132,6 +132,14 @@ export const liveClassroomService = {
 
     const filteredClassrooms = rawClassrooms.filter((cls) => {
       if (isAdmin) return true;
+      if (
+        requestedClassroomId &&
+        (cls.id === requestedClassroomId ||
+          cls.name === requestedClassroomId ||
+          formatClassroomLabel(cls.name) === formatClassroomLabel(requestedClassroomId))
+      ) {
+        return true;
+      }
       if (!taughtClassrooms || taughtClassrooms.length === 0) return true;
 
       const clsNameNorm = formatClassroomLabel(cls.name || '').trim().toLowerCase();
@@ -230,10 +238,24 @@ export const liveClassroomService = {
         }
       }
 
+      // ค้นหารายวิชาที่ครูคนนี้สอนในห้องนี้
+      const taughtSubjects = getDynamicTeachingSubjects();
+      const matchedSubject = taughtSubjects.find((s) =>
+        s.classrooms.some(
+          (r) =>
+            formatClassroomLabel(r) === formatClassroomLabel(cls.name) ||
+            r === cls.id ||
+            r === cls.name
+        )
+      );
+      const subjectLabel = matchedSubject
+        ? `${matchedSubject.code} ${matchedSubject.name}`
+        : (cls as any).subjectGroup || 'รายวิชาพื้นฐาน';
+
       return {
         id: cls.id,
         name: cls.name,
-        subject: cls.level ? `${cls.name} (${cls.level})` : `ห้อง ${cls.name}`,
+        subject: subjectLabel,
         students,
         initialLedger,
       };

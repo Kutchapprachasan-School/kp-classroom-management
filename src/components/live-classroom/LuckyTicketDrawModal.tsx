@@ -3,17 +3,15 @@
 // มีเสียงติ๊กชะลอความเร็วตามสมการ Cubic Bezier และปุ่มมอบรางวัลใหญ่ (+3🪙 หรือ +5🪙 พร้อมหักตั๋ว)
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import {
-  Ticket,
-  Sparkles,
-  Trophy,
-  X,
-  RotateCcw,
-  Coins,
-  CheckCircle2,
-  Gift,
-  Users,
-} from 'lucide-react';
+import CouponRegular from '@mingcute/react/core-regular/coupon';
+import Coin2Regular from '@mingcute/react/core-regular/coin-2';
+import TrophyRegular from '@mingcute/react/core-regular/trophy';
+import SparklesRegular from '@mingcute/react/core-regular/sparkles';
+import CloseRegular from '@mingcute/react/core-regular/close';
+import GiftRegular from '@mingcute/react/core-regular/gift';
+import CheckCircleRegular from '@mingcute/react/core-regular/check-circle';
+import Refresh1Regular from '@mingcute/react/core-regular/refresh-1';
+import { Users } from 'lucide-react';
 import type { LiveStudent } from '../../services/liveClassroomService';
 import {
   buildWeightedWheelSegments,
@@ -193,8 +191,8 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
         {/* Top Header */}
         <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-pink-500/20 border border-pink-500/40 flex items-center justify-center text-pink-400">
-              <Ticket className="w-6 h-6" />
+            <div className="w-12 h-12 rounded-2xl bg-pink-500/20 border border-pink-500/40 flex items-center justify-center text-pink-400 shadow-sm">
+              <CouponRegular className="w-6 h-6" />
             </div>
             <div>
               <h2 className="text-xl md:text-2xl font-extrabold text-white flex items-center gap-2">
@@ -213,7 +211,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
             onClick={handleClose}
             className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
           >
-            <X className="w-5 h-5" />
+            <CloseRegular className="w-5 h-5" />
           </button>
         </div>
 
@@ -273,7 +271,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
               disabled={isSpinning}
               className="flex items-center gap-1.5 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1 rounded-xl font-semibold text-slate-300 transition"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <Refresh1Regular className="w-3.5 h-3.5" />
               <span>คืนสิทธิ์ผู้ชนะทั้งหมด</span>
             </button>
           )}
@@ -375,13 +373,13 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
                   disabled={isSpinning}
                   className="mt-6 flex items-center gap-2.5 bg-gradient-to-r from-pink-600 to-indigo-600 hover:from-pink-500 hover:to-indigo-500 disabled:opacity-50 text-white font-extrabold text-base px-9 py-3 rounded-2xl shadow-xl shadow-pink-600/25 transition transform active:scale-95"
                 >
-                  <Sparkles className="w-5 h-5" />
-                  <span>{isSpinning ? 'กำลังหมุนวงล้อ...' : '🎲 หมุนวงล้อจับรางวัล!'}</span>
+                  <SparklesRegular className="w-5 h-5" />
+                  <span>{isSpinning ? 'กำลังหมุนวงล้อ...' : 'หมุนวงล้อจับรางวัล!'}</span>
                 </button>
               </>
             ) : (
               <div className="py-14 px-6 text-center bg-slate-950/50 border border-slate-800 rounded-3xl w-full space-y-2">
-                <Ticket className="w-14 h-14 mx-auto text-slate-600" />
+                <CouponRegular className="w-14 h-14 mx-auto text-slate-600" />
                 <h3 className="text-lg font-bold text-slate-300">
                   ยังไม่มีนักเรียนที่มีตั๋วสุ่มในกองนี้
                 </h3>
@@ -398,7 +396,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
             {winner && (
               <div className="bg-gradient-to-b from-amber-500/20 to-slate-900 border-2 border-amber-400 rounded-2xl p-5 text-center space-y-3 animate-fade-in shadow-xl">
                 <div className="inline-flex items-center gap-1.5 bg-amber-400 text-amber-950 text-xs font-black px-3 py-1 rounded-full shadow-sm">
-                  <Trophy className="w-4 h-4" />
+                  <TrophyRegular className="w-4 h-4" />
                   <span>ผู้โชคดีได้รับรางวัลท้ายคาบ!</span>
                 </div>
 
@@ -417,22 +415,22 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
                         onClick={() => handleAwardWinner(3, false)}
                         className="flex items-center justify-center gap-1.5 bg-amber-400 hover:bg-amber-300 text-amber-950 font-black py-2 px-3 rounded-xl text-xs transition active:scale-95 shadow-sm"
                       >
-                        <Coins className="w-4 h-4" />
+                        <Coin2Regular className="w-4 h-4" />
                         <span>มอบ +3 🪙</span>
                       </button>
 
                       <button
                         onClick={() => handleAwardWinner(5, true)}
-                        className="flex items-center justify-center gap-1.5 bg-pink-500 hover:bg-pink-400 text-white font-extrabold py-2 px-3 rounded-xl text-xs transition"
+                        className="flex items-center justify-center gap-1.5 bg-pink-500 hover:bg-pink-400 text-white font-extrabold py-2 px-3 rounded-xl text-xs transition active:scale-95 shadow-sm"
                       >
-                        <Gift className="w-4 h-4" />
+                        <GiftRegular className="w-4 h-4" />
                         <span>+5 🪙 (หัก 1 🎟️)</span>
                       </button>
                     </div>
                   </div>
                 ) : (
                   <div className="flex items-center justify-center gap-2 text-emerald-400 font-bold text-xs py-2">
-                    <CheckCircle2 className="w-4 h-4" />
+                    <CheckCircleRegular className="w-4 h-4" />
                     <span>มอบรางวัลและบันทึกเข้า Session Log เรียบร้อย!</span>
                   </div>
                 )}

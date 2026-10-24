@@ -3,11 +3,11 @@
 // พร้อมปุ่ม Undo และแสดงสถานะซิงค์, ปุ่มแจกโบนัสทั้งห้อง, และปุ่มเปิดหมุนวงล้อตั๋วสุ่ม
 
 import React from 'react';
+import TrophyRegular from '@mingcute/react/core-regular/trophy';
+import CouponRegular from '@mingcute/react/core-regular/coupon';
 import {
-  Trophy,
   ClipboardList,
   PartyPopper,
-  Ticket,
   Undo2,
 } from 'lucide-react';
 import type { LiveStudent } from '../../services/liveClassroomService';
@@ -76,7 +76,7 @@ export const RewardBoardSubTab: React.FC<RewardBoardSubTabProps> = ({
         >
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold flex items-center gap-2 text-amber-500">
-              <Trophy className="w-5 h-5" />
+              <TrophyRegular className="w-5 h-5" />
               <span>ดาวเด่นประจำคาบนี้ (Top Earners)</span>
             </h3>
             <span className="text-xs text-slate-400 font-medium">
@@ -135,7 +135,7 @@ export const RewardBoardSubTab: React.FC<RewardBoardSubTabProps> = ({
               ))
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-slate-400 text-center py-12">
-                <Trophy className="w-12 h-12 mb-2 opacity-25 text-amber-500" />
+                <TrophyRegular className="w-12 h-12 mb-2 opacity-25 text-amber-500" />
                 <p className="text-sm font-semibold">ยังไม่มีผู้ได้รับเหรียญหรือตั๋วในคาบนี้</p>
                 <p className="text-xs text-slate-400 mt-1">
                   เริ่มสุ่มชื่อหรือแข่งขันตอบคำถามเพื่อให้คะแนนนักเรียนค่ะ
@@ -266,7 +266,7 @@ export const RewardBoardSubTab: React.FC<RewardBoardSubTabProps> = ({
             onClick={onOpenLuckyDraw}
             className="flex items-center gap-2 bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs shadow-md shadow-pink-500/25 transition active:scale-95"
           >
-            <Ticket className="w-4 h-4" />
+            <CouponRegular className="w-4 h-4" />
             <span>🎰 หมุนวงล้อตั๋วสุ่ม ({sessionTotalTickets} 🎟️)</span>
           </button>
 

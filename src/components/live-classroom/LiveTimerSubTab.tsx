@@ -2,15 +2,13 @@
 // แท็บที่ 2: นาฬิกาจับเวลากิจกรรมฉายจอใหญ่ พร้อมหลอดสถานะสี และโหมดท้าดวลตอบคำถาม (Quick Versus Arena)
 
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Timer,
-  Play,
-  Pause,
-  RotateCcw,
-  Swords,
-  Trophy,
-  Shuffle,
-} from 'lucide-react';
+import TimeRegular from '@mingcute/react/core-regular/time';
+import PlayRegular from '@mingcute/react/core-regular/play';
+import PauseRegular from '@mingcute/react/core-regular/pause';
+import Refresh1Regular from '@mingcute/react/core-regular/refresh-1';
+import TrophyRegular from '@mingcute/react/core-regular/trophy';
+import RandomRegular from '@mingcute/react/core-regular/random';
+import { Swords } from 'lucide-react';
 import type { LiveStudent } from '../../services/liveClassroomService';
 
 export interface LiveTimerSubTabProps {
@@ -128,7 +126,7 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
               isProjectorMode ? 'text-slate-200' : 'text-[#163A66]'
             }`}
           >
-            <Timer className="w-5 h-5 text-blue-500" />
+            <TimeRegular className="w-5 h-5 text-blue-500" />
             <span>นาฬิกาจับเวลากิจกรรม</span>
           </h3>
           <span className="text-xs text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full font-medium">
@@ -201,12 +199,12 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
             >
               {isTimerRunning ? (
                 <>
-                  <Pause className="w-5 h-5" />
+                  <PauseRegular className="w-5 h-5" />
                   <span>พักเวลา</span>
                 </>
               ) : (
                 <>
-                  <Play className="w-5 h-5" />
+                  <PlayRegular className="w-5 h-5" />
                   <span>เริ่มจับเวลา</span>
                 </>
               )}
@@ -220,7 +218,7 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
                   : 'bg-white hover:bg-slate-50 border-[#E6EEF7] text-[#163A66]'
               }`}
             >
-              <RotateCcw className="w-5 h-5" />
+              <Refresh1Regular className="w-5 h-5 text-slate-400" />
               <span>รีเซ็ต (02:00)</span>
             </button>
           </div>
@@ -302,7 +300,7 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
                         : 'bg-amber-400 hover:bg-amber-300 text-amber-950 font-black'
                     }`}
                   >
-                    <Trophy className="w-4 h-4" />
+                    <TrophyRegular className="w-4 h-4" />
                     <span>
                       {awardedChallengerId === ch.id ? 'ได้รับรางวัลแล้ว (+2 🪙)' : 'ชนะดวล (+2 🪙)'}
                     </span>
@@ -332,7 +330,7 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
           disabled={presentStudents.length < versusCount}
           className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-extrabold text-base py-3.5 rounded-2xl shadow-lg shadow-blue-600/25 transition active:scale-95"
         >
-          <Shuffle className="w-5 h-5" />
+          <RandomRegular className="w-5 h-5" />
           <span>สุ่มคู่ท้าดวลใหม่ ({versusCount} คน)</span>
         </button>
       </div>

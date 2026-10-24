@@ -1,22 +1,20 @@
 // src/components/live-classroom/LiveClassroomHeader.tsx
 // แถบควบคุมด้านบนสำหรับครูผู้สอน: เลือกห้องเรียน, เช็คยอดเข้าเรียน, สถานะออฟไลน์/ออนไลน์,
-// ตัวนับเหรียญ/ตั๋วในคาบ, สวิตช์เสียง, โหมดฉายจอโปรเจกเตอร์, และปุ่มสลับ 4 แท็บย่อย
+// ตัวนับเหรียญ/ตั๋วในคาบ, สวิตช์เสียง, โหมดฉายจอโปรเจกเตอร์, และปุ่มสลับ 4 แท็บย่อยสไตล์ Pastel Anime
 
 import React from 'react';
-import {
-  Sparkles,
-  Maximize2,
-  Minimize2,
-  Volume2,
-  VolumeX,
-  ClipboardList,
-  Dices,
-  Timer,
-  Users,
-  Trophy,
-  CheckCircle2,
-  Ticket,
-} from 'lucide-react';
+import SparklesRegular from '@mingcute/react/core-regular/sparkles';
+import RandomRegular from '@mingcute/react/core-regular/random';
+import TimeRegular from '@mingcute/react/core-regular/time';
+import GroupRegular from '@mingcute/react/core-regular/group';
+import TrophyRegular from '@mingcute/react/core-regular/trophy';
+import CouponRegular from '@mingcute/react/core-regular/coupon';
+import Coin2Regular from '@mingcute/react/core-regular/coin-2';
+import CheckCircleRegular from '@mingcute/react/core-regular/check-circle';
+import FullscreenRegular from '@mingcute/react/core-regular/fullscreen';
+import FullscreenExitRegular from '@mingcute/react/core-regular/fullscreen-exit';
+import VolumeRegular from '@mingcute/react/core-regular/volume';
+import VolumeMuteRegular from '@mingcute/react/core-regular/volume-mute';
 
 export type SubTab = 'picker' | 'timer' | 'groups' | 'rewards';
 
@@ -79,7 +77,7 @@ export const LiveClassroomHeader: React.FC<LiveClassroomHeaderProps> = ({
                 : 'bg-blue-50 border border-blue-200 text-[#163A66]'
             }`}
           >
-            <Sparkles className="w-5 h-5 text-blue-500" />
+            <SparklesRegular className="w-5 h-5 text-blue-500" />
             <span className="text-sm font-semibold">เครื่องมือตอนสอน</span>
           </div>
 
@@ -106,7 +104,7 @@ export const LiveClassroomHeader: React.FC<LiveClassroomHeaderProps> = ({
                 : 'bg-emerald-50 border border-emerald-200 text-emerald-800'
             }`}
           >
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            <CheckCircleRegular className="w-4 h-4 text-emerald-500" />
             มาเรียน {presentCount}/{totalCount} คน
           </span>
 
@@ -146,25 +144,25 @@ export const LiveClassroomHeader: React.FC<LiveClassroomHeaderProps> = ({
             className="flex items-center gap-1.5 bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-md shadow-pink-500/20 transition active:scale-95"
             title="เปิดวงล้อจับรางวัลตั๋วสุ่มท้ายคาบ"
           >
-            <Ticket className="w-4 h-4" />
+            <CouponRegular className="w-4 h-4" />
             <span>หมุนวงล้อตั๋วสุ่ม ({sessionTickets} 🎟️)</span>
           </button>
 
           {/* Session Ledger Counter */}
           <button
             onClick={() => onChangeTab('rewards')}
-            className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border transition ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border transition ${
               isProjectorMode
                 ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
                 : 'bg-[#F7FAFF] hover:bg-blue-50 border-[#E6EEF7] text-[#163A66]'
             }`}
             title="ดูประวัติการแจกรางวัลในคาบนี้ (แท็บ 4)"
           >
-            <ClipboardList className="w-4 h-4 text-amber-500" />
+            <Coin2Regular className="w-4 h-4 text-amber-500" />
             <span className="text-xs font-medium">แจกในคาบ:</span>
-            <span className="font-bold text-amber-500">🪙 {sessionCoins}</span>
-            <span className="text-slate-400">|</span>
-            <span className="font-bold text-pink-500">🎟️ {sessionTickets}</span>
+            <span className="font-bold text-amber-500">{sessionCoins} 🪙</span>
+            <span className="text-slate-300">|</span>
+            <span className="font-bold text-pink-500">{sessionTickets} 🎟️</span>
           </button>
 
           {/* Sound FX Toggle */}
@@ -181,7 +179,11 @@ export const LiveClassroomHeader: React.FC<LiveClassroomHeaderProps> = ({
             }`}
             title="เปิด/ปิดเสียงเอฟเฟกต์ (คีย์ลัด M)"
           >
-            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            {soundEnabled ? (
+              <VolumeRegular className="w-4 h-4 text-emerald-500" />
+            ) : (
+              <VolumeMuteRegular className="w-4 h-4 text-rose-500" />
+            )}
             <span className="hidden sm:inline">{soundEnabled ? 'เสียงเปิด' : 'ปิดเสียง'}</span>
           </button>
 
@@ -197,12 +199,12 @@ export const LiveClassroomHeader: React.FC<LiveClassroomHeaderProps> = ({
           >
             {isProjectorMode ? (
               <>
-                <Minimize2 className="w-4 h-4" />
+                <FullscreenExitRegular className="w-4 h-4" />
                 <span>ย่อหน้าจอ</span>
               </>
             ) : (
               <>
-                <Maximize2 className="w-4 h-4 text-blue-500" />
+                <FullscreenRegular className="w-4 h-4 text-blue-500" />
                 <span>โหมดฉายจอใหญ่</span>
               </>
             )}
@@ -217,10 +219,10 @@ export const LiveClassroomHeader: React.FC<LiveClassroomHeaderProps> = ({
         }`}
       >
         {[
-          { id: 'picker', label: '🎯 สุ่มชื่อนักเรียน', icon: Dices },
-          { id: 'timer', label: '⏱️ ตอบคำถามสด', icon: Timer },
-          { id: 'groups', label: '👥 แบ่งกลุ่มกิจกรรม', icon: Users },
-          { id: 'rewards', label: '🏆 บอร์ดรางวัล', icon: Trophy },
+          { id: 'picker', label: 'สุ่มชื่อนักเรียน', icon: RandomRegular },
+          { id: 'timer', label: 'ตอบคำถามสด', icon: TimeRegular },
+          { id: 'groups', label: 'แบ่งกลุ่มกิจกรรม', icon: GroupRegular },
+          { id: 'rewards', label: 'บอร์ดรางวัล', icon: TrophyRegular },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -228,7 +230,7 @@ export const LiveClassroomHeader: React.FC<LiveClassroomHeaderProps> = ({
             <button
               key={tab.id}
               onClick={() => onChangeTab(tab.id as SubTab)}
-              className={`flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl text-sm font-bold transition-all ${
+              className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all ${
                 isActive
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 scale-[1.01]'
                   : isProjectorMode
@@ -236,7 +238,7 @@ export const LiveClassroomHeader: React.FC<LiveClassroomHeaderProps> = ({
                   : 'bg-[#F7FAFF] text-[#6B7C93] hover:bg-blue-50 hover:text-blue-600'
               }`}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="w-4 h-4 shrink-0" />
               <span>{tab.label}</span>
             </button>
           );

@@ -3,9 +3,9 @@
 // สลับสมาชิกข้ามกลุ่มแบบฉับพลัน, แจกรางวัลยกกลุ่ม, และระบบ Group Presets บันทึก/โหลดกลุ่มเดิม
 
 import React, { useState, useEffect, useCallback } from 'react';
+import RandomRegular from '@mingcute/react/core-regular/random';
 import {
   Users,
-  Shuffle,
   Crown,
   ArrowLeftRight,
   Save,
@@ -252,7 +252,7 @@ export const GroupGeneratorSubTab: React.FC<GroupGeneratorSubTabProps> = ({
           onClick={handleGenerate}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold px-5 py-2 rounded-xl text-xs shadow-md shadow-blue-500/20 transition active:scale-95"
         >
-          <Shuffle className="w-4 h-4" />
+          <RandomRegular className="w-4 h-4" />
           <span>สุ่มจัดกลุ่มทันที</span>
         </button>
       </div>

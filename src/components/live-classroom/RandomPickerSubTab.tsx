@@ -1,20 +1,16 @@
 // src/components/live-classroom/RandomPickerSubTab.tsx
 // แท็บที่ 1: สุ่มชื่อนักเรียน (Slot Reel & Card Flip) พร้อมระบบตัดชื่อคนซ้ำ, ให้รางวัลด่วน (+1🪙, +3🪙, +1🎟️),
-// และแถบจัดการสถานะการมาเรียนด่วนแบบ Optimistic UI
+// จับเวลาจริงแม่นยำระดับมิลลิวินาที (1.5s / 3.0s / 5.0s เป๊ะ) และไอคอนสไตล์ Pastel Anime
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  Dices,
-  RotateCcw,
-  Crown,
-  Sparkles,
-  Coins,
-  Ticket,
-  SkipForward,
-  CheckCircle2,
-  UserX,
-  Shuffle,
-} from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import SparklesRegular from '@mingcute/react/core-regular/sparkles';
+import RandomRegular from '@mingcute/react/core-regular/random';
+import Refresh1Regular from '@mingcute/react/core-regular/refresh-1';
+import Coin2Regular from '@mingcute/react/core-regular/coin-2';
+import CouponRegular from '@mingcute/react/core-regular/coupon';
+import CheckCircleRegular from '@mingcute/react/core-regular/check-circle';
+import CloseRegular from '@mingcute/react/core-regular/close';
+import { Crown, SkipForward } from 'lucide-react';
 import type { LiveStudent } from '../../services/liveClassroomService';
 
 export type SpinSpeed = 'fast' | 'normal' | 'dramatic';
@@ -73,6 +69,20 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
   const [cardDeck, setCardDeck] = useState<LiveStudent[]>([]);
   const [flippedStudentId, setFlippedStudentId] = useState<string | null>(null);
 
+  const spinTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const cancelSpinTimers = useCallback(() => {
+    spinTimersRef.current.forEach(clearTimeout);
+    spinTimersRef.current = [];
+    setIsSpinning(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      cancelSpinTimers();
+    };
+  }, [cancelSpinTimers]);
+
   const presentStudents = useMemo(() => students.filter((s) => s.present), [students]);
 
   // กองรายชื่อที่พร้อมให้สุ่ม (ไม่ซ้ำคนที่ถูกเลือกไปแล้วในคาบนี้)
@@ -82,12 +92,13 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
 
   // รีเซ็ตกองสุ่มและสำรับการ์ดเมื่อห้องเรียนเปลี่ยน
   useEffect(() => {
+    cancelSpinTimers();
     setPickedIds([]);
     setSelectedStudent(null);
     setRollingStudent(null);
     setFlippedStudentId(null);
     setCardDeck([]);
-  }, [classroomId, setSelectedStudent, setRollingStudent]);
+  }, [classroomId, cancelSpinTimers, setSelectedStudent, setRollingStudent]);
 
   // เตรียมสำรับการ์ด 8 ใบเมื่อเปิดโหมดการ์ด หรือเมื่อสำรับการ์ดหมด
   useEffect(() => {
@@ -105,43 +116,49 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
   const handleRandomPick = useCallback(() => {
     if (isSpinning || availablePool.length === 0) return;
 
+    cancelSpinTimers();
     setIsSpinning(true);
     setFlippedStudentId(null);
 
     const winner = availablePool[Math.floor(Math.random() * availablePool.length)];
-    let steps = 0;
 
-    // การตั้งค่าความเร็วและระยะเวลาการสุ่มตาม preset ที่ครูเลือก
-    const speedConfig = {
-      fast: { totalSteps: 12, baseDelay: 30, exp: 1.45, mult: 2.0 },
-      normal: { totalSteps: 22, baseDelay: 40, exp: 1.65, mult: 2.5 },
-      dramatic: { totalSteps: 34, baseDelay: 45, exp: 1.85, mult: 3.0 },
+    // ระยะเวลาจริงระดับมิลลิวินาที 100% ตรงตามที่ครูเลือก (1.5s / 3.0s / 5.0s เป๊ะ ไม่เกินแน่นอน)
+    const targetDurationMs = {
+      fast: 1500,     // 1.5 วินาที
+      normal: 3000,   // 3.0 วินาที
+      dramatic: 5000, // 5.0 วินาที
     }[spinSpeed];
 
-    const totalSteps = speedConfig.totalSteps;
+    const totalTicks = {
+      fast: 14,
+      normal: 22,
+      dramatic: 30,
+    }[spinSpeed];
 
-    const runStep = () => {
-      steps++;
-      const randomPreview = presentStudents[Math.floor(Math.random() * presentStudents.length)];
-      setRollingStudent(randomPreview);
-      onPlaySound?.('tick', 450 + steps * 15);
+    // ทยอยสุ่มเปลี่ยนชื่อแบบ Quadratic Deceleration Curve
+    for (let i = 1; i < totalTicks; i++) {
+      const progress = i / totalTicks;
+      const scheduledTime = Math.pow(progress, 1.9) * targetDurationMs;
+      const timer = setTimeout(() => {
+        const randomPreview = presentStudents[Math.floor(Math.random() * presentStudents.length)];
+        setRollingStudent(randomPreview);
+        onPlaySound?.('tick', 450 + i * 15);
+      }, scheduledTime);
+      spinTimersRef.current.push(timer);
+    }
 
-      if (steps < totalSteps) {
-        const delay = speedConfig.baseDelay + Math.pow(steps, speedConfig.exp) * speedConfig.mult;
-        setTimeout(runStep, delay);
-      } else {
-        setRollingStudent(winner);
-        setSelectedStudent(winner);
-        if (noRepeat) {
-          setPickedIds((prev) => (prev.includes(winner.id) ? prev : [...prev, winner.id]));
-        }
-        setIsSpinning(false);
-        onPlaySound?.('fanfare');
+    // Tick สุดท้ายหยุดที่เป้าหมายเวลาจริงเป๊ะ (1.5s, 3.0s, 5.0s) พร้อมประกาศผู้ชนะและเสียงดนตรี
+    const finalTimer = setTimeout(() => {
+      setRollingStudent(winner);
+      setSelectedStudent(winner);
+      if (noRepeat) {
+        setPickedIds((prev) => (prev.includes(winner.id) ? prev : [...prev, winner.id]));
       }
-    };
-
-    runStep();
-  }, [isSpinning, availablePool, presentStudents, spinSpeed, noRepeat, setRollingStudent, setSelectedStudent, onPlaySound]);
+      setIsSpinning(false);
+      onPlaySound?.('fanfare');
+    }, targetDurationMs);
+    spinTimersRef.current.push(finalTimer);
+  }, [isSpinning, availablePool, presentStudents, spinSpeed, noRepeat, cancelSpinTimers, setRollingStudent, setSelectedStudent, onPlaySound]);
 
   // Hotkey สำหรับกด Spacebar สุ่มชื่อในโหมด Slot Reel
   useEffect(() => {
@@ -261,13 +278,13 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
 
         <button
           onClick={handleResetPool}
-          className={`flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-xl font-semibold border transition ${
+          className={`flex items-center gap-1.5 text-xs px-3.5 py-2 rounded-xl font-semibold border transition ${
             isProjectorMode
               ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
               : 'bg-[#F7FAFF] hover:bg-slate-100 border-[#E6EEF7] text-[#6B7C93]'
           }`}
         >
-          <RotateCcw className="w-3.5 h-3.5" />
+          <Refresh1Regular className="w-4 h-4 text-slate-400" />
           <span>รีเซ็ตรายชื่อสุ่ม</span>
         </button>
       </div>
@@ -282,7 +299,9 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
       >
         {presentStudents.length === 0 ? (
           <div className="py-12 text-center text-slate-400 space-y-2">
-            <Dices className="w-16 h-16 mx-auto opacity-30 text-blue-500" />
+            <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-200/80 flex items-center justify-center mx-auto text-blue-500 shadow-sm">
+              <RandomRegular className="w-8 h-8" />
+            </div>
             <h3 className="text-xl font-bold text-[#163A66]">ไม่พบนักเรียนที่มีสถานะมาเรียน</h3>
             <p className="text-xs text-slate-400">
               กรุณาเช็กสถานะการมาเรียนในแถบด้านล่าง หรือเลือกห้องเรียนที่มีนักเรียนค่ะ
@@ -321,8 +340,10 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
                   </p>
                 </div>
               ) : (
-                <div className="py-8 space-y-2 text-slate-400">
-                  <Dices className="w-16 h-16 mx-auto opacity-30 text-blue-500" />
+                <div className="py-8 space-y-3 text-slate-400">
+                  <div className="w-16 h-16 rounded-3xl bg-blue-50 border border-blue-200/80 flex items-center justify-center mx-auto text-blue-500 shadow-sm">
+                    <RandomRegular className="w-8 h-8" />
+                  </div>
                   <p
                     className={`text-2xl font-bold ${
                       isProjectorMode ? 'text-slate-200' : 'text-[#163A66]'
@@ -343,13 +364,13 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
               disabled={isSpinning || availablePool.length === 0}
               className="mt-8 flex items-center gap-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-extrabold text-lg px-9 py-3.5 rounded-2xl shadow-xl shadow-blue-600/30 transition transform active:scale-95"
             >
-              <Dices className="w-6 h-6" />
+              <RandomRegular className="w-6 h-6" />
               <span>
                 {isSpinning
                   ? 'กำลังหมุนสุ่ม...'
                   : availablePool.length === 0
                   ? 'สุ่มครบทุกคนแล้ว! (กดรีเซ็ตด้านบน)'
-                  : '🎲 สุ่มชื่อนักเรียน (Spacebar)'}
+                  : 'สุ่มชื่อนักเรียน (Spacebar)'}
               </span>
             </button>
           </>
@@ -373,7 +394,7 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
                       : 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700'
                   }`}
                 >
-                  <Shuffle className="w-3.5 h-3.5" />
+                  <RandomRegular className="w-3.5 h-3.5" />
                   <span>แจกการ์ดชุดใหม่ (8 ใบ)</span>
                 </button>
               )}
@@ -420,14 +441,14 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
                       </>
                     ) : isPickedInPast ? (
                       <>
-                        <CheckCircle2 className="w-7 h-7 text-slate-500 mb-1" />
+                        <CheckCircleRegular className="w-7 h-7 text-slate-400 mb-1" />
                         <span className="font-bold text-xs text-slate-400">
                           เปิดแล้ว
                         </span>
                       </>
                     ) : (
                       <>
-                        <Sparkles className="w-8 h-8 text-blue-500 mb-2" />
+                        <SparklesRegular className="w-8 h-8 text-blue-500 mb-2" />
                         <span
                           className={`font-bold text-xs ${
                             isProjectorMode ? 'text-slate-300' : 'text-[#163A66]'
@@ -482,9 +503,9 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
                 `${selectedStudent.name} ตอบคำถาม`
               )
             }
-            className="flex items-center gap-1.5 bg-amber-500/20 hover:bg-amber-500/30 disabled:opacity-40 border border-amber-500/40 text-amber-500 font-bold px-3.5 py-1.5 rounded-xl text-xs transition"
+            className="flex items-center gap-1.5 bg-amber-500/15 hover:bg-amber-500/25 disabled:opacity-40 border border-amber-300 text-amber-600 font-bold px-3.5 py-1.5 rounded-xl text-xs transition"
           >
-            <Coins className="w-4 h-4" />
+            <Coin2Regular className="w-4 h-4 text-amber-500" />
             <span>+1 เหรียญ</span>
           </button>
 
@@ -501,7 +522,7 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
             }
             className="flex items-center gap-1.5 bg-amber-400 hover:bg-amber-300 disabled:opacity-40 text-amber-950 font-black px-3.5 py-1.5 rounded-xl text-xs transition active:scale-95 shadow-sm"
           >
-            <Coins className="w-4 h-4" />
+            <Coin2Regular className="w-4 h-4" />
             <span>+3 เหรียญ</span>
           </button>
 
@@ -516,9 +537,9 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
                 `${selectedStudent.name} ได้ตั๋วสุ่มรางวัล`
               )
             }
-            className="flex items-center gap-1.5 bg-pink-500/20 hover:bg-pink-500/30 disabled:opacity-40 border border-pink-500/40 text-pink-500 font-bold px-3.5 py-1.5 rounded-xl text-xs transition"
+            className="flex items-center gap-1.5 bg-pink-500/15 hover:bg-pink-500/25 disabled:opacity-40 border border-pink-300 text-pink-600 font-bold px-3.5 py-1.5 rounded-xl text-xs transition"
           >
-            <Ticket className="w-4 h-4" />
+            <CouponRegular className="w-4 h-4 text-pink-500" />
             <span>+1 ตั๋วสุ่ม</span>
           </button>
 
@@ -568,9 +589,9 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
                 {isSyncing ? (
                   <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 ) : !st.present ? (
-                  <UserX className="w-3.5 h-3.5 text-rose-500" />
+                  <CloseRegular className="w-3.5 h-3.5 text-rose-500" />
                 ) : (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                  <CheckCircleRegular className="w-3.5 h-3.5 text-emerald-500" />
                 )}
                 <span>{st.name}</span>
               </button>
