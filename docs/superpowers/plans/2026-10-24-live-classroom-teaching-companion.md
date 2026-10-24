@@ -49,7 +49,7 @@
 
 ---
 
-### Task 2: Optimistic Rewards & Batch Transaction Hook (`useOptimisticRewards.ts`)
+### Task 2: Optimistic Rewards & Offline Retry Queue Hook (`useOptimisticRewards.ts`)
 
 **Files:**
 - Create: `src/hooks/useOptimisticRewards.ts`
@@ -60,6 +60,7 @@
 - Consumes: `gachaService.addCoins`, `gachaService.addTickets`, `soundFX`
 - Produces:
   ```typescript
+  export type SyncStatus = 'syncing' | 'synced' | 'queued' | 'error';
   export interface RewardBatch {
     id: string;
     classroomId: string;
@@ -69,7 +70,7 @@
     targetStudentIds: string[];
     isRevoked: boolean;
     createdAt: string;
-    syncStatus: 'syncing' | 'synced' | 'error';
+    syncStatus: SyncStatus;
   }
   export function useOptimisticRewards(props: {
     classroomId: string;
@@ -77,20 +78,25 @@
     onPlaySound?: (type: 'coin' | 'buzzer') => void;
   }): {
     ledger: RewardBatch[];
-    setInitialLedger: React.Dispatch<React.SetStateAction<RewardBatch[]>>;
-    toast: { message: string; isError?: boolean } | null;
+    setInitialLedger: (serverLedger: RewardBatch[]) => void;
+    toast: { message: string; variant?: 'success' | 'warning' | 'error' } | null;
+    isOnline: boolean;
+    pendingQueueCount: number;
+    isFlushingQueue: boolean;
+    flushOfflineQueue: () => Promise<void>;
     giveReward: (studentIds: string[], type: 'coin' | 'ticket', amount: number, desc: string) => Promise<void>;
     undoReward: (batch: RewardBatch) => Promise<void>;
   };
   ```
 
-- [ ] **Step 1: เขียนเทสต์จำลองการแจกเหรียญ/ตั๋ว, การ Undo, และการป้องกันยอดติดลบ**
+- [ ] **Step 1: เขียน Unit Test สำหรับ Offline Queue, Smart Offline Undo, และ FIFO Flush**
+  ทดสอบการนำเข้ารายการเมื่อเน็ตหลุด (syncStatus: queued), การตัดรายการออกจากคิวทันทีเมื่อกด Undo ตอนออฟไลน์, และการ flush คิวตามลำดับ FIFO
 - [ ] **Step 2: รันเทสต์เพื่อยืนยันผล**
 - [ ] **Step 3: พัฒนา `src/hooks/useOptimisticRewards.ts`**
-  สร้าง hook รองรับการปรับ State ทันที, อัปเดต `gachaService`, บันทึกประวัติลง `sessionStorage`, `setInitialLedger`, และระบบ Undo พร้อม Rollback เมื่อมี Error
+  สร้าง hook รองรับ Optimistic Update, ตรวจจับ `navigator.onLine`, คิว `localStorage`, การกู้คืนยอดเมื่อ refresh, FIFO queue worker, และระบบ Smart Offline Undo
 - [ ] **Step 4: ตรวจสอบเทสต์ให้ผ่านทั้งหมด**
 - [ ] **Step 5: Commit**
-  `git add src/hooks/useOptimisticRewards.ts tests/liveClassroomEcosystem.test.ts && git commit -m "feat: add useOptimisticRewards hook with rollback and undo"`
+  `git add src/hooks/useOptimisticRewards.ts tests/liveClassroomEcosystem.test.ts && git commit -m "feat: add useOptimisticRewards hook with offline retry queue and smart undo"`
 
 ---
 
