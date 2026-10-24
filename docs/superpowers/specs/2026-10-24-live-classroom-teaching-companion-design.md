@@ -149,7 +149,27 @@
    - เมื่อกดยกเลิก: หักแต้มคืนทันที (`-amount`), อัปเดต `isRevoked: true` ใน `RewardBatch` และปรับยอดใน `gachaService` ทันที
    - หากเกิดข้อผิดพลาดในการบันทึก ระบบจะ Rollback คืนค่าเดิมพร้อมเสียงแจ้งเตือนและข้อความ Toast ให้คุณครูทราบทันที
 4. **Custom Hook `useOptimisticRewards`**:
-   - แยก Logic การจัดการ Ledger, Toast, Give Reward, Undo Reward ออกเป็น Hook เฉพาะ เพื่อให้ `LiveClassroomView.tsx` มีโค้ดที่สะอาดและทดสอบได้ง่าย (Decoupled & Testable)
+   - แยก Logic การจัดการ Ledger, Toast, Give Reward, Undo Reward และ `setInitialLedger` ออกเป็น Hook เฉพาะ เพื่อให้ `LiveClassroomView.tsx` มีโค้ดที่สะอาดและทดสอบได้ง่าย (Decoupled & Testable)
+
+---
+
+## 4.7 ระบบเตรียมข้อมูลห้องเรียนและการจัดระดับ Tier อัตโนมัติ (`liveClassroomService.ts`)
+
+เพื่อความแม่นยำและการกู้คืนข้อมูลกรณีครูกด Refresh หน้าจอ:
+1. **Timezone-Safe Thailand Date Range (UTC+7)**:
+   - คำนวณขอบเขตวันปัจจุบันตามเวลาประเทศไทย (`Asia/Bangkok` UTC+7) เพื่อความถูกต้องของสถิติและรายการแจกของวันนี้
+2. **Smart Attendance Fallback**:
+   - ตรวจสอบสถานะการเช็กชื่อของวันนี้ (`attendanceService` / `attendanceCorrelationService`)
+   - หากคาบนี้ยังไม่ได้เช็กชื่อในระบบ จะถือว่านักเรียนทุกคน "มาเรียน (present: true)" เป็นค่าเริ่มต้น เพื่อให้ครูเริ่มกิจกรรมสุ่มชื่อได้ทันที แต่หากมีการเช็กชื่อแล้ว จะนับเฉพาะคนที่สถานะเป็น `PRESENT` หรือ `LATE` (มาสายยังอยู่ในห้อง)
+3. **Auto-Tier Percentile Calculation (`calculateStudentTierMap`)**:
+   - คำนวณคะแนนสะสมถ่วงน้ำหนัก: `score = totalCoins + totalTickets * 3`
+   - แบ่งนักเรียนออกเป็น 3 ระดับอย่างสมดุล:
+     - `high`: 33% บน
+     - `mid`: 34% กลาง
+     - `low`: 33% ล่าง
+   - กรณีต้นเทอมที่ทุกคนมีคะแนน 0 เท่ากัน จะเกลี่ย Tier สลับวน `high`, `mid`, `low` เพื่อให้ฟีเจอร์จัดกลุ่มคละความสามารถทำงานได้อย่างสมบูรณ์แบบ
+4. **Session Recovery**:
+   - กู้คืนยอดเหรียญและตั๋วที่ได้รับในคาบนี้ (`sessionCoins`, `sessionTickets`) และประวัติ `ledger` จากประวัติของวันปัจจุบัน ทำให้ครูกด Refresh หน้าจอแล้วคะแนนในคาบไม่หายไป
 
 ---
 

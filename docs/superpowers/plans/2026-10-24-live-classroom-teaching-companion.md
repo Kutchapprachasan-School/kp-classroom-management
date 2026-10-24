@@ -77,6 +77,7 @@
     onPlaySound?: (type: 'coin' | 'buzzer') => void;
   }): {
     ledger: RewardBatch[];
+    setInitialLedger: React.Dispatch<React.SetStateAction<RewardBatch[]>>;
     toast: { message: string; isError?: boolean } | null;
     giveReward: (studentIds: string[], type: 'coin' | 'ticket', amount: number, desc: string) => Promise<void>;
     undoReward: (batch: RewardBatch) => Promise<void>;
@@ -86,10 +87,39 @@
 - [ ] **Step 1: เขียนเทสต์จำลองการแจกเหรียญ/ตั๋ว, การ Undo, และการป้องกันยอดติดลบ**
 - [ ] **Step 2: รันเทสต์เพื่อยืนยันผล**
 - [ ] **Step 3: พัฒนา `src/hooks/useOptimisticRewards.ts`**
-  สร้าง hook รองรับการปรับ State ทันที, อัปเดต `gachaService`, บันทึกประวัติลง `sessionStorage`, และระบบ Undo พร้อม Rollback เมื่อมี Error
+  สร้าง hook รองรับการปรับ State ทันที, อัปเดต `gachaService`, บันทึกประวัติลง `sessionStorage`, `setInitialLedger`, และระบบ Undo พร้อม Rollback เมื่อมี Error
 - [ ] **Step 4: ตรวจสอบเทสต์ให้ผ่านทั้งหมด**
 - [ ] **Step 5: Commit**
   `git add src/hooks/useOptimisticRewards.ts tests/liveClassroomEcosystem.test.ts && git commit -m "feat: add useOptimisticRewards hook with rollback and undo"`
+
+---
+
+### Task 2.5: Live Classroom Data Service & Tier Engine (`liveClassroomService.ts`)
+
+**Files:**
+- Create: `src/services/liveClassroomService.ts`
+- Test: `tests/liveClassroomEcosystem.test.ts`
+
+**Interfaces:**
+- Consumes: `classroomService`, `sgsRosterAndSubmissionService`, `gachaService`
+- Produces:
+  ```typescript
+  export function getThailandTodayRange(): { startOfDayUTC: Date; endOfDayUTC: Date };
+  export function calculateStudentTierMap(
+    students: { id: string; totalCoins: number; totalTickets: number }[]
+  ): Record<string, 'high' | 'mid' | 'low'>;
+  export const liveClassroomService: {
+    loadClassroomsData: () => Promise<LiveClassroomData[]>;
+  };
+  ```
+
+- [ ] **Step 1: เขียน Unit Test สำหรับ `calculateStudentTierMap` และ `getThailandTodayRange`**
+  ทดสอบการจัด Tier แบ่งตามเปอร์เซ็นไทล์ 33%/34%/33%, การเกลี่ยสลับเมื่อคะแนน 0 เท่ากันทั้งหมด, และการกู้คืน session ledger
+- [ ] **Step 2: พัฒนา `src/services/liveClassroomService.ts`**
+  สร้างฟังก์ชันคำนวณ Tier อัตโนมัติ, ตรวจสอบสถานะมาเรียน (Fallback: present=true ถ้ายังไม่ได้เช็ก), และการรวบรวมข้อมูลห้องเรียนจริง
+- [ ] **Step 3: ตรวจสอบเทสต์ให้ผ่าน**
+- [ ] **Step 4: Commit**
+  `git add src/services/liveClassroomService.ts tests/liveClassroomEcosystem.test.ts && git commit -m "feat: add liveClassroomService with auto-tier percentile and session recovery"`
 
 ---
 
