@@ -101,7 +101,7 @@
 - Test: `tests/liveClassroomEcosystem.test.ts`
 
 **Interfaces:**
-- Consumes: `classroomService`, `sgsRosterAndSubmissionService`, `gachaService`
+- Consumes: `classroomService`, `sgsRosterAndSubmissionService`, `gachaService`, `attendanceService`
 - Produces:
   ```typescript
   export function getThailandTodayRange(): { startOfDayUTC: Date; endOfDayUTC: Date };
@@ -110,16 +110,17 @@
   ): Record<string, 'high' | 'mid' | 'low'>;
   export const liveClassroomService: {
     loadClassroomsData: () => Promise<LiveClassroomData[]>;
+    toggleAttendance: (classroomId: string, studentId: string, nextPresent: boolean) => Promise<{ success: boolean; present: boolean }>;
   };
   ```
 
-- [ ] **Step 1: เขียน Unit Test สำหรับ `calculateStudentTierMap` และ `getThailandTodayRange`**
-  ทดสอบการจัด Tier แบ่งตามเปอร์เซ็นไทล์ 33%/34%/33%, การเกลี่ยสลับเมื่อคะแนน 0 เท่ากันทั้งหมด, และการกู้คืน session ledger
+- [ ] **Step 1: เขียน Unit Test สำหรับ `calculateStudentTierMap`, `getThailandTodayRange` และ First-Toggle Initialization**
+  ทดสอบการจัด Tier แบ่งตามเปอร์เซ็นไทล์ 33%/34%/33%, การเกลี่ยสลับเมื่อคะแนน 0 เท่ากันทั้งหมด, การกู้คืน session ledger, และการป้องกันบั๊กนักเรียนคนอื่นกลายเป็นขาดเรียนเมื่อกดสลับคนแรก
 - [ ] **Step 2: พัฒนา `src/services/liveClassroomService.ts`**
-  สร้างฟังก์ชันคำนวณ Tier อัตโนมัติ, ตรวจสอบสถานะมาเรียน (Fallback: present=true ถ้ายังไม่ได้เช็ก), และการรวบรวมข้อมูลห้องเรียนจริง
+  สร้างฟังก์ชันคำนวณ Tier อัตโนมัติ, ตรวจสอบสถานะมาเรียน (Fallback: present=true ถ้ายังไม่ได้เช็ก), ระบบ `toggleAttendance` ที่มี First-Toggle Initialization, และการรวบรวมข้อมูลห้องเรียนจริง
 - [ ] **Step 3: ตรวจสอบเทสต์ให้ผ่าน**
 - [ ] **Step 4: Commit**
-  `git add src/services/liveClassroomService.ts tests/liveClassroomEcosystem.test.ts && git commit -m "feat: add liveClassroomService with auto-tier percentile and session recovery"`
+  `git add src/services/liveClassroomService.ts tests/liveClassroomEcosystem.test.ts && git commit -m "feat: add liveClassroomService with auto-tier percentile, first-toggle init, and session recovery"`
 
 ---
 
