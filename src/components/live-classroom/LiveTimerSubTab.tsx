@@ -49,18 +49,17 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
   const [totalSeconds, setTotalSeconds] = useState<number>(120);
   const [remainingSeconds, setRemainingSeconds] = useState<number>(120);
   const [versusCount, setVersusCount] = useState<number>(2);
+  const [awardedChallengerId, setAwardedChallengerId] = useState<string | null>(null);
 
   const presentStudents = students.filter((s) => s.present);
 
-  // นาฬิกานับถอยหลัง
+  // นาฬิกานับถอยหลัง (Interval Effect ปราศจาก Side-effect ซ้อนใน State Updater)
   useEffect(() => {
     if (!isTimerRunning) return;
 
     const interval = setInterval(() => {
       setRemainingSeconds((prev) => {
         if (prev <= 1) {
-          setIsTimerRunning(false);
-          onPlaySound?.('buzzer');
           return 0;
         }
         if (prev <= 11) {
@@ -71,7 +70,15 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isTimerRunning, onPlaySound, setIsTimerRunning]);
+  }, [isTimerRunning, onPlaySound]);
+
+  // เมื่อเวลาหมด (แตะ 0 ขณะที่กำลังจับเวลา) ให้หยุดและส่งเสียงกริ่งหมดเวลา Buzzer
+  useEffect(() => {
+    if (isTimerRunning && remainingSeconds === 0) {
+      setIsTimerRunning(false);
+      onPlaySound?.('buzzer');
+    }
+  }, [isTimerRunning, remainingSeconds, onPlaySound, setIsTimerRunning]);
 
   const addTimerSeconds = (sec: number) => {
     setTotalSeconds((prev) => Math.max(prev + sec, remainingSeconds + sec));
@@ -84,10 +91,22 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
     setRemainingSeconds(newSec);
   };
 
+  const handleToggleTimer = () => {
+    if (!isTimerRunning && remainingSeconds <= 0) {
+      const resetSec = totalSeconds > 0 ? totalSeconds : 120;
+      setTotalSeconds(resetSec);
+      setRemainingSeconds(resetSec);
+      setIsTimerRunning(true);
+      return;
+    }
+    setIsTimerRunning((prev) => !prev);
+  };
+
   const pickChallengers = useCallback(() => {
     if (presentStudents.length < versusCount) return;
     const shuffled = [...presentStudents].sort(() => Math.random() - 0.5);
     setChallengers(shuffled.slice(0, versusCount));
+    setAwardedChallengerId(null);
     onPlaySound?.('fanfare');
   }, [presentStudents, versusCount, onPlaySound, setChallengers]);
 
@@ -173,11 +192,11 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
 
           <div className="flex justify-center gap-3 pt-2">
             <button
-              onClick={() => setIsTimerRunning((prev) => !prev)}
+              onClick={handleToggleTimer}
               className={`flex items-center gap-2 font-bold px-7 py-3 rounded-2xl text-base transition shadow-md ${
                 isTimerRunning
-                  ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
-                  : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                  ? 'bg-amber-400 hover:bg-amber-300 text-amber-950 font-black shadow-amber-400/20'
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'
               }`}
             >
               {isTimerRunning ? (
@@ -265,7 +284,10 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
                     {ch.name}
                   </h4>
                   <button
+                    disabled={awardedChallengerId === ch.id}
                     onClick={() => {
+                      if (awardedChallengerId === ch.id) return;
+                      setAwardedChallengerId(ch.id);
                       onPlaySound?.('fanfare');
                       onGiveReward(
                         [ch.id],
@@ -274,10 +296,16 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
                         `${ch.name} ชนะการดวลตอบคำถาม`
                       );
                     }}
-                    className="w-full flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold py-2 px-3 rounded-xl text-xs transition active:scale-95 shadow-md"
+                    className={`w-full flex items-center justify-center gap-1.5 font-extrabold py-2 px-3 rounded-xl text-xs transition active:scale-95 shadow-md ${
+                      awardedChallengerId === ch.id
+                        ? 'bg-emerald-600 text-white cursor-default'
+                        : 'bg-amber-400 hover:bg-amber-300 text-amber-950 font-black'
+                    }`}
                   >
                     <Trophy className="w-4 h-4" />
-                    <span>ชนะดวล (+2 🪙)</span>
+                    <span>
+                      {awardedChallengerId === ch.id ? 'ได้รับรางวัลแล้ว (+2 🪙)' : 'ชนะดวล (+2 🪙)'}
+                    </span>
                   </button>
                 </div>
               ))}
@@ -302,7 +330,7 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
         <button
           onClick={pickChallengers}
           disabled={presentStudents.length < versusCount}
-          className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500 text-white font-extrabold text-base py-3.5 rounded-2xl shadow-lg shadow-blue-600/25 transition active:scale-95"
+          className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-extrabold text-base py-3.5 rounded-2xl shadow-lg shadow-blue-600/25 transition active:scale-95"
         >
           <Shuffle className="w-5 h-5" />
           <span>สุ่มคู่ท้าดวลใหม่ ({versusCount} คน)</span>

@@ -54,14 +54,24 @@ export function swapStudentsBetweenGroups(
 
   if (!studentA || !studentB) return groups;
 
-  return groups.map((g) => ({
-    ...g,
-    members: g.members.map((m) => {
-      if (m.id === studentAId) return studentB!;
-      if (m.id === studentBId) return studentA!;
-      return m;
-    }),
-  }));
+  return groups.map((g) => {
+    let nextLeaderId = g.leaderId;
+    if (g.leaderId === studentAId) {
+      nextLeaderId = studentBId;
+    } else if (g.leaderId === studentBId) {
+      nextLeaderId = studentAId;
+    }
+
+    return {
+      ...g,
+      leaderId: nextLeaderId,
+      members: g.members.map((m) => {
+        if (m.id === studentAId) return studentB!;
+        if (m.id === studentBId) return studentA!;
+        return m;
+      }),
+    };
+  });
 }
 
 export const GroupGeneratorSubTab: React.FC<GroupGeneratorSubTabProps> = ({

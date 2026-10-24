@@ -2,7 +2,7 @@
 // แท็บที่ 1: สุ่มชื่อนักเรียน (Slot Reel & Card Flip) พร้อมระบบตัดชื่อคนซ้ำ, ให้รางวัลด่วน (+1🪙, +3🪙, +1🎟️),
 // และแถบจัดการสถานะการมาเรียนด่วนแบบ Optimistic UI
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Dices,
   RotateCcw,
@@ -13,11 +13,13 @@ import {
   SkipForward,
   CheckCircle2,
   UserX,
+  Shuffle,
 } from 'lucide-react';
 import type { LiveStudent } from '../../services/liveClassroomService';
 
 export interface RandomPickerSubTabProps {
   students: LiveStudent[];
+  classroomId?: string;
   isProjectorMode: boolean;
   selectedStudent: LiveStudent | null;
   setSelectedStudent: (student: LiveStudent | null) => void;
@@ -50,6 +52,7 @@ export function restoreSkippedStudent(pickedIds: string[], studentId: string): s
 
 export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
   students,
+  classroomId,
   isProjectorMode,
   selectedStudent,
   setSelectedStudent,
@@ -64,7 +67,8 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
   const [noRepeat, setNoRepeat] = useState<boolean>(true);
   const [pickedIds, setPickedIds] = useState<string[]>([]);
   const [isSpinning, setIsSpinning] = useState<boolean>(false);
-  const [flippedCardIndex, setFlippedCardIndex] = useState<number | null>(null);
+  const [cardDeck, setCardDeck] = useState<LiveStudent[]>([]);
+  const [flippedStudentId, setFlippedStudentId] = useState<string | null>(null);
 
   const presentStudents = useMemo(() => students.filter((s) => s.present), [students]);
 
@@ -73,11 +77,33 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
     return getAvailablePool(students, pickedIds, noRepeat);
   }, [students, pickedIds, noRepeat]);
 
+  // รีเซ็ตกองสุ่มและสำรับการ์ดเมื่อห้องเรียนเปลี่ยน
+  useEffect(() => {
+    setPickedIds([]);
+    setSelectedStudent(null);
+    setRollingStudent(null);
+    setFlippedStudentId(null);
+    setCardDeck([]);
+  }, [classroomId, setSelectedStudent, setRollingStudent]);
+
+  // เตรียมสำรับการ์ด 8 ใบเมื่อเปิดโหมดการ์ด หรือเมื่อสำรับการ์ดหมด
+  useEffect(() => {
+    if (pickerMode === 'card' && cardDeck.length === 0 && availablePool.length > 0) {
+      setCardDeck(availablePool.slice(0, 8));
+    }
+  }, [pickerMode, cardDeck.length, availablePool]);
+
+  const dealNewCardDeck = () => {
+    setFlippedStudentId(null);
+    setCardDeck(availablePool.slice(0, 8));
+    onPlaySound?.('tick', 600);
+  };
+
   const handleRandomPick = useCallback(() => {
     if (isSpinning || availablePool.length === 0) return;
 
     setIsSpinning(true);
-    setFlippedCardIndex(null);
+    setFlippedStudentId(null);
 
     const winner = availablePool[Math.floor(Math.random() * availablePool.length)];
     let steps = 0;
@@ -106,9 +132,34 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
     runStep();
   }, [isSpinning, availablePool, presentStudents, noRepeat, setRollingStudent, setSelectedStudent, onPlaySound]);
 
+  // Hotkey สำหรับกด Spacebar สุ่มชื่อในโหมด Slot Reel
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+      if (e.code === 'Space' && pickerMode === 'slot') {
+        e.preventDefault();
+        handleRandomPick();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [pickerMode, handleRandomPick]);
+
   const handleSkipStudent = () => {
     if (!selectedStudent) return;
     setPickedIds((prev) => restoreSkippedStudent(prev, selectedStudent.id));
+    if (flippedStudentId === selectedStudent.id) {
+      setFlippedStudentId(null);
+    }
     setSelectedStudent(null);
     setRollingStudent(null);
   };
@@ -117,7 +168,8 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
     setPickedIds([]);
     setSelectedStudent(null);
     setRollingStudent(null);
-    setFlippedCardIndex(null);
+    setFlippedStudentId(null);
+    setCardDeck([]);
   };
 
   return (
@@ -254,7 +306,7 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
             <button
               onClick={handleRandomPick}
               disabled={isSpinning || availablePool.length === 0}
-              className="mt-8 flex items-center gap-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500 text-white font-extrabold text-lg px-9 py-3.5 rounded-2xl shadow-xl shadow-blue-600/30 transition transform active:scale-95"
+              className="mt-8 flex items-center gap-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-extrabold text-lg px-9 py-3.5 rounded-2xl shadow-xl shadow-blue-600/30 transition transform active:scale-95"
             >
               <Dices className="w-6 h-6" />
               <span>
@@ -267,23 +319,41 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
             </button>
           </>
         ) : (
-          /* Card Flip Grid Mode */
+          /* Card Flip Grid Mode (Stable Card Deck to prevent hopping/switching bug) */
           <div className="w-full max-w-4xl">
-            <p
-              className={`text-center mb-6 font-semibold text-sm ${
-                isProjectorMode ? 'text-slate-300' : 'text-[#163A66]'
-              }`}
-            >
-              คลิกเปิดการ์ด 1 ใบเพื่อสุ่มตัวแทนนักเรียน (เหลือ {availablePool.length} ใบ)
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+              <p
+                className={`font-semibold text-sm ${
+                  isProjectorMode ? 'text-slate-300' : 'text-[#163A66]'
+                }`}
+              >
+                คลิกเปิดการ์ด 1 ใบเพื่อสุ่มตัวแทนนักเรียน (เหลือกองสุ่ม {availablePool.length} คน)
+              </p>
+              {availablePool.length > 0 && (
+                <button
+                  onClick={dealNewCardDeck}
+                  className={`flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded-xl border transition active:scale-95 ${
+                    isProjectorMode
+                      ? 'bg-blue-600/20 hover:bg-blue-600/30 border-blue-500/30 text-blue-300'
+                      : 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700'
+                  }`}
+                >
+                  <Shuffle className="w-3.5 h-3.5" />
+                  <span>แจกการ์ดชุดใหม่ (8 ใบ)</span>
+                </button>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {availablePool.slice(0, 8).map((st, idx) => {
-                const isFlipped = flippedCardIndex === idx;
+              {cardDeck.map((st, idx) => {
+                const isFlipped = flippedStudentId === st.id;
+                const isPickedInPast = pickedIds.includes(st.id) && !isFlipped;
                 return (
                   <button
                     key={st.id}
+                    disabled={isPickedInPast}
                     onClick={() => {
-                      setFlippedCardIndex(idx);
+                      setFlippedStudentId(st.id);
                       setSelectedStudent(st);
                       setRollingStudent(st);
                       if (noRepeat) {
@@ -294,6 +364,8 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
                     className={`h-36 rounded-2xl border-2 p-4 flex flex-col items-center justify-center transition-all duration-300 ${
                       isFlipped
                         ? 'border-amber-400 bg-blue-900 text-white scale-105 shadow-xl'
+                        : isPickedInPast
+                        ? 'opacity-35 border-slate-700 bg-slate-800/40 cursor-not-allowed'
                         : isProjectorMode
                         ? 'border-slate-700 bg-slate-800/80 hover:border-blue-400 hover:-translate-y-1'
                         : 'border-[#E6EEF7] bg-[#F7FAFF] hover:border-blue-400 hover:-translate-y-1'
@@ -306,6 +378,16 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
                         </span>
                         <span className="font-bold text-sm mt-1 text-center line-clamp-2">
                           {st.name}
+                        </span>
+                        <span className="text-[11px] text-emerald-400 font-bold mt-1">
+                          ✓ ผู้ได้รับเลือก
+                        </span>
+                      </>
+                    ) : isPickedInPast ? (
+                      <>
+                        <CheckCircle2 className="w-7 h-7 text-slate-500 mb-1" />
+                        <span className="font-bold text-xs text-slate-400">
+                          เปิดแล้ว
                         </span>
                       </>
                     ) : (
@@ -382,7 +464,7 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
                 `${selectedStudent.name} ตอบคำถามยอดเยี่ยม`
               )
             }
-            className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-bold px-3.5 py-1.5 rounded-xl text-xs transition"
+            className="flex items-center gap-1.5 bg-amber-400 hover:bg-amber-300 disabled:opacity-40 text-amber-950 font-black px-3.5 py-1.5 rounded-xl text-xs transition active:scale-95 shadow-sm"
           >
             <Coins className="w-4 h-4" />
             <span>+3 เหรียญ</span>

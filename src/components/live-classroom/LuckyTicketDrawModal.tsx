@@ -88,12 +88,24 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
   const spinTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tickTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  useEffect(() => {
-    return () => {
-      if (spinTimeoutRef.current) clearTimeout(spinTimeoutRef.current);
-      tickTimersRef.current.forEach(clearTimeout);
-    };
+  const cancelActiveSpin = useCallback(() => {
+    if (spinTimeoutRef.current) {
+      clearTimeout(spinTimeoutRef.current);
+      spinTimeoutRef.current = null;
+    }
+    tickTimersRef.current.forEach(clearTimeout);
+    tickTimersRef.current = [];
+    setIsSpinning(false);
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      cancelActiveSpin();
+    }
+    return () => {
+      cancelActiveSpin();
+    };
+  }, [isOpen, cancelActiveSpin]);
 
   // คำนวณช่องวงล้อถ่วงน้ำหนักตามจำนวนตั๋ว
   const segments = useMemo(() => {
@@ -167,6 +179,11 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
     setPrizeClaimed(true);
   };
 
+  const handleClose = () => {
+    cancelActiveSpin();
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -192,7 +209,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
           </div>
 
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
           >
             <X className="w-5 h-5" />
@@ -253,7 +270,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
           <div className="lg:col-span-7 flex flex-col items-center justify-center relative">
             {segments.length > 0 ? (
               <>
-                <div className="relative w-72 h-72 sm:w-88 sm:h-88 flex items-center justify-center">
+                <div className="relative w-72 h-72 sm:w-80 sm:h-80 md:w-[350px] md:h-[350px] flex items-center justify-center">
                   {/* Top Pointer Arrow */}
                   <div className="absolute -top-3 z-20 flex flex-col items-center drop-shadow-xl">
                     <div className="w-0 h-0 border-l-[14px] border-l-transparent border-r-[14px] border-r-transparent border-t-[26px] border-t-amber-400" />
@@ -365,7 +382,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
           <div className="lg:col-span-5 flex flex-col gap-4">
             {winner && (
               <div className="bg-gradient-to-b from-amber-500/20 to-slate-900 border-2 border-amber-400 rounded-2xl p-5 text-center space-y-3 animate-fade-in shadow-xl">
-                <div className="inline-flex items-center gap-1.5 bg-amber-400 text-slate-950 text-xs font-black px-3 py-1 rounded-full">
+                <div className="inline-flex items-center gap-1.5 bg-amber-400 text-amber-950 text-xs font-black px-3 py-1 rounded-full shadow-sm">
                   <Trophy className="w-4 h-4" />
                   <span>ผู้โชคดีได้รับรางวัลท้ายคาบ!</span>
                 </div>
@@ -383,7 +400,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         onClick={() => handleAwardWinner(3, false)}
-                        className="flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold py-2 px-3 rounded-xl text-xs transition"
+                        className="flex items-center justify-center gap-1.5 bg-amber-400 hover:bg-amber-300 text-amber-950 font-black py-2 px-3 rounded-xl text-xs transition active:scale-95 shadow-sm"
                       >
                         <Coins className="w-4 h-4" />
                         <span>มอบ +3 🪙</span>

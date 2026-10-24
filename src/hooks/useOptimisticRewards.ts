@@ -32,7 +32,7 @@ const OFFLINE_QUEUE_STORAGE_KEY = 'live_classroom_reward_queue_v1';
 const getSessionLedgerKey = (classId: string) => `kp_live_class_session_${classId}`;
 
 // เชื่อมต่อกระเป๋ากาชาจริงใน localStorage และส่ง CustomEvent ให้ระบบทราบทันที
-function applyDirectGachaStateUpdate(
+export function applyDirectGachaStateUpdate(
   studentIds: string[],
   type: 'coin' | 'ticket',
   delta: number
@@ -120,9 +120,12 @@ export function useOptimisticRewards(props: {
     []
   );
 
-  // บันทึก Session Ledger ลง sessionStorage เพื่อกู้คืนกรณี Refresh หน้าจอ
+  // บันทึก Session Ledger ลง sessionStorage เพื่อกู้คืนกรณี Refresh หน้าจอ (พร้อม Consistency Guard ป้องกัน Data Bleeding ข้ามห้อง)
   useEffect(() => {
     if (typeof window === 'undefined' || !classroomId) return;
+    const isConsistent = ledger.length === 0 || ledger.every((b) => b.classroomId === classroomId);
+    if (!isConsistent) return;
+
     try {
       window.sessionStorage.setItem(getSessionLedgerKey(classroomId), JSON.stringify(ledger));
     } catch {
@@ -415,6 +418,14 @@ export function useOptimisticRewards(props: {
     [onUpdateBalances, onPlaySound, showToast, syncUndoToServer]
   );
 
+  const consumeTicket = useCallback(
+    (studentId: string): void => {
+      onUpdateBalances([studentId], 'ticket', -1);
+      applyDirectGachaStateUpdate([studentId], 'ticket', -1);
+    },
+    [onUpdateBalances]
+  );
+
   return {
     ledger,
     setInitialLedger,
@@ -425,5 +436,6 @@ export function useOptimisticRewards(props: {
     flushOfflineQueue,
     giveReward,
     undoReward,
+    consumeTicket,
   };
 }

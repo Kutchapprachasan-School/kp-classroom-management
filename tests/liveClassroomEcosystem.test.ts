@@ -19,7 +19,10 @@ import {
 } from '../src/components/live-classroom/RandomPickerSubTab';
 import { formatTimerMMSS } from '../src/components/live-classroom/LiveTimerSubTab';
 import { swapStudentsBetweenGroups } from '../src/components/live-classroom/GroupGeneratorSubTab';
-import { calculateTopEarners } from '../src/components/live-classroom/RewardBoardSubTab';
+import {
+  calculateTopEarners,
+  formatRewardTimeThai,
+} from '../src/components/live-classroom/RewardBoardSubTab';
 import { describeArcSlice } from '../src/components/live-classroom/LuckyTicketDrawModal';
 
 async function runTests() {
@@ -119,10 +122,12 @@ async function runTests() {
   assert.equal(formatTimerMMSS(0), '00:00');
   assert.equal(formatTimerMMSS(-10), '00:00');
 
-  // 8. ทดสอบ Pure Function ของ GroupGenerator (swapStudentsBetweenGroups)
+  // 8. ทดสอบ Pure Function ของ GroupGenerator (swapStudentsBetweenGroups พร้อมสืบทอดตำแหน่งหัวหน้ากลุ่ม)
+  groups[0].leaderId = groups[0].members[0].id; // ตั้งคนแรกของกลุ่ม 1 เป็นหัวหน้า
   const swappedGroups = swapStudentsBetweenGroups(groups, groups[0].members[0].id, groups[1].members[0].id);
   assert.equal(swappedGroups[0].members[0].id, groups[1].members[0].id);
   assert.equal(swappedGroups[1].members[0].id, groups[0].members[0].id);
+  assert.equal(swappedGroups[0].leaderId, groups[1].members[0].id, 'ตำแหน่งหัวหน้ากลุ่มต้องสืบทอดสู่สมาชิกใหม่ที่สลับเข้ามาแทน');
 
   // 9. ทดสอบ Pure Function ของ RewardBoard (calculateTopEarners)
   const earnersRoster: LiveStudent[] = [
@@ -140,6 +145,11 @@ async function runTests() {
   const arcPath = describeArcSlice(180, 180, 174, 0, 90);
   assert.ok(arcPath.startsWith('M 180 180 L'));
   assert.ok(arcPath.endsWith('Z'));
+
+  // 11. ทดสอบ Pure Function ของ RewardBoard (formatRewardTimeThai)
+  const timeFormatted = formatRewardTimeThai('2026-10-24T06:30:00.000Z');
+  assert.ok(typeof timeFormatted === 'string');
+  assert.ok(timeFormatted.includes(':'), 'รูปแบบเวลาต้องมีเครื่องหมายทวิภาค (:)');
 
   console.log('✅ All Live Classroom Ecosystem tests passed!');
 }

@@ -119,6 +119,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
     flushOfflineQueue,
     giveReward,
     undoReward,
+    consumeTicket,
   } = useOptimisticRewards({
     classroomId: selectedClassId,
     onUpdateBalances: handleUpdateStudentBalances,
@@ -169,7 +170,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
     setGroups([]);
   };
 
-  // Fullscreen Projector Toggle
+  // Fullscreen Projector Toggle & Fullscreen Change Listener
   const toggleProjectorMode = useCallback(() => {
     if (!document.fullscreenElement) {
       containerRef.current?.requestFullscreen().catch(() => {});
@@ -178,6 +179,16 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
       document.exitFullscreen().catch(() => {});
       setIsProjectorMode(false);
     }
+  }, []);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsProjectorMode(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
   }, []);
 
   // Sound FX Toggle
@@ -298,12 +309,12 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
     return students.reduce((sum, s) => sum + s.sessionTickets, 0);
   }, [students]);
 
-  // Consume ticket handler for Lucky Ticket Draw
+  // Consume ticket handler for Lucky Ticket Draw (Optimistic + LocalStorage Gacha State)
   const handleConsumeTicket = useCallback(
     (studentId: string) => {
-      handleUpdateStudentBalances([studentId], 'ticket', -1);
+      consumeTicket(studentId);
     },
-    [handleUpdateStudentBalances]
+    [consumeTicket]
   );
 
   // Class-wide bonus handler
@@ -351,15 +362,17 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
           : 'bg-[#F7FAFF] text-[#163A66] p-4 md:p-6 text-sm'
       }`}
     >
-      {/* Toast Notification */}
+      {/* Toast Notification (Polished: Smooth Ease-Out & Harmonious Contrast Tokens) */}
       {toast && (
         <div
-          className={`fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-2xl shadow-2xl text-xs font-bold animate-bounce transition-all ${
+          role="status"
+          aria-live="polite"
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-2xl shadow-xl text-xs font-bold transition-all duration-300 ease-out border backdrop-blur-sm ${
             toast.variant === 'warning'
-              ? 'bg-amber-500 text-slate-950'
+              ? 'bg-amber-400 border-amber-500/50 text-amber-950 font-black shadow-amber-500/20'
               : toast.variant === 'error'
-              ? 'bg-rose-500 text-white'
-              : 'bg-emerald-600 text-white'
+              ? 'bg-rose-600 border-rose-500/50 text-white font-extrabold shadow-rose-600/20'
+              : 'bg-emerald-600 border-emerald-500/50 text-white font-extrabold shadow-emerald-600/20'
           }`}
         >
           <Sparkles className="w-4 h-4 shrink-0" />
@@ -393,12 +406,13 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
         onOpenLuckyDraw={() => setIsLuckyDrawOpen(true)}
       />
 
-      {/* Main Sub-tool Workspace */}
+      {/* Main Sub-tool Workspace (Persistent Tab Containers to preserve Background Timer & Random Pool) */}
       <main className="flex-1 mt-5 flex flex-col">
         {/* Tab 1: Random Picker */}
-        {activeTab === 'picker' && (
+        <div className={activeTab === 'picker' ? 'flex-1 flex flex-col' : 'hidden'}>
           <RandomPickerSubTab
             students={students}
+            classroomId={selectedClassId}
             isProjectorMode={isProjectorMode}
             selectedStudent={selectedStudent}
             setSelectedStudent={setSelectedStudent}
@@ -409,10 +423,10 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
             onToggleAttendance={handleToggleAttendance}
             syncingAttendanceIds={syncingAttendanceIds}
           />
-        )}
+        </div>
 
         {/* Tab 2: Live Timer & Versus */}
-        {activeTab === 'timer' && (
+        <div className={activeTab === 'timer' ? 'flex-1 flex flex-col' : 'hidden'}>
           <LiveTimerSubTab
             students={students}
             isProjectorMode={isProjectorMode}
@@ -423,10 +437,10 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
             onGiveReward={giveReward}
             onPlaySound={triggerSound}
           />
-        )}
+        </div>
 
         {/* Tab 3: Group Generator */}
-        {activeTab === 'groups' && (
+        <div className={activeTab === 'groups' ? 'flex-1 flex flex-col' : 'hidden'}>
           <GroupGeneratorSubTab
             students={students}
             classroomId={selectedClassId}
@@ -438,10 +452,10 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
             }
             onPlaySound={triggerSound}
           />
-        )}
+        </div>
 
         {/* Tab 4: Reward Board */}
-        {activeTab === 'rewards' && (
+        <div className={activeTab === 'rewards' ? 'flex-1 flex flex-col' : 'hidden'}>
           <RewardBoardSubTab
             students={students}
             ledger={ledger}
@@ -451,7 +465,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
             onUndo={undoReward}
             onGiveClassBonus={handleGiveClassBonus}
           />
-        )}
+        </div>
       </main>
 
       {/* Lucky Ticket Draw Modal */}

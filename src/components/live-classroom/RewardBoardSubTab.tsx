@@ -35,6 +35,20 @@ export function calculateTopEarners(students: LiveStudent[], limit = 8): LiveStu
     .slice(0, limit);
 }
 
+export function formatRewardTimeThai(isoString: string): string {
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return isoString.slice(11, 16);
+    return d.toLocaleTimeString('th-TH', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  } catch {
+    return isoString.slice(11, 16);
+  }
+}
+
 export const RewardBoardSubTab: React.FC<RewardBoardSubTabProps> = ({
   students,
   ledger,
@@ -85,9 +99,9 @@ export const RewardBoardSubTab: React.FC<RewardBoardSubTabProps> = ({
                     <span
                       className={`w-6 h-6 rounded-full flex items-center justify-center font-extrabold text-xs shadow-sm ${
                         idx === 0
-                          ? 'bg-amber-400 text-slate-950'
+                          ? 'bg-amber-400 text-amber-950 font-black'
                           : idx === 1
-                          ? 'bg-slate-300 text-slate-950'
+                          ? 'bg-slate-200 text-slate-800 font-black'
                           : idx === 2
                           ? 'bg-amber-700 text-white'
                           : isProjectorMode
@@ -168,7 +182,7 @@ export const RewardBoardSubTab: React.FC<RewardBoardSubTabProps> = ({
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-slate-400 font-mono text-[11px]">
-                      [{item.createdAt.slice(11, 16)}]
+                      [{formatRewardTimeThai(item.createdAt)}]
                     </span>
                     <span
                       className={`font-semibold ${
@@ -258,7 +272,7 @@ export const RewardBoardSubTab: React.FC<RewardBoardSubTabProps> = ({
 
           <button
             onClick={onGiveClassBonus}
-            className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold px-5 py-2.5 rounded-xl text-xs shadow-md shadow-amber-500/20 transition active:scale-95"
+            className="flex items-center gap-2 bg-amber-400 hover:bg-amber-300 text-amber-950 font-black px-5 py-2.5 rounded-xl text-xs shadow-md shadow-amber-400/20 transition active:scale-95"
           >
             <PartyPopper className="w-4 h-4" />
             <span>แจกโบนัสทั้งห้อง (+1 🪙 ทุกคนที่มาเรียน)</span>
