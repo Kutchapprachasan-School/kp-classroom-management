@@ -403,15 +403,17 @@ export const teacherCourseAssignmentService = {
         const foundInService = studentService.findStudentByCode(subCode);
         const studentRoom = stu?.classroom || foundInService?.classroomId || foundInService?.student.classroomId || sub.classroom || '';
 
-        const asg = termAssignments.find(
-          (a) => {
+        // ค้นหาชิ้นงาน: ให้ความสำคัญกับการจับคู่ตรงด้วย assignmentId ก่อนเสมอ
+        // หากไม่ตรงด้วย ID จึงค่อยพิจารณา unitId หรือชื่อชิ้นงานร่วมกับ Classroom guard
+        const asg =
+          termAssignments.find((a) => a.id === sub.assignmentId) ||
+          termAssignments.find((a) => {
             // Classroom guard: ป้องกันงานของห้องอื่น (เช่น 6/3) ไปจับคู่กับนักเรียนห้อง 6/1
             if (studentRoom && a.targetClassrooms && a.targetClassrooms.length > 0 && !a.targetClassrooms.includes('ALL')) {
               const matchRoom = a.targetClassrooms.some((r: string) => isSameClassroom(r, studentRoom));
               if (!matchRoom) return false;
             }
             return (
-              a.id === sub.assignmentId ||
               (a.unitId && a.unitId === sub.assignmentId) ||
               (sub.workTitle && a.title && (
                 sub.workTitle.trim().toLowerCase() === a.title.trim().toLowerCase() ||
@@ -419,8 +421,7 @@ export const teacherCourseAssignmentService = {
                 a.title.includes(sub.workTitle)
               ))
             );
-          }
-        );
+          });
 
         const isResubmission = Boolean(sub.isResubmission || (savedMatch && savedMatch.isResubmission && sub.status === 'SUBMITTED_PENDING'));
         const isGraded = !isResubmission && (sub.status === 'GRADED' || (savedMatch && savedMatch.status === 'GRADED' && sub.status !== 'SUBMITTED_PENDING'));
@@ -484,7 +485,11 @@ export const teacherCourseAssignmentService = {
             ? formatClassroomLabel(foundInService.classroomId)
             : stu?.classroom
               ? formatClassroomLabel(stu.classroom)
-              : savedMatch?.classroom || 'ม.3/1';
+              : sub.classroom
+                ? formatClassroomLabel(sub.classroom)
+                : (asg?.targetClassrooms && asg.targetClassrooms.length === 1 && asg.targetClassrooms[0] !== 'ALL')
+                  ? formatClassroomLabel(asg.targetClassrooms[0])
+                  : savedMatch?.classroom || 'ม.3/1';
 
         const realSeatNo =
           foundInService?.student.no ?? stu?.sgsSeatNo ?? stu?.no ?? savedMatch?.seatNo ?? (idx + 1);
@@ -520,11 +525,27 @@ export const teacherCourseAssignmentService = {
             ? new Date(sub.submittedAt).getTime()
             : savedMatch?.submittedTimestamp || (Date.now() - idx * 60000);
 
+        const effectiveCourseCode =
+          asg?.courseCode ||
+          sub.courseCode ||
+          savedMatch?.subjectCode ||
+          '';
+
+        const matchedCourse = effectiveCourseCode
+          ? coursesCurriculumService.getCourses().find((c) => c.code === effectiveCourseCode)
+          : undefined;
+
+        const effectiveCourseName =
+          asg?.courseName ||
+          matchedCourse?.name ||
+          savedMatch?.subjectName ||
+          (effectiveCourseCode ? `วิชา ${effectiveCourseCode}` : 'รายวิชา');
+
         const queueItem: GradingQueueItem = {
           id: savedMatch?.id || `q_${pairKey}`,
           queueNo: savedMatch?.queueNo || idx + 1,
-          subjectCode: asg?.courseCode || savedMatch?.subjectCode || 'ท23102',
-          subjectName: asg?.courseName || savedMatch?.subjectName || 'รายวิชา',
+          subjectCode: effectiveCourseCode,
+          subjectName: effectiveCourseName,
           classroom: realClassroom,
           seatNo: realSeatNo,
           studentCode: subCode,

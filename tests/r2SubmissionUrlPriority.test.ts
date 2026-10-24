@@ -117,4 +117,54 @@ describe('R2 Storage Submission URL Resolution & Priority Tests', () => {
     expect(item?.filePreviewUrl).toContain('https://kps-r2-storage.kps-school.workers.dev');
     expect(item?.filePreviewUrl).not.toContain('RAW_BASE64');
   });
+
+  it('matches assignment by exact ID and uses real courseCode/courseName instead of hardcoded fallback ท23102', () => {
+    const asgId = 'asg-1792562483777-gg22m';
+    const stuCode = '14993';
+
+    // Term assignment with courseCode ญ32202 and targeted to ม.5/4
+    const mockAssignment = {
+      id: asgId,
+      title: 'งานที่ 3 แบบฝึกหัดบทที่ 7 ข้อที่ 4-7',
+      courseCode: 'ญ32202',
+      courseName: 'ภาษาญี่ปุ่น 4',
+      targetClassrooms: ['ม.5/4'],
+      maxScore: 10,
+    };
+    localStorage.setItem('kp_term_assignments_v2', JSON.stringify([mockAssignment]));
+
+    // Student submission without classroom or with different room context
+    const mockSubmission: StudentWorkSubmission = {
+      id: `sub_${asgId}_${stuCode}`,
+      assignmentId: asgId,
+      studentCode: stuCode,
+      workTitle: 'งานที่ 3 แบบฝึกหัดบทที่ 7 ข้อที่ 4-7',
+      status: 'SUBMITTED_PENDING',
+      submittedAt: new Date().toISOString(),
+      r2ObjectKey: 'kp-classroom-submissions/ภาคเรียนที่ 2-2569/ม.5-4/asg-1792562483777-gg22m/14993_Screenshot_20261022_200331_Samsung_Notes.webp',
+      fileDataUrl: 'https://kps-r2-storage.kps-school.workers.dev/mock.webp',
+    };
+    localStorage.setItem('kp_work_submissions_v2', JSON.stringify([mockSubmission]));
+
+    const queue = teacherCourseAssignmentService.getGradingQueue();
+    const item = queue.find((q) => q.assignmentId === asgId && q.studentCode === stuCode);
+
+    expect(item).toBeDefined();
+    expect(item?.subjectCode).toBe('ญ32202');
+    expect(item?.subjectCode).not.toBe('ท23102');
+    expect(item?.classroom).toBe('ม.5/4');
+  });
+
+  it('prevents getSubmissionFileUrl from leaking another student base64 cache when studentCode differs', () => {
+    // Only student 14983 has cached data in localStorage
+    localStorage.setItem('kp_sub_file_asg-1_14983', 'data:image/webp;base64,ANUWAT_DATA');
+
+    // Student 14993 requests file for the same assignment
+    const resultFor14993 = sgsRosterAndSubmissionService.getSubmissionFileUrl('asg-1', '14993');
+    expect(resultFor14993).toBeUndefined();
+
+    // Student 14983 gets their own data
+    const resultFor14983 = sgsRosterAndSubmissionService.getSubmissionFileUrl('asg-1', '14983');
+    expect(resultFor14983).toBe('data:image/webp;base64,ANUWAT_DATA');
+  });
 });

@@ -76,15 +76,6 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
     window.addEventListener('kp-sgs-roster-updated', refreshQueue);
     window.addEventListener('kps-data-sync-event', refreshQueue);
 
-    // ซิงค์ไฟล์ที่เคยแคชไว้ในเครื่องขึ้น Cloudflare R2 อัตโนมัติ
-    if (r2StorageService.isConfigured()) {
-      sgsRosterAndSubmissionService.syncLocalSubmissionsToR2().then((res) => {
-        if (res.syncedCount > 0) {
-          refreshQueue();
-        }
-      }).catch(() => {});
-    }
-
     return () => {
       window.removeEventListener('kp-grading-queue-updated', refreshQueue);
       window.removeEventListener('kp-sgs-roster-updated', refreshQueue);

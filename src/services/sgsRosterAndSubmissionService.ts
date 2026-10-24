@@ -2881,7 +2881,7 @@ export const sgsRosterAndSubmissionService = {
         }
       }
 
-      // 3. สแกนคีย์ทั้งหมดใน localStorage ที่ขึ้นต้นด้วย kp_sub_file_
+      // 3. สแกนคีย์ทั้งหมดใน localStorage ที่ขึ้นต้นด้วย kp_sub_file_ (ตรวจจับแบบ Strict ป้องกันงานปนกันข้ามคน)
       try {
         const matchingKeys: { key: string; score: number; value: string }[] = [];
         for (let i = 0; i < localStorage.length; i++) {
@@ -2889,8 +2889,16 @@ export const sgsRosterAndSubmissionService = {
           if (k && k.startsWith('kp_sub_file_')) {
             const val = localStorage.getItem(k);
             if (isValidDataUrl(val)) {
+              // หากระบุ cleanStu ต้องตรงกับนักเรียนคนนั้นเท่านั้น ป้องกันการดึงงานของคนอื่นมาแสดงเด็ดขาด
+              if (cleanStu && !k.endsWith(`_${cleanStu}`) && !k.includes(`_${cleanStu}_`) && !k.includes(cleanStu)) {
+                continue;
+              }
+              // หากระบุ cleanAsg ต้องตรงกับชิ้นงานนั้นด้วย
+              if (cleanAsg && !k.includes(cleanAsg)) {
+                continue;
+              }
               let score = 0;
-              if (cleanStu && (k.endsWith(`_${cleanStu}`) || k.includes(`_${cleanStu}_`) || k.includes(cleanStu))) {
+              if (cleanStu && (k.endsWith(`_${cleanStu}`) || k.includes(`_${cleanStu}_`))) {
                 score += 10;
               }
               if (cleanAsg && k.includes(cleanAsg)) {
@@ -2899,9 +2907,7 @@ export const sgsRosterAndSubmissionService = {
               if (cleanFile && k.includes(cleanFile)) {
                 score += 15;
               }
-              if (score > 0) {
-                matchingKeys.push({ key: k, score, value: val! });
-              }
+              matchingKeys.push({ key: k, score, value: val! });
             }
           }
         }
@@ -3158,6 +3164,8 @@ export const sgsRosterAndSubmissionService = {
       studentId: verifiedStudentId,
       workTitle: payload.workTitle,
       workAttachmentLabel: attachmentLabel,
+      classroom: payload.classroom || identity?.student?.classroom || (existingIdx !== -1 ? submissions[existingIdx].classroom : undefined),
+      academicYearTerm: payload.academicYearTerm || term,
       fileUrl: hasIncomingFile ? (resolvedFileUrl || (existingIdx !== -1 ? submissions[existingIdx].fileUrl : '')) : '',
       fileDataUrl: hasIncomingFile ? (resolvedFileUrl || (existingIdx !== -1 ? submissions[existingIdx].fileDataUrl : '')) : '',
       r2ObjectKey: hasIncomingFile ? resolvedR2Key : undefined,
@@ -3425,25 +3433,27 @@ export const sgsRosterAndSubmissionService = {
 
     const subs = this.getSubmissions();
     const candidates = subs.filter((s) => {
-      const cached = this.getSubmissionFileUrl(
-        s.assignmentId,
-        s.studentCode,
-        s.r2ObjectKey ? s.r2ObjectKey.split('/').pop() : undefined
-      );
-      return Boolean(cached || (s.fileDataUrl && s.fileDataUrl.startsWith('data:')));
+      // หากมี URL ของ Cloudflare R2 อยู่แล้ว ไม่ต้อง sync ทับเด็ดขาด
+      const hasValidR2 =
+        (s.r2ObjectKey && (s.fileDataUrl?.startsWith('http://') || s.fileDataUrl?.startsWith('https://'))) ||
+        (s.fileUrl && (s.fileUrl.startsWith('http://') || s.fileUrl.startsWith('https://')));
+      if (hasValidR2) return false;
+
+      // ตรวจสอบเฉพาะแคชที่ระบุ assignmentId และ studentCode ตรงตัวเท่านั้น
+      const directKey = `kp_sub_file_${s.assignmentId}_${s.studentCode}`;
+      const directVal = typeof localStorage !== 'undefined' ? localStorage.getItem(directKey) : null;
+      return Boolean((directVal && directVal.startsWith('data:')) || (s.fileDataUrl && s.fileDataUrl.startsWith('data:')));
     });
 
     let syncedCount = 0;
     const term = '1/2569';
 
     for (const sub of candidates) {
+      const directKey = `kp_sub_file_${sub.assignmentId}_${sub.studentCode}`;
+      const directVal = typeof localStorage !== 'undefined' ? localStorage.getItem(directKey) : null;
       const base64Data =
         (sub.fileDataUrl && sub.fileDataUrl.startsWith('data:') ? sub.fileDataUrl : null) ||
-        this.getSubmissionFileUrl(
-          sub.assignmentId,
-          sub.studentCode,
-          sub.r2ObjectKey ? sub.r2ObjectKey.split('/').pop() : undefined
-        );
+        (directVal && directVal.startsWith('data:') ? directVal : null);
 
       if (!base64Data || !base64Data.startsWith('data:')) continue;
 

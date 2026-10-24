@@ -29,7 +29,6 @@ import {
 } from '../services/sgsRosterAndSubmissionService';
 import { coursesCurriculumService } from '../services/coursesCurriculumService';
 import { behaviorService } from '../services/behaviorService';
-import { r2StorageService } from '../services/r2StorageService';
 import { validateGoogleDriveUrl } from '../utils/googleDriveUtils';
 import type { StudentQuestItem, StudentLeaderboardEntry } from '../types/viewModels';
 import { authService, type AuthUser } from '../services/authService';
@@ -158,12 +157,6 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
     }
   }, [existingQuizResult]);
 
-  useEffect(() => {
-    // ซิงค์ไฟล์งานที่เคยส่งไว้ในเครื่องนี้ขึ้น Cloudflare R2 อัตโนมัติเมื่อเปิดหน้ารายการงาน
-    if (r2StorageService.isConfigured()) {
-      sgsRosterAndSubmissionService.syncLocalSubmissionsToR2().catch(() => {});
-    }
-  }, []);
 
   // Real student XP calculation
   const myExp = React.useMemo(() => {
@@ -737,9 +730,24 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                       .find((s) => s.studentCode === studentCode && matchSubmissionToAssignment(s, quest));
                     if (sub) {
                       setSubmitLink(sub.externalLinkUrl || '');
-                      setSelectedFileName(sub.workAttachmentLabel ? sub.workAttachmentLabel.replace('☁️ R2: ', '').split(' ')[0] : '');
-                      setSelectedFileDataUrl(sub.fileDataUrl || sgsRosterAndSubmissionService.getSubmissionFileUrl(quest.id, studentCode) || null);
+                      const rawFileName = sub.workAttachmentLabel ? sub.workAttachmentLabel.replace('☁️ R2: ', '').split(' ')[0] : '';
+                      setSelectedFileName(rawFileName);
+                      const fileUrl = sub.fileUrl || sub.fileDataUrl || sgsRosterAndSubmissionService.getSubmissionFileUrl(quest.id, studentCode) || null;
+                      setSelectedFileDataUrl(fileUrl);
                       setSubmitText(sub.textContent || '');
+                      if (fileUrl) {
+                        const lower = (rawFileName || fileUrl).toLowerCase();
+                        if (lower.includes('.pdf')) {
+                          setFileTypeCategory('pdf');
+                          setPreviewUrl(fileUrl);
+                        } else if (lower.includes('.doc') || lower.includes('.docx')) {
+                          setFileTypeCategory('doc');
+                          setPreviewUrl(null);
+                        } else {
+                          setFileTypeCategory('image');
+                          setPreviewUrl(fileUrl);
+                        }
+                      }
                     } else {
                       setSubmitLink('');
                       setSelectedFileName('');
@@ -1384,7 +1392,13 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                       <div className="flex items-center justify-between text-xs text-slate-600 px-1 pt-1 border-t border-slate-100">
                         <span className="truncate font-semibold text-[#163A66] max-w-[70%]">{selectedFileName || 'ไฟล์ผลงาน'}</span>
                         <span className="shrink-0 font-mono text-slate-400 text-[11px]">
-                          {selectedRawFile ? formatBytes(selectedRawFile.size) : (selectedFileDataUrl ? `~${Math.round(selectedFileDataUrl.length / 1365)} KB` : '')}
+                          {selectedRawFile
+                            ? formatBytes(selectedRawFile.size)
+                            : selectedFileDataUrl
+                              ? selectedFileDataUrl.startsWith('data:')
+                                ? `~${Math.round(selectedFileDataUrl.length / 1365)} KB`
+                                : '☁️ Cloudflare R2'
+                              : ''}
                         </span>
                       </div>
                     </div>
