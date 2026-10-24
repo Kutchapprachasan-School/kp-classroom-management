@@ -110,6 +110,7 @@ interface NavMenuItem {
   icon: React.FC<{ className?: string }>;
   badge?: string;
   badgeStyle?: string;
+  liveBadge?: boolean;
 }
 
 export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
@@ -295,7 +296,8 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       items: [
         {
           key: 'live-classroom',
-          label: 'เครื่องมือตอนสอน (สด)',
+          label: 'สอน',
+          liveBadge: true,
           icon: Sparkles,
         },
         {
@@ -483,11 +485,27 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
                         : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
                     }`}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <IconComp
                         className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`}
                       />
                       <span className="truncate">{item.label}</span>
+                      {item.liveBadge && (
+                        <span
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 transition-transform ${
+                            isActive
+                              ? 'bg-white text-rose-600 shadow-xs ring-1 ring-white/80'
+                              : 'bg-rose-500 text-white shadow-xs'
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              isActive ? 'bg-rose-600' : 'bg-white'
+                            } animate-pulse`}
+                          />
+                          Live
+                        </span>
+                      )}
                     </div>
 
                     {item.badge && (

@@ -36,7 +36,8 @@ function shuffleArray<T>(items: T[]): T[] {
 }
 
 /**
- * แบ่งกลุ่มนักเรียนพร้อมเกลี่ยเศษอย่างสมดุล และรองรับการคละระดับคะแนน (Balanced Tiers)
+ * แบ่งกลุ่มนักเรียนพร้อมเกลี่ยเศษอย่างสมดุล รองรับการคละระดับคะแนน (Balanced Tiers),
+ * การคละเพศ ชาย-หญิง (Balance Gender), และการเลือกเอา/ไม่เอานักเรียนที่ไม่มาเรียนออก
  */
 export function generateBalancedGroups(params: {
   students: LiveStudent[];
@@ -44,15 +45,26 @@ export function generateBalancedGroups(params: {
   targetValue: number;
   strategy: 'balanced' | 'random';
   autoLeader: boolean;
+  balanceGender?: boolean;
+  excludeAbsent?: boolean;
 }): StudentGroup[] {
-  const { students, mode, targetValue, strategy, autoLeader } = params;
-  const presentStudents = students.filter((s) => s.present);
-  if (presentStudents.length === 0 || targetValue <= 0) return [];
+  const {
+    students,
+    mode,
+    targetValue,
+    strategy,
+    autoLeader,
+    balanceGender = false,
+    excludeAbsent = true,
+  } = params;
+
+  const candidateStudents = excludeAbsent ? students.filter((s) => s.present) : students;
+  if (candidateStudents.length === 0 || targetValue <= 0) return [];
 
   const numGroups =
     mode === 'byGroupCount'
-      ? Math.min(presentStudents.length, Math.max(1, targetValue))
-      : Math.max(1, Math.ceil(presentStudents.length / targetValue));
+      ? Math.min(candidateStudents.length, Math.max(1, targetValue))
+      : Math.max(1, Math.ceil(candidateStudents.length / targetValue));
 
   const groups: StudentGroup[] = Array.from({ length: numGroups }, (_, idx) => ({
     id: `group-${idx + 1}`,
@@ -61,22 +73,57 @@ export function generateBalancedGroups(params: {
     leaderId: null,
   }));
 
-  let orderedPool: LiveStudent[] = [];
+  if (balanceGender) {
+    const males = candidateStudents.filter((s) => s.gender !== 'FEMALE');
+    const females = candidateStudents.filter((s) => s.gender === 'FEMALE');
 
-  if (strategy === 'balanced') {
-    const highs = shuffleArray(presentStudents.filter((s) => s.tier === 'high'));
-    const mids = shuffleArray(presentStudents.filter((s) => s.tier === 'mid'));
-    const lows = shuffleArray(presentStudents.filter((s) => s.tier === 'low'));
-    orderedPool = [...highs, ...mids, ...lows];
+    let orderedMales: LiveStudent[] = [];
+    let orderedFemales: LiveStudent[] = [];
+
+    if (strategy === 'balanced') {
+      const mHighs = shuffleArray(males.filter((s) => s.tier === 'high'));
+      const mMids = shuffleArray(males.filter((s) => s.tier === 'mid'));
+      const mLows = shuffleArray(males.filter((s) => s.tier === 'low'));
+      orderedMales = [...mHighs, ...mMids, ...mLows];
+
+      const fHighs = shuffleArray(females.filter((s) => s.tier === 'high'));
+      const fMids = shuffleArray(females.filter((s) => s.tier === 'mid'));
+      const fLows = shuffleArray(females.filter((s) => s.tier === 'low'));
+      orderedFemales = [...fHighs, ...fMids, ...fLows];
+    } else {
+      orderedMales = shuffleArray(males);
+      orderedFemales = shuffleArray(females);
+    }
+
+    // แจกนักเรียนชายแบบ Round-Robin
+    orderedMales.forEach((male, index) => {
+      const groupIdx = index % numGroups;
+      groups[groupIdx].members.push(male);
+    });
+
+    // แจกนักเรียนหญิงแบบ Snake / Reverse Round-Robin เพื่อเฉลี่ยจำนวนสัดส่วนชาย-หญิงให้เท่าเทียมกันทุกกลุ่ม
+    orderedFemales.forEach((female, index) => {
+      const groupIdx = numGroups - 1 - (index % numGroups);
+      groups[groupIdx].members.push(female);
+    });
   } else {
-    orderedPool = shuffleArray(presentStudents);
-  }
+    let orderedPool: LiveStudent[] = [];
 
-  // แจกแบบ Round-Robin เพื่อเกลี่ยเศษและระดับคะแนนให้เท่ากันทุกกลุ่ม
-  orderedPool.forEach((student, index) => {
-    const groupIdx = index % numGroups;
-    groups[groupIdx].members.push(student);
-  });
+    if (strategy === 'balanced') {
+      const highs = shuffleArray(candidateStudents.filter((s) => s.tier === 'high'));
+      const mids = shuffleArray(candidateStudents.filter((s) => s.tier === 'mid'));
+      const lows = shuffleArray(candidateStudents.filter((s) => s.tier === 'low'));
+      orderedPool = [...highs, ...mids, ...lows];
+    } else {
+      orderedPool = shuffleArray(candidateStudents);
+    }
+
+    // แจกแบบ Round-Robin เพื่อเกลี่ยเศษและระดับคะแนนให้เท่ากันทุกกลุ่ม
+    orderedPool.forEach((student, index) => {
+      const groupIdx = index % numGroups;
+      groups[groupIdx].members.push(student);
+    });
+  }
 
   if (autoLeader) {
     groups.forEach((g) => {

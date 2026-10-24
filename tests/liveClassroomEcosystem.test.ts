@@ -6,6 +6,8 @@ import { soundFX } from '../src/services/soundFXEngine';
 import {
   calculateStudentTierMap,
   getThailandTodayRange,
+  liveClassroomService,
+  detectStudentGender,
   type LiveStudent,
 } from '../src/services/liveClassroomService';
 import {
@@ -88,6 +90,73 @@ async function runTests() {
   const sizes = groups.map((g) => g.members.length).sort();
   assert.deepEqual(sizes, [3, 3, 4], '10 students in 3 groups must distribute as 3, 3, 4');
   assert.ok(groups.every((g) => g.leaderId !== null), 'Every group must have an auto-assigned leader');
+
+  // 4.1 ทดสอบการคละชาย-หญิง (Balance Gender) และการแยกเพศจากคำนำหน้าชื่อไทย
+  assert.equal(detectStudentGender('เด็กชายสมศักดิ์ รักดี'), 'MALE');
+  assert.equal(detectStudentGender('ด.ช. เก่งกาจ'), 'MALE');
+  assert.equal(detectStudentGender('นายกิตติศักดิ์'), 'MALE');
+  assert.equal(detectStudentGender('เด็กหญิงกานดา สดใส'), 'FEMALE');
+  assert.equal(detectStudentGender('ด.ญ. สุพัตรา'), 'FEMALE');
+  assert.equal(detectStudentGender('นางสาวพิมพ์ชนก'), 'FEMALE');
+
+  const mixedGenderRoster: LiveStudent[] = [
+    { ...sampleRoster[0], id: 'b1', name: 'ด.ช. ก', gender: 'MALE', present: true },
+    { ...sampleRoster[1], id: 'b2', name: 'ด.ช. ข', gender: 'MALE', present: true },
+    { ...sampleRoster[2], id: 'b3', name: 'ด.ช. ค', gender: 'MALE', present: true },
+    { ...sampleRoster[3], id: 'b4', name: 'ด.ช. ง', gender: 'MALE', present: true },
+    { ...sampleRoster[4], id: 'g1', name: 'ด.ญ. จ', gender: 'FEMALE', present: true },
+    { ...sampleRoster[5], id: 'g2', name: 'ด.ญ. ฉ', gender: 'FEMALE', present: true },
+    { ...sampleRoster[6], id: 'g3', name: 'ด.ญ. ช', gender: 'FEMALE', present: true },
+    { ...sampleRoster[7], id: 'g4', name: 'ด.ญ. ซ', gender: 'FEMALE', present: true },
+  ];
+
+  const genderBalancedGroups = generateBalancedGroups({
+    students: mixedGenderRoster,
+    mode: 'byGroupCount',
+    targetValue: 2,
+    strategy: 'balanced',
+    autoLeader: false,
+    balanceGender: true,
+  });
+  assert.equal(genderBalancedGroups.length, 2);
+  genderBalancedGroups.forEach((g) => {
+    const maleCount = g.members.filter((m) => m.gender === 'MALE').length;
+    const femaleCount = g.members.filter((m) => m.gender === 'FEMALE').length;
+    assert.equal(maleCount, 2, 'Each group must have 2 boys');
+    assert.equal(femaleCount, 2, 'Each group must have 2 girls');
+  });
+
+  // 4.2 ทดสอบการเอานักเรียนที่ไม่มาเรียนออก (excludeAbsent: true vs false)
+  const rosterWithAbsents: LiveStudent[] = [
+    { ...mixedGenderRoster[0], id: 'st-p1', present: true },
+    { ...mixedGenderRoster[1], id: 'st-p2', present: true },
+    { ...mixedGenderRoster[2], id: 'st-a1', present: false },
+    { ...mixedGenderRoster[3], id: 'st-a2', present: false },
+  ];
+  const excludedGroups = generateBalancedGroups({
+    students: rosterWithAbsents,
+    mode: 'byGroupCount',
+    targetValue: 2,
+    strategy: 'random',
+    autoLeader: false,
+    excludeAbsent: true,
+  });
+  assert.equal(excludedGroups.reduce((acc, g) => acc + g.members.length, 0), 2, 'Must only include 2 present students');
+
+  const includedGroups = generateBalancedGroups({
+    students: rosterWithAbsents,
+    mode: 'byGroupCount',
+    targetValue: 2,
+    strategy: 'random',
+    autoLeader: false,
+    excludeAbsent: false,
+  });
+  assert.equal(includedGroups.reduce((acc, g) => acc + g.members.length, 0), 4, 'Must include all 4 students when excludeAbsent is false');
+
+  // 4.3 ทดสอบการแยกขอบเขต Group Preset ตามครูผู้สอนและรายวิชา
+  const key1 = liveClassroomService.getGroupPresetStorageKey('room-1-1', 'teacher-A', 'Math');
+  const key2 = liveClassroomService.getGroupPresetStorageKey('room-1-1', 'teacher-B', 'Science');
+  assert.notEqual(key1, key2, 'Preset keys for different teachers and subjects must never collide');
 
   // 5. ทดสอบการคำนวณสัดส่วนวงล้อตั๋วสุ่ม (ตั๋ว 3 ใบ ต้องมีขนาดมุมเป็น 3 เท่าของตั๋ว 1 ใบ)
   const twoStudents: LiveStudent[] = [

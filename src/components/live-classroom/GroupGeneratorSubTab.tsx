@@ -10,6 +10,7 @@ import {
   ArrowLeftRight,
   Save,
   FolderOpen,
+  Trash2,
 } from 'lucide-react';
 import type { LiveStudent } from '../../services/liveClassroomService';
 import { liveClassroomService } from '../../services/liveClassroomService';
@@ -24,6 +25,9 @@ export interface GroupPresetItem {
   presetName: string;
   groupsData: StudentGroup[];
   createdAt: string;
+  teacherId?: string;
+  teacherName?: string;
+  subject?: string;
 }
 
 export interface GroupGeneratorSubTabProps {
@@ -32,6 +36,9 @@ export interface GroupGeneratorSubTabProps {
   isProjectorMode: boolean;
   groups: StudentGroup[];
   setGroups: React.Dispatch<React.SetStateAction<StudentGroup[]>>;
+  currentTeacherId?: string;
+  currentTeacherName?: string;
+  subjectName?: string;
   onGiveRewardGroup: (studentIds: string[], groupName: string) => void;
   onPlaySound?: (type: 'tick' | 'coin' | 'fanfare' | 'buzzer', freq?: number) => void;
   onNotifyToast?: (message: string) => void;
@@ -80,6 +87,9 @@ export const GroupGeneratorSubTab: React.FC<GroupGeneratorSubTabProps> = ({
   isProjectorMode,
   groups,
   setGroups,
+  currentTeacherId,
+  currentTeacherName,
+  subjectName,
   onGiveRewardGroup,
   onPlaySound,
   onNotifyToast,
@@ -89,17 +99,27 @@ export const GroupGeneratorSubTab: React.FC<GroupGeneratorSubTabProps> = ({
   const [groupSizeInput, setGroupSizeInput] = useState<number>(4);
   const [strategy, setStrategy] = useState<'balanced' | 'random'>('balanced');
   const [autoLeader, setAutoLeader] = useState<boolean>(true);
+  const [balanceGender, setBalanceGender] = useState<boolean>(true);
+  const [excludeAbsent, setExcludeAbsent] = useState<boolean>(true);
   const [swapSourceId, setSwapSourceId] = useState<string | null>(null);
 
-  // Group Presets State
+  // Group Presets State (Scoped per Teacher & Subject)
   const [savedPresets, setSavedPresets] = useState<GroupPresetItem[]>([]);
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('');
   const [presetNameInput, setPresetNameInput] = useState<string>('');
+
+  const presentCount = students.filter((s) => s.present).length;
+  const absentCount = students.length - presentCount;
 
   const loadPresets = useCallback(() => {
     if (!classroomId) return;
-    const presets = liveClassroomService.getGroupPresets<StudentGroup[]>(classroomId);
+    const presets = liveClassroomService.getGroupPresets<StudentGroup[]>(
+      classroomId,
+      currentTeacherId,
+      subjectName
+    );
     setSavedPresets(presets);
-  }, [classroomId]);
+  }, [classroomId, currentTeacherId, subjectName]);
 
   useEffect(() => {
     loadPresets();
@@ -112,6 +132,8 @@ export const GroupGeneratorSubTab: React.FC<GroupGeneratorSubTabProps> = ({
       targetValue: groupMode === 'byGroupCount' ? groupCountInput : groupSizeInput,
       strategy,
       autoLeader,
+      balanceGender,
+      excludeAbsent,
     });
     setGroups(result);
     setSwapSourceId(null);
@@ -138,18 +160,40 @@ export const GroupGeneratorSubTab: React.FC<GroupGeneratorSubTabProps> = ({
   const handleSavePreset = () => {
     if (groups.length === 0) return;
     const name = presetNameInput.trim() || `กลุ่มกิจกรรมวันที่ ${new Date().toLocaleDateString('th-TH')}`;
-    liveClassroomService.saveGroupPreset(classroomId, name, groups);
+    liveClassroomService.saveGroupPreset(
+      classroomId,
+      name,
+      groups,
+      currentTeacherId,
+      currentTeacherName,
+      subjectName
+    );
     loadPresets();
     setPresetNameInput('');
-    onNotifyToast?.(`💾 บันทึกกลุ่ม "${name}" เรียบร้อยแล้ว!`);
+    onNotifyToast?.(`💾 บันทึกกลุ่ม "${name}" (เฉพาะรายวิชานี้) เรียบร้อยแล้ว!`);
   };
 
   const handleSelectPreset = (presetId: string) => {
+    setSelectedPresetId(presetId);
     const found = savedPresets.find((p) => p.id === presetId);
     if (found) {
       setGroups(found.groupsData);
       onNotifyToast?.(`📂 โหลดกลุ่ม "${found.presetName}" สำเร็จ!`);
       onPlaySound?.('fanfare');
+    }
+  };
+
+  const handleDeletePreset = (presetId: string) => {
+    if (!presetId) return;
+    const target = savedPresets.find((p) => p.id === presetId);
+    const confirmMsg = target
+      ? `คุณต้องการลบชุดกลุ่ม "${target.presetName}" ใช่หรือไม่?`
+      : 'คุณต้องการลบชุดกลุ่มนี้ใช่หรือไม่?';
+    if (window.confirm(confirmMsg)) {
+      liveClassroomService.deleteGroupPreset(classroomId, presetId, currentTeacherId, subjectName);
+      setSelectedPresetId('');
+      loadPresets();
+      onNotifyToast?.('🗑️ ลบชุดกลุ่มเรียบร้อยแล้ว');
     }
   };
 
@@ -243,7 +287,31 @@ export const GroupGeneratorSubTab: React.FC<GroupGeneratorSubTabProps> = ({
               className="w-4 h-4 rounded accent-blue-600"
             />
             <span className={isProjectorMode ? 'text-slate-200' : 'text-[#163A66]'}>
-              👑 สุ่มหัวหน้ากลุ่มอัตโนมัติ
+              👑 สุ่มหัวหน้ากลุ่ม
+            </span>
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold select-none">
+            <input
+              type="checkbox"
+              checked={balanceGender}
+              onChange={(e) => setBalanceGender(e.target.checked)}
+              className="w-4 h-4 rounded accent-blue-600"
+            />
+            <span className={isProjectorMode ? 'text-slate-200' : 'text-[#163A66]'}>
+              👫 คละชาย-หญิง
+            </span>
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold select-none">
+            <input
+              type="checkbox"
+              checked={excludeAbsent}
+              onChange={(e) => setExcludeAbsent(e.target.checked)}
+              className="w-4 h-4 rounded accent-blue-600"
+            />
+            <span className={isProjectorMode ? 'text-slate-200' : 'text-[#163A66]'}>
+              🚫 ไม่รวมคนไม่มาเรียน {absentCount > 0 ? `(ขาด ${absentCount} คน)` : ''}
             </span>
           </label>
         </div>
@@ -257,7 +325,7 @@ export const GroupGeneratorSubTab: React.FC<GroupGeneratorSubTabProps> = ({
         </button>
       </div>
 
-      {/* Group Presets Save & Load Bar */}
+      {/* Group Presets Save & Load Bar (Scoped exclusively to this teacher & subject) */}
       <div
         className={`rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-4 border transition-colors ${
           isProjectorMode
@@ -288,7 +356,7 @@ export const GroupGeneratorSubTab: React.FC<GroupGeneratorSubTabProps> = ({
           </button>
         </div>
 
-        {/* Load Preset Dropdown */}
+        {/* Load Preset Dropdown with Isolated Scope */}
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <FolderOpen className="w-4 h-4 text-blue-500" />
           <span
@@ -299,10 +367,10 @@ export const GroupGeneratorSubTab: React.FC<GroupGeneratorSubTabProps> = ({
             โหลดกลุ่มเดิม:
           </span>
           <select
+            value={selectedPresetId}
             onChange={(e) => {
               if (e.target.value) handleSelectPreset(e.target.value);
             }}
-            defaultValue=""
             className={`rounded-xl px-3 py-1.5 text-xs font-semibold border transition-colors ${
               isProjectorMode
                 ? 'bg-slate-800 border-slate-700 text-slate-100'
@@ -318,6 +386,16 @@ export const GroupGeneratorSubTab: React.FC<GroupGeneratorSubTabProps> = ({
               </option>
             ))}
           </select>
+
+          {selectedPresetId && (
+            <button
+              onClick={() => handleDeletePreset(selectedPresetId)}
+              className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-slate-800 transition"
+              title="ลบชุดกลุ่มนี้"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -363,11 +441,28 @@ export const GroupGeneratorSubTab: React.FC<GroupGeneratorSubTabProps> = ({
             >
               <div>
                 <div
-                  className={`flex items-center justify-between pb-3 mb-3 border-b ${
+                  className={`flex items-start justify-between pb-3 mb-3 border-b ${
                     isProjectorMode ? 'border-slate-800' : 'border-[#E6EEF7]'
                   }`}
                 >
-                  <h4 className="font-extrabold text-base text-blue-600">{grp.name}</h4>
+                  <div>
+                    <h4 className="font-extrabold text-base text-blue-600 flex items-center gap-1.5">
+                      <span>{grp.name}</span>
+                      <span className="text-xs font-semibold text-slate-400">
+                        ({grp.members.length} คน)
+                      </span>
+                    </h4>
+                    <div className="flex items-center gap-2 text-[11px] font-semibold mt-0.5">
+                      <span className="text-blue-500 flex items-center gap-0.5">
+                        👦 {grp.members.filter((m) => m.gender !== 'FEMALE').length}
+                      </span>
+                      <span className="text-slate-300">•</span>
+                      <span className="text-pink-500 flex items-center gap-0.5">
+                        👧 {grp.members.filter((m) => m.gender === 'FEMALE').length}
+                      </span>
+                    </div>
+                  </div>
+
                   <button
                     onClick={() =>
                       onGiveRewardGroup(
@@ -375,7 +470,7 @@ export const GroupGeneratorSubTab: React.FC<GroupGeneratorSubTabProps> = ({
                         grp.name
                       )
                     }
-                    className="text-xs bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-500 font-bold px-2.5 py-1 rounded-lg transition active:scale-95"
+                    className="text-xs bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-500 font-bold px-2.5 py-1 rounded-lg transition active:scale-95 shrink-0"
                   >
                     +1 🪙 ยกกลุ่ม
                   </button>
@@ -397,15 +492,26 @@ export const GroupGeneratorSubTab: React.FC<GroupGeneratorSubTabProps> = ({
                               : 'bg-[#F7FAFF] hover:bg-blue-50 text-[#163A66]'
                           }`}
                         >
-                          <span className="flex items-center gap-2">
+                          <span className="flex items-center gap-2 min-w-0">
                             {isLeader ? (
                               <Crown className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                             ) : (
-                              <span className="text-slate-400 w-3 text-center">{mIdx + 1}.</span>
+                              <span className="text-slate-400 w-3 text-center shrink-0">{mIdx + 1}.</span>
                             )}
-                            <span className="font-bold">{member.name}</span>
+                            <span className="font-bold truncate">{member.name}</span>
+                            <span
+                              className="text-[11px] shrink-0"
+                              title={member.gender === 'FEMALE' ? 'นักเรียนหญิง' : 'นักเรียนชาย'}
+                            >
+                              {member.gender === 'FEMALE' ? '👧' : '👦'}
+                            </span>
+                            {!member.present && (
+                              <span className="text-[10px] bg-rose-500/10 text-rose-600 border border-rose-300 px-1 py-0.2 rounded font-bold shrink-0">
+                                ขาด
+                              </span>
+                            )}
                           </span>
-                          <span className="text-slate-400 font-mono text-[11px]">
+                          <span className="text-slate-400 font-mono text-[11px] shrink-0 ml-1">
                             #{member.studentCode}
                           </span>
                         </button>

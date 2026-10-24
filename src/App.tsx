@@ -362,7 +362,7 @@ export const App: React.FC = () => {
       case 'admin-dashboard' as any:
         return 'หน้าแรก';
       case 'live-classroom':
-        return 'เครื่องมือตอนสอน (Live Classroom Companion)';
+        return 'สอน (Live Classroom Companion)';
       case 'school-leave-dashboard':
         return `แดชบอร์ดบริหารระบบการลา • ${schoolSettings.nameTh}`;
       case 'class-overview':

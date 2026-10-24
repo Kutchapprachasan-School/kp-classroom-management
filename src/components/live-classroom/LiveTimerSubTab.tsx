@@ -44,10 +44,16 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
   onGiveReward,
   onPlaySound,
 }) => {
+  const [configuredSeconds, setConfiguredSeconds] = useState<number>(120);
   const [totalSeconds, setTotalSeconds] = useState<number>(120);
   const [remainingSeconds, setRemainingSeconds] = useState<number>(120);
   const [versusCount, setVersusCount] = useState<number>(2);
   const [awardedChallengerId, setAwardedChallengerId] = useState<string | null>(null);
+
+  // Custom Time Input States
+  const [isCustomOpen, setIsCustomOpen] = useState<boolean>(false);
+  const [customMinInput, setCustomMinInput] = useState<number>(1);
+  const [customSecInput, setCustomSecInput] = useState<number>(0);
 
   const presentStudents = students.filter((s) => s.present);
 
@@ -78,12 +84,29 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
     }
   }, [isTimerRunning, remainingSeconds, onPlaySound, setIsTimerRunning]);
 
-  const addTimerSeconds = (sec: number) => {
-    setTotalSeconds((prev) => Math.max(prev + sec, remainingSeconds + sec));
-    setRemainingSeconds((prev) => prev + sec);
+  const applyPresetTime = (sec: number) => {
+    setIsTimerRunning(false);
+    setConfiguredSeconds(sec);
+    setTotalSeconds(sec);
+    setRemainingSeconds(sec);
+    onPlaySound?.('tick', 700);
   };
 
-  const resetTimer = (newSec = totalSeconds) => {
+  const handleApplyCustomTime = () => {
+    const mins = Math.max(0, Number(customMinInput) || 0);
+    const secs = Math.max(0, Math.min(59, Number(customSecInput) || 0));
+    const total = mins * 60 + secs;
+    if (total <= 0) return;
+    applyPresetTime(total);
+    setIsCustomOpen(false);
+  };
+
+  const addTimerSeconds = (sec: number) => {
+    setTotalSeconds((prev) => Math.max(prev + sec, remainingSeconds + sec));
+    setRemainingSeconds((prev) => Math.max(0, prev + sec));
+  };
+
+  const resetTimer = (newSec = configuredSeconds) => {
     setIsTimerRunning(false);
     setTotalSeconds(newSec);
     setRemainingSeconds(newSec);
@@ -91,7 +114,7 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
 
   const handleToggleTimer = () => {
     if (!isTimerRunning && remainingSeconds <= 0) {
-      const resetSec = totalSeconds > 0 ? totalSeconds : 120;
+      const resetSec = configuredSeconds > 0 ? configuredSeconds : 120;
       setTotalSeconds(resetSec);
       setRemainingSeconds(resetSec);
       setIsTimerRunning(true);
@@ -99,6 +122,20 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
     }
     setIsTimerRunning((prev) => !prev);
   };
+
+  // Keyboard shortcut: Spacebar to Start/Pause
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+        e.preventDefault();
+        handleToggleTimer();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isTimerRunning, remainingSeconds, configuredSeconds]);
 
   const pickChallengers = useCallback(() => {
     if (presentStudents.length < versusCount) return;
@@ -165,20 +202,25 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
           </div>
         </div>
 
-        {/* Quick Time Presets & Controls */}
-        <div className="space-y-4">
-          <div className="flex flex-wrap justify-center gap-2">
+        {/* Quick Time Presets & Custom Duration Controls */}
+        <div className="space-y-3.5">
+          {/* Preset Duration Buttons (Support Low Durations starting from 30s) */}
+          <div className="flex flex-wrap items-center justify-center gap-1.5">
             {[
-              { label: '+30 วินาที', sec: 30 },
-              { label: '+1 นาที', sec: 60 },
-              { label: '+3 นาที', sec: 180 },
-              { label: '+5 นาที', sec: 300 },
+              { label: '30 วิ', sec: 30 },
+              { label: '1 นาที', sec: 60 },
+              { label: '2 นาที', sec: 120 },
+              { label: '3 นาที', sec: 180 },
+              { label: '5 นาที', sec: 300 },
+              { label: '10 นาที', sec: 600 },
             ].map((btn) => (
               <button
                 key={btn.label}
-                onClick={() => addTimerSeconds(btn.sec)}
-                className={`border text-xs font-semibold px-3.5 py-1.5 rounded-xl transition ${
-                  isProjectorMode
+                onClick={() => applyPresetTime(btn.sec)}
+                className={`border text-xs font-semibold px-3 py-1.5 rounded-xl transition ${
+                  configuredSeconds === btn.sec && !isTimerRunning
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                    : isProjectorMode
                     ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
                     : 'bg-[#F7FAFF] hover:bg-blue-50 border-[#E6EEF7] text-[#163A66]'
                 }`}
@@ -186,8 +228,93 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
                 {btn.label}
               </button>
             ))}
+
+            <button
+              onClick={() => setIsCustomOpen((prev) => !prev)}
+              className={`border text-xs font-semibold px-3 py-1.5 rounded-xl transition flex items-center gap-1 ${
+                isCustomOpen
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                  : isProjectorMode
+                  ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
+                  : 'bg-white hover:bg-slate-50 border-[#E6EEF7] text-[#163A66]'
+              }`}
+            >
+              <span>⚙️ กำหนดเวลาเอง</span>
+            </button>
           </div>
 
+          {/* Custom Duration Input Box */}
+          {isCustomOpen && (
+            <div
+              className={`p-3 rounded-2xl border flex flex-wrap items-center justify-center gap-3 transition-all ${
+                isProjectorMode ? 'bg-slate-800/90 border-slate-700' : 'bg-blue-50/70 border-blue-200 shadow-2xs'
+              }`}
+            >
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  min={0}
+                  max={120}
+                  value={customMinInput}
+                  onChange={(e) => setCustomMinInput(Math.max(0, Number(e.target.value)))}
+                  className={`w-14 rounded-xl px-2 py-1 text-center font-bold text-xs border ${
+                    isProjectorMode
+                      ? 'bg-slate-900 border-slate-700 text-white'
+                      : 'bg-white border-[#BFDBFE] text-[#163A66]'
+                  }`}
+                />
+                <span className="text-xs font-semibold text-slate-500">นาที</span>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  min={0}
+                  max={59}
+                  value={customSecInput}
+                  onChange={(e) => setCustomSecInput(Math.max(0, Math.min(59, Number(e.target.value))))}
+                  className={`w-14 rounded-xl px-2 py-1 text-center font-bold text-xs border ${
+                    isProjectorMode
+                      ? 'bg-slate-900 border-slate-700 text-white'
+                      : 'bg-white border-[#BFDBFE] text-[#163A66]'
+                  }`}
+                />
+                <span className="text-xs font-semibold text-slate-500">วินาที</span>
+              </div>
+
+              <button
+                onClick={handleApplyCustomTime}
+                className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-1.5 rounded-xl transition active:scale-95 shadow-xs"
+              >
+                ตั้งเวลานี้
+              </button>
+            </div>
+          )}
+
+          {/* Quick Adjustment Increment/Decrement Buttons */}
+          <div className="flex flex-wrap justify-center gap-1.5">
+            {[
+              { label: '-30 วิ', sec: -30 },
+              { label: '-10 วิ', sec: -10 },
+              { label: '+10 วิ', sec: 10 },
+              { label: '+30 วิ', sec: 30 },
+              { label: '+1 นาที', sec: 60 },
+            ].map((btn) => (
+              <button
+                key={btn.label}
+                onClick={() => addTimerSeconds(btn.sec)}
+                className={`border text-[11px] font-semibold px-2.5 py-1 rounded-lg transition ${
+                  isProjectorMode
+                    ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-300'
+                    : 'bg-[#F7FAFF] hover:bg-blue-50 border-[#E6EEF7] text-slate-600'
+                }`}
+              >
+                {btn.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Action Buttons: Start/Pause & Dynamic Reset */}
           <div className="flex justify-center gap-3 pt-2">
             <button
               onClick={handleToggleTimer}
@@ -211,15 +338,16 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
             </button>
 
             <button
-              onClick={() => resetTimer(120)}
+              onClick={() => resetTimer()}
               className={`flex items-center gap-2 font-bold px-5 py-3 rounded-2xl text-base border transition ${
                 isProjectorMode
                   ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
                   : 'bg-white hover:bg-slate-50 border-[#E6EEF7] text-[#163A66]'
               }`}
+              title={`รีเซ็ตกลับเป็นเวลาที่กำหนด (${formatTimerMMSS(configuredSeconds)})`}
             >
               <Refresh1Regular className="w-5 h-5 text-slate-400" />
-              <span>รีเซ็ต (02:00)</span>
+              <span>รีเซ็ต ({formatTimerMMSS(configuredSeconds)})</span>
             </button>
           </div>
         </div>

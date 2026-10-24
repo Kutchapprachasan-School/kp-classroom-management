@@ -12,6 +12,7 @@ import {
   type LiveClassroomData,
   type LiveStudent,
 } from '../services/liveClassroomService';
+import { authService } from '../services/authService';
 import { useOptimisticRewards } from '../hooks/useOptimisticRewards';
 import { LiveClassroomHeader, type SubTab } from '../components/live-classroom/LiveClassroomHeader';
 import { RandomPickerSubTab } from '../components/live-classroom/RandomPickerSubTab';
@@ -444,6 +445,9 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
             isProjectorMode={isProjectorMode}
             groups={groups}
             setGroups={setGroups}
+            currentTeacherId={authService.getCurrentUser()?.id || authService.getCurrentUser()?.username || 'teacher_guest'}
+            currentTeacherName={authService.getCurrentUser()?.name || 'ครูผู้สอน'}
+            subjectName={currentClassroom?.subject || 'general_subject'}
             onGiveRewardGroup={(ids, name) =>
               giveReward(ids, 'coin', 1, `รางวัลยกกลุ่ม ${name}`)
             }

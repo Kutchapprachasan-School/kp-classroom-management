@@ -13,6 +13,25 @@ import { authService } from './authService';
 
 export type StudentTier = 'high' | 'mid' | 'low';
 
+export function detectStudentGender(name?: string, explicitGender?: string): 'MALE' | 'FEMALE' {
+  if (explicitGender === 'MALE' || explicitGender === 'FEMALE') {
+    return explicitGender;
+  }
+  const trimmed = (name || '').trim();
+  if (
+    trimmed.startsWith('เด็กหญิง') ||
+    trimmed.startsWith('ด.ญ.') ||
+    trimmed.startsWith('ด.ญ') ||
+    trimmed.startsWith('นางสาว') ||
+    trimmed.startsWith('น.ส.') ||
+    trimmed.startsWith('น.ส') ||
+    trimmed.startsWith('นาง')
+  ) {
+    return 'FEMALE';
+  }
+  return 'MALE';
+}
+
 export interface LiveStudent {
   id: string;
   studentCode: string;
@@ -25,6 +44,7 @@ export interface LiveStudent {
   sessionCoins: number;
   sessionTickets: number;
   tier: StudentTier;
+  gender?: 'MALE' | 'FEMALE';
 }
 
 export interface LiveClassroomData {
@@ -187,9 +207,18 @@ export const liveClassroomService = {
       const studentIds = roster.map((st) => st.id);
       const attendanceMap = this.getTodayAttendanceMap(cls.id, studentIds);
 
+      const directStudentsList =
+        studentService.getStudents(cls.name) ||
+        studentService.getStudents(cls.id) ||
+        (cls.roomNumber ? studentService.getStudents(cls.roomNumber) : []) ||
+        [];
+      const directStudentMap = new Map(directStudentsList.map((s) => [s.id, s]));
+
       // ดึงสถานะกาชาจริงของนักเรียนแต่ละคน
       const initialStudentData = roster.map((st) => {
         const gachaState = gachaService.getState(st.id);
+        const directMatch = directStudentMap.get(st.id);
+        const gender = detectStudentGender(st.name, directMatch?.gender);
         return {
           id: st.id,
           studentCode: st.studentCode || st.id,
@@ -202,6 +231,7 @@ export const liveClassroomService = {
           sessionCoins: 0,
           sessionTickets: 0,
           tier: 'mid' as StudentTier,
+          gender,
         };
       });
 
@@ -337,36 +367,86 @@ export const liveClassroomService = {
   },
 
   /**
-   * บันทึกและโหลด Group Presets แยกตามรหัสห้องเรียน
+   * สร้าง Storage Key สำหรับ Group Preset แยกตามครูผู้สอน, รายวิชา, และห้องเรียน
+   * เพื่อความปลอดภัยและความเป็นส่วนตัว 100% ของใครของมันไม่ปนกัน
    */
-  saveGroupPreset<T>(classroomId: string, presetName: string, groupsData: T): void {
+  getGroupPresetStorageKey(
+    classroomId: string,
+    teacherId?: string,
+    subject?: string
+  ): string {
+    const safeTeacher = (teacherId || 'default').replace(/[^a-zA-Z0-9_\u0E00-\u0E7F-]/g, '_');
+    const safeSubject = (subject || 'default').replace(/[^a-zA-Z0-9_\u0E00-\u0E7F-]/g, '_');
+    return `${GROUP_PRESETS_STORAGE_PREFIX}${safeTeacher}_${safeSubject}_${classroomId}`;
+  },
+
+  /**
+   * บันทึก Group Presets เฉพาะครูผู้สอนและรายวิชานั้นๆ
+   */
+  saveGroupPreset<T>(
+    classroomId: string,
+    presetName: string,
+    groupsData: T,
+    teacherId?: string,
+    teacherName?: string,
+    subject?: string
+  ): void {
     if (typeof window === 'undefined') return;
-    const key = `${GROUP_PRESETS_STORAGE_PREFIX}${classroomId}`;
-    const existing = this.getGroupPresets<T>(classroomId);
+    const key = this.getGroupPresetStorageKey(classroomId, teacherId, subject);
+    const existing = this.getGroupPresets<T>(classroomId, teacherId, subject);
     const newPreset = {
       id: `preset-${Date.now()}`,
       classroomId,
       presetName: presetName.trim() || `กลุ่มกิจกรรมวันที่ ${new Date().toLocaleDateString('th-TH')}`,
       groupsData,
       createdAt: new Date().toISOString(),
+      teacherId,
+      teacherName,
+      subject,
     };
     window.localStorage.setItem(key, JSON.stringify([newPreset, ...existing]));
   },
 
-  getGroupPresets<T>(classroomId: string): {
+  getGroupPresets<T>(
+    classroomId: string,
+    teacherId?: string,
+    subject?: string
+  ): {
     id: string;
     classroomId: string;
     presetName: string;
     groupsData: T;
     createdAt: string;
+    teacherId?: string;
+    teacherName?: string;
+    subject?: string;
   }[] {
     if (typeof window === 'undefined') return [];
-    const key = `${GROUP_PRESETS_STORAGE_PREFIX}${classroomId}`;
+    const key = this.getGroupPresetStorageKey(classroomId, teacherId, subject);
     try {
       const raw = window.localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : [];
+      if (raw) return JSON.parse(raw);
+      // Fallback สำหรับคีย์เก่ากรณีไม่ระบุครูหรือวิชา
+      if (!teacherId && !subject) {
+        const legacyRaw = window.localStorage.getItem(`${GROUP_PRESETS_STORAGE_PREFIX}${classroomId}`);
+        return legacyRaw ? JSON.parse(legacyRaw) : [];
+      }
+      return [];
     } catch {
       return [];
     }
+  },
+
+  deleteGroupPreset(
+    classroomId: string,
+    presetId: string,
+    teacherId?: string,
+    subject?: string
+  ): void {
+    if (typeof window === 'undefined') return;
+    const key = this.getGroupPresetStorageKey(classroomId, teacherId, subject);
+    const existing = this.getGroupPresets(classroomId, teacherId, subject);
+    const filtered = existing.filter((p) => p.id !== presetId);
+    window.localStorage.setItem(key, JSON.stringify(filtered));
   },
 };

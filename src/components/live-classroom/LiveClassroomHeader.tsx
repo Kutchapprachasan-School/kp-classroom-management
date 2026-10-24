@@ -78,7 +78,13 @@ export const LiveClassroomHeader: React.FC<LiveClassroomHeaderProps> = ({
             }`}
           >
             <SparklesRegular className="w-5 h-5 text-blue-500" />
-            <span className="text-sm font-semibold">เครื่องมือตอนสอน</span>
+            <span className="text-sm font-bold flex items-center gap-1.5">
+              <span>สอน</span>
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-rose-500 text-white shadow-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                Live
+              </span>
+            </span>
           </div>
 
           <select
