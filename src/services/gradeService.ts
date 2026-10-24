@@ -249,6 +249,35 @@ export const localGradeDb = {
     }
   },
 
+  // ✅ Batch Stage Dirty Scores: บันทึก Dirty Cells หลายรายการใน 1 Transaction (ป้องกัน Event Storm & Browser Freeze)
+  async stageDirtyScoresBatch(scoreRecords: StudentScore[]): Promise<void> {
+    if (scoreRecords.length === 0) return;
+
+    for (const scoreRecord of scoreRecords) {
+      memoryGradeFallback.scores.set(scoreRecord.id, scoreRecord);
+      memoryGradeFallback.outbox.set(scoreRecord.id, scoreRecord);
+    }
+
+    if (!isIndexedDBAvailable()) return;
+
+    try {
+      const db = await openGradeDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction([STORE_SCORES, STORE_OUTBOX], 'readwrite');
+        const scoreStore = tx.objectStore(STORE_SCORES);
+        const outboxStore = tx.objectStore(STORE_OUTBOX);
+        for (const scoreRecord of scoreRecords) {
+          scoreStore.put(scoreRecord);
+          outboxStore.put(scoreRecord);
+        }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch {
+      // Memory fallback updated
+    }
+  },
+
   async getAllOutbox(): Promise<StudentScore[]> {
     if (!isIndexedDBAvailable()) {
       return Array.from(memoryGradeFallback.outbox.values());
@@ -459,6 +488,27 @@ export const gradeService = {
 
   async setScore(studentId: string, assignmentId: string, scoreValue: number | null): Promise<StudentScore> {
     return this.updateStudentScore(studentId, assignmentId, scoreValue);
+  },
+
+  // ✅ Batch Set Scores: บันทึกคะแนนนักเรียนหลายคนพร้อมกันใน 1 Transaction พร้อม Debounce Flush ครั้งเดียว
+  async setScoresBatch(
+    records: Array<{ studentId: string; assignmentId: string; scoreValue: number | null }>
+  ): Promise<StudentScore[]> {
+    if (records.length === 0) return [];
+
+    const nowIso = new Date().toISOString();
+    const scoreRecords: StudentScore[] = records.map((r) => ({
+      id: `${r.studentId}_${r.assignmentId}`,
+      studentId: r.studentId,
+      assignmentId: r.assignmentId,
+      score: r.scoreValue,
+      updatedAt: nowIso,
+    }));
+
+    await localGradeDb.stageDirtyScoresBatch(scoreRecords);
+    this.scheduleDebouncedFlush();
+
+    return scoreRecords;
   },
 
   /**

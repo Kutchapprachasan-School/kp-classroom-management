@@ -270,15 +270,37 @@ export const StudentGradebookView: React.FC<StudentGradebookViewProps> = ({
 
   const competencyRadarData = useMemo(() => {
     const hasData = subjectsList.length > 0;
-    const avgScore = hasData
-      ? Math.round(subjectsList.reduce((acc, s) => acc + s.totalScore, 0) / subjectsList.length)
-      : 0;
+    let avgFormativePercent = 0;
+    let avgExamPercent = 0;
+
+    if (hasData) {
+      let totalFormativeScore = 0;
+      let totalFormativeMax = 0;
+      let totalExamScore = 0;
+      let totalExamMax = 0;
+
+      for (const s of subjectsList) {
+        const formScore = Number(s.preMidtermScore || 0) + Number(s.postMidtermScore || 0);
+        const formMax = (s.weights?.preMidterm ?? 25) + (s.weights?.postMidterm ?? 25);
+        const exScore = Number(s.midtermScore || 0) + Number(s.finalScore || 0);
+        const exMax = (s.weights?.midterm ?? 20) + (s.weights?.final ?? 30);
+
+        totalFormativeScore += formScore;
+        totalFormativeMax += formMax > 0 ? formMax : 50;
+        totalExamScore += exScore;
+        totalExamMax += exMax > 0 ? exMax : 50;
+      }
+
+      avgFormativePercent = totalFormativeMax > 0 ? Math.round((totalFormativeScore / totalFormativeMax) * 100) : 0;
+      avgExamPercent = totalExamMax > 0 ? Math.round((totalExamScore / totalExamMax) * 100) : 0;
+    }
+
     return [
-      { subject: 'คะแนนเก็บ', student: avgScore, fullMark: 100 },
-      { subject: 'คะแนนสอบ', student: avgScore, fullMark: 100 },
+      { subject: 'คะแนนเก็บ', student: avgFormativePercent, fullMark: 100 },
+      { subject: 'คะแนนสอบ', student: avgExamPercent, fullMark: 100 },
       { subject: 'ส่งงานตรงเวลา', student: hasData ? submissionRate : 0, fullMark: 100 },
-      { subject: 'เวลาเรียน', student: hasData ? (rosterStudent?.attendancePercent ?? 100) : 0, fullMark: 100 },
-      { subject: 'พฤติกรรม', student: hasData ? disciplineScore : 0, fullMark: 100 },
+      { subject: 'เวลาเรียน', student: hasData ? Math.min(100, Math.round(rosterStudent?.attendancePercent ?? 100)) : 0, fullMark: 100 },
+      { subject: 'พฤติกรรม', student: hasData ? Math.min(100, Math.max(0, disciplineScore)) : 0, fullMark: 100 },
     ];
   }, [subjectsList, submissionRate, rosterStudent?.attendancePercent, disciplineScore]);
 

@@ -176,6 +176,9 @@ export function resolveStudentIdentity(
   return null;
 }
 
+// แคชรหัสห้องเรียนของนักเรียน เพื่อลด overhead ในการเรียก findStudentByCode ในลูปคำนวณคะแนน
+const studentClassroomMatchCache = new Map<string, string>();
+
 /**
  * ตรวจสอบว่า Submission ชิ้นนี้ตรงกับ Assignment เป้าหมายหรือไม่
  * รองรับการจับคู่ด้วย id ตรงตัว, unitId (เฉพาะกรณีที่เป็นงานระดับหน่วย), และชื่อชิ้นงาน (workTitle)
@@ -203,8 +206,17 @@ export function matchSubmissionToAssignment(
   if (asgRooms.length > 0 && !asgRooms.includes('ALL')) {
     let effectiveSubRoom = subRoom;
     if (!effectiveSubRoom && sub.studentCode) {
-      const found = studentService.findStudentByCode(sub.studentCode);
-      if (found) effectiveSubRoom = found.classroomId || found.student.classroomId;
+      if (studentClassroomMatchCache.has(sub.studentCode)) {
+        effectiveSubRoom = studentClassroomMatchCache.get(sub.studentCode);
+      } else {
+        const found = studentService.findStudentByCode(sub.studentCode);
+        if (found) {
+          effectiveSubRoom = found.classroomId || found.student.classroomId;
+          if (effectiveSubRoom) {
+            studentClassroomMatchCache.set(sub.studentCode, effectiveSubRoom);
+          }
+        }
+      }
     }
     if (effectiveSubRoom) {
       const isRoomMatch = asgRooms.some((r) => isSameClassroom(r, effectiveSubRoom));
@@ -1554,8 +1566,202 @@ export const sgsRosterAndSubmissionService = {
   },
 
   /**
-   * ซิงค์สถานะในคิวตรวจงานของครู (kp_grading_queue_v2)
-   * แก้ปัญหา Quick Grade หาคีย์ไม่เจอ และแก้ปัญหางานซ่อม (Resubmission) ไม่เด้งกลับเข้าคิว FIFO
+   * ✅ Batch Score Bridge: ส่งคะแนนนักเรียนหลายคนเข้า gradeService ใน 1 Batch
+   * ป้องกันปัญหา Event Storm และ IndexedDB I/O Overwhelming เมื่อใช้คำสั่ง Bulk Grade
+   */
+  syncScoresToGradeServiceOutboxBatch(
+    items: Array<{
+      studentCode?: string;
+      studentId?: string;
+      assignmentId: string;
+      score: number | null;
+    }>
+  ): boolean {
+    if (items.length === 0) return true;
+    try {
+      const roster = this.getRoster() as RosterIdentityRecord[];
+      const termAssignments = this.getTermAssignments();
+      const uniqueAsgIds = Array.from(new Set(items.map((i) => i.assignmentId)));
+
+      // ลงทะเบียน AssessmentColumn ล่วงหน้าสำหรับทุก Assignment ในชุดข้อมูล
+      if (gradeService && typeof (gradeService as any).ensureAssessmentColumn === 'function') {
+        for (const asgId of uniqueAsgIds) {
+          const targetAsg = termAssignments.find((a) => a.id === asgId);
+          if (targetAsg) {
+            void (gradeService as any).ensureAssessmentColumn({
+              id: targetAsg.id,
+              courseId: targetAsg.courseCode || 'GENERAL',
+              classroomId: targetAsg.targetClassrooms?.[0] !== 'ALL' ? targetAsg.targetClassrooms?.[0] : null,
+              title: targetAsg.title,
+              maxScore: targetAsg.maxScore,
+              category: targetAsg.scorePart === 'MIDTERM' ? 'MIDTERM' : targetAsg.scorePart === 'FINAL' ? 'FINAL' : 'HW',
+            });
+          }
+        }
+      }
+
+      const validRecords: Array<{ studentId: string; assignmentId: string; scoreValue: number | null }> = [];
+
+      for (const item of items) {
+        const identity = resolveStudentIdentity(
+          { id: item.studentId, studentCode: item.studentCode },
+          roster
+        );
+        let resolvedStudentId = identity?.studentId || item.studentId;
+        if (!resolvedStudentId && item.studentCode) {
+          const foundStu = studentService.findStudentByCode(item.studentCode);
+          if (foundStu?.student?.id) {
+            resolvedStudentId = foundStu.student.id;
+          } else {
+            resolvedStudentId = `stu-${item.studentCode}`;
+          }
+        }
+
+        if (!resolvedStudentId || !item.assignmentId) continue;
+
+        const sanitizedScore =
+          typeof item.score === 'number' && !Number.isNaN(item.score)
+            ? item.score
+            : null;
+
+        validRecords.push({
+          studentId: resolvedStudentId,
+          assignmentId: item.assignmentId,
+          scoreValue: sanitizedScore,
+        });
+      }
+
+      if (validRecords.length > 0 && gradeService) {
+        if (typeof (gradeService as any).setScoresBatch === 'function') {
+          void (gradeService as any).setScoresBatch(validRecords);
+        } else {
+          for (const rec of validRecords) {
+            gradeService.setScore(rec.studentId, rec.assignmentId, rec.scoreValue);
+          }
+        }
+      }
+
+      // ยิง Event เพียงครั้งเดียวเมื่อประมวลผลทั้ง Batch เสร็จสิ้น ป้องกัน Event Storm
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(
+          new CustomEvent('kp:sgs-score-bridged', {
+            detail: {
+              batch: true,
+              count: validRecords.length,
+              timestamp: Date.now(),
+            },
+          })
+        );
+      }
+
+      return true;
+    } catch (error) {
+      console.error('[ScoreBridgeBatch] เกิดข้อผิดพลาดในการซิงค์คะแนน Batch ไปยัง gradeService:', error);
+      return false;
+    }
+  },
+
+  /**
+   * ซิงค์สถานะในคิวตรวจงานของครูแบบ Batch (kp_grading_queue_v2)
+   * ทำการอ่านและเขียน localStorage เพียงรอบเดียว พร้อมยิง Event ครั้งเดียว
+   */
+  syncGradingQueueItemsBatch(
+    items: Array<{
+      assignmentId: string;
+      studentCode: string;
+      studentId?: string;
+      studentName?: string;
+      classroom?: string;
+      courseCode?: string;
+      workTitle?: string;
+      fileUrl?: string;
+      externalLinkUrl?: string;
+      textContent?: string;
+      status: 'PENDING_REVIEW' | 'GRADED' | 'RETURNED_REVISION' | 'RETURNED';
+      score?: number | null;
+      feedback?: string;
+      isResubmission?: boolean;
+    }>
+  ): void {
+    if (typeof localStorage === 'undefined' || items.length === 0) return;
+
+    try {
+      const rawQueue = localStorage.getItem('kp_grading_queue_v2');
+      const queue: Array<Record<string, any>> = rawQueue ? JSON.parse(rawQueue) : [];
+      const now = Date.now();
+
+      for (const params of items) {
+        const canonicalQueueId = `q_${params.assignmentId}_${params.studentCode}`;
+        const existingIdx = queue.findIndex(
+          (item) =>
+            item.id === canonicalQueueId ||
+            (item.assignmentId === params.assignmentId &&
+              item.studentCode === params.studentCode)
+        );
+
+        const queueStatus =
+          params.status === 'RETURNED_REVISION' ? 'RETURNED' : params.status;
+
+        if (existingIdx !== -1) {
+          const current = queue[existingIdx];
+          queue[existingIdx] = {
+            ...current,
+            id: current.id || canonicalQueueId,
+            assignmentId: params.assignmentId,
+            studentCode: params.studentCode,
+            studentId: params.studentId || current.studentId,
+            status: queueStatus,
+            score: params.score !== undefined ? params.score : current.score,
+            feedback: params.feedback !== undefined ? params.feedback : current.feedback,
+            fileUrl: params.fileUrl || current.fileUrl,
+            externalLinkUrl: params.externalLinkUrl || current.externalLinkUrl,
+            textContent: params.textContent || current.textContent,
+            submittedTimestamp:
+              queueStatus === 'PENDING_REVIEW'
+                ? now
+                : current.submittedTimestamp || now,
+            gradedTimestamp:
+              queueStatus === 'GRADED' ? now : current.gradedTimestamp,
+            isResubmission:
+              params.isResubmission ??
+              (current.status === 'RETURNED' ||
+                current.status === 'RETURNED_REVISION' ||
+                Boolean(current.isResubmission)),
+          };
+        } else if (queueStatus === 'PENDING_REVIEW' || queueStatus === 'GRADED') {
+          queue.push({
+            id: canonicalQueueId,
+            assignmentId: params.assignmentId,
+            studentCode: params.studentCode,
+            studentId: params.studentId,
+            studentName: params.studentName || '',
+            classroom: params.classroom || '',
+            courseCode: params.courseCode || '',
+            workTitle: params.workTitle || '',
+            fileUrl: params.fileUrl || '',
+            externalLinkUrl: params.externalLinkUrl || '',
+            textContent: params.textContent || '',
+            status: queueStatus,
+            score: params.score ?? null,
+            feedback: params.feedback || '',
+            submittedTimestamp: now,
+            gradedTimestamp: queueStatus === 'GRADED' ? now : undefined,
+            isResubmission: Boolean(params.isResubmission),
+          });
+        }
+      }
+
+      localStorage.setItem('kp_grading_queue_v2', JSON.stringify(queue));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kp-grading-queue-updated'));
+      }
+    } catch (err) {
+      console.warn('[GradingQueueSyncBatch] ไม่สามารถอัปเดตคิวตรวจงาน Batch ใน localStorage:', err);
+    }
+  },
+
+  /**
+   * ซิงค์สถานะในคิวตรวจงานของครู (kp_grading_queue_v2) รายการเดี่ยว
    */
   syncGradingQueueItem(params: {
     assignmentId: string;
@@ -1573,82 +1779,7 @@ export const sgsRosterAndSubmissionService = {
     feedback?: string;
     isResubmission?: boolean;
   }): void {
-    if (typeof localStorage === 'undefined') return;
-
-    try {
-      const rawQueue = localStorage.getItem('kp_grading_queue_v2');
-      const queue: Array<Record<string, any>> = rawQueue ? JSON.parse(rawQueue) : [];
-      const canonicalQueueId = `q_${params.assignmentId}_${params.studentCode}`;
-      const now = Date.now();
-
-      // ค้นหาแบบยืดหยุ่น: เช็คทั้ง ID มาตรฐาน และคู่ (assignmentId + studentCode)
-      const existingIdx = queue.findIndex(
-        (item) =>
-          item.id === canonicalQueueId ||
-          (item.assignmentId === params.assignmentId &&
-            item.studentCode === params.studentCode)
-      );
-
-      const queueStatus =
-        params.status === 'RETURNED_REVISION' ? 'RETURNED' : params.status;
-
-      if (existingIdx !== -1) {
-        const current = queue[existingIdx];
-        queue[existingIdx] = {
-          ...current,
-          id: current.id || canonicalQueueId,
-          assignmentId: params.assignmentId,
-          studentCode: params.studentCode,
-          studentId: params.studentId || current.studentId,
-          status: queueStatus,
-          score: params.score !== undefined ? params.score : current.score,
-          feedback: params.feedback !== undefined ? params.feedback : current.feedback,
-          fileUrl: params.fileUrl || current.fileUrl,
-          externalLinkUrl: params.externalLinkUrl || current.externalLinkUrl,
-          textContent: params.textContent || current.textContent,
-          // หากนักเรียนส่งงานใหม่หรือส่งงานซ่อม ให้รีเซ็ตเวลาส่งเพื่อให้เข้าคิว FIFO รอตรวจของครูทันที
-          submittedTimestamp:
-            queueStatus === 'PENDING_REVIEW'
-              ? now
-              : current.submittedTimestamp || now,
-          gradedTimestamp:
-            queueStatus === 'GRADED' ? now : current.gradedTimestamp,
-          isResubmission:
-            params.isResubmission ??
-            (current.status === 'RETURNED' ||
-              current.status === 'RETURNED_REVISION' ||
-              Boolean(current.isResubmission)),
-        };
-      } else if (queueStatus === 'PENDING_REVIEW' || queueStatus === 'GRADED') {
-        // กรณีไม่มีในคิวมาก่อน (เช่น ส่งงานครั้งแรก หรือครู Quick Grade จากตารางโดยตรง)
-        queue.push({
-          id: canonicalQueueId,
-          assignmentId: params.assignmentId,
-          studentCode: params.studentCode,
-          studentId: params.studentId,
-          studentName: params.studentName || '',
-          classroom: params.classroom || '',
-          courseCode: params.courseCode || '',
-          workTitle: params.workTitle || '',
-          fileUrl: params.fileUrl || '',
-          externalLinkUrl: params.externalLinkUrl || '',
-          textContent: params.textContent || '',
-          status: queueStatus,
-          score: params.score ?? null,
-          feedback: params.feedback || '',
-          submittedTimestamp: now,
-          gradedTimestamp: queueStatus === 'GRADED' ? now : undefined,
-          isResubmission: Boolean(params.isResubmission),
-        });
-      }
-
-      localStorage.setItem('kp_grading_queue_v2', JSON.stringify(queue));
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('kp-grading-queue-updated'));
-      }
-    } catch (err) {
-      console.warn('[GradingQueueSync] ไม่สามารถอัปเดตคิวตรวจงานใน localStorage:', err);
-    }
+    this.syncGradingQueueItemsBatch([params]);
   },
 
   /**
@@ -1806,9 +1937,14 @@ export const sgsRosterAndSubmissionService = {
     teacherFeedback?: string
   ): StudentWorkSubmission[] {
     const subs = this.getSubmissions();
-    const idx = subs.findIndex(
-      (s) => s.assignmentId === assignmentId && s.studentCode === studentCode
-    );
+    const asg = this.getTermAssignments().find((a) => a.id === assignmentId);
+    // BUG-3 FIX: ค้นหา submission ด้วย matchSubmissionToAssignment(s, asg) เพื่อรองรับกรณีงานระดับหน่วย (unitId)
+    const idx = subs.findIndex((s) => {
+      if (s.studentCode !== studentCode) return false;
+      if (s.assignmentId === assignmentId) return true;
+      if (asg && matchSubmissionToAssignment(s, asg)) return true;
+      return false;
+    });
     const nowIso = new Date().toISOString();
     const formattedNote = `[ส่งงานกลับเนื่องจาก: ${reason}] ${teacherFeedback || ''}`.trim();
 
@@ -1830,7 +1966,9 @@ export const sgsRosterAndSubmissionService = {
             returnReason: reason,
             returnedAt: nowIso,
             teacherFeedback: formattedNote,
-            workTitle: 'งานที่ส่งกลับเพื่อแก้ไข',
+            workTitle: asg?.title || 'งานที่ส่งกลับเพื่อแก้ไข',
+            courseCode: asg?.courseCode,
+            unitId: asg?.unitId,
           };
 
     const updated =
@@ -1840,32 +1978,72 @@ export const sgsRosterAndSubmissionService = {
 
     // ซิงค์สถานะลงคิวตรวจงาน (kp_grading_queue_v2) ให้แสดงเป็นสถานะ 'RETURNED' ทันที
     this.syncGradingQueueItem({
-      assignmentId,
+      assignmentId: nextItem.assignmentId || assignmentId,
       studentCode,
       status: 'RETURNED_REVISION',
       feedback: formattedNote,
       score: null,
+      courseCode: nextItem.courseCode || asg?.courseCode,
+      workTitle: nextItem.workTitle || asg?.title,
     });
 
     return this.saveSubmissions(updated);
   },
 
   // 1-Click Bulk Action: ให้คะแนนเต็มทุกคนที่ส่งงานแล้ว (รอตรวจ -> ตรวจเสร็จทันที)
+  // BUG-2 FIX: Bridge คะแนนเข้า gradeService แบบ Batch + อัปเดตคิวตรวจงานแบบ Batch เพื่อป้องกัน Event Storm
   bulkGradeAllSubmitted(assignmentId?: string): StudentWorkSubmission[] {
     const assignments = this.getTermAssignments();
+    const nowIso = new Date().toISOString();
+    const newlyGraded: StudentWorkSubmission[] = [];
+
     const subs = this.getSubmissions().map((sub) => {
       if (assignmentId && sub.assignmentId !== assignmentId) return sub;
       if (sub.status === 'SUBMITTED_PENDING') {
         const asg = assignments.find((a) => a.id === sub.assignmentId);
-        return {
+        const maxScore = asg ? asg.maxScore : 10;
+        const gradedSub: StudentWorkSubmission = {
           ...sub,
           status: 'GRADED' as const,
-          score: asg ? asg.maxScore : 10,
+          score: maxScore,
+          maxScore: sub.maxScore ?? maxScore,
+          gradedAt: nowIso,
         };
+        newlyGraded.push(gradedSub);
+        return gradedSub;
       }
       return sub;
     });
-    return this.saveSubmissions(subs);
+
+    const saved = this.saveSubmissions(subs);
+
+    if (newlyGraded.length > 0) {
+      // 1. ซิงค์สถานะในคิวตรวจงานแบบ Batch (บันทึก localStorage รอบเดียว + ยิง event รอบเดียว)
+      this.syncGradingQueueItemsBatch(
+        newlyGraded.map((item) => ({
+          assignmentId: item.assignmentId,
+          studentCode: item.studentCode,
+          studentId: item.studentId,
+          workTitle: item.workTitle,
+          courseCode: item.courseCode,
+          status: 'GRADED',
+          score: item.score,
+          feedback: item.feedback || item.teacherFeedback,
+        }))
+      );
+
+      // 2. Bridge คะแนนเข้าสู่ gradeService แบบ Batch (IndexedDB Outbox -> ตาราง "StudentScore" บน Neon DB)
+      this.syncScoresToGradeServiceOutboxBatch(
+        newlyGraded.map((item) => ({
+          studentCode: item.studentCode,
+          studentId: item.studentId,
+          assignmentId: item.assignmentId,
+          score: item.score ?? null,
+        }))
+      );
+    }
+
+    return saved;
   },
 
   // คำนวณคะแนน 4 ส่วน (ก่อนกลางภาค, กลางภาค, หลังกลางภาค, ปลายภาค) + รองรับการพิมพ์คะแนนตรงในตาราง ปพ.5
@@ -1985,9 +2163,20 @@ export const sgsRosterAndSubmissionService = {
       }
     }
 
+    // BUG-6 FIX: เรียงลำดับ submissions จากใหม่สุดไปเก่าสุด เพื่อป้องกันกรณี
+    // returnSubmissionForRevision สร้าง submission ซ้ำ → .find() จะได้ตัวล่าสุดเสมอ
+    const sortedSubs = [...subs].sort((a, b) => {
+      const ta = a.submittedAt || a.gradedAt || '';
+      const tb = b.submittedAt || b.gradedAt || '';
+      return tb.localeCompare(ta);
+    });
+    // กรอง RETURNED_REVISION ออกก่อน แล้ว fallback ไป subs ทั้งหมดถ้าไม่เจอ
+    const activeSubs = sortedSubs.filter((s) => s.status !== 'RETURNED_REVISION');
+
     // 1. คำนวณชิ้นงานเดี่ยวปกติ
     for (const asg of directAssignments) {
-      const sub = subs.find((s) => matchSubmissionToAssignment(s, asg));
+      const sub = activeSubs.find((s) => matchSubmissionToAssignment(s, asg))
+        || sortedSubs.find((s) => matchSubmissionToAssignment(s, asg));
       if (
         sub &&
         (sub.status === 'GRADED' ||
@@ -1998,10 +2187,12 @@ export const sgsRosterAndSubmissionService = {
         if (sub.status === 'SUBMITTED_PENDING') {
           pendingReviewCount += 1;
         }
+        // BUG-1 FIX: Whitelist — เฉพาะ SUBMISSION_COUNT_RATIO เท่านั้นที่ให้คะแนนเต็มเมื่อส่งงาน
+        // งาน DIRECT_SCORE หรือวิธีอื่นที่ยังไม่ตรวจ (SUBMITTED_PENDING, score=null) ให้ได้ 0
         const earned =
           sub.score !== null && sub.score !== undefined
             ? sub.score
-            : sub.status === 'SUBMITTED_PENDING'
+            : sub.status === 'SUBMITTED_PENDING' && asg.scoringMethod === 'SUBMISSION_COUNT_RATIO'
             ? asg.maxScore
             : 0;
         if (asg.sgsUnit === 'u1') u1 += earned;
@@ -2039,7 +2230,8 @@ export const sgsRosterAndSubmissionService = {
       let rawMaxSum = 0;
 
       for (const asg of unitTasks) {
-        const sub = subs.find((s) => matchSubmissionToAssignment(s, asg));
+        const sub = activeSubs.find((s) => matchSubmissionToAssignment(s, asg))
+          || sortedSubs.find((s) => matchSubmissionToAssignment(s, asg));
         if (
           sub &&
           (sub.status === 'GRADED' ||
@@ -2051,10 +2243,11 @@ export const sgsRosterAndSubmissionService = {
           if (sub.status === 'SUBMITTED_PENDING') {
             pendingReviewCount += 1;
           }
+          // BUG-1 FIX: Whitelist — เฉพาะ SUBMISSION_COUNT_RATIO/RAW_SCORE_AVERAGE เท่านั้น
           const earned =
             sub.score !== null && sub.score !== undefined
               ? sub.score
-              : sub.status === 'SUBMITTED_PENDING'
+              : sub.status === 'SUBMITTED_PENDING' && asg.scoringMethod === 'SUBMISSION_COUNT_RATIO'
               ? asg.maxScore
               : 0;
           rawEarnedSum += earned;
@@ -2171,6 +2364,29 @@ export const sgsRosterAndSubmissionService = {
       ? (student.manualAccumulatedOverride as number)
       : calculatedAccumulated;
 
+    // BUG-5 FIX: ตรวจสอบและบันทึกข้อความแจ้งเตือน (Warnings) กรณีคะแนนดิบจากชิ้นงานเกินสัดส่วนที่หลักสูตรกำหนด
+    const scoreWarnings: string[] = [];
+    if (!isPreMidtermManual && preFromWorks > weights.preMidterm) {
+      scoreWarnings.push(
+        `คะแนนชิ้นงานก่อนกลางภาค (${preFromWorks}) เกินสัดส่วนที่กำหนด (${weights.preMidterm}) ระบบปรับลดลงเหลือ ${preVal}`
+      );
+    }
+    if (!isPostMidtermManual && postFromWorks > weights.postMidterm) {
+      scoreWarnings.push(
+        `คะแนนชิ้นงานหลังกลางภาค (${postFromWorks}) เกินสัดส่วนที่กำหนด (${weights.postMidterm}) ระบบปรับลดลงเหลือ ${postVal}`
+      );
+    }
+    if (manualMid === null && midFromWorks > weights.midterm) {
+      scoreWarnings.push(
+        `คะแนนชิ้นงานกลางภาค (${midFromWorks}) เกินสัดส่วนที่กำหนด (${weights.midterm}) ระบบปรับลดลงเหลือ ${midtermVal}`
+      );
+    }
+    if (manualFinal === null && finalFromWorks > weights.final) {
+      scoreWarnings.push(
+        `คะแนนชิ้นงานปลายภาค (${finalFromWorks}) เกินสัดส่วนที่กำหนด (${weights.final}) ระบบปรับลดลงเหลือ ${finalVal}`
+      );
+    }
+
     const total = effectiveAccumulated + midtermVal + finalVal;
 
     let gradeLabel = '0';
@@ -2251,7 +2467,8 @@ export const sgsRosterAndSubmissionService = {
     const targetRoom = classroomId || student.classroom;
     const missingAssignments = missingMandatoryTitles.map((t) => ({ id: t, title: t }));
     const items = assignments.map((asg) => {
-      const matched = subs.find((s) => matchSubmissionToAssignment(s, asg));
+      const matched = activeSubs.find((s) => matchSubmissionToAssignment(s, asg))
+        || sortedSubs.find((s) => matchSubmissionToAssignment(s, asg));
       return {
         assignmentId: asg.id,
         title: asg.title || asg.id,
@@ -2308,6 +2525,7 @@ export const sgsRosterAndSubmissionService = {
       pendingReviewCount,
       missingMandatoryTitles,
       rReasonLabel,
+      warnings: scoreWarnings,
     };
   },
 
@@ -2958,6 +3176,7 @@ export const sgsRosterAndSubmissionService = {
   submitStudentWorkToR2(payload: {
     assignmentId: string;
     studentCode: string;
+    studentName?: string;
     workTitle: string;
     fileName?: string;
     originalSizeKb?: number;
@@ -2966,6 +3185,8 @@ export const sgsRosterAndSubmissionService = {
     fileDataUrl?: string;
     academicYearTerm?: string;
     classroom?: string;
+    courseCode?: string;
+    unitId?: string;
   }): StudentWorkSubmission[] {
     const subs = this.getSubmissions();
     const idx = subs.findIndex(
@@ -2973,6 +3194,16 @@ export const sgsRosterAndSubmissionService = {
         s.assignmentId === payload.assignmentId &&
         s.studentCode === payload.studentCode
     );
+    const targetAsg = this.getTermAssignments().find((a) => a.id === payload.assignmentId);
+    const resolvedCourseCode =
+      payload.courseCode ||
+      targetAsg?.courseCode ||
+      (idx !== -1 ? subs[idx].courseCode : undefined);
+    const resolvedUnitId =
+      payload.unitId ||
+      targetAsg?.unitId ||
+      (idx !== -1 ? subs[idx].unitId : undefined);
+
     const term = payload.academicYearTerm || '1/2569';
     const cleanFileName = payload.fileName
       ? payload.fileName.replace(/\.(jpg|jpeg|png|heic)$/i, '.webp')
@@ -3064,14 +3295,17 @@ export const sgsRosterAndSubmissionService = {
     const wasReturned = idx !== -1 && subs[idx]?.status === 'RETURNED_REVISION';
     const isResubmission = wasReturned || Boolean(subs[idx]?.isResubmission);
 
+    // BUG-4 FIX: เก็บ courseCode และ unitId ลงใน submission เพื่อให้ Course Code Guard ใน matchSubmissionToAssignment ทำงานถูกต้อง
     const nextItem: StudentWorkSubmission = {
       ...(idx !== -1 ? subs[idx] : {}),
       assignmentId: payload.assignmentId,
+      unitId: resolvedUnitId,
+      courseCode: resolvedCourseCode,
       studentCode: payload.studentCode,
       status: 'SUBMITTED_PENDING',
       score: null,
       submittedAt: finalSubmittedAt,
-      workTitle: payload.workTitle || 'ส่งชิ้นงานผ่านระบบออนไลน์',
+      workTitle: payload.workTitle || targetAsg?.title || 'ส่งชิ้นงานผ่านระบบออนไลน์',
       workAttachmentLabel: attachmentLabel,
       r2ObjectKey: r2Key,
       originalSizeKb: origKb,
@@ -3088,12 +3322,16 @@ export const sgsRosterAndSubmissionService = {
         ? subs.map((item, i) => (i === idx ? nextItem : item))
         : [...subs, nextItem];
 
-    // ดันงานเข้าคิวรอตรวจ (kp_grading_queue_v2) ผ่าน syncGradingQueueItem
+    // ดันงานเข้าคิวรอตรวจ (kp_grading_queue_v2) ผ่าน syncGradingQueueItem พร้อม courseCode และ studentName
     this.syncGradingQueueItem({
       assignmentId: payload.assignmentId,
       studentCode: payload.studentCode,
-      workTitle: payload.workTitle,
+      studentName: payload.studentName,
+      classroom: payload.classroom,
+      courseCode: resolvedCourseCode,
+      workTitle: payload.workTitle || targetAsg?.title,
       fileUrl: payload.fileDataUrl,
+      externalLinkUrl: payload.externalLinkUrl,
       status: 'PENDING_REVIEW',
       isResubmission,
     });
