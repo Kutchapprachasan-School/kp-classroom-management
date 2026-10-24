@@ -250,16 +250,48 @@
   export interface RewardBoardSubTabProps {
     students: Student[];
     ledger: RewardBatch[];
+    sessionTotalTickets: number;
+    onOpenLuckyDraw: () => void;
     onUndo: (batch: RewardBatch) => void;
     onGiveClassBonus: () => void;
   }
   ```
 
 - [ ] **Step 1: พัฒนา `src/components/live-classroom/RewardBoardSubTab.tsx`**
-  สร้างกระดานจัดอันดับดาวเด่นประจำคาบ (Top 8 Earners) พร้อมเหรียญรางวัล 🥇🥈🥉, แสดงประวัติการแจกรางวัลในคาบ (Session Log) พร้อมปุ่ม Undo และ Badge สถานะการซิงค์, และปุ่มแจกโบนัสทั้งห้อง (+1 🪙 ทุกคนที่มาเรียน)
+  สร้างกระดานจัดอันดับดาวเด่นประจำคาบ (Top 8 Earners) พร้อมเหรียญรางวัล 🥇🥈🥉, แสดงประวัติการแจกรางวัลในคาบ (Session Log) พร้อมปุ่ม Undo และ Badge สถานะการซิงค์, ปุ่มแจกโบนัสทั้งห้อง (+1 🪙 ทุกคนที่มาเรียน), และปุ่มเปิด "🎰 หมุนวงล้อตั๋วสุ่ม"
 - [ ] **Step 2: ตรวจสอบการปิดปุ่ม Undo ขณะสถานะ `syncing`**
 - [ ] **Step 3: Commit**
-  `git add src/components/live-classroom/RewardBoardSubTab.tsx && git commit -m "feat: add RewardBoardSubTab with top earners and undo ledger"`
+  `git add src/components/live-classroom/RewardBoardSubTab.tsx && git commit -m "feat: add RewardBoardSubTab with top earners, undo ledger, and lucky draw button"`
+
+---
+
+### Task 7.5: วงล้อจับรางวัลตั๋วสุ่มท้ายคาบ (`LuckyTicketDrawModal.tsx`)
+
+**Files:**
+- Create: `src/components/live-classroom/LuckyTicketDrawModal.tsx`
+- Test: `tests/liveClassroomEcosystem.test.ts` (ทดสอบการคำนวณสัดส่วนองศา Weighted Segments ตามจำนวนตั๋ว และการสุ่มผู้ชนะ)
+
+**Interfaces:**
+- Consumes: `Student`, `SoundFXEngine`
+- Produces:
+  ```typescript
+  export interface LuckyTicketDrawModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    students: Student[];
+    onGiveReward: (studentIds: string[], type: 'coin' | 'ticket', amount: number, desc: string) => void;
+    onConsumeTicket?: (studentId: string) => void;
+    onPlaySound?: (type: 'tick' | 'coin' | 'fanfare' | 'buzzer', freq?: number) => void;
+  }
+  ```
+
+- [ ] **Step 1: เขียน Unit Test สำหรับการคำนวณ Weighted Segments และ Random Target Angle**
+  ทดสอบความกว้างของช่อง SVG เป็นสัดส่วนกับจำนวนตั๋ว (ตั๋ว 3 ใบ = พื้นที่ 3 เท่า), โอกาสถูกรางวัล, และการคำนวณองศาหมุนให้ผู้ชนะหยุดตรงเข็มด้านบน
+- [ ] **Step 2: พัฒนา `src/components/live-classroom/LuckyTicketDrawModal.tsx`**
+  สร้างโมดอลวงล้อ SVG ถ่วงน้ำหนักความน่าจะเป็น, ตัวเลือกระหว่าง sessionTickets vs totalTickets, ตัวเลือกตัดสิทธิ์ผู้ชนะเดิม, แอนิเมชันหมุน 4.5 วินาที พร้อมเสียงติ๊ก Web Audio แบบ Cubic Bezier, และปุ่มมอบรางวัลใหญ่ (+3🪙 หรือ +5🪙 พร้อมหักตั๋ว)
+- [ ] **Step 3: ตรวจสอบเทสต์ให้ผ่าน**
+- [ ] **Step 4: Commit**
+  `git add src/components/live-classroom/LuckyTicketDrawModal.tsx tests/liveClassroomEcosystem.test.ts && git commit -m "feat: add LuckyTicketDrawModal component with proportional weighted SVG wheel"`
 
 ---
 
