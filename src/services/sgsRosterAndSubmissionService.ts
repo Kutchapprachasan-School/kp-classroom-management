@@ -64,22 +64,62 @@ export function normalizeClassroomCode(room?: string | null): string {
   const trimmed = String(room).trim();
   if (!trimmed) return '';
 
-  // กรณีรหัสภายใน เช่น 'room-3-1' หรือ 'room_3_1' -> 'ม.3/1'
+  // 1. ตรวจสอบผ่าน formatClassroomLabel (รองรับทั้งชื่อห้องจริง และ ID เช่น room-1791986992100)
+  try {
+    const formatted = formatClassroomLabel(trimmed);
+    if (formatted && formatted !== trimmed) {
+      const thaiMatch = formatted.match(/^ม\.?\s*(\d+)\s*\/\s*(\d+)$/);
+      if (thaiMatch) {
+        return `ม.${thaiMatch[1]}/${thaiMatch[2]}`;
+      }
+      return formatted;
+    }
+  } catch {
+    // ignore
+  }
+
+  // 2. กรณีรหัสภายใน เช่น 'room-3-1' หรือ 'room_3_1' -> 'ม.3/1'
   const roomCodeMatch = trimmed.match(/^room[-_](\d+)[-_](\d+)$/i);
   if (roomCodeMatch) {
     return `ม.${roomCodeMatch[1]}/${roomCodeMatch[2]}`;
   }
 
-  // กรณี 'M.3/1' หรือ 'm3/1' -> 'ม.3/1'
+  // 3. กรณี 'M.3/1' หรือ 'm3/1' -> 'ม.3/1'
   const engMatch = trimmed.match(/^m\.?\s*(\d+)\s*\/\s*(\d+)$/i);
   if (engMatch) {
     return `ม.${engMatch[1]}/${engMatch[2]}`;
   }
 
-  // กรณี 'ม. 3 / 1' หรือ 'ม3/1' -> 'ม.3/1'
+  // 4. กรณี 'ม. 3 / 1' หรือ 'ม3/1' -> 'ม.3/1'
   const thaiMatch = trimmed.match(/^ม\.?\s*(\d+)\s*\/\s*(\d+)$/);
   if (thaiMatch) {
     return `ม.${thaiMatch[1]}/${thaiMatch[2]}`;
+  }
+
+  // 5. ตรวจสอบผ่าน cls_classrooms_data ใน localStorage
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const raw = localStorage.getItem('cls_classrooms_data');
+      if (raw) {
+        const rooms = JSON.parse(raw);
+        if (Array.isArray(rooms)) {
+          const match = rooms.find(
+            (r: any) =>
+              r.id === trimmed ||
+              r.name === trimmed ||
+              r.roomNumber === trimmed ||
+              (r.name && r.name.replace(/\s+/g, '') === trimmed.replace(/\s+/g, ''))
+          );
+          if (match && match.name) {
+            const m = match.name.match(/^ม\.?\s*(\d+)\s*\/\s*(\d+)$/);
+            if (m) return `ม.${m[1]}/${m[2]}`;
+            return match.name;
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
   }
 
   return trimmed.replace(/\s+/g, '').toLowerCase();
@@ -91,7 +131,22 @@ export function normalizeClassroomCode(room?: string | null): string {
 export function isSameClassroom(roomA?: string | null, roomB?: string | null): boolean {
   if (!roomA || !roomB) return false;
   if (roomA.trim() === roomB.trim()) return true;
-  return normalizeClassroomCode(roomA) === normalizeClassroomCode(roomB);
+
+  const normA = normalizeClassroomCode(roomA);
+  const normB = normalizeClassroomCode(roomB);
+  if (normA && normB && normA === normB) return true;
+
+  // Cross-check ผ่าน resolveRoomCandidates
+  try {
+    const candsA = resolveRoomCandidates(roomA);
+    const candsB = resolveRoomCandidates(roomB);
+    if (candsA.some((c) => candsB.includes(c) || c === roomB)) return true;
+    if (candsB.some((c) => candsA.includes(c) || c === roomA)) return true;
+  } catch {
+    // ignore
+  }
+
+  return false;
 }
 
 /**

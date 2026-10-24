@@ -256,6 +256,34 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
     refreshAssignments();
   }, [refreshAssignments]);
 
+  // Refresh roster & assignments when switching subject or classroom
+  useEffect(() => {
+    refreshRoster(selectedClassroom);
+    refreshAssignments();
+  }, [selectedSubjectCode, selectedClassroom, refreshRoster, refreshAssignments]);
+
+  // Listen to remote cloud sync and submission update events
+  useEffect(() => {
+    const handleSync = () => {
+      refreshRoster(selectedClassroom);
+      refreshAssignments();
+    };
+
+    window.addEventListener('kps-cloud-synced', handleSync);
+    window.addEventListener('kp-sgs-roster-updated', handleSync);
+    window.addEventListener('kp-grading-queue-updated', handleSync);
+    window.addEventListener('kps-data-sync-event', handleSync);
+    window.addEventListener('storage', handleSync);
+
+    return () => {
+      window.removeEventListener('kps-cloud-synced', handleSync);
+      window.removeEventListener('kp-sgs-roster-updated', handleSync);
+      window.removeEventListener('kp-grading-queue-updated', handleSync);
+      window.removeEventListener('kps-data-sync-event', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, [selectedClassroom, refreshRoster, refreshAssignments]);
+
   // 5. Create New Assignment Modal (Supports All Rooms in Subject OR Selected Rooms)
   const [isAddAssignModalOpen, setIsAddAssignModalOpen] = useState(false);
   const [newAssignTitle, setNewAssignTitle] = useState('');

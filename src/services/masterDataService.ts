@@ -37,32 +37,8 @@ export function resolveRoomCandidates(classroomId: string): string[] {
   if (!trimmed) return [];
   set.add(trimmed);
 
-  if (typeof localStorage !== 'undefined') {
-    try {
-      const raw = localStorage.getItem('cls_classrooms_data');
-      if (raw) {
-        const rooms = JSON.parse(raw);
-        if (Array.isArray(rooms)) {
-          for (const r of rooms) {
-            if (
-              r.id === trimmed ||
-              r.name === trimmed ||
-              r.roomNumber === trimmed ||
-              (r.name && r.name.replace(/\s+/g, '') === trimmed.replace(/\s+/g, ''))
-            ) {
-              if (r.id) set.add(r.id);
-              if (r.name) set.add(r.name);
-              if (r.roomNumber) set.add(r.roomNumber);
-            }
-          }
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
-
   const mThai = trimmed.match(/^ม\.?\s*(\d+)\s*\/\s*(\d+)$/);
+  const normalizedThai = mThai ? `ม.${mThai[1]}/${mThai[2]}` : null;
   if (mThai) {
     set.add(`room-${mThai[1]}-${mThai[2]}`);
     set.add(`ม.${mThai[1]}/${mThai[2]}`);
@@ -70,6 +46,40 @@ export function resolveRoomCandidates(classroomId: string): string[] {
   const mRoom = trimmed.match(/^room-(\d+)-(\d+)$/);
   if (mRoom) {
     set.add(`ม.${mRoom[1]}/${mRoom[2]}`);
+  }
+
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const raw = localStorage.getItem('cls_classrooms_data');
+      if (raw) {
+        const rooms = JSON.parse(raw);
+        if (Array.isArray(rooms)) {
+          for (const r of rooms) {
+            const rName = (r.name || '').trim();
+            const rId = (r.id || '').trim();
+            const rNum = (r.roomNumber ? String(r.roomNumber) : '').trim();
+            const rThai = rName.match(/^ม\.?\s*(\d+)\s*\/\s*(\d+)$/);
+            const rNorm = rThai ? `ม.${rThai[1]}/${rThai[2]}` : rName;
+
+            const isMatch =
+              rId === trimmed ||
+              rName === trimmed ||
+              rNum === trimmed ||
+              (normalizedThai && (rName === normalizedThai || rNorm === normalizedThai)) ||
+              (rName && rName.replace(/\s+/g, '') === trimmed.replace(/\s+/g, ''));
+
+            if (isMatch) {
+              if (rId) set.add(rId);
+              if (rName) set.add(rName);
+              if (rNum) set.add(rNum);
+              if (rNorm) set.add(rNorm);
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
   }
 
   return Array.from(set);

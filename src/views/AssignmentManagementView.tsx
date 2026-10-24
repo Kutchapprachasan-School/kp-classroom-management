@@ -112,7 +112,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
   });
 
   const [selectedGradeLevel, setSelectedGradeLevel] = useState<string>('ALL');
-  const [selectedStatusFilter, setSelectedStatusFilter] = useState<'ALL' | 'PENDING_SCORE' | 'IN_PROGRESS' | 'GRADED'>('ALL');
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<'ALL' | 'PENDING_REVIEW' | 'PENDING_SCORE' | 'IN_PROGRESS' | 'GRADED'>('ALL');
   const [selectedScorePart, setSelectedScorePart] = useState<string>('ALL');
   const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -693,7 +693,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       submittedCount: number;
       gradedCount: number;
       pendingReviewCount: number;
-      displayStatus: 'PENDING_SCORE' | 'IN_PROGRESS' | 'GRADED';
+      displayStatus: 'PENDING_REVIEW' | 'PENDING_SCORE' | 'IN_PROGRESS' | 'GRADED';
       progressCount: number;
       progressPercent: number;
       subTasks: TermAssignmentConfig[];
@@ -748,17 +748,19 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         (s) => s.status === 'SUBMITTED_PENDING' || (s.status !== 'GRADED' && s.score === null)
       ).length;
 
-      let displayStatus: 'PENDING_SCORE' | 'IN_PROGRESS' | 'GRADED' = 'PENDING_SCORE';
-      if (totalStudents > 0) {
+      let displayStatus: 'PENDING_REVIEW' | 'PENDING_SCORE' | 'IN_PROGRESS' | 'GRADED' = 'PENDING_SCORE';
+      if (pendingReviewCount > 0) {
+        displayStatus = 'PENDING_REVIEW';
+      } else if (totalStudents > 0) {
         if (fullyGradedStudents >= totalStudents) {
           displayStatus = 'GRADED';
-        } else if (fullyGradedStudents > 0 || submittedStudents > 0 || pendingReviewCount > 0) {
+        } else if (fullyGradedStudents > 0 || submittedStudents > 0) {
           displayStatus = 'IN_PROGRESS';
         } else {
           displayStatus = 'PENDING_SCORE';
         }
       } else {
-        if (fullyGradedStudents > 0 && pendingReviewCount === 0) {
+        if (fullyGradedStudents > 0) {
           displayStatus = 'GRADED';
         } else if (submittedStudents > 0) {
           displayStatus = 'IN_PROGRESS';
@@ -846,17 +848,19 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         (s) => s.status === 'SUBMITTED_PENDING' || (s.status !== 'GRADED' && s.score === null)
       ).length;
 
-      let displayStatus: 'PENDING_SCORE' | 'IN_PROGRESS' | 'GRADED' = 'PENDING_SCORE';
-      if (totalStudents > 0) {
+      let displayStatus: 'PENDING_REVIEW' | 'PENDING_SCORE' | 'IN_PROGRESS' | 'GRADED' = 'PENDING_SCORE';
+      if (pendingReviewCount > 0) {
+        displayStatus = 'PENDING_REVIEW';
+      } else if (totalStudents > 0) {
         if (gradedCount >= totalStudents) {
           displayStatus = 'GRADED';
-        } else if (gradedCount > 0 || submittedCount > 0 || pendingReviewCount > 0) {
+        } else if (gradedCount > 0 || submittedCount > 0) {
           displayStatus = 'IN_PROGRESS';
         } else {
           displayStatus = 'PENDING_SCORE';
         }
       } else {
-        if (gradedCount > 0 && pendingReviewCount === 0) {
+        if (gradedCount > 0) {
           displayStatus = 'GRADED';
         } else if (submittedCount > 0) {
           displayStatus = 'IN_PROGRESS';
@@ -967,10 +971,11 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
   const assignmentSummaryStats = useMemo(() => {
     const total = filteredAssignmentCards.length;
+    const pendingReview = filteredAssignmentCards.filter((i) => i.displayStatus === 'PENDING_REVIEW').length;
     const inProgress = filteredAssignmentCards.filter((i) => i.displayStatus === 'IN_PROGRESS').length;
     const graded = filteredAssignmentCards.filter((i) => i.displayStatus === 'GRADED').length;
     const pendingScore = filteredAssignmentCards.filter((i) => i.displayStatus === 'PENDING_SCORE').length;
-    return { total, inProgress, graded, pendingScore };
+    return { total, pendingReview, inProgress, graded, pendingScore };
   }, [filteredAssignmentCards]);
 
   const statusFilteredCards = useMemo(() => {
@@ -1490,8 +1495,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
          ==================================================================== */}
       {activeSectionTab === 'ASSIGNED_LIST' && (
         <div className="space-y-4">
-          {/* Top 4 Summary Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          {/* Top 5 Summary Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
             {/* Card 1: งานทั้งหมด */}
             <div
               onClick={() => {
@@ -1516,7 +1521,44 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
               </div>
             </div>
 
-            {/* Card 2: กำลังดำเนินการ */}
+            {/* Card 2: รอตรวจงาน (Red Alert) */}
+            <div
+              onClick={() => {
+                setSelectedStatusFilter('PENDING_REVIEW');
+                setCurrentPage(1);
+              }}
+              className={`p-4 rounded-[18px] border bg-white shadow-[0_4px_16px_rgba(40,90,140,0.06)] flex items-center gap-3.5 cursor-pointer transition-all ${
+                selectedStatusFilter === 'PENDING_REVIEW'
+                  ? 'border-[#EF4444] ring-2 ring-[#EF4444]/20 bg-rose-50/20'
+                  : assignmentSummaryStats.pendingReview > 0
+                  ? 'border-[#FECACA] hover:border-[#EF4444] bg-[#FEF2F2]/40'
+                  : 'border-[#E6EEF7] hover:border-[#BFDBFE]'
+              }`}
+            >
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border ${
+                assignmentSummaryStats.pendingReview > 0
+                  ? 'bg-[#FEF2F2] text-[#EF4444] border-[#FECACA]'
+                  : 'bg-slate-50 text-slate-400 border-slate-200'
+              }`}>
+                <Eye className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-xs text-[#6B7C93] font-medium flex items-center gap-1.5">
+                  <span>รอตรวจงาน</span>
+                  {assignmentSummaryStats.pendingReview > 0 && (
+                    <span className="w-2 h-2 rounded-full bg-[#EF4444] animate-pulse" />
+                  )}
+                </div>
+                <div className={`text-xl sm:text-2xl font-bold leading-tight ${
+                  assignmentSummaryStats.pendingReview > 0 ? 'text-[#991B1B]' : 'text-[#163A66]'
+                }`}>
+                  {assignmentSummaryStats.pendingReview}
+                </div>
+                <div className="text-[11px] text-[#94A3B8]">รายการ</div>
+              </div>
+            </div>
+
+            {/* Card 3: กำลังตรวจ */}
             <div
               onClick={() => {
                 setSelectedStatusFilter('IN_PROGRESS');
@@ -1540,7 +1582,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
               </div>
             </div>
 
-            {/* Card 3: ตรวจแล้ว */}
+            {/* Card 4: ตรวจแล้ว */}
             <div
               onClick={() => {
                 setSelectedStatusFilter('GRADED');
@@ -1564,7 +1606,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
               </div>
             </div>
 
-            {/* Card 4: รอส่งคะแนน */}
+            {/* Card 5: รอส่งคะแนน */}
             <div
               onClick={() => {
                 setSelectedStatusFilter('PENDING_SCORE');
@@ -1572,7 +1614,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
               }}
               className={`p-4 rounded-[18px] border bg-white shadow-[0_4px_16px_rgba(40,90,140,0.06)] flex items-center gap-3.5 cursor-pointer transition-all ${
                 selectedStatusFilter === 'PENDING_SCORE'
-                  ? 'border-rose-400 ring-2 ring-rose-400/20 bg-rose-50/20'
+                  ? 'border-purple-400 ring-2 ring-purple-400/20 bg-purple-50/20'
                   : 'border-[#E6EEF7] hover:border-[#FECACA]'
               }`}
             >
@@ -1608,16 +1650,21 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
             <button
               type="button"
               onClick={() => {
-                setSelectedStatusFilter('PENDING_SCORE');
+                setSelectedStatusFilter('PENDING_REVIEW');
                 setCurrentPage(1);
               }}
-              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                selectedStatusFilter === 'PENDING_SCORE'
-                  ? 'bg-[#3B82F6] text-white shadow-xs'
+              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedStatusFilter === 'PENDING_REVIEW'
+                  ? 'bg-[#EF4444] text-white shadow-xs'
+                  : assignmentSummaryStats.pendingReview > 0
+                  ? 'bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA] hover:bg-rose-100'
                   : 'bg-white text-[#6B7C93] hover:text-[#163A66] border border-[#E6EEF7]'
               }`}
             >
-              รอส่งคะแนน ({assignmentSummaryStats.pendingScore})
+              {assignmentSummaryStats.pendingReview > 0 && (
+                <span className="w-2 h-2 rounded-full bg-[#EF4444] animate-pulse" />
+              )}
+              <span>รอตรวจ ({assignmentSummaryStats.pendingReview})</span>
             </button>
             <button
               type="button"
@@ -1641,11 +1688,25 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
               }}
               className={`px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                 selectedStatusFilter === 'GRADED'
-                  ? 'bg-[#3B82F6] text-white shadow-xs'
+                  ? 'bg-[#10B981] text-white shadow-xs'
                   : 'bg-white text-[#6B7C93] hover:text-[#163A66] border border-[#E6EEF7]'
               }`}
             >
               ตรวจแล้ว ({assignmentSummaryStats.graded})
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedStatusFilter('PENDING_SCORE');
+                setCurrentPage(1);
+              }}
+              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                selectedStatusFilter === 'PENDING_SCORE'
+                  ? 'bg-[#8B5CF6] text-white shadow-xs'
+                  : 'bg-white text-[#6B7C93] hover:text-[#163A66] border border-[#E6EEF7]'
+              }`}
+            >
+              รอส่งคะแนน ({assignmentSummaryStats.pendingScore})
             </button>
           </div>
 
@@ -1891,11 +1952,13 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                       {/* Left indicator bar */}
                       <div
                         className={`absolute left-0 top-3 bottom-3 w-1.5 rounded-r ${
-                          item.displayStatus === 'GRADED'
+                          item.displayStatus === 'PENDING_REVIEW'
+                            ? 'bg-rose-500'
+                            : item.displayStatus === 'GRADED'
                             ? 'bg-emerald-500'
                             : item.displayStatus === 'IN_PROGRESS'
                             ? 'bg-[#3B82F6]'
-                            : 'bg-rose-500'
+                            : 'bg-amber-400'
                         }`}
                       />
 
@@ -1903,6 +1966,12 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                         {/* Left Column: Status Badge + Title + Course / Room metadata */}
                         <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                           {/* Status Pill Badge */}
+                          {item.displayStatus === 'PENDING_REVIEW' && (
+                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA] flex items-center gap-1.5 shrink-0 shadow-2xs">
+                              <span className="w-2 h-2 rounded-full bg-[#EF4444] animate-pulse" />
+                              <span>รอตรวจ ({item.pendingReviewCount} งาน)</span>
+                            </span>
+                          )}
                           {item.displayStatus === 'GRADED' && (
                             <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0] flex items-center gap-1.5 shrink-0">
                               <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981]" />
@@ -1916,8 +1985,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                             </span>
                           )}
                           {item.displayStatus === 'PENDING_SCORE' && (
-                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA] flex items-center gap-1.5 shrink-0">
-                              <Clock className="w-3.5 h-3.5 text-[#EF4444]" />
+                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#FFFBEB] text-[#92400E] border border-[#FDE68A] flex items-center gap-1.5 shrink-0">
+                              <Clock className="w-3.5 h-3.5 text-[#F59E0B]" />
                               <span>รอส่งคะแนน</span>
                             </span>
                           )}
@@ -1926,11 +1995,13 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                             <div className="flex flex-wrap items-center gap-2">
                               <span
                                 className={`w-2 h-2 rounded-full shrink-0 ${
-                                  item.displayStatus === 'GRADED'
+                                  item.displayStatus === 'PENDING_REVIEW'
+                                    ? 'bg-rose-500'
+                                    : item.displayStatus === 'GRADED'
                                     ? 'bg-emerald-500'
                                     : item.displayStatus === 'IN_PROGRESS'
                                     ? 'bg-[#3B82F6]'
-                                    : 'bg-rose-500'
+                                    : 'bg-amber-400'
                                 }`}
                               />
                               <h3 className="text-sm sm:text-base font-bold text-[#163A66] break-words">
@@ -2014,6 +2085,17 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
                         {/* Right Action & Meatball Menu */}
                         <div className="flex items-center gap-2 self-end lg:self-center shrink-0 relative">
+                          {item.displayStatus === 'PENDING_REVIEW' && (
+                            <button
+                              type="button"
+                              onClick={() => handleRowPrimaryAction(item)}
+                              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#EF4444] hover:bg-[#DC2626] text-white text-xs sm:text-sm font-bold transition-all shadow-xs cursor-pointer"
+                            >
+                              <Eye className="w-4 h-4" />
+                              <span>ตรวจงาน ({item.pendingReviewCount})</span>
+                            </button>
+                          )}
+
                           {item.displayStatus === 'GRADED' && (
                             <button
                               type="button"
@@ -2155,6 +2237,9 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                               (s) => s.status === 'GRADED' || (s.score !== null && s.score !== undefined)
                             ).length;
                             const taskSubmitted = taskSubs.filter((s) => s.status !== 'MISSING').length;
+                            const taskPending = taskSubs.filter(
+                              (s) => s.status === 'SUBMITTED_PENDING' || (s.status !== 'GRADED' && s.score === null && s.status !== 'MISSING')
+                            ).length;
                             return (
                               <div
                                 key={task.id}
@@ -2194,11 +2279,24 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                                         handleOpenCheckMatrix(item.courseCode, item.targetClassrooms);
                                       }
                                     }}
-                                    className="px-2.5 py-1 rounded-lg bg-blue-50 text-[#3B82F6] hover:bg-blue-100 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
-                                    title="ตรวจงานย่อยนี้"
+                                    className={`px-2.5 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors ${
+                                      taskPending > 0
+                                        ? 'bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA] hover:bg-rose-100 shadow-2xs'
+                                        : 'bg-blue-50 text-[#3B82F6] hover:bg-blue-100'
+                                    }`}
+                                    title={taskPending > 0 ? `มีงานรอตรวจ ${taskPending} รายการ` : 'ตรวจงานย่อยนี้'}
                                   >
-                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                    <span>ตรวจงานย่อย</span>
+                                    {taskPending > 0 ? (
+                                      <>
+                                        <span className="w-1.5 h-1.5 rounded-full bg-[#EF4444] animate-pulse" />
+                                        <span>รอตรวจ ({taskPending})</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        <span>ตรวจงานย่อย</span>
+                                      </>
+                                    )}
                                   </button>
                                   <button
                                     type="button"
