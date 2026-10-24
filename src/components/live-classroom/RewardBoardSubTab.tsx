@@ -4,7 +4,7 @@
 
 import React from 'react';
 import TrophyRegular from '@mingcute/react/core-regular/trophy';
-import CouponRegular from '@mingcute/react/core-regular/coupon';
+import TicketRegular from '@mingcute/react/core-regular/ticket';
 import {
   ClipboardList,
   PartyPopper,
@@ -266,8 +266,8 @@ export const RewardBoardSubTab: React.FC<RewardBoardSubTabProps> = ({
             onClick={onOpenLuckyDraw}
             className="flex items-center gap-2 bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs shadow-md shadow-pink-500/25 transition active:scale-95"
           >
-            <CouponRegular className="w-4 h-4" />
-            <span>🎰 หมุนวงล้อตั๋วสุ่ม ({sessionTotalTickets} 🎟️)</span>
+            <TicketRegular className="w-4 h-4" />
+            <span>หมุนวงล้อตั๋วสุ่ม ({sessionTotalTickets} 🎟️)</span>
           </button>
 
           <button

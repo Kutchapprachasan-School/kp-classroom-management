@@ -1,14 +1,13 @@
 // src/components/live-classroom/LuckyTicketDrawModal.tsx
 // วงล้อจับรางวัลท้ายคาบด้วยตั๋วสุ่ม (🎟️) ถ่วงน้ำหนักความกว้างของช่องตามจำนวนตั๋วจริง
-// มีเสียงติ๊กชะลอความเร็วตามสมการ Cubic Bezier และปุ่มมอบรางวัลใหญ่ (+3🪙 หรือ +5🪙 พร้อมหักตั๋ว)
+// สอดคล้องกับระบบเศรษฐกิจ 200 เหรียญ = 1 ตั๋วสุ่ม โดยผู้ชนะจะได้รับรางวัลโบนัสเพิ่ม (ไม่หักตั๋วเดิมของนักเรียน)
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import CouponRegular from '@mingcute/react/core-regular/coupon';
+import TicketRegular from '@mingcute/react/core-regular/ticket';
 import Coin2Regular from '@mingcute/react/core-regular/coin-2';
 import TrophyRegular from '@mingcute/react/core-regular/trophy';
 import SparklesRegular from '@mingcute/react/core-regular/sparkles';
 import CloseRegular from '@mingcute/react/core-regular/close';
-import GiftRegular from '@mingcute/react/core-regular/gift';
 import CheckCircleRegular from '@mingcute/react/core-regular/check-circle';
 import Refresh1Regular from '@mingcute/react/core-regular/refresh-1';
 import { Users } from 'lucide-react';
@@ -71,7 +70,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
   onClose,
   students,
   onGiveReward,
-  onConsumeTicket,
+  onConsumeTicket: _onConsumeTicket,
   onPlaySound,
 }) => {
   const [ticketSource, setTicketSource] = useState<'session' | 'total'>('session');
@@ -157,18 +156,36 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
     }, spinDurationMs);
   }, [isSpinning, segments, rotation, spinDurationSec, onPlaySound]);
 
-  const handleAwardWinner = (coinAmount: number, consumeOneTicket: boolean) => {
+  const handleAwardWinner = (rewardType: 'coin' | 'ticket' | 'combo', amount = 10) => {
     if (!winner || prizeClaimed) return;
 
-    onGiveReward(
-      [winner.id],
-      'coin',
-      coinAmount,
-      `🎉 รางวัลใหญ่ท้ายคาบ (${winner.name})`
-    );
-
-    if (consumeOneTicket && onConsumeTicket) {
-      onConsumeTicket(winner.id);
+    if (rewardType === 'coin') {
+      onGiveReward(
+        [winner.id],
+        'coin',
+        amount,
+        `🎉 รางวัลใหญ่ท้ายคาบ +${amount} เหรียญ (${winner.name})`
+      );
+    } else if (rewardType === 'ticket') {
+      onGiveReward(
+        [winner.id],
+        'ticket',
+        amount,
+        `🎟️ รางวัลใหญ่ท้ายคาบ +${amount} ตั๋วสุ่ม (${winner.name})`
+      );
+    } else if (rewardType === 'combo') {
+      onGiveReward(
+        [winner.id],
+        'coin',
+        20,
+        `🎉 รางวัลแชมป์ท้ายคาบ +20 เหรียญ (${winner.name})`
+      );
+      onGiveReward(
+        [winner.id],
+        'ticket',
+        1,
+        `🎟️ รางวัลแชมป์ท้ายคาบ +1 ตั๋วสุ่ม (${winner.name})`
+      );
     }
 
     if (excludeWinners) {
@@ -192,7 +209,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-pink-500/20 border border-pink-500/40 flex items-center justify-center text-pink-400 shadow-sm">
-              <CouponRegular className="w-6 h-6" />
+              <TicketRegular className="w-6 h-6" />
             </div>
             <div>
               <h2 className="text-xl md:text-2xl font-extrabold text-white flex items-center gap-2">
@@ -379,7 +396,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
               </>
             ) : (
               <div className="py-14 px-6 text-center bg-slate-950/50 border border-slate-800 rounded-3xl w-full space-y-2">
-                <CouponRegular className="w-14 h-14 mx-auto text-slate-600" />
+                <TicketRegular className="w-14 h-14 mx-auto text-slate-600" />
                 <h3 className="text-lg font-bold text-slate-300">
                   ยังไม่มีนักเรียนที่มีตั๋วสุ่มในกองนี้
                 </h3>
@@ -408,30 +425,38 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
                 {!prizeClaimed ? (
                   <div className="space-y-2 pt-1">
                     <p className="text-xs text-slate-300 font-medium">
-                      เลือกรางวัลที่ต้องการมอบให้ผู้โชคดี:
+                      เลือกรางวัลที่ต้องการมอบให้ผู้โชคดี (ไม่หักตั๋วเดิมของนักเรียน):
                     </p>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <button
-                        onClick={() => handleAwardWinner(3, false)}
-                        className="flex items-center justify-center gap-1.5 bg-amber-400 hover:bg-amber-300 text-amber-950 font-black py-2 px-3 rounded-xl text-xs transition active:scale-95 shadow-sm"
+                        onClick={() => handleAwardWinner('coin', 10)}
+                        className="flex items-center justify-center gap-1.5 bg-amber-400 hover:bg-amber-300 text-amber-950 font-black py-2.5 px-2 rounded-xl text-xs transition active:scale-95 shadow-sm"
                       >
                         <Coin2Regular className="w-4 h-4" />
-                        <span>มอบ +3 🪙</span>
+                        <span>มอบ +10 🪙</span>
                       </button>
 
                       <button
-                        onClick={() => handleAwardWinner(5, true)}
-                        className="flex items-center justify-center gap-1.5 bg-pink-500 hover:bg-pink-400 text-white font-extrabold py-2 px-3 rounded-xl text-xs transition active:scale-95 shadow-sm"
+                        onClick={() => handleAwardWinner('ticket', 1)}
+                        className="flex items-center justify-center gap-1.5 bg-pink-500 hover:bg-pink-400 text-white font-extrabold py-2.5 px-2 rounded-xl text-xs transition active:scale-95 shadow-sm"
                       >
-                        <GiftRegular className="w-4 h-4" />
-                        <span>+5 🪙 (หัก 1 🎟️)</span>
+                        <TicketRegular className="w-4 h-4" />
+                        <span>มอบ +1 🎟️</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleAwardWinner('combo')}
+                        className="flex items-center justify-center gap-1 bg-gradient-to-r from-amber-400 to-pink-500 hover:from-amber-300 hover:to-pink-400 text-slate-950 font-black py-2.5 px-2 rounded-xl text-xs transition active:scale-95 shadow-sm"
+                      >
+                        <TrophyRegular className="w-3.5 h-3.5" />
+                        <span>+20🪙 & +1🎟️</span>
                       </button>
                     </div>
                   </div>
                 ) : (
                   <div className="flex items-center justify-center gap-2 text-emerald-400 font-bold text-xs py-2">
                     <CheckCircleRegular className="w-4 h-4" />
-                    <span>มอบรางวัลและบันทึกเข้า Session Log เรียบร้อย!</span>
+                    <span>มอบรางวัลและบันทึกเข้า Session Log เรียบร้อย (ตั๋วเดิมคงอยู่ครบ)!</span>
                   </div>
                 )}
               </div>

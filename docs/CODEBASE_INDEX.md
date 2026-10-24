@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 24/10/2569 15:27:36 | รวมทั้งหมด 221 ไฟล์*
+*อัปเดตล่าสุด: 24/10/2569 16:44:04 | รวมทั้งหมด 221 ไฟล์*
 
 ---
 
@@ -133,7 +133,7 @@
 | [src/components/live-classroom/GroupGeneratorSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/GroupGeneratorSubTab.tsx) | 444 | `GroupPresetItem` (L21), `GroupGeneratorSubTabProps` (L29), `swapStudentsBetweenGroups` (L40), `GroupGeneratorSubTab` (L77) |
 | [src/components/live-classroom/LiveClassroomHeader.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LiveClassroomHeader.tsx) | 250 | `SubTab` (L19), `LiveClassroomHeaderProps` (L21), `LiveClassroomHeader` (L42) |
 | [src/components/live-classroom/LiveTimerSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LiveTimerSubTab.tsx) | 340 | `LiveTimerSubTabProps` (L14), `formatTimerMMSS` (L30), `LiveTimerSubTab` (L37) |
-| [src/components/live-classroom/LuckyTicketDrawModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LuckyTicketDrawModal.tsx) | 492 | `LuckyTicketDrawModalProps` (L21), `createSlicePath` (L44), `describeArcSlice` (L67), `LuckyTicketDrawModal` (L69) |
+| [src/components/live-classroom/LuckyTicketDrawModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LuckyTicketDrawModal.tsx) | 517 | `LuckyTicketDrawModalProps` (L20), `createSlicePath` (L43), `describeArcSlice` (L66), `LuckyTicketDrawModal` (L68) |
 | [src/components/live-classroom/RandomPickerSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RandomPickerSubTab.tsx) | 605 | `SpinSpeed` (L16), `RandomPickerSubTabProps` (L18), `getAvailablePool` (L37), `restoreSkippedStudent` (L47), `RandomPickerSubTab` (L51) |
 | [src/components/live-classroom/RewardBoardSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RewardBoardSubTab.tsx) | 285 | `RewardBoardSubTabProps` (L16), `calculateTopEarners` (L26), `formatRewardTimeThai` (L38), `RewardBoardSubTab` (L52) |
 | [src/components/mobile/index.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/mobile/index.ts) | 12 | *(Internal / Default Export)* |

@@ -7,7 +7,7 @@ import SparklesRegular from '@mingcute/react/core-regular/sparkles';
 import RandomRegular from '@mingcute/react/core-regular/random';
 import Refresh1Regular from '@mingcute/react/core-regular/refresh-1';
 import Coin2Regular from '@mingcute/react/core-regular/coin-2';
-import CouponRegular from '@mingcute/react/core-regular/coupon';
+import TicketRegular from '@mingcute/react/core-regular/ticket';
 import CheckCircleRegular from '@mingcute/react/core-regular/check-circle';
 import CloseRegular from '@mingcute/react/core-regular/close';
 import { Crown, SkipForward } from 'lucide-react';
@@ -539,7 +539,7 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
             }
             className="flex items-center gap-1.5 bg-pink-500/15 hover:bg-pink-500/25 disabled:opacity-40 border border-pink-300 text-pink-600 font-bold px-3.5 py-1.5 rounded-xl text-xs transition"
           >
-            <CouponRegular className="w-4 h-4 text-pink-500" />
+            <TicketRegular className="w-4 h-4 text-pink-500" />
             <span>+1 ตั๋วสุ่ม</span>
           </button>
 

@@ -8,7 +8,7 @@ import RandomRegular from '@mingcute/react/core-regular/random';
 import TimeRegular from '@mingcute/react/core-regular/time';
 import GroupRegular from '@mingcute/react/core-regular/group';
 import TrophyRegular from '@mingcute/react/core-regular/trophy';
-import CouponRegular from '@mingcute/react/core-regular/coupon';
+import TicketRegular from '@mingcute/react/core-regular/ticket';
 import Coin2Regular from '@mingcute/react/core-regular/coin-2';
 import CheckCircleRegular from '@mingcute/react/core-regular/check-circle';
 import FullscreenRegular from '@mingcute/react/core-regular/fullscreen';
@@ -144,7 +144,7 @@ export const LiveClassroomHeader: React.FC<LiveClassroomHeaderProps> = ({
             className="flex items-center gap-1.5 bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-md shadow-pink-500/20 transition active:scale-95"
             title="เปิดวงล้อจับรางวัลตั๋วสุ่มท้ายคาบ"
           >
-            <CouponRegular className="w-4 h-4" />
+            <TicketRegular className="w-4 h-4" />
             <span>หมุนวงล้อตั๋วสุ่ม ({sessionTickets} 🎟️)</span>
           </button>
 
