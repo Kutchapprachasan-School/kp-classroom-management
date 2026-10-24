@@ -119,6 +119,40 @@
 
 ---
 
+## 4.6 สถาปัตยกรรม Optimistic UI และโมเดล RewardBatch (Optimistic Rewards & Atomic Rollback)
+
+เพื่อตอบสนองการใช้งานหน้าห้องเรียนที่ต้องรวดเร็ว ฉับไว ไม่สะดุดระหว่างสอน (Zero-Latency In-Class UX):
+1. **หลักการ Optimistic UI**:
+   - เมื่อครูกดแจกเหรียญหรือตั๋ว (ไม่ว่าจะรายบุคคล ยกกลุ่ม หรือทั้งห้อง):
+     - ขั้นที่ 1: หน้าจออัปเดตตัวเลขเหรียญ/ตั๋วทันที + เล่นเสียง Web Audio ทันที
+     - ขั้นที่ 2: เรียก `gachaService.addCoins` / `gachaService.addTickets` ปรับยอดสะสมใน `kp_gacha_state:<studentId>` ทันที
+     - ขั้นที่ 3: บันทึก `RewardBatch` ลงใน Session Ledger ด้วยสถานะ `syncing` แล้วทำการซิงค์ลง Storage/Cloud ในเบื้องหลัง (Background Task)
+     - ขั้นที่ 4: เมื่อซิงค์สำเร็จ เปลี่ยนสถานะเป็น `synced`
+2. **โมเดลประวัติการแจกแบบกลุ่ม (`RewardBatch`)**:
+   ```typescript
+   export interface RewardBatch {
+     id: string; // temp-... หรือ batch-cuid
+     classroomId: string;
+     teacherId?: string;
+     rewardType: 'coin' | 'ticket';
+     amount: number; // จำนวนที่แจกต่อคน เช่น +1, +3
+     description: string; // เช่น "ด.ช.สมชาย ตอบคำถาม", "รางวัลยกกลุ่ม กลุ่มที่ 1"
+     targetStudentIds: string[]; // รายชื่อนักเรียนทุกคนในชุดนี้
+     isRevoked: boolean; // ป้องกันการกด Undo ซ้ำซ้อน
+     createdAt: string;
+     revokedAt?: string | null;
+     syncStatus: 'syncing' | 'synced' | 'error';
+   }
+   ```
+3. **กลไก Optimistic Undo & Atomic Rollback**:
+   - ตรวจสอบ `isRevoked === false` หากกำลังซิงค์อยู่จะปิดไม่ให้กดยกเลิกชั่วคราว
+   - เมื่อกดยกเลิก: หักแต้มคืนทันที (`-amount`), อัปเดต `isRevoked: true` ใน `RewardBatch` และปรับยอดใน `gachaService` ทันที
+   - หากเกิดข้อผิดพลาดในการบันทึก ระบบจะ Rollback คืนค่าเดิมพร้อมเสียงแจ้งเตือนและข้อความ Toast ให้คุณครูทราบทันที
+4. **Custom Hook `useOptimisticRewards`**:
+   - แยก Logic การจัดการ Ledger, Toast, Give Reward, Undo Reward ออกเป็น Hook เฉพาะ เพื่อให้ `LiveClassroomView.tsx` มีโค้ดที่สะอาดและทดสอบได้ง่าย (Decoupled & Testable)
+
+---
+
 ## 5. ระบบเสียงสังเคราะห์ Web Audio API (SoundFXEngine)
 
 ทำงานแบบ Standalone ไม่ต้องโหลดไฟล์ MP3 ภายนอก:
