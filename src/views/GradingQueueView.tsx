@@ -452,13 +452,18 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
                     <button
                       type="button"
                       onClick={() => {
+                        const resolvedR2 = r2StorageService.resolvePublicViewUrl(item.filePreviewUrl);
+                        const isR2Available = Boolean(
+                          resolvedR2 &&
+                            (resolvedR2.startsWith('http://') || resolvedR2.startsWith('https://')) &&
+                            !resolvedR2.startsWith('data:')
+                        );
                         const cachedFile = sgsRosterAndSubmissionService.getSubmissionFileUrl(
                           item.assignmentId,
                           item.studentCode,
                           item.fileName
                         );
-                        const resolvedR2 = r2StorageService.resolvePublicViewUrl(item.filePreviewUrl);
-                        const fileUrl = cachedFile || resolvedR2 || item.filePreviewUrl;
+                        const fileUrl = isR2Available ? resolvedR2 : (cachedFile || resolvedR2 || item.filePreviewUrl);
                         setPreviewItem({
                           title: item.assignmentTitle,
                           studentName: displayName,

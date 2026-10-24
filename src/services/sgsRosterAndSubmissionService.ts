@@ -1367,11 +1367,14 @@ export const sgsRosterAndSubmissionService = {
         return list.map((sub) => {
           let fileUrl = sub.fileDataUrl;
 
-          // ถ้ามี R2 Worker Configured และมี URL/Key ของ R2 ให้แปลงเป็น URL ที่เปิดดูได้จริง
-          if (r2StorageService.isConfigured() && (fileUrl || sub.r2ObjectKey)) {
-            const resolvedR2 = r2StorageService.resolvePublicViewUrl(fileUrl || sub.r2ObjectKey);
-            if (resolvedR2 && (resolvedR2.startsWith('http://') || resolvedR2.startsWith('https://'))) {
-              return { ...sub, fileDataUrl: resolvedR2 };
+          // ถ้ามี R2 Worker Configured และมี URL/Key ของ R2 ให้แปลงเป็น URL ที่เปิดดูได้จริง (ให้ความสำคัญกับ R2 Key ก่อน Base64 เสมอ)
+          if (r2StorageService.isConfigured() && (sub.r2ObjectKey || fileUrl)) {
+            const r2Target = sub.r2ObjectKey || (fileUrl && !fileUrl.startsWith('data:') ? fileUrl : undefined);
+            if (r2Target) {
+              const resolvedR2 = r2StorageService.resolvePublicViewUrl(r2Target);
+              if (resolvedR2 && (resolvedR2.startsWith('http://') || resolvedR2.startsWith('https://'))) {
+                return { ...sub, fileDataUrl: resolvedR2, fileUrl: resolvedR2 };
+              }
             }
           }
 
@@ -2810,6 +2813,32 @@ export const sgsRosterAndSubmissionService = {
       const cleanStu = studentCode ? String(studentCode).trim() : '';
       const cleanFile = fileName ? String(fileName).trim() : '';
 
+      // ตรวจสอบก่อนว่า submission มี Cloudflare R2 URL หรือ Key อยู่แล้วหรือไม่ เพื่อใช้ URL จริงแทน Base64 เสมอ
+      if (cleanAsg && cleanStu) {
+        try {
+          const subs = this.getSubmissions();
+          const matchedSub = subs.find(
+            (s) =>
+              s.assignmentId === cleanAsg &&
+              (s.studentCode === cleanStu || (s as any).studentId === cleanStu)
+          );
+          if (matchedSub?.r2ObjectKey && r2StorageService.isConfigured()) {
+            const resolvedR2 = r2StorageService.resolvePublicViewUrl(matchedSub.r2ObjectKey);
+            if (resolvedR2 && (resolvedR2.startsWith('http://') || resolvedR2.startsWith('https://'))) {
+              return resolvedR2;
+            }
+          }
+          if (
+            matchedSub?.fileDataUrl &&
+            (matchedSub.fileDataUrl.startsWith('http://') || matchedSub.fileDataUrl.startsWith('https://'))
+          ) {
+            return matchedSub.fileDataUrl;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
       const isValidDataUrl = (val: any): boolean => {
         if (!val || typeof val !== 'string') return false;
         if (
@@ -3074,12 +3103,13 @@ export const sgsRosterAndSubmissionService = {
       resolvedFileUrl = URL.createObjectURL(fileToUpload);
     }
 
-    // แคชไฟล์ภาพ / preview URL ลง localStorage เพื่อให้ครูเปิดดูออฟไลน์ได้ทันที
+    // แคชไฟล์ภาพ / preview URL ลง localStorage เพื่อให้ครูเปิดดูออฟไลน์ได้ทันที (ให้ความสำคัญกับ R2 URL ก่อน Base64 เสมอ)
     if ((payload.fileDataUrl || resolvedFileUrl) && typeof localStorage !== 'undefined') {
       try {
         const cleanAsg = String(payload.assignmentId).trim();
         const cleanStu = String(verifiedStudentCode).trim();
-        const cacheUrl = payload.fileDataUrl || resolvedFileUrl;
+        const isR2Url = resolvedFileUrl && (resolvedFileUrl.startsWith('http://') || resolvedFileUrl.startsWith('https://'));
+        const cacheUrl = isR2Url ? resolvedFileUrl : (resolvedFileUrl || payload.fileDataUrl);
         if (cacheUrl && !cacheUrl.startsWith('blob:')) {
           localStorage.setItem(`kp_sub_file_${cleanAsg}_${cleanStu}`, cacheUrl);
           if (cleanFileName) {

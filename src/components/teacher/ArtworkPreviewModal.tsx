@@ -77,18 +77,26 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
     setRotation(0);
   };
 
-  // ดึงแคชจากเครื่อง (localStorage) เป็นอันดับแรกเพื่อรองรับงานเก่าที่ส่งก่อนเชื่อมต่อ R2
+  // ลำดับความสำคัญ: ให้ความสำคัญกับ Cloudflare R2 URL เสมอถ้ามี แล้วจึงใช้ Local Cache เป็น Fallback
   const match = url?.match(/(asg-[^/]+)\/([^_/]+)_/);
   const targetAsgId = match ? match[1] : assignmentId;
   const targetStuCode = match ? match[2] : studentCode;
   const cached = sgsRosterAndSubmissionService.getSubmissionFileUrl(targetAsgId, targetStuCode, fileName);
 
+  const r2Url = r2StorageService.resolvePublicViewUrl(url);
+  const isR2Valid = Boolean(
+    r2Url &&
+      (r2Url.startsWith('http://') || r2Url.startsWith('https://')) &&
+      !r2Url.startsWith('data:')
+  );
+
   let resolvedFileUrl =
     localFallbackUrl ||
-    (cached && cached.startsWith('data:') ? cached : null) ||
-    r2StorageService.resolvePublicViewUrl(url) ||
-    url ||
-    cached;
+    (isR2Valid ? r2Url : null) ||
+    (url && (url.startsWith('http://') || url.startsWith('https://')) && !url.startsWith('data:') ? url : null) ||
+    (cached && (cached.startsWith('http://') || cached.startsWith('https://')) ? cached : null) ||
+    cached ||
+    url;
 
   // หากพบแคชในเครื่อง แต่ URL ใน R2 ยังไม่มี ให้ซิงก์ขึ้น R2 ในเบื้องหลังอัตโนมัติ
   if (cached && cached.startsWith('data:') && r2StorageService.isConfigured() && (!url || url.startsWith('r2://'))) {

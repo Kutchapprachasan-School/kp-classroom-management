@@ -97,8 +97,11 @@ export const r2StorageService = {
     const cleanAsg = params.assignmentId.trim();
     const cleanStu = params.studentCode.trim();
     const cleanFile = params.fileName.trim().replace(/\.(jpg|jpeg|png|heic)$/i, '.webp');
+    const cleanFileWithoutStu = cleanFile.startsWith(`${cleanStu}_`)
+      ? cleanFile.slice(cleanStu.length + 1)
+      : cleanFile;
 
-    return `kp-classroom-submissions/${term}/${room}/${cleanAsg}/${cleanStu}_${cleanFile}`;
+    return `kp-classroom-submissions/${term}/${room}/${cleanAsg}/${cleanStu}_${cleanFileWithoutStu}`;
   },
 
   /**
