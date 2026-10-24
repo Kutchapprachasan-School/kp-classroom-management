@@ -126,16 +126,25 @@ export const liveClassroomService = {
     const currentUser = authService.getCurrentUser();
     const isAdmin = currentUser?.role === 'ADMIN';
     const taughtClassrooms = getTeacherTaughtClassrooms();
+    const taughtNormalized = new Set(
+      taughtClassrooms.map((t) => formatClassroomLabel(t).trim().toLowerCase())
+    );
 
     const filteredClassrooms = rawClassrooms.filter((cls) => {
       if (isAdmin) return true;
       if (!taughtClassrooms || taughtClassrooms.length === 0) return true;
 
-      const formattedLabel = formatClassroomLabel(cls.name || cls.id);
+      const clsNameNorm = formatClassroomLabel(cls.name || '').trim().toLowerCase();
+      const clsIdNorm = formatClassroomLabel(cls.id || '').trim().toLowerCase();
+      const clsRoomNorm = cls.roomNumber
+        ? formatClassroomLabel(cls.roomNumber).trim().toLowerCase()
+        : '';
+
       return (
+        taughtNormalized.has(clsNameNorm) ||
+        taughtNormalized.has(clsIdNorm) ||
+        (clsRoomNorm ? taughtNormalized.has(clsRoomNorm) : false) ||
         taughtClassrooms.includes(cls.name) ||
-        taughtClassrooms.includes(formattedLabel) ||
-        taughtClassrooms.includes(cls.roomNumber || '') ||
         taughtClassrooms.includes(cls.id)
       );
     });

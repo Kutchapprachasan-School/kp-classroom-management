@@ -77,6 +77,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
   onPlaySound,
 }) => {
   const [ticketSource, setTicketSource] = useState<'session' | 'total'>('session');
+  const [spinDurationSec, setSpinDurationSec] = useState<number>(4.5);
   const [excludeWinners, setExcludeWinners] = useState<boolean>(true);
   const [pastWinnerIds, setPastWinnerIds] = useState<string[]>([]);
 
@@ -138,8 +139,8 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
     // เสียงติ๊กจำลองเข็มดีดผ่านหมุดวงล้อ ค่อยๆ ชะลอความเร็วตามสมการ Cubic Bezier
     tickTimersRef.current.forEach(clearTimeout);
     tickTimersRef.current = [];
-    const totalTicks = 28;
-    const spinDurationMs = 4500;
+    const totalTicks = Math.round(spinDurationSec * 6.5);
+    const spinDurationMs = spinDurationSec * 1000;
 
     for (let i = 1; i <= totalTicks; i++) {
       const progress = i / totalTicks;
@@ -156,7 +157,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
       setWinner(spinResult.winnerSegment.student);
       onPlaySound?.('fanfare');
     }, spinDurationMs);
-  }, [isSpinning, segments, rotation, onPlaySound]);
+  }, [isSpinning, segments, rotation, spinDurationSec, onPlaySound]);
 
   const handleAwardWinner = (coinAmount: number, consumeOneTicket: boolean) => {
     if (!winner || prizeClaimed) return;
@@ -235,6 +236,20 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
               </select>
             </div>
 
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 font-medium">ความเร็วการหมุน:</span>
+              <select
+                value={spinDurationSec}
+                onChange={(e) => setSpinDurationSec(Number(e.target.value))}
+                disabled={isSpinning}
+                className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-1 font-semibold text-slate-100 text-xs"
+              >
+                <option value={3.0}>⚡ ด่วน (3.0 วินาที)</option>
+                <option value={4.5}>🎲 ปกติ (4.5 วินาที)</option>
+                <option value={6.0}>🎭 ลุ้นระทึก (6.0 วินาที)</option>
+              </select>
+            </div>
+
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -283,7 +298,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
                     style={{
                       transform: `rotate(${rotation}deg)`,
                       transition: isSpinning
-                        ? 'transform 4.5s cubic-bezier(0.12, 0.8, 0.18, 1)'
+                        ? `transform ${spinDurationSec}s cubic-bezier(0.12, 0.8, 0.18, 1)`
                         : 'none',
                     }}
                   >

@@ -120,6 +120,24 @@ export function useOptimisticRewards(props: {
     []
   );
 
+  // เมื่อห้องเรียนเปลี่ยน โหลดประวัติรางวัลเฉพาะของห้องเรียนนั้นจาก sessionStorage ทันที
+  useEffect(() => {
+    if (typeof window === 'undefined' || !classroomId) return;
+    try {
+      const stored = window.sessionStorage.getItem(getSessionLedgerKey(classroomId));
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setLedger(parsed);
+          return;
+        }
+      }
+    } catch {
+      // Ignore
+    }
+    setLedger([]);
+  }, [classroomId]);
+
   // บันทึก Session Ledger ลง sessionStorage เพื่อกู้คืนกรณี Refresh หน้าจอ (พร้อม Consistency Guard ป้องกัน Data Bleeding ข้ามห้อง)
   useEffect(() => {
     if (typeof window === 'undefined' || !classroomId) return;

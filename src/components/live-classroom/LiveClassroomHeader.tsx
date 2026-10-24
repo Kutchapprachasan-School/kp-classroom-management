@@ -21,7 +21,7 @@ import {
 export type SubTab = 'picker' | 'timer' | 'groups' | 'rewards';
 
 export interface LiveClassroomHeaderProps {
-  classrooms: { id: string; name: string; subject: string }[];
+  classrooms: { id: string; name: string; subject: string; studentCount?: number }[];
   selectedClassId: string;
   onSelectClassId: (id: string) => void;
   presentCount: number;
@@ -94,7 +94,7 @@ export const LiveClassroomHeader: React.FC<LiveClassroomHeaderProps> = ({
           >
             {classrooms.map((cls) => (
               <option key={cls.id} value={cls.id}>
-                ห้อง {cls.name} — {cls.subject}
+                ห้อง {cls.name}{cls.studentCount !== undefined ? ` (${cls.studentCount} คน)` : ''} — {cls.subject}
               </option>
             ))}
           </select>

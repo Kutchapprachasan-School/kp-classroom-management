@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 24/10/2569 14:56:14 | รวมทั้งหมด 221 ไฟล์*
+*อัปเดตล่าสุด: 24/10/2569 15:03:29 | รวมทั้งหมด 221 ไฟล์*
 
 ---
 
@@ -25,7 +25,7 @@
 | [src/views/GradingQueueView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/GradingQueueView.tsx) | 553 | `GradingQueueView` (L37) |
 | [src/views/HomeVisitSdqView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/HomeVisitSdqView.tsx) | 1355 | `HomeVisitSdqView` (L27) |
 | [src/views/LessonPlansView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/LessonPlansView.tsx) | 1776 | `UnitStatus` (L33), `EvaluationItem` (L35), `UnitPlanItem` (L42), `CourseFilterOption` (L87), `LessonPlansView` (L96) |
-| [src/views/LiveClassroomView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/LiveClassroomView.tsx) | 485 | `LiveClassroomViewProps` (L23), `LiveClassroomView` (L27) |
+| [src/views/LiveClassroomView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/LiveClassroomView.tsx) | 486 | `LiveClassroomViewProps` (L23), `LiveClassroomView` (L27) |
 | [src/views/MessagesView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/MessagesView.tsx) | 1455 | `MessagesView` (L47) |
 | [src/views/MorningAssemblyView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/MorningAssemblyView.tsx) | 1323 | `MorningAssemblyViewProps` (L54), `MorningAssemblyView` (L90) |
 | [src/views/SchoolLeaveExecutiveDashboardView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/SchoolLeaveExecutiveDashboardView.tsx) | 292 | `SchoolLeaveExecutiveDashboardView` (L43) |
@@ -133,8 +133,8 @@
 | [src/components/live-classroom/GroupGeneratorSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/GroupGeneratorSubTab.tsx) | 444 | `GroupPresetItem` (L21), `GroupGeneratorSubTabProps` (L29), `swapStudentsBetweenGroups` (L40), `GroupGeneratorSubTab` (L77) |
 | [src/components/live-classroom/LiveClassroomHeader.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LiveClassroomHeader.tsx) | 248 | `SubTab` (L21), `LiveClassroomHeaderProps` (L23), `LiveClassroomHeader` (L44) |
 | [src/components/live-classroom/LiveTimerSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LiveTimerSubTab.tsx) | 342 | `LiveTimerSubTabProps` (L16), `formatTimerMMSS` (L32), `LiveTimerSubTab` (L39) |
-| [src/components/live-classroom/LuckyTicketDrawModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LuckyTicketDrawModal.tsx) | 479 | `LuckyTicketDrawModalProps` (L23), `createSlicePath` (L46), `describeArcSlice` (L69), `LuckyTicketDrawModal` (L71) |
-| [src/components/live-classroom/RandomPickerSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RandomPickerSubTab.tsx) | 549 | `RandomPickerSubTabProps` (L20), `getAvailablePool` (L39), `restoreSkippedStudent` (L49), `RandomPickerSubTab` (L53) |
+| [src/components/live-classroom/LuckyTicketDrawModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LuckyTicketDrawModal.tsx) | 494 | `LuckyTicketDrawModalProps` (L23), `createSlicePath` (L46), `describeArcSlice` (L69), `LuckyTicketDrawModal` (L71) |
+| [src/components/live-classroom/RandomPickerSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RandomPickerSubTab.tsx) | 584 | `SpinSpeed` (L20), `RandomPickerSubTabProps` (L22), `getAvailablePool` (L41), `restoreSkippedStudent` (L51), `RandomPickerSubTab` (L55) |
 | [src/components/live-classroom/RewardBoardSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RewardBoardSubTab.tsx) | 285 | `RewardBoardSubTabProps` (L16), `calculateTopEarners` (L26), `formatRewardTimeThai` (L38), `RewardBoardSubTab` (L52) |
 | [src/components/mobile/index.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/mobile/index.ts) | 12 | *(Internal / Default Export)* |
 | [src/components/mobile/TeacherMobileBottomNav.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/mobile/TeacherMobileBottomNav.tsx) | 250 | `TeacherMobileBottomNav` (L17) |
@@ -203,7 +203,7 @@
 | [src/services/gradeService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts) | 736 | `AssessmentColumn` (L16), `StudentScore` (L30), `GradeSyncMeta` (L38), `localGradeDb` (L123), `gradeService` (L388) |
 | [src/services/homeVisitService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/homeVisitService.ts) | 292 | `VisitStatus` (L6), `SdqLevel` (L7), `CctSyncStatus` (L8), `HouseholdMember` (L11), `StudentAttendanceLeavePolicy` (L28), `HomeVisitRecord` (L35), `homeVisitService` (L153) |
 | [src/services/index.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/index.ts) | 20 | *(Internal / Default Export)* |
-| [src/services/liveClassroomService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/liveClassroomService.ts) | 342 | `StudentTier` (L14), `LiveStudent` (L16), `LiveClassroomData` (L30), `getThailandTodayRange` (L44), `calculateStudentTierMap` (L67), `liveClassroomService` (L111) |
+| [src/services/liveClassroomService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/liveClassroomService.ts) | 351 | `StudentTier` (L14), `LiveStudent` (L16), `LiveClassroomData` (L30), `getThailandTodayRange` (L44), `calculateStudentTierMap` (L67), `liveClassroomService` (L111) |
 | [src/services/localCacheDb.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/localCacheDb.ts) | 292 | `CachedClassroom` (L9), `CachedStudent` (L20), `SyncMeta` (L42), `localCacheDb` (L113) |
 | [src/services/masterDataService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/masterDataService.ts) | 464 | `resolveRoomCandidates` (L34), `masterDataService` (L107) |
 | [src/services/messagingService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/messagingService.ts) | 1546 | `ChatGroupType` (L17), `ChatMember` (L19), `ChatAttachmentMeta` (L30), `ChatMessage` (L40), `ChatGroup` (L67), `StudentTransferPayload` (L87), `StudentTransferResult` (L95), `CHAT_GROUPS_EVENT` (L111), `STUDENT_TRANSFERRED_EVENT` (L112), `CourseClassroomMapping` (L115) *(+2 รายการ)* |
@@ -230,7 +230,7 @@
 | [src/services/teacherBannerService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/teacherBannerService.ts) | 294 | `TeacherBannerKey` (L7), `TeacherBannerItem` (L9), `TEACHER_BANNERS_EVENT` (L29), `DEFAULT_TEACHER_BANNERS` (L31), `teacherBannerService` (L85) |
 | [src/services/teacherCalendarTodoService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/teacherCalendarTodoService.ts) | 448 | `DayWorkStatus` (L3), `DayTaskDetail` (L5), `CalendarDayStatus` (L17), `DailyTodoItem` (L30), `UpcomingMilestone` (L45), `teacherCalendarTodoService` (L85) |
 | [src/services/teacherCopilotService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/teacherCopilotService.ts) | 811 | `TimeOfDayScenario` (L19), `UrgentPriorityLevel` (L25), `DeepLinkTargetView` (L27), `CrossViewNavigationPayload` (L47), `UrgentTriageItem` (L58), `DailyStepItem` (L74), `GrillMeRoundRecord` (L86), `GRILL_ME_8_ROUNDS_LOG` (L137), `teacherCopilotService` (L293) |
-| [src/services/teacherCourseAssignmentService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/teacherCourseAssignmentService.ts) | 848 | `TeachingSubjectInfo` (L19), `TeachingCourseClassroom` (L31), `getAllAvailableClassroomLabels` (L37), `getDynamicTeachingSubjects` (L55), `getTeacherTaughtClassrooms` (L101), `TEACHER_SUBJECTS_LIST` (L160), `HOMEROOM_ADVISORY` (L176), `SubmissionChannelType` (L188), `GradingQueueItem` (L190), `StudentBundleProgress` (L223) *(+3 รายการ)* |
+| [src/services/teacherCourseAssignmentService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/teacherCourseAssignmentService.ts) | 857 | `TeachingSubjectInfo` (L19), `TeachingCourseClassroom` (L31), `getAllAvailableClassroomLabels` (L37), `getDynamicTeachingSubjects` (L55), `getTeacherTaughtClassrooms` (L101), `TEACHER_SUBJECTS_LIST` (L169), `HOMEROOM_ADVISORY` (L185), `SubmissionChannelType` (L197), `GradingQueueItem` (L199), `StudentBundleProgress` (L232) *(+3 รายการ)* |
 | [src/services/trashService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/trashService.ts) | 197 | `TRASH_SYNC_EVENT` (L7), `trashService` (L27) |
 | [src/services/types.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/types.ts) | 118 | 📌 *CLASSROOM & ROSTER SCHEMAS* (L3), `ClassroomCreateSchema` (L4), `ClassroomCreateInput` (L14), `StudentCreateSchema` (L16), `StudentCreateInput` (L23), 📌 *ASSIGNMENT & EXAM SCHEMAS* (L25), `AssignmentCreateSchema` (L26), `AssignmentCreateInput` (L34), 📌 *SCORE & AUDIT LOG SCHEMAS* (L36), `ScoreUpdateSchema` (L37) *(+17 รายการ)* |
 | [src/services/weeklyQuizService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/weeklyQuizService.ts) | 276 | `parseThaiTermDate` (L35), `QuizWeekInfo` (L46), `computeQuizWeek` (L59), `QuizScoreInput` (L99), `QuizScoreOutput` (L109), `scoreWeeklyQuiz` (L125), `weeklyQuizService` (L159) |
@@ -272,7 +272,7 @@
 | ไฟล์ (File Path) | จำนวนบรรทัด | สัญลักษณ์หลัก & ช่วงบรรทัด (Key Exports & Line Numbers) |
 | :--- | :---: | :--- |
 | [src/App.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/App.tsx) | 1021 | `App` (L86) |
-| [src/hooks/useOptimisticRewards.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/hooks/useOptimisticRewards.ts) | 442 | `SyncStatus` (L7), `RewardBatch` (L9), `OfflineQueueItem` (L23), `applyDirectGachaStateUpdate` (L35), `useOptimisticRewards` (L83) |
+| [src/hooks/useOptimisticRewards.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/hooks/useOptimisticRewards.ts) | 460 | `SyncStatus` (L7), `RewardBatch` (L9), `OfflineQueueItem` (L23), `applyDirectGachaStateUpdate` (L35), `useOptimisticRewards` (L83) |
 | [src/lib/neonClient.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/lib/neonClient.ts) | 569 | `neonConnectionString` (L22), `isNeonConfigured` (L25), `neonCacheStats` (L43), `clearNeonCache` (L51), `QueryResult` (L62), `NeonQueryBuilder` (L71), `neonClient` (L567) |
 | [src/lib/supabaseClient.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/lib/supabaseClient.ts) | 2 | *(Internal / Default Export)* |
 | [src/lib/supabase.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/lib/supabase.ts) | 44 | `isSupabaseConfigured` (L19), `supabase` (L29), `logDbOperation` (L39) |

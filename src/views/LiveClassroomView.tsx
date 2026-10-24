@@ -386,6 +386,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
           id: c.id,
           name: c.name,
           subject: c.subject,
+          studentCount: c.students.length,
         }))}
         selectedClassId={selectedClassId}
         onSelectClassId={handleSelectClassroom}

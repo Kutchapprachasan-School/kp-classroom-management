@@ -145,6 +145,15 @@ export const getTeacherTaughtClassrooms = (
     }
   });
 
+  // รวบรวมห้องเรียนที่ปรึกษา / ประจำชั้น (Homeroom / Advisor) ของครูคนนี้ด้วย
+  const currentUser = authService.getCurrentUser();
+  if (currentUser?.classroomName) {
+    allTaught.add(formatClassroomLabel(currentUser.classroomName));
+  }
+  if (currentUser?.classroomId) {
+    allTaught.add(formatClassroomLabel(currentUser.classroomId));
+  }
+
   if (allTaught.size > 0) {
     return Array.from(allTaught);
   }

@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import type { LiveStudent } from '../../services/liveClassroomService';
 
+export type SpinSpeed = 'fast' | 'normal' | 'dramatic';
+
 export interface RandomPickerSubTabProps {
   students: LiveStudent[];
   classroomId?: string;
@@ -64,6 +66,7 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
   syncingAttendanceIds,
 }) => {
   const [pickerMode, setPickerMode] = useState<'slot' | 'card'>('slot');
+  const [spinSpeed, setSpinSpeed] = useState<SpinSpeed>('normal');
   const [noRepeat, setNoRepeat] = useState<boolean>(true);
   const [pickedIds, setPickedIds] = useState<string[]>([]);
   const [isSpinning, setIsSpinning] = useState<boolean>(false);
@@ -107,7 +110,15 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
 
     const winner = availablePool[Math.floor(Math.random() * availablePool.length)];
     let steps = 0;
-    const totalSteps = 22;
+
+    // การตั้งค่าความเร็วและระยะเวลาการสุ่มตาม preset ที่ครูเลือก
+    const speedConfig = {
+      fast: { totalSteps: 12, baseDelay: 30, exp: 1.45, mult: 2.0 },
+      normal: { totalSteps: 22, baseDelay: 40, exp: 1.65, mult: 2.5 },
+      dramatic: { totalSteps: 34, baseDelay: 45, exp: 1.85, mult: 3.0 },
+    }[spinSpeed];
+
+    const totalSteps = speedConfig.totalSteps;
 
     const runStep = () => {
       steps++;
@@ -116,7 +127,7 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
       onPlaySound?.('tick', 450 + steps * 15);
 
       if (steps < totalSteps) {
-        const delay = 40 + Math.pow(steps, 1.65) * 2.5;
+        const delay = speedConfig.baseDelay + Math.pow(steps, speedConfig.exp) * speedConfig.mult;
         setTimeout(runStep, delay);
       } else {
         setRollingStudent(winner);
@@ -130,7 +141,7 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
     };
 
     runStep();
-  }, [isSpinning, availablePool, presentStudents, noRepeat, setRollingStudent, setSelectedStudent, onPlaySound]);
+  }, [isSpinning, availablePool, presentStudents, spinSpeed, noRepeat, setRollingStudent, setSelectedStudent, onPlaySound]);
 
   // Hotkey สำหรับกด Spacebar สุ่มชื่อในโหมด Slot Reel
   useEffect(() => {
@@ -202,6 +213,30 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
             >
               <option value="slot">🎰 สล็อตแมชชีน (Slot Reel)</option>
               <option value="card">🃏 สุ่มเปิดการ์ด (Card Flip)</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span
+              className={`text-xs font-semibold ${
+                isProjectorMode ? 'text-slate-400' : 'text-[#6B7C93]'
+              }`}
+            >
+              เวลาการสุ่ม:
+            </span>
+            <select
+              value={spinSpeed}
+              onChange={(e) => setSpinSpeed(e.target.value as SpinSpeed)}
+              disabled={isSpinning}
+              className={`rounded-xl px-3 py-1.5 font-semibold text-xs transition-colors ${
+                isProjectorMode
+                  ? 'bg-slate-800 border border-slate-700 text-slate-100'
+                  : 'bg-[#F7FAFF] border border-[#E2E8F0] text-[#163A66]'
+              }`}
+            >
+              <option value="fast">⚡ ด่วน (1.5 วินาที)</option>
+              <option value="normal">🎲 ปกติ (3.0 วินาที)</option>
+              <option value="dramatic">🎭 ลุ้นระทึก (5.0 วินาที)</option>
             </select>
           </div>
 
