@@ -54,6 +54,7 @@ export type TeacherViewKey =
   | 'school-login'
   | 'home'
   | 'admin-dashboard'
+  | 'live-classroom'
   | 'class-overview'
   | 'morning-assembly'
   | 'classroom-attendance'
@@ -292,6 +293,11 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     {
       title: 'การสอน & วัดผล',
       items: [
+        {
+          key: 'live-classroom',
+          label: 'เครื่องมือตอนสอน (สด)',
+          icon: Sparkles,
+        },
         {
           key: 'grading-queue',
           label: 'คิวตรวจงาน',

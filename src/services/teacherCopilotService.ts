@@ -27,6 +27,7 @@ export type UrgentPriorityLevel = 'CRITICAL' | 'URGENT' | 'IMPORTANT';
 export type DeepLinkTargetView =
   | 'home'
   | 'admin-dashboard'
+  | 'live-classroom'
   | 'class-overview'
   | 'assignments'
   | 'readiness'

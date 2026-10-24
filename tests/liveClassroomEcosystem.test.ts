@@ -13,6 +13,14 @@ import {
   buildWeightedWheelSegments,
   pickWeightedWheelWinner,
 } from '../src/utils/liveClassroomAlgorithms';
+import {
+  getAvailablePool,
+  restoreSkippedStudent,
+} from '../src/components/live-classroom/RandomPickerSubTab';
+import { formatTimerMMSS } from '../src/components/live-classroom/LiveTimerSubTab';
+import { swapStudentsBetweenGroups } from '../src/components/live-classroom/GroupGeneratorSubTab';
+import { calculateTopEarners } from '../src/components/live-classroom/RewardBoardSubTab';
+import { describeArcSlice } from '../src/components/live-classroom/LuckyTicketDrawModal';
 
 async function runTests() {
   console.log('🧪 Running Live Classroom Ecosystem Tests...');
@@ -93,6 +101,45 @@ async function runTests() {
   const spinResult = pickWeightedWheelWinner(segments, 0);
   assert.ok(spinResult !== null);
   assert.ok(spinResult.nextRotationDeg >= 360 * 6);
+
+  // 6. ทดสอบ Pure Function ของ RandomPicker (getAvailablePool & restoreSkippedStudent)
+  const poolA = getAvailablePool(sampleRoster, ['std-1', 'std-2'], true);
+  assert.equal(poolA.length, 8, 'Pool should exclude picked students when noRepeat is true');
+  assert.ok(!poolA.some((s) => s.id === 'std-1' || s.id === 'std-2'));
+
+  const poolB = getAvailablePool(sampleRoster, ['std-1', 'std-2'], false);
+  assert.equal(poolB.length, 10, 'Pool should include all present students when noRepeat is false');
+
+  const restoredIds = restoreSkippedStudent(['std-1', 'std-2', 'std-3'], 'std-2');
+  assert.deepEqual(restoredIds, ['std-1', 'std-3'], 'restoreSkippedStudent should remove skipped student ID');
+
+  // 7. ทดสอบ Pure Function ของ LiveTimer (formatTimerMMSS)
+  assert.equal(formatTimerMMSS(125), '02:05');
+  assert.equal(formatTimerMMSS(5), '00:05');
+  assert.equal(formatTimerMMSS(0), '00:00');
+  assert.equal(formatTimerMMSS(-10), '00:00');
+
+  // 8. ทดสอบ Pure Function ของ GroupGenerator (swapStudentsBetweenGroups)
+  const swappedGroups = swapStudentsBetweenGroups(groups, groups[0].members[0].id, groups[1].members[0].id);
+  assert.equal(swappedGroups[0].members[0].id, groups[1].members[0].id);
+  assert.equal(swappedGroups[1].members[0].id, groups[0].members[0].id);
+
+  // 9. ทดสอบ Pure Function ของ RewardBoard (calculateTopEarners)
+  const earnersRoster: LiveStudent[] = [
+    { ...sampleRoster[0], id: 's-1', sessionCoins: 2, sessionTickets: 0 }, // score = 4
+    { ...sampleRoster[1], id: 's-2', sessionCoins: 1, sessionTickets: 2 }, // score = 2 + 6 = 8
+    { ...sampleRoster[2], id: 's-3', sessionCoins: 5, sessionTickets: 1 }, // score = 10 + 3 = 13
+    { ...sampleRoster[3], id: 's-4', sessionCoins: 0, sessionTickets: 0 }, // 0
+  ];
+  const topEarners = calculateTopEarners(earnersRoster, 2);
+  assert.equal(topEarners.length, 2);
+  assert.equal(topEarners[0].id, 's-3');
+  assert.equal(topEarners[1].id, 's-2');
+
+  // 10. ทดสอบ Pure Function ของ LuckyTicketDrawModal (describeArcSlice)
+  const arcPath = describeArcSlice(180, 180, 174, 0, 90);
+  assert.ok(arcPath.startsWith('M 180 180 L'));
+  assert.ok(arcPath.endsWith('Z'));
 
   console.log('✅ All Live Classroom Ecosystem tests passed!');
 }

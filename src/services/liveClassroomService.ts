@@ -3,6 +3,7 @@
 // และการจัดเก็บ Group Presets ตามหลัก Strict Zero Mock Data Policy
 
 import type { RewardBatch } from '../hooks/useOptimisticRewards';
+import type { ClassroomRosterItem } from '../types/viewModels';
 import { classroomService } from './classroomService';
 import { sgsRosterAndSubmissionService } from './sgsRosterAndSubmissionService';
 import { gachaService } from './gachaService';
@@ -109,28 +110,26 @@ export const liveClassroomService = {
    * โหลดข้อมูลห้องเรียนและนักเรียนจริง 100% (Strict Zero Mock)
    */
   async loadClassroomsData(): Promise<LiveClassroomData[]> {
-    const rawClassrooms = await classroomService.getLocalClassrooms();
+    const rawClassrooms = await classroomService.getAll();
     if (!rawClassrooms || rawClassrooms.length === 0) {
       return [];
     }
 
-    const { dateKey } = getThailandTodayRange();
-
-    return rawClassrooms.map((cls) => {
+    return rawClassrooms.map((cls: ClassroomRosterItem) => {
       const roster = sgsRosterAndSubmissionService.getRoster(cls.id);
-      const studentIds = roster.map((st) => st.studentId);
+      const studentIds = roster.map((st) => st.id);
       const attendanceMap = this.getTodayAttendanceMap(cls.id, studentIds);
 
       // ดึงสถานะกาชาจริงของนักเรียนแต่ละคน
       const initialStudentData = roster.map((st) => {
-        const gachaState = gachaService.getState(st.studentId);
+        const gachaState = gachaService.getState(st.id);
         return {
-          id: st.studentId,
-          studentCode: st.studentCode || st.studentNumber?.toString() || st.studentId,
-          name: st.studentName,
-          nickname: st.nickname,
-          avatarUrl: st.avatarUrl,
-          present: attendanceMap[st.studentId] !== false,
+          id: st.id,
+          studentCode: st.studentCode || st.id,
+          name: st.name || `นักเรียน (${st.studentCode})`,
+          nickname: undefined,
+          avatarUrl: undefined,
+          present: attendanceMap[st.id] !== false,
           totalCoins: gachaState.coins || 0,
           totalTickets: gachaState.tickets || 0,
           sessionCoins: 0,
@@ -175,7 +174,7 @@ export const liveClassroomService = {
       return {
         id: cls.id,
         name: cls.name,
-        subject: cls.subject || 'วิชาเรียน',
+        subject: cls.level ? `${cls.name} (${cls.level})` : 'วิชาเรียน',
         students,
         initialLedger,
       };

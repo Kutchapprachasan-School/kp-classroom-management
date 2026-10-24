@@ -129,10 +129,10 @@
 - **[READ:SELECT]** [`src/services/authService.ts:81`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L81)
 
 #### 🗂️ ตาราง/View: `AssessmentColumn` (5 จุดเรียกใช้)
-- **[READ:SELECT]** [`src/services/gradeService.ts:386`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L386)
-- **[WRITE:UPSERT]** [`src/services/gradeService.ts:496`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L496)
-- **[READ:SELECT]** [`src/services/gradeService.ts:542`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L542)
-- **[WRITE:UPSERT]** [`src/services/gradeService.ts:573`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L573)
+- **[READ:SELECT]** [`src/services/gradeService.ts:415`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L415)
+- **[WRITE:UPSERT]** [`src/services/gradeService.ts:546`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L546)
+- **[READ:SELECT]** [`src/services/gradeService.ts:592`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L592)
+- **[WRITE:UPSERT]** [`src/services/gradeService.ts:623`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L623)
 - **[READ:SELECT]** [`src/services/studentEnrollmentService.ts:124`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentEnrollmentService.ts#L124)
 
 #### 🗂️ ตาราง/View: `Assignment` (4 จุดเรียกใช้)
@@ -231,8 +231,8 @@
 - **[READ:SELECT]** [`src/services/studentPromotionService.ts:112`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentPromotionService.ts#L112)
 
 #### 🗂️ ตาราง/View: `StudentScore` (3 จุดเรียกใช้)
-- **[READ:SELECT]** [`src/services/gradeService.ts:402`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L402)
-- **[WRITE:UPSERT]** [`src/services/gradeService.ts:580`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L580)
+- **[READ:SELECT]** [`src/services/gradeService.ts:431`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L431)
+- **[WRITE:UPSERT]** [`src/services/gradeService.ts:630`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L630)
 - **[READ:SELECT]** [`src/services/studentEnrollmentService.ts:112`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentEnrollmentService.ts#L112)
 
 #### 🗂️ ตาราง/View: `SystemSettings` (4 จุดเรียกใช้)

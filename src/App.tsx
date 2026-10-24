@@ -27,6 +27,7 @@ import { StudentAffairsCouncilView } from './views/StudentAffairsCouncilView';
 import { SchoolLeaveExecutiveDashboardView } from './views/SchoolLeaveExecutiveDashboardView';
 import { MorningAssemblyView } from './views/MorningAssemblyView';
 import { ClassroomAttendanceView } from './views/ClassroomAttendanceView';
+import { LiveClassroomView } from './views/LiveClassroomView';
 import { QuickSearchModal } from './components/common/QuickSearchModal';
 import { PwaInstallPrompt } from './components/common/PwaInstallPrompt';
 import type { AtRiskStudent } from './types/viewModels';
@@ -360,6 +361,8 @@ export const App: React.FC = () => {
       case 'home':
       case 'admin-dashboard' as any:
         return 'หน้าแรก';
+      case 'live-classroom':
+        return 'เครื่องมือตอนสอน (Live Classroom Companion)';
       case 'school-leave-dashboard':
         return `แดชบอร์ดบริหารระบบการลา • ${schoolSettings.nameTh}`;
       case 'class-overview':
@@ -742,6 +745,10 @@ export const App: React.FC = () => {
                   }
                   avatarUrl={currentAuthUser?.avatarUrl}
                 />
+              )}
+
+              {currentView === 'live-classroom' && (
+                <LiveClassroomView initialClassroomId={selectedClassroomIdForRoster} />
               )}
 
               {currentView === 'class-overview' && (

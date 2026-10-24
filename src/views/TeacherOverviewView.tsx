@@ -107,6 +107,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
   initialGradesFilter = 'ALL',
   initialAssignmentFilter = 'ALL',
   initialHighlightBanner = null,
+  onDeepNavigate,
 }) => {
   // Normalize initial tab so it always lands on a valid visible tab
   const resolveTab = (t?: ClassSubTab): 'grades' | 'attributes' | 'assignments' => {
@@ -574,6 +575,18 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
             <Plus className="w-4 h-4" />
             <span>สั่งงานใหม่</span>
           </button>
+
+          {onDeepNavigate && (
+            <button
+              type="button"
+              onClick={() => onDeepNavigate({ view: 'live-classroom' })}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-semibold shadow-xs transition-all cursor-pointer"
+              title="เปิดเครื่องมือสุ่มชื่อ จับเวลา และแจกเหรียญรางวัลในชั้นเรียนสด"
+            >
+              <Sparkles className="w-4 h-4 text-amber-300" />
+              <span>โหมดตอนสอนสด</span>
+            </button>
+          )}
         </div>
       </div>
 
