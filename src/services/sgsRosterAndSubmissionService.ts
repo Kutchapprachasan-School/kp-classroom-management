@@ -2878,32 +2878,6 @@ export const sgsRosterAndSubmissionService = {
       const cleanStu = studentCode ? String(studentCode).trim() : '';
       const cleanFile = fileName ? String(fileName).trim() : '';
 
-      // ตรวจสอบก่อนว่า submission มี Cloudflare R2 URL หรือ Key อยู่แล้วหรือไม่ เพื่อใช้ URL จริงแทน Base64 เสมอ
-      if (cleanAsg && cleanStu) {
-        try {
-          const subs = this.getSubmissions();
-          const matchedSub = subs.find(
-            (s) =>
-              s.assignmentId === cleanAsg &&
-              (s.studentCode === cleanStu || (s as any).studentId === cleanStu)
-          );
-          if (matchedSub?.r2ObjectKey && r2StorageService.isConfigured()) {
-            const resolvedR2 = r2StorageService.resolvePublicViewUrl(matchedSub.r2ObjectKey);
-            if (resolvedR2 && (resolvedR2.startsWith('http://') || resolvedR2.startsWith('https://'))) {
-              return resolvedR2;
-            }
-          }
-          if (
-            matchedSub?.fileDataUrl &&
-            (matchedSub.fileDataUrl.startsWith('http://') || matchedSub.fileDataUrl.startsWith('https://'))
-          ) {
-            return matchedSub.fileDataUrl;
-          }
-        } catch {
-          // ignore
-        }
-      }
-
       const isValidDataUrl = (val: any): boolean => {
         if (!val || typeof val !== 'string') return false;
         if (
@@ -2946,7 +2920,34 @@ export const sgsRosterAndSubmissionService = {
         }
       }
 
-      // 3. สแกนคีย์ทั้งหมดใน localStorage ที่ขึ้นต้นด้วย kp_sub_file_ (ตรวจจับแบบ Strict ป้องกันงานปนกันข้ามคน)
+      // 3. หากไม่มีในแคชของเครื่อง ให้ตรวจจาก submission (Cloudflare R2 URL สำหรับครูเปิดดูข้ามเครื่อง)
+      if (cleanAsg && cleanStu) {
+        try {
+          const subs = this.getSubmissions();
+          const matchedSub = subs.find(
+            (s) =>
+              s.assignmentId === cleanAsg &&
+              (s.studentCode === cleanStu || (s as any).studentId === cleanStu)
+          );
+          if (
+            matchedSub?.fileDataUrl &&
+            (matchedSub.fileDataUrl.startsWith('http://') || matchedSub.fileDataUrl.startsWith('https://')) &&
+            !matchedSub.fileDataUrl.includes('storage.kps.ac.th')
+          ) {
+            return matchedSub.fileDataUrl;
+          }
+          if (matchedSub?.r2ObjectKey && r2StorageService.isConfigured()) {
+            const resolved = r2StorageService.resolvePublicViewUrl(matchedSub.r2ObjectKey);
+            if (resolved && (resolved.startsWith('http://') || resolved.startsWith('https://')) && !resolved.includes('storage.kps.ac.th')) {
+              return resolved;
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      // 4. สแกนคีย์ทั้งหมดใน localStorage ที่ขึ้นต้นด้วย kp_sub_file_ (ตรวจจับแบบ Strict ป้องกันงานปนกันข้ามคน)
       try {
         const matchingKeys: { key: string; score: number; value: string }[] = [];
         for (let i = 0; i < localStorage.length; i++) {
@@ -3106,7 +3107,14 @@ export const sgsRosterAndSubmissionService = {
     // อัปโหลดไฟล์ขึ้น R2 (หรือเก็บเฉพาะ Metadata URL หากออฟไลน์ เพื่อไม่ให้ localStorage เต็ม 5MB)
     let resolvedFileUrl = payload.fileUrl || payload.fileDataUrl || '';
     let resolvedR2Key = existingIdx !== -1 ? submissions[existingIdx].r2ObjectKey : undefined;
-    const fileToUpload = payload.file || payload.fileBlob;
+    let fileToUpload = payload.file || payload.fileBlob;
+    if (!fileToUpload && payload.fileDataUrl && payload.fileDataUrl.startsWith('data:')) {
+      try {
+        fileToUpload = r2StorageService.dataUrlToBlob(payload.fileDataUrl).blob;
+      } catch {
+        // ignore
+      }
+    }
     const term = payload.academicYearTerm || '1/2569';
     const cleanFileName = payload.fileName
       ? payload.fileName.replace(/\.(jpg|jpeg|png|heic)$/i, '.webp')
@@ -3163,11 +3171,20 @@ export const sgsRosterAndSubmissionService = {
         );
         if (uploadRes.success && uploadRes.url) {
           resolvedFileUrl = uploadRes.url;
+        } else {
+          console.error('[R2Upload] Cloudflare R2 returned error:', uploadRes.error);
+          throw new Error(uploadRes.error || 'การอัปโหลดไฟล์ไปยัง Cloudflare R2 ล้มเหลว กรุณาลองใหม่อีกครั้ง');
         }
-      } catch (uploadErr) {
-        console.warn('[R2Upload] อัปโหลดขึ้น R2 ไม่สำเร็จ ใช้ Object URL ชั่วคราวแทนการเก็บ Base64 ก้อนใหญ่ลง localStorage:', uploadErr);
-        if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
-          resolvedFileUrl = URL.createObjectURL(fileToUpload);
+      } catch (uploadErr: any) {
+        console.error('[R2Upload] อัปโหลดขึ้น R2 ไม่สำเร็จ:', uploadErr);
+        // หากผู้ใช้ Offline จริง ให้บันทึกแคชชั่วคราวในเครื่อง แต่หาก Online ต้องแจ้งข้อผิดพลาดแก่ผู้ใช้
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          console.warn('[R2Upload] ออฟไลน์: บันทึกแคชชั่วคราวในเครื่อง');
+          if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+            resolvedFileUrl = URL.createObjectURL(fileToUpload);
+          }
+        } else {
+          throw new Error(uploadErr.message || 'การอัปโหลดไฟล์ผลงานไปยังเซิร์ฟเวอร์ R2 ขัดข้อง กรุณาลองใหม่อีกครั้ง');
         }
       }
     } else if (fileToUpload && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {

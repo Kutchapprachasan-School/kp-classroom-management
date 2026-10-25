@@ -508,12 +508,12 @@ export const teacherCourseAssignmentService = {
           effectiveFileName
         );
 
-        const r2FromKey = sub.r2ObjectKey ? r2StorageService.resolvePublicViewUrl(sub.r2ObjectKey) : undefined;
+        const r2FromKey = sub.r2ObjectKey ? resolveFileUrl(sub.r2ObjectKey) : undefined;
         const r2FromDataUrl = sub.fileDataUrl ? resolveFileUrl(sub.fileDataUrl) : undefined;
         const validR2Url =
-          (r2FromKey && (r2FromKey.startsWith('http://') || r2FromKey.startsWith('https://')) && !r2FromKey.startsWith('data:'))
+          (r2FromKey && (r2FromKey.startsWith('http://') || r2FromKey.startsWith('https://')) && !r2FromKey.startsWith('data:') && !r2FromKey.includes('storage.kps.ac.th'))
             ? r2FromKey
-            : (r2FromDataUrl && (r2FromDataUrl.startsWith('http://') || r2FromDataUrl.startsWith('https://')) && !r2FromDataUrl.startsWith('data:'))
+            : (r2FromDataUrl && (r2FromDataUrl.startsWith('http://') || r2FromDataUrl.startsWith('https://')) && !r2FromDataUrl.startsWith('data:') && !r2FromDataUrl.includes('storage.kps.ac.th'))
               ? r2FromDataUrl
               : undefined;
 

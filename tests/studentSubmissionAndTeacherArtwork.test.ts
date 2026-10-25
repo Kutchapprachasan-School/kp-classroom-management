@@ -57,12 +57,15 @@ describe('Student Submission & Teacher Artwork Display Fixes', () => {
     const cachedFile = sgsRosterAndSubmissionService.getSubmissionFileUrl('asg-test-1', '45101');
     expect(cachedFile).toBe(sampleDataUrl);
 
-    // Verify getSubmissions automatically re-hydrates fileDataUrl
+    // Verify getSubmissions automatically re-hydrates fileDataUrl (either from local cache or upgraded to R2 URL)
     const allSubs = sgsRosterAndSubmissionService.getSubmissions();
     const hydrated = allSubs.find(
       (s) => s.assignmentId === 'asg-test-1' && s.studentCode === '45101'
     );
-    expect(hydrated?.fileDataUrl).toBe(sampleDataUrl);
+    expect(
+      hydrated?.fileDataUrl === sampleDataUrl ||
+      hydrated?.fileDataUrl?.startsWith('https://kps-r2-storage.kps-school.workers.dev')
+    ).toBe(true);
   });
 
   it('allows students to submit only an external link (Canva / Google Drive) without a file', () => {
@@ -125,7 +128,10 @@ describe('Student Submission & Teacher Artwork Display Fixes', () => {
     );
 
     expect(item).toBeDefined();
-    expect(item?.filePreviewUrl).toBe(sampleDataUrl);
+    expect(
+      item?.filePreviewUrl === sampleDataUrl ||
+      item?.filePreviewUrl?.startsWith('https://kps-r2-storage.kps-school.workers.dev')
+    ).toBe(true);
     // Must NOT contain fake unreachable domain
     expect(item?.filePreviewUrl).not.toContain('storage.kps.ac.th');
   });

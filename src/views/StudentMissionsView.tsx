@@ -351,18 +351,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
     }
 
     try {
-      try {
-        await gamificationService.submitQuest(selectedQuest.id, trimmedLink, studentId);
-      } catch {
-        // If quest was an SGS term assignment, award XP directly
-        await behaviorService.awardXp(
-          studentId,
-          selectedQuest.xpReward,
-          `ส่งภารกิจ: ${selectedQuest.title}`,
-          `quest-sub-${selectedQuest.id}-${studentId}`
-        );
-      }
-
+      // 1. อัปโหลดไฟล์ขึ้น Cloudflare R2 และบันทึกผลงานลงฐานข้อมูลก่อนเสมอ
       await sgsRosterAndSubmissionService.submitStudentWorkToR2Async({
         assignmentId: selectedQuest.id,
         unitId: selectedQuest.unitId,
@@ -383,10 +372,24 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
         },
       });
 
+      // 2. มอบคะแนน XP Gamification เฉพาะเมื่อการอัปโหลดและบันทึกผลงานสำเร็จสมบูรณ์แล้วเท่านั้น
+      try {
+        await gamificationService.submitQuest(selectedQuest.id, trimmedLink, studentId);
+      } catch {
+        // If quest was an SGS term assignment, award XP directly
+        await behaviorService.awardXp(
+          studentId,
+          selectedQuest.xpReward,
+          `ส่งภารกิจ: ${selectedQuest.title}`,
+          `quest-sub-${selectedQuest.id}-${studentId}`
+        );
+      }
+
+      // 3. แสดงข้อความแจ้งเตือนสำเร็จเมื่ออัปโหลดและบันทึกครบถ้วนแล้ว
       if (hasFile && hasLink) {
-        setToastMsg(`🎉 อัปโหลดไฟล์และแนบลิงก์ผลงานสำเร็จ! (+${selectedQuest.xpReward} XP)`);
+        setToastMsg(`🎉 อัปโหลดไฟล์ขึ้น Cloudflare R2 และแนบลิงก์ผลงานสำเร็จ! (+${selectedQuest.xpReward} XP)`);
       } else if (hasFile) {
-        setToastMsg(`☁️ อัปโหลดไฟล์ผลงานเข้าสู่ระบบสำเร็จ! (+${selectedQuest.xpReward} XP)`);
+        setToastMsg(`☁️ อัปโหลดไฟล์ผลงานเข้าสู่ Cloudflare R2 สำเร็จเรียบร้อย! (+${selectedQuest.xpReward} XP)`);
       } else if (hasLink) {
         setToastMsg(`🔗 แนบลิงก์ผลงานสำเร็จ! (+${selectedQuest.xpReward} XP)`);
       } else {
@@ -414,6 +417,10 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
       }
       setUploadProgressInfo({ percent: 0, loadedBytes: 0, totalBytes: 0 });
       setIsEditingSubmission(false);
+    } catch (err: any) {
+      console.error('[StudentSubmission] Upload/Submission error:', err);
+      setToastMsg(`❌ การส่งงานขัดข้อง: ${err.message || 'ไม่สามารถอัปโหลดไฟล์ไปยังเซิร์ฟเวอร์ R2 ได้ กรุณาลองใหม่อีกครั้ง'}`);
+      setTimeout(() => setToastMsg(null), 5000);
     } finally {
       setIsSubmitting(false);
       setIsUploadingR2(false);
