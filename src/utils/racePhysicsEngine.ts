@@ -1,8 +1,123 @@
 // src/utils/racePhysicsEngine.ts
-// ฟิสิกส์การวิ่งแบบ Harmonic Perturbation สำหรับสนามแข่ง RunningTrackArena
-// สร้างความตื่นเต้นด้วยการแซงสลับตำแหน่งผู้นำ แต่การันตีผู้ชนะแตะเส้นชัยอันดับ 1 เสมอ 100% โดยไม่เกิดการเสมอกัน (Tie)
+// ระบบฟิสิกส์พิกัดโลกเสมือน 2,400px และกล้องติดตาม 3 ระยะ (Running Race 2.0 Engine)
+// รองรับ Virtual 100m Track, Distance Markers, Dynamic Camera Lerp และแก้ปัญหาเสมอกัน (No Tie Bug)
 
 import type { LiveStudent } from '../services/liveClassroomService';
+
+export const WORLD_TRACK_LENGTH = 2400; // ความยาวโลกเสมือนทั้งหมด (px)
+export const START_WORLD_X = 150;       // จุดปล่อยตัว (Starting Blocks)
+export const FINISH_WORLD_X = 2250;     // เส้นชัย 100m (ระยะวิ่งสุทธิ 2,100 px)
+export const MIN_LANE_HEIGHT_PX = 54;   // ความสูงขั้นต่ำต่อลู่บนมือถือ (>= 50px)
+export const PROJECTOR_LANE_HEIGHT_PX = 66;
+export const STADIUM_HEADER_HEIGHT_PX = 38;
+
+export interface DistanceMarker {
+  meters: number;
+  label: string;
+  worldX: number;
+}
+
+/**
+ * สร้างพิกัดเสาบอกระยะทางทุกๆ 10 เมตร (0m, 10m, 20m ... 100m FINISH)
+ */
+export function getTrackDistanceMarkers(): DistanceMarker[] {
+  const markers: DistanceMarker[] = [];
+  const sprintDistance = FINISH_WORLD_X - START_WORLD_X; // 2,100 px
+
+  for (let m = 0; m <= 100; m += 10) {
+    const ratio = m / 100;
+    markers.push({
+      meters: m,
+      label: m === 0 ? 'START' : m === 100 ? '100m FINISH' : `${m}m`,
+      worldX: Math.round(START_WORLD_X + ratio * sprintDistance),
+    });
+  }
+  return markers;
+}
+
+/**
+ * คำนวณสัดส่วนการวิ่ง (0.0 ถึง 1.045) พร้อมคลื่นเร่งแซง (Harmonic Micro-Bursts)
+ * รับประกันว่าที่ t = 0 ทุกคนอยู่ที่จุดสตาร์ต (0) และแตะเส้นชัย (1.0) ตามเวลาเป้าหมายอย่างแม่นยำ
+ */
+export function computeRunnerProgress(
+  elapsedMs: number,
+  targetFinishMs: number,
+  burstAmp1: number,
+  burstAmp2: number,
+  phaseOffset: number
+): number {
+  if (elapsedMs <= 0) return 0;
+  const u = Math.min(1, Math.max(0, elapsedMs / targetFinishMs));
+
+  if (u >= 1) {
+    // วิ่งทะลุเส้นชัยไปชะลอตัวในโซน Run-off ด้านหลังเส้นชัยเล็กน้อย
+    const extraTimeRatio = Math.min(1, (elapsedMs - targetFinishMs) / 600);
+    return 1 + extraTimeRatio * 0.045;
+  }
+
+  const wave1 = burstAmp1 * Math.sin(2 * Math.PI * u + phaseOffset) * (1 - u);
+  const wave2 = burstAmp2 * Math.sin(4 * Math.PI * u) * u * (1 - u);
+  return Math.max(0, Math.min(0.998, u + wave1 + wave2));
+}
+
+/**
+ * แปลงสัดส่วนการวิ่ง (Progress) เป็นพิกัด X ในโลกเสมือน (Virtual World X)
+ */
+export function computeRunnerWorldX(
+  progress: number,
+  startX: number = START_WORLD_X,
+  finishX: number = FINISH_WORLD_X
+): number {
+  return startX + progress * (finishX - startX);
+}
+
+/**
+ * คำนวณระยะทางเมตรปัจจุบัน (0m - 100m) สำหรับแสดงบน HUD
+ */
+export function computeCurrentMeters(worldX: number): number {
+  const ratio = (worldX - START_WORLD_X) / (FINISH_WORLD_X - START_WORLD_X);
+  return Math.max(0, Math.min(100, Math.round(ratio * 100)));
+}
+
+/**
+ * ระบบกล้องติดตามอัจฉริยะ 3 ระยะ (3-Phase Smooth Camera Lerp)
+ * - ระยะที่ 1 (Start 0-12%): กล้องเกาะจุดสตาร์ตเพื่อดูจังหวะออกตัวจากบล็อก
+ * - ระยะที่ 2 (Mid-Sprint 12-88%): กล้องจัดให้ผู้นำอยู่บริเวณ 45% ของความกว้างหน้าจอ
+ * - ระยะที่ 3 (Final Dash 88-100%): กล้องล็อกขอบขวาของสนามเพื่อให้เห็นเส้นชัยและริบบิ้นชัดเจน
+ */
+export function computeNextCameraX(
+  currentCameraX: number,
+  leaderWorldX: number,
+  viewportWidth: number,
+  worldLength: number = WORLD_TRACK_LENGTH,
+  lerpFactor: number = 0.14
+): number {
+  const maxCameraX = Math.max(0, worldLength - viewportWidth);
+
+  // ช่วงออกตัว (ยังไม่พ้น 75px แรกในโลกเสมือน) ให้ตรึงกล้องใกล้จุดสตาร์ตชั่วคราว
+  if (leaderWorldX <= START_WORLD_X + 75) {
+    const nextCam = currentCameraX + (0 - currentCameraX) * lerpFactor;
+    return Math.abs(nextCam) < 0.5 ? 0 : nextCam;
+  }
+
+  // จัดตำแหน่งให้กลุ่มผู้นำอยู่ราวๆ 45% ของหน้าจอ เพื่อให้เห็นทั้งคนที่ไล่กวดด้านหลังและลู่ข้างหน้า
+  const rawTargetX = leaderWorldX - viewportWidth * 0.45;
+  const clampedTargetX = Math.max(0, Math.min(maxCameraX, rawTargetX));
+
+  const nextCam = currentCameraX + (clampedTargetX - currentCameraX) * lerpFactor;
+  return Math.abs(clampedTargetX - nextCam) < 0.5 ? clampedTargetX : nextCam;
+}
+
+/**
+ * แปลงพิกัดโลกเสมือน (World X) เป็นพิกัดวาดบนหน้าจอ (Screen X)
+ */
+export function worldToScreenX(worldX: number, cameraX: number): number {
+  return worldX - cameraX;
+}
+
+// ==========================================
+// BACKWARD COMPATIBILITY HELPERS
+// ==========================================
 
 export interface LanePalette {
   base: string;
@@ -25,32 +140,6 @@ export const RACE_LANE_PALETTES: LanePalette[] = [
   { base: '#818CF8', soft: '#EEF2FF', border: '#C7D2FE', text: '#4338CA', label: 'ลู่ 10 ครามสดใส' },
 ];
 
-export interface RaceContestant {
-  id: string;
-  name: string;
-  number?: number;
-  studentCode?: string;
-  avatarUrl?: string;
-  laneIndex: number;
-  palette: LanePalette;
-  studentRef: LiveStudent;
-  targetFinishMs: number;
-  perturbation: {
-    A1: number;
-    A2: number;
-    phi: number;
-  };
-  currentProgress: number; // 0.0 ถึง 1.0
-  prevProgress: number;
-  finishRank?: number; // 1 = Champion, 2 = 2nd, etc.
-  hasCrossedFinish: boolean;
-  isWinner: boolean;
-}
-
-/**
- * คำนวณระยะก้าวหน้า progress จากเวลา u \in [0, 1] ด้วย Harmonic Wave
- * ที่จุด u = 0 และ u = 1 พจน์คลื่นไซน์ทั้งหมดจะกลายเป็น 0 ทำให้เริ่มต้นที่จุดสตาร์ตและเข้าเส้นชัยตรงเป๊ะ
- */
 export function calculateHarmonicProgress(
   u: number,
   prevProgress: number,
@@ -62,31 +151,23 @@ export function calculateHarmonicProgress(
   if (clampedU <= 0) return 0;
   if (clampedU >= 1) return 1;
 
-  // คลื่นสร้างความลุ้นระทึก: A1 * sin(pi * u) * sin(2*pi*u + phi) + A2 * sin(2*pi*u) * (1 - u)
-  // ที่ u=0: sin(0) = 0 -> offset = 0
-  // ที่ u=1: sin(pi) = 0 และ (1 - 1) = 0 -> offset = 0
   const offset =
     A1 * Math.sin(Math.PI * clampedU) * Math.sin(2 * Math.PI * clampedU + phi) +
     A2 * Math.sin(2 * Math.PI * clampedU) * (1 - clampedU);
 
   const raw = clampedU + offset;
-  // ไม่ให้นักวิ่งถอยหลัง (Monotonic Forward Motion)
   return Math.min(1, Math.max(prevProgress, raw));
 }
 
-/**
- * สุ่มตัวแทนเข้าแข่งขันสำหรับฮีตนี้ (ตามจำนวนเลนที่เลือก) และกำหนดผู้ชนะล่วงหน้าอย่างยุติธรรม
- */
 export function prepareRaceContestants(
   pool: LiveStudent[],
   laneCount: number,
   baseDurationMs: number = 6000
-): { contestants: RaceContestant[]; winner: LiveStudent } {
+) {
   if (pool.length === 0) {
     throw new Error('Cannot prepare race contestants from an empty student pool');
   }
 
-  // 1. สุ่มเลือกนักเรียนตามจำนวนเลน โดยไม่ซ้ำคน (Fisher-Yates Shuffle)
   const shuffledPool = [...pool];
   for (let i = shuffledPool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -95,109 +176,31 @@ export function prepareRaceContestants(
 
   const selectedCount = Math.min(laneCount, shuffledPool.length);
   const contestantsSelection = shuffledPool.slice(0, selectedCount);
-
-  // 2. สุ่มเลือกผู้ชนะในฮีตนี้ 1 คนอย่างยุติธรรม
   const winnerIndex = Math.floor(Math.random() * contestantsSelection.length);
   const winnerStudent = contestantsSelection[winnerIndex];
-
-  // 3. กำหนดลำดับเข้าเส้นชัยที่แน่นอน (Finishing Order) โดยไม่มีทางเสมอ
-  // ผู้ชนะ = อันดับ 1 (baseDurationMs)
-  // คนอื่นๆ จัดอันดับ 2, 3, ... N และบวกเวลาห่างกันอย่างน้อย 160-240ms
-  const otherIndices = contestantsSelection
-    .map((_, idx) => idx)
-    .filter((idx) => idx !== winnerIndex);
-
-  // สลับลำดับคนอื่นๆ
-  for (let i = otherIndices.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [otherIndices[i], otherIndices[j]] = [otherIndices[j], otherIndices[i]];
-  }
 
   const finishTimes: number[] = new Array(contestantsSelection.length);
   finishTimes[winnerIndex] = baseDurationMs;
 
   let currentStaggerMs = baseDurationMs + 240;
-  otherIndices.forEach((cIdx) => {
-    // บวกเวลาห่างแบบมี jitter เล็กน้อย แต่รับประกันว่ามากกว่าคนก่อนหน้าเสมอ
-    const jitter = Math.floor(Math.random() * 80);
-    finishTimes[cIdx] = currentStaggerMs + jitter;
-    currentStaggerMs += 200 + jitter;
+  contestantsSelection.forEach((_, idx) => {
+    if (idx !== winnerIndex) {
+      finishTimes[idx] = currentStaggerMs;
+      currentStaggerMs += 200;
+    }
   });
 
-  // 4. สร้าง Contestant Objects พร้อม Harmonic Perturbation Parameters
-  const contestants: RaceContestant[] = contestantsSelection.map((st, idx) => {
-    const isWinner = idx === winnerIndex;
-    const palette = RACE_LANE_PALETTES[idx % RACE_LANE_PALETTES.length];
-
-    // ผู้ชนะจะมีแอมพลิจูดเร่งแซงช่วงท้าย
-    const A1 = isWinner ? 0.12 + Math.random() * 0.05 : 0.08 + Math.random() * 0.08;
-    const A2 = isWinner ? 0.08 + Math.random() * 0.04 : 0.06 + Math.random() * 0.06;
-    const phi = Math.random() * Math.PI * 2;
-
-    return {
-      id: st.id,
-      name: st.name,
-      number: st.number,
-      studentCode: st.studentCode,
-      avatarUrl: st.avatarUrl,
-      laneIndex: idx,
-      palette,
-      studentRef: st,
-      targetFinishMs: finishTimes[idx],
-      perturbation: { A1, A2, phi },
-      currentProgress: 0,
-      prevProgress: 0,
-      hasCrossedFinish: false,
-      isWinner,
-    };
-  });
+  const contestants = contestantsSelection.map((st, idx) => ({
+    id: st.id,
+    name: st.name,
+    number: st.number,
+    studentCode: st.studentCode,
+    laneIndex: idx,
+    palette: RACE_LANE_PALETTES[idx % RACE_LANE_PALETTES.length],
+    studentRef: st,
+    targetFinishMs: finishTimes[idx],
+    isWinner: idx === winnerIndex,
+  }));
 
   return { contestants, winner: winnerStudent };
-}
-
-/**
- * คำนวณความคืบหน้าของนักวิ่งทุกคนในแต่ละเฟรม (Frame Tick)
- */
-export function updateContestantsFrame(
-  contestants: RaceContestant[],
-  elapsedMs: number
-): {
-  updatedContestants: RaceContestant[];
-  newFinishers: RaceContestant[];
-  allFinished: boolean;
-} {
-  const newFinishers: RaceContestant[] = [];
-
-  const updatedContestants = contestants.map((c) => {
-    if (c.hasCrossedFinish) {
-      return c;
-    }
-
-    const u = Math.min(1, elapsedMs / c.targetFinishMs);
-    const progress = calculateHarmonicProgress(
-      u,
-      c.prevProgress,
-      c.perturbation.A1,
-      c.perturbation.A2,
-      c.perturbation.phi
-    );
-
-    const hasCrossed = progress >= 1.0;
-    const updated: RaceContestant = {
-      ...c,
-      prevProgress: progress,
-      currentProgress: progress,
-      hasCrossedFinish: hasCrossed,
-    };
-
-    if (hasCrossed && !c.hasCrossedFinish) {
-      newFinishers.push(updated);
-    }
-
-    return updated;
-  });
-
-  const allFinished = updatedContestants.every((c) => c.hasCrossedFinish);
-
-  return { updatedContestants, newFinishers, allFinished };
 }

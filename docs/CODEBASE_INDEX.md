@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 25/10/2569 10:22:29 | รวมทั้งหมด 225 ไฟล์*
+*อัปเดตล่าสุด: 25/10/2569 10:58:25 | รวมทั้งหมด 225 ไฟล์*
 
 ---
 
@@ -137,7 +137,7 @@
 | [src/components/live-classroom/RandomPickerSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RandomPickerSubTab.tsx) | 730 | `PickerMode` (L18), `SpinSpeed` (L19), `RandomPickerSubTabProps` (L21), `getAvailablePool` (L40), `restoreSkippedStudent` (L50), `RandomPickerSubTab` (L54) |
 | [src/components/live-classroom/RandomTextSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RandomTextSubTab.tsx) | 804 | `SpinSpeed` (L29), `RandomTextSubTabProps` (L31), `RandomTextSubTab` (L48) |
 | [src/components/live-classroom/RewardBoardSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RewardBoardSubTab.tsx) | 285 | `RewardBoardSubTabProps` (L16), `calculateTopEarners` (L26), `formatRewardTimeThai` (L38), `RewardBoardSubTab` (L52) |
-| [src/components/live-classroom/RunningTrackArena.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RunningTrackArena.tsx) | 863 | `RunningTrackArenaProps` (L19), `RaceSpeed` (L31), `RunningTrackArena` (L45) |
+| [src/components/live-classroom/RunningTrackArena.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RunningTrackArena.tsx) | 1320 | `RaceCandidate` (L40), `RunningTrackArenaProps` (L77), `RunningTrackArena` (L240) |
 | [src/components/mobile/index.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/mobile/index.ts) | 12 | *(Internal / Default Export)* |
 | [src/components/mobile/TeacherMobileBottomNav.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/mobile/TeacherMobileBottomNav.tsx) | 250 | `TeacherMobileBottomNav` (L17) |
 | [src/components/mobile/TeacherMobileCalendarScreen.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/mobile/TeacherMobileCalendarScreen.tsx) | 212 | `TeacherMobileCalendarScreen` (L17) |
@@ -260,7 +260,7 @@
 | [src/utils/indexedDbAdapter.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/indexedDbAdapter.ts) | 392 | `OutboxSyncStatus` (L9), `OutboxItem` (L11), `RetryPolicyConfig` (L23), `DEFAULT_RETRY_CONFIG` (L31), `computeNextBackoffMs` (L42), `canonicalJsonStringify` (L58), `indexedDbAdapter` (L391) |
 | [src/utils/liveClassroomAlgorithms.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/liveClassroomAlgorithms.ts) | 205 | `StudentGroup` (L7), `WeightedWheelSegment` (L14), `generateBalancedGroups` (L42), `buildWeightedWheelSegments` (L143), `pickWeightedWheelWinner` (L186) |
 | [src/utils/promotionDryRunEngine.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/promotionDryRunEngine.ts) | 376 | `PromotionActionType` (L11), `GraduationApprovalStatus` (L19), `ClassroomMappingRule` (L25), `StudentDryRunInput` (L33), `StudentPromotionDecision` (L50), `PromotionDryRunConfig` (L62), `PromotionDryRunReport` (L69), `parseGradeLevelFromRoom` (L90), `generateDefaultClassroomMappings` (L107), `evaluateStudentPromotion` (L148) *(+2 รายการ)* |
-| [src/utils/racePhysicsEngine.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/racePhysicsEngine.ts) | 204 | `LanePalette` (L7), `RACE_LANE_PALETTES` (L15), `RaceContestant` (L28), `calculateHarmonicProgress` (L54), `prepareRaceContestants` (L80), `updateContestantsFrame` (L161) |
+| [src/utils/racePhysicsEngine.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/racePhysicsEngine.ts) | 207 | `WORLD_TRACK_LENGTH` (L7), `START_WORLD_X` (L8), `FINISH_WORLD_X` (L9), `MIN_LANE_HEIGHT_PX` (L10), `PROJECTOR_LANE_HEIGHT_PX` (L11), `STADIUM_HEADER_HEIGHT_PX` (L12), `DistanceMarker` (L14), `getTrackDistanceMarkers` (L23), `computeRunnerProgress` (L42), `computeRunnerWorldX` (L66) *(+7 รายการ)* |
 | [src/utils/speechTTS.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/speechTTS.ts) | 130 | `JapanesePraise` (L5), `tts` (L129) |
 | [src/utils/studentIdentityUtils.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/studentIdentityUtils.ts) | 24 | `StudentIdentityCandidate` (L16) |
 | [src/utils/timetableDateUtils.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/timetableDateUtils.ts) | 797 | `TimetableColorTheme` (L6), `TimetableMatrixSlot` (L15), `TaskWidgetItem` (L38), `CalendarEventItem` (L47), `THAI_MONTHS_SHORT` (L54), `WeekDayInfo` (L69), `ComputedWeekInfo` (L75), `BANGKOK_TIMEZONE` (L87), `getBangkokNow` (L89), `getBangkokTodayString` (L95) *(+8 รายการ)* |

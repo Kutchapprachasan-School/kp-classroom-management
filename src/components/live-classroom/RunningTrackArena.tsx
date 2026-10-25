@@ -1,591 +1,984 @@
 // src/components/live-classroom/RunningTrackArena.tsx
-// สนามวิ่งแข่งสุ่มชื่อนักเรียน (Running Track Arena) 60 FPS HTML5 Canvas + Web Speech TTS + Victory Podium
-// ได้รับแรงบันดาลใจจาก Online-Stopwatch World Games Running ปรับปรุงสู่สไตล์ Pastel Anime Education Dashboard
-// ปฏิบัติตาม Strict Zero-Mock Policy ดึงนักเรียนจริง 100%
+// สนามวิ่งแข่งสุ่มชื่อนักเรียน 2.0 (Running Track Arena 2.0: Dynamic Camera & No-Overlap Layout)
+// แยก Left Roster Column (HTML) กับ 2,400px Side-Scrolling Track Canvas (60 FPS) อย่างสมบูรณ์แบบ
+// ปลอดป้ายชื่อทับซ้อน 100%, ฉากเลื่อนตามกล้อง 3 ระยะ, และรองรับทั้งจอมือถือและโปรเจกเตอร์
 
-import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import Refresh1Regular from '@mingcute/react/core-regular/refresh-1';
-import Coin2Regular from '@mingcute/react/core-regular/coin-2';
-import TicketRegular from '@mingcute/react/core-regular/ticket';
-import { Trophy, Play, RotateCcw } from 'lucide-react';
-import type { LiveStudent } from '../../services/liveClassroomService';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  prepareRaceContestants,
-  updateContestantsFrame,
-  type RaceContestant,
+  Flag,
+  Play,
+  RotateCcw,
+  Trophy,
+  Coins,
+  Ticket,
+  Sparkles,
+  Users,
+  Timer,
+  SkipForward,
+  Gauge,
+} from 'lucide-react';
+import {
+  WORLD_TRACK_LENGTH,
+  START_WORLD_X,
+  FINISH_WORLD_X,
+  MIN_LANE_HEIGHT_PX,
+  PROJECTOR_LANE_HEIGHT_PX,
+  STADIUM_HEADER_HEIGHT_PX,
+  getTrackDistanceMarkers,
+  computeRunnerProgress,
+  computeRunnerWorldX,
+  computeCurrentMeters,
+  computeNextCameraX,
+  worldToScreenX,
 } from '../../utils/racePhysicsEngine';
+import type { LiveStudent } from '../../services/liveClassroomService';
 import { tts, type JapanesePraise } from '../../utils/speechTTS';
 
-export interface RunningTrackArenaProps {
-  students: LiveStudent[];
-  onWinnerConfirmed: (winner: LiveStudent) => void;
-  onAwardCoin: (studentId: string, amount: number) => void;
-  onAwardTicket: (studentId: string, amount: number) => void;
-  isProjectorMode: boolean;
-  onPlaySound?: (type: 'tick' | 'coin' | 'fanfare' | 'buzzer' | 'whistle', freq?: number) => void;
-  ttsEnabled?: boolean;
-  selectedPraise?: JapanesePraise;
-  onRaceStateChange?: (isRunning: boolean) => void;
+// ==========================================
+// 1. TYPES & STRICT ZERO-MOCK INTERFACES
+// ==========================================
+export interface RaceCandidate {
+  id: string;
+  number?: number;
+  label: string;
+  subLabel?: string;
+  coins?: number;
+  rawStudent?: LiveStudent;
 }
 
-export type RaceSpeed = 'fast' | 'normal' | 'dramatic';
+interface RunnerInstance {
+  candidate: RaceCandidate;
+  laneIndex: number;
+  laneColor: string;
+  accentColor: string;
+  borderColor: string;
+  rankTarget: number;
+  targetFinishMs: number;
+  phaseOffset: number;
+  burstAmp1: number;
+  burstAmp2: number;
+  progress: number;
+  worldX: number;
+  finished: boolean;
+  finishTimestampMs: number | null;
+  currentRank: number;
+}
 
 interface ConfettiParticle {
-  x: number;
+  worldX: number;
   y: number;
   vx: number;
   vy: number;
   color: string;
   size: number;
-  rotation: number;
-  rotationSpeed: number;
-  opacity: number;
+  alpha: number;
 }
 
+export interface RunningTrackArenaProps {
+  students?: LiveStudent[];
+  candidates?: RaceCandidate[];
+  isProjectorMode?: boolean;
+  soundEnabled?: boolean;
+  ttsEnabled?: boolean;
+  selectedPraise?: JapanesePraise;
+  onWinnerConfirmed?: (winner: LiveStudent, podium?: LiveStudent[]) => void;
+  onAwardCoin?: (studentId: string, amount: number) => void;
+  onAwardTicket?: (studentId: string, amount: number) => void;
+  onGiveReward?: (
+    targetIds: string[],
+    rewardType: 'coin' | 'ticket',
+    amount: number,
+    description: string
+  ) => void;
+  onSkipWinner?: (winnerId: string) => void;
+  onPlaySound?: (type: 'tick' | 'coin' | 'fanfare' | 'buzzer' | 'whistle', freq?: number) => void;
+  onRaceStateChange?: (isRunning: boolean) => void;
+}
+
+const PASTEL_LANES = [
+  { bg: '#FDF2F8', track: '#FCE7F3', border: '#F472B6', accent: '#DB2777', name: 'Sakura' },
+  { bg: '#F0F9FF', track: '#E0F2FE', border: '#38BDF8', accent: '#0284C7', name: 'Sora' },
+  { bg: '#ECFDF5', track: '#D1FAE5', border: '#34D399', accent: '#059669', name: 'Matcha' },
+  { bg: '#F5F3FF', track: '#EDE9FE', border: '#A78BFA', accent: '#7C3AED', name: 'Fuji' },
+  { bg: '#FFFBEB', track: '#FEF3C7', border: '#FBBF24', accent: '#D97706', name: 'Yuzu' },
+  { bg: '#FFF1F2', track: '#FFE4E6', border: '#FB7185', accent: '#E11D48', name: 'Momo' },
+  { bg: '#ECFEFF', track: '#CFFAFE', border: '#22D3EE', accent: '#0891B2', name: 'Ramune' },
+  { bg: '#F7FEE7', track: '#ECFCCB', border: '#A3E635', accent: '#65A30D', name: 'Melon' },
+  { bg: '#FAF5FF', track: '#F3E8FF', border: '#C084FC', accent: '#9333EA', name: 'Sumire' },
+  { bg: '#FFF7ED', track: '#FFEDD5', border: '#FB923C', accent: '#EA580C', name: 'Mikan' },
+];
+
+const DISTANCE_MARKERS = getTrackDistanceMarkers();
+
+// ==========================================
+// 2. CRYPTOGRAPHIC FAIR SHUFFLE
+// ==========================================
+function cryptoShuffle<T>(items: T[]): T[] {
+  const arr = [...items];
+  if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+    const randomBuffer = new Uint32Array(arr.length);
+    window.crypto.getRandomValues(randomBuffer);
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = randomBuffer[i] % (i + 1);
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  } else {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+  return arr;
+}
+
+// ==========================================
+// 3. WEB AUDIO API RACE SYNTHESIZER (0 BYTE)
+// ==========================================
+class RaceAudioSynthesizer {
+  private ctx: AudioContext | null = null;
+
+  private getContext(): AudioContext | null {
+    if (typeof window === 'undefined') return null;
+    if (!this.ctx) {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (AudioCtx) {
+        this.ctx = new AudioCtx();
+      }
+    }
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
+    }
+    return this.ctx;
+  }
+
+  playStartWhistle() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    const mainGain = ctx.createGain();
+
+    lfo.frequency.setValueAtTime(42, now);
+    lfoGain.gain.setValueAtTime(140, now);
+    lfo.connect(osc.frequency);
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(2750, now);
+
+    mainGain.gain.setValueAtTime(0.01, now);
+    mainGain.gain.linearRampToValueAtTime(0.22, now + 0.04);
+    mainGain.gain.setValueAtTime(0.22, now + 0.35);
+    mainGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+    osc.connect(mainGain);
+    mainGain.connect(ctx.destination);
+
+    lfo.start(now);
+    osc.start(now);
+    lfo.stop(now + 0.5);
+    osc.stop(now + 0.5);
+  }
+
+  playFootstep(pitchOffset = 0) {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(130 + pitchOffset, now);
+    osc.frequency.exponentialRampToValueAtTime(55, now + 0.045);
+
+    gain.gain.setValueAtTime(0.075, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.05);
+  }
+
+  playVictoryFanfare() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const notes = [523.25, 659.25, 783.99, 1046.5, 1318.51];
+    notes.forEach((freq, idx) => {
+      if (!ctx) return;
+      const start = ctx.currentTime + idx * 0.085;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.2, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.38);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.38);
+    });
+  }
+
+  cleanup() {
+    if (this.ctx && this.ctx.state !== 'closed') {
+      this.ctx.close().catch(() => {});
+      this.ctx = null;
+    }
+  }
+}
+
+const raceAudio = new RaceAudioSynthesizer();
+
+// ==========================================
+// 4. MAIN COMPONENT: RunningTrackArena 2.0
+// ==========================================
 export const RunningTrackArena: React.FC<RunningTrackArenaProps> = ({
   students,
+  candidates,
+  isProjectorMode = false,
+  soundEnabled = true,
+  ttsEnabled = true,
+  selectedPraise = 'sugoi',
   onWinnerConfirmed,
   onAwardCoin,
   onAwardTicket,
-  isProjectorMode,
+  onGiveReward,
+  onSkipWinner,
   onPlaySound,
-  ttsEnabled = true,
-  selectedPraise = 'sugoi',
   onRaceStateChange,
 }) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  // แปลง candidates ให้รองรับทั้ง prop candidates และ prop students (Strict Zero-Mock)
+  const rawCandidates: RaceCandidate[] = useMemo(() => {
+    if (candidates && candidates.length > 0) return candidates;
+    if (students && students.length > 0) {
+      return students.map((st) => ({
+        id: st.id,
+        number: st.number,
+        label: st.name,
+        subLabel: st.studentCode,
+        coins: st.sessionCoins,
+        rawStudent: st,
+      }));
+    }
+    return [];
+  }, [candidates, students]);
 
-  // การตั้งค่าการแข่งขัน
-  const [laneCount, setLaneCount] = useState<number>(() => Math.min(6, Math.max(4, students.length)));
-  const [raceSpeed, setRaceSpeed] = useState<RaceSpeed>('normal');
-  const [isRacing, setIsRacing] = useState<boolean>(false);
-  const [raceFinished, setRaceFinished] = useState<boolean>(false);
-  const [showPodium, setShowPodium] = useState<boolean>(false);
-
-  // รายชื่อผู้เข้าแข่งขันในฮีตปัจจุบัน
-  const [contestants, setContestants] = useState<RaceContestant[]>([]);
-  const [champion, setChampion] = useState<RaceContestant | null>(null);
-  const [finishers, setFinishers] = useState<RaceContestant[]>([]);
-
-  // รางวัลที่กดมอบใน Podium (ป้องกันการกดซ้ำ)
+  const [maxLanes, setMaxLanes] = useState<number>(() =>
+    Math.min(8, Math.max(4, rawCandidates.length || 6))
+  );
+  const [raceDurationSec, setRaceDurationSec] = useState<number>(6);
+  const [raceStatus, setRaceStatus] = useState<'idle' | 'running' | 'finished'>('idle');
+  const [podium, setPodium] = useState<RunnerInstance[]>([]);
+  const [liveRanksById, setLiveRanksById] = useState<Record<string, number>>({});
+  const [leaderMeters, setLeaderMeters] = useState<number>(0);
+  const [liveLeaderName, setLiveLeaderName] = useState<string>('');
+  const [heatSeed, setHeatSeed] = useState<number>(0);
   const [awardedRewards, setAwardedRewards] = useState<Record<string, { coin: number; ticket: number }>>({});
 
-  // Animation Frame & Timers Ref
-  const animFrameRef = useRef<number | null>(null);
-  const startTimeRef = useRef<number | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const runnersRef = useRef<RunnerInstance[]>([]);
+  const cameraXRef = useRef<number>(0);
   const confettiRef = useRef<ConfettiParticle[]>([]);
+  const rafIdRef = useRef<number | null>(null);
+  const raceStartTimeRef = useRef<number>(0);
+  const lastStepSoundTimeRef = useRef<number>(0);
+  const lastUiSyncTimeRef = useRef<number>(0);
   const ribbonBrokenRef = useRef<boolean>(false);
-  const footstepTimerRef = useRef<number>(0);
-  const ttsTimeoutRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const ttsTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  const raceDurationMs = useMemo(() => {
-    switch (raceSpeed) {
-      case 'fast':
-        return 3800; // 3.8 วินาที
-      case 'normal':
-        return 5800; // 5.8 วินาที
-      case 'dramatic':
-        return 8200; // 8.2 วินาที
-    }
-  }, [raceSpeed]);
+  // ความสูงต่อลู่วิ่งแบบบังคับขั้นต่ำ >= 54px เพื่อไม่ให้ตัวละครอึดอัดบนมือถือ
+  const laneHeightPx = isProjectorMode ? PROJECTOR_LANE_HEIGHT_PX : MIN_LANE_HEIGHT_PX;
 
-  // ล้าง Timeout ของ TTS ทั้งหมดเมื่อ Unmount
+  // คัดกรองผู้เข้าแข่งขันลงลู่ (Fisher-Yates Shuffle)
+  const activeLaneCandidates = useMemo(() => {
+    if (rawCandidates.length === 0) return [];
+    const shuffled = cryptoShuffle(rawCandidates);
+    return shuffled.slice(0, Math.min(maxLanes, shuffled.length));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawCandidates, maxLanes, heatSeed]);
+
+  const totalCanvasHeight =
+    STADIUM_HEADER_HEIGHT_PX + Math.max(1, activeLaneCandidates.length) * laneHeightPx;
+
+  // ล้าง TTS Timeouts ทั้งหมด
   const clearAllTTSTimeouts = useCallback(() => {
-    ttsTimeoutRef.current.forEach(clearTimeout);
-    ttsTimeoutRef.current = [];
+    ttsTimeoutsRef.current.forEach(clearTimeout);
+    ttsTimeoutsRef.current = [];
   }, []);
 
-  useEffect(() => {
-    return () => {
-      clearAllTTSTimeouts();
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-      }
-    };
-  }, [clearAllTTSTimeouts]);
+  // สร้างข้อมูลนักวิ่งเริ่มต้นในพิกัดโลกเสมือน
+  const initializeRunners = useCallback(
+    (laneItems: RaceCandidate[], durationSec: number): RunnerInstance[] => {
+      const ranks = cryptoShuffle(
+        Array.from({ length: laneItems.length }, (_, index) => index + 1)
+      );
+      const baseDurationMs = durationSec * 1000;
 
-  // สุ่มจัดฮีตใหม่เมื่อจำนวนนักเรียนเปลี่ยน หรือครูกดสุ่มฮีตใหม่
-  const handleSetupNewHeat = useCallback(() => {
-    if (isRacing || students.length === 0) return;
+      return laneItems.map((candidate, idx) => {
+        const assignedRank = ranks[idx];
+        const palette = PASTEL_LANES[idx % PASTEL_LANES.length];
+        const rankDelayMs = (assignedRank - 1) * 165 + (idx % 3) * 16;
 
-    clearAllTTSTimeouts();
-    if (animFrameRef.current) {
-      cancelAnimationFrame(animFrameRef.current);
-      animFrameRef.current = null;
-    }
+        const direction = idx % 2 === 0 ? 1 : -1;
+        const burstAmp1 = direction * (0.068 + (idx % 3) * 0.024);
+        const burstAmp2 = -direction * (0.058 + ((idx + 1) % 3) * 0.019);
 
-    const effectiveLanes = Math.min(laneCount, students.length);
-    const { contestants: newContestants } = prepareRaceContestants(
-      students,
-      effectiveLanes,
-      raceDurationMs
-    );
+        return {
+          candidate,
+          laneIndex: idx,
+          laneColor: palette.track,
+          accentColor: palette.accent,
+          borderColor: palette.border,
+          rankTarget: assignedRank,
+          targetFinishMs: baseDurationMs + rankDelayMs,
+          phaseOffset: idx * 0.85,
+          burstAmp1,
+          burstAmp2,
+          progress: 0,
+          worldX: START_WORLD_X,
+          finished: false,
+          finishTimestampMs: null,
+          currentRank: idx + 1,
+        };
+      });
+    },
+    []
+  );
 
-    setContestants(newContestants);
-    setChampion(null);
-    setFinishers([]);
-    setIsRacing(false);
-    setRaceFinished(false);
-    setShowPodium(false);
-    setAwardedRewards({});
-    ribbonBrokenRef.current = false;
-    confettiRef.current = [];
-    startTimeRef.current = null;
-    onRaceStateChange?.(false);
-  }, [isRacing, students, laneCount, raceDurationMs, clearAllTTSTimeouts, onRaceStateChange]);
-
-  // สุ่มฮีตครั้งแรกเมื่อโหลดคอมโพเนนต์
-  useEffect(() => {
-    if (contestants.length === 0 && students.length > 0) {
-      handleSetupNewHeat();
-    }
-  }, [contestants.length, students.length, handleSetupNewHeat]);
-
-  // ฟังก์ชันสร้างอนุภาค Confetti ฉลองชัย
-  const spawnConfetti = (centerX: number, centerY: number) => {
+  // สร้างพลุ Confetti แตกกระจายที่เส้นชัยเมื่ออันดับ 1 วิ่งชนริบบิ้น
+  const spawnFinishConfetti = useCallback((canvasHeight: number) => {
     const particles: ConfettiParticle[] = [];
-    const colors = ['#38BDF8', '#FB7185', '#34D399', '#FBBF24', '#A78BFA', '#F472B6', '#F59E0B'];
-    for (let i = 0; i < 70; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 2 + Math.random() * 7;
+    const colors = ['#F472B6', '#38BDF8', '#34D399', '#FBBF24', '#A78BFA', '#FB7185'];
+    for (let i = 0; i < 55; i++) {
       particles.push({
-        x: centerX,
-        y: centerY,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 3,
-        color: colors[Math.floor(Math.random() * colors.length)],
-        size: 5 + Math.random() * 7,
-        rotation: Math.random() * 360,
-        rotationSpeed: (Math.random() - 0.5) * 10,
-        opacity: 1.0,
+        worldX: FINISH_WORLD_X + (Math.random() - 0.3) * 35,
+        y: STADIUM_HEADER_HEIGHT_PX + Math.random() * (canvasHeight - STADIUM_HEADER_HEIGHT_PX),
+        vx: (Math.random() - 0.2) * 6.5,
+        vy: (Math.random() - 0.85) * 7.5,
+        color: colors[i % colors.length],
+        size: 5 + Math.random() * 5,
+        alpha: 1,
       });
     }
     confettiRef.current = particles;
-  };
+  }, []);
 
-  // เริ่มการแข่งขัน (Start Race)
-  const handleStartRace = useCallback(() => {
-    if (isRacing || contestants.length === 0) return;
+  // ==========================================
+  // 5. SIDE-SCROLLING PARALLAX CANVAS RENDERER
+  // ==========================================
+  const renderTrackFrame = useCallback(
+    (elapsedMs: number) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    clearAllTTSTimeouts();
-    setIsRacing(true);
-    setRaceFinished(false);
-    setShowPodium(false);
-    setFinishers([]);
-    ribbonBrokenRef.current = false;
-    confettiRef.current = [];
-    startTimeRef.current = null;
-    footstepTimerRef.current = 0;
-    onRaceStateChange?.(true);
+      const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+      const rect = canvas.getBoundingClientRect();
+      const viewportW = Math.max(200, rect.width);
+      const viewportH = totalCanvasHeight;
 
-    // เสียงนกหวีดปล่อยตัว
-    onPlaySound?.('whistle');
-  }, [isRacing, contestants.length, clearAllTTSTimeouts, onRaceStateChange, onPlaySound]);
+      if (
+        canvas.width !== Math.floor(viewportW * dpr) ||
+        canvas.height !== Math.floor(viewportH * dpr)
+      ) {
+        canvas.width = Math.floor(viewportW * dpr);
+        canvas.height = Math.floor(viewportH * dpr);
+      }
 
-  // วาดฉากลู่วิ่งและตัวละคร Chibi บน Canvas (60 FPS Engine)
-  const drawArena = useCallback(
-    (
-      ctx: CanvasRenderingContext2D,
-      width: number,
-      height: number,
-      currentContestants: RaceContestant[],
-      runCycle: number
-    ) => {
-      ctx.clearRect(0, 0, width, height);
+      ctx.save();
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, viewportW, viewportH);
 
-      const numLanes = currentContestants.length;
-      if (numLanes === 0) return;
+      const runners = runnersRef.current;
+      const cameraX = cameraXRef.current;
 
-      const trackMarginTop = 32;
-      const trackMarginBottom = 24;
-      const trackHeight = height - trackMarginTop - trackMarginBottom;
-      const laneHeight = trackHeight / numLanes;
+      // --------------------------------------------------
+      // A. วาดแถบขอบสนามด้านบน + ป้ายบอกระยะ 10m..100m ที่เลื่อนตามกล้อง
+      // --------------------------------------------------
+      ctx.fillStyle = '#0F172A';
+      ctx.fillRect(0, 0, viewportW, STADIUM_HEADER_HEIGHT_PX);
 
-      // พิกัดจุดสตาร์ตและเส้นชัย
-      const startX = 85;
-      const finishX = width - 110;
-      const totalTrackDist = finishX - startX;
+      // ลายอัฒจันทร์ Parallax ด้านบน (เลื่อนช้ากว่ากล้อง 0.5 เท่าเพื่อสร้างมิติลึก)
+      const parallaxOffset = (cameraX * 0.5) % 80;
+      ctx.fillStyle = '#1E293B';
+      for (let x = -parallaxOffset; x < viewportW; x += 80) {
+        ctx.fillRect(x, 0, 40, 6);
+      }
 
-      // 1. วาดพื้นหลังสนามหญ้าและลู่วิ่ง
-      for (let i = 0; i < numLanes; i++) {
-        const laneY = trackMarginTop + i * laneHeight;
-        const c = currentContestants[i];
+      // วาดป้ายระยะทางทุกๆ 10m (START, 10m, 20m ... 100m FINISH)
+      ctx.font = 'bold 11px Prompt, sans-serif';
+      ctx.textBaseline = 'middle';
+      DISTANCE_MARKERS.forEach((marker) => {
+        const sx = worldToScreenX(marker.worldX, cameraX);
+        if (sx < -80 || sx > viewportW + 80) return;
 
-        // สีพื้นของลู่วิ่งสลับเฉดพาสเทลนุ่มนวล
-        ctx.fillStyle = i % 2 === 0 ? '#F8FAFC' : '#F1F5F9';
-        if (isProjectorMode) {
-          ctx.fillStyle = i % 2 === 0 ? '#1E293B' : '#0F172A';
-        }
-        ctx.fillRect(0, laneY, width, laneHeight);
+        const isMajor = marker.meters === 0 || marker.meters === 50 || marker.meters === 100;
+        const badgeW = marker.meters === 100 ? 86 : marker.meters === 0 ? 54 : 38;
 
-        // ไฮไลต์ลู่วิ่งของแต่ละคนด้วยสีประจำเลนอ่อนๆ
-        ctx.fillStyle = c.palette.soft;
-        if (isProjectorMode) {
-          ctx.fillStyle = `${c.palette.base}22`;
-        }
-        ctx.fillRect(startX - 20, laneY + 2, totalTrackDist + 40, laneHeight - 4);
+        ctx.fillStyle =
+          marker.meters === 100
+            ? '#E11D48'
+            : marker.meters === 0
+            ? '#4F46E5'
+            : isMajor
+            ? '#0284C7'
+            : '#334155';
 
-        // เส้นแบ่งลู่วิ่ง
-        ctx.strokeStyle = isProjectorMode ? '#334155' : '#E2E8F0';
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([8, 6]);
         ctx.beginPath();
-        ctx.moveTo(0, laneY);
-        ctx.lineTo(width, laneY);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // หมายเลขเลนด้านซ้ายสุด
-        ctx.fillStyle = c.palette.base;
-        ctx.beginPath();
-        ctx.arc(42, laneY + laneHeight / 2, 16, 0, Math.PI * 2);
+        ctx.roundRect(sx - badgeW / 2, 8, badgeW, 22, 6);
         ctx.fill();
 
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 14px Prompt, sans-serif';
         ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(`${i + 1}`, 42, laneY + laneHeight / 2);
-      }
+        ctx.fillText(marker.label, sx, 19);
+      });
 
-      // เส้นขอบล่างสุดของสนาม
-      ctx.strokeStyle = isProjectorMode ? '#334155' : '#CBD5E1';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(0, trackMarginTop + trackHeight);
-      ctx.lineTo(width, trackMarginTop + trackHeight);
-      ctx.stroke();
+      // --------------------------------------------------
+      // B. วาดพื้นลู่วิ่งพาสเทลและเส้น Texture เลื่อนถอยหลัง
+      // --------------------------------------------------
+      runners.forEach((_, idx) => {
+        const palette = PASTEL_LANES[idx % PASTEL_LANES.length];
+        const yTop = STADIUM_HEADER_HEIGHT_PX + idx * laneHeightPx;
 
-      // 2. เส้นสตาร์ต (Start Line)
-      ctx.strokeStyle = '#94A3B8';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(startX, trackMarginTop);
-      ctx.lineTo(startX, trackMarginTop + trackHeight);
-      ctx.stroke();
+        // พื้นลู่พาสเทล
+        ctx.fillStyle = palette.track;
+        ctx.fillRect(0, yTop, viewportW, laneHeightPx);
 
-      // 3. เส้นชัยตารางหมากรุก (Checkered Finish Line)
-      const checkerSize = 8;
-      const numRows = Math.floor(trackHeight / checkerSize);
-      for (let r = 0; r < numRows; r++) {
-        for (let col = 0; col < 2; col++) {
-          const isBlack = (r + col) % 2 === 0;
-          ctx.fillStyle = isBlack ? '#1E293B' : '#FFFFFF';
-          ctx.fillRect(finishX + col * checkerSize, trackMarginTop + r * checkerSize, checkerSize, checkerSize);
+        // แถบสีเข้มสลับทุกๆ 70px ในพิกัดโลก เพื่อให้ตาเห็นความเร็วพื้นลู่วิ่งเลื่อนถอยหลังชัดเจน!
+        const stripeStep = 70;
+        const firstStripeWorldX = Math.floor(cameraX / stripeStep) * stripeStep;
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.028)';
+        for (
+          let wx = firstStripeWorldX;
+          wx < cameraX + viewportW + stripeStep;
+          wx += stripeStep * 2
+        ) {
+          const sx = worldToScreenX(wx, cameraX);
+          ctx.fillRect(sx, yTop, stripeStep, laneHeightPx);
+        }
+
+        // เส้นแบ่งลู่สีขาวคมชัด
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, yTop + laneHeightPx);
+        ctx.lineTo(viewportW, yTop + laneHeightPx);
+        ctx.stroke();
+
+        // บล็อกปล่อยตัว (Starting Blocks) ที่จุดสตาร์ต (X = 150px)
+        const startScreenX = worldToScreenX(START_WORLD_X, cameraX);
+        if (startScreenX > -40 && startScreenX < viewportW + 40) {
+          ctx.fillStyle = '#475569';
+          ctx.beginPath();
+          ctx.roundRect(
+            startScreenX - 24,
+            yTop + laneHeightPx * 0.35,
+            14,
+            laneHeightPx * 0.3,
+            3
+          );
+          ctx.fill();
+        }
+      });
+
+      // --------------------------------------------------
+      // C. วาดเส้นชอล์กบอกระยะทุก 10m พาดผ่านลู่วิ่ง
+      // --------------------------------------------------
+      DISTANCE_MARKERS.forEach((marker) => {
+        const sx = worldToScreenX(marker.worldX, cameraX);
+        if (sx < -20 || sx > viewportW + 20) return;
+
+        if (marker.meters === 0) {
+          ctx.strokeStyle = '#F43F5E';
+          ctx.lineWidth = 3.5;
+          ctx.beginPath();
+          ctx.moveTo(sx, STADIUM_HEADER_HEIGHT_PX);
+          ctx.lineTo(sx, viewportH);
+          ctx.stroke();
+        } else if (marker.meters < 100) {
+          ctx.strokeStyle =
+            marker.meters === 50 ? 'rgba(2, 132, 199, 0.35)' : 'rgba(15, 23, 42, 0.14)';
+          ctx.lineWidth = marker.meters === 50 ? 2 : 1.5;
+          ctx.setLineDash([6, 6]);
+          ctx.beginPath();
+          ctx.moveTo(sx, STADIUM_HEADER_HEIGHT_PX);
+          ctx.lineTo(sx, viewportH);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      });
+
+      // --------------------------------------------------
+      // D. วาดเส้นชัยตารางหมากรุก & ริบบิ้นสีแดงชมพูที่ระยะ 100m (WorldX = 2250)
+      // --------------------------------------------------
+      const finishScreenX = worldToScreenX(FINISH_WORLD_X, cameraX);
+      if (finishScreenX > -60 && finishScreenX < viewportW + 60) {
+        const checkerSize = 9;
+        for (let y = STADIUM_HEADER_HEIGHT_PX; y < viewportH; y += checkerSize) {
+          const row = Math.floor((y - STADIUM_HEADER_HEIGHT_PX) / checkerSize);
+          ctx.fillStyle = row % 2 === 0 ? '#0F172A' : '#FFFFFF';
+          ctx.fillRect(finishScreenX - checkerSize, y, checkerSize, checkerSize);
+          ctx.fillStyle = row % 2 === 0 ? '#FFFFFF' : '#0F172A';
+          ctx.fillRect(finishScreenX, y, checkerSize, checkerSize);
+        }
+
+        // ริบบิ้นเส้นชัย (ถ้ายังไม่ถูกชนขาด)
+        if (!ribbonBrokenRef.current) {
+          ctx.strokeStyle = '#E11D48';
+          ctx.lineWidth = 4.5;
+          ctx.beginPath();
+          ctx.moveTo(finishScreenX + 2, STADIUM_HEADER_HEIGHT_PX);
+          ctx.lineTo(finishScreenX + 2, viewportH);
+          ctx.stroke();
         }
       }
 
-      // ป้าย FINISH เหนือเส้นชัย
-      ctx.fillStyle = '#EF4444';
-      ctx.font = 'bold 12px Prompt, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('FINISH 🏁', finishX + checkerSize, trackMarginTop - 12);
+      // --------------------------------------------------
+      // E. วาดตัวละคร Chibi คาดผ้า Hachimaki (ปลอดป้ายชื่อทับซ้อน 100%!)
+      // --------------------------------------------------
+      runners.forEach((runner, idx) => {
+        const palette = PASTEL_LANES[idx % PASTEL_LANES.length];
+        const yCenter = STADIUM_HEADER_HEIGHT_PX + idx * laneHeightPx + laneHeightPx / 2;
+        const runnerScreenX = worldToScreenX(runner.worldX, cameraX);
 
-      // 4. ริบบิ้นเส้นชัยสีแดง (Finish Ribbon)
-      if (!ribbonBrokenRef.current) {
-        ctx.strokeStyle = '#EF4444';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(finishX + 8, trackMarginTop);
-        ctx.lineTo(finishX + 8, trackMarginTop + trackHeight);
-        ctx.stroke();
-      }
+        if (runnerScreenX < -60 || runnerScreenX > viewportW + 60) return;
 
-      // 5. วาดตัวละครนักวิ่ง Chibi แต่ละคน
-      currentContestants.forEach((c) => {
-        const laneCenterY = trackMarginTop + c.laneIndex * laneHeight + laneHeight / 2;
-        const runnerX = startX + c.currentProgress * totalTrackDist;
+        const isMoving = elapsedMs > 0 && !runner.finished;
+        const stridePhase = isMoving ? elapsedMs * 0.025 + runner.phaseOffset : 0;
+        const bounceY = isMoving ? Math.abs(Math.sin(stridePhase)) * -5 : 0;
+        const avatarRadius = Math.min(17, Math.max(13, laneHeightPx * 0.25));
 
-        // บันทึกสถานะ Canvas เพื่อวาด Chibi
-        ctx.save();
-        ctx.translate(runnerX, laneCenterY);
+        // 1. เส้นสปีดลม (Speed Streaks) & ฝุ่นควันใต้เท้า
+        if (isMoving) {
+          ctx.strokeStyle = runner.currentRank === 1 ? '#F59E0B' : palette.border;
+          ctx.lineWidth = runner.currentRank === 1 ? 2.2 : 1.5;
+          for (let s = -1; s <= 1; s++) {
+            const streakLen = runner.currentRank === 1 ? 24 : 14;
+            ctx.beginPath();
+            ctx.moveTo(runnerScreenX - avatarRadius - 5, yCenter + s * 6 + bounceY);
+            ctx.lineTo(runnerScreenX - avatarRadius - 5 - streakLen, yCenter + s * 6 + bounceY);
+            ctx.stroke();
+          }
 
-        // ฝุ่นความเร็วเมื่อกำลังวิ่ง
-        if (isRacing && !c.hasCrossedFinish) {
-          const dustOffset = Math.sin(runCycle * 14 + c.laneIndex) * 3;
-          ctx.fillStyle = isProjectorMode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(148, 163, 184, 0.35)';
+          const dustOffset = (elapsedMs * 0.18 + idx * 17) % 22;
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
           ctx.beginPath();
-          ctx.arc(-24 + dustOffset, 12, 5, 0, Math.PI * 2);
-          ctx.arc(-32 + dustOffset, 10, 3, 0, Math.PI * 2);
+          ctx.arc(
+            runnerScreenX - avatarRadius - dustOffset,
+            yCenter + avatarRadius * 0.75 - dustOffset * 0.2,
+            3.5 - dustOffset * 0.12,
+            0,
+            Math.PI * 2
+          );
           ctx.fill();
         }
 
-        // ก้าวกระโดดของตัวละคร (Bobbing Animation)
-        const bobY = isRacing && !c.hasCrossedFinish ? Math.abs(Math.sin(runCycle * 16 + c.laneIndex)) * -5 : 0;
-        ctx.translate(0, bobY);
-
-        // ขาซ้ายและขวาขยับสลับกัน
-        const legSwing = isRacing && !c.hasCrossedFinish ? Math.sin(runCycle * 16 + c.laneIndex) * 8 : 0;
-
-        // ขาซ้าย
-        ctx.strokeStyle = c.palette.base;
-        ctx.lineWidth = 3.5;
+        // 2. เงาพื้นใต้เท้านักวิ่ง
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.2)';
         ctx.beginPath();
-        ctx.moveTo(-2, 10);
-        ctx.lineTo(-4 - legSwing, 18);
-        ctx.stroke();
-
-        // ขาขวา
-        ctx.beginPath();
-        ctx.moveTo(4, 10);
-        ctx.lineTo(6 + legSwing, 18);
-        ctx.stroke();
-
-        // ลำตัว (เสื้อทีมสีพาสเทล)
-        ctx.fillStyle = c.palette.base;
-        ctx.beginPath();
-        ctx.roundRect(-10, -2, 20, 14, 5);
+        ctx.ellipse(
+          runnerScreenX,
+          yCenter + avatarRadius * 0.95,
+          avatarRadius * 0.8,
+          4,
+          0,
+          0,
+          Math.PI * 2
+        );
         ctx.fill();
 
-        // แขนแกว่ง
-        ctx.strokeStyle = '#FCD34D';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(-8, 2);
-        ctx.lineTo(-12 + legSwing, 8);
-        ctx.moveTo(8, 2);
-        ctx.lineTo(12 - legSwing, 8);
-        ctx.stroke();
-
-        // ศีรษะ Chibi กลมมนน่ารัก
-        ctx.fillStyle = '#FED7AA'; // ผิวขาวอมชมพู
-        ctx.beginPath();
-        ctx.arc(0, -12, 12, 0, Math.PI * 2);
-        ctx.fill();
-
-        // ทรงผม Chibi สีน้ำตาลเข้ม
-        ctx.fillStyle = '#475569';
-        ctx.beginPath();
-        ctx.arc(0, -16, 12, Math.PI, 0, false);
-        ctx.fill();
-
-        // ผ้าโพกหัว Hachimaki สีขาวคาดหน้าผาก
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(-12, -16, 24, 4);
-
-        // โบว์ผ้าโพกหัวปลิวไสวข้างหลัง
-        const ribbonWave = isRacing ? Math.sin(runCycle * 12 + c.laneIndex) * 4 : 0;
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.moveTo(-12, -14);
-        ctx.quadraticCurveTo(-18, -16 + ribbonWave, -22, -12 + ribbonWave);
-        ctx.stroke();
-
-        // จุดสีแดงตรงกลางผ้าโพกหัว (ธงนำชัย)
-        ctx.fillStyle = '#EF4444';
-        ctx.beginPath();
-        ctx.arc(0, -14, 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        // ดวงตากลมโตมุ่งมั่น
-        ctx.fillStyle = '#1E293B';
-        ctx.beginPath();
-        ctx.arc(4, -12, 1.8, 0, Math.PI * 2);
-        ctx.fill();
-
-        // รอยยิ้ม
+        // 3. ขาวิ่งสลับซ้าย-ขวา
+        const legSwing = Math.sin(stridePhase) * 7.5;
         ctx.strokeStyle = '#1E293B';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 3.2;
+        ctx.lineCap = 'round';
         ctx.beginPath();
-        ctx.arc(4, -9, 2.5, 0, Math.PI, false);
+        ctx.moveTo(runnerScreenX, yCenter + bounceY + 2);
+        ctx.lineTo(runnerScreenX + legSwing, yCenter + avatarRadius * 0.92);
+        ctx.moveTo(runnerScreenX, yCenter + bounceY + 2);
+        ctx.lineTo(runnerScreenX - legSwing, yCenter + avatarRadius * 0.92);
         ctx.stroke();
 
-        // แก้มอมชมพู
+        // 4. เสื้อวิ่งพละสีประจำลู่
+        ctx.fillStyle = palette.accent;
+        ctx.beginPath();
+        ctx.roundRect(
+          runnerScreenX - avatarRadius * 0.6,
+          yCenter - avatarRadius * 0.18 + bounceY,
+          avatarRadius * 1.2,
+          avatarRadius * 0.88,
+          5
+        );
+        ctx.fill();
+
+        // แขนแกว่งสลับขา
+        const armSwing = -legSwing * 0.75;
+        ctx.strokeStyle = '#FFE4C4';
+        ctx.lineWidth = 2.8;
+        ctx.beginPath();
+        ctx.moveTo(runnerScreenX, yCenter + bounceY);
+        ctx.lineTo(runnerScreenX + armSwing, yCenter + avatarRadius * 0.45 + bounceY);
+        ctx.stroke();
+
+        // 5. ศีรษะ Chibi
+        const headX = runnerScreenX + 2;
+        const headY = yCenter - avatarRadius * 0.48 + bounceY;
+        ctx.fillStyle = '#FFE4C4';
+        ctx.beginPath();
+        ctx.arc(headX, headY, avatarRadius * 0.74, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#0F172A';
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+
+        // 6. ผ้าโพกหัว Hachimaki พร้อมชายผ้าปลิวไสวด้านหลัง
+        ctx.fillStyle = palette.accent;
+        ctx.fillRect(
+          headX - avatarRadius * 0.74,
+          headY - avatarRadius * 0.38,
+          avatarRadius * 1.48,
+          4.5
+        );
+        ctx.beginPath();
+        ctx.moveTo(headX - avatarRadius * 0.74, headY - avatarRadius * 0.25);
+        ctx.lineTo(
+          headX - avatarRadius * 1.45,
+          headY - avatarRadius * 0.4 + Math.sin(stridePhase * 1.3) * 4
+        );
+        ctx.strokeStyle = palette.accent;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // 7. ดวงตาอนิเมะมุ่งมั่น + แก้มชมพูพาสเทล
+        ctx.fillStyle = '#0F172A';
+        ctx.beginPath();
+        ctx.arc(headX + avatarRadius * 0.32, headY + 1, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+
         ctx.fillStyle = '#FDA4AF';
         ctx.beginPath();
-        ctx.arc(5, -9, 1.5, 0, Math.PI * 2);
+        ctx.arc(headX + avatarRadius * 0.18, headY + 4, 2.2, 0, Math.PI * 2);
         ctx.fill();
 
-        // ป้ายชื่อนักเรียนลอยอยู่เหนือศีรษะ (Pastel Name Tag)
-        const nameText = `${c.number ? `[#${c.number}] ` : ''}${c.name}`;
-        ctx.font = 'bold 12px Prompt, sans-serif';
-        const textWidth = ctx.measureText(nameText).width;
-        const tagPadding = 8;
-        const tagW = textWidth + tagPadding * 2;
-        const tagH = 20;
+        // 8. ป้ายเบอร์เสื้อจิ๋วด้านหลังตัวละคร (ขนาดเพียง 15px ไม่เกะกะ ไม่บังลู่อื่น)
+        const miniBadgeText =
+          runner.candidate.number !== undefined
+            ? `#${runner.candidate.number}`
+            : `L${idx + 1}`;
+        ctx.font = 'bold 9.5px sans-serif';
+        const tagW = ctx.measureText(miniBadgeText).width + 8;
+        const tagX = runnerScreenX - avatarRadius - tagW - 3;
+        const tagY = yCenter - 7 + bounceY;
 
-        // กล่องป้ายชื่อ
-        ctx.fillStyle = isProjectorMode ? 'rgba(15, 23, 42, 0.92)' : 'rgba(255, 255, 255, 0.95)';
-        ctx.strokeStyle = c.palette.base;
-        ctx.lineWidth = 1.5;
+        ctx.fillStyle =
+          runner.currentRank === 1 ? '#FACC15' : 'rgba(15, 23, 42, 0.78)';
         ctx.beginPath();
-        ctx.roundRect(-tagW / 2, -44, tagW, tagH, 6);
+        ctx.roundRect(tagX, tagY, tagW, 15, 4);
         ctx.fill();
-        ctx.stroke();
 
-        // ข้อความชื่อนักเรียน
-        ctx.fillStyle = isProjectorMode ? '#F8FAFC' : c.palette.text;
+        ctx.fillStyle = runner.currentRank === 1 ? '#0F172A' : '#FFFFFF';
         ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(nameText, 0, -34);
+        ctx.fillText(miniBadgeText, tagX + tagW / 2, tagY + 8);
 
-        // ป้ายอันดับเมื่อเข้าเส้นชัยแล้ว
-        if (c.finishRank) {
-          const medal = c.finishRank === 1 ? '🥇' : c.finishRank === 2 ? '🥈' : c.finishRank === 3 ? '🥉' : `${c.finishRank}`;
-          ctx.font = 'bold 16px sans-serif';
-          ctx.fillText(medal, tagW / 2 + 10, -34);
+        // วาดมงกุฎทองจิ๋ว 👑 เฉพาะคนที่เป็นผู้นำอันดับ 1
+        if (runner.currentRank === 1 && elapsedMs > 0) {
+          ctx.font = '12px sans-serif';
+          ctx.fillText('👑', headX, headY - avatarRadius * 0.95);
         }
-
-        ctx.restore();
       });
 
-      // 6. วาด Confetti ฉลองชัย
+      // --------------------------------------------------
+      // F. วาดพลุ Confetti ฉลองที่เส้นชัย
+      // --------------------------------------------------
       if (confettiRef.current.length > 0) {
-        confettiRef.current.forEach((p) => {
+        confettiRef.current.forEach((pt) => {
+          pt.worldX += pt.vx;
+          pt.y += pt.vy;
+          pt.vy += 0.18;
+          pt.alpha = Math.max(0, pt.alpha - 0.012);
+
+          const sx = worldToScreenX(pt.worldX, cameraX);
           ctx.save();
-          ctx.translate(p.x, p.y);
-          ctx.rotate((p.rotation * Math.PI) / 180);
-          ctx.fillStyle = p.color;
-          ctx.globalAlpha = p.opacity;
-          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+          ctx.globalAlpha = pt.alpha;
+          ctx.fillStyle = pt.color;
+          ctx.fillRect(sx, pt.y, pt.size, pt.size * 0.7);
           ctx.restore();
         });
       }
+
+      ctx.restore();
     },
-    [isProjectorMode, isRacing]
+    [laneHeightPx, totalCanvasHeight]
   );
 
-  // Main Animation Loop (60 FPS)
+  // เตรียมลู่วิ่งเมื่อเปลี่ยนรายการผู้เข้าแข่งขันหรือความยาวเวลา
   useEffect(() => {
-    let active = true;
+    if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+    clearAllTTSTimeouts();
+    setRaceStatus('idle');
+    setPodium([]);
+    setLeaderMeters(0);
+    setLiveLeaderName('');
+    cameraXRef.current = 0;
+    confettiRef.current = [];
+    ribbonBrokenRef.current = false;
+    onRaceStateChange?.(false);
 
-    const tick = (timestamp: number) => {
-      if (!active) return;
+    const initialRunners = initializeRunners(activeLaneCandidates, raceDurationSec);
+    runnersRef.current = initialRunners;
 
-      const canvas = canvasRef.current;
-      if (!canvas) {
-        animFrameRef.current = requestAnimationFrame(tick);
-        return;
-      }
+    const initialRanks: Record<string, number> = {};
+    initialRunners.forEach((r, idx) => {
+      initialRanks[r.candidate.id] = idx + 1;
+    });
+    setLiveRanksById(initialRanks);
 
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        animFrameRef.current = requestAnimationFrame(tick);
-        return;
-      }
-
-      const rect = canvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      const displayWidth = rect.width;
-      const displayHeight = rect.height;
-
-      // จัดการ DPR Scaling สำหรับจอ Retina/4K Projector
-      if (canvas.width !== displayWidth * dpr || canvas.height !== displayHeight * dpr) {
-        canvas.width = displayWidth * dpr;
-        canvas.height = displayHeight * dpr;
-        ctx.scale(dpr, dpr);
-      }
-
-      if (isRacing) {
-        if (!startTimeRef.current) {
-          startTimeRef.current = timestamp;
-        }
-
-        const elapsedMs = timestamp - startTimeRef.current;
-
-        // เล่นเสียงฝีเท้าเบาๆ เป็นจังหวะ
-        if (timestamp - footstepTimerRef.current > 140) {
-          onPlaySound?.('tick', 320 + Math.random() * 80);
-          footstepTimerRef.current = timestamp;
-        }
-
-        // คำนวณเฟรมฟิสิกส์
-        const { updatedContestants, newFinishers, allFinished } = updateContestantsFrame(
-          contestants,
-          elapsedMs
-        );
-
-        // ตรวจสอบคนเข้าเส้นชัยใหม่
-        if (newFinishers.length > 0) {
-          newFinishers.forEach((finisher) => {
-            // เมื่อผู้ชนะแตะเส้นชัยเป็นคนแรก
-            if (finisher.isWinner && !ribbonBrokenRef.current) {
-              ribbonBrokenRef.current = true;
-              spawnConfetti(rect.width - 110, rect.height / 2);
-              onPlaySound?.('fanfare');
-              setChampion(finisher);
-              onWinnerConfirmed(finisher.studentRef);
-
-              // 🔊 อ่านชื่อภาษาไทยและตามด้วยคำชมภาษาญี่ปุ่น (TTS)
-              if (ttsEnabled) {
-                tts.speakStudentName(finisher.number, finisher.name, true);
-                const praiseTimer = setTimeout(() => {
-                  tts.speakJapanesePraise(selectedPraise, true);
-                }, 1200);
-                ttsTimeoutRef.current.push(praiseTimer);
-              }
-            }
-          });
-
-          setFinishers((prev) => {
-            const existingIds = new Set(prev.map((p) => p.id));
-            const fresh = newFinishers.filter((f) => !existingIds.has(f.id));
-            const combined = [...prev, ...fresh];
-            // กำหนด rank ตามลำดับที่แตะเส้นชัย
-            return combined.map((item, idx) => ({ ...item, finishRank: idx + 1 }));
-          });
-        }
-
-        setContestants(updatedContestants);
-
-        // อัปเดต Confetti
-        if (confettiRef.current.length > 0) {
-          confettiRef.current = confettiRef.current
-            .map((p) => ({
-              ...p,
-              x: p.x + p.vx,
-              y: p.y + p.vy,
-              vy: p.vy + 0.15, // แรงโน้มถ่วง
-              rotation: p.rotation + p.rotationSpeed,
-              opacity: p.opacity - 0.007,
-            }))
-            .filter((p) => p.opacity > 0);
-        }
-
-        // เมื่อทุกคนเข้าเส้นชัยเสร็จสิ้น
-        if (allFinished) {
-          setIsRacing(false);
-          setRaceFinished(true);
-          onRaceStateChange?.(false);
-          // แสดงโพเดียมหลังจากนั้น 600ms
-          const podiumTimer = setTimeout(() => {
-            setShowPodium(true);
-          }, 600);
-          ttsTimeoutRef.current.push(podiumTimer);
-        }
-      }
-
-      // วาดเฟรมปัจจุบัน
-      drawArena(ctx, displayWidth, displayHeight, contestants, timestamp / 1000);
-
-      animFrameRef.current = requestAnimationFrame(tick);
-    };
-
-    animFrameRef.current = requestAnimationFrame(tick);
-
-    return () => {
-      active = false;
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-      }
-    };
+    renderTrackFrame(0);
   }, [
-    isRacing,
-    contestants,
-    drawArena,
-    onPlaySound,
-    onWinnerConfirmed,
-    ttsEnabled,
-    selectedPraise,
+    activeLaneCandidates,
+    raceDurationSec,
+    initializeRunners,
+    renderTrackFrame,
+    clearAllTTSTimeouts,
     onRaceStateChange,
   ]);
 
-  // ฟังก์ชันมอบเหรียญด่วนใน Podium
-  const handleAwardPodiumCoin = (c: RaceContestant, amount: number = 1) => {
-    onAwardCoin(c.id, amount);
-    onPlaySound?.('coin');
+  // วาดซ้ำเมื่อขนาดหน้าจอเปลี่ยน
+  useEffect(() => {
+    const handleResize = () => renderTrackFrame(0);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [renderTrackFrame]);
+
+  // Cleanup ป้องกัน Memory Leak
+  useEffect(() => {
+    return () => {
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+      clearAllTTSTimeouts();
+      raceAudio.cleanup();
+    };
+  }, [clearAllTTSTimeouts]);
+
+  // ==========================================
+  // 6. START 60 FPS RACE & CAMERA TRACKING LOOP
+  // ==========================================
+  const startRace = useCallback(() => {
+    if (activeLaneCandidates.length < 2 || raceStatus === 'running') return;
+
+    if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+    clearAllTTSTimeouts();
+    runnersRef.current = initializeRunners(activeLaneCandidates, raceDurationSec);
+    cameraXRef.current = 0;
+    confettiRef.current = [];
+    ribbonBrokenRef.current = false;
+    setPodium([]);
+    setLeaderMeters(0);
+    setRaceStatus('running');
+    onRaceStateChange?.(true);
+
+    if (soundEnabled) {
+      if (onPlaySound) onPlaySound('whistle');
+      else raceAudio.playStartWhistle();
+    }
+
+    raceStartTimeRef.current = performance.now();
+    lastStepSoundTimeRef.current = performance.now();
+    lastUiSyncTimeRef.current = performance.now();
+
+    const stepLoop = (now: number) => {
+      const elapsedMs = now - raceStartTimeRef.current;
+
+      if (soundEnabled && now - lastStepSoundTimeRef.current > 125) {
+        if (onPlaySound) onPlaySound('tick', 320 + Math.random() * 80);
+        else raceAudio.playFootstep((elapsedMs % 40) - 20);
+        lastStepSoundTimeRef.current = now;
+      }
+
+      let allFinished = true;
+      let maxLeaderWorldX = START_WORLD_X;
+
+      runnersRef.current.forEach((runner) => {
+        const progress = computeRunnerProgress(
+          elapsedMs,
+          runner.targetFinishMs,
+          runner.burstAmp1,
+          runner.burstAmp2,
+          runner.phaseOffset
+        );
+
+        runner.progress = progress;
+        runner.worldX = computeRunnerWorldX(progress);
+
+        if (runner.worldX > maxLeaderWorldX) {
+          maxLeaderWorldX = runner.worldX;
+        }
+
+        if (elapsedMs >= runner.targetFinishMs) {
+          if (!runner.finished) {
+            runner.finished = true;
+            runner.finishTimestampMs = elapsedMs + runner.rankTarget * 0.001;
+
+            if (!ribbonBrokenRef.current && runner.rankTarget === 1) {
+              ribbonBrokenRef.current = true;
+              spawnFinishConfetti(totalCanvasHeight);
+              if (soundEnabled) {
+                if (onPlaySound) onPlaySound('fanfare');
+                else raceAudio.playVictoryFanfare();
+              }
+
+              // 🔊 Web Speech API อ่านชื่อภาษาไทยและตามด้วยคำชมภาษาญี่ปุ่น
+              if (ttsEnabled) {
+                tts.speakStudentName(runner.candidate.number, runner.candidate.label, true);
+                const praiseTimer = setTimeout(() => {
+                  tts.speakJapanesePraise(selectedPraise, true);
+                }, 1200);
+                ttsTimeoutsRef.current.push(praiseTimer);
+              }
+            }
+          }
+        } else {
+          allFinished = false;
+        }
+      });
+
+      // จัดลำดับผู้นำแบบ Real-time
+      const sortedByProgress = [...runnersRef.current].sort((a, b) => {
+        if (a.finished && b.finished) {
+          return (a.finishTimestampMs || 0) - (b.finishTimestampMs || 0);
+        }
+        if (a.finished) return -1;
+        if (b.finished) return 1;
+        return b.worldX - a.worldX;
+      });
+
+      sortedByProgress.forEach((r, idx) => {
+        r.currentRank = idx + 1;
+      });
+
+      // อัปเดตกล้อง 3 ระยะ (Smooth Camera Lerp ตามตำแหน่งผู้นำ)
+      const viewportW = canvasRef.current?.getBoundingClientRect().width || 600;
+      cameraXRef.current = computeNextCameraX(
+        cameraXRef.current,
+        maxLeaderWorldX,
+        viewportW,
+        WORLD_TRACK_LENGTH,
+        0.15
+      );
+
+      // ซิงค์อันดับและระยะทางเมตรไปที่ Left Roster Column ทุกๆ 100ms
+      if (now - lastUiSyncTimeRef.current > 100 || allFinished) {
+        const rankMap: Record<string, number> = {};
+        sortedByProgress.forEach((r) => {
+          rankMap[r.candidate.id] = r.currentRank;
+        });
+        setLiveRanksById(rankMap);
+        setLeaderMeters(computeCurrentMeters(maxLeaderWorldX));
+        if (sortedByProgress[0]) {
+          setLiveLeaderName(sortedByProgress[0].candidate.label);
+        }
+        lastUiSyncTimeRef.current = now;
+      }
+
+      renderTrackFrame(elapsedMs);
+
+      if (!allFinished) {
+        rafIdRef.current = requestAnimationFrame(stepLoop);
+      } else {
+        setRaceStatus('finished');
+        setLeaderMeters(100);
+        onRaceStateChange?.(false);
+        const finalTop3 = sortedByProgress.slice(0, 3);
+        setPodium(finalTop3);
+
+        if (onWinnerConfirmed && finalTop3[0]) {
+          const winnerCandidate = finalTop3[0].candidate;
+          const winnerStudent: LiveStudent = winnerCandidate.rawStudent || {
+            id: winnerCandidate.id,
+            name: winnerCandidate.label,
+            number: winnerCandidate.number,
+            studentCode: winnerCandidate.subLabel || '',
+            present: true,
+            sessionCoins: winnerCandidate.coins || 0,
+            sessionTickets: 0,
+            totalCoins: 0,
+            totalTickets: 0,
+            tier: 'mid',
+          };
+          const podiumStudents: LiveStudent[] = finalTop3.map(
+            (p) =>
+              p.candidate.rawStudent || {
+                id: p.candidate.id,
+                name: p.candidate.label,
+                number: p.candidate.number,
+                studentCode: p.candidate.subLabel || '',
+                present: true,
+                sessionCoins: p.candidate.coins || 0,
+                sessionTickets: 0,
+                totalCoins: 0,
+                totalTickets: 0,
+                tier: 'mid',
+              }
+          );
+          onWinnerConfirmed(winnerStudent, podiumStudents);
+        }
+      }
+    };
+
+    rafIdRef.current = requestAnimationFrame(stepLoop);
+  }, [
+    activeLaneCandidates,
+    raceStatus,
+    raceDurationSec,
+    soundEnabled,
+    onPlaySound,
+    ttsEnabled,
+    selectedPraise,
+    initializeRunners,
+    spawnFinishConfetti,
+    totalCanvasHeight,
+    renderTrackFrame,
+    onRaceStateChange,
+    onWinnerConfirmed,
+    clearAllTTSTimeouts,
+  ]);
+
+  // Spacebar Hotkey
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+      if (e.code === 'Space' && raceStatus !== 'running') {
+        e.preventDefault();
+        startRace();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [raceStatus, startRace]);
+
+  // มอบเหรียญด่วน
+  const handleAwardCoin = (c: RaceCandidate, amount: number) => {
+    if (onAwardCoin) onAwardCoin(c.id, amount);
+    if (onGiveReward) {
+      onGiveReward([c.id], 'coin', amount, `${c.label} ชนะวิ่งแข่ง 100m`);
+    }
+    if (onPlaySound) onPlaySound('coin');
+    else raceAudio.playFootstep();
+
     setAwardedRewards((prev) => {
       const current = prev[c.id] || { coin: 0, ticket: 0 };
       return {
@@ -595,10 +988,15 @@ export const RunningTrackArena: React.FC<RunningTrackArenaProps> = ({
     });
   };
 
-  // ฟังก์ชันมอบตั๋วด่วนใน Podium
-  const handleAwardPodiumTicket = (c: RaceContestant, amount: number = 1) => {
-    onAwardTicket(c.id, amount);
-    onPlaySound?.('coin');
+  // มอบตั๋วด่วน
+  const handleAwardTicket = (c: RaceCandidate, amount: number) => {
+    if (onAwardTicket) onAwardTicket(c.id, amount);
+    if (onGiveReward) {
+      onGiveReward([c.id], 'ticket', amount, `${c.label} ได้ตั๋วสุ่มจากสนามวิ่งแข่ง`);
+    }
+    if (onPlaySound) onPlaySound('coin');
+    else raceAudio.playFootstep();
+
     setAwardedRewards((prev) => {
       const current = prev[c.id] || { coin: 0, ticket: 0 };
       return {
@@ -608,246 +1006,303 @@ export const RunningTrackArena: React.FC<RunningTrackArenaProps> = ({
     });
   };
 
-  // ดึง Top 3 ผู้เข้าเส้นชัย
-  const topThree = useMemo(() => {
-    const sorted = [...finishers].sort((a, b) => (a.finishRank || 99) - (b.finishRank || 99));
-    return sorted.slice(0, 3);
-  }, [finishers]);
+  if (rawCandidates.length < 2) {
+    return (
+      <div className="w-full bg-slate-900/70 border border-slate-800 rounded-3xl p-10 text-center space-y-3">
+        <Flag className="w-14 h-14 mx-auto text-pink-400 opacity-50" />
+        <h3 className="text-xl font-bold text-slate-200">
+          ต้องมีรายชื่อในกองสุ่มอย่างน้อย 2 รายการเพื่อจัดวิ่งแข่ง
+        </h3>
+        <p className="text-sm text-slate-400 max-w-md mx-auto">
+          ระบบดึงเฉพาะรายชื่อนักเรียนที่มีสถานะมาเรียนจริงและยังไม่ถูกสุ่มซ้ำในคาบนี้ค่ะ (กดปุ่ม &ldquo;รีเซ็ตรายชื่อทั้งหมด&rdquo; ด้านบนเพื่อเริ่มรอบใหม่)
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div
-      ref={containerRef}
-      className={`w-full flex flex-col gap-4 transition-all duration-300 ${
-        isProjectorMode ? 'text-white' : 'text-[#163A66]'
-      }`}
-    >
-      {/* Race Top Controller Bar */}
+    <div className="w-full flex flex-col gap-4">
+      {/* ====================================================
+          1. แถบควบคุมสนามวิ่ง & มาตรวัดระยะทาง 100 เมตร
+         ==================================================== */}
       <div
-        className={`rounded-2xl p-3.5 px-4 flex flex-wrap items-center justify-between gap-3 border transition-colors ${
+        className={`rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-sm border transition-colors ${
           isProjectorMode
             ? 'bg-slate-900 border-slate-800'
             : 'bg-white border-[#E6EEF7] shadow-sm'
         }`}
       >
-        <div className="flex flex-wrap items-center gap-3">
-          {/* จำนวนเลนวิ่ง (Lane Selector) */}
-          <div className="flex items-center gap-2 text-xs font-semibold">
-            <span className={isProjectorMode ? 'text-slate-400' : 'text-[#6B7C93]'}>
-              จำนวนลู่วิ่ง:
-            </span>
-            <select
-              value={laneCount}
-              onChange={(e) => {
-                const count = Number(e.target.value);
-                setLaneCount(count);
-              }}
-              disabled={isRacing}
-              className={`rounded-xl px-2.5 py-1.5 font-bold text-xs transition border ${
-                isProjectorMode
-                  ? 'bg-slate-800 border-slate-700 text-slate-100'
-                  : 'bg-[#F7FAFF] border-[#E2E8F0] text-[#163A66]'
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-pink-500" />
+            <span
+              className={`font-semibold text-xs ${
+                isProjectorMode ? 'text-slate-300' : 'text-[#6B7C93]'
               }`}
             >
-              {[4, 5, 6, 8, 10].map((num) => (
-                <option key={num} value={num} disabled={students.length < num}>
-                  {num} เลน {students.length < num ? `(มีนักเรียน ${students.length} คน)` : ''}
+              จำนวนลู่:
+            </span>
+            <select
+              value={maxLanes}
+              disabled={raceStatus === 'running'}
+              onChange={(e) => setMaxLanes(Number(e.target.value))}
+              className={`rounded-xl px-2.5 py-1 font-bold text-xs border transition ${
+                isProjectorMode
+                  ? 'bg-slate-800 border-slate-700 text-pink-300'
+                  : 'bg-[#F7FAFF] border-[#E2E8F0] text-pink-600'
+              }`}
+            >
+              {[4, 6, 8, 10].map((num) => (
+                <option key={num} value={num} disabled={rawCandidates.length < num}>
+                  {num} ลู่ {rawCandidates.length < num ? `(มีนักเรียน ${rawCandidates.length} คน)` : ''}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* ความเร็วการวิ่ง */}
-          <div className="flex items-center gap-2 text-xs font-semibold">
-            <span className={isProjectorMode ? 'text-slate-400' : 'text-[#6B7C93]'}>
-              ระยะเวลาแข่ง:
-            </span>
-            <select
-              value={raceSpeed}
-              onChange={(e) => setRaceSpeed(e.target.value as RaceSpeed)}
-              disabled={isRacing}
-              className={`rounded-xl px-2.5 py-1.5 font-bold text-xs transition border ${
-                isProjectorMode
-                  ? 'bg-slate-800 border-slate-700 text-slate-100'
-                  : 'bg-[#F7FAFF] border-[#E2E8F0] text-[#163A66]'
+          <div className="flex items-center gap-2">
+            <Timer className="w-4 h-4 text-sky-500" />
+            <span
+              className={`font-semibold text-xs ${
+                isProjectorMode ? 'text-slate-300' : 'text-[#6B7C93]'
               }`}
             >
-              <option value="fast">⚡ เร็ว (3.8 วิ)</option>
-              <option value="normal">🏃 ปกติ (5.8 วิ)</option>
-              <option value="dramatic">🎭 ลุ้นระทึก (8.2 วิ)</option>
+              เวลาวิ่ง:
+            </span>
+            <select
+              value={raceDurationSec}
+              disabled={raceStatus === 'running'}
+              onChange={(e) => setRaceDurationSec(Number(e.target.value))}
+              className={`rounded-xl px-2.5 py-1 font-bold text-xs border transition ${
+                isProjectorMode
+                  ? 'bg-slate-800 border-slate-700 text-sky-300'
+                  : 'bg-[#F7FAFF] border-[#E2E8F0] text-sky-600'
+              }`}
+            >
+              <option value={4}>4 วินาที (ด่วน)</option>
+              <option value={6}>6 วินาที (ปกติ)</option>
+              <option value={8}>8 วินาที (ลุ้นระทึก)</option>
             </select>
           </div>
-
-          {/* สุ่มฮีตใหม่ */}
-          <button
-            onClick={handleSetupNewHeat}
-            disabled={isRacing || students.length === 0}
-            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl font-bold border transition ${
-              isProjectorMode
-                ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
-                : 'bg-[#F7FAFF] hover:bg-blue-50 border-[#E2E8F0] text-[#163A66]'
-            }`}
-          >
-            <Refresh1Regular className="w-3.5 h-3.5 text-blue-500" />
-            <span>สุ่มฮีตผู้เข้าแข่งใหม่</span>
-          </button>
         </div>
 
-        {/* ปุ่มปล่อยตัววิ่งแข่ง (Primary Action CTA) */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleStartRace}
-            disabled={isRacing || contestants.length === 0}
-            className={`flex items-center gap-2.5 px-6 py-2.5 rounded-xl font-extrabold text-sm shadow-md transition transform active:scale-95 ${
-              isRacing
-                ? 'bg-slate-400 cursor-not-allowed text-white'
-                : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/30'
-            }`}
-          >
-            <Play className={`w-4 h-4 fill-current ${isRacing ? 'animate-pulse' : ''}`} />
-            <span>{isRacing ? 'กำลังวิ่งแข่งชิงชัย! 🏃💨' : 'ปล่อยตัวนักวิ่ง (Spacebar)'}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* HTML5 Canvas Track Container */}
-      <div
-        className={`w-full rounded-2xl overflow-hidden border relative transition-all ${
-          isProjectorMode
-            ? 'bg-slate-950 border-slate-800 shadow-2xl'
-            : 'bg-white border-[#E6EEF7] shadow-sm'
-        }`}
-      >
-        <canvas
-          ref={canvasRef}
-          className="w-full h-[380px] md:h-[460px] block cursor-pointer select-none"
-          onClick={() => {
-            if (!isRacing && !raceFinished) {
-              handleStartRace();
-            }
-          }}
-        />
-
-        {/* ผู้ชนะประกาศตัวกลางจอระหว่างเข้าเส้นชัย */}
-        {champion && !showPodium && (
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-white/95 dark:bg-slate-900/95 border-2 border-amber-400 rounded-2xl px-6 py-2.5 shadow-2xl flex items-center gap-3 animate-bounce">
-            <Trophy className="w-6 h-6 text-amber-500 fill-amber-400" />
-            <div>
-              <p className="text-xs font-bold text-amber-600 dark:text-amber-400">
-                เข้าเส้นชัยอันดับ 1 (แชมเปียน)!
-              </p>
-              <h4 className="text-lg font-black text-[#163A66] dark:text-white">
-                {champion.number ? `เลขที่ ${champion.number} ` : ''}
-                {champion.name}
-              </h4>
-            </div>
+        {/* มาตรวัดระยะทาง 100m แบบสด */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-1.5 bg-indigo-950/90 border border-indigo-500/40 text-indigo-200 px-3 py-1 rounded-full text-xs font-bold">
+            <Gauge className="w-3.5 h-3.5 text-sky-400" />
+            <span>ระยะทาง: {leaderMeters}m / 100m</span>
           </div>
-        )}
+
+          {raceStatus === 'running' && liveLeaderName && (
+            <span className="inline-flex items-center gap-1.5 bg-amber-500/20 border border-amber-400/40 text-amber-300 px-3 py-1 rounded-full font-bold text-xs animate-pulse">
+              👑 ผู้นำ: {liveLeaderName}
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* Victory Podium Modal / Overlay */}
-      {showPodium && champion && (
-        <div
-          className={`rounded-2xl p-5 border shadow-xl transition-all animate-in fade-in zoom-in-95 duration-300 ${
-            isProjectorMode
-              ? 'bg-slate-900/95 border-slate-700'
-              : 'bg-gradient-to-b from-blue-50/60 to-white border-blue-200/80'
-          }`}
+      {/* ====================================================
+          2. โครงสร้างเลย์เอาต์ใหม่ NO-OVERLAP SPLIT ARENA
+             ซ้าย: Fixed Roster Column | ขวา: Scrolling 2,400px Canvas
+         ==================================================== */}
+      <div className="w-full rounded-3xl overflow-hidden border-2 border-indigo-500/30 shadow-2xl bg-slate-950">
+        <div className="flex w-full max-h-[620px] overflow-y-auto">
+          {/* ฝั่งซ้าย: Left Roster Column (ปลอดการทับซ้อนกับตัวละคร 100%) */}
+          <div className="w-[36%] min-w-[130px] max-w-[240px] sm:w-[210px] md:w-[235px] shrink-0 bg-slate-900 border-r-2 border-slate-800 select-none z-10">
+            {/* หัวตารางฝั่งซ้าย ล็อกความสูงเท่ากับ STADIUM_HEADER_HEIGHT_PX (38px) */}
+            <div
+              style={{ height: `${STADIUM_HEADER_HEIGHT_PX}px` }}
+              className="px-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between text-[11px] font-extrabold text-slate-400 uppercase tracking-wider"
+            >
+              <span>ลู่ / นักเรียน</span>
+              <span>อันดับ</span>
+            </div>
+
+            {/* รายชื่อนักเรียนแต่ละลู่ ล็อกความสูงเท่ากับ laneHeightPx (54px / 66px) */}
+            {activeLaneCandidates.map((cand, idx) => {
+              const palette = PASTEL_LANES[idx % PASTEL_LANES.length];
+              const liveRank = liveRanksById[cand.id] ?? idx + 1;
+              const isFirst = liveRank === 1 && raceStatus !== 'idle';
+
+              return (
+                <div
+                  key={cand.id}
+                  style={{ height: `${laneHeightPx}px` }}
+                  className={`px-2.5 border-b border-slate-800/90 flex items-center justify-between gap-1.5 transition-colors ${
+                    isFirst ? 'bg-amber-500/15' : 'bg-slate-900/95'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      style={{ backgroundColor: palette.accent }}
+                      className="w-6 h-6 rounded-full text-white font-black text-xs flex items-center justify-center shrink-0 shadow-sm"
+                    >
+                      {idx + 1}
+                    </span>
+
+                    <div className="min-w-0">
+                      <p className="text-xs sm:text-sm font-bold text-slate-100 truncate">
+                        {cand.number !== undefined ? `#${cand.number} ` : ''}
+                        {cand.label}
+                      </p>
+                      {cand.coins !== undefined && (
+                        <p className="text-[10px] text-amber-400 font-semibold leading-none mt-0.5">
+                          🪙 {cand.coins}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <span
+                    className={`shrink-0 text-[11px] font-extrabold px-2 py-0.5 rounded-full ${
+                      liveRank === 1
+                        ? 'bg-amber-400 text-slate-950'
+                        : liveRank === 2
+                        ? 'bg-slate-300 text-slate-950'
+                        : liveRank === 3
+                        ? 'bg-amber-700 text-white'
+                        : 'bg-slate-800 text-slate-400'
+                    }`}
+                  >
+                    {liveRank === 1 ? '👑 1' : `#${liveRank}`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ฝั่งขวา: Side-Scrolling 100m Track Canvas */}
+          <div className="flex-1 min-w-0 relative bg-slate-950">
+            <canvas
+              ref={canvasRef}
+              style={{ height: `${totalCanvasHeight}px` }}
+              className="w-full block"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ====================================================
+          3. ปุ่มปล่อยตัวนักวิ่งและสลับฮีตใหม่
+         ==================================================== */}
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <button
+          onClick={startRace}
+          disabled={raceStatus === 'running'}
+          className="flex items-center gap-2.5 bg-gradient-to-r from-pink-500 via-indigo-500 to-sky-500 hover:from-pink-400 hover:to-sky-400 disabled:opacity-50 text-white font-extrabold text-base md:text-lg px-8 md:px-9 py-3.5 rounded-2xl shadow-xl shadow-indigo-500/25 transition transform active:scale-95"
         >
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-5 border-b pb-3.5 border-slate-200 dark:border-slate-800">
+          <Play className="w-5 h-5 fill-current" />
+          <span>
+            {raceStatus === 'running'
+              ? `กำลังสปรินต์ (${leaderMeters}m / 100m)...`
+              : '🔫 เป่านกหวีดปล่อยตัว 100 เมตร! (Spacebar)'}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setHeatSeed((prev) => prev + 1)}
+          disabled={raceStatus === 'running'}
+          className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 border border-slate-700 text-slate-200 font-bold px-5 py-3.5 rounded-2xl transition"
+        >
+          <RotateCcw className="w-4 h-4" />
+          <span>สลับตัวแทนลงลู่ใหม่</span>
+        </button>
+      </div>
+
+      {/* ====================================================
+          4. แท่นรับรางวัล VICTORY PODIUM (🥇 1st, 🥈 2nd, 🥉 3rd)
+         ==================================================== */}
+      {raceStatus === 'finished' && podium.length > 0 && (
+        <div className="bg-gradient-to-b from-indigo-950/90 to-slate-900 border-2 border-amber-400/60 rounded-3xl p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-300">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
             <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-xl bg-amber-100 border border-amber-300 text-amber-600 flex items-center justify-center shadow-sm">
-                <Trophy className="w-5 h-5 fill-amber-400" />
-              </div>
+              <Trophy className="w-7 h-7 text-amber-400" />
               <div>
-                <h3 className="text-lg font-black tracking-tight text-[#163A66] dark:text-white">
-                  ผลการแข่งขันวิ่งแข่งชิงแชมป์ประจำคาบ
+                <h3 className="text-xl font-extrabold text-white">
+                  ผลการแข่งขัน 100 เมตร (Victory Podium)
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  มอบเหรียญรางวัลและตั๋วสุ่มพิเศษให้กับนักเรียนได้ทันที
+                <p className="text-xs text-slate-400">
+                  มอบเหรียญหรือตั๋วสุ่มให้แชมป์ประจำฮีต หรือแจกรางวัลครบทั้ง Top 3 ได้ในคลิกเดียวค่ะ
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={handleSetupNewHeat}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/20 transition active:scale-95"
+                onClick={() => {
+                  podium.forEach((p) => handleAwardCoin(p.candidate, 1));
+                }}
+                className="flex items-center gap-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-300 font-bold px-4 py-2 rounded-xl text-xs transition"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>แข่งรอบใหม่ (ฮีตถัดไป)</span>
+                <Sparkles className="w-4 h-4" />
+                <span>แจก +1 🪙 ให้ Top 3 ทุกคน</span>
               </button>
+
+              {onSkipWinner && (
+                <button
+                  onClick={() => onSkipWinner(podium[0].candidate.id)}
+                  className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-semibold px-3 py-2 rounded-xl text-xs transition"
+                >
+                  <SkipForward className="w-3.5 h-3.5" />
+                  <span>ข้ามแชมป์ (ไม่อยู่ในห้อง)</span>
+                </button>
+              )}
             </div>
           </div>
 
-          {/* การ์ดอันดับ Podium 1st, 2nd, 3rd */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {topThree.map((c, idx) => {
-              const rank = c.finishRank || idx + 1;
-              const isChamp = rank === 1;
-              const rewardsGiven = awardedRewards[c.id] || { coin: 0, ticket: 0 };
+            {podium.map((runner, idx) => {
+              const medal =
+                idx === 0 ? '🥇 อันดับ 1 (แชมป์)' : idx === 1 ? '🥈 อันดับ 2' : '🥉 อันดับ 3';
+              const cardStyle =
+                idx === 0
+                  ? 'border-amber-400 bg-amber-500/10'
+                  : idx === 1
+                  ? 'border-slate-400 bg-slate-800/70'
+                  : 'border-amber-700 bg-slate-900/80';
+              const rewardsGiven = awardedRewards[runner.candidate.id] || { coin: 0, ticket: 0 };
 
               return (
                 <div
-                  key={c.id}
-                  className={`rounded-2xl p-4 border relative flex flex-col justify-between transition-all ${
-                    isChamp
-                      ? 'border-amber-400 bg-amber-500/10 shadow-lg ring-2 ring-amber-400/40 md:-translate-y-2'
-                      : rank === 2
-                      ? 'border-slate-300 bg-slate-50 dark:bg-slate-800/60 dark:border-slate-700'
-                      : 'border-amber-700/30 bg-amber-900/5 dark:bg-slate-800/40 dark:border-slate-700'
-                  }`}
+                  key={runner.candidate.id}
+                  className={`border-2 rounded-2xl p-4 flex flex-col justify-between gap-3 ${cardStyle}`}
                 >
-                  {/* Badge อันดับ */}
-                  <div className="flex items-center justify-between mb-3">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold ${
-                        isChamp
-                          ? 'bg-amber-400 text-amber-900 shadow-sm'
-                          : rank === 2
-                          ? 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200'
-                          : 'bg-amber-200 text-amber-800'
-                      }`}
-                    >
-                      {rank === 1 ? '🥇 อันดับ 1 ชนะเลิศ' : rank === 2 ? '🥈 อันดับ 2 รองชนะเลิศ' : '🥉 อันดับ 3'}
+                  <div>
+                    <span className="text-xs font-extrabold text-amber-300">
+                      {medal} • ลู่ที่ {runner.laneIndex + 1}
                     </span>
-                    <span className="text-xs font-semibold text-slate-400">
-                      ลู่ที่ {c.laneIndex + 1}
-                    </span>
-                  </div>
-
-                  {/* ข้อมูลนักเรียน */}
-                  <div className="space-y-1 mb-4">
-                    <p className="text-xs font-semibold text-blue-500">
-                      {c.studentCode ? `รหัส ${c.studentCode}` : ''}{' '}
-                      {c.number ? `• เลขที่ ${c.number}` : ''}
-                    </p>
-                    <h4 className="text-base font-bold text-[#163A66] dark:text-white leading-tight">
-                      {c.name}
+                    <h4 className="text-xl font-black text-white mt-1">
+                      {runner.candidate.number !== undefined
+                        ? `เลขที่ ${runner.candidate.number} • `
+                        : ''}
+                      {runner.candidate.label}
                     </h4>
                   </div>
 
-                  {/* ปุ่มมอบรางวัลด่วน (+1🪙, +1🎟️) */}
-                  <div className="pt-3 border-t border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5">
+                  <div className="flex items-center justify-between gap-2 pt-2">
+                    <div className="flex items-center gap-2 flex-1">
                       <button
-                        onClick={() => handleAwardPodiumCoin(c, 1)}
-                        className="flex items-center gap-1 bg-amber-500 hover:bg-amber-400 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg shadow-sm transition active:scale-95"
+                        onClick={() =>
+                          handleAwardCoin(runner.candidate, idx === 0 ? 2 : 1)
+                        }
+                        className="flex-1 flex items-center justify-center gap-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold py-2 px-3 rounded-xl text-xs transition active:scale-95"
                       >
-                        <Coin2Regular className="w-3.5 h-3.5" />
-                        <span>+1 🪙</span>
+                        <Coins className="w-3.5 h-3.5" />
+                        <span>+{idx === 0 ? 2 : 1} 🪙</span>
                       </button>
+
                       <button
-                        onClick={() => handleAwardPodiumTicket(c, 1)}
-                        className="flex items-center gap-1 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg shadow-sm transition active:scale-95"
+                        onClick={() => handleAwardTicket(runner.candidate, 1)}
+                        className="flex-1 flex items-center justify-center gap-1 bg-pink-500/20 hover:bg-pink-500/30 border border-pink-400/40 text-pink-200 font-bold py-2 px-3 rounded-xl text-xs transition active:scale-95"
                       >
-                        <TicketRegular className="w-3.5 h-3.5" />
+                        <Ticket className="w-3.5 h-3.5" />
                         <span>+1 🎟️</span>
                       </button>
                     </div>
 
                     {(rewardsGiven.coin > 0 || rewardsGiven.ticket > 0) && (
-                      <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                        ได้รับ: +{rewardsGiven.coin}🪙 {rewardsGiven.ticket > 0 ? `+${rewardsGiven.ticket}🎟️` : ''}
+                      <span className="text-[11px] font-bold text-emerald-400 shrink-0">
+                        ได้รับ: +{rewardsGiven.coin}🪙
                       </span>
                     )}
                   </div>
@@ -860,3 +1315,5 @@ export const RunningTrackArena: React.FC<RunningTrackArenaProps> = ({
     </div>
   );
 };
+
+export default RunningTrackArena;
