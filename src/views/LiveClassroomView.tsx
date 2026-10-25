@@ -298,12 +298,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
         return;
       }
 
-      if (e.code === 'Space') {
-        e.preventDefault();
-        if (activeTab === 'timer') {
-          setIsTimerRunning((prev) => !prev);
-        }
-      } else if (e.key.toLowerCase() === 'f') {
+      if (e.key.toLowerCase() === 'f') {
         e.preventDefault();
         toggleProjectorMode();
       } else if (e.key.toLowerCase() === 'm') {
@@ -314,7 +309,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab, toggleProjectorMode, toggleSound]);
+  }, [toggleProjectorMode, toggleSound]);
 
   // Totals
   const sessionTotalCoins = useMemo(() => {
@@ -440,6 +435,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
             onPlaySound={triggerSound}
             onToggleAttendance={handleToggleAttendance}
             syncingAttendanceIds={syncingAttendanceIds}
+            isActive={activeTab === 'picker'}
           />
         </div>
 
@@ -454,6 +450,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
             subjectName={currentClassroom?.subject || 'general_subject'}
             onGiveReward={giveReward}
             onPlaySound={triggerSound}
+            isActive={activeTab === 'words'}
           />
         </div>
 
@@ -469,6 +466,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
             onGiveReward={giveReward}
             onPlaySound={triggerSound}
             onOpenGoldQuestArena={() => setIsGoldQuestArenaOpen(true)}
+            isActive={activeTab === 'timer'}
           />
         </div>
 

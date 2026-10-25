@@ -43,6 +43,7 @@ export interface RandomTextSubTabProps {
   ) => void;
   onPlaySound?: (type: 'tick' | 'coin' | 'fanfare' | 'buzzer', freq?: number) => void;
   onNotifyToast?: (message: string) => void;
+  isActive?: boolean;
 }
 
 export const RandomTextSubTab: React.FC<RandomTextSubTabProps> = ({
@@ -55,6 +56,7 @@ export const RandomTextSubTab: React.FC<RandomTextSubTabProps> = ({
   onGiveReward,
   onPlaySound,
   onNotifyToast,
+  isActive = true,
 }) => {
   // Decks state
   const [decks, setDecks] = useState<WordDeckItem[]>([]);
@@ -74,6 +76,22 @@ export const RandomTextSubTab: React.FC<RandomTextSubTabProps> = ({
   const [pairedStudent, setPairedStudent] = useState<LiveStudent | null>(null);
   const [rollingStudent, setRollingStudent] = useState<LiveStudent | null>(null);
   const [rewardGranted, setRewardGranted] = useState<boolean>(false);
+
+  // Voice & Speech TTS settings (Thai, English, Japanese, Chinese)
+  const [speakStudentName, setSpeakStudentName] = useState<boolean>(() => {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('cls_speak_student_name_vocab');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
+  const [vocabSpeechLang, setVocabSpeechLang] = useState<'th-TH' | 'en-US' | 'ja-JP' | 'zh-CN'>(() => {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('cls_vocab_speech_lang');
+      if (saved) return saved as any;
+    }
+    return 'th-TH';
+  });
 
   // Deck Management Modal State
   const [isDeckModalOpen, setIsDeckModalOpen] = useState<boolean>(false);
@@ -228,14 +246,14 @@ export const RandomTextSubTab: React.FC<RandomTextSubTabProps> = ({
           onPlaySound?.('fanfare');
 
           // 🔊 อ่านออกเสียงเมื่อสุ่มเสร็จสิ้น
-          if (targetStudent) {
+          if (targetStudent && speakStudentName) {
             tts.speakStudentName(targetStudent.number, targetStudent.name, true);
             const wordTimer = setTimeout(() => {
-              tts.speakText(targetWord);
+              tts.speakText(targetWord, vocabSpeechLang, true);
             }, 1200);
             spinTimersRef.current.push(wordTimer);
           } else {
-            tts.speakText(targetWord);
+            tts.speakText(targetWord, vocabSpeechLang, true);
           }
         }
       }, stepTimeMs);
@@ -247,10 +265,34 @@ export const RandomTextSubTab: React.FC<RandomTextSubTabProps> = ({
     availableWords,
     cancelSpinTimers,
     isPairStudent,
+    speakStudentName,
+    vocabSpeechLang,
     presentStudents,
     spinSpeed,
     onPlaySound,
   ]);
+
+  // คีย์ลัด Spacebar สำหรับสุ่มคำศัพท์
+  useEffect(() => {
+    if (!isActive) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+      if (e.code === 'Space') {
+        e.preventDefault();
+        handleSpinWord();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isActive, handleSpinWord]);
 
   // สลับนักเรียนคนอื่น (กรณีสุ่มคำศัพท์เดิมแต่นักเรียนขอผ่าน)
   const handleRerollStudent = () => {
@@ -443,6 +485,43 @@ export const RandomTextSubTab: React.FC<RandomTextSubTabProps> = ({
               🎯 สุ่มคู่กับนักเรียนตอบ
             </span>
           </label>
+
+          {isPairStudent && (
+            <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold select-none bg-blue-50/70 dark:bg-slate-800/80 px-2.5 py-1 rounded-xl border border-blue-100 dark:border-slate-700">
+              <input
+                type="checkbox"
+                checked={speakStudentName}
+                onChange={(e) => {
+                  setSpeakStudentName(e.target.checked);
+                  localStorage.setItem('cls_speak_student_name_vocab', String(e.target.checked));
+                }}
+                className="w-3.5 h-3.5 rounded accent-blue-600"
+              />
+              <Volume2 className="w-3.5 h-3.5 text-blue-500" />
+              <span className={isProjectorMode ? 'text-slate-200' : 'text-[#163A66]'}>
+                เรียกชื่อนักเรียนด้วยเสียงพูด
+              </span>
+            </label>
+          )}
+
+          {/* ตัวเลือกภาษาสำหรับอ่านออกเสียงคำศัพท์ (ไทย, อังกฤษ, ญี่ปุ่น, จีน) */}
+          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700">
+            <span className="text-[11px] font-bold text-slate-500">ภาษาเสียง:</span>
+            <select
+              value={vocabSpeechLang}
+              onChange={(e) => {
+                const val = e.target.value as any;
+                setVocabSpeechLang(val);
+                localStorage.setItem('cls_vocab_speech_lang', val);
+              }}
+              className="text-xs font-bold bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer"
+            >
+              <option value="th-TH">🇹🇭 ไทย</option>
+              <option value="en-US">🇬🇧 English</option>
+              <option value="ja-JP">🇯🇵 日本語</option>
+              <option value="zh-CN">🇨🇳 中文</option>
+            </select>
+          </div>
 
           <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl">
             {(['fast', 'normal', 'dramatic'] as SpinSpeed[]).map((spd) => (

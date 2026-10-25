@@ -26,6 +26,7 @@ export interface LiveTimerSubTabProps {
   ) => void;
   onPlaySound?: (type: 'tick' | 'coin' | 'fanfare' | 'buzzer', freq?: number) => void;
   onOpenGoldQuestArena?: () => void;
+  isActive?: boolean;
 }
 
 export function formatTimerMMSS(seconds: number): string {
@@ -45,6 +46,7 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
   onGiveReward,
   onPlaySound,
   onOpenGoldQuestArena,
+  isActive = true,
 }) => {
   const [configuredSeconds, setConfiguredSeconds] = useState<number>(120);
   const [totalSeconds, setTotalSeconds] = useState<number>(120);
@@ -127,6 +129,7 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
 
   // Keyboard shortcut: Spacebar to Start/Pause
   useEffect(() => {
+    if (!isActive) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
         const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
@@ -137,7 +140,7 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isTimerRunning, remainingSeconds, configuredSeconds]);
+  }, [isActive, isTimerRunning, remainingSeconds, configuredSeconds]);
 
   const pickChallengers = useCallback(() => {
     if (presentStudents.length < versusCount) return;

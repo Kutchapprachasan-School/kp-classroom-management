@@ -163,17 +163,21 @@ export const LiveClassroomHeader: React.FC<LiveClassroomHeaderProps> = ({
           {/* Quick Lucky Draw Button */}
           <button
             onClick={onOpenLuckyDraw}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-md shadow-pink-500/20 transition active:scale-95"
+            className="flex items-center gap-1.5 bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-md shadow-pink-500/20 transition active:scale-95 cursor-pointer"
             title="เปิดวงล้อจับรางวัลตั๋วสุ่มท้ายคาบ"
           >
             <TicketRegular className="w-4 h-4" />
-            <span>หมุนวงล้อตั๋วสุ่ม ({sessionTickets} 🎟️)</span>
+            <span className="inline-flex items-center gap-1">
+              <span>หมุนวงล้อตั๋วสุ่ม ({sessionTickets}</span>
+              <TicketRegular className="w-3.5 h-3.5 inline" />
+              <span>)</span>
+            </span>
           </button>
 
           {/* Session Ledger Counter */}
           <button
             onClick={() => onChangeTab('rewards')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border transition ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border transition cursor-pointer ${
               isProjectorMode
                 ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
                 : 'bg-[#F7FAFF] hover:bg-blue-50 border-[#E6EEF7] text-[#163A66]'
@@ -182,9 +186,15 @@ export const LiveClassroomHeader: React.FC<LiveClassroomHeaderProps> = ({
           >
             <Coin2Regular className="w-4 h-4 text-amber-500" />
             <span className="text-xs font-medium">แจกในคาบ:</span>
-            <span className="font-bold text-amber-500">{sessionCoins} 🪙</span>
+            <span className="inline-flex items-center gap-1 font-bold text-amber-500">
+              <span>{sessionCoins}</span>
+              <Coin2Regular className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+            </span>
             <span className="text-slate-300">|</span>
-            <span className="font-bold text-pink-500">{sessionTickets} 🎟️</span>
+            <span className="inline-flex items-center gap-1 font-bold text-pink-500">
+              <span>{sessionTickets}</span>
+              <TicketRegular className="w-3.5 h-3.5 text-pink-500 shrink-0" />
+            </span>
           </button>
 
           {/* Sound FX Toggle */}

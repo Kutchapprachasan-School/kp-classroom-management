@@ -35,6 +35,7 @@ export interface RandomPickerSubTabProps {
   onPlaySound?: (type: 'tick' | 'coin' | 'fanfare' | 'buzzer' | 'whistle', freq?: number) => void;
   onToggleAttendance: (studentId: string) => Promise<void>;
   syncingAttendanceIds: string[];
+  isActive?: boolean;
 }
 
 export function getAvailablePool(
@@ -63,6 +64,7 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
   onPlaySound,
   onToggleAttendance,
   syncingAttendanceIds,
+  isActive = true,
 }) => {
   const [pickerMode, setPickerMode] = useState<PickerMode>('slot');
   const [spinSpeed, setSpinSpeed] = useState<SpinSpeed>('normal');
@@ -188,6 +190,7 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
 
   // Hotkey สำหรับกด Spacebar สุ่มชื่อในโหมด Slot Reel
   useEffect(() => {
+    if (!isActive) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (
@@ -206,7 +209,7 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [pickerMode, handleRandomPick]);
+  }, [isActive, pickerMode, handleRandomPick]);
 
   const handleSkipStudent = () => {
     if (!selectedStudent) return;

@@ -101,13 +101,25 @@ class CoursesCurriculumService {
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) {
-            // Auto-heal any courses that have leftover default 'ม.3/1' or 'ม.3/2' when their level is different (e.g. ม.1)
+            // Auto-heal any courses that have mismatched assignedClassrooms for their level (e.g. ม.3 having ม.1/1)
             let modified = false;
             parsed.forEach((c: CourseCurriculumRecord) => {
-              if (c.level && c.level !== 'ม.3' && Array.isArray(c.assignedClassrooms) && c.assignedClassrooms.length > 1) {
+              if (c.level && Array.isArray(c.assignedClassrooms) && c.assignedClassrooms.length > 0) {
                 const levelMatching = c.assignedClassrooms.filter((r) => r.startsWith(c.level));
                 if (levelMatching.length > 0 && levelMatching.length < c.assignedClassrooms.length) {
                   c.assignedClassrooms = levelMatching;
+                  modified = true;
+                } else if (levelMatching.length === 0) {
+                  // Assigned rooms were completely from wrong grade (e.g. all ม.1 on a ม.3 course)
+                  const fallbackByLevel: Record<string, string[]> = {
+                    'ม.1': ['ม.1/1', 'ม.1/2'],
+                    'ม.2': ['ม.2/1'],
+                    'ม.3': ['ม.3/1', 'ม.3/2'],
+                    'ม.4': ['ม.4/1'],
+                    'ม.5': ['ม.5/1'],
+                    'ม.6': ['ม.6/1'],
+                  };
+                  c.assignedClassrooms = fallbackByLevel[c.level] || [`${c.level}/1`];
                   modified = true;
                 }
               }

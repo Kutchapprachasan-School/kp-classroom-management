@@ -422,15 +422,43 @@ export const ExamManagementView: React.FC = () => {
   );
 
   const currentSubjectRooms = useMemo(() => {
-    if (selectedCurriculumCourse?.assignedClassrooms && selectedCurriculumCourse.assignedClassrooms.length > 0) {
-      return selectedCurriculumCourse.assignedClassrooms;
+    const courseLevel = selectedCurriculumCourse?.level;
+    if (selectedCurriculumCourse) {
+      let validRooms = Array.isArray(selectedCurriculumCourse.assignedClassrooms)
+        ? selectedCurriculumCourse.assignedClassrooms.filter(Boolean)
+        : [];
+      if (courseLevel) {
+        const levelMatching = validRooms.filter((r) => r.startsWith(courseLevel));
+        if (levelMatching.length > 0) {
+          return levelMatching;
+        }
+        const sysRooms = allSystemClassrooms.filter((r) => r.startsWith(courseLevel));
+        if (sysRooms.length > 0) return sysRooms;
+      } else if (validRooms.length > 0) {
+        return validRooms;
+      }
     }
+
     const matchedSubject = teachingSubjects.find(
       (s) => s.code === newSubjectCode || `${s.code} ${s.name}` === newSubjectCode
     );
     if (matchedSubject?.classrooms && matchedSubject.classrooms.length > 0) {
-      return matchedSubject.classrooms;
+      if (courseLevel) {
+        const filtered = matchedSubject.classrooms.filter((r) => r.startsWith(courseLevel));
+        if (filtered.length > 0) return filtered;
+      } else {
+        return matchedSubject.classrooms;
+      }
     }
+
+    // Check if subject code or title has a grade level indicator (e.g. ญ21202 or ม.1 or ม.3)
+    const codeMatch = newSubjectCode.match(/([ม]\.[1-6])/);
+    const targetLevel = courseLevel || (codeMatch ? codeMatch[1] : null);
+    if (targetLevel) {
+      const filtered = allSystemClassrooms.filter((r) => r.startsWith(targetLevel));
+      if (filtered.length > 0) return filtered;
+    }
+
     return allSystemClassrooms;
   }, [selectedCurriculumCourse, newSubjectCode, teachingSubjects, allSystemClassrooms]);
 
@@ -439,9 +467,23 @@ export const ExamManagementView: React.FC = () => {
     const course = curriculumCourses.find((c) => c.id === courseId);
     if (course) {
       setNewSubjectCode(`${course.code} ${course.name}`);
-      if (course.assignedClassrooms && course.assignedClassrooms.length > 0) {
-        setNewRoomName(course.assignedClassrooms.join(', '));
-        setFormSelectedRooms(course.assignedClassrooms);
+      const courseLevel = course.level;
+      let validRooms = (course.assignedClassrooms || []).filter(Boolean);
+      if (courseLevel) {
+        const levelMatching = validRooms.filter((r) => r.startsWith(courseLevel));
+        if (levelMatching.length > 0) {
+          validRooms = levelMatching;
+        } else {
+          const sysRooms = allSystemClassrooms.filter((r) => r.startsWith(courseLevel));
+          validRooms = sysRooms.length > 0 ? sysRooms : validRooms;
+        }
+      }
+      if (validRooms.length > 0) {
+        setNewRoomName(validRooms.join(', '));
+        setFormSelectedRooms(validRooms);
+      } else if (allSystemClassrooms.length > 0) {
+        setNewRoomName(allSystemClassrooms[0]);
+        setFormSelectedRooms([allSystemClassrooms[0]]);
       }
       if (course.units && course.units.length > 0) {
         const firstUnit = course.units[0];
@@ -690,27 +732,64 @@ export const ExamManagementView: React.FC = () => {
 
     async function loadDataForExam() {
       try {
-        let roomId = currentExam.classroom || currentExam.roomName || '';
         const allRooms = await classroomService.getAll();
-        const matched = allRooms.find(
-          (r) => r.name === roomId || r.roomNumber === roomId || r.id === roomId
+
+        // Determine expected grade level (e.g. "ม.3" or "ม.4")
+        const matchedCourse = curriculumCourses.find(
+          (c) =>
+            c.id === currentExam.targetCurriculumCourseId ||
+            `${c.code} ${c.name}` === currentExam.subjectCode ||
+            c.code === currentExam.subjectCode
         );
-        if (matched) {
-          roomId = matched.id;
-        } else if (!roomId && allRooms.length > 0) {
-          roomId = allRooms[0].id;
+        const expectedLevel =
+          matchedCourse?.level || currentExam.subjectCode.match(/([ม]\.[1-6])/)?.[1];
+
+        let targetClassroomNames: string[] = [];
+        if (Array.isArray(currentExam.targetClassrooms) && currentExam.targetClassrooms.length > 0) {
+          targetClassroomNames = currentExam.targetClassrooms;
+        } else if (currentExam.roomName) {
+          const roomMatches = currentExam.roomName.match(/ม\.[1-6]\/\d+/g);
+          if (roomMatches && roomMatches.length > 0) {
+            targetClassroomNames = roomMatches;
+          } else {
+            targetClassroomNames = [currentExam.classroom || currentExam.roomName];
+          }
         }
 
-        const realStudents = await studentService.getByClassroom(roomId);
-        const mappedEntries: StudentScoreEntry[] = realStudents.map((stu) => ({
-          id: stu.id,
-          studentNo: stu.no,
-          studentCode: stu.code,
-          name: stu.name,
-          room: matched?.name || currentExam.roomName || (allSystemClassrooms[0] || ''),
-          score: null,
-          status: 'PENDING',
-        }));
+        // Filter out mismatched classrooms if expectedLevel is known
+        if (expectedLevel) {
+          const levelMatching = targetClassroomNames.filter((r) => r.startsWith(expectedLevel));
+          if (levelMatching.length > 0) {
+            targetClassroomNames = levelMatching;
+          } else {
+            const sysOfLevel = allSystemClassrooms.filter((r) => r.startsWith(expectedLevel));
+            targetClassroomNames = sysOfLevel.length > 0 ? sysOfLevel : targetClassroomNames;
+          }
+        }
+
+        if (targetClassroomNames.length === 0 && allRooms.length > 0) {
+          targetClassroomNames = [allRooms[0].name || allRooms[0].roomNumber || allRooms[0].id];
+        }
+
+        const mappedEntries: StudentScoreEntry[] = [];
+        for (const roomLabel of targetClassroomNames) {
+          const matched = allRooms.find(
+            (r) => r.name === roomLabel || r.roomNumber === roomLabel || r.id === roomLabel
+          );
+          const rId = matched?.id || roomLabel;
+          const realStudents = await studentService.getByClassroom(rId);
+          realStudents.forEach((stu) => {
+            mappedEntries.push({
+              id: stu.id,
+              studentNo: stu.no,
+              studentCode: stu.code,
+              name: stu.name,
+              room: matched?.name || roomLabel,
+              score: null,
+              status: 'PENDING',
+            });
+          });
+        }
 
         let loadedScores: Record<string, number | null> = {};
         try {
@@ -1971,9 +2050,9 @@ export const ExamManagementView: React.FC = () => {
           MODAL 1: สร้างชุดข้อสอบใหม่ (Create New Exam Form)
           ======================================================== */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-xl w-full p-6 space-y-4 animate-scale-up">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-xl w-full p-5 sm:p-6 space-y-4 max-h-[92vh] flex flex-col my-auto animate-scale-up">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
                   <PenTool className="w-5 h-5" />
@@ -1997,7 +2076,7 @@ export const ExamManagementView: React.FC = () => {
             </div>
 
             {/* Preset Buttons */}
-            <div className="bg-slate-50 p-2.5 rounded-2xl border border-slate-100 space-y-1.5">
+            <div className="bg-slate-50 p-2.5 rounded-2xl border border-slate-100 space-y-1.5 shrink-0">
               <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                 <span>แม่แบบด่วน (Quick Presets):</span>
@@ -2034,7 +2113,7 @@ export const ExamManagementView: React.FC = () => {
               </div>
             </div>
 
-            <form onSubmit={handleCreateExam} className="space-y-3.5 text-xs">
+            <form onSubmit={handleCreateExam} className="space-y-3.5 text-xs overflow-y-auto flex-1 pr-1.5 min-h-0">
               {/* เลือกรายวิชาจากหลักสูตร */}
               <div className="p-3 bg-blue-50/50 border border-blue-200/80 rounded-xl space-y-2">
                 <label className="font-bold text-blue-950 flex items-center justify-between">
@@ -2372,7 +2451,7 @@ export const ExamManagementView: React.FC = () => {
                 )}
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 shrink-0 bg-white">
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}

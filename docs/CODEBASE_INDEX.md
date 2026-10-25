@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 25/10/2569 13:35:47 | รวมทั้งหมด 230 ไฟล์*
+*อัปเดตล่าสุด: 25/10/2569 14:15:14 | รวมทั้งหมด 230 ไฟล์*
 
 ---
 
@@ -21,13 +21,13 @@
 | [src/views/CoursesCurriculumView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/CoursesCurriculumView.tsx) | 2100 | `CoursesCurriculumViewProps` (L38), `CoursesCurriculumView` (L42) |
 | [src/views/CrossClassSarView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/CrossClassSarView.tsx) | 1627 | `CrossClassSarView` (L79) |
 | [src/views/EndTermReadinessView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/EndTermReadinessView.tsx) | 1192 | `EndTermReadinessViewProps` (L32), `StudentWithGrades` (L36), `EndTermReadinessView` (L66) |
-| [src/views/ExamManagementView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ExamManagementView.tsx) | 3191 | `ExtendedExamItem` (L79), `ExamManagementView` (L97) |
+| [src/views/ExamManagementView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ExamManagementView.tsx) | 3270 | `ExtendedExamItem` (L79), `ExamManagementView` (L97) |
 | [src/views/GoldQuestJoinView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/GoldQuestJoinView.tsx) | 496 | `RoomStudent` (L22), `AVATAR_OPTIONS` (L28), `GoldQuestJoinView` (L480) |
 | [src/views/GoldQuestPlayView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/GoldQuestPlayView.tsx) | 10 | `GoldQuestPlayView` (L8) |
 | [src/views/GradingQueueView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/GradingQueueView.tsx) | 549 | `GradingQueueView` (L37) |
 | [src/views/HomeVisitSdqView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/HomeVisitSdqView.tsx) | 1355 | `HomeVisitSdqView` (L27) |
 | [src/views/LessonPlansView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/LessonPlansView.tsx) | 1776 | `UnitStatus` (L33), `EvaluationItem` (L35), `UnitPlanItem` (L42), `CourseFilterOption` (L87), `LessonPlansView` (L96) |
-| [src/views/LiveClassroomView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/LiveClassroomView.tsx) | 540 | `LiveClassroomViewProps` (L27), `LiveClassroomView` (L31) |
+| [src/views/LiveClassroomView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/LiveClassroomView.tsx) | 538 | `LiveClassroomViewProps` (L27), `LiveClassroomView` (L31) |
 | [src/views/MessagesView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/MessagesView.tsx) | 1455 | `MessagesView` (L47) |
 | [src/views/MorningAssemblyView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/MorningAssemblyView.tsx) | 1323 | `MorningAssemblyViewProps` (L54), `MorningAssemblyView` (L90) |
 | [src/views/SchoolLeaveExecutiveDashboardView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/SchoolLeaveExecutiveDashboardView.tsx) | 292 | `SchoolLeaveExecutiveDashboardView` (L43) |
@@ -135,11 +135,11 @@
 | [src/components/exam/StudentExamPlayerModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/exam/StudentExamPlayerModal.tsx) | 479 | `StudentExamPlayerModal` (L38) |
 | [src/components/live-classroom/GoldQuestArena.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/GoldQuestArena.tsx) | 16 | *(Internal / Default Export)* |
 | [src/components/live-classroom/GroupGeneratorSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/GroupGeneratorSubTab.tsx) | 550 | `GroupPresetItem` (L22), `GroupGeneratorSubTabProps` (L33), `swapStudentsBetweenGroups` (L47), `GroupGeneratorSubTab` (L84) |
-| [src/components/live-classroom/LiveClassroomHeader.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LiveClassroomHeader.tsx) | 273 | `SubTab` (L21), `LiveClassroomHeaderProps` (L23), `LiveClassroomHeader` (L45) |
-| [src/components/live-classroom/LiveTimerSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LiveTimerSubTab.tsx) | 480 | `LiveTimerSubTabProps` (L14), `formatTimerMMSS` (L31), `LiveTimerSubTab` (L38) |
+| [src/components/live-classroom/LiveClassroomHeader.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LiveClassroomHeader.tsx) | 283 | `SubTab` (L21), `LiveClassroomHeaderProps` (L23), `LiveClassroomHeader` (L45) |
+| [src/components/live-classroom/LiveTimerSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LiveTimerSubTab.tsx) | 483 | `LiveTimerSubTabProps` (L14), `formatTimerMMSS` (L32), `LiveTimerSubTab` (L39) |
 | [src/components/live-classroom/LuckyTicketDrawModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LuckyTicketDrawModal.tsx) | 517 | `LuckyTicketDrawModalProps` (L20), `createSlicePath` (L43), `describeArcSlice` (L66), `LuckyTicketDrawModal` (L68) |
-| [src/components/live-classroom/RandomPickerSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RandomPickerSubTab.tsx) | 730 | `PickerMode` (L18), `SpinSpeed` (L19), `RandomPickerSubTabProps` (L21), `getAvailablePool` (L40), `restoreSkippedStudent` (L50), `RandomPickerSubTab` (L54) |
-| [src/components/live-classroom/RandomTextSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RandomTextSubTab.tsx) | 804 | `SpinSpeed` (L29), `RandomTextSubTabProps` (L31), `RandomTextSubTab` (L48) |
+| [src/components/live-classroom/RandomPickerSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RandomPickerSubTab.tsx) | 733 | `PickerMode` (L18), `SpinSpeed` (L19), `RandomPickerSubTabProps` (L21), `getAvailablePool` (L41), `restoreSkippedStudent` (L51), `RandomPickerSubTab` (L55) |
+| [src/components/live-classroom/RandomTextSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RandomTextSubTab.tsx) | 883 | `SpinSpeed` (L29), `RandomTextSubTabProps` (L31), `RandomTextSubTab` (L49) |
 | [src/components/live-classroom/RewardBoardSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RewardBoardSubTab.tsx) | 285 | `RewardBoardSubTabProps` (L16), `calculateTopEarners` (L26), `formatRewardTimeThai` (L38), `RewardBoardSubTab` (L52) |
 | [src/components/live-classroom/RunningTrackArena.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RunningTrackArena.tsx) | 1320 | `RaceCandidate` (L40), `RunningTrackArenaProps` (L77), `RunningTrackArena` (L240) |
 | [src/components/mobile/index.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/mobile/index.ts) | 12 | *(Internal / Default Export)* |
@@ -199,7 +199,7 @@
 | [src/services/classroomService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts) | 846 | `getDeletedRoomsSet` (L10), `saveDeletedRoomsSet` (L25), `getLocalClassrooms` (L36), `TeacherAccountItem` (L90), `DEFAULT_TEACHER_ACCOUNTS` (L100), `INITIAL_SEED_CLASSROOMS` (L102), `invalidateClassroomCache` (L125), `classroomService` (L132) |
 | [src/services/cleanSlateService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/cleanSlateService.ts) | 211 | `CleanSlatePurgeResult` (L5), `TRANSACTIONAL_STORAGE_KEYS` (L16), `PRESERVED_INFRASTRUCTURE_KEYS` (L61), `cleanSlateService` (L210) |
 | [src/services/cloudDataService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/cloudDataService.ts) | 983 | `CloudStoreRecord` (L8), `CloudSyncState` (L14), `cloudDataService` (L645), `FileValidationResult` (L647), `MAX_IMAGE_SIZE_MB` (L655), `MAX_DOC_SIZE_MB` (L656), `ALLOWED_IMAGE_EXTENSIONS` (L659), `ALLOWED_DOC_EXTENSIONS` (L660), `ALLOWED_MIME_TYPES` (L662), `sanitizeFileName` (L675) *(+5 รายการ)* |
-| [src/services/coursesCurriculumService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/coursesCurriculumService.ts) | 813 | `MediaType` (L12), `UnitMediaItem` (L14), `CurriculumUnit` (L28), `CourseCurriculumRecord` (L40), `TrashMediaItem` (L57), `calculatePeriodsPerWeek` (L76), `coursesCurriculumService` (L811) |
+| [src/services/coursesCurriculumService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/coursesCurriculumService.ts) | 825 | `MediaType` (L12), `UnitMediaItem` (L14), `CurriculumUnit` (L28), `CourseCurriculumRecord` (L40), `TrashMediaItem` (L57), `calculatePeriodsPerWeek` (L76), `coursesCurriculumService` (L823) |
 | [src/services/gachaAdminService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gachaAdminService.ts) | 383 | `GachaSnapshot` (L14), `GachaAdminAuditLog` (L24), `gachaAdminService` (L83), 📌 *Snapshots & Rollback* (L84), 📌 *Granting Operations* (L155), 📌 *Reset Operations* (L277), 📌 *Audit Logs* (L377) |
 | [src/services/gachaConfigService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gachaConfigService.ts) | 218 | `GACHA_CONFIG_STORAGE_KEY` (L9), `GACHA_CONFIG_UPDATED_EVENT` (L10), `RARITY_ORDER` (L12), `GachaAdminConfig` (L21), `DEFAULT_GACHA_CONFIG` (L71), `validateGachaConfig` (L160), `gachaConfigService` (L180) |
 | [src/services/gachaRewardEngine.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gachaRewardEngine.ts) | 183 | `StudentQuest` (L9), `gachaRewardEngine` (L31) |
@@ -266,7 +266,7 @@
 | [src/utils/liveClassroomAlgorithms.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/liveClassroomAlgorithms.ts) | 205 | `StudentGroup` (L7), `WeightedWheelSegment` (L14), `generateBalancedGroups` (L42), `buildWeightedWheelSegments` (L143), `pickWeightedWheelWinner` (L186) |
 | [src/utils/promotionDryRunEngine.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/promotionDryRunEngine.ts) | 376 | `PromotionActionType` (L11), `GraduationApprovalStatus` (L19), `ClassroomMappingRule` (L25), `StudentDryRunInput` (L33), `StudentPromotionDecision` (L50), `PromotionDryRunConfig` (L62), `PromotionDryRunReport` (L69), `parseGradeLevelFromRoom` (L90), `generateDefaultClassroomMappings` (L107), `evaluateStudentPromotion` (L148) *(+2 รายการ)* |
 | [src/utils/racePhysicsEngine.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/racePhysicsEngine.ts) | 207 | `WORLD_TRACK_LENGTH` (L7), `START_WORLD_X` (L8), `FINISH_WORLD_X` (L9), `MIN_LANE_HEIGHT_PX` (L10), `PROJECTOR_LANE_HEIGHT_PX` (L11), `STADIUM_HEADER_HEIGHT_PX` (L12), `DistanceMarker` (L14), `getTrackDistanceMarkers` (L23), `computeRunnerProgress` (L42), `computeRunnerWorldX` (L66) *(+7 รายการ)* |
-| [src/utils/speechTTS.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/speechTTS.ts) | 130 | `JapanesePraise` (L5), `tts` (L129) |
+| [src/utils/speechTTS.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/speechTTS.ts) | 226 | `JapanesePraise` (L5), `EnglishPraise` (L6), `ChinesePraise` (L7), `SpeechLanguage` (L8), `tts` (L225) |
 | [src/utils/studentIdentityUtils.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/studentIdentityUtils.ts) | 24 | `StudentIdentityCandidate` (L16) |
 | [src/utils/timetableDateUtils.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/timetableDateUtils.ts) | 797 | `TimetableColorTheme` (L6), `TimetableMatrixSlot` (L15), `TaskWidgetItem` (L38), `CalendarEventItem` (L47), `THAI_MONTHS_SHORT` (L54), `WeekDayInfo` (L69), `ComputedWeekInfo` (L75), `BANGKOK_TIMEZONE` (L87), `getBangkokNow` (L89), `getBangkokTodayString` (L95) *(+8 รายการ)* |
 
