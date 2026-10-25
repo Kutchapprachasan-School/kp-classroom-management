@@ -505,7 +505,8 @@ export const teacherCourseAssignmentService = {
         const cachedDirectUrl = sgsRosterAndSubmissionService.getSubmissionFileUrl(
           sub.assignmentId,
           subCode,
-          effectiveFileName
+          effectiveFileName,
+          true
         );
 
         const r2FromKey = sub.r2ObjectKey ? resolveFileUrl(sub.r2ObjectKey) : undefined;
@@ -602,7 +603,7 @@ export const teacherCourseAssignmentService = {
             it.fileName ||
             (rawFileUrl ? decodeURIComponent(rawFileUrl.split('/').pop()?.split('?')[0] || '') : '');
           if (!previewUrl) {
-            previewUrl = sgsRosterAndSubmissionService.getSubmissionFileUrl(it.assignmentId, it.studentCode, cleanFileName);
+            previewUrl = sgsRosterAndSubmissionService.getSubmissionFileUrl(it.assignmentId, it.studentCode, cleanFileName, true);
           }
 
           const isImage = Boolean(

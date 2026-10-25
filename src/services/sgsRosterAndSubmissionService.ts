@@ -1449,7 +1449,8 @@ export const sgsRosterAndSubmissionService = {
             const cachedUrl = this.getSubmissionFileUrl(
               sub.assignmentId,
               sub.studentCode,
-              cleanFileName || sub.workAttachmentLabel
+              cleanFileName || sub.workAttachmentLabel,
+              true
             );
             if (cachedUrl) {
               return { ...sub, fileDataUrl: cachedUrl };
@@ -2870,7 +2871,8 @@ export const sgsRosterAndSubmissionService = {
   getSubmissionFileUrl(
     assignmentId?: string,
     studentCode?: string,
-    fileName?: string
+    fileName?: string,
+    fastDirectOnly: boolean = false
   ): string | undefined {
     if (typeof localStorage === 'undefined') return undefined;
     try {
@@ -2920,34 +2922,12 @@ export const sgsRosterAndSubmissionService = {
         }
       }
 
-      // 3. หากไม่มีในแคชของเครื่อง ให้ตรวจจาก submission (Cloudflare R2 URL สำหรับครูเปิดดูข้ามเครื่อง)
-      if (cleanAsg && cleanStu) {
-        try {
-          const subs = this.getSubmissions();
-          const matchedSub = subs.find(
-            (s) =>
-              s.assignmentId === cleanAsg &&
-              (s.studentCode === cleanStu || (s as any).studentId === cleanStu)
-          );
-          if (
-            matchedSub?.fileDataUrl &&
-            (matchedSub.fileDataUrl.startsWith('http://') || matchedSub.fileDataUrl.startsWith('https://')) &&
-            !matchedSub.fileDataUrl.includes('storage.kps.ac.th')
-          ) {
-            return matchedSub.fileDataUrl;
-          }
-          if (matchedSub?.r2ObjectKey && r2StorageService.isConfigured()) {
-            const resolved = r2StorageService.resolvePublicViewUrl(matchedSub.r2ObjectKey);
-            if (resolved && (resolved.startsWith('http://') || resolved.startsWith('https://')) && !resolved.includes('storage.kps.ac.th')) {
-              return resolved;
-            }
-          }
-        } catch {
-          // ignore
-        }
+      // เมื่อถูกเรียกจากภายใน getSubmissions() ให้หยุดแค่ O(1) Direct Key Lookup เพื่อป้องกัน Infinite Recursion และลด O(N^2) JSON.parse
+      if (fastDirectOnly) {
+        return undefined;
       }
 
-      // 4. สแกนคีย์ทั้งหมดใน localStorage ที่ขึ้นต้นด้วย kp_sub_file_ (ตรวจจับแบบ Strict ป้องกันงานปนกันข้ามคน)
+      // 3. สแกนคีย์ทั้งหมดใน localStorage ที่ขึ้นต้นด้วย kp_sub_file_ (ตรวจจับแบบ Strict ป้องกันงานปนกันข้ามคน)
       try {
         const matchingKeys: { key: string; score: number; value: string }[] = [];
         for (let i = 0; i < localStorage.length; i++) {
@@ -2985,7 +2965,7 @@ export const sgsRosterAndSubmissionService = {
         console.warn('Scan localStorage keys error', scanErr);
       }
 
-      // 4. ค้นหา Fallback ใน kp_work_submissions_v2 / v1
+      // 4. ค้นหา Fallback ใน kp_work_submissions_v2 / v1 (อ่านจาก raw JSON โดยตรง ห้ามเรียก this.getSubmissions() ซ้ำเพื่อป้องกัน Infinite Recursion)
       try {
         const rawSubs =
           localStorage.getItem(STORAGE_KEY_WORK_SUBMISSIONS) ||
@@ -2994,7 +2974,7 @@ export const sgsRosterAndSubmissionService = {
           const parsedList: StudentWorkSubmission[] = JSON.parse(rawSubs);
           const found = parsedList.find((s) => {
             if (!s) return false;
-            const matchStu = cleanStu ? s.studentCode === cleanStu : true;
+            const matchStu = cleanStu ? (s.studentCode === cleanStu || (s as any).studentId === cleanStu) : true;
             const matchAsg = cleanAsg ? s.assignmentId === cleanAsg : true;
             const matchFile = cleanFile
               ? s.workAttachmentLabel?.includes(cleanFile) || s.r2ObjectKey?.includes(cleanFile)
@@ -3003,6 +2983,12 @@ export const sgsRosterAndSubmissionService = {
           });
           if (found?.fileDataUrl && isValidDataUrl(found.fileDataUrl)) {
             return found.fileDataUrl;
+          }
+          if (found?.r2ObjectKey && r2StorageService.isConfigured()) {
+            const resolved = r2StorageService.resolvePublicViewUrl(found.r2ObjectKey);
+            if (resolved && isValidDataUrl(resolved)) {
+              return resolved;
+            }
           }
         }
       } catch (subErr) {
@@ -3468,7 +3454,8 @@ export const sgsRosterAndSubmissionService = {
       const cached = this.getSubmissionFileUrl(
         s.assignmentId,
         s.studentCode,
-        s.r2ObjectKey ? s.r2ObjectKey.split('/').pop() : undefined
+        s.r2ObjectKey ? s.r2ObjectKey.split('/').pop() : undefined,
+        true
       );
       if (cached && cached.startsWith('data:')) {
         count++;

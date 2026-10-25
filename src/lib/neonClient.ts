@@ -24,8 +24,8 @@ export const neonConnectionString =
 
 export const isNeonConfigured = Boolean(neonConnectionString);
 
-// Create the raw SQL query executor
-const sql = neon(neonConnectionString);
+// Create the raw SQL query executor (suppress browser console banner spam)
+const sql = neon(neonConnectionString, { disableWarningInBrowsers: true });
 
 // Cache Configuration
 const DEFAULT_SELECT_CACHE_TTL_MS = 30_000; // 30 seconds default TTL for read queries
