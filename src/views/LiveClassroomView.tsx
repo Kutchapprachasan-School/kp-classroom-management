@@ -16,6 +16,7 @@ import { authService } from '../services/authService';
 import { useOptimisticRewards } from '../hooks/useOptimisticRewards';
 import { LiveClassroomHeader, type SubTab } from '../components/live-classroom/LiveClassroomHeader';
 import { RandomPickerSubTab } from '../components/live-classroom/RandomPickerSubTab';
+import { RandomTextSubTab } from '../components/live-classroom/RandomTextSubTab';
 import { LiveTimerSubTab } from '../components/live-classroom/LiveTimerSubTab';
 import { GroupGeneratorSubTab } from '../components/live-classroom/GroupGeneratorSubTab';
 import { RewardBoardSubTab } from '../components/live-classroom/RewardBoardSubTab';
@@ -420,6 +421,20 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
             onPlaySound={triggerSound}
             onToggleAttendance={handleToggleAttendance}
             syncingAttendanceIds={syncingAttendanceIds}
+          />
+        </div>
+
+        {/* Tab 2: Random Text & Vocabulary Picker */}
+        <div className={activeTab === 'words' ? 'flex-1 flex flex-col' : 'hidden'}>
+          <RandomTextSubTab
+            students={students}
+            classroomId={selectedClassId}
+            isProjectorMode={isProjectorMode}
+            currentTeacherId={authService.getCurrentUser()?.id || authService.getCurrentUser()?.username || 'teacher_guest'}
+            currentTeacherName={authService.getCurrentUser()?.name || 'ครูผู้สอน'}
+            subjectName={currentClassroom?.subject || 'general_subject'}
+            onGiveReward={giveReward}
+            onPlaySound={triggerSound}
           />
         </div>
 

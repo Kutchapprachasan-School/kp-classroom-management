@@ -158,6 +158,23 @@ async function runTests() {
   const key2 = liveClassroomService.getGroupPresetStorageKey('room-1-1', 'teacher-B', 'Science');
   assert.notEqual(key1, key2, 'Preset keys for different teachers and subjects must never collide');
 
+  // 4.4 ทดสอบระบบจัดเก็บชุดคำศัพท์ (Word Decks) แยกครูผู้สอนและรายวิชา
+  const deckKeyTeacher1 = liveClassroomService.getWordDeckStorageKey('room-1-1', 'teacher-1', 'English');
+  const deckKeyTeacher2 = liveClassroomService.getWordDeckStorageKey('room-1-1', 'teacher-2', 'Science');
+  assert.notEqual(deckKeyTeacher1, deckKeyTeacher2, 'Word deck keys for different teachers and subjects must be isolated');
+
+  const sampleWords = ['Photosynthesis', 'Chloroplast', 'Mitochondria', '  Mitochondria  ', ' '];
+  const savedDeck = liveClassroomService.saveWordDeck(
+    'room-1-1',
+    'ชีววิทยา Unit 1',
+    sampleWords,
+    'teacher-1',
+    'ครูสมศรี',
+    'Biology'
+  );
+  assert.equal(savedDeck.name, 'ชีววิทยา Unit 1');
+  assert.deepEqual(savedDeck.words, ['Photosynthesis', 'Chloroplast', 'Mitochondria'], 'Must trim and deduplicate words');
+
   // 5. ทดสอบการคำนวณสัดส่วนวงล้อตั๋วสุ่ม (ตั๋ว 3 ใบ ต้องมีขนาดมุมเป็น 3 เท่าของตั๋ว 1 ใบ)
   const twoStudents: LiveStudent[] = [
     { ...sampleRoster[0], id: 'std-A', sessionTickets: 3, present: true },

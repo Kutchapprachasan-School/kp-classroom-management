@@ -15,8 +15,9 @@ import FullscreenRegular from '@mingcute/react/core-regular/fullscreen';
 import FullscreenExitRegular from '@mingcute/react/core-regular/fullscreen-exit';
 import VolumeRegular from '@mingcute/react/core-regular/volume';
 import VolumeMuteRegular from '@mingcute/react/core-regular/volume-mute';
+import Book2Regular from '@mingcute/react/core-regular/book-2';
 
-export type SubTab = 'picker' | 'timer' | 'groups' | 'rewards';
+export type SubTab = 'picker' | 'words' | 'timer' | 'groups' | 'rewards';
 
 export interface LiveClassroomHeaderProps {
   classrooms: { id: string; name: string; subject: string; studentCount?: number }[];
@@ -218,14 +219,15 @@ export const LiveClassroomHeader: React.FC<LiveClassroomHeaderProps> = ({
         </div>
       </div>
 
-      {/* Sub-tool Navigation (4 Tabs) */}
+      {/* Sub-tool Navigation (5 Tabs) */}
       <nav
-        className={`grid grid-cols-2 md:grid-cols-4 gap-2.5 mt-4 pt-4 border-t ${
+        className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 mt-4 pt-4 border-t ${
           isProjectorMode ? 'border-slate-800' : 'border-[#E6EEF7]'
         }`}
       >
         {[
           { id: 'picker', label: 'สุ่มชื่อนักเรียน', icon: RandomRegular },
+          { id: 'words', label: 'สุ่มคำศัพท์ / ข้อความ', icon: Book2Regular },
           { id: 'timer', label: 'ตอบคำถามสด', icon: TimeRegular },
           { id: 'groups', label: 'แบ่งกลุ่มกิจกรรม', icon: GroupRegular },
           { id: 'rewards', label: 'บอร์ดรางวัล', icon: TrophyRegular },

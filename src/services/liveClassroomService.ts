@@ -47,6 +47,18 @@ export interface LiveStudent {
   gender?: 'MALE' | 'FEMALE';
 }
 
+export interface WordDeckItem {
+  id: string;
+  name: string;
+  words: string[];
+  classroomId: string;
+  teacherId?: string;
+  teacherName?: string;
+  subject?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface LiveClassroomData {
   id: string;
   name: string;
@@ -57,6 +69,7 @@ export interface LiveClassroomData {
 
 const ATTENDANCE_STORAGE_PREFIX = 'kp_live_attendance_';
 const GROUP_PRESETS_STORAGE_PREFIX = 'kp_group_presets_';
+const WORD_DECKS_STORAGE_PREFIX = 'kp_word_decks_';
 
 /**
  * คำนวณขอบเขตเวลา 00:00:00.000 ถึง 23:59:59.999 ตามเวลาประเทศไทย (Asia/Bangkok UTC+7)
@@ -447,6 +460,116 @@ export const liveClassroomService = {
     const key = this.getGroupPresetStorageKey(classroomId, teacherId, subject);
     const existing = this.getGroupPresets(classroomId, teacherId, subject);
     const filtered = existing.filter((p) => p.id !== presetId);
+    window.localStorage.setItem(key, JSON.stringify(filtered));
+  },
+
+  /**
+   * สร้าง Storage Key สำหรับ Word Decks (คลังคำศัพท์/คำถาม) แยกตามครูผู้สอน, รายวิชา, และห้องเรียน
+   */
+  getWordDeckStorageKey(
+    classroomId: string,
+    teacherId?: string,
+    subject?: string
+  ): string {
+    const safeTeacher = (teacherId || 'default').replace(/[^a-zA-Z0-9_\u0E00-\u0E7F-]/g, '_');
+    const safeSubject = (subject || 'default').replace(/[^a-zA-Z0-9_\u0E00-\u0E7F-]/g, '_');
+    return `${WORD_DECKS_STORAGE_PREFIX}${safeTeacher}_${safeSubject}_${classroomId}`;
+  },
+
+  getWordDecks(
+    classroomId: string,
+    teacherId?: string,
+    subject?: string
+  ): WordDeckItem[] {
+    if (typeof window === 'undefined') return [];
+    const key = this.getWordDeckStorageKey(classroomId, teacherId, subject);
+    try {
+      const raw = window.localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  },
+
+  saveWordDeck(
+    classroomId: string,
+    deckName: string,
+    words: string[],
+    teacherId?: string,
+    teacherName?: string,
+    subject?: string,
+    existingDeckId?: string
+  ): WordDeckItem {
+    const key = this.getWordDeckStorageKey(classroomId, teacherId, subject);
+    const existing = this.getWordDecks(classroomId, teacherId, subject);
+    const now = new Date().toISOString();
+
+    const cleanedWords = Array.from(
+      new Set(
+        words
+          .map((w) => w.trim())
+          .filter((w) => w.length > 0)
+      )
+    );
+
+    let updatedDeck: WordDeckItem;
+
+    if (existingDeckId) {
+      const foundIdx = existing.findIndex((d) => d.id === existingDeckId);
+      if (foundIdx >= 0) {
+        updatedDeck = {
+          ...existing[foundIdx],
+          name: deckName.trim() || existing[foundIdx].name,
+          words: cleanedWords,
+          updatedAt: now,
+        };
+        existing[foundIdx] = updatedDeck;
+      } else {
+        updatedDeck = {
+          id: existingDeckId,
+          name: deckName.trim() || 'ชุดคำศัพท์',
+          words: cleanedWords,
+          classroomId,
+          teacherId,
+          teacherName,
+          subject,
+          createdAt: now,
+          updatedAt: now,
+        };
+        existing.unshift(updatedDeck);
+      }
+    } else {
+      updatedDeck = {
+        id: `deck-${Date.now()}`,
+        name: deckName.trim() || `ชุดคำศัพท์ ${new Date().toLocaleDateString('th-TH')}`,
+        words: cleanedWords,
+        classroomId,
+        teacherId,
+        teacherName,
+        subject,
+        createdAt: now,
+        updatedAt: now,
+      };
+      existing.unshift(updatedDeck);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(key, JSON.stringify(existing));
+    }
+
+    return updatedDeck;
+  },
+
+  deleteWordDeck(
+    classroomId: string,
+    deckId: string,
+    teacherId?: string,
+    subject?: string
+  ): void {
+    if (typeof window === 'undefined') return;
+    const key = this.getWordDeckStorageKey(classroomId, teacherId, subject);
+    const existing = this.getWordDecks(classroomId, teacherId, subject);
+    const filtered = existing.filter((d) => d.id !== deckId);
     window.localStorage.setItem(key, JSON.stringify(filtered));
   },
 };
