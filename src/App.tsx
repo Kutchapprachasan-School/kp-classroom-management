@@ -83,19 +83,9 @@ import {
   academicCalendarService,
   ACADEMIC_CALENDAR_EVENT,
 } from './services/academicCalendarService';
-import { AppLoadingScreen } from './components/common/AppLoadingScreen';
 
 export const App: React.FC = () => {
-  const [isAppReady, setIsAppReady] = useState(false);
   const [schoolSettings, setSchoolSettings] = useState(() => getSchoolSettings());
-
-  useEffect(() => {
-    // ค้างหน้าโหลดไว้ 1 วินาทีเต็ม (1000ms) เพื่อแสดงตราโรงเรียนอย่างสวยงาม
-    const timer = setTimeout(() => {
-      setIsAppReady(true);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, []);
   const [activeAcademicTerm, setActiveAcademicTerm] = useState(() =>
     academicCalendarService.getActiveTerm()
   );
@@ -493,10 +483,6 @@ export const App: React.FC = () => {
       setCurrentView('home');
     }
   };
-
-  if (!isAppReady) {
-    return <AppLoadingScreen />;
-  }
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans overflow-x-hidden">

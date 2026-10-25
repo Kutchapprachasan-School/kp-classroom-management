@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 25/10/2569 21:39:23 | รวมทั้งหมด 230 ไฟล์*
+*อัปเดตล่าสุด: 25/10/2569 21:58:25 | รวมทั้งหมด 231 ไฟล์*
 
 ---
 
@@ -126,6 +126,7 @@
 | [src/components/attendance/StudentIdCardModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/attendance/StudentIdCardModal.tsx) | 127 | `StudentIdCardModalProps` (L10), `StudentIdCardModal` (L19) |
 | [src/components/attendance/StudentQrScannerModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/attendance/StudentQrScannerModal.tsx) | 222 | `StudentQrScannerModalProps` (L18), `StudentQrScannerModal` (L29) |
 | [src/components/common/AppLoadingScreen.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/common/AppLoadingScreen.tsx) | 115 | `AppLoadingScreen` (L10) |
+| [src/components/common/ErrorBoundary.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/common/ErrorBoundary.tsx) | 106 | `ErrorBoundary` (L17) |
 | [src/components/common/Pagination.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/common/Pagination.tsx) | 182 | `PageSizeOption` (L8), `PaginationProps` (L10), `Pagination` (L21) |
 | [src/components/common/PixelPet.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/common/PixelPet.tsx) | 69 | `PixelPet` (L8) |
 | [src/components/common/PwaInstallPrompt.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/common/PwaInstallPrompt.tsx) | 252 | `PwaInstallPrompt` (L12) |
@@ -280,11 +281,11 @@
 
 | ไฟล์ (File Path) | จำนวนบรรทัด | สัญลักษณ์หลัก & ช่วงบรรทัด (Key Exports & Line Numbers) |
 | :--- | :---: | :--- |
-| [src/App.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/App.tsx) | 1055 | `App` (L88) |
+| [src/App.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/App.tsx) | 1041 | `App` (L87) |
 | [src/hooks/useOptimisticRewards.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/hooks/useOptimisticRewards.ts) | 461 | `SyncStatus` (L7), `RewardBatch` (L9), `OfflineQueueItem` (L23), `applyDirectGachaStateUpdate` (L35), `useOptimisticRewards` (L83) |
 | [src/lib/neonClient.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/lib/neonClient.ts) | 587 | `neonConnectionString` (L22), `isNeonConfigured` (L25), `neonCacheStats` (L43), `clearNeonCache` (L51), `QueryResult` (L62), `NeonQueryBuilder` (L71), `neonClient` (L585) |
 | [src/lib/supabaseClient.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/lib/supabaseClient.ts) | 2 | *(Internal / Default Export)* |
 | [src/lib/supabase.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/lib/supabase.ts) | 44 | `isSupabaseConfigured` (L19), `supabase` (L29), `logDbOperation` (L39) |
 | [src/lib/universalAdapter.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/lib/universalAdapter.ts) | 575 | `RealtimePayload` (L16), `StorageDriver` (L22), `UniversalAdapterConfig` (L29), `UniversalAdapter` (L43), `getStorageDriver` (L61), `clearMemoryStore` (L87), `getMemoryStore` (L88), `readStorage` (L90), `writeStorage` (L101), `removeStorage` (L110) *(+3 รายการ)* |
-| [src/main.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/main.tsx) | 42 | *(Internal / Default Export)* |
+| [src/main.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/main.tsx) | 45 | *(Internal / Default Export)* |
 
