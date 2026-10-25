@@ -3,10 +3,15 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "env": {
+    "VITE_NEON_DATABASE_URL": "postgresql://neondb_owner:npg_mHKSdpe5IM7i@ep-fancy-pine-aom5dqmg-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require",
     "VITE_SUPABASE_URL": "https://ngzflajpifmsvhldhviu.supabase.co",
     "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5nemZsYWpwaWZtc3ZobGRodml1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDQ0NTMzMSwiZXhwIjoyMTAwMDIxMzMxfQ.y7GkdSDqZR95v0kHBIXLD1cRbwgNYksMm8hZ1uStec8",
     "VITE_SUPABASE_FAILOVER_URL": "https://mpszhfmlkazzcyolwkol.supabase.co",
-    "VITE_ELEAVE_PORTAL_URL": "https://e-leave-system-kappa.vercel.app"
+    "VITE_ELEAVE_PORTAL_URL": "https://e-leave-system-kappa.vercel.app",
+    "VITE_R2_PUBLIC_DOMAIN": "https://pub-aa304866cbd343079277d38c5b525574.r2.dev",
+    "VITE_R2_WORKER_URL": "https://kps-r2-storage.kps-school.workers.dev",
+    "VITE_R2_PUBLIC_URL": "https://pub-aa304866cbd343079277d38c5b525574.r2.dev",
+    "VITE_R2_UPLOAD_SECRET": "kps_r2_prod_secret_2026_udkp"
   },
   "rewrites": [
     {

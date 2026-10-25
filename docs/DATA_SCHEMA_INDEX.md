@@ -126,7 +126,7 @@
 ### 4.1 ฝั่งระบบจัดการชั้นเรียน (`09 ระบบจัดการชั้นเรียน/src`)
 
 #### 🗂️ ตาราง/View: `Account` (1 จุดเรียกใช้)
-- **[READ:SELECT]** [`src/services/authService.ts:81`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L81)
+- **[READ:SELECT]** [`src/services/authService.ts:105`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L105)
 
 #### 🗂️ ตาราง/View: `AssessmentColumn` (5 จุดเรียกใช้)
 - **[READ:SELECT]** [`src/services/gradeService.ts:415`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts#L415)
@@ -158,10 +158,10 @@
 - **[WRITE:INSERT]** [`src/services/classroomService.ts:591`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L591)
 - **[WRITE:UPDATE]** [`src/services/classroomService.ts:692`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L692)
 - **[WRITE:UPDATE]** [`src/services/classroomService.ts:817`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L817)
-- **[READ:SELECT]** [`src/services/masterDataService.ts:148`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/masterDataService.ts#L148)
+- **[READ:SELECT]** [`src/services/masterDataService.ts:158`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/masterDataService.ts#L158)
 
 #### 🗂️ ตาราง/View: `classrooms` (3 จุดเรียกใช้)
-- **[READ:SELECT]** [`src/services/authService.ts:251`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L251)
+- **[READ:SELECT]** [`src/services/authService.ts:324`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L324)
 - **[READ:SELECT]** [`src/services/classroomService.ts:202`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L202)
 - **[READ:SELECT]** [`src/services/classroomService.ts:218`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L218)
 
@@ -202,15 +202,15 @@
 - **[WRITE:INSERT]** [`src/services/sgsExportService.ts:143`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/sgsExportService.ts#L143)
 
 #### 🗂️ ตาราง/View: `Student` (6 จุดเรียกใช้)
-- **[READ:SELECT]** [`src/services/authService.ts:180`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L180)
-- **[WRITE:UPSERT]** [`src/services/masterDataService.ts:369`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/masterDataService.ts#L369)
+- **[READ:SELECT]** [`src/services/authService.ts:253`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L253)
+- **[WRITE:UPSERT]** [`src/services/masterDataService.ts:379`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/masterDataService.ts#L379)
 - **[WRITE:UPSERT]** [`src/services/studentService.ts:571`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L571)
 - **[WRITE:UPDATE]** [`src/services/studentService.ts:634`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L634)
 - **[WRITE:UPDATE]** [`src/services/studentService.ts:771`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L771)
 - **[WRITE:UPSERT]** [`src/services/studentService.ts:847`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L847)
 
 #### 🗂️ ตาราง/View: `StudentEnrollment` (6 จุดเรียกใช้)
-- **[WRITE:UPSERT]** [`src/services/masterDataService.ts:385`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/masterDataService.ts#L385)
+- **[WRITE:UPSERT]** [`src/services/masterDataService.ts:395`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/masterDataService.ts#L395)
 - **[WRITE:UPSERT]** [`src/services/studentService.ts:586`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L586)
 - **[WRITE:UPDATE]** [`src/services/studentService.ts:638`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L638)
 - **[WRITE:UPDATE]** [`src/services/studentService.ts:692`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L692)
@@ -222,9 +222,9 @@
 - **[READ:SELECT]** [`src/services/studentEnrollmentService.ts:88`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentEnrollmentService.ts#L88)
 
 #### 🗂️ ตาราง/View: `students` (7 จุดเรียกใช้)
-- **[READ:SELECT]** [`src/services/authService.ts:172`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L172)
-- **[READ:SELECT]** [`src/services/masterDataService.ts:272`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/masterDataService.ts#L272)
-- **[READ:SELECT]** [`src/services/masterDataService.ts:416`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/masterDataService.ts#L416)
+- **[READ:SELECT]** [`src/services/authService.ts:245`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L245)
+- **[READ:SELECT]** [`src/services/masterDataService.ts:282`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/masterDataService.ts#L282)
+- **[READ:SELECT]** [`src/services/masterDataService.ts:426`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/masterDataService.ts#L426)
 - **[READ:SELECT]** [`src/services/smsNotificationService.ts:212`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/smsNotificationService.ts#L212)
 - **[WRITE:UPDATE]** [`src/services/smsNotificationService.ts:267`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/smsNotificationService.ts#L267)
 - **[READ:SELECT]** [`src/services/studentEnrollmentService.ts:207`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentEnrollmentService.ts#L207)
@@ -253,7 +253,7 @@
 - **[WRITE:DELETE]** [`src/services/trashService.ts:187`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/trashService.ts#L187)
 
 #### 🗂️ ตาราง/View: `User` (2 จุดเรียกใช้)
-- **[READ:SELECT]** [`src/services/authService.ts:73`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L73)
+- **[READ:SELECT]** [`src/services/authService.ts:97`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L97)
 - **[READ:SELECT]** [`src/services/classroomService.ts:141`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L141)
 
 #### 🗂️ ตาราง/View: `XpTransaction` (2 จุดเรียกใช้)

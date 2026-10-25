@@ -18,10 +18,11 @@ const supabaseAnonKey =
 // Neon PostgreSQL is the primary, active database destination
 export const isSupabaseConfigured = isNeonConfigured || Boolean(supabaseUrl && supabaseAnonKey);
 
+// Fallback client with auth background polling disabled (prevents 402 quota refresh loops)
 const fallbackClient = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: true,
-    autoRefreshToken: true,
+    persistSession: false,
+    autoRefreshToken: false,
   },
 });
 
@@ -33,7 +34,6 @@ export const supabase = {
   channel: (_name: string) => neonClient.channel(_name),
   removeChannel: (_channel: any) => neonClient.removeChannel(_channel),
 };
-
 
 // Helper for logging database operations
 export const logDbOperation = (operation: string, details?: unknown) => {

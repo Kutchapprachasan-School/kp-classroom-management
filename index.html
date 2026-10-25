@@ -12,15 +12,15 @@
     <meta name="apple-mobile-web-app-title" content="จัดการชั้นเรียน" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/png" href="/pwa-192x192.png" />
-    <link rel="shortcut icon" href="/favicon.png" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="shortcut icon" href="/school-logo.png" />
+    <link rel="apple-touch-icon" href="/school-logo.png" />
 
     <!-- Google Fonts: Prompt & Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Prompt:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 
-    <!-- Instant Preloader Styles (Zero-Flicker First Paint, No Mock Logo) -->
+    <!-- Instant Preloader Styles (Zero-Flicker First Paint with Official School Logo) -->
     <style>
       #kps-preloader {
         position: fixed;
@@ -62,13 +62,31 @@
         position: relative;
         z-index: 2;
         width: 100%;
-        max-width: 340px;
-        background: rgba(255, 255, 255, 0.95);
+        max-width: 360px;
+        background: rgba(255, 255, 255, 0.98);
         border: 1px solid #E6EEF7;
         border-radius: 24px;
-        padding: 36px 24px 30px;
+        padding: 32px 24px 28px;
         text-align: center;
         box-shadow: 0 10px 30px rgba(40, 90, 140, 0.08);
+      }
+      .kps-logo-wrap {
+        width: 76px;
+        height: 76px;
+        margin: 0 auto 16px;
+        border-radius: 20px;
+        background: linear-gradient(180deg, #FFFFFF 0%, #EFF6FF 100%);
+        border: 1px solid #BFDBFE;
+        padding: 8px;
+        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.12);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .kps-logo-img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
       }
       .kps-title {
         font-size: 19px;
@@ -89,7 +107,7 @@
         background: #E2E8F0;
         border-radius: 9999px;
         overflow: hidden;
-        margin: 24px 0 12px;
+        margin: 20px 0 12px;
         position: relative;
       }
       .kps-bar-fill {
@@ -127,6 +145,36 @@
         color: #94A3B8;
         text-align: center;
       }
+      .kps-fallback-btn {
+        background: #3B82F6;
+        color: #FFFFFF;
+        border: none;
+        border-radius: 12px;
+        padding: 9px 16px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: inherit;
+      }
+      .kps-fallback-btn:hover {
+        background: #2563EB;
+      }
+      .kps-fallback-btn-secondary {
+        background: #FFFFFF;
+        color: #163A66;
+        border: 1px solid #CBD5E1;
+        border-radius: 12px;
+        padding: 9px 16px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: inherit;
+      }
+      .kps-fallback-btn-secondary:hover {
+        background: #F8FAFC;
+      }
       @keyframes kpsShimmer {
         0% { background-position: 200% 0; }
         100% { background-position: -200% 0; }
@@ -139,30 +187,96 @@
   </head>
   <body class="bg-[#F8FAFC] text-slate-800 antialiased selection:bg-blue-100 selection:text-blue-900 font-sans">
     <div id="root">
-      <!-- Instant First-Paint Preloader (No mock or unverified logo) -->
+      <!-- Instant First-Paint Preloader with Official School Logo & Watchdog -->
       <div id="kps-preloader">
         <div class="kps-preloader-blob-1"></div>
         <div class="kps-preloader-blob-2"></div>
         <div class="kps-preloader-card">
+          <div class="kps-logo-wrap">
+            <img
+              src="/school-logo.png"
+              alt="โรงเรียนกุดจับประชาสรรค์"
+              class="kps-logo-img"
+              onerror="this.parentElement.style.display='none'"
+            />
+          </div>
           <h1 class="kps-title">โรงเรียนกุดจับประชาสรรค์</h1>
           <p class="kps-subtitle">ระบบบริหารจัดการชั้นเรียน & การศึกษาดิจิทัล</p>
           <div class="kps-bar-track">
             <div class="kps-bar-fill"></div>
           </div>
-          <p class="kps-status">
-            กำลังเปิดระบบจัดการชั้นเรียน
-            <span>
+          <p class="kps-status" id="kps-status-container">
+            <span id="kps-status-text">กำลังเปิดระบบจัดการชั้นเรียน</span>
+            <span id="kps-dots">
               <span class="kps-dot"></span>
               <span class="kps-dot"></span>
               <span class="kps-dot"></span>
             </span>
           </p>
+
+          <div id="kps-preloader-fallback" style="display: none; margin-top: 16px;">
+            <p style="font-size: 12px; color: #6B7C93; margin: 0 0 10px; line-height: 1.4;">
+              หากหน้านี้ค้าง หรือการเชื่อมต่อเครือข่ายช้า กรุณากดปุ่มเพื่อดำเนินการต่อ
+            </p>
+            <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+              <button
+                type="button"
+                class="kps-fallback-btn"
+                onclick="window.location.reload()"
+              >
+                โหลดหน้าเว็บใหม่
+              </button>
+              <button
+                type="button"
+                class="kps-fallback-btn-secondary"
+                onclick="try { localStorage.clear(); sessionStorage.clear(); } catch(e){} window.location.href='/'"
+              >
+                ล้างแคช & เริ่มต้นใหม่
+              </button>
+            </div>
+          </div>
         </div>
         <div class="kps-footer">
           Kutchapprachasan School Management • 2569
         </div>
       </div>
     </div>
+
+    <!-- Preloader Watchdog Script (Auto-triggers recovery options if app takes > 6s to load) -->
+    <script>
+      (function() {
+        var timer = setTimeout(function() {
+          var status = document.getElementById('kps-status-text');
+          var dots = document.getElementById('kps-dots');
+          var fallback = document.getElementById('kps-preloader-fallback');
+          if (status) {
+            status.textContent = 'การเปิดระบบใช้เวลานานกว่าปกติ';
+          }
+          if (dots) {
+            dots.style.display = 'none';
+          }
+          if (fallback) {
+            fallback.style.display = 'block';
+          }
+        }, 6000);
+
+        window.addEventListener('error', function() {
+          var status = document.getElementById('kps-status-text');
+          var dots = document.getElementById('kps-dots');
+          var fallback = document.getElementById('kps-preloader-fallback');
+          if (status) {
+            status.textContent = 'เกิดข้อผิดพลาดในการโหลดไฟล์ระบบ';
+          }
+          if (dots) {
+            dots.style.display = 'none';
+          }
+          if (fallback) {
+            fallback.style.display = 'block';
+          }
+        });
+      })();
+    </script>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
