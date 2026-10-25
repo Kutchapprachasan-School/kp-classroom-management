@@ -28,6 +28,7 @@ import { SchoolLeaveExecutiveDashboardView } from './views/SchoolLeaveExecutiveD
 import { MorningAssemblyView } from './views/MorningAssemblyView';
 import { ClassroomAttendanceView } from './views/ClassroomAttendanceView';
 import { LiveClassroomView } from './views/LiveClassroomView';
+import { GoldQuestJoinView } from './views/GoldQuestJoinView';
 import { QuickSearchModal } from './components/common/QuickSearchModal';
 import { PwaInstallPrompt } from './components/common/PwaInstallPrompt';
 import type { AtRiskStudent } from './types/viewModels';
@@ -122,6 +123,24 @@ export const App: React.FC = () => {
       window.removeEventListener('kps-auth-changed', handleAuthChanged);
       window.removeEventListener('kps-student-avatar-updated', handleAvatarUpdated);
     };
+  }, []);
+
+  // Check if current URL is Gold Quest Join (e.g. from QR Code scan)
+  const [isGoldQuestRoute, setIsGoldQuestRoute] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const path = window.location.pathname.toLowerCase();
+    return path.includes('/gold-quest/join') || path.includes('/live-classroom/gold-quest/join');
+  });
+
+  useEffect(() => {
+    const handleLocationChange = () => {
+      const path = window.location.pathname.toLowerCase();
+      setIsGoldQuestRoute(
+        path.includes('/gold-quest/join') || path.includes('/live-classroom/gold-quest/join')
+      );
+    };
+    window.addEventListener('popstate', handleLocationChange);
+    return () => window.removeEventListener('popstate', handleLocationChange);
   }, []);
   const [currentView, setCurrentView] = useState<TeacherViewKey>(() => {
     const user = authService.getCurrentUser();
@@ -628,8 +647,10 @@ export const App: React.FC = () => {
       )}
 
 
-      {/* Conditional Rendering: Direct Login Screen vs Student Portal vs Admin Executive Dashboard vs Classroom Management */}
-      {currentView === 'school-login' ? (
+      {/* Gold Quest Live Classroom Student Join Screen */}
+      {isGoldQuestRoute ? (
+        <GoldQuestJoinView />
+      ) : currentView === 'school-login' ? (
         <SchoolPortalView
           onEnterClassroomPortal={(target, channel, role) => {
             if (channel) {
