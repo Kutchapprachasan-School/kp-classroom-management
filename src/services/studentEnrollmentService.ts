@@ -205,7 +205,7 @@ export const studentEnrollmentService = {
   }): Promise<AlumniStudentSummary[]> {
     let query = supabase
       .from('students')
-      .select('id, student_code, prefix, first_name, last_name, academic_status, graduated_academic_year')
+      .select('id, studentCode, code, title, first_name, last_name, academic_status, graduated_academic_year')
       .eq('academic_status', 'GRADUATED');
 
     if (params?.graduatedYear) {
@@ -218,7 +218,15 @@ export const studentEnrollmentService = {
 
     if (error) throw error;
 
-    const list = (data as AlumniStudentSummary[]) || [];
+    const list: AlumniStudentSummary[] = ((data as any[]) || []).map((item) => ({
+      id: item.id,
+      student_code: item.studentCode || item.code,
+      prefix: item.title,
+      first_name: item.first_name,
+      last_name: item.last_name,
+      academic_status: item.academic_status,
+      graduated_academic_year: item.graduated_academic_year,
+    }));
     if (!params?.searchQuery?.trim()) return list;
 
     const q = params.searchQuery.trim().toLowerCase();

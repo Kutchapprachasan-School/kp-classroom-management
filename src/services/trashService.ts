@@ -28,22 +28,26 @@ export const trashService = {
   // READ: Get all items in trash
   async getAll(): Promise<SoftDeletedItem[]> {
     if (isSupabaseConfigured) {
-      logDbOperation("SELECT * FROM TrashLog WHERE status = 'DELETED'");
-      const { data, error } = await supabase
-        .from('TrashLog')
-        .select('*')
-        .eq('status', 'DELETED')
-        .order('deleted_at', { ascending: false });
+      try {
+        logDbOperation("SELECT * FROM TrashLog WHERE status = 'DELETED'");
+        const { data, error } = await supabase
+          .from('TrashLog')
+          .select('*')
+          .eq('status', 'DELETED')
+          .order('deleted_at', { ascending: false });
 
-      if (!error && data && data.length > 0) {
-        return data.map((d) => ({
-          id: d.id,
-          entityType: d.entity_type,
-          name: d.name,
-          deletedAt: d.deleted_at,
-          deletedBy: d.deleted_by || 'ครูผู้สอน',
-          daysRemaining: d.days_remaining ?? 30,
-        }));
+        if (!error && data && data.length > 0) {
+          return data.map((d) => ({
+            id: d.id,
+            entityType: d.entity_type,
+            name: d.name,
+            deletedAt: d.deleted_at,
+            deletedBy: d.deleted_by || 'ครูผู้สอน',
+            daysRemaining: d.days_remaining ?? 30,
+          }));
+        }
+      } catch (err) {
+        console.warn('[trashService] Remote query fallback:', err);
       }
     }
     return getLocalTrash();
@@ -76,14 +80,18 @@ export const trashService = {
     saveLocalTrash(updated);
 
     if (isSupabaseConfigured) {
-      logDbOperation('INSERT INTO TrashLog', newItem);
-      await supabase.from('TrashLog').insert({
-        id: newItem.id,
-        entity_type: newItem.entityType,
-        name: newItem.name,
-        deleted_by: newItem.deletedBy,
-        status: 'DELETED',
-      });
+      try {
+        logDbOperation('INSERT INTO TrashLog', newItem);
+        await supabase.from('TrashLog').insert({
+          id: newItem.id,
+          entity_type: newItem.entityType,
+          name: newItem.name,
+          deleted_by: newItem.deletedBy,
+          status: 'DELETED',
+        });
+      } catch (err) {
+        console.warn('[trashService] Remote insert fallback:', err);
+      }
     }
 
     try {
@@ -103,8 +111,12 @@ export const trashService = {
     saveLocalTrash(updated);
 
     if (isSupabaseConfigured) {
-      logDbOperation(`RESTORE Trash item id = ${id}`);
-      await supabase.from('TrashLog').delete().eq('id', id);
+      try {
+        logDbOperation(`RESTORE Trash item id = ${id}`);
+        await supabase.from('TrashLog').delete().eq('id', id);
+      } catch (err) {
+        console.warn('[trashService] Remote restore fallback:', err);
+      }
     }
 
     if (target && target.entityType === 'ชั้นเรียน') {
@@ -148,8 +160,12 @@ export const trashService = {
     }
 
     if (isSupabaseConfigured) {
-      logDbOperation(`PERMANENT DELETE FROM TrashLog WHERE id = ${id}`);
-      await supabase.from('TrashLog').delete().eq('id', id);
+      try {
+        logDbOperation(`PERMANENT DELETE FROM TrashLog WHERE id = ${id}`);
+        await supabase.from('TrashLog').delete().eq('id', id);
+      } catch (err) {
+        console.warn('[trashService] Remote permanent delete fallback:', err);
+      }
     }
 
     try {
@@ -183,8 +199,12 @@ export const trashService = {
     saveLocalTrash([]);
 
     if (isSupabaseConfigured) {
-      logDbOperation('EMPTY TRASH (DELETE FROM TrashLog)');
-      await supabase.from('TrashLog').delete().neq('id', 'null');
+      try {
+        logDbOperation('EMPTY TRASH (DELETE FROM TrashLog)');
+        await supabase.from('TrashLog').delete().neq('id', 'null');
+      } catch (err) {
+        console.warn('[trashService] Remote empty trash fallback:', err);
+      }
     }
 
     try {

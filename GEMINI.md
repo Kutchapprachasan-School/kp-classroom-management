@@ -53,15 +53,21 @@ To prevent Quadratic Context Explosion and eliminate wasteful token consumption 
 2. 🔄 **Milestone Handoff / Compact Cadence**:
    - Conclude each development milestone (code change + test verification) with a concise status digest.
    - Proactively recommend or execute `/compact` to clear tool call histories and large logs before switching tasks.
-3. 🧠 **Smart Model Routing**:
-   - Route tasks by complexity: use light/fast models (`flash` / `flash_lite`) for simple lookups, file indexing, and regex scans.
-   - Reserve high-tier models (`inherit` / `pro`) strictly for complex reasoning, architectural refactoring, and multi-file logic.
+3. 🧠 **Argon Head Command & Smart Model Routing (Explicit User Mandate)**:
+   - **Argon (`Gemini 4 Argon (High)`) is the Head Orchestrator**: Argon plans architecture, checks `docs/CODEBASE_INDEX.md` / `docs/DATA_SCHEMA_INDEX.md`, dispatches tasks, and verifies final results. Never waste Argon's main context on broad file scanning, log reading, or repetitive boilerplate edits.
+   - **Mandatory `Model` Override on `invoke_subagent`**: By explicit user command, ALWAYS override the default `Model: 'inherit'` and explicitly select the lowest sufficient model tier:
+     - **`Model: "flash_lite"` (`argon-scout` / `research`)**: File/line lookups, grep/regex scans, error log tailing (`scratch/`), import checks, and index verification. (Return digest ≤ 15 lines).
+     - **`Model: "flash"` (`argon-worker` / `argon-specialist` / `self`)**: Primary workhorse for UI building/styling (`style.md`), CRUD/state wiring, writing & running tests (`npm test`, `tsc`), AND multi-file refactoring when guided by Head's exact line coordinates. (Return digest ≤ 20 lines).
+     - **`Model: "pro"`**: Use ONLY if Pro quota is available for deep DB/cross-system tasks; if Pro quota is depleted/unavailable, route all Specialist tasks to **`Model: "flash"`** with detailed step-by-step coordinates from Head.
+     - **`Model: "inherit"`**: NEVER pass `"inherit"` to subagents (especially when Head is Argon, Sonnet, or Opus, as it drains scarce top-tier quota).
+   - **Head Succession & Sniper Mode (`Argon` ➔ `Flash` ➔ `Sonnet` / `Opus`)**:
+     - If **Argon** quota runs out, switch main chat to **Gemini Flash** as Acting Head (guided by `CODEBASE_INDEX.md` + `DATA_SCHEMA_INDEX.md`).
+     - Reserve **Claude Sonnet** (Surgical UI/Logic Coder) and **Claude Opus** (Nuclear Architecture/Deadlock Solver) strictly for **1–2 turn Sniper Mode** after running `/compact` and after `flash_lite` has already located exact file/line numbers. Switch back to Argon/Flash immediately after the surgical fix.
 4. 🗄️ **Scratchpad Output Redirect**:
    - Never dump massive command logs (e.g. `npm test`, large directory trees) directly into chat context.
    - Pipe or redirect verbose outputs to scratch files (e.g. `npm test > scratch/test.log 2>&1`), and read only exit codes or compact failure summaries.
-5. 🐝 **Ephemeral Subagent Swarm**:
-   - Offload broad explorations and code audits to subagents running in isolated contexts.
-   - Subagents must return only concise summaries, dissolving immediately without polluting parent conversation history.
+5. 🐝 **Ephemeral Subagent Swarm & 4-Part Dispatch Brief**:
+   - Every `invoke_subagent` prompt from Argon must include: **(1) Objective** (1–2 sentences), **(2) Target Coordinates** (exact file paths + `StartLine–EndLine` from `docs/CODEBASE_INDEX.md`), **(3) Guardrails** (30–80 line slice limit, Zero-Mock, Design Tokens, Scratchpad redirect), and **(4) Return Digest Contract** (concise 10–25 line summary only; never dump full files back to Head).
 6. 📑 **Living Codebase Index Maintenance**:
    - Maintain [`docs/CODEBASE_INDEX.md`](docs/CODEBASE_INDEX.md) as the single source of truth for file paths and key symbol line numbers.
    - **Mandatory**: Run `node scripts/index_codebase.mjs` every time files are added, removed, or majorly refactored so line references stay synchronized.

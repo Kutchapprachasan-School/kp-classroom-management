@@ -93,24 +93,28 @@ export const scoreService = {
   // READ: Get all scores for an assignment
   async getByAssignment(assignmentId: string): Promise<ScoreRecord[]> {
     if (isSupabaseConfigured) {
-      logDbOperation(`SELECT selective FROM Score WHERE assignmentId = ${assignmentId}`);
-      const { data, error } = await supabase
-        .from('Score')
-        .select('id, assignmentId, enrollmentId, classroomId, value, maxScore, isExempt, state, updatedAt')
-        .eq('assignmentId', assignmentId);
+      try {
+        logDbOperation(`SELECT selective FROM Score WHERE assignmentId = ${assignmentId}`);
+        const { data, error } = await supabase
+          .from('Score')
+          .select('id, assignmentId, enrollmentId, classroomId, value, maxScore, isExempt, state, updatedAt')
+          .eq('assignmentId', assignmentId);
 
-      if (!error && data && data.length > 0) {
-        return data.map((item) => ({
-          id: item.id,
-          assignmentId: item.assignmentId,
-          enrollmentId: item.enrollmentId,
-          classroomId: item.classroomId,
-          score: item.value,
-          maxScore: item.maxScore || 10,
-          isExempt: item.isExempt || false,
-          state: item.state || 'DRAFT',
-          updatedAt: item.updatedAt,
-        }));
+        if (!error && data && data.length > 0) {
+          return data.map((item) => ({
+            id: item.id,
+            assignmentId: item.assignmentId,
+            enrollmentId: item.enrollmentId,
+            classroomId: item.classroomId,
+            score: item.value,
+            maxScore: item.maxScore || 10,
+            isExempt: item.isExempt || false,
+            state: item.state || 'DRAFT',
+            updatedAt: item.updatedAt,
+          }));
+        }
+      } catch (err) {
+        console.warn('[scoreService] Remote query fallback:', err);
       }
     }
     const all = getLocalScores();
@@ -120,24 +124,28 @@ export const scoreService = {
   // READ: Get all scores for a student
   async getByStudent(enrollmentId: string): Promise<ScoreRecord[]> {
     if (isSupabaseConfigured) {
-      logDbOperation(`SELECT selective FROM Score WHERE enrollmentId = ${enrollmentId}`);
-      const { data, error } = await supabase
-        .from('Score')
-        .select('id, assignmentId, enrollmentId, classroomId, value, maxScore, isExempt, state, updatedAt')
-        .eq('enrollmentId', enrollmentId);
+      try {
+        logDbOperation(`SELECT selective FROM Score WHERE enrollmentId = ${enrollmentId}`);
+        const { data, error } = await supabase
+          .from('Score')
+          .select('id, assignmentId, enrollmentId, classroomId, value, maxScore, isExempt, state, updatedAt')
+          .eq('enrollmentId', enrollmentId);
 
-      if (!error && data && data.length > 0) {
-        return data.map((item) => ({
-          id: item.id,
-          assignmentId: item.assignmentId,
-          enrollmentId: item.enrollmentId,
-          classroomId: item.classroomId,
-          score: item.value,
-          maxScore: item.maxScore || 10,
-          isExempt: item.isExempt || false,
-          state: item.state || 'DRAFT',
-          updatedAt: item.updatedAt,
-        }));
+        if (!error && data && data.length > 0) {
+          return data.map((item) => ({
+            id: item.id,
+            assignmentId: item.assignmentId,
+            enrollmentId: item.enrollmentId,
+            classroomId: item.classroomId,
+            score: item.value,
+            maxScore: item.maxScore || 10,
+            isExempt: item.isExempt || false,
+            state: item.state || 'DRAFT',
+            updatedAt: item.updatedAt,
+          }));
+        }
+      } catch (err) {
+        console.warn('[scoreService] Remote query fallback:', err);
       }
     }
     const all = getLocalScores();
@@ -147,27 +155,31 @@ export const scoreService = {
   // READ: Get audit logs (optionally filtered by assignment or student)
   async getAuditLogs(assignmentId?: string, enrollmentId?: string): Promise<ScoreAuditLogRecord[]> {
     if (isSupabaseConfigured) {
-      let query = supabase
-        .from('ScoreAuditLog')
-        .select('id, scoreId, assignmentId, enrollmentId, oldValue, newValue, reason, changedBy, created_at')
-        .order('created_at', { ascending: false })
-        .limit(100);
-      if (assignmentId) query = query.eq('assignmentId', assignmentId);
-      if (enrollmentId) query = query.eq('enrollmentId', enrollmentId);
+      try {
+        let query = supabase
+          .from('ScoreAuditLog')
+          .select('id, scoreId, assignmentId, enrollmentId, oldValue, newValue, reason, changedBy, created_at')
+          .order('created_at', { ascending: false })
+          .limit(100);
+        if (assignmentId) query = query.eq('assignmentId', assignmentId);
+        if (enrollmentId) query = query.eq('enrollmentId', enrollmentId);
 
-      const { data, error } = await query;
-      if (!error && data && data.length > 0) {
-        return data.map((log) => ({
-          id: log.id,
-          scoreId: log.scoreId,
-          assignmentId: log.assignmentId,
-          enrollmentId: log.enrollmentId,
-          oldValue: log.oldValue,
-          newValue: log.newValue,
-          reason: log.reason,
-          changedBy: log.changedBy,
-          timestamp: log.created_at,
-        }));
+        const { data, error } = await query;
+        if (!error && data && data.length > 0) {
+          return data.map((log) => ({
+            id: log.id,
+            scoreId: log.scoreId,
+            assignmentId: log.assignmentId,
+            enrollmentId: log.enrollmentId,
+            oldValue: log.oldValue,
+            newValue: log.newValue,
+            reason: log.reason,
+            changedBy: log.changedBy,
+            timestamp: log.created_at,
+          }));
+        }
+      } catch (err) {
+        console.warn('[scoreService] Remote audit log fallback:', err);
       }
     }
     const logs = getLocalAuditLogs();
@@ -253,33 +265,41 @@ export const scoreService = {
       saveLocalAuditLogs(logs);
 
       if (isSupabaseConfigured) {
-        logDbOperation('INSERT INTO ScoreAuditLog', auditLog);
-        await supabase.from('ScoreAuditLog').insert({
-          id: auditLog.id,
-          scoreId: auditLog.scoreId,
-          assignmentId: auditLog.assignmentId,
-          enrollmentId: auditLog.enrollmentId,
-          oldValue: auditLog.oldValue,
-          newValue: auditLog.newValue,
-          reason: auditLog.reason,
-          changedBy: auditLog.changedBy,
-        });
+        try {
+          logDbOperation('INSERT INTO ScoreAuditLog', auditLog);
+          await supabase.from('ScoreAuditLog').insert({
+            id: auditLog.id,
+            scoreId: auditLog.scoreId,
+            assignmentId: auditLog.assignmentId,
+            enrollmentId: auditLog.enrollmentId,
+            oldValue: auditLog.oldValue,
+            newValue: auditLog.newValue,
+            reason: auditLog.reason,
+            changedBy: auditLog.changedBy,
+          });
+        } catch (err) {
+          console.warn('[scoreService] Remote audit log insert fallback:', err);
+        }
       }
     }
 
     if (isSupabaseConfigured) {
-      logDbOperation('UPSERT Score', scoreRecord);
-      await supabase.from('Score').upsert({
-        id: scoreRecord.id,
-        assignmentId: scoreRecord.assignmentId,
-        enrollmentId: scoreRecord.enrollmentId,
-        classroomId: scoreRecord.classroomId,
-        value: scoreRecord.score,
-        maxScore: scoreRecord.maxScore,
-        isExempt: scoreRecord.isExempt,
-        state: scoreRecord.state,
-        updatedAt: scoreRecord.updatedAt,
-      });
+      try {
+        logDbOperation('UPSERT Score', scoreRecord);
+        await supabase.from('Score').upsert({
+          id: scoreRecord.id,
+          assignmentId: scoreRecord.assignmentId,
+          enrollmentId: scoreRecord.enrollmentId,
+          classroomId: scoreRecord.classroomId,
+          value: scoreRecord.score,
+          maxScore: scoreRecord.maxScore,
+          isExempt: scoreRecord.isExempt,
+          state: scoreRecord.state,
+          updatedAt: scoreRecord.updatedAt,
+        });
+      } catch (err) {
+        console.warn('[scoreService] Remote score upsert fallback:', err);
+      }
     }
 
     return scoreRecord;
@@ -322,8 +342,12 @@ export const scoreService = {
     saveLocalScores(updated);
 
     if (isSupabaseConfigured) {
-      logDbOperation(`UPDATE Score SET state = 'LOCKED' WHERE assignmentId = ${assignmentId}`);
-      await supabase.from('Score').update({ state: 'LOCKED' }).eq('assignmentId', assignmentId);
+      try {
+        logDbOperation(`UPDATE Score SET state = 'LOCKED' WHERE assignmentId = ${assignmentId}`);
+        await supabase.from('Score').update({ state: 'LOCKED' }).eq('assignmentId', assignmentId);
+      } catch (err) {
+        console.warn('[scoreService] Remote lock fallback:', err);
+      }
     }
   },
 

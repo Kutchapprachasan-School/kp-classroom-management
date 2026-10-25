@@ -12,12 +12,12 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
   subMessage = 'โรงเรียนกุดจับประชาสรรค์ • ระบบบริหารจัดการชั้นเรียน',
 }) => {
   const schoolSettings = getSchoolSettings();
-  const [isLogoLoaded, setIsLogoLoaded] = useState(false);
+  const [isLogoLoaded, setIsLogoLoaded] = useState(true);
   const [hasLogoError, setHasLogoError] = useState(false);
 
-  // ดึงโลโก้ทางการจากข้อมูลโรงเรียน (ถ้ายังไม่โหลด หรือโหลดไม่ติด จะไม่แสดงขึ้นมาเด็ดขาด)
-  const logoUrl = schoolSettings.logoUrl?.trim() || '';
-  const canShowLogo = Boolean(logoUrl) && !hasLogoError;
+  // ดึงโลโก้ทางการจากข้อมูลโรงเรียน หรือใช้โลโก้มาตรฐานของโรงเรียน
+  const logoUrl = schoolSettings.logoUrl?.trim() || '/school-logo.png';
+  const canShowLogo = !hasLogoError;
 
   return (
     <div
@@ -34,13 +34,12 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
 
       {/* Main Glassmorphic Pastel Card */}
       <div className="relative z-10 flex flex-col items-center w-full max-w-[360px] p-6 sm:p-8 rounded-3xl bg-white/95 backdrop-blur-md border border-[#E6EEF7] shadow-[0_8px_32px_rgba(40,90,140,0.08)] text-center transition-all duration-300">
-        {/* แสดงเฉพาะเมื่อโลโก้โรงเรียนโหลดเสร็จสมบูรณ์แล้วเท่านั้น (ถ้ายังไม่โหลด ไม่เอาขึ้น) */}
         {canShowLogo && (
           <div
             className={`relative mb-5 flex items-center justify-center transition-all duration-500 ease-out ${
               isLogoLoaded
                 ? 'opacity-100 scale-100 max-h-32'
-                : 'opacity-0 scale-90 max-h-0 pointer-events-none overflow-hidden mb-0'
+                : 'opacity-80 scale-95 max-h-32'
             }`}
           >
             <div
@@ -53,9 +52,14 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
                 alt={schoolSettings.nameTh}
                 className="w-full h-full object-contain drop-shadow-xs"
                 onLoad={() => setIsLogoLoaded(true)}
-                onError={() => {
-                  setHasLogoError(true);
-                  setIsLogoLoaded(false);
+                onError={(e) => {
+                  const img = e.currentTarget as HTMLImageElement;
+                  if (!img.src.includes('/school-logo.png')) {
+                    img.src = '/school-logo.png';
+                    setIsLogoLoaded(true);
+                  } else {
+                    setHasLogoError(true);
+                  }
                 }}
               />
             </div>

@@ -291,7 +291,12 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
               alt={schoolSettings.nameTh}
               className="w-full h-full object-contain"
               onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src = '/school-logo.png';
+                const img = e.currentTarget as HTMLImageElement;
+                if (!img.src.includes('/school-logo.png')) {
+                  img.src = '/school-logo.png';
+                } else if (!img.src.includes('/favicon.png')) {
+                  img.src = '/favicon.png';
+                }
               }}
             />
           </div>

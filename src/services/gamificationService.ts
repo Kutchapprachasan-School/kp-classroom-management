@@ -69,10 +69,14 @@ export const gamificationService = {
   // READ: List all student quests
   async getQuests(): Promise<StudentQuestItem[]> {
     if (isSupabaseConfigured) {
-      logDbOperation('SELECT * FROM Quest ORDER BY dueDateText DESC');
-      const { data, error } = await supabase.from('Quest').select('*');
-      if (!error && data && data.length > 0) {
-        return data as StudentQuestItem[];
+      try {
+        logDbOperation('SELECT * FROM Quest ORDER BY dueDateText DESC');
+        const { data, error } = await supabase.from('Quest').select('*');
+        if (!error && data && data.length > 0) {
+          return data as StudentQuestItem[];
+        }
+      } catch (err) {
+        console.warn('[gamificationService] Remote quest query fallback:', err);
       }
     }
     return getLocalQuests();
@@ -107,15 +111,19 @@ export const gamificationService = {
     );
 
     if (isSupabaseConfigured) {
-      logDbOperation(`UPDATE Quest SET status='SUBMITTED' WHERE id=${questId}`, { proofUrl });
-      await supabase
-        .from('QuestSubmission')
-        .insert({
-          quest_id: questId,
-          student_id: studentId,
-          proof_url: proofUrl,
-          status: 'SUBMITTED',
-        });
+      try {
+        logDbOperation(`UPDATE Quest SET status='SUBMITTED' WHERE id=${questId}`, { proofUrl });
+        await supabase
+          .from('QuestSubmission')
+          .insert({
+            quest_id: questId,
+            student_id: studentId,
+            proof_url: proofUrl,
+            status: 'SUBMITTED',
+          });
+      } catch (err) {
+        console.warn('[gamificationService] Remote submission fallback:', err);
+      }
     }
 
     return updated;

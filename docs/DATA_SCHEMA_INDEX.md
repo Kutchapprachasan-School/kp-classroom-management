@@ -136,10 +136,10 @@
 - **[READ:SELECT]** [`src/services/studentEnrollmentService.ts:124`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentEnrollmentService.ts#L124)
 
 #### 🗂️ ตาราง/View: `Assignment` (4 จุดเรียกใช้)
-- **[READ:SELECT]** [`src/services/assignmentService.ts:74`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/assignmentService.ts#L74)
-- **[WRITE:INSERT]** [`src/services/assignmentService.ts:124`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/assignmentService.ts#L124)
-- **[WRITE:UPDATE]** [`src/services/assignmentService.ts:153`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/assignmentService.ts#L153)
-- **[WRITE:DELETE]** [`src/services/assignmentService.ts:183`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/assignmentService.ts#L183)
+- **[READ:SELECT]** [`src/services/assignmentService.ts:75`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/assignmentService.ts#L75)
+- **[WRITE:INSERT]** [`src/services/assignmentService.ts:129`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/assignmentService.ts#L129)
+- **[WRITE:UPDATE]** [`src/services/assignmentService.ts:162`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/assignmentService.ts#L162)
+- **[WRITE:DELETE]** [`src/services/assignmentService.ts:196`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/assignmentService.ts#L196)
 
 #### 🗂️ ตาราง/View: `Attendance` (2 จุดเรียกใช้)
 - **[READ:SELECT]** [`src/services/attendanceService.ts:417`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/attendanceService.ts#L417)
@@ -161,7 +161,7 @@
 - **[READ:SELECT]** [`src/services/masterDataService.ts:158`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/masterDataService.ts#L158)
 
 #### 🗂️ ตาราง/View: `classrooms` (3 จุดเรียกใช้)
-- **[READ:SELECT]** [`src/services/authService.ts:324`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L324)
+- **[READ:SELECT]** [`src/services/authService.ts:332`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L332)
 - **[READ:SELECT]** [`src/services/classroomService.ts:202`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L202)
 - **[READ:SELECT]** [`src/services/classroomService.ts:218`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L218)
 
@@ -182,34 +182,35 @@
 - **[READ:SELECT]** [`src/services/studentPromotionService.ts:259`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentPromotionService.ts#L259)
 
 #### 🗂️ ตาราง/View: `Quest` (1 จุดเรียกใช้)
-- **[READ:SELECT]** [`src/services/gamificationService.ts:73`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gamificationService.ts#L73)
+- **[READ:SELECT]** [`src/services/gamificationService.ts:74`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gamificationService.ts#L74)
 
 #### 🗂️ ตาราง/View: `QuestSubmission` (1 จุดเรียกใช้)
-- **[WRITE:INSERT]** [`src/services/gamificationService.ts:112`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gamificationService.ts#L112)
+- **[WRITE:INSERT]** [`src/services/gamificationService.ts:117`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gamificationService.ts#L117)
 
 #### 🗂️ ตาราง/View: `Score` (4 จุดเรียกใช้)
-- **[READ:SELECT]** [`src/services/scoreService.ts:98`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/scoreService.ts#L98)
-- **[READ:SELECT]** [`src/services/scoreService.ts:125`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/scoreService.ts#L125)
-- **[WRITE:UPSERT]** [`src/services/scoreService.ts:272`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/scoreService.ts#L272)
-- **[WRITE:UPDATE]** [`src/services/scoreService.ts:326`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/scoreService.ts#L326)
+- **[READ:SELECT]** [`src/services/scoreService.ts:99`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/scoreService.ts#L99)
+- **[READ:SELECT]** [`src/services/scoreService.ts:130`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/scoreService.ts#L130)
+- **[WRITE:UPSERT]** [`src/services/scoreService.ts:289`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/scoreService.ts#L289)
+- **[WRITE:UPDATE]** [`src/services/scoreService.ts:347`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/scoreService.ts#L347)
 
 #### 🗂️ ตาราง/View: `ScoreAuditLog` (2 จุดเรียกใช้)
-- **[READ:SELECT]** [`src/services/scoreService.ts:151`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/scoreService.ts#L151)
-- **[WRITE:INSERT]** [`src/services/scoreService.ts:257`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/scoreService.ts#L257)
+- **[READ:SELECT]** [`src/services/scoreService.ts:160`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/scoreService.ts#L160)
+- **[WRITE:INSERT]** [`src/services/scoreService.ts:270`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/scoreService.ts#L270)
 
 #### 🗂️ ตาราง/View: `StorageUploadLog` (2 จุดเรียกใช้)
 - **[READ:SELECT]** [`src/services/sgsExportService.ts:58`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/sgsExportService.ts#L58)
 - **[WRITE:INSERT]** [`src/services/sgsExportService.ts:143`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/sgsExportService.ts#L143)
 
 #### 🗂️ ตาราง/View: `Student` (6 จุดเรียกใช้)
-- **[READ:SELECT]** [`src/services/authService.ts:253`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L253)
+- **[READ:SELECT]** [`src/services/authService.ts:246`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L246)
 - **[WRITE:UPSERT]** [`src/services/masterDataService.ts:379`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/masterDataService.ts#L379)
 - **[WRITE:UPSERT]** [`src/services/studentService.ts:571`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L571)
 - **[WRITE:UPDATE]** [`src/services/studentService.ts:634`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L634)
 - **[WRITE:UPDATE]** [`src/services/studentService.ts:771`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L771)
 - **[WRITE:UPSERT]** [`src/services/studentService.ts:847`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L847)
 
-#### 🗂️ ตาราง/View: `StudentEnrollment` (6 จุดเรียกใช้)
+#### 🗂️ ตาราง/View: `StudentEnrollment` (7 จุดเรียกใช้)
+- **[READ:SELECT]** [`src/services/authService.ts:256`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L256)
 - **[WRITE:UPSERT]** [`src/services/masterDataService.ts:395`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/masterDataService.ts#L395)
 - **[WRITE:UPSERT]** [`src/services/studentService.ts:586`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L586)
 - **[WRITE:UPDATE]** [`src/services/studentService.ts:638`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L638)
@@ -222,7 +223,7 @@
 - **[READ:SELECT]** [`src/services/studentEnrollmentService.ts:88`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentEnrollmentService.ts#L88)
 
 #### 🗂️ ตาราง/View: `students` (7 จุดเรียกใช้)
-- **[READ:SELECT]** [`src/services/authService.ts:245`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L245)
+- **[READ:SELECT]** [`src/services/authService.ts:238`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L238)
 - **[READ:SELECT]** [`src/services/masterDataService.ts:282`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/masterDataService.ts#L282)
 - **[READ:SELECT]** [`src/services/masterDataService.ts:426`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/masterDataService.ts#L426)
 - **[READ:SELECT]** [`src/services/smsNotificationService.ts:212`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/smsNotificationService.ts#L212)
@@ -246,19 +247,19 @@
 - **[WRITE:UPDATE]** [`src/services/attendanceService.ts:705`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/attendanceService.ts#L705)
 
 #### 🗂️ ตาราง/View: `TrashLog` (5 จุดเรียกใช้)
-- **[READ:SELECT]** [`src/services/trashService.ts:33`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/trashService.ts#L33)
-- **[WRITE:INSERT]** [`src/services/trashService.ts:80`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/trashService.ts#L80)
-- **[WRITE:DELETE]** [`src/services/trashService.ts:107`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/trashService.ts#L107)
-- **[WRITE:DELETE]** [`src/services/trashService.ts:152`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/trashService.ts#L152)
-- **[WRITE:DELETE]** [`src/services/trashService.ts:187`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/trashService.ts#L187)
+- **[READ:SELECT]** [`src/services/trashService.ts:34`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/trashService.ts#L34)
+- **[WRITE:INSERT]** [`src/services/trashService.ts:85`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/trashService.ts#L85)
+- **[WRITE:DELETE]** [`src/services/trashService.ts:116`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/trashService.ts#L116)
+- **[WRITE:DELETE]** [`src/services/trashService.ts:165`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/trashService.ts#L165)
+- **[WRITE:DELETE]** [`src/services/trashService.ts:204`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/trashService.ts#L204)
 
 #### 🗂️ ตาราง/View: `User` (2 จุดเรียกใช้)
 - **[READ:SELECT]** [`src/services/authService.ts:97`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L97)
 - **[READ:SELECT]** [`src/services/classroomService.ts:141`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L141)
 
 #### 🗂️ ตาราง/View: `XpTransaction` (2 จุดเรียกใช้)
-- **[WRITE:INSERT]** [`src/services/behaviorService.ts:194`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/behaviorService.ts#L194)
-- **[READ:SELECT]** [`src/services/behaviorService.ts:212`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/behaviorService.ts#L212)
+- **[WRITE:INSERT]** [`src/services/behaviorService.ts:195`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/behaviorService.ts#L195)
+- **[READ:SELECT]** [`src/services/behaviorService.ts:217`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/behaviorService.ts#L217)
 
 ### 4.2 PostgreSQL RPCs ที่เรียกใช้ในระบบจัดการชั้นเรียน
 - **RPC `execute_student_promotion_batch()`**:

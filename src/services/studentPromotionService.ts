@@ -110,19 +110,19 @@ export const studentPromotionService = {
     // ดึงรายชื่อนักเรียนที่กำลังศึกษาอยู่ในห้องต้นทาง
     const { data: students, error: stdError } = await supabase
       .from('students')
-      .select('id, prefix, first_name, last_name, classroom_id, academic_status')
+      .select('id, title, first_name, last_name, classroom_id, academic_status')
       .in('classroom_id', fromClassroomIds)
       .eq('academic_status', 'STUDYING');
 
     if (stdError) throw stdError;
 
-    const activeStudents = (students as Array<{
-      id: string;
-      prefix?: string;
-      first_name?: string;
-      last_name?: string;
-      classroom_id: string;
-    }>) || [];
+    const activeStudents = ((students as any[]) || []).map((s) => ({
+      id: s.id,
+      prefix: s.title,
+      first_name: s.first_name,
+      last_name: s.last_name,
+      classroom_id: s.classroom_id,
+    }));
 
     const mappingByRoom = new Map<string, ClassroomMappingRule>(
       params.mappings.map((m) => [m.fromClassroomId, m])

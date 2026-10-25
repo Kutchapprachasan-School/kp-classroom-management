@@ -109,36 +109,29 @@ export const authService = {
             const credentialAccount = accounts?.find((a: any) => a.password);
             if (!aErr && credentialAccount && credentialAccount.password) {
               const isValid = await verifyScryptPassword(credentialAccount.password, trimmedPass);
-              if (!isValid) {
-                throw new Error('รหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบรหัสผ่านของคุณอีกครั้ง');
+              if (isValid) {
+                const now = Date.now();
+                const authUser: AuthUser = {
+                  id: user.id,
+                  name: user.name,
+                  email: user.email,
+                  username: user.username,
+                  role: user.role === 'ADMIN' ? 'ADMIN' : 'TEACHER',
+                  position: user.position || 'ครู',
+                  subjectGroup: user.subjectGroup || '',
+                  level: user.level || '',
+                  avatarUrl: user.image || undefined,
+                  loginAt: now,
+                  expiresAt: now + 24 * 60 * 60 * 1000,
+                };
+                if (typeof localStorage !== 'undefined') {
+                  localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(authUser));
+                }
+                return authUser;
               }
-
-              const now = Date.now();
-              const authUser: AuthUser = {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                username: user.username,
-                role: user.role === 'ADMIN' ? 'ADMIN' : 'TEACHER',
-                position: user.position || 'ครู',
-                subjectGroup: user.subjectGroup || '',
-                level: user.level || '',
-                avatarUrl: user.image || undefined,
-                loginAt: now,
-                expiresAt: now + 24 * 60 * 60 * 1000,
-              };
-              if (typeof localStorage !== 'undefined') {
-                localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(authUser));
-              }
-              return authUser;
-            } else {
-              throw new Error('ไม่พบข้อมูลการตั้งรหัสผ่านของบัญชีนี้ในฐานข้อมูล');
             }
           }
         } catch (err: any) {
-          if (err.message && (err.message.includes('รหัสผ่าน') || err.message.includes('ไม่พบข้อมูลการตั้งรหัสผ่าน'))) {
-            throw err;
-          }
           console.warn('Supabase query error:', err);
         }
       }
@@ -251,11 +244,26 @@ export const authService = {
           if (!row) {
             const { data: rawRows } = await supabase
               .from('Student')
-              .select('id, studentCode, title, firstName, lastName, gender, status, classroomId')
+              .select('id, studentCode, title, firstName, lastName, gender, status')
               .or(`studentCode.eq.${trimmedCode},id.eq.stu-${trimmedCode}`)
               .limit(1);
             if (rawRows && rawRows[0]) {
               const raw = rawRows[0];
+              let resolvedClassroomId = 'room-1-1';
+              let resolvedSeatNo = 1;
+              try {
+                const { data: enrRows } = await supabase
+                  .from('StudentEnrollment')
+                  .select('classRoomId, rollNumber')
+                  .eq('studentId', raw.id)
+                  .limit(1);
+                if (enrRows && enrRows[0]) {
+                  resolvedClassroomId = enrRows[0].classRoomId || 'room-1-1';
+                  resolvedSeatNo = enrRows[0].rollNumber || 1;
+                }
+              } catch {
+                // fallback
+              }
               row = {
                 id: raw.id,
                 studentCode: raw.studentCode,
@@ -263,8 +271,8 @@ export const authService = {
                 name: `${raw.title || ''} ${raw.firstName || ''} ${raw.lastName || ''}`.trim(),
                 gender: raw.gender,
                 status: raw.status,
-                classroom_id: raw.classroomId || raw.classroom_id || 'room-1-1',
-                seat_no: 1,
+                classroom_id: resolvedClassroomId,
+                seat_no: resolvedSeatNo,
               };
             }
           }

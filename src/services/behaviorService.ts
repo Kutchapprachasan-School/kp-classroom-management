@@ -71,7 +71,7 @@ export const behaviorService = {
         logDbOperation('SELECT selective FROM BehaviorRecord ORDER BY createdAt DESC LIMIT 100');
         const { data, error } = await supabase
           .from('BehaviorRecord')
-          .select('id, studentName, studentId, type, description, text, points, businessDate, createdAt, reportedById, author')
+          .select('id, studentId, type, description, points, businessDate, createdAt, reportedById')
           .order('createdAt', { ascending: false })
           .limit(100);
 
@@ -190,8 +190,12 @@ export const behaviorService = {
     saveLocalXpTransactions(txs);
 
     if (isSupabaseConfigured) {
-      logDbOperation('INSERT INTO XpTransaction (Idempotent)', newTx);
-      await supabase.from('XpTransaction').insert(newTx);
+      try {
+        logDbOperation('INSERT INTO XpTransaction (Idempotent)', newTx);
+        await supabase.from('XpTransaction').insert(newTx);
+      } catch (err) {
+        console.warn('[behaviorService] XpTransaction insert fallback:', err);
+      }
     }
 
     const newTotal = txs
@@ -208,15 +212,19 @@ export const behaviorService = {
   // READ: Get XP history for student
   async getXpTransactions(studentId: string): Promise<XpTransactionRecord[]> {
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase
-        .from('XpTransaction')
-        .select('id, studentId, amount, reason, createdAt')
-        .eq('studentId', studentId)
-        .order('createdAt', { ascending: false })
-        .limit(50);
+      try {
+        const { data, error } = await supabase
+          .from('XpTransaction')
+          .select('id, studentId, amount, reason, createdAt')
+          .eq('studentId', studentId)
+          .order('createdAt', { ascending: false })
+          .limit(50);
 
-      if (!error && data && data.length > 0) {
-        return data as XpTransactionRecord[];
+        if (!error && data && data.length > 0) {
+          return data as XpTransactionRecord[];
+        }
+      } catch (err) {
+        console.warn('[behaviorService] XpTransaction query fallback:', err);
       }
     }
     const all = getLocalXpTransactions();

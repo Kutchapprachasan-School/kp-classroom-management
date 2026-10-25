@@ -69,27 +69,31 @@ export const assignmentService = {
     const resolvedTotal = studentCount > 0 ? studentCount : 0;
 
     if (isSupabaseConfigured) {
-      logDbOperation(`SELECT * FROM Assignment WHERE classroomId = ${classroomId}`);
-      const { data, error } = await supabase
-        .from('Assignment')
-        .select('id, classroomId, title, maxScore, sgsUnit:SgsUnit(name)')
-        .eq('classroomId', classroomId);
+      try {
+        logDbOperation(`SELECT * FROM Assignment WHERE classroomId = ${classroomId}`);
+        const { data, error } = await supabase
+          .from('Assignment')
+          .select('id, classroomId, title, maxScore, sgsUnit:SgsUnit(name)')
+          .eq('classroomId', classroomId);
 
-      if (!error && data && data.length > 0) {
-        return data.map((item) => ({
-          id: item.id,
-          classroomId: item.classroomId,
-          title: item.title,
-          subtext: `มอบหมายเมื่อ ${new Date().toLocaleDateString('th-TH')}`,
-          category: 'คะแนนเก็บ',
-          sgsUnit: item.sgsUnit?.name || 'หน่วยที่ 1',
-          dueDate: 'ไม่ระบุ',
-          maxScore: Number(item.maxScore),
-          submittedCount: 0,
-          totalStudents: resolvedTotal,
-          isFull: false,
-          status: 'ACTIVE',
-        }));
+        if (!error && data && data.length > 0) {
+          return data.map((item) => ({
+            id: item.id,
+            classroomId: item.classroomId,
+            title: item.title,
+            subtext: `มอบหมายเมื่อ ${new Date().toLocaleDateString('th-TH')}`,
+            category: 'คะแนนเก็บ',
+            sgsUnit: item.sgsUnit?.name || 'หน่วยที่ 1',
+            dueDate: 'ไม่ระบุ',
+            maxScore: Number(item.maxScore),
+            submittedCount: 0,
+            totalStudents: resolvedTotal,
+            isFull: false,
+            status: 'ACTIVE',
+          }));
+        }
+      } catch (err) {
+        console.warn('[assignmentService] Remote query fallback:', err);
       }
     }
     const all = getLocalAssignments();
@@ -120,13 +124,17 @@ export const assignmentService = {
     };
 
     if (isSupabaseConfigured) {
-      logDbOperation('INSERT INTO Assignment', newAssignment);
-      await supabase.from('Assignment').insert({
-        id: newAssignment.id,
-        classroomId,
-        title: newAssignment.title,
-        maxScore: newAssignment.maxScore,
-      });
+      try {
+        logDbOperation('INSERT INTO Assignment', newAssignment);
+        await supabase.from('Assignment').insert({
+          id: newAssignment.id,
+          classroomId,
+          title: newAssignment.title,
+          maxScore: newAssignment.maxScore,
+        });
+      } catch (err) {
+        console.warn('[assignmentService] Remote insert fallback:', err);
+      }
     }
 
     const current = getLocalAssignments();
@@ -147,10 +155,14 @@ export const assignmentService = {
     saveLocalAssignments(current);
 
     if (isSupabaseConfigured) {
-      const cleanPayload = sanitizeAssignmentUpdatePayload(updates as Record<string, unknown>);
-      if (Object.keys(cleanPayload).length > 0) {
-        logDbOperation(`UPDATE Assignment WHERE id = ${id}`, cleanPayload);
-        await supabase.from('Assignment').update(cleanPayload).eq('id', id);
+      try {
+        const cleanPayload = sanitizeAssignmentUpdatePayload(updates as Record<string, unknown>);
+        if (Object.keys(cleanPayload).length > 0) {
+          logDbOperation(`UPDATE Assignment WHERE id = ${id}`, cleanPayload);
+          await supabase.from('Assignment').update(cleanPayload).eq('id', id);
+        }
+      } catch (err) {
+        console.warn('[assignmentService] Remote update fallback:', err);
       }
     }
 
@@ -179,8 +191,12 @@ export const assignmentService = {
     saveLocalAssignments(filtered);
 
     if (isSupabaseConfigured) {
-      logDbOperation(`DELETE FROM Assignment WHERE id = ${id}`);
-      await supabase.from('Assignment').delete().eq('id', id);
+      try {
+        logDbOperation(`DELETE FROM Assignment WHERE id = ${id}`);
+        await supabase.from('Assignment').delete().eq('id', id);
+      } catch (err) {
+        console.warn('[assignmentService] Remote delete fallback:', err);
+      }
     }
 
     return true;

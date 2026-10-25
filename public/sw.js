@@ -1,12 +1,18 @@
 // public/sw.js - PWA Service Worker with Native Phone Notification Support
-const _CACHE_NAME = 'kps-cache-v1';
+const _CACHE_NAME = 'kps-cache-v2';
 
 self.addEventListener('install', (_event) => {
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys.filter((k) => k !== _CACHE_NAME).map((k) => caches.delete(k))
+      )
+    ).then(() => self.clients.claim())
+  );
 });
 
 // Handle native push event (Web Push API)
