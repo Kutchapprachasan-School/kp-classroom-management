@@ -69,12 +69,28 @@ export interface WordDeckItem {
   id: string;
   name: string;
   words: string[];
-  classroomId: string;
+  classroomId?: string;
+  courseCode?: string;
   teacherId?: string;
   teacherName?: string;
   subject?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * สกัดรหัสวิชาหลัก (เช่น 'ญ21202', 'ศ23101', 'ส30206') ออกจากชื่อเต็มของวิชา
+ * เพื่อใช้เป็น Scope กลางในการแชร์ชุดคำศัพท์ระหว่างทุกห้องเรียนของครูผู้สอนคนเดียวกัน
+ */
+export function extractCourseCode(subject?: string): string {
+  if (!subject) return 'DEFAULT';
+  const trimmed = subject.trim();
+  // ตรวจหารหัสวิชาที่มีตัวอักษรและตัวเลข เช่น ญ21202, ส30206, ENG101
+  const m = trimmed.match(/^([a-zA-Z\u0E00-\u0E7F]+\d+)/);
+  if (m) return m[1].toUpperCase();
+  // หากไม่มีตัวเลขคั่น ให้ใช้คำแรก หรือคำเต็มที่ไม่เกิน 20 ตัวอักษร
+  const firstWord = trimmed.split(/\s+/)[0];
+  return (firstWord || 'DEFAULT').toUpperCase();
 }
 
 export interface LiveClassroomData {
@@ -498,29 +514,87 @@ export const liveClassroomService = {
   /**
    * สร้าง Storage Key สำหรับ Word Decks (คลังคำศัพท์/คำถาม) แยกตามครูผู้สอน, รายวิชา, และห้องเรียน
    */
+  /**
+   * คำนวณคีย์ LocalStorage สำหรับจัดเก็บชุดคำศัพท์
+   * สโคปตาม "ครูผู้สอน (teacherId)" และ "รหัสวิชา (courseCode)" โดยไม่แยกรายห้องเรียน
+   * เพื่อให้ทุกห้องเรียนที่เรียนวิชานี้ด้วยกันแชร์ชุดคำศัพท์ร่วมกันได้ และคงอยู่ข้ามปีการศึกษา
+   */
   getWordDeckStorageKey(
-    classroomId: string,
     teacherId?: string,
     subject?: string
   ): string {
     const safeTeacher = (teacherId || 'default').replace(/[^a-zA-Z0-9_\u0E00-\u0E7F-]/g, '_');
-    const safeSubject = (subject || 'default').replace(/[^a-zA-Z0-9_\u0E00-\u0E7F-]/g, '_');
-    return `${WORD_DECKS_STORAGE_PREFIX}${safeTeacher}_${safeSubject}_${classroomId}`;
+    const courseCode = extractCourseCode(subject);
+    const safeSubject = courseCode.replace(/[^a-zA-Z0-9_\u0E00-\u0E7F-]/g, '_');
+    return `${WORD_DECKS_STORAGE_PREFIX}${safeTeacher}_${safeSubject}`;
   },
 
   getWordDecks(
-    classroomId: string,
+    classroomId?: string,
     teacherId?: string,
     subject?: string
   ): WordDeckItem[] {
     if (typeof window === 'undefined') return [];
-    const key = this.getWordDeckStorageKey(classroomId, teacherId, subject);
+    const effectiveSubject = subject || classroomId || '';
+    const courseCode = extractCourseCode(effectiveSubject);
+    const primaryKey = this.getWordDeckStorageKey(teacherId, effectiveSubject);
+
+    let decks: WordDeckItem[] = [];
     try {
-      const raw = window.localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : [];
+      const raw = window.localStorage.getItem(primaryKey);
+      if (raw) {
+        decks = JSON.parse(raw);
+      }
     } catch {
-      return [];
+      decks = [];
     }
+
+    // Auto-Migration: ดึงชุดคำศัพท์เดิมที่เคยสร้างไว้แยกรายห้อง (Legacy Key) มารวมไว้ที่รหัสวิชานี้
+    try {
+      const safeTeacher = (teacherId || 'default').replace(/[^a-zA-Z0-9_\u0E00-\u0E7F-]/g, '_');
+      const teacherPrefix = `${WORD_DECKS_STORAGE_PREFIX}${safeTeacher}_`;
+      let migratedAny = false;
+
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (!key || !key.startsWith(teacherPrefix) || key === primaryKey) continue;
+
+        // หากคีย์เก่ามีรหัสวิชาตรงกัน (เช่น kp_word_decks_..._ญ21202_...)
+        if (
+          key.includes(courseCode) ||
+          (subject && key.includes(subject.replace(/[^a-zA-Z0-9_\u0E00-\u0E7F-]/g, '_')))
+        ) {
+          const legacyRaw = window.localStorage.getItem(key);
+          if (legacyRaw) {
+            try {
+              const legacyDecks: WordDeckItem[] = JSON.parse(legacyRaw);
+              if (Array.isArray(legacyDecks)) {
+                legacyDecks.forEach((ld) => {
+                  if (!decks.some((d) => d.id === ld.id || d.name === ld.name)) {
+                    decks.push({
+                      ...ld,
+                      courseCode,
+                      subject: effectiveSubject,
+                    });
+                    migratedAny = true;
+                  }
+                });
+              }
+            } catch {
+              // ignore
+            }
+          }
+        }
+      }
+
+      if (migratedAny && typeof window !== 'undefined') {
+        window.localStorage.setItem(primaryKey, JSON.stringify(decks));
+      }
+    } catch {
+      // ignore
+    }
+
+    return decks;
   },
 
   saveWordDeck(
@@ -532,7 +606,9 @@ export const liveClassroomService = {
     subject?: string,
     existingDeckId?: string
   ): WordDeckItem {
-    const key = this.getWordDeckStorageKey(classroomId, teacherId, subject);
+    const effectiveSubject = subject || classroomId || '';
+    const courseCode = extractCourseCode(effectiveSubject);
+    const key = this.getWordDeckStorageKey(teacherId, effectiveSubject);
     const existing = this.getWordDecks(classroomId, teacherId, subject);
     const now = new Date().toISOString();
 
@@ -553,6 +629,10 @@ export const liveClassroomService = {
           ...existing[foundIdx],
           name: deckName.trim() || existing[foundIdx].name,
           words: cleanedWords,
+          courseCode,
+          subject: effectiveSubject,
+          teacherId,
+          teacherName,
           updatedAt: now,
         };
         existing[foundIdx] = updatedDeck;
@@ -561,10 +641,10 @@ export const liveClassroomService = {
           id: existingDeckId,
           name: deckName.trim() || 'ชุดคำศัพท์',
           words: cleanedWords,
-          classroomId,
+          courseCode,
           teacherId,
           teacherName,
-          subject,
+          subject: effectiveSubject,
           createdAt: now,
           updatedAt: now,
         };
@@ -575,10 +655,10 @@ export const liveClassroomService = {
         id: `deck-${Date.now()}`,
         name: deckName.trim() || `ชุดคำศัพท์ ${new Date().toLocaleDateString('th-TH')}`,
         words: cleanedWords,
-        classroomId,
+        courseCode,
         teacherId,
         teacherName,
-        subject,
+        subject: effectiveSubject,
         createdAt: now,
         updatedAt: now,
       };
@@ -599,7 +679,8 @@ export const liveClassroomService = {
     subject?: string
   ): void {
     if (typeof window === 'undefined') return;
-    const key = this.getWordDeckStorageKey(classroomId, teacherId, subject);
+    const effectiveSubject = subject || classroomId || '';
+    const key = this.getWordDeckStorageKey(teacherId, effectiveSubject);
     const existing = this.getWordDecks(classroomId, teacherId, subject);
     const filtered = existing.filter((d) => d.id !== deckId);
     window.localStorage.setItem(key, JSON.stringify(filtered));

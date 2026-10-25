@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 25/10/2569 21:01:51 | รวมทั้งหมด 230 ไฟล์*
+*อัปเดตล่าสุด: 25/10/2569 21:10:19 | รวมทั้งหมด 230 ไฟล์*
 
 ---
 
@@ -139,7 +139,7 @@
 | [src/components/live-classroom/LiveTimerSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LiveTimerSubTab.tsx) | 483 | `LiveTimerSubTabProps` (L14), `formatTimerMMSS` (L32), `LiveTimerSubTab` (L39) |
 | [src/components/live-classroom/LuckyTicketDrawModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LuckyTicketDrawModal.tsx) | 1151 | `PrizeTier` (L26), `PrizePoolPreset` (L40), `PRIZE_POOLS` (L47), `LuckyTicketDrawModalProps` (L306), `createSlicePath` (L332), `describeArcSlice` (L355), `LuckyTicketDrawModal` (L357) |
 | [src/components/live-classroom/RandomPickerSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RandomPickerSubTab.tsx) | 733 | `PickerMode` (L18), `SpinSpeed` (L19), `RandomPickerSubTabProps` (L21), `getAvailablePool` (L41), `restoreSkippedStudent` (L51), `RandomPickerSubTab` (L55) |
-| [src/components/live-classroom/RandomTextSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RandomTextSubTab.tsx) | 950 | `SpinSpeed` (L29), `RandomTextSubTabProps` (L31), `RandomTextSubTab` (L49) |
+| [src/components/live-classroom/RandomTextSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RandomTextSubTab.tsx) | 985 | `SpinSpeed` (L29), `RandomTextSubTabProps` (L31), `RandomTextSubTab` (L49) |
 | [src/components/live-classroom/RewardBoardSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RewardBoardSubTab.tsx) | 301 | `RewardBoardSubTabProps` (L17), `calculateTopEarners` (L27), `formatRewardTimeThai` (L39), `RewardBoardSubTab` (L53) |
 | [src/components/live-classroom/RunningTrackArena.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RunningTrackArena.tsx) | 1320 | `RaceCandidate` (L40), `RunningTrackArenaProps` (L77), `RunningTrackArena` (L240) |
 | [src/components/mobile/index.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/mobile/index.ts) | 12 | *(Internal / Default Export)* |
@@ -210,7 +210,7 @@
 | [src/services/gradeService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gradeService.ts) | 736 | `AssessmentColumn` (L16), `StudentScore` (L30), `GradeSyncMeta` (L38), `localGradeDb` (L123), `gradeService` (L388) |
 | [src/services/homeVisitService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/homeVisitService.ts) | 292 | `VisitStatus` (L6), `SdqLevel` (L7), `CctSyncStatus` (L8), `HouseholdMember` (L11), `StudentAttendanceLeavePolicy` (L28), `HomeVisitRecord` (L35), `homeVisitService` (L153) |
 | [src/services/index.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/index.ts) | 20 | *(Internal / Default Export)* |
-| [src/services/liveClassroomService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/liveClassroomService.ts) | 729 | `WEEKLY_GACHA_TICKETS_UPDATED_EVENT` (L17), `getCurrentBangkokWeekKey` (L22), `StudentTier` (L31), `detectStudentGender` (L33), `LiveStudent` (L52), `WordDeckItem` (L68), `LiveClassroomData` (L80), `getThailandTodayRange` (L95), `calculateStudentTierMap` (L118), `liveClassroomService` (L162) |
+| [src/services/liveClassroomService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/liveClassroomService.ts) | 810 | `WEEKLY_GACHA_TICKETS_UPDATED_EVENT` (L17), `getCurrentBangkokWeekKey` (L22), `StudentTier` (L31), `detectStudentGender` (L33), `LiveStudent` (L52), `WordDeckItem` (L68), `extractCourseCode` (L85), `LiveClassroomData` (L96), `getThailandTodayRange` (L111), `calculateStudentTierMap` (L134) *(+1 รายการ)* |
 | [src/services/localCacheDb.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/localCacheDb.ts) | 292 | `CachedClassroom` (L9), `CachedStudent` (L20), `SyncMeta` (L42), `localCacheDb` (L113) |
 | [src/services/masterDataService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/masterDataService.ts) | 474 | `resolveRoomCandidates` (L34), `masterDataService` (L117) |
 | [src/services/messagingService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/messagingService.ts) | 1546 | `ChatGroupType` (L17), `ChatMember` (L19), `ChatAttachmentMeta` (L30), `ChatMessage` (L40), `ChatGroup` (L67), `StudentTransferPayload` (L87), `StudentTransferResult` (L95), `CHAT_GROUPS_EVENT` (L111), `STUDENT_TRANSFERRED_EVENT` (L112), `CourseClassroomMapping` (L115) *(+2 รายการ)* |

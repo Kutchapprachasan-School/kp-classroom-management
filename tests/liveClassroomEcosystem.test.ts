@@ -8,6 +8,7 @@ import {
   getThailandTodayRange,
   liveClassroomService,
   detectStudentGender,
+  extractCourseCode,
   type LiveStudent,
 } from '../src/services/liveClassroomService';
 import { tts, formatStudentNameForSpeech } from '../src/utils/speechTTS';
@@ -285,6 +286,24 @@ async function runTests() {
   assert.equal(formatStudentNameForSpeech('น.ส วิภาดา ดวงดี'), 'นางสาววิภาดา ดวงดี');
   assert.equal(formatStudentNameForSpeech('นายเอกพล ขยันยิ่ง'), 'นายเอกพล ขยันยิ่ง');
   assert.equal(formatStudentNameForSpeech('เด็กชายธนดล'), 'เด็กชายธนดล');
+
+  // 15. ทดสอบการแยกชุดคำศัพท์ตามรหัสวิชา (Course Code Scope) และแยกตามครูผู้สอน
+  assert.equal(extractCourseCode('ญ21202 ญี่ปุ่น'), 'ญ21202');
+  assert.equal(extractCourseCode('ญ31202 ญี่ปุ่น2'), 'ญ31202');
+  assert.equal(extractCourseCode('ส30206 ต้านทุจริต'), 'ส30206');
+  assert.equal(extractCourseCode('ENG101 English'), 'ENG101');
+  assert.equal(extractCourseCode('ญ21202'), 'ญ21202');
+
+  const keyTeacher1 = liveClassroomService.getWordDeckStorageKey('teacher-A', 'ญ21202 ญี่ปุ่น');
+  const keyTeacher2 = liveClassroomService.getWordDeckStorageKey('teacher-B', 'ญ21202 ญี่ปุ่น');
+  assert.equal(keyTeacher1, 'kp_word_decks_teacher-A_ญ21202');
+  assert.equal(keyTeacher2, 'kp_word_decks_teacher-B_ญ21202');
+  assert.notEqual(keyTeacher1, keyTeacher2, 'ครูต่างคนกันต้องมีคีย์ชุดคำศัพท์แยกจากกัน');
+
+  // ทุกห้องเรียนที่เรียนวิชาเดียวกันของครูคนเดียวกัน ต้องได้คีย์เดียวกัน 100%
+  const keyRoomM11 = liveClassroomService.getWordDeckStorageKey('teacher-A', 'ญ21202 ญี่ปุ่น');
+  const keyRoomM12 = liveClassroomService.getWordDeckStorageKey('teacher-A', 'ญ21202');
+  assert.equal(keyRoomM11, keyRoomM12, 'ห้อง ม.1/1 และ ม.1/2 ต้องแชร์คีย์เดียวกันในวิชา ญ21202');
 
   console.log('✅ All Live Classroom Ecosystem tests passed!');
 }

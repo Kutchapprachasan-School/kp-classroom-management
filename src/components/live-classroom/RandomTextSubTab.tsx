@@ -23,7 +23,7 @@ import {
   Volume2,
 } from 'lucide-react';
 import type { LiveStudent, WordDeckItem } from '../../services/liveClassroomService';
-import { liveClassroomService } from '../../services/liveClassroomService';
+import { liveClassroomService, extractCourseCode } from '../../services/liveClassroomService';
 import { tts } from '../../utils/speechTTS';
 
 export type SpinSpeed = 'fast' | 'normal' | 'dramatic';
@@ -118,9 +118,10 @@ export const RandomTextSubTab: React.FC<RandomTextSubTabProps> = ({
     return () => cancelSpinTimers();
   }, [cancelSpinTimers]);
 
-  // โหลดชุดคำศัพท์ที่บันทึกไว้ของครูและวิชานี้
+  const courseCode = useMemo(() => extractCourseCode(subjectName), [subjectName]);
+
+  // โหลดชุดคำศัพท์ที่บันทึกไว้ของครูและวิชานี้ (แชร์ร่วมกันทุกห้องในรหัสวิชานี้ และเก็บไว้ใช้ได้ทุกปีการศึกษา)
   const loadDecks = useCallback(() => {
-    if (!classroomId) return;
     const loaded = liveClassroomService.getWordDecks(classroomId, currentTeacherId, subjectName);
     setDecks(loaded);
     if (loaded.length > 0 && (!selectedDeckId || !loaded.some((d) => d.id === selectedDeckId))) {
@@ -437,6 +438,20 @@ export const RandomTextSubTab: React.FC<RandomTextSubTabProps> = ({
                 ))
               )}
             </select>
+
+            {courseCode && courseCode !== 'DEFAULT' && (
+              <span
+                className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border flex items-center gap-1 shrink-0 ${
+                  isProjectorMode
+                    ? 'bg-blue-900/30 border-blue-700/50 text-blue-300'
+                    : 'bg-blue-50 border-blue-200 text-blue-700'
+                }`}
+                title={`ชุดคำศัพท์นี้แชร์ร่วมกันในทุกห้องที่เรียนวิชา ${courseCode} และเก็บไว้ใช้ได้ทุกปีการศึกษา`}
+              >
+                <span>วิชา {courseCode}</span>
+                <span className="text-[10px] opacity-75 font-normal">(แชร์ทุกห้อง)</span>
+              </span>
+            )}
           </div>
 
           {/* Create & Edit Deck Buttons */}
@@ -876,6 +891,26 @@ export const RandomTextSubTab: React.FC<RandomTextSubTabProps> = ({
             </div>
 
             <div className="space-y-4">
+              {courseCode && courseCode !== 'DEFAULT' && (
+                <div
+                  className={`flex items-start gap-2.5 p-3 rounded-2xl border text-xs leading-relaxed ${
+                    isProjectorMode
+                      ? 'bg-blue-950/40 border-blue-800/60 text-blue-200'
+                      : 'bg-blue-50/80 border-blue-200 text-blue-900'
+                  }`}
+                >
+                  <BookOpen className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-extrabold text-blue-600 dark:text-blue-400">
+                      รายวิชา {courseCode} ({subjectName}):
+                    </span>{' '}
+                    <span>
+                      ชุดคำศัพท์นี้จะแสดงและแชร์ร่วมกันในทุกห้องที่เรียนวิชานี้ของคุณครู และบันทึกเก็บไว้ใช้ต่อในปีการศึกษาถัดไปได้ทันที
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold mb-1.5 text-slate-700 dark:text-slate-300">
                   ชื่อชุดคำศัพท์ / คลังคำถาม:
