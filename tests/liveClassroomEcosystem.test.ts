@@ -10,7 +10,7 @@ import {
   detectStudentGender,
   type LiveStudent,
 } from '../src/services/liveClassroomService';
-import { tts } from '../src/utils/speechTTS';
+import { tts, formatStudentNameForSpeech } from '../src/utils/speechTTS';
 import {
   generateBalancedGroups,
   buildWeightedWheelSegments,
@@ -272,6 +272,19 @@ async function runTests() {
   assert.equal(inferGradeLevelFromCourseCode('ญ30206'), 'ม.6', 'ญ30206 ต้องเป็นชั้น ม.6');
   assert.equal(inferGradeLevelFromCourseCode('ญ33202'), 'ม.6', 'ญ33202 ต้องเป็นชั้น ม.6');
   assert.equal(inferGradeLevelFromCourseCode(''), null);
+
+  // 14. ทดสอบการแปลงคำนำหน้าชื่อย่อภาษาไทยสำหรับ TTS (formatStudentNameForSpeech)
+  assert.equal(formatStudentNameForSpeech('ด.ช.ปรเมศวร์ รัตนวารี'), 'เด็กชายปรเมศวร์ รัตนวารี');
+  assert.equal(formatStudentNameForSpeech('ด.ช. ปรเมศวร์ รัตนวารี'), 'เด็กชายปรเมศวร์ รัตนวารี');
+  assert.equal(formatStudentNameForSpeech('ด.ช ปรเมศวร์ รัตนวารี'), 'เด็กชายปรเมศวร์ รัตนวารี');
+  assert.equal(formatStudentNameForSpeech('ด.ญ.กัญญารัตน์ สดใส'), 'เด็กหญิงกัญญารัตน์ สดใส');
+  assert.equal(formatStudentNameForSpeech('ด.ญ. กัญญารัตน์ สดใส'), 'เด็กหญิงกัญญารัตน์ สดใส');
+  assert.equal(formatStudentNameForSpeech('ด.ญ กัญญารัตน์ สดใส'), 'เด็กหญิงกัญญารัตน์ สดใส');
+  assert.equal(formatStudentNameForSpeech('น.ส.วิภาดา ดวงดี'), 'นางสาววิภาดา ดวงดี');
+  assert.equal(formatStudentNameForSpeech('น.ส. วิภาดา ดวงดี'), 'นางสาววิภาดา ดวงดี');
+  assert.equal(formatStudentNameForSpeech('น.ส วิภาดา ดวงดี'), 'นางสาววิภาดา ดวงดี');
+  assert.equal(formatStudentNameForSpeech('นายเอกพล ขยันยิ่ง'), 'นายเอกพล ขยันยิ่ง');
+  assert.equal(formatStudentNameForSpeech('เด็กชายธนดล'), 'เด็กชายธนดล');
 
   console.log('✅ All Live Classroom Ecosystem tests passed!');
 }

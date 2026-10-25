@@ -7,6 +7,29 @@ export type EnglishPraise = 'great' | 'awesome' | 'perfect' | 'excellent';
 export type ChinesePraise = 'taiBangLe' | 'haoJiLe' | 'zhenBang';
 export type SpeechLanguage = 'th-TH' | 'en-US' | 'ja-JP' | 'zh-CN' | string;
 
+/**
+ * แปลงคำนำหน้าชื่อย่อภาษาไทยให้เป็นคำเต็มที่ลื่นไหลสำหรับระบบสังเคราะห์เสียงพูด (TTS)
+ * ป้องกันไม่ให้ AI อ่านสะกดทีละตัวอักษร เช่น:
+ * - ด.ช. / ด.ช / ด. ช. -> เด็กชาย
+ * - ด.ญ. / ด.ญ / ด. ญ. -> เด็กหญิง
+ * - น.ส. / น.ส / น. ส. -> นางสาว
+ */
+export function formatStudentNameForSpeech(name: string): string {
+  if (!name) return '';
+  let formatted = name.trim();
+
+  // ด.ช. / ด.ช / ด. ช. -> เด็กชาย
+  formatted = formatted.replace(/(^|[\s(])ด\s*\.\s*ช\s*\.?\s*/gi, '$1เด็กชาย');
+
+  // ด.ญ. / ด.ญ / ด. ญ. -> เด็กหญิง
+  formatted = formatted.replace(/(^|[\s(])ด\s*\.\s*ญ\s*\.?\s*/gi, '$1เด็กหญิง');
+
+  // น.ส. / น.ส / น. ส. -> นางสาว
+  formatted = formatted.replace(/(^|[\s(])น\s*\.\s*ส\s*\.?\s*/gi, '$1นางสาว');
+
+  return formatted;
+}
+
 class SpeechTTSEngine {
   private synth: SpeechSynthesis | null = null;
   private thaiVoice: SpeechSynthesisVoice | null = null;
@@ -79,7 +102,7 @@ class SpeechTTSEngine {
     if (!this.synth || !enabled) return;
     this.stop();
 
-    const cleanName = (name || '').trim();
+    const cleanName = formatStudentNameForSpeech((name || '').trim());
     let textToSpeech = cleanName;
     if (lang.startsWith('th')) {
       textToSpeech = number ? `เลขที่ ${number}, ${cleanName}` : cleanName;

@@ -481,10 +481,21 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
                         <span>ตรวจแล้ว ({item.score}/{item.maxScore})</span>
                       </span>
                     ) : item.status === 'RETURNED' || (item as any).status === 'RETURNED_REVISION' ? (
-                      <span className="px-3.5 py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-300 text-xs font-bold flex items-center gap-1.5">
-                        <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-                        <span>ส่งกลับแก้ไขแล้ว</span>
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-300 text-xs font-bold flex items-center gap-1.5">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                          <span>ส่งกลับแก้ไขแล้ว</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setGradingModalItem(item)}
+                          className="px-3 py-1.5 rounded-xl border border-amber-300 bg-white hover:bg-amber-50 text-xs font-bold text-amber-900 flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                          title="ตรวจซ้ำ / ให้คะแนน (กรณีตรวจสอบแล้วพบว่าทำถูกต้องแล้ว)"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 text-amber-600" />
+                          <span>ตรวจซ้ำ</span>
+                        </button>
+                      </div>
                     ) : (
                       <button
                         type="button"

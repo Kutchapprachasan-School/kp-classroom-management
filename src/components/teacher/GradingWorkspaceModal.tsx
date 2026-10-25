@@ -134,27 +134,32 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
     onSaveGrade(currentItem.id, num, feedbackInput);
   };
 
+  const rawFileUrl = currentItem?.filePreviewUrl || (currentItem as any)?.fileUrl || '';
+  const cleanPreview = rawFileUrl
+    ? r2StorageService.resolvePublicViewUrl(rawFileUrl) || rawFileUrl
+    : undefined;
+  const inferredFileName =
+    currentItem?.fileName ||
+    (rawFileUrl ? decodeURIComponent(rawFileUrl.split('/').pop()?.split('?')[0] || '') : undefined);
   const cachedFile = currentItem
     ? sgsRosterAndSubmissionService.getSubmissionFileUrl(
         currentItem.assignmentId,
         currentItem.studentCode,
-        currentItem.fileName
+        inferredFileName
       )
     : undefined;
-  const cleanPreview = currentItem?.filePreviewUrl
-    ? r2StorageService.resolvePublicViewUrl(currentItem.filePreviewUrl) || currentItem.filePreviewUrl
-    : undefined;
-  const effectiveFileUrl = localOverrideFileUrl || cachedFile || cleanPreview;
+  const effectiveFileUrl = localOverrideFileUrl || cleanPreview || cachedFile;
 
   const isImage = Boolean(
     effectiveFileUrl?.startsWith('data:image/') ||
     currentItem.submissionChannel === 'IMAGE_UPLOAD' ||
-    (currentItem.fileName || '').match(/\.(jpg|jpeg|png|webp|gif|svg)$/i)
+    (inferredFileName || '').match(/\.(jpg|jpeg|png|webp|gif|svg)$/i) ||
+    (effectiveFileUrl && effectiveFileUrl.match(/\.(jpg|jpeg|png|webp|gif|svg)(\?.*)?$/i))
   );
   const isPdf = Boolean(
     currentItem.submissionChannel === 'PDF_UPLOAD' ||
-    (currentItem.fileName || '').endsWith('.pdf') ||
-    (effectiveFileUrl && effectiveFileUrl.toLowerCase().includes('.pdf'))
+    (inferredFileName || '').toLowerCase().endsWith('.pdf') ||
+    (effectiveFileUrl && effectiveFileUrl.toLowerCase().match(/\.pdf(\?.*)?$/i))
   );
   const hasText = Boolean(currentItem.textContent && currentItem.textContent.trim().length > 0);
 
@@ -168,6 +173,11 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
     currentItem?.classroom ||
     (resolvedStu?.classroomId ? formatClassroomLabel(resolvedStu.classroomId) : 'ม.3/1');
   const resolvedSeat = currentItem?.seatNo ?? resolvedStu?.student.no ?? '-';
+
+  const resolvedSubjectCode = currentItem.subjectCode || (currentItem as any).courseCode || '';
+  const resolvedSubjectName = currentItem.subjectName || (currentItem as any).courseName || '';
+  const resolvedAssignmentTitle = currentItem.assignmentTitle || (currentItem as any).workTitle || 'ชิ้นงาน';
+  const resolvedSubmittedAt = currentItem.submittedAtText || (currentItem as any).submittedAt || '-';
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 animate-fade-in font-sans">
@@ -190,14 +200,19 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                     ✓ ตรวจแล้ว ({currentItem.score}/{currentItem.maxScore})
                   </span>
+                ) : currentItem.status === 'RETURNED' || (currentItem as any).status === 'RETURNED_REVISION' ? (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                    ⚠️ ส่งกลับแก้ไข
+                  </span>
                 ) : (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
                     ⏳ รอตรวจ
                   </span>
                 )}
               </div>
               <p className="text-xs text-slate-500">
-                วิชา {currentItem.subjectCode} {currentItem.subjectName} • {currentItem.assignmentTitle} • ส่งเมื่อ {currentItem.submittedAtText}
+                {resolvedSubjectCode ? `วิชา ${resolvedSubjectCode}${resolvedSubjectName ? ` ${resolvedSubjectName}` : ''} • ` : ''}
+                {resolvedAssignmentTitle} • ส่งเมื่อ {resolvedSubmittedAt}
               </p>
             </div>
           </div>
@@ -247,7 +262,7 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-xs font-bold text-slate-700">ไฟล์ผลงาน:</span>
                 <span className="text-xs font-bold text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 truncate max-w-xs">
-                  {currentItem.fileName || 'ผลงานนักเรียน'}
+                  {inferredFileName || currentItem.fileName || 'ผลงานนักเรียน'}
                 </span>
                 {currentItem.externalLinkUrl && (
                   <a
@@ -468,22 +483,22 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
                   </div>
                 )
               ) : !hasText ? (
-                <div className="p-6 text-center space-y-4 bg-indigo-50/60 border border-indigo-200 rounded-2xl w-full max-w-md">
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mx-auto shadow-sm">
-                    <Sparkles className="w-6 h-6 text-cyan-300" />
-                  </div>
-                  <div>
-                    <span className="px-2 py-0.5 rounded-md bg-gradient-to-r from-[#00C4CC] to-indigo-600 text-white font-black text-[11px]">
-                      {currentItem.externalPlatform || 'CANVA'}
-                    </span>
-                    <h4 className="text-sm font-bold text-slate-900 mt-2">
-                      {currentItem.fileName || 'งานออกแบบออนไลน์'}
-                    </h4>
-                    <p className="text-xs text-slate-500 mt-1">
-                      คลิกปุ่มด้านล่างเพื่อเปิดดูผลงานบน {currentItem.externalPlatform || 'Canva'}
-                    </p>
-                  </div>
-                  {currentItem.externalLinkUrl && (
+                currentItem.externalLinkUrl ? (
+                  <div className="p-6 text-center space-y-4 bg-indigo-50/60 border border-indigo-200 rounded-2xl w-full max-w-md">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mx-auto shadow-sm">
+                      <Sparkles className="w-6 h-6 text-cyan-300" />
+                    </div>
+                    <div>
+                      <span className="px-2 py-0.5 rounded-md bg-gradient-to-r from-[#00C4CC] to-indigo-600 text-white font-black text-[11px]">
+                        {currentItem.externalPlatform || 'LINK'}
+                      </span>
+                      <h4 className="text-sm font-bold text-slate-900 mt-2">
+                        {inferredFileName || currentItem.fileName || 'ผลงานออนไลน์'}
+                      </h4>
+                      <p className="text-xs text-slate-500 mt-1">
+                        คลิกปุ่มด้านล่างเพื่อเปิดดูผลงานบน {currentItem.externalPlatform || 'เว็บไซต์ภายนอก'}
+                      </p>
+                    </div>
                     <a
                       href={currentItem.externalLinkUrl}
                       target="_blank"
@@ -491,10 +506,22 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
                       className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-extrabold shadow-sm transition-colors cursor-pointer"
                     >
                       <ExternalLink className="w-4 h-4" />
-                      <span>เปิดดูผลงาน {currentItem.externalPlatform || 'Canva'} ↗</span>
+                      <span>เปิดดูผลงาน {currentItem.externalPlatform || 'ภายนอก'} ↗</span>
                     </a>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center space-y-3 bg-slate-50 border border-slate-200 rounded-2xl w-full max-w-md">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-200 text-slate-500 flex items-center justify-center mx-auto">
+                      <FileText className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800">ไม่พบไฟล์ผลงาน</h4>
+                      <p className="text-xs text-slate-500 mt-1">
+                        นักเรียนอาจยังไม่ได้แนบไฟล์ หรือไฟล์อยู่ในคิวประมวลผล
+                      </p>
+                    </div>
+                  </div>
+                )
               ) : null}
             </div>
           </div>
@@ -851,7 +878,11 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
                   className="w-full py-3.5 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                 >
                   <Check className="w-5 h-5" />
-                  <span>บันทึกคะแนน & ตรวจคนถัดไป ➔</span>
+                  <span>
+                    {currentItem.status === 'RETURNED' || (currentItem as any).status === 'RETURNED_REVISION'
+                      ? 'บันทึกคะแนน (ตรวจซ้ำ)'
+                      : 'บันทึกคะแนน & ตรวจคนถัดไป ➔'}
+                  </span>
                 </button>
 
                 {!isReturningWork && (

@@ -583,17 +583,54 @@ export const teacherCourseAssignmentService = {
         const pairKey = `${it.assignmentId}_${it.studentCode}`;
         if (!handledKeys.has(pairKey) && !handledKeys.has(it.id)) {
           if (termAssignments.length > 0 && it.assignmentId) {
-            const exists = termAssignments.some((a) => a.id === it.assignmentId);
+            const exists = termAssignments.some(
+              (a) => a.id === it.assignmentId || (a.unitId && a.unitId === it.assignmentId)
+            );
             if (!exists) return;
           }
-          // Rehydrate filePreviewUrl if missing or contains storage.kps.ac.th
-          let previewUrl = resolveFileUrl(it.filePreviewUrl);
+
+          const asg = termAssignments.find(
+            (a) => a.id === it.assignmentId || (a.unitId && a.unitId === it.assignmentId)
+          );
+          const subCode = (it.studentCode || '').trim();
+          const stu = studentMap.get(subCode);
+          const foundInService = studentService.findStudentByCode(subCode);
+
+          const rawFileUrl = it.filePreviewUrl || (it as any).fileUrl || '';
+          let previewUrl = resolveFileUrl(rawFileUrl) || rawFileUrl;
+          const cleanFileName =
+            it.fileName ||
+            (rawFileUrl ? decodeURIComponent(rawFileUrl.split('/').pop()?.split('?')[0] || '') : '');
           if (!previewUrl) {
-            previewUrl = sgsRosterAndSubmissionService.getSubmissionFileUrl(it.assignmentId, it.studentCode, it.fileName);
+            previewUrl = sgsRosterAndSubmissionService.getSubmissionFileUrl(it.assignmentId, it.studentCode, cleanFileName);
           }
+
+          const isImage = Boolean(
+            previewUrl?.match(/\.(webp|png|jpg|jpeg|gif|svg)$/i) ||
+            cleanFileName.match(/\.(webp|png|jpg|jpeg|gif|svg)$/i) ||
+            previewUrl?.startsWith('data:image/')
+          );
+          const isPdf = Boolean(
+            previewUrl?.toLowerCase().includes('.pdf') ||
+            cleanFileName.toLowerCase().endsWith('.pdf') ||
+            previewUrl?.startsWith('data:application/pdf')
+          );
+          const channel = isImage ? 'IMAGE_UPLOAD' : isPdf ? 'PDF_UPLOAD' : (it.submissionChannel || 'ONLINE_FORM');
+
           mergedQueue.push({
             ...it,
+            studentName: it.studentName || stu?.name || foundInService?.student?.name || `นักเรียน (${it.studentCode})`,
+            classroom: it.classroom || stu?.classroom || (foundInService?.classroomId ? formatClassroomLabel(foundInService.classroomId) : ''),
+            seatNo: it.seatNo ?? stu?.seatNo ?? foundInService?.student?.no ?? '-',
+            subjectCode: it.subjectCode || (it as any).courseCode || asg?.courseCode || '',
+            subjectName: it.subjectName || asg?.courseName || asg?.unitTitle || '',
+            assignmentTitle: it.assignmentTitle || (it as any).workTitle || asg?.title || 'ชิ้นงาน',
+            sgsUnit: it.sgsUnit || asg?.unitTitle || 'งานระหว่างภาค',
+            maxScore: it.maxScore || asg?.maxScore || 10,
             filePreviewUrl: previewUrl,
+            fileName: cleanFileName,
+            submissionChannel: it.submissionChannel || channel,
+            submittedAtText: it.submittedAtText || formatSubmissionTimestamp(it.submittedTimestamp || Date.now()),
           });
         }
       });

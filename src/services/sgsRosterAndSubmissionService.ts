@@ -1772,6 +1772,10 @@ export const sgsRosterAndSubmissionService = {
             score: params.score !== undefined ? params.score : current.score,
             feedback: params.feedback !== undefined ? params.feedback : current.feedback,
             fileUrl: params.fileUrl || current.fileUrl,
+            filePreviewUrl: params.fileUrl || current.filePreviewUrl || current.fileUrl,
+            fileName: current.fileName || (params.fileUrl ? decodeURIComponent(params.fileUrl.split('/').pop()?.split('?')[0] || '') : undefined),
+            subjectCode: current.subjectCode || params.courseCode || current.courseCode,
+            assignmentTitle: current.assignmentTitle || params.workTitle || current.workTitle,
             externalLinkUrl: params.externalLinkUrl || current.externalLinkUrl,
             textContent: params.textContent || current.textContent,
             submittedTimestamp:
@@ -1787,6 +1791,8 @@ export const sgsRosterAndSubmissionService = {
                 Boolean(current.isResubmission)),
           };
         } else if (queueStatus === 'PENDING_REVIEW' || queueStatus === 'GRADED') {
+          const rawUrl = params.fileUrl || '';
+          const resolvedFileName = rawUrl ? decodeURIComponent(rawUrl.split('/').pop()?.split('?')[0] || '') : '';
           queue.push({
             id: canonicalQueueId,
             assignmentId: params.assignmentId,
@@ -1795,8 +1801,12 @@ export const sgsRosterAndSubmissionService = {
             studentName: params.studentName || '',
             classroom: params.classroom || '',
             courseCode: params.courseCode || '',
+            subjectCode: params.courseCode || '',
             workTitle: params.workTitle || '',
-            fileUrl: params.fileUrl || '',
+            assignmentTitle: params.workTitle || '',
+            fileUrl: rawUrl,
+            filePreviewUrl: rawUrl,
+            fileName: resolvedFileName,
             externalLinkUrl: params.externalLinkUrl || '',
             textContent: params.textContent || '',
             status: queueStatus,
@@ -3301,6 +3311,7 @@ export const sgsRosterAndSubmissionService = {
     const cleanFileName = payload.fileName
       ? payload.fileName.replace(/\.(jpg|jpeg|png|heic)$/i, '.webp')
       : undefined;
+    const cleanRoom = (payload.classroom ? formatClassroomLabel(payload.classroom).toLowerCase().replace(/\s+/g, '').replace('/', '-') : 'all');
     const r2Key = cleanFileName
       ? (r2StorageService.isConfigured()
           ? r2StorageService.buildSubmissionKey({
@@ -3310,7 +3321,7 @@ export const sgsRosterAndSubmissionService = {
               studentCode: payload.studentCode,
               fileName: cleanFileName,
             })
-          : `r2://kp-classroom-submissions/${term.replace('/', '-')}/m3-1/${payload.assignmentId}/${payload.studentCode}_${cleanFileName}`)
+          : `r2://kp-classroom-submissions/${term.replace('/', '-')}/${cleanRoom}/${payload.assignmentId}/${payload.studentCode}_${cleanFileName}`)
       : undefined;
     const origKb = payload.originalSizeKb ?? (cleanFileName ? 4250 : 0);
     const compKb = payload.compressedSizeKb ?? (cleanFileName ? 148 : 0);
