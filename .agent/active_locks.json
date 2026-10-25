@@ -1,1 +1,9 @@
-{}
+{
+  "309dc9d0-64bb-43c0-858e-01baff058c29": {
+    "updatedAt": 1792909444204,
+    "files": [
+      "components/GoldQuestArena.tsx",
+      "src/components/live-classroom/GoldQuestArena.tsx"
+    ]
+  }
+}

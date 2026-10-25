@@ -1,7 +1,7 @@
 // components/GoldQuestArena.tsx
 // หน้าจอควบคุมและโปรเจกเตอร์ฝั่งคุณครู (Teacher Live Arena & Projector Dashboard)
+// พร้อมแผงตั้งค่าก่อนเริ่มห้องสอบ (Pre-Exam Setup Panel): เลือกชุดข้อสอบ 3 ชุด, เวลาสอบ 3-15 นาที, สลับลำดับข้อสอบ
 // เชื่อมต่อกับ RoomQRCodeModal.tsx และดึงข้อมูลจาก API /api/live-classroom/gold-quest แบบเรียลไทม์ทุกๆ 2 วินาที
-// อัปเดตทั้ง กระดานผู้นำ (Leaderboard), แท่นรางวัล Top 3, สถานะนักเรียนที่สแกน QR Code เข้ามาแล้ว, และ แถบเหตุการณ์สด (Live Feed)
 
 'use client';
 
@@ -23,6 +23,11 @@ import {
   UserPlus,
   CheckCircle2,
   RefreshCw,
+  Settings2,
+  BookOpen,
+  Timer,
+  Shuffle,
+  Eye,
   X,
   Volume2,
   VolumeX,
@@ -59,6 +64,15 @@ export interface ArenaQuestion {
   correctIndex: number;
 }
 
+export interface QuestionBankSet {
+  id: string;
+  title: string;
+  subtitle: string;
+  badge: string;
+  difficulty: 'ง่าย' | 'ปานกลาง' | 'ท้าทาย';
+  questions: ArenaQuestion[];
+}
+
 export interface GoldQuestArenaProps {
   roomId?: string;
   initialPin?: string;
@@ -75,46 +89,153 @@ export interface GoldQuestArenaProps {
   onAwardSessionRewards?: (awards: { studentId: string; coins: number; tickets: number }[]) => void;
 }
 
-// ชุดข้อสอบเริ่มต้นสำหรับส่งเข้าห้องสอบตอนกดเริ่มเกม
-const DEFAULT_JAPANESE_MIDTERM_QUESTIONS: ArenaQuestion[] = [
+// ============================================================================
+// คลังชุดข้อสอบให้คุณครูเลือกก่อนเปิดห้องสอบ (Question Bank Sets)
+// ============================================================================
+export const QUESTION_BANK_SETS: QuestionBankSet[] = [
   {
-    id: 'q1',
-    category: 'คำทักทายภาษาญี่ปุ่น',
-    prompt: 'คำว่า 「おはようございます」 (Ohayou gozaimasu) ใช้ทักทายในเวลาใด?',
-    options: ['ตอนเช้า', 'ตอนกลางวัน', 'ตอนเย็น', 'ก่อนนอน'],
-    correctIndex: 0,
+    id: 'jp-midterm-n5',
+    title: 'ชุดที่ 1: สอบกลางภาคภาษาญี่ปุ่นพื้นฐาน (JLPT N5)',
+    subtitle: 'คำทักทาย คำศัพท์ในห้องเรียน ตัวเลข และไวยากรณ์พื้นฐาน',
+    badge: 'ยอดนิยม',
+    difficulty: 'ง่าย',
+    questions: [
+      {
+        id: 'q1',
+        category: 'คำทักทายภาษาญี่ปุ่น',
+        prompt: 'คำว่า 「おはようございます」 (Ohayou gozaimasu) ใช้ทักทายในเวลาใด?',
+        options: ['ตอนเช้า', 'ตอนกลางวัน', 'ตอนเย็น', 'ก่อนนอน'],
+        correctIndex: 0,
+      },
+      {
+        id: 'q2',
+        category: 'คำศัพท์พื้นฐาน',
+        prompt: 'คำว่า 「せんせい」 (Sensei) มีความหมายตรงกับข้อใด?',
+        options: ['นักเรียน', 'คุณครู', 'เพื่อนร่วมชั้น', 'ผู้อำนวยการ'],
+        correctIndex: 1,
+      },
+      {
+        id: 'q3',
+        category: 'ตัวเลขภาษาญี่ปุ่น',
+        prompt: 'ข้อใดคือคำอ่านของตัวเลข 「7」 ในภาษาญี่ปุ่น?',
+        options: ['Roku (ろく)', 'Hachi (はち)', 'Nana (なな)', 'Kyuu (きゅう)'],
+        correctIndex: 2,
+      },
+      {
+        id: 'q4',
+        category: 'ไวยากรณ์ N5',
+        prompt: 'わたし ___ がくせい です。 คำช่วยในช่องว่างคือข้อใด?',
+        options: ['は (wa)', 'を (wo)', 'に (ni)', 'で (de)'],
+        correctIndex: 0,
+      },
+      {
+        id: 'q5',
+        category: 'คำศัพท์อาหาร',
+        prompt: 'คำว่า 「みず」 (Mizu) หมายถึงข้อใด?',
+        options: ['ชาเขียว', 'นมสด', 'น้ำเปล่า', 'น้ำผลไม้'],
+        correctIndex: 2,
+      },
+    ],
   },
   {
-    id: 'q2',
-    category: 'คำศัพท์พื้นฐาน',
-    prompt: 'คำว่า 「せんせい」 (Sensei) มีความหมายตรงกับข้อใด?',
-    options: ['นักเรียน', 'คุณครู', 'เพื่อนร่วมชั้น', 'ผู้อำนวยการ'],
-    correctIndex: 1,
+    id: 'jp-hiragana-katakana',
+    title: 'ชุดที่ 2: ทดสอบตัวอักษร ฮิรางะนะ & คะตะคะนะ',
+    subtitle: 'การอ่านออกเสียงตัวอักษรและคำทับศัพท์ภาษาต่างประเทศ',
+    badge: 'ฝึกความไว',
+    difficulty: 'ปานกลาง',
+    questions: [
+      {
+        id: 'hk1',
+        category: 'ตัวอักษรฮิรางะนะ',
+        prompt: 'คำว่า 「さくら」 (Sakura) หมายถึงดอกไม้ชนิดใด?',
+        options: ['ดอกทานตะวัน', 'ดอกซากุระ', 'ดอกกุหลาบ', 'ดอกทิวลิป'],
+        correctIndex: 1,
+      },
+      {
+        id: 'hk2',
+        category: 'ตัวอักษรคะตะคะนะ',
+        prompt: 'คำว่า 「テレビ」 (Terebi) แปลว่าอะไร?',
+        options: ['วิทยุ', 'คอมพิวเตอร์', 'โทรทัศน์', 'โทรศัพท์มือถือ'],
+        correctIndex: 2,
+      },
+      {
+        id: 'hk3',
+        category: 'คำทับศัพท์อาหาร',
+        prompt: 'คำว่า 「パン」 (Pan) ในภาษาญี่ปุ่นหมายถึงข้อใด?',
+        options: ['ขนมปัง', 'ข้าวสวย', 'ราเม็ง', 'แกงกะหรี่'],
+        correctIndex: 0,
+      },
+      {
+        id: 'hk4',
+        category: 'ตัวอักษรฮิรางะนะ',
+        prompt: 'ตัวอักษร 「ねこ」 อ่านออกเสียงและมีความหมายว่าอย่างไร?',
+        options: ['Inu - สุนัข', 'Neko - แมว', 'Tori - นก', 'Sakana - ปลา'],
+        correctIndex: 1,
+      },
+      {
+        id: 'hk5',
+        category: 'ตัวอักษรคะตะคะนะ',
+        prompt: 'ข้อใดเขียนคำว่า 「Coffee (กาแฟ)」 ด้วยคะตะคะนะได้ถูกต้อง?',
+        options: ['コーラ', 'コーヒー', 'ジュース', 'ミルク'],
+        correctIndex: 1,
+      },
+    ],
   },
   {
-    id: 'q3',
-    category: 'ตัวเลขภาษาญี่ปุ่น',
-    prompt: 'ข้อใดคือคำอ่านของตัวเลข 「7」 ในภาษาญี่ปุ่น?',
-    options: ['Roku (ろく)', 'Hachi (はち)', 'Nana (なな)', 'Kyuu (きゅう)'],
-    correctIndex: 2,
-  },
-  {
-    id: 'q4',
-    category: 'ไวยากรณ์ N5',
-    prompt: 'わたし ___ がくせい です。 คำช่วยในช่องว่างคือข้อใด?',
-    options: ['は (wa)', 'を (wo)', 'に (ni)', 'で (de)'],
-    correctIndex: 0,
-  },
-  {
-    id: 'q5',
-    category: 'คำศัพท์อาหาร',
-    prompt: 'คำว่า 「みず」 (Mizu) หมายถึงข้อใด?',
-    options: ['ชาเขียว', 'นมสด', 'น้ำเปล่า', 'น้ำผลไม้'],
-    correctIndex: 2,
+    id: 'jp-kanji-daily',
+    title: 'ชุดที่ 3: คันจิในชีวิตประจำวัน & วันเวลา',
+    subtitle: 'คันจิหมวดวันทั้ง 7 ตัวเลขราคา และสถานที่สำคัญ',
+    badge: 'เก็บคะแนน',
+    difficulty: 'ท้าทาย',
+    questions: [
+      {
+        id: 'kj1',
+        category: 'คันจิหมวดธรรมชาติ',
+        prompt: 'คันจิตัวใดมีความหมายว่า 「ไฟ (Hi / Ka)」?',
+        options: ['水', '火', '木', '金'],
+        correctIndex: 1,
+      },
+      {
+        id: 'kj2',
+        category: 'คันจิวันในสัปดาห์',
+        prompt: 'คำว่า 「日曜日」 (Nichiyoubi) คือวันใดในสัปดาห์?',
+        options: ['วันจันทร์', 'วันศุกร์', 'วันเสาร์', 'วันอาทิตย์'],
+        correctIndex: 3,
+      },
+      {
+        id: 'kj3',
+        category: 'คันจิสถานที่',
+        prompt: 'คำว่า 「学校」 (Gakkou) มีความหมายว่าอย่างไร?',
+        options: ['โรงเรียน', 'โรงพยาบาล', 'สถานีรถไฟ', 'ห้องสมุด'],
+        correctIndex: 0,
+      },
+      {
+        id: 'kj4',
+        category: 'คันจิตัวเลข',
+        prompt: 'ป้ายราคา 「百円」 (Hyaku-en) หมายถึงราคากี่เยน?',
+        options: ['10 เยน', '100 เยน', '1,000 เยน', '10,000 เยน'],
+        correctIndex: 1,
+      },
+      {
+        id: 'kj5',
+        category: 'คันจิทิศทาง',
+        prompt: 'คำว่า 「出口」 (Deguchi) ตามสถานีรถไฟหมายถึงอะไร?',
+        options: ['ทางเข้า', 'ทางออก', 'ห้องน้ำ', 'จุดจำหน่ายตั๋ว'],
+        correctIndex: 1,
+      },
+    ],
   },
 ];
 
-// รายชื่อนักเรียนตัวอย่าง (กรณีไม่ได้ส่ง Props presentStudents เข้ามา)
+// ตัวเลือกเวลาสอบ (นาที)
+export const DURATION_OPTIONS = [
+  { minutes: 3, label: '3 นาที', desc: 'โหมดสายฟ้าแลบ (Speed Run)' },
+  { minutes: 5, label: '5 นาที', desc: 'มาตรฐาน (แนะนำสำหรับ 5-10 ข้อ)' },
+  { minutes: 10, label: '10 นาที', desc: 'โหมดชิงไหวพริบเต็มรูปแบบ' },
+  { minutes: 15, label: '15 นาที', desc: 'สอบเก็บคะแนนท้ายบท' },
+];
+
+// รายชื่อนักเรียนตัวอย่าง
 const DEFAULT_PRESENT_STUDENTS = [
   { id: 'std_1', name: 'น้องมินท์ เลขที่ 1' },
   { id: 'std_2', name: 'น้องภูมิ เลขที่ 2' },
@@ -138,7 +259,7 @@ export default function GoldQuestArena({
   initialPin = '849201',
   classroomId = 'class-m4-1',
   classroomName = 'ห้องเรียน',
-  examTitle = 'สอบเก็บคะแนนภาษาญี่ปุ่น (Gold Quest Arena)',
+  examTitle,
   presentStudents,
   students: propStudents,
   isProjectorMode: initialProjectorMode = false,
@@ -148,6 +269,19 @@ export default function GoldQuestArena({
   onClose,
   onAwardSessionRewards,
 }: GoldQuestArenaProps) {
+  // ==========================================================================
+  // State สำหรับการตั้งค่าก่อนเปิดห้องสอบ (Pre-Exam Settings)
+  // ==========================================================================
+  const [selectedSetId, setSelectedSetId] = useState<string>(QUESTION_BANK_SETS[0].id);
+  const [selectedDurationMinutes, setSelectedDurationMinutes] = useState<number>(5);
+  const [shuffleQuestions, setShuffleQuestions] = useState<boolean>(true);
+  const [showQuestionPreview, setShowQuestionPreview] = useState<boolean>(false);
+
+  // ดึงชุดข้อสอบที่ครูเลือกในปัจจุบัน
+  const currentQuestionSet =
+    QUESTION_BANK_SETS.find((s) => s.id === selectedSetId) || QUESTION_BANK_SETS[0];
+  const activeExamTitle = examTitle || currentQuestionSet.title;
+
   // สถานะห้องสอบและ QR Code Modal
   const [isRoomActive, setIsRoomActive] = useState<boolean>(false);
   const [examStatus, setExamStatus] = useState<'waiting' | 'active' | 'ended'>('waiting');
@@ -189,8 +323,8 @@ export default function GoldQuestArena({
   const [logs, setLogs] = useState<ArenaLog[]>([]);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
-  // ระบบจับเวลาถอยหลังหน้าห้องเรียน (เริ่มต้น 5 นาที = 300 วินาที)
-  const [timeLeftSeconds, setTimeLeftSeconds] = useState<number>(300);
+  // ระบบจับเวลาถอยหลังหน้าห้องเรียน (คำนวณจากนาทีที่ครูเลือก)
+  const [timeLeftSeconds, setTimeLeftSeconds] = useState<number>(selectedDurationMinutes * 60);
 
   // เล่นเสียงประกอบ
   const playSfx = useCallback(
@@ -208,6 +342,13 @@ export default function GoldQuestArena({
     },
     [isSoundOn]
   );
+
+  // อัปเดตเวลาแสดงผลเมื่อครูเปลี่ยนตัวเลือกเวลาในหน้า Waiting
+  useEffect(() => {
+    if (examStatus !== 'active') {
+      setTimeLeftSeconds(selectedDurationMinutes * 60);
+    }
+  }, [selectedDurationMinutes, examStatus]);
 
   // 1. ฟังก์ชันดึงข้อมูล Leaderboard & Activity Logs แบบเรียลไทม์จาก API
   const fetchLiveArenaState = useCallback(async () => {
@@ -282,12 +423,19 @@ export default function GoldQuestArena({
     return () => unsubscribe();
   }, [roomId, roomPinCode]);
 
-  // 2. ฟังก์ชันเปิดห้องสอบและสุ่มรหัส PIN 6 หลักใหม่
+  // 2. ฟังก์ชันเปิดห้องสอบตามเวลาและชุดข้อสอบที่ครูเลือก
   const handleStartExamRoom = async () => {
     const generatedPin = generateSecurePin();
+    const totalSeconds = selectedDurationMinutes * 60;
+
     setRoomPinCode(generatedPin);
-    setTimeLeftSeconds(300);
+    setTimeLeftSeconds(totalSeconds);
     setIsRewardsAwarded(false);
+
+    // จัดเตรียมชุดข้อสอบ (สลับลำดับข้อหากคุณครูเปิดใช้งาน Shuffle)
+    const preparedQuestions = shuffleQuestions
+      ? [...currentQuestionSet.questions].sort(() => Math.random() - 0.5)
+      : currentQuestionSet.questions;
 
     try {
       const res = await fetch('/api/live-classroom/gold-quest', {
@@ -298,9 +446,10 @@ export default function GoldQuestArena({
           roomId,
           pin: generatedPin,
           classroomId,
-          examTitle,
+          examTitle: activeExamTitle,
+          durationMinutes: selectedDurationMinutes,
           students: defaultStudentsList,
-          questions: DEFAULT_JAPANESE_MIDTERM_QUESTIONS,
+          questions: preparedQuestions,
         }),
       });
 
@@ -318,9 +467,9 @@ export default function GoldQuestArena({
       roomId,
       pin: generatedPin,
       classroomId,
-      examTitle,
+      examTitle: activeExamTitle,
       students: defaultStudentsList,
-      questions: DEFAULT_JAPANESE_MIDTERM_QUESTIONS,
+      questions: preparedQuestions,
     });
 
     setIsRoomActive(true);
@@ -440,7 +589,7 @@ export default function GoldQuestArena({
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl md:text-2xl font-black text-white">
-                {examTitle}
+                {activeExamTitle}
               </h1>
               {examStatus === 'active' && (
                 <span className="inline-flex items-center gap-1.5 text-xs font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-3 py-0.5 rounded-full animate-pulse">
@@ -454,13 +603,21 @@ export default function GoldQuestArena({
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-400 mt-1 flex items-center gap-2">
+            <p className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-2">
               <span>{classroomName} • รหัสห้อง: {roomId}</span>
               <span>•</span>
-              <span className="flex items-center gap-1 text-indigo-300">
-                <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
-                ซิงค์ข้อมูลอัตโนมัติ
-              </span>
+              <span>จำนวน {currentQuestionSet.questions.length} ข้อ</span>
+              <span>•</span>
+              <span>เวลาสอบ {selectedDurationMinutes} นาที</span>
+              {examStatus === 'active' && (
+                <>
+                  <span>•</span>
+                  <span className="flex items-center gap-1 text-indigo-300">
+                    <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                    ซิงค์ข้อมูลอัตโนมัติ
+                  </span>
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -490,9 +647,15 @@ export default function GoldQuestArena({
               </div>
 
               {/* นาฬิกานับถอยหลัง */}
-              <div className="bg-slate-950 border border-indigo-500/40 rounded-2xl px-4 py-2 flex items-center gap-2">
+              <div
+                className={`bg-slate-950 border rounded-2xl px-4 py-2 flex items-center gap-2 ${
+                  timeLeftSeconds <= 60
+                    ? 'border-rose-500/60 text-rose-400 animate-pulse'
+                    : 'border-indigo-500/40 text-white'
+                }`}
+              >
                 <Clock className="w-4 h-4 text-indigo-400" />
-                <span className="text-xl font-mono font-black text-white">
+                <span className="text-xl font-mono font-black">
                   {formatTime(timeLeftSeconds)}
                 </span>
               </div>
@@ -525,8 +688,8 @@ export default function GoldQuestArena({
               <Play className="w-4 h-4 fill-current" />
               <span>
                 {examStatus === 'ended'
-                  ? 'เปิดห้องสอบรอบใหม่ (สุ่ม PIN ใหม่)'
-                  : 'เปิดห้องสอบ & แสดง QR Code'}
+                  ? 'เปิดห้องสอบรอบใหม่ (ตามที่ตั้งค่า)'
+                  : `เปิดห้องสอบ (${selectedDurationMinutes} นาที) & แสดง QR Code`}
               </span>
             </button>
           )}
@@ -563,7 +726,185 @@ export default function GoldQuestArena({
       </div>
 
       {/* ================================================================= */}
-      {/* 2. การ์ดสรุปสถิติภาพรวมทั้งห้องเรียน (4 กล่อง)                     */}
+      {/* 2. แผงตั้งค่าก่อนเริ่มห้องสอบ (แสดงเฉพาะตอนยังไม่เริ่มหรือจบเกมแล้ว) */}
+      {/* ================================================================= */}
+      {examStatus !== 'active' && (
+        <div className="bg-slate-900/90 border-2 border-slate-800 rounded-3xl p-5 md:p-6 shadow-xl space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
+                <Settings2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-black text-white">
+                  ตั้งค่าห้องสอบก่อนเริ่มแข่งขัน (Exam Room Setup)
+                </h2>
+                <p className="text-xs text-slate-400">
+                  เลือกชุดข้อสอบและกำหนดเวลาสอบก่อนกดเปิด QR Code ให้นักเรียนสแกน
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowQuestionPreview((prev) => !prev)}
+              className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer"
+            >
+              <Eye className="w-3.5 h-3.5 text-amber-400" />
+              <span>
+                {showQuestionPreview
+                  ? 'ซ่อนตัวอย่างข้อสอบ'
+                  : `ดูโจทย์ในชุดนี้ (${currentQuestionSet.questions.length} ข้อ)`}
+              </span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* ฝั่งซ้าย (7 คอลัมน์): เลือกชุดข้อสอบ */}
+            <div className="lg:col-span-7 space-y-3">
+              <label className="text-xs font-extrabold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+                <BookOpen className="w-4 h-4 text-amber-400" />
+                <span>1. เลือกชุดข้อสอบ (Question Set)</span>
+              </label>
+
+              <div className="grid grid-cols-1 gap-2.5">
+                {QUESTION_BANK_SETS.map((setItem) => {
+                  const isSelected = setItem.id === selectedSetId;
+                  return (
+                    <button
+                      key={setItem.id}
+                      type="button"
+                      onClick={() => setSelectedSetId(setItem.id)}
+                      className={`w-full text-left p-4 rounded-2xl border-2 transition flex items-start justify-between gap-3 cursor-pointer ${
+                        isSelected
+                          ? 'bg-indigo-950/60 border-indigo-500 shadow-lg shadow-indigo-500/10'
+                          : 'bg-slate-950/70 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-black text-white">
+                            {setItem.title}
+                          </span>
+                          <span className="text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                            {setItem.badge}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400">{setItem.subtitle}</p>
+                      </div>
+
+                      <div className="text-right shrink-0 space-y-1">
+                        <span className="inline-block text-xs font-mono font-black text-indigo-300 bg-indigo-500/15 px-2.5 py-1 rounded-xl">
+                          {setItem.questions.length} ข้อ
+                        </span>
+                        <div className="text-[10px] text-slate-400">
+                          ระดับ: {setItem.difficulty}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ฝั่งขวา (5 คอลัมน์): เลือกเวลาสอบ & ออปชันเสริม */}
+            <div className="lg:col-span-5 space-y-4 flex flex-col justify-between">
+              <div className="space-y-3">
+                <label className="text-xs font-extrabold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+                  <Timer className="w-4 h-4 text-emerald-400" />
+                  <span>2. เลือกเวลาสอบ (Time Limit)</span>
+                </label>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  {DURATION_OPTIONS.map((item) => {
+                    const isSelected = selectedDurationMinutes === item.minutes;
+                    return (
+                      <button
+                        key={item.minutes}
+                        type="button"
+                        onClick={() => setSelectedDurationMinutes(item.minutes)}
+                        className={`p-3.5 rounded-2xl border-2 text-left transition cursor-pointer ${
+                          isSelected
+                            ? 'bg-amber-500/15 border-amber-400 text-white shadow-md shadow-amber-500/10'
+                            : 'bg-slate-950/70 border-slate-800 text-slate-300 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-lg font-mono font-black text-amber-400">
+                            {item.label}
+                          </span>
+                          {isSelected && (
+                            <CheckCircle2 className="w-4 h-4 text-amber-400" />
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-1 line-clamp-1">
+                          {item.desc}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ตัวเลือกสลับลำดับข้อสอบ */}
+              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3.5 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <Shuffle className="w-4 h-4 text-indigo-400" />
+                  <div>
+                    <div className="text-xs font-bold text-white">
+                      สลับลำดับข้อสอบอัตโนมัติ (Shuffle)
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      ป้องกันการลอกคำตอบระหว่างทำข้อสอบในห้องเรียน
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShuffleQuestions((prev) => !prev)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer ${
+                    shuffleQuestions
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                      : 'bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  {shuffleQuestions ? 'เปิดใช้งาน' : 'ปิด'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* กล่องแสดงตัวอย่างข้อสอบในชุดที่เลือก (เมื่อกดปุ่มดูโจทย์) */}
+          {showQuestionPreview && (
+            <div className="pt-4 border-t border-slate-800 space-y-2.5">
+              <div className="text-xs font-bold text-amber-300">
+                ตัวอย่างคำถามใน &ldquo;{currentQuestionSet.title}&rdquo;:
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1">
+                {currentQuestionSet.questions.map((q, idx) => (
+                  <div
+                    key={q.id}
+                    className="bg-slate-950 border border-slate-800 rounded-2xl p-3 text-xs space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between text-slate-400">
+                      <span className="font-bold text-indigo-300">
+                        ข้อที่ {idx + 1} ({q.category})
+                      </span>
+                      <span className="text-emerald-400 font-semibold">
+                        เฉลย: {q.options[q.correctIndex]}
+                      </span>
+                    </div>
+                    <p className="font-bold text-white">{q.prompt}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* 3. การ์ดสรุปสถิติภาพรวมทั้งห้องเรียน (4 กล่อง)                     */}
       {/* ================================================================= */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
@@ -618,7 +959,7 @@ export default function GoldQuestArena({
       </div>
 
       {/* ================================================================= */}
-      {/* 3. พื้นที่หลัก: กระดานผู้นำ (ซ้าย 8 คอลัมน์) + Activity Logs (ขวา 4) */}
+      {/* 4. พื้นที่หลัก: กระดานผู้นำ (ซ้าย 8 คอลัมน์) + Activity Logs (ขวา 4) */}
       {/* ================================================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* ฝั่งซ้าย: แท่นรางวัล Top 3 & ตาราง Leaderboard ทั้งห้อง */}
@@ -781,7 +1122,7 @@ export default function GoldQuestArena({
                 <div className="py-16 text-center space-y-2 text-slate-500">
                   <Sparkles className="w-8 h-8 mx-auto text-slate-700" />
                   <p className="text-xs">
-                    กดปุ่ม &ldquo;เปิดห้องสอบ & แสดง QR Code&rdquo; เพื่อเริ่มรับข้อมูลจากมือถือของนักเรียน
+                    เลือกชุดข้อสอบและเวลาสอบด้านบน จากนั้นกดปุ่ม &ldquo;เปิดห้องสอบ&rdquo;
                   </p>
                 </div>
               ) : (
@@ -833,14 +1174,14 @@ export default function GoldQuestArena({
       </div>
 
       {/* ================================================================= */}
-      {/* 4. Modal แสดง QR Code และรหัส PIN 6 หลักสำหรับฉายขึ้นโปรเจกเตอร์   */}
+      {/* 5. Modal แสดง QR Code และรหัส PIN 6 หลักสำหรับฉายขึ้นโปรเจกเตอร์   */}
       {/* ================================================================= */}
       <RoomQRCodeModal
         isOpen={isQrModalOpen}
         onClose={() => setIsQrModalOpen(false)}
         roomId={roomId}
         roomPin={roomPinCode}
-        examTitle={examTitle}
+        examTitle={activeExamTitle}
         studentCount={joinedCount}
         onPlaySound={playSfx}
       />
