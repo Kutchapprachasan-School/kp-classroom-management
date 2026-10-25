@@ -45,6 +45,7 @@ export interface LiveStudent {
   sessionTickets: number;
   tier: StudentTier;
   gender?: 'MALE' | 'FEMALE';
+  number?: number;
 }
 
 export interface WordDeckItem {
@@ -228,7 +229,7 @@ export const liveClassroomService = {
       const directStudentMap = new Map(directStudentsList.map((s) => [s.id, s]));
 
       // ดึงสถานะกาชาจริงของนักเรียนแต่ละคน
-      const initialStudentData = roster.map((st) => {
+      const initialStudentData = roster.map((st, idx) => {
         const gachaState = gachaService.getState(st.id);
         const directMatch = directStudentMap.get(st.id);
         const gender = detectStudentGender(st.name, directMatch?.gender);
@@ -236,6 +237,7 @@ export const liveClassroomService = {
           id: st.id,
           studentCode: st.studentCode || st.id,
           name: st.name || `นักเรียน (${st.studentCode})`,
+          number: directMatch?.no || idx + 1,
           nickname: undefined,
           avatarUrl: undefined,
           present: attendanceMap[st.id] !== false,

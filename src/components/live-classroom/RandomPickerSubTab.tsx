@@ -12,6 +12,7 @@ import CheckCircleRegular from '@mingcute/react/core-regular/check-circle';
 import CloseRegular from '@mingcute/react/core-regular/close';
 import { Crown, SkipForward } from 'lucide-react';
 import type { LiveStudent } from '../../services/liveClassroomService';
+import { tts, type JapanesePraise } from '../../utils/speechTTS';
 
 export type SpinSpeed = 'fast' | 'normal' | 'dramatic';
 
@@ -68,6 +69,8 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
   const [isSpinning, setIsSpinning] = useState<boolean>(false);
   const [cardDeck, setCardDeck] = useState<LiveStudent[]>([]);
   const [flippedStudentId, setFlippedStudentId] = useState<string | null>(null);
+  const [ttsEnabled, setTtsEnabled] = useState<boolean>(true);
+  const [selectedPraise, setSelectedPraise] = useState<JapanesePraise>('sugoi');
 
   const spinTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -156,9 +159,30 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
       }
       setIsSpinning(false);
       onPlaySound?.('fanfare');
+
+      // 🔊 อ่านชื่อภาษาไทยและพูดคำชมภาษาญี่ปุ่นอัตโนมัติ
+      if (ttsEnabled) {
+        tts.speakStudentName(winner.number, winner.name, true);
+        const praiseTimer = setTimeout(() => {
+          tts.speakJapanesePraise(selectedPraise, true);
+        }, 1200);
+        spinTimersRef.current.push(praiseTimer);
+      }
     }, targetDurationMs);
     spinTimersRef.current.push(finalTimer);
-  }, [isSpinning, availablePool, presentStudents, spinSpeed, noRepeat, cancelSpinTimers, setRollingStudent, setSelectedStudent, onPlaySound]);
+  }, [
+    isSpinning,
+    availablePool,
+    presentStudents,
+    spinSpeed,
+    noRepeat,
+    ttsEnabled,
+    selectedPraise,
+    cancelSpinTimers,
+    setRollingStudent,
+    setSelectedStudent,
+    onPlaySound,
+  ]);
 
   // Hotkey สำหรับกด Spacebar สุ่มชื่อในโหมด Slot Reel
   useEffect(() => {
@@ -289,6 +313,75 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
         </button>
       </div>
 
+      {/* TTS Speech & Japanese Praise Control Bar */}
+      <div
+        className={`rounded-2xl p-3 px-4 flex flex-wrap items-center justify-between gap-3 text-xs border transition-colors ${
+          isProjectorMode
+            ? 'bg-slate-900/90 border-slate-800'
+            : 'bg-[#F7FAFF] border-[#E6EEF7]'
+        }`}
+      >
+        <div className="flex flex-wrap items-center gap-3.5">
+          {/* TTS Enable Toggle */}
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={ttsEnabled}
+              onChange={(e) => setTtsEnabled(e.target.checked)}
+              className="w-4 h-4 rounded accent-blue-600"
+            />
+            <span
+              className={`font-bold flex items-center gap-1.5 ${
+                isProjectorMode ? 'text-slate-200' : 'text-[#163A66]'
+              }`}
+            >
+              <span>🗣️ อ่านชื่อนักเรียนอัตโนมัติ (TTS)</span>
+            </span>
+          </label>
+
+          {/* Japanese Praise Selector */}
+          <div className="flex items-center gap-2">
+            <span
+              className={`font-semibold ${
+                isProjectorMode ? 'text-slate-400' : 'text-[#6B7C93]'
+              }`}
+            >
+              คำชมภาษาญี่ปุ่น:
+            </span>
+            <select
+              value={selectedPraise}
+              onChange={(e) => setSelectedPraise(e.target.value as JapanesePraise)}
+              className={`rounded-xl px-3 py-1 font-bold text-xs border transition-colors ${
+                isProjectorMode
+                  ? 'bg-slate-800 border-slate-700 text-amber-300'
+                  : 'bg-white border-[#BFDBFE] text-indigo-700'
+              }`}
+            >
+              <option value="sugoi">🌸 Sugoi! (すごい - ยอดเยี่ยม!)</option>
+              <option value="yatta">🎉 Yatta! (やった - สำเร็จแล้ว!)</option>
+              <option value="excellent">⭐ Subarashii! (すばらしい - วิเศษมาก!)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Test Speech Button */}
+        <button
+          type="button"
+          onClick={() => {
+            const sampleStudent = presentStudents[0] || { number: 1, name: 'สมชาย ใจดี' };
+            tts.speakStudentName(sampleStudent.number || 1, sampleStudent.name, true);
+            const praiseTimer = setTimeout(() => {
+              tts.speakJapanesePraise(selectedPraise, true);
+            }, 1200);
+            spinTimersRef.current.push(praiseTimer);
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 transition active:scale-95"
+          title="ทดลองกดฟังเสียงอ่านชื่อและคำชมภาษาญี่ปุ่น"
+        >
+          <span>🔊 ทดสอบเสียงพูด</span>
+        </button>
+      </div>
+
       {/* Center Stage: Slot Reel or Card Flip */}
       <div
         className={`flex-1 rounded-3xl p-8 flex flex-col items-center justify-center relative overflow-hidden min-h-[360px] border transition-colors ${
@@ -416,6 +509,14 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
                         setPickedIds((prev) => (prev.includes(st.id) ? prev : [...prev, st.id]));
                       }
                       onPlaySound?.('fanfare');
+
+                      if (ttsEnabled) {
+                        tts.speakStudentName(st.number, st.name, true);
+                        const praiseTimer = setTimeout(() => {
+                          tts.speakJapanesePraise(selectedPraise, true);
+                        }, 1200);
+                        spinTimersRef.current.push(praiseTimer);
+                      }
                     }}
                     className={`h-36 rounded-2xl border-2 p-4 flex flex-col items-center justify-center transition-all duration-300 ${
                       isFlipped

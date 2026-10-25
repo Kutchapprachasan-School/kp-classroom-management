@@ -20,9 +20,11 @@ import {
   Users,
   Edit3,
   HelpCircle,
+  Volume2,
 } from 'lucide-react';
 import type { LiveStudent, WordDeckItem } from '../../services/liveClassroomService';
 import { liveClassroomService } from '../../services/liveClassroomService';
+import { tts } from '../../utils/speechTTS';
 
 export type SpinSpeed = 'fast' | 'normal' | 'dramatic';
 
@@ -224,6 +226,17 @@ export const RandomTextSubTab: React.FC<RandomTextSubTabProps> = ({
           ]);
 
           onPlaySound?.('fanfare');
+
+          // 🔊 อ่านออกเสียงเมื่อสุ่มเสร็จสิ้น
+          if (targetStudent) {
+            tts.speakStudentName(targetStudent.number, targetStudent.name, true);
+            const wordTimer = setTimeout(() => {
+              tts.speakText(targetWord);
+            }, 1200);
+            spinTimersRef.current.push(wordTimer);
+          } else {
+            tts.speakText(targetWord);
+          }
         }
       }, stepTimeMs);
 
@@ -495,15 +508,27 @@ export const RandomTextSubTab: React.FC<RandomTextSubTabProps> = ({
                     <span>คำศัพท์ที่สุ่มได้</span>
                   </div>
 
-                  <h1
-                    className={`font-black tracking-wide leading-tight break-words px-4 transition-all ${
-                      isProjectorMode
-                        ? 'text-5xl md:text-7xl lg:text-8xl text-white drop-shadow-md'
-                        : 'text-4xl md:text-6xl lg:text-7xl text-[#163A66]'
-                    } ${isSpinning ? 'opacity-80 scale-95 blur-[0.5px]' : 'scale-100'}`}
-                  >
-                    {displayWord}
-                  </h1>
+                  <div className="flex items-center justify-center gap-3">
+                    <h1
+                      className={`font-black tracking-wide leading-tight break-words px-4 transition-all ${
+                        isProjectorMode
+                          ? 'text-5xl md:text-7xl lg:text-8xl text-white drop-shadow-md'
+                          : 'text-4xl md:text-6xl lg:text-7xl text-[#163A66]'
+                      } ${isSpinning ? 'opacity-80 scale-95 blur-[0.5px]' : 'scale-100'}`}
+                    >
+                      {displayWord}
+                    </h1>
+                    {!isSpinning && displayWord && (
+                      <button
+                        type="button"
+                        onClick={() => tts.speakText(displayWord)}
+                        className="p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 transition active:scale-90 shadow-sm shrink-0"
+                        title="กดเพื่อฟังเสียงอ่านคำศัพท์นี้"
+                      >
+                        <Volume2 className="w-6 h-6" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="flex flex-col items-center text-slate-400">

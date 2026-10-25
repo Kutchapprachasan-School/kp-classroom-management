@@ -10,6 +10,7 @@ import {
   detectStudentGender,
   type LiveStudent,
 } from '../src/services/liveClassroomService';
+import { tts } from '../src/utils/speechTTS';
 import {
   generateBalancedGroups,
   buildWeightedWheelSegments,
@@ -174,6 +175,16 @@ async function runTests() {
   );
   assert.equal(savedDeck.name, 'ชีววิทยา Unit 1');
   assert.deepEqual(savedDeck.words, ['Photosynthesis', 'Chloroplast', 'Mitochondria'], 'Must trim and deduplicate words');
+
+  // 4.5 ทดสอบ SpeechTTSEngine ในสภาพแวดล้อม Headless/Node (Safe fallback ปราศจาก Error)
+  assert.doesNotThrow(() => {
+    tts.speakStudentName(5, 'เด็กชายสมหมาย', true);
+    tts.speakJapanesePraise('sugoi', true);
+    tts.speakJapanesePraise('yatta', true);
+    tts.speakJapanesePraise('excellent', true);
+    tts.speakText('Photosynthesis', 'en-US', true);
+    tts.stop();
+  }, 'SpeechTTSEngine should safely execute in headless environment without crashing');
 
   // 5. ทดสอบการคำนวณสัดส่วนวงล้อตั๋วสุ่ม (ตั๋ว 3 ใบ ต้องมีขนาดมุมเป็น 3 เท่าของตั๋ว 1 ใบ)
   const twoStudents: LiveStudent[] = [
