@@ -73,6 +73,8 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
   // 1. เข้าสู่ระบบสำหรับครู / บุคลากร (ตรวจสอบกับฐานข้อมูล User & Account)
   const handleTeacherLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+
     const cleanUser = teacherUsername.trim();
     const cleanPass = teacherPassword.trim();
 
@@ -94,8 +96,23 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
     setLoading(true);
     setErrorMessage(null);
 
+    let settled = false;
+    const safetyTimer = setTimeout(() => {
+      if (!settled) {
+        setLoading(false);
+        setErrorMessage(
+          lang === 'th'
+            ? 'การเข้าสู่ระบบใช้เวลานานเกินไป กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่อีกครั้ง'
+            : 'Login timed out. Please try again.'
+        );
+      }
+    }, 8500);
+
     try {
       const teacherUser = await authService.loginTeacher(cleanUser, cleanPass);
+      settled = true;
+      clearTimeout(safetyTimer);
+
       const appRole: SchoolUserRole =
         teacherUser.role === 'ADMIN'
           ? 'ACADEMIC_ADMIN'
@@ -118,11 +135,15 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
         smsSynced: true,
       });
     } catch (err: any) {
+      settled = true;
+      clearTimeout(safetyTimer);
       setErrorMessage(
         err.message ||
           (lang === 'th' ? 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ' : 'Authentication failed')
       );
     } finally {
+      settled = true;
+      clearTimeout(safetyTimer);
       setLoading(false);
     }
   };
@@ -130,6 +151,8 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
   // 2. เข้าสู่ระบบสำหรับนักเรียน (แยกส่วนต่างหากตามที่ผู้ใช้ร้องขอ)
   const handleStudentLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+
     const cleanCode = studentCode.trim();
     const cleanPass = studentPassword.trim();
 
@@ -151,11 +174,26 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
     setLoading(true);
     setErrorMessage(null);
 
+    let settled = false;
+    const safetyTimer = setTimeout(() => {
+      if (!settled) {
+        setLoading(false);
+        setErrorMessage(
+          lang === 'th'
+            ? 'การเข้าสู่ระบบใช้เวลานานเกินไป กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่อีกครั้ง'
+            : 'Login timed out. Please try again.'
+        );
+      }
+    }, 8500);
+
     try {
       const studentUser = await authService.loginStudentWithHashedPassword(
         cleanCode,
         cleanPass
       );
+      settled = true;
+      clearTimeout(safetyTimer);
+
       onEnterStudentPortal('STUDENT_GENERAL', {
         id: studentUser.id,
         smsId: studentUser.studentCode || cleanCode,
@@ -170,6 +208,8 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
         smsSynced: true,
       });
     } catch (err: any) {
+      settled = true;
+      clearTimeout(safetyTimer);
       setErrorMessage(
         err.message ||
           (lang === 'th'
@@ -177,6 +217,8 @@ export const SchoolPortalView: React.FC<SchoolPortalViewProps> = ({
             : 'Invalid student ID or password')
       );
     } finally {
+      settled = true;
+      clearTimeout(safetyTimer);
       setLoading(false);
     }
   };

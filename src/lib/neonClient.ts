@@ -316,10 +316,16 @@ export class NeonQueryBuilder<T = any[]> implements PromiseLike<QueryResult<T>> 
       const fetchPromise = (async (): Promise<QueryResult<T>> => {
         try {
           neonCacheStats.networkQueries++;
-          const res =
+          const queryPromise =
             typeof (sql as any).query === 'function'
-              ? await (sql as any).query(querySql, params)
-              : await (sql as any)(querySql, params);
+              ? (sql as any).query(querySql, params)
+              : (sql as any)(querySql, params);
+
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`Neon query timeout on "${this.table}" (7000ms)`)), 7000)
+          );
+
+          const res = (await Promise.race([queryPromise, timeoutPromise])) as any;
 
           let finalResult: QueryResult<T>;
 
@@ -470,10 +476,16 @@ export class NeonQueryBuilder<T = any[]> implements PromiseLike<QueryResult<T>> 
         querySql += ` ${returningClause}`;
       }
 
-      const res =
+      const queryPromise =
         typeof (sql as any).query === 'function'
-          ? await (sql as any).query(querySql, params)
-          : await (sql as any)(querySql, params);
+          ? (sql as any).query(querySql, params)
+          : (sql as any)(querySql, params);
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`Neon mutation timeout on "${this.table}" (8000ms)`)), 8000)
+      );
+
+      const res = (await Promise.race([queryPromise, timeoutPromise])) as any;
 
       return { data: (res || []) as any, error: null };
     } catch (err: any) {
@@ -537,10 +549,16 @@ class NeonClient {
       }
 
       const querySql = `SELECT public.${fnName}(${paramExpressions.join(', ')}) as rpc_res;`;
-      const res =
+      const queryPromise =
         typeof (sql as any).query === 'function'
-          ? await (sql as any).query(querySql, params)
-          : await (sql as any)(querySql, params);
+          ? (sql as any).query(querySql, params)
+          : (sql as any)(querySql, params);
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`Neon RPC timeout on "${fnName}" (8000ms)`)), 8000)
+      );
+
+      const res = (await Promise.race([queryPromise, timeoutPromise])) as any;
 
       const firstRow = Array.isArray(res) && res.length > 0 ? res[0] : null;
       const data =
