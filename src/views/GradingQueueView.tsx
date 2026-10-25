@@ -139,9 +139,10 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
     assignmentId?: string;
     classroom?: string;
     seatNo?: number;
-    type?: 'IMAGE' | 'PDF' | 'LINK';
+    type?: 'IMAGE' | 'PDF' | 'LINK' | 'TEXT';
     url?: string;
     externalLinkUrl?: string;
+    textContent?: string;
     fileName?: string;
     platform?: 'CANVA' | 'GOOGLE_DOCS' | 'GOOGLE_DRIVE' | 'YOUTUBE' | 'FIGMA' | 'OTHER';
   } | null>(null);
@@ -465,6 +466,7 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
                           type: isPdf ? 'PDF' : fileUrl ? 'IMAGE' : isLink ? 'LINK' : 'IMAGE',
                           url: fileUrl || item.externalLinkUrl,
                           externalLinkUrl: item.externalLinkUrl,
+                          textContent: item.textContent,
                           fileName: item.fileName,
                           platform: isDrive ? 'GOOGLE_DRIVE' : item.externalPlatform,
                         });
@@ -547,9 +549,10 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
           assignmentId={previewItem.assignmentId}
           classroom={previewItem.classroom}
           seatNo={previewItem.seatNo}
-          type={previewItem.type}
+          type={previewItem.type || 'IMAGE'}
           url={previewItem.url}
           externalLinkUrl={previewItem.externalLinkUrl}
+          textContent={previewItem.textContent}
           fileName={previewItem.fileName}
           platform={previewItem.platform}
         />

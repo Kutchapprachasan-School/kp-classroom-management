@@ -552,7 +552,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     assignmentId?: string;
     classroom?: string;
     seatNo?: number;
-    type?: 'IMAGE' | 'PDF' | 'LINK';
+    type?: 'IMAGE' | 'PDF' | 'LINK' | 'TEXT';
     url?: string;
     externalLinkUrl?: string;
     textContent?: string;

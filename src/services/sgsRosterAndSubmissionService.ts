@@ -1420,7 +1420,7 @@ export const sgsRosterAndSubmissionService = {
         const list: StudentWorkSubmission[] = JSON.parse(raw);
         // Hydrate fileDataUrl if not present in item but present in separate scoped key or Cloudflare R2
         return list.map((sub) => {
-          let fileUrl = sub.fileDataUrl;
+          let fileUrl = sub.fileUrl || sub.fileDataUrl;
 
           // ถ้ามี R2 Worker Configured และมี URL/Key ของ R2 ให้แปลงเป็น URL ที่เปิดดูได้จริง (ให้ความสำคัญกับ R2 Key ก่อน Base64 เสมอ)
           if (r2StorageService.isConfigured() && (sub.r2ObjectKey || fileUrl)) {
@@ -1428,7 +1428,17 @@ export const sgsRosterAndSubmissionService = {
             if (r2Target) {
               const resolvedR2 = r2StorageService.resolvePublicViewUrl(r2Target);
               if (resolvedR2 && (resolvedR2.startsWith('http://') || resolvedR2.startsWith('https://'))) {
-                return { ...sub, fileDataUrl: resolvedR2, fileUrl: resolvedR2 };
+                const cleanObjKey = sub.r2ObjectKey
+                  ? r2StorageService.normalizeObjectKey(sub.r2ObjectKey)
+                  : r2StorageService.isR2OrLocalFileUrl(r2Target)
+                    ? r2StorageService.normalizeObjectKey(r2Target)
+                    : undefined;
+                return {
+                  ...sub,
+                  fileDataUrl: resolvedR2,
+                  fileUrl: resolvedR2,
+                  ...(cleanObjKey ? { r2ObjectKey: cleanObjKey } : {}),
+                };
               }
             }
           }
@@ -1453,10 +1463,10 @@ export const sgsRosterAndSubmissionService = {
               true
             );
             if (cachedUrl) {
-              return { ...sub, fileDataUrl: cachedUrl };
+              return { ...sub, fileDataUrl: cachedUrl, fileUrl: cachedUrl };
             }
           }
-          return { ...sub, fileDataUrl: fileUrl };
+          return { ...sub, fileDataUrl: fileUrl, fileUrl: sub.fileUrl || fileUrl };
         });
       }
       return [];
@@ -1480,11 +1490,34 @@ export const sgsRosterAndSubmissionService = {
         }
       });
 
-      // Strip large dataUrls from monolithic array to prevent 5MB localStorage quota exhaustion
+      // Strip ONLY large Base64 data: URLs from monolithic array to prevent 5MB localStorage quota exhaustion.
+      // NEVER strip https:// R2 URLs (even when Thai URL-encoded paths exceed 250 chars)!
       const compactList = list.map((sub) => {
-        if (sub.fileDataUrl && sub.fileDataUrl.length > 250) {
+        const isHttp = (v?: string) => Boolean(v && (v.startsWith('http://') || v.startsWith('https://')));
+        const resolvedHttp =
+          (isHttp(sub.fileUrl) ? r2StorageService.resolvePublicViewUrl(sub.fileUrl) : undefined) ||
+          (isHttp(sub.fileDataUrl) ? r2StorageService.resolvePublicViewUrl(sub.fileDataUrl) : undefined) ||
+          (sub.r2ObjectKey && r2StorageService.isConfigured()
+            ? r2StorageService.resolvePublicViewUrl(sub.r2ObjectKey)
+            : undefined);
+
+        if (sub.fileDataUrl && sub.fileDataUrl.startsWith('data:') && sub.fileDataUrl.length > 250) {
           const { fileDataUrl, ...rest } = sub;
-          return rest as StudentWorkSubmission;
+          return {
+            ...rest,
+            ...(resolvedHttp ? { fileUrl: resolvedHttp, fileDataUrl: resolvedHttp } : {}),
+          } as StudentWorkSubmission;
+        }
+
+        if (resolvedHttp) {
+          return {
+            ...sub,
+            fileUrl: resolvedHttp,
+            fileDataUrl: resolvedHttp,
+            r2ObjectKey: sub.r2ObjectKey
+              ? r2StorageService.normalizeObjectKey(sub.r2ObjectKey)
+              : sub.r2ObjectKey,
+          };
         }
         return sub;
       });
@@ -1493,7 +1526,13 @@ export const sgsRosterAndSubmissionService = {
     } catch (err) {
       console.warn('saveSubmissions fallback to minimal payload', err);
       try {
-        const minimalList = list.map(({ fileDataUrl, ...rest }) => rest as StudentWorkSubmission);
+        const minimalList = list.map((sub) => {
+          if (sub.fileDataUrl && sub.fileDataUrl.startsWith('data:')) {
+            const { fileDataUrl, ...rest } = sub;
+            return rest as StudentWorkSubmission;
+          }
+          return sub;
+        });
         localStorage.setItem(STORAGE_KEY_WORK_SUBMISSIONS, JSON.stringify(minimalList));
       } catch (e2) {
         console.error('saveSubmissions quota exceeded completely', e2);
@@ -2981,8 +3020,10 @@ export const sgsRosterAndSubmissionService = {
               : true;
             return matchStu && (matchAsg || matchFile);
           });
-          if (found?.fileDataUrl && isValidDataUrl(found.fileDataUrl)) {
-            return found.fileDataUrl;
+          const candidateUrl = found?.fileUrl || found?.fileDataUrl;
+          if (candidateUrl && isValidDataUrl(candidateUrl)) {
+            const healed = r2StorageService.resolvePublicViewUrl(candidateUrl) || candidateUrl;
+            if (isValidDataUrl(healed)) return healed;
           }
           if (found?.r2ObjectKey && r2StorageService.isConfigured()) {
             const resolved = r2StorageService.resolvePublicViewUrl(found.r2ObjectKey);
@@ -3007,8 +3048,9 @@ export const sgsRosterAndSubmissionService = {
             const matchFile = cleanFile ? q.fileName?.includes(cleanFile) : true;
             return matchStu && (matchAsg || matchFile);
           });
-          if (foundQ?.filePreviewUrl && isValidDataUrl(foundQ.filePreviewUrl)) {
-            return foundQ.filePreviewUrl;
+          const qUrl = foundQ?.filePreviewUrl || foundQ?.fileUrl;
+          if (qUrl && isValidDataUrl(qUrl)) {
+            return r2StorageService.resolvePublicViewUrl(qUrl) || qUrl;
           }
         }
       } catch (qErr) {
@@ -3102,8 +3144,15 @@ export const sgsRosterAndSubmissionService = {
       }
     }
     const term = payload.academicYearTerm || '1/2569';
-    const cleanFileName = payload.fileName
-      ? payload.fileName.replace(/\.(jpg|jpeg|png|heic)$/i, '.webp')
+    const rawFileObjName =
+      fileToUpload && 'name' in fileToUpload && typeof (fileToUpload as File).name === 'string'
+        ? (fileToUpload as File).name
+        : payload.fileName;
+    const isConvertedWebp = Boolean(fileToUpload && fileToUpload.type === 'image/webp');
+    const cleanFileName = rawFileObjName
+      ? isConvertedWebp
+        ? rawFileObjName.replace(/\.(jpg|jpeg|png|heic|heif|bmp)$/i, '.webp')
+        : rawFileObjName
       : undefined;
 
     const hasIncomingFile = Boolean(fileToUpload || payload.fileDataUrl || payload.fileUrl);
@@ -3310,13 +3359,18 @@ export const sgsRosterAndSubmissionService = {
       targetAsg?.unitId ||
       (idx !== -1 ? subs[idx].unitId : undefined);
 
-    const term = payload.academicYearTerm || '1/2569';
-    const cleanFileName = payload.fileName
-      ? payload.fileName.replace(/\.(jpg|jpeg|png|heic)$/i, '.webp')
-      : undefined;
+    const term = payload.academicYearTerm || '2/2569';
+    const cleanFileName = payload.fileName ? payload.fileName.trim() : undefined;
     const cleanRoom = (payload.classroom ? formatClassroomLabel(payload.classroom).toLowerCase().replace(/\s+/g, '').replace('/', '-') : 'all');
-    const r2Key = cleanFileName
-      ? (r2StorageService.isConfigured()
+    const isAlreadyUploadedR2Url = Boolean(
+      payload.fileDataUrl &&
+        (payload.fileDataUrl.startsWith('http://') || payload.fileDataUrl.startsWith('https://')) &&
+        r2StorageService.isR2OrLocalFileUrl(payload.fileDataUrl)
+    );
+    const r2Key = isAlreadyUploadedR2Url
+      ? r2StorageService.normalizeObjectKey(payload.fileDataUrl!)
+      : cleanFileName
+        ? r2StorageService.isConfigured()
           ? r2StorageService.buildSubmissionKey({
               term,
               classroom: payload.classroom,
@@ -3324,8 +3378,8 @@ export const sgsRosterAndSubmissionService = {
               studentCode: payload.studentCode,
               fileName: cleanFileName,
             })
-          : `r2://kp-classroom-submissions/${term.replace('/', '-')}/${cleanRoom}/${payload.assignmentId}/${payload.studentCode}_${cleanFileName}`)
-      : undefined;
+          : `r2://kp-classroom-submissions/${term.replace('/', '-')}/${cleanRoom}/${payload.assignmentId}/${payload.studentCode}_${cleanFileName}`
+        : undefined;
     const origKb = payload.originalSizeKb ?? (cleanFileName ? 4250 : 0);
     const compKb = payload.compressedSizeKb ?? (cleanFileName ? 148 : 0);
 

@@ -18,6 +18,7 @@ import {
   getDynamicTeachingSubjects,
   type TeachingSubjectInfo,
 } from '../../services/teacherCourseAssignmentService';
+import { resolveSubmissionMedia } from '../../utils/submissionPreviewUtils';
 
 interface Submission3ColorMatrixModalProps {
   isOpen: boolean;
@@ -28,11 +29,13 @@ interface Submission3ColorMatrixModalProps {
     title: string;
     studentName: string;
     studentCode?: string;
+    assignmentId?: string;
     classroom?: string;
     seatNo?: number;
-    type?: 'IMAGE' | 'PDF' | 'LINK';
+    type?: 'IMAGE' | 'PDF' | 'LINK' | 'TEXT';
     url?: string;
     externalLinkUrl?: string;
+    textContent?: string;
     fileName?: string;
     platform?: 'CANVA' | 'GOOGLE_DOCS' | 'GOOGLE_DRIVE' | 'YOUTUBE' | 'FIGMA' | 'OTHER';
   }) => void;
@@ -386,34 +389,40 @@ export const Submission3ColorMatrixModal: React.FC<Submission3ColorMatrixModalPr
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const cachedFile = sgsRosterAndSubmissionService.getSubmissionFileUrl(
-                                    asg.id,
-                                    stu.studentCode,
-                                    sub?.workAttachmentLabel || sub?.workTitle
-                                  );
-                                  const cleanSubFile =
-                                    sub?.fileDataUrl &&
-                                    !sub.fileDataUrl.includes('storage.kps.ac.th') &&
-                                    !sub.fileDataUrl.startsWith('r2://')
-                                      ? sub.fileDataUrl
-                                      : undefined;
-                                  const fileUrl = cleanSubFile || cachedFile;
-                                  const linkUrl = sub?.externalLinkUrl;
-                                  const isCanva = (sub?.workTitle || '').includes('Canva') || (linkUrl || '').includes('canva.com');
-                                  const isDrive = Boolean((linkUrl || '').includes('drive.google.com') || (linkUrl || '').includes('docs.google.com'));
-                                  const isPdf = (sub?.workTitle || '').endsWith('.pdf') || (fileUrl || '').includes('.pdf');
+                                  const resolved = resolveSubmissionMedia({
+                                    fileUrl: sub?.fileUrl,
+                                    fileDataUrl: sub?.fileDataUrl,
+                                    r2ObjectKey: sub?.r2ObjectKey,
+                                    externalLinkUrl: sub?.externalLinkUrl,
+                                    assignmentId: asg.id,
+                                    studentCode: stu.studentCode,
+                                    fileName: sub?.workAttachmentLabel || sub?.workTitle,
+                                    textContent: sub?.textContent,
+                                  });
                                   if (onOpenPreview) {
                                     onOpenPreview({
                                       title: asg.title,
                                       studentName: stu.studentName,
                                       studentCode: stu.studentCode,
+                                      assignmentId: asg.id,
                                       classroom: selectedRoom,
                                       seatNo: stu.sgsSeatNo,
-                                      type: isPdf ? 'PDF' : fileUrl ? 'IMAGE' : isCanva || isDrive ? 'LINK' : 'IMAGE',
-                                      url: fileUrl || linkUrl,
-                                      externalLinkUrl: linkUrl,
-                                      fileName: sub?.workTitle || `${asg.title}_${stu.studentName}`,
-                                      platform: isDrive ? 'GOOGLE_DRIVE' : isCanva ? 'CANVA' : undefined,
+                                      type:
+                                        resolved.fileCategory === 'PDF'
+                                          ? 'PDF'
+                                          : resolved.hasFile
+                                            ? 'IMAGE'
+                                            : resolved.hasLink
+                                              ? 'LINK'
+                                              : 'TEXT',
+                                      url: resolved.effectiveFileUrl || resolved.effectiveLinkUrl,
+                                      externalLinkUrl: resolved.effectiveLinkUrl,
+                                      textContent: sub?.textContent,
+                                      fileName: resolved.inferredFileName,
+                                      platform:
+                                        resolved.externalLinkInfo?.platform === 'LOOM'
+                                          ? 'OTHER'
+                                          : resolved.externalLinkInfo?.platform,
                                     });
                                   }
                                 }}
@@ -424,13 +433,54 @@ export const Submission3ColorMatrixModal: React.FC<Submission3ColorMatrixModalPr
                                 <span>รอตรวจ 👁️</span>
                               </button>
                             ) : (
-                              // 🟢 สีเขียว: ส่งแล้ว / ตรวจแล้ว
-                              <div className="w-full py-1.5 px-2 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold flex items-center justify-center gap-1">
+                              // 🟢 สีเขียว: ส่งแล้ว / ตรวจแล้ว (คลิกเพื่อดูไฟล์ย้อนหลังได้)
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!onOpenPreview) return;
+                                  const resolved = resolveSubmissionMedia({
+                                    fileUrl: sub?.fileUrl,
+                                    fileDataUrl: sub?.fileDataUrl,
+                                    r2ObjectKey: sub?.r2ObjectKey,
+                                    externalLinkUrl: sub?.externalLinkUrl,
+                                    assignmentId: asg.id,
+                                    studentCode: stu.studentCode,
+                                    fileName: sub?.workAttachmentLabel || sub?.workTitle,
+                                    textContent: sub?.textContent,
+                                  });
+                                  onOpenPreview({
+                                    title: asg.title,
+                                    studentName: stu.studentName,
+                                    studentCode: stu.studentCode,
+                                    assignmentId: asg.id,
+                                    classroom: selectedRoom,
+                                    seatNo: stu.sgsSeatNo,
+                                    type:
+                                      resolved.fileCategory === 'PDF'
+                                        ? 'PDF'
+                                        : resolved.hasFile
+                                          ? 'IMAGE'
+                                          : resolved.hasLink
+                                            ? 'LINK'
+                                            : 'TEXT',
+                                    url: resolved.effectiveFileUrl || resolved.effectiveLinkUrl,
+                                    externalLinkUrl: resolved.effectiveLinkUrl,
+                                    textContent: sub?.textContent,
+                                    fileName: resolved.inferredFileName,
+                                    platform:
+                                      resolved.externalLinkInfo?.platform === 'LOOM'
+                                        ? 'OTHER'
+                                        : resolved.externalLinkInfo?.platform,
+                                  });
+                                }}
+                                title="คลิกเพื่อดูผลงานที่ตรวจแล้ว"
+                                className="w-full py-1.5 px-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                              >
                                 <Check className="w-3 h-3 text-emerald-600" />
                                 <span>
                                   {sub?.score ?? asg.maxScore}/{asg.maxScore}
                                 </span>
-                              </div>
+                              </button>
                             )}
                           </td>
                         );

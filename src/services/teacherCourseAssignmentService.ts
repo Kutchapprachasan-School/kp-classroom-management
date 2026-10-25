@@ -510,11 +510,20 @@ export const teacherCourseAssignmentService = {
         );
 
         const r2FromKey = sub.r2ObjectKey ? resolveFileUrl(sub.r2ObjectKey) : undefined;
+        const r2FromFileUrl = sub.fileUrl ? resolveFileUrl(sub.fileUrl) : undefined;
         const r2FromDataUrl = sub.fileDataUrl ? resolveFileUrl(sub.fileDataUrl) : undefined;
-        const validR2Url =
-          (r2FromKey && (r2FromKey.startsWith('http://') || r2FromKey.startsWith('https://')) && !r2FromKey.startsWith('data:') && !r2FromKey.includes('storage.kps.ac.th'))
-            ? r2FromKey
-            : (r2FromDataUrl && (r2FromDataUrl.startsWith('http://') || r2FromDataUrl.startsWith('https://')) && !r2FromDataUrl.startsWith('data:') && !r2FromDataUrl.includes('storage.kps.ac.th'))
+        const isHttpR2 = (u?: string) =>
+          Boolean(
+            u &&
+              (u.startsWith('http://') || u.startsWith('https://')) &&
+              !u.startsWith('data:') &&
+              !u.includes('storage.kps.ac.th')
+          );
+        const validR2Url = isHttpR2(r2FromKey)
+          ? r2FromKey
+          : isHttpR2(r2FromFileUrl)
+            ? r2FromFileUrl
+            : isHttpR2(r2FromDataUrl)
               ? r2FromDataUrl
               : undefined;
 
@@ -522,7 +531,8 @@ export const teacherCourseAssignmentService = {
           validR2Url ||
           cachedDirectUrl ||
           cleanSavedUrl ||
-          resolveFileUrl(sub.fileDataUrl) ||
+          r2FromFileUrl ||
+          r2FromDataUrl ||
           undefined;
 
         const subTimestamp =

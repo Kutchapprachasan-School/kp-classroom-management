@@ -39,6 +39,7 @@ import { formatClassroomLabel } from '../services/studentService';
 import { resolveStudentIdentity } from '../utils/studentIdentityUtils';
 import { type UploadProgressInfo, validateSubmissionFile, compressImageToWebP } from '../services/cloudDataService';
 import { formatBytes } from '../components/student/StudentSubmissionUploader';
+import { detectFileCategory } from '../utils/submissionPreviewUtils';
 
 export interface ExtendedStudentQuestItem extends StudentQuestItem {
   courseCode?: string;
@@ -88,7 +89,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
   const [selectedFileDataUrl, setSelectedFileDataUrl] = useState<string | null>(null);
   const [selectedRawFile, setSelectedRawFile] = useState<File | Blob | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [fileTypeCategory, setFileTypeCategory] = useState<'image' | 'pdf' | 'doc' | 'other'>('other');
+  const [fileTypeCategory, setFileTypeCategory] = useState<'image' | 'pdf' | 'doc' | 'video' | 'audio' | 'archive' | 'other'>('other');
   const [fileValidationError, setFileValidationError] = useState<string | null>(null);
   const [compressionNotice, setCompressionNotice] = useState<string | null>(null);
   const [isCompressingImage, setIsCompressingImage] = useState(false);
@@ -321,7 +322,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
 
     const trimmedLink = submitLink.trim();
     const trimmedText = submitText.trim();
-    const hasFile = Boolean(selectedFileDataUrl || selectedFileName);
+    const hasFile = Boolean(selectedRawFile || selectedFileDataUrl || selectedFileName);
     const hasLink = Boolean(trimmedLink);
     const hasText = Boolean(trimmedText);
 
@@ -358,9 +359,23 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
         courseCode: selectedQuest.courseCode,
         studentCode,
         workTitle: selectedQuest.title,
-        fileName: selectedFileName || (selectedFileDataUrl ? `work_${studentCode}.webp` : undefined),
-        originalSizeKb: selectedFileDataUrl ? Math.round(selectedFileDataUrl.length / 1024) : 0,
-        compressedSizeKb: selectedFileDataUrl ? Math.round(selectedFileDataUrl.length / 1365) : 0,
+        fileName:
+          selectedFileName ||
+          (selectedRawFile && 'name' in selectedRawFile && selectedRawFile.name
+            ? selectedRawFile.name
+            : selectedFileDataUrl
+            ? `work_${studentCode}.webp`
+            : undefined),
+        originalSizeKb: selectedRawFile
+          ? Math.max(1, Math.round(selectedRawFile.size / 1024))
+          : selectedFileDataUrl
+          ? Math.round(selectedFileDataUrl.length / 1024)
+          : 0,
+        compressedSizeKb: selectedRawFile
+          ? Math.max(1, Math.round(selectedRawFile.size / 1024))
+          : selectedFileDataUrl
+          ? Math.round(selectedFileDataUrl.length / 1365)
+          : 0,
         fileDataUrl: selectedFileDataUrl || undefined,
         fileBlob: selectedRawFile || undefined,
         externalLinkUrl: hasLink ? trimmedLink : undefined,
@@ -1128,33 +1143,92 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                         </span>
                       </div>
 
-                      {/* Display Image Thumbnail Preview if student attached an image */}
-                      {filePreview && (
-                        <div className="p-3 bg-white rounded-xl border border-emerald-200 space-y-2">
-                          <span className="text-[11px] font-bold text-slate-700 block">🖼️ ไฟล์ภาพผลงานที่ส่ง:</span>
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={filePreview}
-                              alt="ผลงานที่ส่ง"
-                              className="w-20 h-20 object-cover rounded-xl border border-slate-200 shadow-2xs shrink-0"
-                            />
-                            <div className="space-y-1 text-xs min-w-0">
-                              <p className="font-bold text-slate-800 truncate">
-                                {submission?.workAttachmentLabel || selectedQuest.title}
-                              </p>
-                              <a
-                                href={filePreview}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-[11px] font-bold text-teal-700 hover:text-teal-900 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200 transition-colors"
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                                <span>เปิดดูรูปภาพขนาดเต็ม ↗</span>
-                              </a>
-                            </div>
+                      {/* Display File Preview if student attached a file */}
+                      {filePreview && (() => {
+                        const attachedCat = detectFileCategory(filePreview, submission?.workAttachmentLabel);
+                        return (
+                          <div className="p-3 bg-white rounded-xl border border-emerald-200 space-y-2">
+                            <span className="text-[11px] font-bold text-slate-700 block">
+                              {attachedCat === 'IMAGE'
+                                ? '🖼️ ไฟล์ภาพผลงานที่ส่ง:'
+                                : attachedCat === 'PDF'
+                                ? '📄 ไฟล์เอกสาร PDF ที่ส่ง:'
+                                : attachedCat === 'VIDEO'
+                                ? '🎬 ไฟล์วิดีโอผลงานที่ส่ง:'
+                                : attachedCat === 'AUDIO'
+                                ? '🎵 ไฟล์เสียงผลงานที่ส่ง:'
+                                : '📎 ไฟล์ผลงานที่ส่ง (Cloudflare R2):'}
+                            </span>
+                            {attachedCat === 'VIDEO' ? (
+                              <div className="space-y-2">
+                                <video
+                                  src={filePreview}
+                                  controls
+                                  className="w-full max-h-56 rounded-xl bg-slate-900 border border-slate-200"
+                                />
+                                <a
+                                  href={filePreview}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[11px] font-bold text-teal-700 hover:text-teal-900 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200 transition-colors"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  <span>เปิดวิดีโอ / ดาวน์โหลด ↗</span>
+                                </a>
+                              </div>
+                            ) : attachedCat === 'AUDIO' ? (
+                              <div className="space-y-2">
+                                <audio src={filePreview} controls className="w-full" />
+                                <a
+                                  href={filePreview}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[11px] font-bold text-teal-700 hover:text-teal-900 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200 transition-colors"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  <span>เปิดฟัง / ดาวน์โหลดไฟล์เสียง ↗</span>
+                                </a>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-3">
+                                {attachedCat === 'IMAGE' ? (
+                                  <img
+                                    src={filePreview}
+                                    alt="ผลงานที่ส่ง"
+                                    className="w-20 h-20 object-cover rounded-xl border border-slate-200 shadow-2xs shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-14 h-14 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 font-black text-xs shrink-0">
+                                    {attachedCat === 'PDF'
+                                      ? 'PDF'
+                                      : attachedCat === 'OFFICE'
+                                      ? 'DOC'
+                                      : attachedCat === 'ARCHIVE'
+                                      ? 'ZIP'
+                                      : 'FILE'}
+                                  </div>
+                                )}
+                                <div className="space-y-1 text-xs min-w-0">
+                                  <p className="font-bold text-slate-800 truncate">
+                                    {submission?.workAttachmentLabel || selectedQuest.title}
+                                  </p>
+                                  <a
+                                    href={filePreview}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-[11px] font-bold text-teal-700 hover:text-teal-900 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200 transition-colors"
+                                  >
+                                    <ExternalLink className="w-3 h-3" />
+                                    <span>
+                                      {attachedCat === 'IMAGE' ? 'เปิดดูรูปภาพขนาดเต็ม ↗' : 'เปิดดู / ดาวน์โหลดไฟล์ ↗'}
+                                    </span>
+                                  </a>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       {/* Display External Link Preview if student attached a link */}
                       {submission?.externalLinkUrl && (
@@ -1295,10 +1369,10 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-[#163A66] flex items-center gap-1.5 text-xs sm:text-sm">
                       <Upload className="w-4 h-4 text-[#3B82F6]" />
-                      <span>1. แนบไฟล์รูปภาพ หรือเอกสาร PDF (Cloudflare R2)</span>
+                      <span>1. แนบไฟล์ผลงาน (รูปภาพ, PDF, Word, Excel, PowerPoint, วิดีโอ, เสียง, ZIP)</span>
                     </span>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                      บีบอัดอัตโนมัติ
+                      อัปโหลดขึ้น R2
                     </span>
                   </div>
 
@@ -1370,18 +1444,33 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                         </div>
                       )}
 
-                      {/* 3. กรณีเป็นไฟล์ Word (.doc, .docx): แสดงการ์ดข้อมูลเอกสาร */}
-                      {fileTypeCategory === 'doc' && (
+                      {/* 3. กรณีเป็นไฟล์วิดีโอ: แสดง Video Player */}
+                      {fileTypeCategory === 'video' && previewUrl && (
+                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-950 p-2 shadow-2xs">
+                          <video src={previewUrl} controls className="max-h-60 w-full rounded-lg" />
+                        </div>
+                      )}
+
+                      {/* 4. กรณีเป็นไฟล์เสียง: แสดง Audio Player */}
+                      {fileTypeCategory === 'audio' && previewUrl && (
+                        <div className="rounded-xl border border-purple-200 bg-purple-50/40 p-3.5 space-y-2 shadow-2xs">
+                          <p className="text-xs font-bold text-[#163A66]">🎵 ไฟล์เสียงพร้อมอัปโหลด</p>
+                          <audio src={previewUrl} controls className="w-full" />
+                        </div>
+                      )}
+
+                      {/* 5. กรณีเป็นไฟล์เอกสาร (Word, Excel, PowerPoint, Text) หรือ ZIP */}
+                      {(fileTypeCategory === 'doc' || fileTypeCategory === 'archive' || fileTypeCategory === 'other') && (
                         <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50/40 p-3.5 shadow-2xs">
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 border border-blue-200 text-lg font-black text-[#3B82F6]">
-                            W
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 border border-blue-200 text-xs font-black text-[#3B82F6]">
+                            {fileTypeCategory === 'archive' ? 'ZIP' : 'DOC'}
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-xs font-bold text-[#163A66]">
-                              ไฟล์เอกสาร Microsoft Word
+                              {selectedFileName || 'ไฟล์เอกสาร / ชิ้นงาน'}
                             </p>
                             <p className="text-[11px] text-[#6B7C93]">
-                              พร้อมสำหรับอัปโหลดขึ้น Cloudflare R2
+                              พร้อมสำหรับอัปโหลดขึ้น Cloudflare R2 ให้คุณครูตรวจพรีวิวได้ทันที
                             </p>
                           </div>
                         </div>
@@ -1417,16 +1506,16 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                       </div>
                       <div>
                         <span className="font-bold text-slate-800 block text-xs sm:text-sm">
-                          📷 ถ่ายภาพ หรือ 📁 คลิกเพื่อเลือกไฟล์จากเครื่อง
+                          📷 ถ่ายภาพ หรือ 📁 คลิกเพื่อเลือกไฟล์ทุกประเภทจากเครื่อง
                         </span>
                         <span className="text-[11px] text-[#6B7C93] mt-0.5 block">
-                          รองรับรูปภาพ (บีบอัด WebP อัตโนมัติ) และเอกสาร (PDF, Word ไม่เกิน 15 MB)
+                          รองรับรูปภาพ, PDF, Word, Excel, PowerPoint, วิดีโอ (MP4), เสียง (MP3) และไฟล์ ZIP
                         </span>
                       </div>
                       <input
                         ref={fileInputRef}
                         type="file"
-                        accept=".jpg,.jpeg,.png,.webp,.heic,.pdf,.doc,.docx"
+                        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.txt,.csv,.rtf,.md,.json,.zip,.rar,.7z"
                         disabled={isSubmitting || isUploadingR2}
                         className="hidden"
                         onChange={async (e) => {
@@ -1439,7 +1528,6 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                             setIsCompressingImage(true);
 
                             // 1. ถ้านักเรียนเลือกรูปภาพ ให้บีบอัดและแปลงเป็น WebP อัตโนมัติก่อน
-                            // (แม้ภาพถ่ายกล้องสดจากมือถือจะใหญ่ 6-12 MB ก็จะถูกย่อเหลือ ~200-400 KB ทันที)
                             const { file: processedFile, originalSize, compressedSize, wasCompressed } =
                               await compressImageToWebP(f, {
                                 maxWidthOrHeight: 1920,
@@ -1466,14 +1554,18 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                             setSelectedFileName(cleanName);
                             setUploadProgressInfo({ percent: 0, loadedBytes: 0, totalBytes: processedFile.size });
 
-                            // จัดการ Memory Preview ด้วย URL.createObjectURL(processedFile) (ไม่เปลืองแรมมือถือ)
+                            // จัดการ Memory Preview ด้วย URL.createObjectURL(processedFile)
                             if (previewUrl) {
                               URL.revokeObjectURL(previewUrl);
                             }
 
                             const lowerName = processedFile.name.toLowerCase();
-                            const isImage = validation.category === 'image' || processedFile.type.startsWith('image/');
-                            const isPdf = processedFile.type === 'application/pdf' || lowerName.endsWith('.pdf');
+                            const detectedCat = detectFileCategory(lowerName, cleanName);
+                            const isImage = validation.category === 'image' || processedFile.type.startsWith('image/') || detectedCat === 'IMAGE';
+                            const isPdf = processedFile.type === 'application/pdf' || lowerName.endsWith('.pdf') || detectedCat === 'PDF';
+                            const isVideo = processedFile.type.startsWith('video/') || detectedCat === 'VIDEO';
+                            const isAudio = processedFile.type.startsWith('audio/') || detectedCat === 'AUDIO';
+                            const isArchive = validation.category === 'archive' || detectedCat === 'ARCHIVE';
 
                             if (isImage) {
                               setFileTypeCategory('image');
@@ -1481,20 +1573,33 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                             } else if (isPdf) {
                               setFileTypeCategory('pdf');
                               setPreviewUrl(URL.createObjectURL(processedFile));
+                            } else if (isVideo) {
+                              setFileTypeCategory('video');
+                              setPreviewUrl(URL.createObjectURL(processedFile));
+                            } else if (isAudio) {
+                              setFileTypeCategory('audio');
+                              setPreviewUrl(URL.createObjectURL(processedFile));
+                            } else if (isArchive) {
+                              setFileTypeCategory('archive');
+                              setPreviewUrl(null);
                             } else {
                               setFileTypeCategory('doc');
                               setPreviewUrl(null);
                             }
 
-                            // DataUrl สำรองสำหรับการทำงานแบบออฟไลน์
-                            const reader = new FileReader();
-                            reader.onload = (event) => {
-                              const resultStr = event.target?.result as string;
-                              if (resultStr) setSelectedFileDataUrl(resultStr);
-                            };
-                            reader.readAsDataURL(processedFile);
+                            // DataUrl สำรองเฉพาะไฟล์ขนาดไม่เกิน 5 MB เพื่อไม่ให้กินหน่วยความจำเครื่อง
+                            if (processedFile.size <= 5 * 1024 * 1024) {
+                              const reader = new FileReader();
+                              reader.onload = (event) => {
+                                const resultStr = event.target?.result as string;
+                                if (resultStr) setSelectedFileDataUrl(resultStr);
+                              };
+                              reader.readAsDataURL(processedFile);
+                            } else {
+                              setSelectedFileDataUrl(null);
+                            }
                           } catch {
-                            setFileValidationError('เกิดข้อผิดพลาดในการประมวลผลไฟล์รูปภาพ');
+                            setFileValidationError('เกิดข้อผิดพลาดในการประมวลผลไฟล์');
                             handleClearFile();
                           } finally {
                             setIsCompressingImage(false);
@@ -1682,7 +1787,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                     </span>
                   </div>
                   <div className="flex items-center gap-1 text-[11px] font-bold">
-                    {selectedFileDataUrl && (
+                    {(selectedRawFile || selectedFileDataUrl) && (
                       <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
                         ✓ แนบไฟล์
                       </span>
@@ -1690,6 +1795,11 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                     {submitLink.trim() && (
                       <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800">
                         ✓ แนบลิงก์
+                      </span>
+                    )}
+                    {submitText.trim() && (
+                      <span className="px-2 py-0.5 rounded bg-teal-100 text-teal-800">
+                        ✓ ข้อความคำตอบ
                       </span>
                     )}
                   </div>
@@ -1711,7 +1821,12 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || isUploadingR2 || Boolean(fileValidationError) || (!selectedFileDataUrl && !submitLink.trim())}
+                  disabled={
+                    isSubmitting ||
+                    isUploadingR2 ||
+                    Boolean(fileValidationError) ||
+                    (!selectedRawFile && !selectedFileDataUrl && !submitLink.trim() && !submitText.trim())
+                  }
                   className="px-6 py-2 bg-[#3B82F6] hover:bg-[#2563EB] disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-xl font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
                 >
                   {isUploadingR2 ? (

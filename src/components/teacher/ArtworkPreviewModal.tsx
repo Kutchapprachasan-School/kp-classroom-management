@@ -1,19 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X,
-  ExternalLink,
   ZoomIn,
   ZoomOut,
   RotateCw,
-  ChevronLeft,
-  ChevronRight,
+  Download,
+  ExternalLink,
   FileText,
-  Palette,
+  Image as ImageIcon,
+  Link2,
   CheckCircle2,
+  Sparkles,
+  RefreshCw,
+  Copy,
+  Check,
   Upload,
 } from 'lucide-react';
 import { sgsRosterAndSubmissionService } from '../../services/sgsRosterAndSubmissionService';
 import { r2StorageService } from '../../services/r2StorageService';
+import {
+  resolveSubmissionMedia,
+  getOfficeViewerUrls,
+} from '../../utils/submissionPreviewUtils';
 
 export interface ArtworkPreviewModalProps {
   isOpen: boolean;
@@ -24,12 +32,12 @@ export interface ArtworkPreviewModalProps {
   assignmentId?: string;
   classroom?: string;
   seatNo?: number;
-  type?: 'IMAGE' | 'PDF' | 'LINK';
+  type: 'IMAGE' | 'PDF' | 'LINK' | 'TEXT';
   url?: string;
   externalLinkUrl?: string;
   textContent?: string;
   fileName?: string;
-  platform?: 'CANVA' | 'GOOGLE_DOCS' | 'GOOGLE_DRIVE' | 'YOUTUBE' | 'FIGMA' | 'OTHER';
+  platform?: 'CANVA' | 'GOOGLE_DOCS' | 'GOOGLE_DRIVE' | 'FIGMA' | 'YOUTUBE' | 'OTHER';
 }
 
 export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
@@ -37,109 +45,88 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
   onClose,
   title,
   studentName,
-  studentCode = '45102',
+  studentCode = '-',
   assignmentId,
   classroom = 'ม.3/1',
-  seatNo = 2,
+  seatNo = 1,
   type,
   url,
   externalLinkUrl,
   textContent,
-  fileName = 'ผลงานนักเรียน',
+  fileName,
   platform,
 }) => {
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [rotation, setRotation] = useState<number>(0);
-  const [pdfPage, setPdfPage] = useState<number>(1);
-  const [imgLoadError, setImgLoadError] = useState<boolean>(false);
   const [reminderSent, setReminderSent] = useState<boolean>(false);
+  const [copiedText, setCopiedText] = useState<boolean>(false);
+  const [imgLoadError, setImgLoadError] = useState<boolean>(false);
   const [localFallbackUrl, setLocalFallbackUrl] = useState<string | null>(null);
   const [isUploadingReplacement, setIsUploadingReplacement] = useState<boolean>(false);
   const [uploadSuccessToast, setUploadSuccessToast] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'FILE' | 'LINK' | 'TEXT'>('FILE');
+  const [officeViewerEngine, setOfficeViewerEngine] = useState<'OFFICE' | 'GOOGLE'>('GOOGLE');
+  const [showLinkEmbed, setShowLinkEmbed] = useState<boolean>(true);
 
+  const targetAsgId = assignmentId || (url?.startsWith('asg-') ? url : undefined);
+  const targetStuCode = studentCode !== '-' ? studentCode : undefined;
+
+  const media = resolveSubmissionMedia({
+    url,
+    externalLinkUrl,
+    assignmentId: targetAsgId,
+    studentCode: targetStuCode,
+    fileName,
+    textContent,
+    typeHint: type,
+    platformHint: platform,
+    localOverrideUrl: localFallbackUrl,
+  });
+
+  const {
+    effectiveFileUrl,
+    effectiveLinkUrl,
+    inferredFileName,
+    fileExtension,
+    fileCategory,
+    externalLinkInfo,
+    hasFile,
+    hasLink,
+    hasText,
+  } = media;
+
+  // รีเซ็ตสถานะทุกครั้งที่เปลี่ยนชิ้นงานหรือนักเรียน
   useEffect(() => {
     setImgLoadError(false);
-    setZoomLevel(100);
-    setRotation(0);
-    setPdfPage(1);
-    setReminderSent(false);
     setLocalFallbackUrl(null);
     setUploadSuccessToast(null);
-  }, [isOpen, url, externalLinkUrl]);
+    setZoomLevel(100);
+    setRotation(0);
+    setShowLinkEmbed(true);
+
+    if (hasFile) {
+      setActiveTab('FILE');
+    } else if (hasLink) {
+      setActiveTab('LINK');
+    } else if (hasText) {
+      setActiveTab('TEXT');
+    } else {
+      setActiveTab('FILE');
+    }
+  }, [url, externalLinkUrl, targetAsgId, targetStuCode, fileName, hasFile, hasLink, hasText]);
 
   if (!isOpen) return null;
 
-  const handleZoomIn = () => setZoomLevel((z) => Math.min(200, z + 25));
-  const handleZoomOut = () => setZoomLevel((z) => Math.max(50, z - 25));
-  const handleRotate = () => setRotation((r) => (r + 90) % 360);
-  const handleResetZoom = () => {
-    setZoomLevel(100);
-    setRotation(0);
-  };
-
-  // ลำดับความสำคัญ: ให้ความสำคัญกับ Cloudflare R2 URL เสมอถ้ามี แล้วจึงใช้ Local Cache เป็น Fallback
-  const match = url?.match(/(asg-[^/]+)\/([^_/]+)_/);
-  const targetAsgId = match ? match[1] : assignmentId;
-  const targetStuCode = match ? match[2] : studentCode;
-  const cached = sgsRosterAndSubmissionService.getSubmissionFileUrl(targetAsgId, targetStuCode, fileName);
-
-  const r2Url = r2StorageService.resolvePublicViewUrl(url);
-  const isR2Valid = Boolean(
-    r2Url &&
-      (r2Url.startsWith('http://') || r2Url.startsWith('https://')) &&
-      !r2Url.startsWith('data:')
-  );
-
-  let resolvedFileUrl =
-    localFallbackUrl ||
-    (isR2Valid ? r2Url : null) ||
-    (url && (url.startsWith('http://') || url.startsWith('https://')) && !url.startsWith('data:') ? url : null) ||
-    (cached && (cached.startsWith('http://') || cached.startsWith('https://')) ? cached : null) ||
-    cached ||
-    url;
-
-  // หากพบแคชในเครื่อง แต่ URL ใน R2 ยังไม่มี ให้ซิงก์ขึ้น R2 ในเบื้องหลังอัตโนมัติ
-  if (cached && cached.startsWith('data:') && r2StorageService.isConfigured() && (!url || url.startsWith('r2://'))) {
-    const cleanRoom = (classroom || 'all').toLowerCase().replace(/\s+/g, '').replace('/', '-');
-    const cleanFile = (fileName || `${targetStuCode}_submission.webp`).replace(/\s+/g, '_');
-    const r2Key = `kp-classroom-submissions/2-2569/${cleanRoom}/${targetAsgId || 'asg'}/${targetStuCode || 'stu'}_${cleanFile}`;
-    r2StorageService.uploadFile(r2Key, cached, 'image/webp').catch(() => {});
-  }
-
-  // แยกแยะระหว่าง URL ของไฟล์ (ภาพ/PDF) กับลิงก์ภายนอก (Canva/Google Drive)
-  const effectiveLinkUrl =
-    externalLinkUrl ||
-    (resolvedFileUrl &&
-      (resolvedFileUrl.startsWith('http://') || resolvedFileUrl.startsWith('https://')) &&
-      !resolvedFileUrl.match(/\.(jpg|jpeg|png|webp|gif|svg|pdf)$/i)
-      ? resolvedFileUrl
-      : undefined);
-
-  const effectiveFileUrl =
-    resolvedFileUrl &&
-    (resolvedFileUrl.startsWith('data:') ||
-      resolvedFileUrl.startsWith('blob:') ||
-      resolvedFileUrl.match(/\.(jpg|jpeg|png|webp|gif|svg|pdf)$/i) ||
-      !effectiveLinkUrl)
-      ? resolvedFileUrl
-      : undefined;
-
   const handleImageError = () => {
-    // หาก R2 ตอบ 404 ให้ลองค้นใน localStorage ของเครื่องนี้
     if (!localFallbackUrl) {
-      const localDirect = sgsRosterAndSubmissionService.getSubmissionFileUrl(targetAsgId, targetStuCode, fileName);
-      if (localDirect && localDirect.startsWith('data:')) {
+      const localDirect = sgsRosterAndSubmissionService.getSubmissionFileUrl(
+        targetAsgId,
+        targetStuCode,
+        fileName || inferredFileName
+      );
+      if (localDirect && localDirect !== effectiveFileUrl) {
         setLocalFallbackUrl(localDirect);
         setImgLoadError(false);
-        if (r2StorageService.isConfigured()) {
-          const cleanFile = (fileName || `${targetStuCode}_submission.webp`).replace(/\s+/g, '_');
-          const r2Key = `kp-classroom-submissions/2-2569/all/${targetAsgId || 'asg'}/${targetStuCode || 'stu'}_${cleanFile}`;
-          r2StorageService.uploadFile(r2Key, localDirect, 'image/webp').then((res) => {
-            if (res.success && res.url) {
-              setLocalFallbackUrl(res.url);
-            }
-          }).catch(() => {});
-        }
         return;
       }
     }
@@ -154,11 +141,19 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
     try {
       const effectiveAsg = targetAsgId || 'asg-general';
       const effectiveStu = targetStuCode || 'student';
-      const cleanName = `${effectiveStu}_${file.name.replace(/\s+/g, '_')}`;
-      const cleanRoom = (classroom || 'all').toLowerCase().replace(/\s+/g, '').replace('/', '-');
-      const r2Key = `kp-classroom-submissions/2-2569/${cleanRoom}/${effectiveAsg}/${cleanName}`;
+      const r2Key = r2StorageService.buildSubmissionKey({
+        term: '2/2569',
+        classroom: classroom || 'all',
+        assignmentId: effectiveAsg,
+        studentCode: effectiveStu,
+        fileName: file.name,
+      });
 
-      const uploadRes = await r2StorageService.uploadFile(r2Key, file, file.type || 'image/webp');
+      const uploadRes = await r2StorageService.uploadFile(
+        r2Key,
+        file,
+        file.type || 'application/octet-stream'
+      );
       if (uploadRes.success && uploadRes.url) {
         setLocalFallbackUrl(uploadRes.url);
         setImgLoadError(false);
@@ -169,7 +164,7 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
           assignmentId: effectiveAsg,
           studentCode: effectiveStu,
           workTitle: title,
-          fileName: cleanName,
+          fileName: file.name,
           fileDataUrl: uploadRes.url,
           classroom,
         });
@@ -183,579 +178,585 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
     }
   };
 
-  // ตรวจสอบนามสกุลไฟล์และประเภท
-  const lowerFile = (fileName || '').toLowerCase();
-  const isJpg = lowerFile.endsWith('.jpg') || lowerFile.endsWith('.jpeg') || (effectiveFileUrl || '').startsWith('data:image/jpeg');
-  const isPng = lowerFile.endsWith('.png') || (effectiveFileUrl || '').startsWith('data:image/png');
-  const isWebp = lowerFile.endsWith('.webp') || (effectiveFileUrl || '').startsWith('data:image/webp');
-  const isPdf = type === 'PDF' || lowerFile.endsWith('.pdf') || (effectiveFileUrl && effectiveFileUrl.toLowerCase().includes('.pdf'));
-  const isGoogleDrive = Boolean(
-    platform === 'GOOGLE_DRIVE' ||
-      (effectiveLinkUrl && (effectiveLinkUrl.includes('drive.google.com') || effectiveLinkUrl.includes('docs.google.com')))
-  );
-  const isCanva = Boolean(
-    platform === 'CANVA' || (effectiveLinkUrl && effectiveLinkUrl.includes('canva.com'))
-  );
-
-  // กำหนดว่ามีภาพหรือ PDF ที่พร้อมแสดงผลหรือไม่
-  const showImage = Boolean(effectiveFileUrl && !isPdf);
-  const showPdf = Boolean(effectiveFileUrl && isPdf);
-  const showOnlyLink = Boolean(!showImage && !showPdf && effectiveLinkUrl);
-
   const handleSendPermissionReminder = () => {
     setReminderSent(true);
     const reminderText = `แจ้งเตือนการส่งงาน: คุณครูไม่สามารถเข้าถึงไฟล์งาน '${title}' ได้ กรุณาเปิดสิทธิ์แชร์ใน Google Drive ให้คุณครูด้วยครับ`;
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(reminderText).catch(() => {});
     }
+    if (assignmentId && studentCode && studentCode !== '-') {
+      sgsRosterAndSubmissionService.returnSubmissionForRevision(
+        assignmentId,
+        studentCode,
+        'LINK_ACCESS_DENIED',
+        `คุณครูเปิดดูลิงก์ Google Drive ของนักเรียนไม่ได้ (ติดสิทธิ์ Access Denied) กรุณาตั้งค่าการแชร์โฟลเดอร์เป็น "ทุกคนที่มีลิงก์ (Anyone with the link)" แล้วกดส่งงานอีกครั้งครับ`
+      );
+    }
+    setTimeout(() => setReminderSent(false), 4500);
   };
 
+  const handleZoomIn = () => setZoomLevel((z) => Math.min(200, z + 25));
+  const handleZoomOut = () => setZoomLevel((z) => Math.max(50, z - 25));
+  const handleRotate = () => setRotation((r) => (r + 90) % 360);
+  const handleResetView = () => {
+    setZoomLevel(100);
+    setRotation(0);
+  };
+
+  const getFormatBadge = () => {
+    if (activeTab === 'LINK' && externalLinkInfo) {
+      return {
+        label: externalLinkInfo.platformLabel.toUpperCase(),
+        color: 'bg-teal-500 text-white',
+        icon: <Link2 className="w-3.5 h-3.5" />,
+      };
+    }
+    if (activeTab === 'TEXT') {
+      return {
+        label: 'TEXT RESPONSE',
+        color: 'bg-blue-600 text-white',
+        icon: <FileText className="w-3.5 h-3.5" />,
+      };
+    }
+    if (fileCategory === 'PDF') {
+      return {
+        label: 'PDF DOCUMENT',
+        color: 'bg-rose-600 text-white',
+        icon: <FileText className="w-3.5 h-3.5" />,
+      };
+    }
+    if (fileCategory === 'OFFICE') {
+      return {
+        label: `OFFICE (${(fileExtension || '.DOCX').replace('.', '').toUpperCase()})`,
+        color: 'bg-blue-600 text-white',
+        icon: <FileText className="w-3.5 h-3.5" />,
+      };
+    }
+    if (fileCategory === 'VIDEO') {
+      return {
+        label: `VIDEO (${(fileExtension || '.MP4').replace('.', '').toUpperCase()})`,
+        color: 'bg-purple-600 text-white',
+        icon: <Sparkles className="w-3.5 h-3.5" />,
+      };
+    }
+    if (fileCategory === 'AUDIO') {
+      return {
+        label: `AUDIO (${(fileExtension || '.MP3').replace('.', '').toUpperCase()})`,
+        color: 'bg-amber-600 text-white',
+        icon: <Sparkles className="w-3.5 h-3.5" />,
+      };
+    }
+    if (fileCategory === 'ARCHIVE' || fileCategory === 'TEXT') {
+      return {
+        label: `FILE (${(fileExtension || 'ATTACHMENT').replace('.', '').toUpperCase()})`,
+        color: 'bg-indigo-600 text-white',
+        icon: <FileText className="w-3.5 h-3.5" />,
+      };
+    }
+    return {
+      label: `${(fileExtension || '.WEBP').replace('.', '').toUpperCase()} IMAGE`,
+      color: 'bg-teal-600 text-white',
+      icon: <ImageIcon className="w-3.5 h-3.5" />,
+    };
+  };
+
+  const badge = getFormatBadge();
+
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 md:p-6 animate-fade-in font-sans">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-5xl w-full h-[92vh] flex flex-col overflow-hidden shadow-2xl">
-        {/* Top Header */}
-        <div className="px-5 py-3.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-white shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-teal-500/20 border border-teal-400/30 flex items-center justify-center text-teal-400">
-              {showPdf ? (
-                <FileText className="w-5 h-5 text-rose-400" />
-              ) : isGoogleDrive ? (
-                <span className="text-xl">📁</span>
-              ) : isCanva ? (
-                <Palette className="w-5 h-5 text-[#00C4CC]" />
-              ) : (
-                <Palette className="w-5 h-5 text-teal-400" />
-              )}
-            </div>
-            <div>
+    <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col justify-between p-2 sm:p-4 md:p-6 animate-fade-in font-sans text-white">
+      {/* Main Container */}
+      <div className="max-w-6xl w-full mx-auto flex-1 flex flex-col bg-slate-900 rounded-3xl border border-slate-700/80 overflow-hidden shadow-2xl">
+        {/* Top Bar: Student & Format Info + Quick Controls */}
+        <div className="px-5 py-3.5 bg-slate-900/95 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <span
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-black tracking-wide flex items-center gap-1.5 shadow-sm shrink-0 ${badge.color}`}
+            >
+              {badge.icon}
+              <span>{badge.label}</span>
+            </span>
+
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-sm sm:text-base font-extrabold text-white truncate max-w-md">
+                <h3 className="text-sm sm:text-base font-extrabold text-white truncate">
                   {title}
-                </span>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-slate-800 text-slate-300 border border-slate-700">
-                  {showPdf
-                    ? 'PDF DOCUMENT'
-                    : isGoogleDrive
-                    ? 'GOOGLE DRIVE'
-                    : isCanva
-                    ? 'CANVA PROJECT'
-                    : showImage
-                    ? isJpg
-                      ? 'JPG IMAGE'
-                      : isPng
-                      ? 'PNG IMAGE'
-                      : 'IMAGE'
-                    : 'SUBMISSION'}
+                </h3>
+                <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-800 text-teal-300 border border-slate-700 shrink-0">
+                  {inferredFileName}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 font-medium">
-                ผลงานของ: <span className="text-teal-300 font-bold">{studentName}</span> (เลขที่ {seatNo} • รหัส {studentCode} • ชั้น {classroom}) • {fileName}
+              <p className="text-xs text-slate-400 truncate">
+                ผู้ส่ง: <span className="text-slate-200 font-bold">{studentName}</span> • เลขที่{' '}
+                {seatNo} • ชั้น {classroom} • รหัส {studentCode}
               </p>
             </div>
           </div>
 
+          {/* Right Action Controls */}
           <div className="flex items-center gap-2">
             {(effectiveFileUrl || effectiveLinkUrl) && (
               <a
-                href={effectiveFileUrl || effectiveLinkUrl}
+                href={activeTab === 'LINK' ? effectiveLinkUrl || effectiveFileUrl : effectiveFileUrl || effectiveLinkUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-colors"
-                title="เปิดในแท็บใหม่"
+                download={activeTab === 'FILE' && effectiveFileUrl ? inferredFileName : undefined}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="เปิดหรือดาวน์โหลดไฟล์ในแท็บใหม่"
               >
-                <ExternalLink className="w-3.5 h-3.5" />
-                <span>เปิดลิงก์ภายนอก ↗</span>
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">เปิด/ดาวน์โหลด ↗</span>
               </a>
             )}
 
             <button
               type="button"
               onClick={onClose}
-              className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-              title="ปิด (Esc)"
+              className="w-9 h-9 rounded-full bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              title="ปิดหน้าต่าง Preview"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Student Written Text Response Banner */}
-        {textContent && (
-          <div className="px-5 py-3 bg-slate-800/90 border-b border-slate-700/80 text-white shrink-0">
-            <div className="flex items-center gap-2 mb-1.5 text-emerald-400 font-bold text-xs">
-              <FileText className="w-4 h-4" />
-              <span>ข้อความคำตอบที่นักเรียนพิมพ์ส่ง:</span>
-            </div>
-            <p className="text-xs text-slate-200 whitespace-pre-line leading-relaxed bg-slate-900/90 p-3 rounded-xl border border-slate-700 max-h-36 overflow-y-auto">
-              {textContent}
-            </p>
-          </div>
-        )}
-
-        {/* Toolbar Bar */}
-        <div className="px-4 py-2 bg-slate-950/70 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300 shrink-0">
-          {/* Zoom & Rotate Controls */}
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={handleZoomOut}
-              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer"
-              title="ซูมออก (-)"
-            >
-              <ZoomOut className="w-3.5 h-3.5" />
-            </button>
-            <span className="font-mono font-bold text-[11px] px-2 py-0.5 bg-slate-800/70 rounded-md min-w-[50px] text-center">
-              {zoomLevel}%
-            </span>
-            <button
-              type="button"
-              onClick={handleZoomIn}
-              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer"
-              title="ซูมเข้า (+)"
-            >
-              <ZoomIn className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={handleRotate}
-              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer ml-1"
-              title="หมุนภาพ 90 องศา"
-            >
-              <RotateCw className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={handleResetZoom}
-              className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold cursor-pointer ml-1"
-            >
-              พอดีจอ
-            </button>
+        {/* Sub-Toolbar: Multi-Channel Switcher + Zoom / Rotate / Viewer Engine */}
+        <div className="px-5 py-2.5 bg-slate-800/80 border-b border-slate-700/70 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
+          {/* Left: Multi-Channel Tabs (ไฟล์แนบ R2 / ลิงก์ภายนอก / ข้อความคำตอบ) */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {(hasFile || (!hasLink && !hasText)) && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('FILE')}
+                className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                  activeTab === 'FILE'
+                    ? 'bg-[#3B82F6] text-white shadow-sm'
+                    : 'bg-slate-900/70 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                <span>📎 ไฟล์ผลงาน ({fileCategory === 'NONE' ? 'R2' : fileCategory})</span>
+              </button>
+            )}
+            {hasLink && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('LINK')}
+                className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                  activeTab === 'LINK'
+                    ? 'bg-teal-600 text-white shadow-sm'
+                    : 'bg-slate-900/70 text-teal-300 hover:bg-slate-700 border border-teal-500/30'
+                }`}
+              >
+                <span>{externalLinkInfo?.iconEmoji || '🔗'}</span>
+                <span>ลิงก์แนบ ({externalLinkInfo?.platformLabel || 'External Link'})</span>
+              </button>
+            )}
+            {hasText && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('TEXT')}
+                className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                  activeTab === 'TEXT'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'bg-slate-900/70 text-indigo-300 hover:bg-slate-700 border border-indigo-500/30'
+                }`}
+              >
+                <span>✍️ ข้อความคำตอบ</span>
+              </button>
+            )}
           </div>
 
-          {/* PDF Page Navigation */}
-          {showPdf && (
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-slate-400 font-bold">
-                เอกสารหน้าที่:
-              </span>
-              <div className="flex items-center gap-1 bg-slate-800 p-0.5 rounded-lg">
+          {/* Right: Contextual Controls (Zoom/Rotate for Image, Viewer Toggle for Office/Link) */}
+          <div className="flex items-center gap-2">
+            {activeTab === 'FILE' && fileCategory === 'IMAGE' && (
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  disabled={pdfPage <= 1}
-                  onClick={() => setPdfPage((p) => Math.max(1, p - 1))}
-                  className="p-1 rounded text-slate-300 disabled:opacity-40 hover:bg-slate-700 cursor-pointer"
+                  onClick={handleZoomOut}
+                  className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-slate-200 transition-colors cursor-pointer"
+                  title="ย่อ (Zoom Out)"
                 >
-                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <ZoomOut className="w-4 h-4" />
                 </button>
-                <span className="px-2 text-xs font-bold text-teal-300">
-                  {pdfPage} / 3
+                <span className="font-mono font-bold text-teal-300 px-2 min-w-[52px] text-center">
+                  {zoomLevel}%
                 </span>
                 <button
                   type="button"
-                  disabled={pdfPage >= 3}
-                  onClick={() => setPdfPage((p) => Math.min(3, p + 1))}
-                  className="p-1 rounded text-slate-300 disabled:opacity-40 hover:bg-slate-700 cursor-pointer"
+                  onClick={handleZoomIn}
+                  className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-slate-200 transition-colors cursor-pointer"
+                  title="ขยาย (Zoom In)"
                 >
-                  <ChevronRight className="w-3.5 h-3.5" />
+                  <ZoomIn className="w-4 h-4" />
+                </button>
+                <div className="h-4 w-px bg-slate-700 mx-1" />
+                <button
+                  type="button"
+                  onClick={handleRotate}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="หมุนภาพ 90 องศา"
+                >
+                  <RotateCw className="w-3.5 h-3.5 text-amber-400" />
+                  <span>หมุนภาพ ({rotation}°)</span>
+                </button>
+                {(zoomLevel !== 100 || rotation !== 0) && (
+                  <button
+                    type="button"
+                    onClick={handleResetView}
+                    className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>รีเซ็ต</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'FILE' && fileCategory === 'OFFICE' && (
+              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setOfficeViewerEngine('GOOGLE')}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-colors ${
+                    officeViewerEngine === 'GOOGLE'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Google Docs Viewer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOfficeViewerEngine('OFFICE')}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-colors ${
+                    officeViewerEngine === 'OFFICE'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  MS Office Viewer
                 </button>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Canva / Platform Notice */}
-          {isCanva && (
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#00C4CC] animate-pulse" />
-              <span className="text-[11px] font-bold text-[#00C4CC]">
-                Canva Project Link
-              </span>
-            </div>
-          )}
+            {activeTab === 'LINK' && externalLinkInfo?.canEmbed && (
+              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setShowLinkEmbed(true)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-colors ${
+                    showLinkEmbed ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  🖥️ แสดงสดในหน้านี้ (Embed)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowLinkEmbed(false)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-colors ${
+                    !showLinkEmbed ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  🔗 ข้อมูลลิงก์ & ตั้งค่าสิทธิ์
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ================================================================== */}
-        {/* PREVIEW CANVAS AREA (Scrollable, Zoomable, Rotatable) */}
+        {/* PREVIEW CANVAS AREA                                                */}
         {/* ================================================================== */}
         <div className="flex-1 overflow-auto p-4 sm:p-6 flex flex-col items-center justify-center bg-slate-950/95 relative select-none">
-          {/* External Link Notice Banner when file (Image/PDF) is shown along with an external link */}
-          {(showImage || showPdf) && effectiveLinkUrl && (
-            <div className="w-full max-w-3xl mb-4 px-4 py-2.5 bg-slate-900 border border-slate-700/90 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs shadow-lg shrink-0">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-base">{isGoogleDrive ? '📁' : isCanva ? '🎨' : '🔗'}</span>
-                <span className="text-slate-300 font-semibold truncate max-w-sm sm:max-w-md">
-                  ลิงก์ผลงานแนบเพิ่มเติม: <span className="text-teal-300 font-bold">{effectiveLinkUrl}</span>
-                </span>
+          {/* ================================================================ */}
+          {/* TAB 1: TEXT CONTENT VIEWER                                       */}
+          {/* ================================================================ */}
+          {activeTab === 'TEXT' && hasText ? (
+            <div className="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-3 text-left">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-xs font-bold">
+                    ✍️ ข้อความคำตอบของนักเรียน
+                  </span>
+                  <span className="text-xs text-slate-400">({studentName})</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(textContent || '');
+                    setCopiedText(true);
+                    setTimeout(() => setCopiedText(false), 2000);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  {copiedText ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-emerald-400">คัดลอกข้อความแล้ว</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-slate-400" />
+                      <span>คัดลอกข้อความ</span>
+                    </>
+                  )}
+                </button>
               </div>
-              <a
-                href={effectiveLinkUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shrink-0 shadow-sm"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                <span>เปิดดูลิงก์แนบ ↗</span>
-              </a>
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-sm sm:text-base leading-relaxed whitespace-pre-wrap max-h-[60vh] overflow-y-auto select-text">
+                {textContent}
+              </div>
             </div>
-          )}
-
-          {/* ================================================================ */}
-          {/* 1. CANVA / EXTERNAL LINK PREVIEW (เมื่อไม่มีไฟล์ภาพ/PDF) */}
-          {/* ================================================================ */}
-          {showOnlyLink ? (
-            <div
-              className="transition-transform duration-200 origin-center max-w-3xl w-full"
-              style={{
-                transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
-              }}
-            >
-              {isGoogleDrive ? (
-                /* Google Drive Pre-Flight Workspace Card */
-                <div className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl p-6 sm:p-8 max-w-xl mx-auto text-white space-y-5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-400 flex items-center justify-center text-2xl shadow-lg">
-                      📁
+          ) : activeTab === 'LINK' && externalLinkInfo ? (
+            /* ================================================================ */
+            /* TAB 2: EXTERNAL LINK PREVIEW (YouTube, Drive, Docs, Canva, etc.) */
+            /* ================================================================ */
+            <div className="w-full max-w-4xl flex flex-col items-center justify-center space-y-4">
+              {externalLinkInfo.canEmbed && showLinkEmbed && externalLinkInfo.embedUrl ? (
+                <div className="w-full bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden shadow-2xl">
+                  <div className="px-4 py-2.5 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span>{externalLinkInfo.iconEmoji}</span>
+                      <span className="font-bold text-teal-300">{externalLinkInfo.platformLabel}</span>
+                      <span className="text-slate-500">•</span>
+                      <span className="text-slate-400 truncate max-w-xs sm:max-w-md font-mono">
+                        {externalLinkInfo.url}
+                      </span>
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
+                      {externalLinkInfo.platform === 'GOOGLE_DRIVE' && (
+                        <button
+                          type="button"
+                          onClick={handleSendPermissionReminder}
+                          className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-300 font-bold text-[11px] cursor-pointer"
+                        >
+                          {reminderSent ? '✓ แจ้งเตือนขอสิทธิ์แล้ว' : '⚠️ ติดสิทธิ์? แจ้งนักเรียน'}
+                        </button>
+                      )}
+                      <a
+                        href={externalLinkInfo.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-bold text-[11px] flex items-center gap-1 transition-colors"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span>เปิดต้นฉบับในแท็บใหม่ ↗</span>
+                      </a>
+                    </div>
+                  </div>
+                  <iframe
+                    src={externalLinkInfo.embedUrl}
+                    title={title}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                    allowFullScreen
+                    className="w-full h-[68vh] bg-white border-0"
+                  />
+                </div>
+              ) : (
+                <div className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl p-6 sm:p-8 max-w-xl w-full mx-auto text-white space-y-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-teal-500/20 border border-teal-400/40 text-teal-300 flex items-center justify-center text-2xl shadow-lg">
+                      {externalLinkInfo.iconEmoji}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-extrabold text-base sm:text-lg text-white">
-                          โฟลเดอร์ผลงานบน Google Drive
+                          {externalLinkInfo.platformLabel}
                         </h3>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                          GOOGLE DRIVE
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                          {externalLinkInfo.platform}
                         </span>
                       </div>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        ส่งงานแบบโฟลเดอร์ส่วนตัวของนักเรียน • ไม่จำกัดขนาดไฟล์
+                        ผลงานของ {studentName} (เลขที่ {seatNo} • ชั้น {classroom})
                       </p>
                     </div>
                   </div>
 
-                  {/* URL Box */}
                   <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1">
-                    <span className="text-[11px] text-slate-400 font-semibold block">ลิงก์โฟลเดอร์ปลายทาง:</span>
-                    <p className="font-mono text-xs text-emerald-300 break-all select-all">
-                      {effectiveLinkUrl || url}
-                    </p>
-                  </div>
-
-                  {/* Validation & Pre-Flight Status */}
-                  <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded-xl space-y-1.5">
-                    <div className="flex items-center gap-2 text-emerald-300 font-bold text-xs">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span>ตรวจสอบรูปแบบลิงก์: ถูกต้องตามมาตรฐาน Google Drive</span>
-                    </div>
-                    <p className="text-[11px] text-slate-300 leading-relaxed">
-                      เนื่องจาก Google Drive มีการจำกัดสิทธิ์ตามบัญชีผู้ใช้ คุณครูสามารถกดเปิดลิงก์เพื่อตรวจสอบว่าเปิดดูได้หรือไม่ หากพบว่าติดสิทธิ์ (Access Denied) ให้กดปุ่ม &quot;แจ้งเตือนขอสิทธิ์&quot; ด้านล่าง
-                    </p>
-                  </div>
-
-                  {/* Pre-Flight Actions */}
-                  <div className="space-y-2 pt-2 border-t border-slate-800">
+                    <span className="text-[11px] text-slate-400 font-semibold block">
+                      ลิงก์ชิ้นงานที่นักเรียนส่ง:
+                    </span>
                     <a
-                      href={effectiveLinkUrl || url}
+                      href={externalLinkInfo.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 transition-colors shadow-md"
+                      className="font-mono text-xs text-teal-300 hover:underline break-all select-all block"
+                    >
+                      {externalLinkInfo.url}
+                    </a>
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t border-slate-800">
+                    <a
+                      href={externalLinkInfo.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-3 px-4 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 transition-colors shadow-md"
                     >
                       <ExternalLink className="w-4 h-4" />
-                      <span>1. เปิดโฟลเดอร์ Google Drive ในแท็บใหม่ ↗</span>
+                      <span>เปิดดูชิ้นงานบน {externalLinkInfo.platformLabel} ในแท็บใหม่ ↗</span>
                     </a>
 
-                    <button
-                      type="button"
-                      onClick={handleSendPermissionReminder}
-                      className={`w-full py-2.5 px-4 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                        reminderSent
-                          ? 'bg-amber-500/20 border-amber-400/50 text-amber-300'
-                          : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
-                      }`}
-                    >
-                      <span>⚠️</span>
-                      <span>
-                        {reminderSent
-                          ? '✓ คัดลอกข้อความขอสิทธิ์แล้ว (ส่งแจ้งเตือนในระบบสำเร็จ)'
-                          : '2. ติดปัญหาเปิดไม่ได้? กดแจ้งเตือนขอสิทธิ์แชร์โฟลเดอร์'}
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                /* Canva Window Shell */
-                <div className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl">
-                  {/* Canva Top Bar */}
-                  <div className="bg-slate-950 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="font-black text-sm tracking-tight text-[#00C4CC] flex items-center gap-1">
-                      <span>Canva</span>
-                      <span className="text-[9px] bg-gradient-to-r from-purple-500 to-pink-500 text-white px-1.5 py-0.2 rounded-full font-bold">
-                        PRO DESIGN
-                      </span>
-                    </span>
-                    <span className="text-slate-500 text-xs">•</span>
-                    <span className="text-slate-300 font-semibold truncate max-w-xs">
-                      {fileName || 'โปสเตอร์ศิลปวัฒนธรรมกุดจับประยุกต์ร่วมสมัย'}
-                    </span>
-                  </div>
-
-                    {(effectiveLinkUrl || url) && (
-                      <a
-                        href={effectiveLinkUrl || url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#00C4CC] hover:bg-[#00b2b8] text-white text-[11px] font-black transition-colors"
+                    {(externalLinkInfo.platform === 'GOOGLE_DRIVE' ||
+                      externalLinkInfo.platform === 'GOOGLE_DOCS') && (
+                      <button
+                        type="button"
+                        onClick={handleSendPermissionReminder}
+                        className={`w-full py-2.5 px-4 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                          reminderSent
+                            ? 'bg-amber-500/20 border-amber-400/50 text-amber-300'
+                            : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
+                        }`}
                       >
-                        <span>เปิดใน Canva ต้นฉบับ ↗</span>
-                      </a>
-                    )}
-                  </div>
-
-                  {/* Canva Artwork Presentation */}
-                  <div className="bg-slate-950 p-6 sm:p-10 text-white min-h-[420px] flex flex-col justify-between items-center text-center relative overflow-hidden border border-slate-800">
-                    <div className="max-w-md w-full space-y-4 my-auto">
-                      <div className="w-16 h-16 rounded-2xl bg-[#00C4CC]/20 border border-[#00C4CC]/40 text-[#00C4CC] mx-auto flex items-center justify-center text-2xl font-black">
-                        🎨
-                      </div>
-                      <div>
-                        <span className="inline-block px-3 py-1 rounded-full bg-[#00C4CC]/10 text-[#00C4CC] border border-[#00C4CC]/30 text-xs font-bold uppercase mb-2">
-                          Canva Project Link
+                        <span>⚠️</span>
+                        <span>
+                          {reminderSent
+                            ? '✓ ส่งแจ้งเตือนขอสิทธิ์แชร์ให้นักเรียนเรียบร้อยแล้ว'
+                            : 'ติดปัญหาเปิดไม่ได้ (Access Denied)? กดแจ้งเตือนขอสิทธิ์แชร์'}
                         </span>
-                        <h2 className="text-xl font-bold text-white">
-                          {title}
-                        </h2>
-                        <p className="text-xs text-slate-400 mt-1">
-                          ผลงานของ {studentName} (เลขที่ {seatNo} • ห้อง {classroom} • รหัส {studentCode})
-                        </p>
-                      </div>
-
-                      <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 break-all text-left">
-                        <p className="text-[11px] text-slate-500 font-semibold mb-1">ลิงก์ชิ้นงานที่ส่ง:</p>
-                        <a
-                          href={effectiveLinkUrl || url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[#00C4CC] hover:underline"
-                        >
-                          {effectiveLinkUrl || url || 'ไม่มีลิงก์แนบ'}
-                        </a>
-                      </div>
-
-                      {(effectiveLinkUrl || url) && (
-                        <a
-                          href={effectiveLinkUrl || url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#00C4CC] hover:bg-[#00b2b8] text-white text-xs font-bold transition-colors shadow-lg w-full"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                          <span>เปิดดูชิ้นงานใน Canva ต้นฉบับ ↗</span>
-                        </a>
-                      )}
-                    </div>
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
             </div>
-          ) : showPdf ? (
-            /* ============================================================== */
-            /* 2. REAL PDF EMBED OR MULTI-PAGE DOCUMENT PREVIEW             */
-            /* ============================================================== */
-            effectiveFileUrl && !imgLoadError ? (
-              <div
-                className="transition-transform duration-200 origin-center max-w-4xl w-full flex items-center justify-center"
-                style={{
-                  transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
-                }}
-              >
-                {effectiveFileUrl.toLowerCase().includes('.pdf') ? (
-                  <iframe
-                    src={`${effectiveFileUrl}#toolbar=0`}
-                    title={title}
-                    onError={() => setImgLoadError(true)}
-                    className="w-full h-[74vh] rounded-2xl border border-slate-700 bg-white shadow-2xl"
-                  />
-                ) : (
-                  <img
-                    src={effectiveFileUrl}
-                    alt={fileName || 'เอกสารผลงาน PDF'}
-                    onError={() => setImgLoadError(true)}
-                    className="max-w-full max-h-[72vh] object-contain rounded-2xl shadow-2xl border border-slate-700/60 bg-slate-900"
-                  />
-                )}
-              </div>
-            ) : (
-            <div
-              className="transition-transform duration-200 origin-center max-w-2xl w-full"
-              style={{
-                transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
-              }}
-            >
-              {/* PDF Document Page Shell (Realistic A4 Look) */}
-              <div className="bg-white text-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-300 p-8 sm:p-12 min-h-[640px] flex flex-col justify-between">
-                {/* PDF Page 1: Cover Page */}
-                {pdfPage === 1 && (
-                  <div className="space-y-6 flex-1 flex flex-col justify-between">
-                    <div className="text-center space-y-2 border-b-2 border-slate-900 pb-6">
-                      <div className="w-14 h-14 rounded-2xl bg-teal-600 text-white mx-auto flex items-center justify-center font-black text-xl shadow-md">
-                        ก.ป.
-                      </div>
-                      <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                        โรงเรียนกุดจับประชาสรรค์ • สำนักงานเขตพื้นที่การศึกษามัธยมศึกษาอุดรธานี
-                      </h2>
-                      <h1 className="text-xl sm:text-2xl font-black text-slate-900">
-                        แฟ้มสะสมผลงานทัศนศิลป์ (Art Portfolio)
-                      </h1>
-                      <p className="text-xs text-teal-700 font-bold">
-                        รายวิชา ศ23101 ศิลปะ 3 • ภาคเรียนที่ 1 ปีการศึกษา 2569
-                      </p>
-                    </div>
-
-                    <div className="my-auto py-6 text-center space-y-4 bg-slate-50 rounded-2xl border border-slate-200 p-6">
-                      <div className="w-28 h-28 rounded-full bg-teal-100 border-4 border-teal-500 text-teal-800 mx-auto flex items-center justify-center font-black text-2xl shadow-inner">
-                        {studentName.slice(0, 5)}
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-black text-slate-900">{studentName}</h3>
-                        <p className="text-xs text-slate-600 font-semibold mt-1">
-                          เลขที่ {seatNo} • รหัสประจำตัว {studentCode} • ชั้นมัธยมศึกษาปีที่ {classroom}
-                        </p>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          ครูผู้สอน: นายภาสภูมิ เรืองปราชญ์ (กลุ่มสาระการเรียนรู้ศิลปะ)
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="border-t border-slate-200 pt-3 flex items-center justify-between text-[11px] text-slate-400">
-                      <span>เอกสารประกอบการประเมินผลตัวชี้วัด ศ 1.1 ม.3/1 - ม.3/6</span>
-                      <span className="font-bold text-slate-700">หน้า 1 / 3</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* PDF Page 2: Artwork Gallery & Concept */}
-                {pdfPage === 2 && (
-                  <div className="space-y-5 flex-1 flex flex-col justify-between">
-                    <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
-                      <span className="text-xs font-bold text-teal-700 uppercase">
-                        ผลงานชิ้นเอก: จิตรกรรมไทยร่วมสมัย
-                      </span>
-                      <span className="text-[11px] text-slate-400">หน้า 2 / 3</span>
-                    </div>
-
-                    {/* Artwork Container */}
-                    <div className="rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-100 p-3 shadow-inner space-y-3">
-                      <div className="h-44 bg-gradient-to-tr from-amber-200 via-rose-300 to-indigo-400 rounded-lg flex items-center justify-center relative overflow-hidden">
-                        <div className="absolute inset-0 bg-[radial-gradient(#ffffff33_1px,transparent_1px)] [background-size:16px_16px]" />
-                        <span className="text-sm font-black text-slate-800 bg-white/80 px-4 py-1.5 rounded-full shadow-md">
-                          ภาพวาดสีน้ำ: สายธารแห่งกุดจับ
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 bg-white p-3 rounded-lg border border-slate-200">
-                        <div>
-                          <span className="font-bold text-slate-900 block">เทคนิค:</span>
-                          สีน้ำบนกระดาษ Arches 300g
-                        </div>
-                        <div>
-                          <span className="font-bold text-slate-900 block">ขนาด:</span>
-                          A3 (29.7 x 42.0 cm)
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Concept Statement */}
-                    <div className="space-y-1.5 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
-                      <h4 className="text-xs font-bold text-slate-900">
-                        แนวคิดในการสร้างสรรค์ผลงาน (Artist Statement):
-                      </h4>
-                      <p className="text-[11px] text-slate-600 leading-relaxed indent-4">
-                        "ข้าพเจ้าได้แรงบันดาลใจมาจากวิถีชีวิตริมหนองน้ำกุดจับในยามเช้า โดยเลือกใช้โทนสีเย็นและวรรณะอุ่นเพื่อสร้างความขัดแย้งที่กลมกลืน (Harmonious Contrast) ลายเส้นกิ่งไม้และระลอกคลื่นช่วยนำสายตาผู้ชมเข้าสู่จุดเด่นของภาพ"
-                      </p>
-                    </div>
-
-                    <div className="border-t border-slate-200 pt-2 flex items-center justify-between text-[11px] text-slate-400">
-                      <span>{studentName} (ม.{classroom})</span>
-                      <span className="font-bold text-slate-700">หน้า 2 / 3</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* PDF Page 3: Rubric & Self Evaluation */}
-                {pdfPage === 3 && (
-                  <div className="space-y-4 flex-1 flex flex-col justify-between">
-                    <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
-                      <span className="text-xs font-bold text-teal-700 uppercase">
-                        การประเมินตนเองและรูบริกส์ (Rubric Evaluation)
-                      </span>
-                      <span className="text-[11px] text-slate-400">หน้า 3 / 3</span>
-                    </div>
-
-                    <table className="w-full text-left text-xs border border-slate-200 rounded-lg overflow-hidden">
-                      <thead className="bg-slate-100 text-slate-800 font-bold border-b border-slate-200">
-                        <tr>
-                          <th className="p-2">เกณฑ์การประเมิน</th>
-                          <th className="p-2 text-center w-20">คะแนนเต็ม</th>
-                          <th className="p-2 text-center w-24">ประเมินตนเอง</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        <tr>
-                          <td className="p-2">1. ความคิดสร้างสรรค์และแนวคิด</td>
-                          <td className="p-2 text-center font-bold">5</td>
-                          <td className="p-2 text-center text-teal-700 font-black">5</td>
-                        </tr>
-                        <tr>
-                          <td className="p-2">2. ทักษะการใช้สีน้ำหนักแสงเงา</td>
-                          <td className="p-2 text-center font-bold">5</td>
-                          <td className="p-2 text-center text-teal-700 font-black">4.5</td>
-                        </tr>
-                        <tr>
-                          <td className="p-2">3. ความประณีตและเสร็จสมบูรณ์</td>
-                          <td className="p-2 text-center font-bold">5</td>
-                          <td className="p-2 text-center text-teal-700 font-black">5</td>
-                        </tr>
-                        <tr className="bg-teal-50 font-bold">
-                          <td className="p-2 text-teal-900">คะแนนรวมทั้งหมด</td>
-                          <td className="p-2 text-center text-teal-900">15</td>
-                          <td className="p-2 text-center text-teal-900 font-black">14.5 / 15</td>
-                        </tr>
-                      </tbody>
-                    </table>
-
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
-                      <h4 className="text-xs font-bold text-slate-900">
-                        ข้อคิดเห็นเพิ่มเติมของนักเรียน:
-                      </h4>
-                      <p className="text-[11px] text-slate-600">
-                        "หนูพอใจกับการผสมสีและการควบคุมน้ำในชิ้นนี้มากค่ะ แต่ครั้งต่อไปจะระวังเรื่องการตัดขอบไม่ให้สีซึมเปื้อนบริเวณมุมล่างขวา"
-                      </p>
-                    </div>
-
-                    <div className="border-t border-slate-200 pt-2 flex items-center justify-between text-[11px] text-slate-400">
-                      <span>ลงชื่อ: {studentName} (ผู้ส่งงาน)</span>
-                      <span className="font-bold text-slate-700">หน้า 3 / 3</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            )
           ) : (
-            /* ============================================================== */
-            /* 3. IMAGE PREVIEW (JPG, PNG, WEBP) */
-            /* ============================================================== */
-            <div
-              className="transition-transform duration-200 origin-center max-w-4xl max-h-[75vh] flex items-center justify-center"
-              style={{
-                transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
-              }}
-            >
-              {!imgLoadError && effectiveFileUrl ? (
-                <img
-                  src={effectiveFileUrl}
-                  alt={fileName || 'ผลงานนักเรียน'}
-                  onError={handleImageError}
-                  className="max-w-full max-h-[72vh] object-contain rounded-2xl shadow-2xl border border-slate-700/60 bg-slate-900"
-                />
+            /* ================================================================ */
+            /* TAB 3: UPLOADED FILE PREVIEW (IMAGE, PDF, OFFICE, VIDEO, AUDIO)  */
+            /* ================================================================ */
+            <div className="w-full max-w-5xl flex flex-col items-center justify-center">
+              {effectiveFileUrl && !imgLoadError ? (
+                fileCategory === 'PDF' ? (
+                  <div className="w-full bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden shadow-2xl">
+                    <div className="px-4 py-2 bg-slate-950 border-b border-slate-800 flex items-center justify-between text-xs">
+                      <span className="text-slate-300 font-bold truncate">📄 {inferredFileName}</span>
+                      <a
+                        href={effectiveFileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-[11px] flex items-center gap-1"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span>เปิด PDF เต็มหน้าต่าง ↗</span>
+                      </a>
+                    </div>
+                    <iframe
+                      src={effectiveFileUrl}
+                      title={inferredFileName}
+                      className="w-full h-[72vh] bg-white border-0"
+                    />
+                  </div>
+                ) : fileCategory === 'OFFICE' ? (
+                  (() => {
+                    const { officeEmbedUrl, googleEmbedUrl } = getOfficeViewerUrls(effectiveFileUrl);
+                    const activeEmbed =
+                      officeViewerEngine === 'OFFICE' ? officeEmbedUrl : googleEmbedUrl;
+                    return (
+                      <div className="w-full bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden shadow-2xl">
+                        <div className="px-4 py-2.5 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <span className="text-slate-200 font-bold truncate">
+                            📘 เอกสาร Office: {inferredFileName}
+                          </span>
+                          <a
+                            href={effectiveFileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download={inferredFileName}
+                            className="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] flex items-center gap-1.5"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>ดาวน์โหลดไฟล์ต้นฉบับ ⬇</span>
+                          </a>
+                        </div>
+                        <iframe
+                          src={activeEmbed}
+                          title={inferredFileName}
+                          className="w-full h-[70vh] bg-white border-0"
+                        />
+                      </div>
+                    );
+                  })()
+                ) : fileCategory === 'VIDEO' ? (
+                  <div className="w-full max-w-4xl bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden shadow-2xl p-4 space-y-3">
+                    <video
+                      src={effectiveFileUrl}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      onError={handleImageError}
+                      className="w-full max-h-[68vh] rounded-xl bg-black"
+                    />
+                    <div className="flex items-center justify-between text-xs text-slate-300 px-1">
+                      <span className="font-bold truncate">🎬 {inferredFileName}</span>
+                      <a
+                        href={effectiveFileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-teal-300 hover:underline font-bold flex items-center gap-1"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>เปิดวิดีโอในแท็บใหม่ ↗</span>
+                      </a>
+                    </div>
+                  </div>
+                ) : fileCategory === 'AUDIO' ? (
+                  <div className="w-full max-w-lg bg-slate-900 rounded-2xl border border-slate-700 p-6 sm:p-8 shadow-2xl text-center space-y-4">
+                    <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-400/40 text-amber-300 mx-auto flex items-center justify-center text-3xl">
+                      🎵
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-white break-all">{inferredFileName}</h3>
+                      <p className="text-xs text-slate-400 mt-1">ไฟล์เสียงผลงานของ {studentName}</p>
+                    </div>
+                    <audio
+                      src={effectiveFileUrl}
+                      controls
+                      preload="metadata"
+                      onError={handleImageError}
+                      className="w-full"
+                    />
+                  </div>
+                ) : fileCategory === 'ARCHIVE' || fileCategory === 'TEXT' ? (
+                  <div className="w-full max-w-lg bg-slate-900 rounded-2xl border border-slate-700 p-6 sm:p-8 shadow-2xl text-center space-y-4">
+                    <div className="w-16 h-16 rounded-2xl bg-indigo-500/20 border border-indigo-400/40 text-indigo-300 mx-auto flex items-center justify-center text-3xl">
+                      📦
+                    </div>
+                    <div className="space-y-1">
+                      <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold border border-indigo-500/30">
+                        ไฟล์แนบ {(fileExtension || '').toUpperCase() || 'ATTACHMENT'}
+                      </span>
+                      <h3 className="text-base sm:text-lg font-bold text-white break-all pt-1">
+                        {inferredFileName}
+                      </h3>
+                      <p className="text-xs text-slate-400">
+                        อัปโหลดบน Cloudflare R2 เรียบร้อยแล้ว • พร้อมเปิดหรือดาวน์โหลด
+                      </p>
+                    </div>
+                    <a
+                      href={effectiveFileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download={inferredFileName}
+                      className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-colors shadow-lg w-full"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>เปิดดู / ดาวน์โหลดไฟล์ ({inferredFileName}) ⬇</span>
+                    </a>
+                  </div>
+                ) : (
+                  <div
+                    className="transition-transform duration-200 origin-center max-w-4xl max-h-[75vh] flex items-center justify-center"
+                    style={{
+                      transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
+                    }}
+                  >
+                    <img
+                      src={effectiveFileUrl}
+                      alt={inferredFileName}
+                      onError={handleImageError}
+                      className="max-w-full max-h-[72vh] object-contain rounded-2xl shadow-2xl border border-slate-700/60 bg-slate-900"
+                    />
+                  </div>
+                )
               ) : (
                 /* Clean file status card conforming to Strict Zero Mock Policy */
                 <div className="bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-700 shadow-2xl text-white max-w-lg w-full text-center space-y-4">
@@ -764,13 +765,14 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                   </div>
                   <div className="space-y-1">
                     <span className="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-700">
-                      {isJpg ? 'ไฟล์ภาพ JPG' : isPng ? 'ไฟล์ภาพ PNG' : isWebp ? 'ไฟล์ภาพ WebP' : 'ไฟล์ภาพชิ้นงาน'}
+                      ไฟล์ชิ้นงานนักเรียน
                     </span>
                     <h3 className="text-base sm:text-lg font-bold text-white break-all">
-                      {fileName || 'ไฟล์ผลงานนักเรียน'}
+                      {inferredFileName}
                     </h3>
                     <p className="text-xs text-slate-400">
-                      ผลงานของ: <span className="text-teal-300 font-semibold">{studentName}</span> (เลขที่ {seatNo} • ชั้น {classroom} • รหัส {studentCode})
+                      ผลงานของ: <span className="text-teal-300 font-semibold">{studentName}</span> (เลขที่{' '}
+                      {seatNo} • ชั้น {classroom} • รหัส {studentCode})
                     </p>
                   </div>
 
@@ -780,22 +782,17 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                         <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                         <span>{uploadSuccessToast}</span>
                       </div>
-                    ) : imgLoadError ? (
+                    ) : (
                       <div className="text-amber-300 flex items-start gap-2">
                         <span className="shrink-0 text-base">⚠️</span>
                         <div className="space-y-1">
                           <p className="font-bold text-amber-200">
-                            ไม่พบไฟล์บน Cloudflare R2 (404 File Not Found)
+                            ไม่พบไฟล์ต้นฉบับบน Cloudflare R2
                           </p>
                           <p className="text-[11px] text-slate-300 leading-relaxed">
-                            เนื่องจากนักเรียนส่งงานนี้ไว้ในเครื่องก่อนเริ่มเปิดใช้งาน Cloudflare R2 หรือเครื่องนักเรียนยังไม่ได้ซิงก์ภาพ คุณครูสามารถเลือกอัปโหลดภาพผลงานแทนนักเรียนได้ทันทีด้านล่างครับ
+                            นักเรียนอาจส่งงานนี้ไว้ในเครื่องก่อนเชื่อมระบบคลาวด์ หรือยังไม่ได้แนบไฟล์ คุณครูสามารถอัปโหลดไฟล์ผลงานแทนนักเรียน (รองรับรูปภาพ, PDF, Word, Excel, PowerPoint, วิดีโอ) ได้ทันทีด้านล่างครับ
                           </p>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="text-slate-300 flex items-start gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                        <span>ไฟล์ได้รับการบันทึกและส่งผ่านระบบเรียบร้อยแล้ว</span>
                       </div>
                     )}
                   </div>
@@ -803,10 +800,14 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                   <div className="pt-2 space-y-2">
                     <label className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-colors shadow-md w-full cursor-pointer">
                       <Upload className="w-4 h-4" />
-                      <span>{isUploadingReplacement ? '⏳ กำลังอัปโหลดขึ้น Cloudflare R2...' : '📸 อัปโหลดรูปภาพผลงานแทนนักเรียน'}</span>
+                      <span>
+                        {isUploadingReplacement
+                          ? '⏳ กำลังอัปโหลดขึ้น Cloudflare R2...'
+                          : '📤 อัปโหลดไฟล์ผลงานแทนนักเรียน (ขึ้น Cloudflare R2)'}
+                      </span>
                       <input
                         type="file"
-                        accept="image/*,application/pdf"
+                        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar"
                         disabled={isUploadingReplacement}
                         onChange={handleTeacherUploadFile}
                         className="hidden"
@@ -821,20 +822,19 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                         className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-colors w-full border border-slate-700"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
-                        <span>เปิดลิงก์เดิมในแท็บใหม่ ↗</span>
+                        <span>ลองเปิดลิงก์ไฟล์โดยตรงในแท็บใหม่ ↗</span>
                       </a>
                     )}
 
                     {effectiveLinkUrl && (
-                      <a
-                        href={effectiveLinkUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition-colors shadow-md w-full"
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('LINK')}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition-colors shadow-md w-full cursor-pointer"
                       >
                         <ExternalLink className="w-4 h-4" />
-                        <span>เปิดดูชิ้นงานจากลิงก์แนบ ↗</span>
-                      </a>
+                        <span>สลับไปดูลิงก์ผลงานที่นักเรียนแนบ ↗</span>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -848,7 +848,7 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-teal-400" />
             <span className="font-semibold text-slate-300">
-              สถานะ: ตรวจสอบผลงานได้ทันทีบนหน้าจอ ไม่ต้องดาวน์โหลดลงเครื่อง
+              รองรับการพรีวิวทุกประเภทไฟล์ (รูปภาพ, PDF, Word/Excel/PPT, วิดีโอ/เสียง) และลิงก์ภายนอก (Drive, Canva, YouTube, Figma)
             </span>
           </div>
 

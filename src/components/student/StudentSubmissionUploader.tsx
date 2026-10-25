@@ -98,14 +98,14 @@ export const StudentSubmissionUploader: React.FC<StudentSubmissionUploaderProps>
           แนบไฟล์ผลงานนักเรียน
         </label>
         <p className="text-xs text-[#6B7C93] mt-0.5">
-          รองรับรูปภาพ (JPG, PNG, WebP ไม่เกิน 5 MB) และเอกสาร (PDF, Word ไม่เกิน 15 MB)
+          รองรับรูปภาพ, PDF, Word, Excel, PowerPoint, วิดีโอ (MP4), เสียง (MP3) และไฟล์ ZIP
         </p>
       </div>
 
       <input
         ref={fileInputRef}
         type="file"
-        accept=".jpg,.jpeg,.png,.webp,.heic,.pdf,.doc,.docx"
+        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.txt,.csv,.rtf,.md,.json,.zip,.rar,.7z"
         disabled={isUploading}
         onChange={handleFileChange}
         className="block w-full text-xs text-slate-600 file:mr-4 file:rounded-xl file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-xs file:font-semibold file:text-[#3B82F6] hover:file:bg-blue-100 disabled:opacity-50 cursor-pointer"

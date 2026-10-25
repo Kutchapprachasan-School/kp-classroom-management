@@ -82,6 +82,102 @@ export const r2StorageService = {
   },
 
   /**
+   * ถอดรหัส URL / R2 Key ที่อาจถูก encode ซ้ำซ้อน (%25E0%25B8...) ให้กลับมาเป็น UTF-8 Object Key ที่สะอาดเสมอ
+   */
+  normalizeObjectKey(rawUrlOrKey: string): string {
+    if (!rawUrlOrKey) return '';
+    let cleaned = rawUrlOrKey
+      .trim()
+      .replace(/^r2:\/\//i, '')
+      .replace(/^https?:\/\/[^/]+\//i, '')
+      .replace(/^\/+/, '');
+
+    // ถอดรหัสซ้ำสูงสุด 4 รอบ เพื่อแก้ปัญหา Double/Triple URL Encoding (%25E0%25B8... -> ภาษาไทยปกติ)
+    for (let i = 0; i < 4; i++) {
+      if (!/%[0-9A-Fa-f]{2}/.test(cleaned)) break;
+      try {
+        const decoded = decodeURIComponent(cleaned);
+        if (decoded === cleaned) break;
+        cleaned = decoded;
+      } catch {
+        try {
+          const decodedUri = decodeURI(cleaned);
+          if (decodedUri === cleaned) break;
+          cleaned = decodedUri;
+        } catch {
+          break;
+        }
+      }
+    }
+
+    return cleaned.replace(/^\/+/, '');
+  },
+
+  /**
+   * เข้ารหัส Object Key สำหรับใช้ใน HTTP URL เพียง 1 ครั้งอย่างปลอดภัย (รองรับภาษาไทย ช่องว่าง และอักขระ # ?)
+   */
+  encodeObjectKeyForUrl(rawKey: string): string {
+    const normalized = this.normalizeObjectKey(rawKey);
+    if (!normalized) return '';
+    return encodeURI(normalized).replace(/#/g, '%23').replace(/\?/g, '%3F');
+  },
+
+  /**
+   * ตรวจสอบว่า URL หรือ Key นี้เป็นไฟล์บน Cloudflare R2 / Local File (data:, blob:) หรือไม่
+   * เพื่อแยกออกจากลิงก์ภายนอก เช่น Canva, Google Drive, YouTube, Figma
+   */
+  isR2OrLocalFileUrl(rawUrlOrKey?: string): boolean {
+    if (!rawUrlOrKey || typeof rawUrlOrKey !== 'string') return false;
+    const trimmed = rawUrlOrKey.trim();
+    if (!trimmed) return false;
+
+    if (
+      trimmed.startsWith('data:') ||
+      trimmed.startsWith('blob:') ||
+      trimmed.startsWith('r2://') ||
+      trimmed.startsWith('kp-classroom-submissions/')
+    ) {
+      return true;
+    }
+
+    const lower = trimmed.toLowerCase();
+    // ลิงก์แพลตฟอร์มภายนอกที่รู้จักชัดเจน ไม่ใช่ไฟล์ R2
+    if (
+      lower.includes('canva.com') ||
+      lower.includes('drive.google.com') ||
+      lower.includes('docs.google.com') ||
+      lower.includes('youtube.com') ||
+      lower.includes('youtu.be') ||
+      lower.includes('figma.com') ||
+      lower.includes('loom.com') ||
+      lower.includes('padlet.com') ||
+      lower.includes('kahoot.it') ||
+      lower.includes('tiktok.com') ||
+      lower.includes('vimeo.com')
+    ) {
+      return false;
+    }
+
+    const workerBase = this.getWorkerUrl().toLowerCase();
+    const publicBase = this.getPublicUrl().toLowerCase();
+    if (
+      (workerBase && lower.startsWith(workerBase)) ||
+      (publicBase && lower.startsWith(publicBase)) ||
+      lower.includes('kps-r2-storage') ||
+      lower.includes('workers.dev/kp-classroom-submissions') ||
+      lower.includes('storage.kps.ac.th') ||
+      lower.includes('/kp-classroom-submissions/')
+    ) {
+      return true;
+    }
+
+    // กรณีเป็น Direct File URL ที่ลงท้ายด้วยนามสกุลไฟล์งาน
+    return /\.(webp|jpg|jpeg|png|gif|svg|bmp|avif|heic|pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv|zip|rar|7z|mp4|webm|mov|mp3|wav|m4a|ogg)(\?.*|#.*)?$/i.test(
+      lower
+    );
+  },
+
+  /**
    * สร้าง Canonical R2 Key สำหรับจัดเก็บผลงานนักเรียน
    * โครงสร้าง: kp-classroom-submissions/{term}/{room}/{assignmentId}/{studentCode}_{fileName}
    */
@@ -92,14 +188,17 @@ export const r2StorageService = {
     studentCode: string;
     fileName: string;
   }): string {
-    const term = (params.term || '1/2569').replace('/', '-');
-    const room = (params.classroom || 'all').toLowerCase().replace(/\s+/g, '').replace('/', '-');
+    const term = this.normalizeObjectKey(params.term || '1/2569').replace(/\//g, '-');
+    const room = this.normalizeObjectKey(params.classroom || 'all')
+      .toLowerCase()
+      .replace(/\s+/g, '')
+      .replace(/\//g, '-');
     const cleanAsg = params.assignmentId.trim();
     const cleanStu = params.studentCode.trim();
-    const cleanFile = params.fileName.trim().replace(/\.(jpg|jpeg|png|heic)$/i, '.webp');
-    const cleanFileWithoutStu = cleanFile.startsWith(`${cleanStu}_`)
-      ? cleanFile.slice(cleanStu.length + 1)
-      : cleanFile;
+    const rawFile = this.normalizeObjectKey(params.fileName || `work_${cleanStu}.webp`).trim();
+    const cleanFileWithoutStu = rawFile.startsWith(`${cleanStu}_`)
+      ? rawFile.slice(cleanStu.length + 1)
+      : rawFile;
 
     return `kp-classroom-submissions/${term}/${room}/${cleanAsg}/${cleanStu}_${cleanFileWithoutStu}`;
   },
@@ -162,8 +261,9 @@ export const r2StorageService = {
         }
       }
 
-      const cleanKey = key.startsWith('/') ? key.slice(1) : key;
-      const targetEndpoint = `${workerUrl}/${encodeURI(cleanKey)}`;
+      const cleanKey = this.normalizeObjectKey(key);
+      const encodedKey = this.encodeObjectKeyForUrl(cleanKey);
+      const targetEndpoint = `${workerUrl}/${encodedKey}`;
 
       const response = await fetch(targetEndpoint, {
         method: 'PUT',
@@ -186,7 +286,7 @@ export const r2StorageService = {
       }
 
       const publicBase = this.getPublicUrl();
-      const publicUrl = `${publicBase}/${encodeURI(cleanKey)}`;
+      const publicUrl = `${publicBase}/${encodedKey}`;
       const sizeKb = Math.round(uploadPayload.size / 1024);
 
       return {
@@ -226,7 +326,7 @@ export const r2StorageService = {
         uploadPayload = body;
       }
 
-      const cleanKey = key.startsWith('/') ? key.slice(1) : key;
+      const cleanKey = this.normalizeObjectKey(key);
       const publicUrl = await uploadToR2WithProgress(cleanKey, uploadPayload, onProgress);
       const sizeKb = Math.round(uploadPayload.size / 1024);
 
@@ -256,8 +356,8 @@ export const r2StorageService = {
     if (!workerUrl || !uploadSecret) return false;
 
     try {
-      const cleanKey = key.startsWith('/') ? key.slice(1) : key;
-      const res = await fetch(`${workerUrl}/${encodeURI(cleanKey)}`, {
+      const encodedKey = this.encodeObjectKeyForUrl(key);
+      const res = await fetch(`${workerUrl}/${encodedKey}`, {
         method: 'DELETE',
         headers: {
           'X-Custom-Auth-Key': uploadSecret,
@@ -271,9 +371,7 @@ export const r2StorageService = {
 
   /**
    * แปลง Path R2 ให้อยู่ในรูป Public URL ที่เปิดดูได้จริง
-   * รองรับ:
-   * - r2://kp-classroom-submissions/...
-   * - https://storage.kps.ac.th/... (เชื่อมผ่าน Worker หากยังไม่ได้ผูกโดเมน)
+   * รองรับการซ่อมแซม URL ที่ถูก Double-Encode (%25E0%25B8...) อัตโนมัติ
    */
   resolvePublicViewUrl(rawUrlOrKey?: string): string | undefined {
     if (!rawUrlOrKey) return undefined;
@@ -289,20 +387,23 @@ export const r2StorageService = {
     const workerBase = this.getWorkerUrl();
     const activeBase = publicBase || workerBase;
 
-    // แปลง r2://kp-classroom-submissions/... หรือ raw object key เป็น https://...
-    if (trimmed.startsWith('r2://') || (!trimmed.startsWith('http://') && !trimmed.startsWith('https://'))) {
-      const keyWithoutScheme = trimmed.replace(/^r2:\/\//, '').replace(/^\/+/, '');
-      return `${activeBase}/${encodeURI(keyWithoutScheme)}`;
-    }
+    const isR2Target =
+      trimmed.startsWith('r2://') ||
+      trimmed.startsWith('kp-classroom-submissions/') ||
+      (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) ||
+      trimmed.includes('kps-r2-storage') ||
+      trimmed.includes('workers.dev/kp-classroom-submissions') ||
+      trimmed.includes('/kp-classroom-submissions/') ||
+      trimmed.includes('storage.kps.ac.th');
 
-    // กรณีเป็นโดเมน storage.kps.ac.th แต่ยังไม่ได้ผูก DNS จริง
-    if (trimmed.includes('storage.kps.ac.th')) {
-      if (workerBase && !workerBase.includes('storage.kps.ac.th')) {
-        // เปลี่ยนมาใช้ worker url ชั่วคราวเพื่อให้เปิดดูได้ทันที
-        const path = trimmed.replace(/^https?:\/\/storage\.kps\.ac\.th\/?/, '');
-        return `${workerBase}/${encodeURI(path)}`;
-      }
-      return trimmed;
+    if (isR2Target) {
+      const normalizedKey = this.normalizeObjectKey(trimmed);
+      if (!normalizedKey) return undefined;
+      const baseToUse =
+        trimmed.includes('storage.kps.ac.th') && workerBase && !workerBase.includes('storage.kps.ac.th')
+          ? workerBase
+          : activeBase;
+      return `${baseToUse}/${this.encodeObjectKeyForUrl(normalizedKey)}`;
     }
 
     return trimmed;

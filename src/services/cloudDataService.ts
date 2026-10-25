@@ -648,25 +648,134 @@ export interface FileValidationResult {
   valid: boolean;
   error?: string;
   sanitizedName?: string;
-  category?: 'image' | 'document';
+  category?: 'image' | 'document' | 'media' | 'archive';
 }
 
 // ตั้งค่าขนาดไฟล์สูงสุดที่อนุญาต (Client-side & Server-side Safeguard)
-export const MAX_IMAGE_SIZE_MB = 5;
-export const MAX_DOC_SIZE_MB = 15;
+export const MAX_IMAGE_SIZE_MB = 15;
+export const MAX_DOC_SIZE_MB = 25;
+export const MAX_MEDIA_SIZE_MB = 50;
 
-// นามสกุลและ MIME Type ที่อนุญาตสำหรับงานนักเรียน
-export const ALLOWED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.heic'];
-export const ALLOWED_DOC_EXTENSIONS = ['.pdf', '.doc', '.docx'];
+// นามสกุลและ MIME Type ที่อนุญาตสำหรับงานนักเรียน (รองรับทุกประเภทไฟล์การเรียนการสอน)
+export const ALLOWED_IMAGE_EXTENSIONS = [
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.webp',
+  '.gif',
+  '.svg',
+  '.heic',
+  '.heif',
+  '.bmp',
+  '.avif',
+];
+
+export const ALLOWED_DOC_EXTENSIONS = [
+  '.pdf',
+  '.doc',
+  '.docx',
+  '.xls',
+  '.xlsx',
+  '.ppt',
+  '.pptx',
+  '.odt',
+  '.ods',
+  '.odp',
+  '.txt',
+  '.csv',
+  '.rtf',
+  '.md',
+  '.json',
+  '.xml',
+  '.html',
+  '.py',
+  '.js',
+  '.ts',
+  '.c',
+  '.cpp',
+  '.java',
+  '.ipynb',
+];
+
+export const ALLOWED_MEDIA_EXTENSIONS = [
+  '.mp4',
+  '.webm',
+  '.mov',
+  '.m4v',
+  '.mp3',
+  '.wav',
+  '.m4a',
+  '.ogg',
+  '.aac',
+];
+
+export const ALLOWED_ARCHIVE_EXTENSIONS = [
+  '.zip',
+  '.rar',
+  '.7z',
+  '.psd',
+  '.ai',
+  '.eps',
+];
+
+const BLOCKED_EXECUTABLE_EXTENSIONS = [
+  '.exe',
+  '.bat',
+  '.cmd',
+  '.msi',
+  '.scr',
+  '.vbs',
+  '.ps1',
+  '.sh',
+  '.com',
+  '.dll',
+  '.apk',
+];
 
 export const ALLOWED_MIME_TYPES = [
   'image/jpeg',
+  'image/jpg',
   'image/png',
   'image/webp',
+  'image/gif',
+  'image/svg+xml',
   'image/heic',
+  'image/heif',
+  'image/bmp',
+  'image/avif',
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.oasis.opendocument.text',
+  'application/vnd.oasis.opendocument.spreadsheet',
+  'application/vnd.oasis.opendocument.presentation',
+  'text/plain',
+  'text/csv',
+  'text/markdown',
+  'text/html',
+  'application/json',
+  'application/rtf',
+  'application/zip',
+  'application/x-zip-compressed',
+  'application/x-rar-compressed',
+  'application/vnd.rar',
+  'application/x-7z-compressed',
+  'application/octet-stream',
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+  'audio/mpeg',
+  'audio/mp3',
+  'audio/wav',
+  'audio/x-wav',
+  'audio/mp4',
+  'audio/x-m4a',
+  'audio/ogg',
+  'audio/aac',
 ];
 
 /**
@@ -701,7 +810,7 @@ export interface CompressionResult {
 /**
  * บีบอัดรูปภาพและแปลงเป็นไฟล์ .webp อัตโนมัติด้วย HTML5 Canvas ฝั่ง Frontend
  * ช่วยลดขนาดไฟล์ภาพถ่าย 4-8 MB เหลือเพียง ~150-400 KB โดยที่ตัวหนังสือยังคมชัด
- * หากไม่ใช่ไฟล์รูปภาพ (เช่น PDF/Word) จะคืนค่าไฟล์เดิมกลับไปทันที
+ * หากไม่ใช่ไฟล์รูปภาพทั่วไป (เช่น PDF, Word, GIF, SVG) จะคืนค่าไฟล์เดิมกลับไปทันที
  */
 export async function compressImageToWebP(
   inputFile: File,
@@ -710,10 +819,16 @@ export async function compressImageToWebP(
   const maxDimension = options.maxWidthOrHeight ?? 1920;
   const quality = options.quality ?? 0.82;
 
-  // 1. ตรวจสอบสภาพแวดล้อมและประเภทไฟล์
-  const isImageMime = inputFile.type.startsWith('image/');
+  // 1. ตรวจสอบสภาพแวดล้อมและประเภทไฟล์ (ข้าม GIF และ SVG เพื่อรักษา Animation / Vector)
   const lowerName = inputFile.name.toLowerCase();
-  const isImageExt = ALLOWED_IMAGE_EXTENSIONS.some((ext) => lowerName.endsWith(ext));
+  const isAnimatedOrVector =
+    lowerName.endsWith('.gif') ||
+    lowerName.endsWith('.svg') ||
+    inputFile.type === 'image/gif' ||
+    inputFile.type === 'image/svg+xml';
+  const isImageMime = inputFile.type.startsWith('image/') && !isAnimatedOrVector;
+  const isImageExt =
+    !isAnimatedOrVector && ALLOWED_IMAGE_EXTENSIONS.some((ext) => lowerName.endsWith(ext));
 
   if (typeof window === 'undefined' || typeof document === 'undefined' || (!isImageMime && !isImageExt)) {
     return {
@@ -836,21 +951,35 @@ export function validateSubmissionFile(file: File): FileValidationResult {
   const lastDot = file.name.lastIndexOf('.');
   const ext = lastDot !== -1 ? file.name.slice(lastDot).toLowerCase() : '';
 
-  const isImageExt = ALLOWED_IMAGE_EXTENSIONS.includes(ext);
-  const isDocExt = ALLOWED_DOC_EXTENSIONS.includes(ext);
-
-  if (!isImageExt && !isDocExt) {
+  if (BLOCKED_EXECUTABLE_EXTENSIONS.includes(ext)) {
     return {
       valid: false,
-      error: `ไม่รองรับไฟล์นามสกุล "${ext || 'ไม่ทราบชนิด'}" (อนุญาตเฉพาะรูปภาพ JPG, PNG, WebP และเอกสาร PDF, Word เท่านั้น)`,
+      error: `ไม่อนุญาตให้อัปโหลดไฟล์โปรแกรมหรือสคริปต์นามสกุล "${ext}" เพื่อความปลอดภัยของระบบ`,
+    };
+  }
+
+  const isImageExt = ALLOWED_IMAGE_EXTENSIONS.includes(ext) || file.type.startsWith('image/');
+  const isDocExt = ALLOWED_DOC_EXTENSIONS.includes(ext) || file.type === 'application/pdf' || file.type.startsWith('text/');
+  const isMediaExt = ALLOWED_MEDIA_EXTENSIONS.includes(ext) || file.type.startsWith('video/') || file.type.startsWith('audio/');
+  const isArchiveExt = ALLOWED_ARCHIVE_EXTENSIONS.includes(ext);
+
+  if (!isImageExt && !isDocExt && !isMediaExt && !isArchiveExt) {
+    return {
+      valid: false,
+      error: `ไม่รองรับไฟล์นามสกุล "${ext || 'ไม่ทราบชนิด'}" (รองรับรูปภาพ, PDF, Word, Excel, PowerPoint, วิดีโอ, เสียง และ ZIP)`,
     };
   }
 
   // 3. ตรวจสอบ MIME Type ป้องกันการเปลี่ยนนามสกุลไฟล์หลอก (เช่น เอาไฟล์ .exe มาเปลี่ยนชื่อเป็น .jpg)
-  if (file.type && !ALLOWED_MIME_TYPES.includes(file.type)) {
+  if (
+    file.type &&
+    (file.type.includes('x-msdownload') ||
+      file.type.includes('x-executable') ||
+      file.type.includes('x-dosexec'))
+  ) {
     return {
       valid: false,
-      error: `รูปแบบข้อมูลของไฟล์ (${file.type}) ไม่ถูกต้องหรือไม่ปลอดภัย`,
+      error: `รูปแบบข้อมูลของไฟล์ (${file.type}) ไม่ปลอดภัย`,
     };
   }
 
@@ -871,10 +1000,23 @@ export function validateSubmissionFile(file: File): FileValidationResult {
     };
   }
 
+  if ((isMediaExt || isArchiveExt) && fileSizeMB > MAX_MEDIA_SIZE_MB) {
+    return {
+      valid: false,
+      error: `ไฟล์สื่อ/แฟ้มบีบอัดมีขนาดใหญ่เกินไป (${fileSizeMB.toFixed(2)} MB) กรุณาใช้ไฟล์ขนาดไม่เกิน ${MAX_MEDIA_SIZE_MB} MB หรือแนบเป็นลิงก์ Google Drive แทน`,
+    };
+  }
+
   return {
     valid: true,
     sanitizedName: sanitizeFileName(file.name),
-    category: isImageExt ? 'image' : 'document',
+    category: isImageExt
+      ? 'image'
+      : isMediaExt
+        ? 'media'
+        : isArchiveExt
+          ? 'archive'
+          : 'document',
   };
 }
 
@@ -916,13 +1058,52 @@ export function uploadToR2WithProgress(
       return;
     }
 
-    const cleanKey = r2Key
-      .replace(/^r2:\/\/kp-classroom-submissions\//, '')
-      .replace(/^https?:\/\/[^/]+\//, '')
+    let cleanKey = r2Key
+      .trim()
+      .replace(/^r2:\/\//i, '')
+      .replace(/^https?:\/\/[^/]+\//i, '')
       .replace(/^\/+/, '');
 
+    // ป้องกันการ Encode ซ้ำซ้อน (%25E0%25B8...)
+    for (let i = 0; i < 4; i++) {
+      if (!/%[0-9A-Fa-f]{2}/.test(cleanKey)) break;
+      try {
+        const dec = decodeURIComponent(cleanKey);
+        if (dec === cleanKey) break;
+        cleanKey = dec;
+      } catch {
+        break;
+      }
+    }
+
+    const encodedKey = encodeURI(cleanKey).replace(/#/g, '%23').replace(/\?/g, '%3F');
+
+    // รองรับสภาพแวดล้อม Node/Test ที่ไม่มี XMLHttpRequest
+    if (typeof XMLHttpRequest === 'undefined') {
+      fetch(`${workerUrl}/${encodedKey}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type || 'application/octet-stream',
+          'X-Custom-Auth-Key': uploadSecret,
+        },
+        body: file,
+      })
+        .then(async (res) => {
+          if (res.ok) {
+            if (onProgress) {
+              onProgress({ percent: 100, loadedBytes: file.size, totalBytes: file.size });
+            }
+            resolve(`${publicUrl}/${encodedKey}`);
+          } else {
+            reject(new Error(`อัปโหลดไม่สำเร็จ (รหัส ${res.status}): ${await res.text()}`));
+          }
+        })
+        .catch(() => reject(new Error('การเชื่อมต่อขัดข้อง กรุณาตรวจสอบสัญญาณอินเทอร์เน็ตแล้วลองใหม่อีกครั้ง')));
+      return;
+    }
+
     const xhr = new XMLHttpRequest();
-    xhr.open('PUT', `${workerUrl}/${encodeURI(cleanKey)}`, true);
+    xhr.open('PUT', `${workerUrl}/${encodedKey}`, true);
     xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
     xhr.setRequestHeader('X-Custom-Auth-Key', uploadSecret);
 
@@ -941,7 +1122,7 @@ export function uploadToR2WithProgress(
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         // คืนค่าลิงก์จริงสำหรับให้ครูเปิดดูข้ามเครื่อง
-        resolve(`${publicUrl}/${encodeURI(cleanKey)}`);
+        resolve(`${publicUrl}/${encodedKey}`);
       } else {
         reject(new Error(`อัปโหลดไม่สำเร็จ (รหัส ${xhr.status}): ${xhr.responseText}`));
       }
