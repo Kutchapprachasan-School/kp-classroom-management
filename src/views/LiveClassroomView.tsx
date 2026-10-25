@@ -22,6 +22,7 @@ import { GroupGeneratorSubTab } from '../components/live-classroom/GroupGenerato
 import { RewardBoardSubTab } from '../components/live-classroom/RewardBoardSubTab';
 import { LuckyTicketDrawModal } from '../components/live-classroom/LuckyTicketDrawModal';
 import { GoldQuestArena } from '../components/live-classroom/GoldQuestArena';
+import { gachaConfigService } from '../services/gachaConfigService';
 import type { StudentGroup } from '../utils/liveClassroomAlgorithms';
 
 export interface LiveClassroomViewProps {
@@ -125,6 +126,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
     giveReward,
     undoReward,
     consumeTicket,
+    showToast,
   } = useOptimisticRewards({
     classroomId: selectedClassId,
     onUpdateBalances: handleUpdateStudentBalances,
@@ -270,19 +272,95 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
     ]
   );
 
+  // Guarded giveReward with per-session ticket cap (จำกัดตั๋วสุ่มไม่เกิน 5 ใบต่อคาบ ป้องกันภาวะตั๋วเฟ้อ)
+  const guardedGiveReward = useCallback(
+    async (
+      studentIds: string[],
+      type: 'coin' | 'ticket',
+      amount: number,
+      desc: string
+    ) => {
+      if (type !== 'ticket' || amount <= 0) {
+        return giveReward(studentIds, type, amount, desc);
+      }
+
+      // ตรวจสอบกรณีเป็นตั๋วกาชาจากวงล้อจับรางวัลท้ายคาบ (ผูกกับโควตารายวิชาประจำสัปดาห์)
+      const isGachaTicketReward = desc.includes('ตั๋วกาชา') || desc.includes('รางวัลใหญ่ท้ายคาบ');
+      if (isGachaTicketReward) {
+        const isCapped = liveClassroomService.isWeeklyGachaTicketCapped(
+          selectedClassId,
+          currentClassroom?.subject || 'general',
+          currentClassroom?.name
+        );
+        if (isCapped) {
+          triggerSound('buzzer');
+          showToast(
+            `⚠️ โควตากาชาของวิชานี้เต็มเพดานสัปดาห์นี้แล้ว (${currentClassroom?.name || 'ห้องเรียน'})`,
+            'warning'
+          );
+          return;
+        }
+        return giveReward(studentIds, 'ticket', amount, desc);
+      }
+
+      const cfg = gachaConfigService.getConfig();
+      const cap = cfg.rewards?.sessionTicketCap ?? 5;
+
+      const allowedStudentIds: string[] = [];
+      const cappedStudents: string[] = [];
+
+      studentIds.forEach((id) => {
+        const student = students.find((s) => s.id === id);
+        const currentTickets = student?.sessionTickets || 0;
+        if (currentTickets >= cap) {
+          cappedStudents.push(student?.name || id);
+        } else {
+          allowedStudentIds.push(id);
+        }
+      });
+
+      if (cappedStudents.length > 0 && allowedStudentIds.length === 0) {
+        triggerSound('buzzer');
+        const nameList =
+          cappedStudents.slice(0, 3).join(', ') +
+          (cappedStudents.length > 3 ? ` และอีก ${cappedStudents.length - 3} คน` : '');
+        showToast(
+          `⚠️ ${nameList} ได้รับตั๋วสุ่มครบโควตาเพดาน ${cap} ใบ/คาบแล้ว (ป้องกันภาวะตั๋วเฟ้อ)`,
+          'warning'
+        );
+        return;
+      }
+
+      if (allowedStudentIds.length > 0) {
+        await giveReward(allowedStudentIds, 'ticket', amount, desc);
+      }
+
+      if (cappedStudents.length > 0) {
+        const nameList =
+          cappedStudents.slice(0, 2).join(', ') +
+          (cappedStudents.length > 2 ? ` และอีก ${cappedStudents.length - 2} คน` : '');
+        showToast(
+          `ℹ️ มีนักเรียน ${cappedStudents.length} คน (${nameList}) ได้รับตั๋วเต็มเพดาน ${cap} ใบในคาบนี้แล้ว`,
+          'warning'
+        );
+      }
+    },
+    [giveReward, students, triggerSound, showToast]
+  );
+
   // มอบรางวัลเหรียญ/ตั๋วจริงจากการแข่งขัน Gold Quest Arena เข้าสู่กระเป๋าในคาบ
   const handleAwardGoldQuestRewards = useCallback(
     (awards: { studentId: string; coins: number; tickets: number }[]) => {
       awards.forEach((a) => {
         if (a.coins > 0) {
-          giveReward([a.studentId], 'coin', a.coins, 'รางวัลสมรภูมิ Gold Quest Arena');
+          guardedGiveReward([a.studentId], 'coin', a.coins, 'รางวัลสมรภูมิ Gold Quest Arena');
         }
         if (a.tickets > 0) {
-          giveReward([a.studentId], 'ticket', a.tickets, 'รางวัลสมรภูมิ Gold Quest Arena');
+          guardedGiveReward([a.studentId], 'ticket', a.tickets, 'รางวัลสมรภูมิ Gold Quest Arena');
         }
       });
     },
-    [giveReward]
+    [guardedGiveReward]
   );
 
   // Global Hotkeys (Spacebar, F, M) พร้อม Input Field Guard
@@ -331,13 +409,13 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
   // Class-wide bonus handler
   const handleGiveClassBonus = useCallback(() => {
     triggerSound('fanfare');
-    giveReward(
+    guardedGiveReward(
       presentStudents.map((s) => s.id),
       'coin',
       1,
       '🎉 โบนัสตั้งใจเรียนทั้งห้อง'
     );
-  }, [presentStudents, triggerSound, giveReward]);
+  }, [presentStudents, triggerSound, guardedGiveReward]);
 
   if (isLoading) {
     return (
@@ -369,7 +447,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
       ref={containerRef}
       className={`min-h-screen flex flex-col transition-colors duration-300 ${
         isProjectorMode
-          ? 'bg-slate-950 text-slate-100 p-6 text-base'
+          ? 'bg-slate-950 text-slate-100 p-6 text-base dark'
           : 'bg-[#F7FAFF] text-[#163A66] p-4 md:p-6 text-sm'
       }`}
     >
@@ -431,7 +509,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
             setSelectedStudent={setSelectedStudent}
             rollingStudent={rollingStudent}
             setRollingStudent={setRollingStudent}
-            onGiveReward={giveReward}
+            onGiveReward={guardedGiveReward}
             onPlaySound={triggerSound}
             onToggleAttendance={handleToggleAttendance}
             syncingAttendanceIds={syncingAttendanceIds}
@@ -448,7 +526,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
             currentTeacherId={authService.getCurrentUser()?.id || authService.getCurrentUser()?.username || 'teacher_guest'}
             currentTeacherName={authService.getCurrentUser()?.name || 'ครูผู้สอน'}
             subjectName={currentClassroom?.subject || 'general_subject'}
-            onGiveReward={giveReward}
+            onGiveReward={guardedGiveReward}
             onPlaySound={triggerSound}
             isActive={activeTab === 'words'}
           />
@@ -463,7 +541,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
             setChallengers={setChallengers}
             isTimerRunning={isTimerRunning}
             setIsTimerRunning={setIsTimerRunning}
-            onGiveReward={giveReward}
+            onGiveReward={guardedGiveReward}
             onPlaySound={triggerSound}
             onOpenGoldQuestArena={() => setIsGoldQuestArenaOpen(true)}
             isActive={activeTab === 'timer'}
@@ -482,7 +560,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
             currentTeacherName={authService.getCurrentUser()?.name || 'ครูผู้สอน'}
             subjectName={currentClassroom?.subject || 'general_subject'}
             onGiveRewardGroup={(ids, name) =>
-              giveReward(ids, 'coin', 1, `รางวัลยกกลุ่ม ${name}`)
+              guardedGiveReward(ids, 'coin', 1, `รางวัลยกกลุ่ม ${name}`)
             }
             onPlaySound={triggerSound}
           />
@@ -507,7 +585,10 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
         isOpen={isLuckyDrawOpen}
         onClose={() => setIsLuckyDrawOpen(false)}
         students={students}
-        onGiveReward={giveReward}
+        classroomId={selectedClassId}
+        classroomName={currentClassroom?.name}
+        subjectName={currentClassroom?.subject}
+        onGiveReward={guardedGiveReward}
         onConsumeTicket={handleConsumeTicket}
         onPlaySound={triggerSound}
       />

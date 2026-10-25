@@ -34,7 +34,7 @@ import {
   type GachaBuddy,
   type GachaPullResult,
 } from '../../services/gachaService';
-import { gachaConfigService } from '../../services/gachaConfigService';
+import { gachaConfigService, GACHA_CONFIG_UPDATED_EVENT } from '../../services/gachaConfigService';
 import { gachaSkillEngine } from '../../services/gachaSkillEngine';
 import { gachaRewardEngine } from '../../services/gachaRewardEngine';
 import { weeklyQuizService, type QuizWeekInfo } from '../../services/weeklyQuizService';
@@ -104,6 +104,8 @@ export const StudentAnimeAppView: React.FC<StudentAnimeAppViewProps> = ({
   const [eliminatedChoices, setEliminatedChoices] = useState<Record<number, number[]>>({});
   const [quizResultSummary, setQuizResultSummary] = useState<any>(null);
 
+  const [adminConfig, setAdminConfig] = useState(() => gachaConfigService.getConfig());
+
   // Active Buddy Buffs
   const activeBuffs = useMemo(() => gachaSkillEngine.getBuffsForBuddy(equippedBuddy), [equippedBuddy]);
 
@@ -128,10 +130,12 @@ export const StudentAnimeAppView: React.FC<StudentAnimeAppViewProps> = ({
 
     const handleSync = () => {
       syncStateFromGacha();
+      setAdminConfig(gachaConfigService.getConfig());
     };
 
     window.addEventListener(BUDDY_CHANGED_EVENT, handleSync);
     window.addEventListener(GACHA_STATE_UPDATED_EVENT, handleSync);
+    window.addEventListener(GACHA_CONFIG_UPDATED_EVENT, handleSync);
     window.addEventListener('storage', handleSync);
     window.addEventListener('kps-cloud-synced', handleSync);
     window.addEventListener('kps-data-sync-event', handleSync);
@@ -139,6 +143,7 @@ export const StudentAnimeAppView: React.FC<StudentAnimeAppViewProps> = ({
     return () => {
       window.removeEventListener(BUDDY_CHANGED_EVENT, handleSync);
       window.removeEventListener(GACHA_STATE_UPDATED_EVENT, handleSync);
+      window.removeEventListener(GACHA_CONFIG_UPDATED_EVENT, handleSync);
       window.removeEventListener('storage', handleSync);
       window.removeEventListener('kps-cloud-synced', handleSync);
       window.removeEventListener('kps-data-sync-event', handleSync);
@@ -1274,10 +1279,10 @@ export const StudentAnimeAppView: React.FC<StudentAnimeAppViewProps> = ({
                         syncStateFromGacha();
                         showToast('✨ แลกตั๋วสุ่มสำเร็จ! (+1 ตั๋ว)');
                       }}
-                      disabled={starShards < gachaConfigService.getConfig().shop.shardsPerTicket}
+                      disabled={starShards < (adminConfig.shop?.shardsPerTicket ?? 300)}
                       className="w-full p-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 disabled:opacity-50 text-amber-950 border border-amber-200 text-xs font-bold flex items-center justify-between cursor-pointer"
                     >
-                      <span>ใช้ {gachaConfigService.getConfig().shop.shardsPerTicket} เศษดาว แลก 1 ตั๋ว</span>
+                      <span>ใช้ {adminConfig.shop?.shardsPerTicket ?? 300} เศษดาว แลก 1 ตั๋ว</span>
                       <span className="bg-amber-500 text-white px-2 py-0.5 rounded-lg text-[10px] font-black">
                         แลกตั๋ว
                       </span>
@@ -1294,10 +1299,10 @@ export const StudentAnimeAppView: React.FC<StudentAnimeAppViewProps> = ({
                         syncStateFromGacha();
                         showToast('🛒 ซื้อตั๋วสุ่มสำเร็จ! (+1 ตั๋ว)');
                       }}
-                      disabled={coins < gachaConfigService.getConfig().shop.coinsPerTicket}
+                      disabled={coins < (adminConfig.shop?.coinsPerTicket ?? 200)}
                       className="w-full p-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 disabled:opacity-50 text-blue-950 border border-blue-200 text-xs font-bold flex items-center justify-between cursor-pointer"
                     >
-                      <span>ใช้ {gachaConfigService.getConfig().shop.coinsPerTicket} เหรียญ ซื้อ 1 ตั๋ว</span>
+                      <span>ใช้ {adminConfig.shop?.coinsPerTicket ?? 200} เหรียญ ซื้อ 1 ตั๋ว</span>
                       <span className="bg-blue-600 text-white px-2 py-0.5 rounded-lg text-[10px] font-black">
                         ซื้อตั๋ว
                       </span>

@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import RandomRegular from '@mingcute/react/core-regular/random';
+import Coin2Regular from '@mingcute/react/core-regular/coin-2';
 import {
   Users,
   Crown,
@@ -470,9 +471,11 @@ export const GroupGeneratorSubTab: React.FC<GroupGeneratorSubTabProps> = ({
                         grp.name
                       )
                     }
-                    className="text-xs bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-500 font-bold px-2.5 py-1 rounded-lg transition active:scale-95 shrink-0"
+                    className="flex items-center gap-1 text-xs bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-600 dark:text-amber-400 font-bold px-2.5 py-1 rounded-lg transition active:scale-95 shrink-0"
+                    title="แจกเหรียญ 1 เหรียญให้สมาชิกทุกคนในกลุ่ม"
                   >
-                    +1 🪙 ยกกลุ่ม
+                    <Coin2Regular className="w-3.5 h-3.5" />
+                    <span>+1 ยกกลุ่ม</span>
                   </button>
                 </div>
 

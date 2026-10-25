@@ -88,6 +88,30 @@ export const calculatePeriodsPerWeek = (
   };
 };
 
+/**
+ * ตรวจสอบและดึงระดับชั้นจริงจากรหัสวิชาตามมาตรฐานกระทรวงศึกษาธิการ
+ * เช่น ญ21202 -> ม.1, ญ22xxx -> ม.2, ญ23xxx -> ม.3, ญ31202 -> ม.4, ญ32202 -> ม.5, ญ33xxx / ส30xxx / ญ30xxx -> ม.6
+ */
+export function inferGradeLevelFromCourseCode(code: string): string | null {
+  if (!code) return null;
+  const clean = code.trim().toUpperCase();
+  const m = clean.match(/^[^\d]*([123])([0-9])/);
+  if (m) {
+    const tier = m[1];
+    const gradeDigit = m[2];
+    if (tier === '1' || tier === '2') {
+      if (gradeDigit === '1') return 'ม.1';
+      if (gradeDigit === '2') return 'ม.2';
+      if (gradeDigit === '3') return 'ม.3';
+    } else if (tier === '3') {
+      if (gradeDigit === '1') return 'ม.4';
+      if (gradeDigit === '2') return 'ม.5';
+      if (gradeDigit === '3' || gradeDigit === '0') return 'ม.6';
+    }
+  }
+  return null;
+}
+
 // ข้อมูลเริ่มต้นสำหรับระบบ (Zero Mock Data)
 const INITIAL_COURSES: CourseCurriculumRecord[] = [];
 class CoursesCurriculumService {
@@ -104,6 +128,28 @@ class CoursesCurriculumService {
             // Auto-heal any courses that have mismatched assignedClassrooms for their level (e.g. ม.3 having ม.1/1)
             let modified = false;
             parsed.forEach((c: CourseCurriculumRecord) => {
+              const inferred = inferGradeLevelFromCourseCode(c.code);
+              // หากรหัสวิชาระบุชั้นชัดเจน (เช่น ญ21202 คือ ม.1) ให้ปรับ level ให้ตรงกับรหัสวิชาเสมอ
+              if (inferred && c.level !== inferred) {
+                c.level = inferred;
+                modified = true;
+              }
+
+              // ตรวจสอบห้องเรียนเฉพาะทางของวิชา ญ21202 ตามตารางสอนจริงของโรงเรียน (ม.1/1 - ม.1/6)
+              if (c.code === 'ญ21202') {
+                const targetM1Rooms = ['ม.1/1', 'ม.1/2', 'ม.1/3', 'ม.1/4', 'ม.1/5', 'ม.1/6'];
+                if (
+                  !Array.isArray(c.assignedClassrooms) ||
+                  c.assignedClassrooms.some((r) => r.startsWith('ม.3')) ||
+                  c.assignedClassrooms.length < 6
+                ) {
+                  c.assignedClassrooms = targetM1Rooms;
+                  c.level = 'ม.1';
+                  c.periodsPerWeek = 6;
+                  modified = true;
+                }
+              }
+
               if (c.level && Array.isArray(c.assignedClassrooms) && c.assignedClassrooms.length > 0) {
                 const levelMatching = c.assignedClassrooms.filter((r) => r.startsWith(c.level));
                 if (levelMatching.length > 0 && levelMatching.length < c.assignedClassrooms.length) {
@@ -112,12 +158,12 @@ class CoursesCurriculumService {
                 } else if (levelMatching.length === 0) {
                   // Assigned rooms were completely from wrong grade (e.g. all ม.1 on a ม.3 course)
                   const fallbackByLevel: Record<string, string[]> = {
-                    'ม.1': ['ม.1/1', 'ม.1/2'],
+                    'ม.1': ['ม.1/1', 'ม.1/2', 'ม.1/3', 'ม.1/4', 'ม.1/5', 'ม.1/6'],
                     'ม.2': ['ม.2/1'],
                     'ม.3': ['ม.3/1', 'ม.3/2'],
-                    'ม.4': ['ม.4/1'],
-                    'ม.5': ['ม.5/1'],
-                    'ม.6': ['ม.6/1'],
+                    'ม.4': ['ม.4/4'],
+                    'ม.5': ['ม.5/4'],
+                    'ม.6': ['ม.6/1', 'ม.6/2', 'ม.6/3'],
                   };
                   c.assignedClassrooms = fallbackByLevel[c.level] || [`${c.level}/1`];
                   modified = true;

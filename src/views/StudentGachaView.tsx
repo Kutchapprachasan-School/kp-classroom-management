@@ -19,7 +19,7 @@ import {
   type GachaPullResult,
   type GachaState,
 } from '../services/gachaService';
-import { gachaConfigService } from '../services/gachaConfigService';
+import { gachaConfigService, GACHA_CONFIG_UPDATED_EVENT } from '../services/gachaConfigService';
 import { MAX_BUDDY_STARS } from '../config/gachaStarTable';
 import { gachaSkillEngine } from '../services/gachaSkillEngine';
 import { ChibiBuddyAvatar } from '../components/student/ChibiBuddyAvatar';
@@ -38,6 +38,10 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
   );
   const [activeBuddy, setActiveBuddy] = useState<GachaBuddy>(() =>
     gachaService.getActiveBuddy()
+  );
+
+  const [adminConfig, setAdminConfig] = useState(() =>
+    gachaConfigService.getConfig()
   );
 
   // Modal states
@@ -69,10 +73,12 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
 
     const handleSync = () => {
       reloadState();
+      setAdminConfig(gachaConfigService.getConfig());
     };
 
     window.addEventListener(BUDDY_CHANGED_EVENT, handleSync);
     window.addEventListener(GACHA_STATE_UPDATED_EVENT, handleSync);
+    window.addEventListener(GACHA_CONFIG_UPDATED_EVENT, handleSync);
     window.addEventListener('storage', handleSync);
     window.addEventListener('kps-cloud-synced', handleSync);
     window.addEventListener('kps-data-sync-event', handleSync);
@@ -80,6 +86,7 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
     return () => {
       window.removeEventListener(BUDDY_CHANGED_EVENT, handleSync);
       window.removeEventListener(GACHA_STATE_UPDATED_EVENT, handleSync);
+      window.removeEventListener(GACHA_CONFIG_UPDATED_EVENT, handleSync);
       window.removeEventListener('storage', handleSync);
       window.removeEventListener('kps-cloud-synced', handleSync);
       window.removeEventListener('kps-data-sync-event', handleSync);
@@ -383,7 +390,9 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                     </span>
                     <span className="font-bold text-slate-700">Common</span>
                   </div>
-                  <span className="font-extrabold text-slate-900 tabular-nums">40.0%</span>
+                  <span className="font-extrabold text-slate-900 tabular-nums">
+                    {(adminConfig.rates.COMMON ?? 40).toFixed(1)}%
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between py-1 px-2 rounded-xl bg-emerald-50/60 hover:bg-emerald-50 transition-colors">
@@ -393,7 +402,9 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                     </span>
                     <span className="font-bold text-emerald-800">Uncommon</span>
                   </div>
-                  <span className="font-extrabold text-emerald-900 tabular-nums">35.0%</span>
+                  <span className="font-extrabold text-emerald-900 tabular-nums">
+                    {(adminConfig.rates.UNCOMMON ?? 35).toFixed(1)}%
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between py-1 px-2 rounded-xl bg-blue-50/60 hover:bg-blue-50 transition-colors">
@@ -403,7 +414,9 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                     </span>
                     <span className="font-bold text-blue-800">Rare</span>
                   </div>
-                  <span className="font-extrabold text-blue-900 tabular-nums">18.0%</span>
+                  <span className="font-extrabold text-blue-900 tabular-nums">
+                    {(adminConfig.rates.RARE ?? 18).toFixed(1)}%
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between py-1 px-2 rounded-xl bg-purple-50/60 hover:bg-purple-50 transition-colors">
@@ -413,7 +426,9 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                     </span>
                     <span className="font-bold text-purple-800">Epic</span>
                   </div>
-                  <span className="font-extrabold text-purple-900 tabular-nums">5.0%</span>
+                  <span className="font-extrabold text-purple-900 tabular-nums">
+                    {(adminConfig.rates.EPIC ?? 5).toFixed(1)}%
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between py-1 px-2 rounded-xl bg-amber-50/60 hover:bg-amber-50 transition-colors">
@@ -423,7 +438,9 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                     </span>
                     <span className="font-bold text-amber-800">Legendary</span>
                   </div>
-                  <span className="font-extrabold text-amber-900 tabular-nums">1.8%</span>
+                  <span className="font-extrabold text-amber-900 tabular-nums">
+                    {(adminConfig.rates.LEGENDARY ?? 1.8).toFixed(1)}%
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between py-1 px-2 rounded-xl bg-rose-50/70 hover:bg-rose-100 transition-colors border border-rose-200">
@@ -433,7 +450,9 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                     </span>
                     <span className="font-bold text-rose-700">Mythic</span>
                   </div>
-                  <span className="font-extrabold text-rose-900 tabular-nums">0.2%</span>
+                  <span className="font-extrabold text-rose-900 tabular-nums">
+                    {(adminConfig.rates.MYTHIC ?? 0.2).toFixed(1)}%
+                  </span>
                 </div>
               </div>
             </div>
@@ -449,7 +468,7 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 mb-2 leading-relaxed">
-                สุ่มครบ <span className="font-bold text-purple-700">80 ครั้ง</span> การันตี Epic หรือ Legendary แน่นอน!
+                สุ่มครบ <span className="font-bold text-purple-700">{adminConfig.pityMax || 80} ครั้ง</span> การันตี Epic หรือสูงกว่าแน่นอน!
               </p>
 
               {/* Progress bar */}
@@ -457,7 +476,7 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
                 <div
                   className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 h-full rounded-full transition-all duration-500"
                   style={{
-                    width: `${Math.min(100, (gachaState.pityCount / gachaState.pityMax) * 100)}%`,
+                    width: `${Math.min(100, (gachaState.pityCount / (adminConfig.pityMax || 80)) * 100)}%`,
                   }}
                 />
               </div>
@@ -1116,13 +1135,13 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
               <button
                 type="button"
                 onClick={() => handleExchangeShardsForTickets(1)}
-                disabled={gachaState.starShards < gachaConfigService.getConfig().shop.shardsPerTicket}
+                disabled={gachaState.starShards < (adminConfig.shop?.shardsPerTicket ?? 300)}
                 className="w-full p-3 rounded-2xl bg-amber-50 hover:bg-amber-100 disabled:opacity-50 text-amber-950 border border-amber-200 font-bold text-xs flex items-center justify-between transition-colors cursor-pointer"
               >
                 <div className="text-left">
                   <span className="block font-black">✨ แลกตั๋วสุ่มด้วยเศษดาว</span>
                   <span className="text-[10px] text-amber-700">
-                    ใช้ {gachaConfigService.getConfig().shop.shardsPerTicket} เศษดาว ต่อ 1 ตั๋ว
+                    ใช้ {adminConfig.shop?.shardsPerTicket ?? 300} เศษดาว ต่อ 1 ตั๋ว
                   </span>
                 </div>
                 <span className="bg-amber-500 text-white px-2.5 py-1 rounded-xl text-xs font-black">
@@ -1134,13 +1153,13 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
               <button
                 type="button"
                 onClick={() => handleBuyTicketsWithCoins(1)}
-                disabled={gachaState.coins < gachaConfigService.getConfig().shop.coinsPerTicket}
+                disabled={gachaState.coins < (adminConfig.shop?.coinsPerTicket ?? 200)}
                 className="w-full p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 disabled:opacity-50 text-blue-950 border border-blue-200 font-bold text-xs flex items-center justify-between transition-colors cursor-pointer"
               >
                 <div className="text-left">
                   <span className="block font-black">🪙 ซื้อตั๋วสุ่มด้วยเหรียญทอง</span>
                   <span className="text-[10px] text-blue-700">
-                    ใช้ {gachaConfigService.getConfig().shop.coinsPerTicket} เหรียญ ต่อ 1 ตั๋ว
+                    ใช้ {adminConfig.shop?.coinsPerTicket ?? 200} เหรียญ ต่อ 1 ตั๋ว
                   </span>
                 </div>
                 <span className="bg-blue-600 text-white px-2.5 py-1 rounded-xl text-xs font-black">
@@ -1230,21 +1249,21 @@ export const StudentGachaView: React.FC<StudentGachaViewProps> = ({
               </div>
 
               <div>
-                <h4 className="font-bold text-slate-800 mb-1">ตารางอัตราการสุ่ม (Drop Rates):</h4>
+                <h4 className="font-bold text-slate-800 mb-1">ตารางอัตราการสุ่ม (Drop Rates ตามการตั้งค่าปัจจุบัน):</h4>
                 <ul className="list-disc pl-5 space-y-1">
-                  <li><strong>Common (40.0%):</strong> น้องโอม, น้องแป้ง, น้องซัน, น้องมายด์</li>
-                  <li><strong>Uncommon (35.0%):</strong> น้องพิมพ์, น้องต้น, น้องเจน, น้องพีค</li>
-                  <li><strong>Rare (18.0%):</strong> น้องคิน, น้องโนจิ, น้องฟ้า, น้องเบส</li>
-                  <li><strong>Epic (5.0%):</strong> น้องริน, น้องเชน, น้องมิ้น, น้องคิว</li>
-                  <li><strong>Legendary (1.8%):</strong> น้องวาเลน, น้องเรย์, น้องอามิ, น้องไทเกอร์</li>
-                  <li><strong>Mythic (0.2%):</strong> น้องเซเรน, น้องไนท์</li>
+                  <li><strong>Common ({(adminConfig.rates.COMMON ?? 40).toFixed(1)}%):</strong> น้องโอม, น้องแป้ง, น้องซัน, น้องมายด์</li>
+                  <li><strong>Uncommon ({(adminConfig.rates.UNCOMMON ?? 35).toFixed(1)}%):</strong> น้องพิมพ์, น้องต้น, น้องเจน, น้องพีค</li>
+                  <li><strong>Rare ({(adminConfig.rates.RARE ?? 18).toFixed(1)}%):</strong> น้องคิน, น้องโนจิ, น้องฟ้า, น้องเบส</li>
+                  <li><strong>Epic ({(adminConfig.rates.EPIC ?? 5).toFixed(1)}%):</strong> น้องลิน, น้องเซน, น้องมิ้น, น้องคิว</li>
+                  <li><strong>Legendary ({(adminConfig.rates.LEGENDARY ?? 1.8).toFixed(1)}%):</strong> น้องวาเลน, น้องเรย์, น้องอามิ, น้องไทเกอร์</li>
+                  <li><strong>Mythic ({(adminConfig.rates.MYTHIC ?? 0.2).toFixed(1)}%):</strong> น้องเซเรน, น้องไนท์</li>
                 </ul>
               </div>
 
               <div>
                 <h4 className="font-bold text-slate-800 mb-1">ระบบการันตี (Pity Guarantee System):</h4>
                 <p>
-                  เพื่อป้องกันไม่ให้ผู้เรียนท้อ หากสุ่มติดต่อกันครบ <strong>80 ครั้ง</strong> ระบบจะการันตีคู่หูระดับ <strong>Epic หรือ Legendary</strong> แน่นอน 100% ทันที และเมื่อได้รับระดับพิเศษ ตัวนับการันตีจะรีเซ็ตกลับเป็น 0 เพื่อเริ่มรอบใหม่
+                  เพื่อป้องกันไม่ให้ผู้เรียนท้อ หากสุ่มติดต่อกันครบ <strong>{adminConfig.pityMax || 80} ครั้ง</strong> ระบบจะการันตีคู่หูระดับ <strong>Epic หรือสูงกว่า</strong> แน่นอน 100% ทันที และเมื่อได้รับระดับพิเศษ ตัวนับการันตีจะรีเซ็ตกลับเป็น 0 เพื่อเริ่มรอบใหม่
                 </p>
               </div>
 

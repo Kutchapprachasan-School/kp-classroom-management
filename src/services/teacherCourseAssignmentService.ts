@@ -9,7 +9,7 @@
 // ============================================================================
 
 import { cleanSlateService } from './cleanSlateService.ts';
-import { coursesCurriculumService } from './coursesCurriculumService.ts';
+import { coursesCurriculumService, inferGradeLevelFromCourseCode } from './coursesCurriculumService.ts';
 import { studentService, formatClassroomLabel } from './studentService.ts';
 import { classroomService } from './classroomService.ts';
 import { authService } from './authService.ts';
@@ -68,11 +68,15 @@ export const getDynamicTeachingSubjects = (teacherIdOrName?: string): TeachingSu
       4: 'bg-amber-100 text-amber-800 border-amber-300',
     };
     return curriculumCourses.map((c, idx) => {
+      const inferredLevel = inferGradeLevelFromCourseCode(c.code) || c.level;
       let assigned = Array.isArray(c.assignedClassrooms) ? c.assignedClassrooms.filter(Boolean) : [];
+      if (inferredLevel) {
+        assigned = assigned.filter((r) => r.startsWith(inferredLevel));
+      }
       if (assigned.length === 0) {
         // กรอง fallback เฉพาะห้องที่มีระดับชั้นตรงกับวิชา (เช่น ม.6 ไม่เอาห้อง ม.1-ม.5 มาปน)
-        assigned = c.level
-          ? fallbackRooms.filter((r) => r.startsWith(c.level))
+        assigned = inferredLevel
+          ? fallbackRooms.filter((r) => r.startsWith(inferredLevel))
           : fallbackRooms;
       }
       return {

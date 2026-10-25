@@ -1,6 +1,8 @@
 // src/components/live-classroom/LuckyTicketDrawModal.tsx
 // วงล้อจับรางวัลท้ายคาบด้วยตั๋วสุ่ม (🎟️) ถ่วงน้ำหนักความกว้างของช่องตามจำนวนตั๋วจริง
-// สอดคล้องกับระบบเศรษฐกิจ 200 เหรียญ = 1 ตั๋วสุ่ม โดยผู้ชนะจะได้รับรางวัลโบนัสเพิ่ม (ไม่หักตั๋วเดิมของนักเรียน)
+// รองรับการเลือก/สุ่มของรางวัลก่อนหมุนคน (Pre-determined Prize) พร้อมระบบเรทขั้นบันได (Stepped Rates)
+// กฎการหักตั๋ว: ได้ตั๋วกาชาหรือเหรียญจะหัก 1 ตั๋วสุ่ม / ได้ตั๋วสุ่มจะเป็นการคืนตั๋ว (-1 +1 ตั๋วเดิมอยู่ครบ)
+// พร้อมระบบเพดานตั๋วกาชาผูกกับคาบเรียนรายวิชาประจำสัปดาห์ (โควตา 5 ใบ/คาบ x คาบต่อสัปดาห์)
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import TicketRegular from '@mingcute/react/core-regular/ticket';
@@ -10,17 +12,304 @@ import SparklesRegular from '@mingcute/react/core-regular/sparkles';
 import CloseRegular from '@mingcute/react/core-regular/close';
 import CheckCircleRegular from '@mingcute/react/core-regular/check-circle';
 import Refresh1Regular from '@mingcute/react/core-regular/refresh-1';
-import { Users } from 'lucide-react';
+import { Users, Dices, Gift, ArrowRight } from 'lucide-react';
 import type { LiveStudent } from '../../services/liveClassroomService';
+import {
+  liveClassroomService,
+  WEEKLY_GACHA_TICKETS_UPDATED_EVENT,
+} from '../../services/liveClassroomService';
 import {
   buildWeightedWheelSegments,
   pickWeightedWheelWinner,
 } from '../../utils/liveClassroomAlgorithms';
 
+export interface PrizeTier {
+  id: string;
+  name: string;
+  rewardType: 'coin' | 'ticket' | 'ticket_draw' | 'combo';
+  coins: number;
+  tickets: number;
+  weight: number; // โอกาสออกเป็นเปอร์เซ็นต์ในพูล (เช่น 35, 25, 18, 10, 7, 4, 1)
+  badgeLabel: string;
+  badgeBg: string;
+  badgeText: string;
+  description: string;
+  convertedDueToCap?: boolean;
+}
+
+export interface PrizePoolPreset {
+  id: string;
+  title: string;
+  description: string;
+  tiers: PrizeTier[];
+}
+
+export const PRIZE_POOLS: PrizePoolPreset[] = [
+  {
+    id: 'standard',
+    title: '🏆 สุ่มรวมขั้นบันได (Unified Ladder)',
+    description: 'รางวัลกระจายตามน้ำหนัก 10-100 เหรียญ, ตั๋วสุ่ม (+1 คืนตั๋ว), และตั๋วกาชาหายากที่สุด',
+    tiers: [
+      {
+        id: 'std-coin-10',
+        name: 'รางวัลทั่วไป 10 เหรียญ',
+        rewardType: 'coin',
+        coins: 10,
+        tickets: 0,
+        weight: 35,
+        badgeLabel: 'Common (35%)',
+        badgeBg: 'bg-slate-700/80',
+        badgeText: 'text-slate-200',
+        description: 'เหรียญสะสม +10 🪙 (หัก 1 ตั๋วสุ่ม)',
+      },
+      {
+        id: 'std-coin-20',
+        name: 'รางวัลพิเศษ 20 เหรียญ',
+        rewardType: 'coin',
+        coins: 20,
+        tickets: 0,
+        weight: 25,
+        badgeLabel: 'Uncommon (25%)',
+        badgeBg: 'bg-emerald-900/60',
+        badgeText: 'text-emerald-300',
+        description: 'เหรียญสะสม +20 🪙 (หัก 1 ตั๋วสุ่ม)',
+      },
+      {
+        id: 'std-coin-50',
+        name: 'รางวัลระดับสูง 50 เหรียญ',
+        rewardType: 'coin',
+        coins: 50,
+        tickets: 0,
+        weight: 18,
+        badgeLabel: 'Rare (18%)',
+        badgeBg: 'bg-blue-900/60',
+        badgeText: 'text-blue-300',
+        description: 'เหรียญสะสม +50 🪙 (หัก 1 ตั๋วสุ่ม)',
+      },
+      {
+        id: 'std-ticket-draw',
+        name: 'ตั๋วสุ่มเพิ่ม (+1 ตั๋วสุ่ม)',
+        rewardType: 'ticket_draw',
+        coins: 0,
+        tickets: 1,
+        weight: 10,
+        badgeLabel: 'คืนตั๋ว (10%)',
+        badgeBg: 'bg-teal-900/70 border border-teal-500/40',
+        badgeText: 'text-teal-300',
+        description: '🎟️ ได้รับตั๋วสุ่มคืน (-1 +1 ตั๋วสุ่มเท่าเดิม ไม่หักตั๋วสะสม)',
+      },
+      {
+        id: 'std-coin-100',
+        name: 'รางวัลใหญ่แจ็กพอต 100 เหรียญ!',
+        rewardType: 'coin',
+        coins: 100,
+        tickets: 0,
+        weight: 7,
+        badgeLabel: 'Jackpot (7%)',
+        badgeBg: 'bg-amber-900/70 border border-amber-500/40',
+        badgeText: 'text-amber-300',
+        description: 'ขุมทรัพย์ก้อนโต +100 🪙 (หัก 1 ตั๋วสุ่ม)',
+      },
+      {
+        id: 'std-ticket-1',
+        name: 'ตั๋วกาชา 1 ใบ (Super Rare)',
+        rewardType: 'ticket',
+        coins: 0,
+        tickets: 1,
+        weight: 4,
+        badgeLabel: 'Super Rare (4%)',
+        badgeBg: 'bg-pink-900/70 border border-pink-500/40',
+        badgeText: 'text-pink-300',
+        description: '🎫 ตั๋วกาชาสำหรับสุ่มบัดดี้ +1 ใบ (หัก 1 ตั๋วสุ่ม)',
+      },
+      {
+        id: 'std-combo-mythic',
+        name: 'มหาโชค: 100 เหรียญ + 1 ตั๋วกาชา!',
+        rewardType: 'combo',
+        coins: 100,
+        tickets: 1,
+        weight: 1,
+        badgeLabel: 'Mythic (1%)',
+        badgeBg: 'bg-purple-900/70 border border-purple-500/40 animate-pulse',
+        badgeText: 'text-purple-300',
+        description: '👑 แจ็กพอตคู่หู +100🪙 & 🎫 1 ตั๋วกาชา (หัก 1 ตั๋วสุ่ม)',
+      },
+    ],
+  },
+  {
+    id: 'coin_rush',
+    title: '🪙 ล่าขุมทรัพย์เหรียญทอง (Coin Rush)',
+    description: 'เน้นสะสมเหรียญไปช้อปปิ้งไอเทมและขนมในร้านค้า',
+    tiers: [
+      {
+        id: 'cr-15',
+        name: 'เหรียญทอง 15 เหรียญ',
+        rewardType: 'coin',
+        coins: 15,
+        tickets: 0,
+        weight: 40,
+        badgeLabel: 'Common (40%)',
+        badgeBg: 'bg-slate-700/80',
+        badgeText: 'text-slate-200',
+        description: 'เหรียญสะสม +15 🪙 (หัก 1 ตั๋วชิงโชค)',
+      },
+      {
+        id: 'cr-30',
+        name: 'เหรียญทอง 30 เหรียญ',
+        rewardType: 'coin',
+        coins: 30,
+        tickets: 0,
+        weight: 35,
+        badgeLabel: 'Uncommon (35%)',
+        badgeBg: 'bg-emerald-900/60',
+        badgeText: 'text-emerald-300',
+        description: 'เหรียญสะสม +30 🪙 (หัก 1 ตั๋วชิงโชค)',
+      },
+      {
+        id: 'cr-60',
+        name: 'เหรียญทอง 60 เหรียญ',
+        rewardType: 'coin',
+        coins: 60,
+        tickets: 0,
+        weight: 18,
+        badgeLabel: 'Rare (18%)',
+        badgeBg: 'bg-blue-900/60',
+        badgeText: 'text-blue-300',
+        description: 'เหรียญสะสม +60 🪙 (หัก 1 ตั๋วชิงโชค)',
+      },
+      {
+        id: 'cr-120',
+        name: 'แจ็กพอตทองคำ 120 เหรียญ!',
+        rewardType: 'coin',
+        coins: 120,
+        tickets: 0,
+        weight: 7,
+        badgeLabel: 'Jackpot (7%)',
+        badgeBg: 'bg-amber-900/70 border border-amber-500/40',
+        badgeText: 'text-amber-300',
+        description: 'ทองคำก้อนโต +120 🪙 (หัก 1 ตั๋วชิงโชค)',
+      },
+    ],
+  },
+  {
+    id: 'gacha_mania',
+    title: '🎟️ กาชามาเนีย (Gacha Mania)',
+    description: 'เน้นโอกาสลุ้นตั๋วสุ่มกาชาไปสุ่มหาบัดดี้คู่หู',
+    tiers: [
+      {
+        id: 'gm-20',
+        name: 'เหรียญทอง 20 เหรียญ',
+        rewardType: 'coin',
+        coins: 20,
+        tickets: 0,
+        weight: 45,
+        badgeLabel: 'Common (45%)',
+        badgeBg: 'bg-slate-700/80',
+        badgeText: 'text-slate-200',
+        description: 'เหรียญสะสม +20 🪙 (หัก 1 ตั๋วชิงโชค)',
+      },
+      {
+        id: 'gm-50',
+        name: 'เหรียญทอง 50 เหรียญ',
+        rewardType: 'coin',
+        coins: 50,
+        tickets: 0,
+        weight: 30,
+        badgeLabel: 'Rare (30%)',
+        badgeBg: 'bg-blue-900/60',
+        badgeText: 'text-blue-300',
+        description: 'เหรียญสะสม +50 🪙 (หัก 1 ตั๋วชิงโชค)',
+      },
+      {
+        id: 'gm-ticket-1',
+        name: 'ตั๋วสุ่มกาชา 1 ใบ',
+        rewardType: 'ticket',
+        coins: 0,
+        tickets: 1,
+        weight: 18,
+        badgeLabel: 'Special (18%)',
+        badgeBg: 'bg-pink-900/70 border border-pink-500/40',
+        badgeText: 'text-pink-300',
+        description: '🎟️ ตั๋วสุ่มกาชา +1 ใบ (หัก 1 ตั๋ว และคืน +1 ตั๋ว = รอบนี้ +1 และไม่หักตั๋วเดิม)',
+      },
+      {
+        id: 'gm-combo',
+        name: 'คอมโบทองคำ + ตั๋ว 2 ใบ!',
+        rewardType: 'combo',
+        coins: 50,
+        tickets: 2,
+        weight: 7,
+        badgeLabel: 'Jackpot (7%)',
+        badgeBg: 'bg-purple-900/70 border border-purple-500/40',
+        badgeText: 'text-purple-300',
+        description: '🎉 +50🪙 และ +2🎟️ (หัก 1 ตั๋วชิงโชค = ได้กำไรสุทธิ +1 ตั๋ว และ +50 เหรียญ)',
+      },
+    ],
+  },
+  {
+    id: 'high_stakes',
+    title: '🔥 รางวัลใหญ่จัดเต็ม (High Stakes)',
+    description: 'รางวัลมูลค่าสูงพิเศษสำหรับรอบปิดคาบเรียนสำคัญ',
+    tiers: [
+      {
+        id: 'hs-30',
+        name: 'เหรียญทอง 30 เหรียญ',
+        rewardType: 'coin',
+        coins: 30,
+        tickets: 0,
+        weight: 50,
+        badgeLabel: 'Tier 1 (50%)',
+        badgeBg: 'bg-slate-700/80',
+        badgeText: 'text-slate-200',
+        description: 'เหรียญสะสม +30 🪙 (หัก 1 ตั๋วชิงโชค)',
+      },
+      {
+        id: 'hs-70',
+        name: 'เหรียญทอง 70 เหรียญ',
+        rewardType: 'coin',
+        coins: 70,
+        tickets: 0,
+        weight: 30,
+        badgeLabel: 'Tier 2 (30%)',
+        badgeBg: 'bg-blue-900/60',
+        badgeText: 'text-blue-300',
+        description: 'เหรียญสะสม +70 🪙 (หัก 1 ตั๋วชิงโชค)',
+      },
+      {
+        id: 'hs-100',
+        name: 'เหรียญทอง 100 เหรียญ',
+        rewardType: 'coin',
+        coins: 100,
+        tickets: 0,
+        weight: 15,
+        badgeLabel: 'Tier 3 (15%)',
+        badgeBg: 'bg-amber-900/70 border border-amber-500/40',
+        badgeText: 'text-amber-300',
+        description: 'เหรียญสะสม +100 🪙 (หัก 1 ตั๋วชิงโชค)',
+      },
+      {
+        id: 'hs-jackpot',
+        name: 'มหาโชค: ตั๋วสุ่มกาชา + 100 เหรียญ!',
+        rewardType: 'combo',
+        coins: 100,
+        tickets: 1,
+        weight: 5,
+        badgeLabel: 'Super Jackpot (5%)',
+        badgeBg: 'bg-rose-900/70 border border-rose-500/40 animate-pulse',
+        badgeText: 'text-rose-300',
+        description: '👑 +100🪙 & 🎟️ 1 ตั๋ว (ไม่หักตั๋วเดิม และได้รับ +100 เหรียญ)',
+      },
+    ],
+  },
+];
+
 export interface LuckyTicketDrawModalProps {
   isOpen: boolean;
   onClose: () => void;
   students: LiveStudent[];
+  classroomId?: string;
+  classroomName?: string;
+  subjectName?: string;
   onGiveReward: (
     studentIds: string[],
     rewardType: 'coin' | 'ticket',
@@ -69,8 +358,11 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
   isOpen,
   onClose,
   students,
+  classroomId,
+  classroomName,
+  subjectName,
   onGiveReward,
-  onConsumeTicket: _onConsumeTicket,
+  onConsumeTicket,
   onPlaySound,
 }) => {
   const [ticketSource, setTicketSource] = useState<'session' | 'total'>('session');
@@ -78,6 +370,56 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
   const [excludeWinners, setExcludeWinners] = useState<boolean>(true);
   const [pastWinnerIds, setPastWinnerIds] = useState<string[]>([]);
 
+  // ระบบติดตามเพดานโควตาสูงสุดของตั๋วกาชาประจำสัปดาห์ (ผูกกับคาบเรียน: 5 ใบ/คาบ x คาบต่อสัปดาห์)
+  const [weeklyGachaGiven, setWeeklyGachaGiven] = useState<number>(0);
+
+  const weeklyCapInfo = useMemo(() => {
+    return liveClassroomService.getWeeklyGachaTicketCap(
+      subjectName || 'general',
+      classroomName
+    );
+  }, [subjectName, classroomName]);
+
+  const isWeeklyGachaCapped = useMemo(() => {
+    return weeklyGachaGiven >= weeklyCapInfo.weeklyCap;
+  }, [weeklyGachaGiven, weeklyCapInfo.weeklyCap]);
+
+  // ซิงค์ยอดตั๋วกาชาประจำสัปดาห์
+  const syncWeeklyGachaTickets = useCallback(() => {
+    if (!classroomId) return;
+    const count = liveClassroomService.getWeeklyGachaTicketsGiven(
+      classroomId,
+      subjectName || 'general'
+    );
+    setWeeklyGachaGiven(count);
+  }, [classroomId, subjectName]);
+
+  useEffect(() => {
+    syncWeeklyGachaTickets();
+    const handleSync = () => syncWeeklyGachaTickets();
+    window.addEventListener(WEEKLY_GACHA_TICKETS_UPDATED_EVENT, handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener(WEEKLY_GACHA_TICKETS_UPDATED_EVENT, handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, [syncWeeklyGachaTickets]);
+
+  // ระบบของรางวัลและเรทขั้นบันได
+  const [selectedPoolId, setSelectedPoolId] = useState<string>('standard');
+  const currentPool = useMemo(() => {
+    return PRIZE_POOLS.find((p) => p.id === selectedPoolId) || PRIZE_POOLS[0];
+  }, [selectedPoolId]);
+
+  const [activePrize, setActivePrize] = useState<PrizeTier>(() => PRIZE_POOLS[0].tiers[0]);
+  const [isRollingPrize, setIsRollingPrize] = useState<boolean>(false);
+
+  // อัปเดต activePrize เมื่อเปลี่ยนพูล
+  useEffect(() => {
+    setActivePrize(currentPool.tiers[0]);
+  }, [currentPool]);
+
+  // วงล้อหมุนนักเรียน
   const [rotation, setRotation] = useState<number>(0);
   const [isSpinning, setIsSpinning] = useState<boolean>(false);
   const [winner, setWinner] = useState<LiveStudent | null>(null);
@@ -85,15 +427,21 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
 
   const spinTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tickTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const prizeRollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cancelActiveSpin = useCallback(() => {
     if (spinTimeoutRef.current) {
       clearTimeout(spinTimeoutRef.current);
       spinTimeoutRef.current = null;
     }
+    if (prizeRollTimerRef.current) {
+      clearTimeout(prizeRollTimerRef.current);
+      prizeRollTimerRef.current = null;
+    }
     tickTimersRef.current.forEach(clearTimeout);
     tickTimersRef.current = [];
     setIsSpinning(false);
+    setIsRollingPrize(false);
   }, []);
 
   useEffect(() => {
@@ -118,8 +466,71 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
     return segments.reduce((sum, s) => sum + s.tickets, 0);
   }, [segments]);
 
+  // ฟังก์ชันสุ่มของรางวัลก่อนหมุนคน (Roll Prize First) ตามน้ำหนักเรทขั้นบันได
+  const handleRollPrize = useCallback(() => {
+    if (isSpinning || isRollingPrize) return;
+
+    setIsRollingPrize(true);
+    onPlaySound?.('tick', 600);
+
+    // หากโควตากาชาของวิชาประจำสัปดาห์นี้เต็มแล้ว รางวัลกาชาจะแปลงเป็น 100 เหรียญแจ็กพอตแทน
+    const effectiveTiers: PrizeTier[] = currentPool.tiers.map((t) => {
+      if (isWeeklyGachaCapped && t.tickets > 0 && t.rewardType !== 'ticket_draw') {
+        return {
+          ...t,
+          convertedDueToCap: true,
+          name: `${t.name} (โควตาสัปดาห์เต็ม ➔ แปลงเป็น 100 เหรียญ)`,
+          rewardType: 'coin',
+          coins: 100,
+          tickets: 0,
+          description: `🪙 รางวัลใหญ่ 100 เหรียญแทน (โควตาสัปดาห์นี้เต็ม ${weeklyGachaGiven}/${weeklyCapInfo.weeklyCap} ใบ)`,
+        };
+      }
+      return t;
+    });
+
+    const totalWeight = effectiveTiers.reduce((sum, t) => sum + t.weight, 0);
+    const rand = Math.random() * totalWeight;
+    let accumulated = 0;
+    let chosen = effectiveTiers[0];
+
+    for (const tier of effectiveTiers) {
+      accumulated += tier.weight;
+      if (rand <= accumulated) {
+        chosen = tier;
+        break;
+      }
+    }
+
+    // แอนิเมชันสลับรางวัลจำลองการสุ่ม 1.2 วินาที
+    let cycleCount = 0;
+    const maxCycles = 12;
+    const interval = setInterval(() => {
+      cycleCount++;
+      const tempIndex = cycleCount % effectiveTiers.length;
+      setActivePrize(effectiveTiers[tempIndex]);
+      onPlaySound?.('tick', 500 + cycleCount * 25);
+
+      if (cycleCount >= maxCycles) {
+        clearInterval(interval);
+        setActivePrize(chosen);
+        setIsRollingPrize(false);
+        onPlaySound?.('coin');
+      }
+    }, 90);
+  }, [
+    isSpinning,
+    isRollingPrize,
+    currentPool,
+    isWeeklyGachaCapped,
+    weeklyGachaGiven,
+    weeklyCapInfo.weeklyCap,
+    onPlaySound,
+  ]);
+
+  // ฟังก์ชันหมุนวงล้อหานักเรียนผู้โชคดี
   const handleSpinWheel = useCallback(() => {
-    if (isSpinning || segments.length === 0) return;
+    if (isSpinning || segments.length === 0 || isRollingPrize) return;
 
     setIsSpinning(true);
     setWinner(null);
@@ -133,7 +544,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
 
     setRotation(spinResult.nextRotationDeg);
 
-    // เสียงติ๊กจำลองเข็มดีดผ่านหมุดวงล้อ ค่อยๆ ชะลอความเร็วตามสมการ Cubic Bezier
+    // เสียงติ๊กจำลองเข็มดีดผ่านหมุดวงล้อ ค่อยๆ ชะลอความเร็วตาม Cubic Bezier
     tickTimersRef.current.forEach(clearTimeout);
     tickTimersRef.current = [];
     const totalTicks = Math.round(spinDurationSec * 6.5);
@@ -154,38 +565,91 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
       setWinner(spinResult.winnerSegment.student);
       onPlaySound?.('fanfare');
     }, spinDurationMs);
-  }, [isSpinning, segments, rotation, spinDurationSec, onPlaySound]);
+  }, [isSpinning, segments, rotation, spinDurationSec, isRollingPrize, onPlaySound]);
 
-  const handleAwardWinner = (rewardType: 'coin' | 'ticket' | 'combo', amount = 10) => {
+  // ฟังก์ชันมอบรางวัลและจัดการตั๋วสุ่ม
+  const handleConfirmAward = () => {
     if (!winner || prizeClaimed) return;
 
-    if (rewardType === 'coin') {
+    if (activePrize.rewardType === 'coin') {
+      // 1. รางวัลเป็นเหรียญ: หัก 1 ตั๋วสุ่ม และมอบเหรียญรางวัล
+      onConsumeTicket?.(winner.id);
       onGiveReward(
         [winner.id],
         'coin',
-        amount,
-        `🎉 รางวัลใหญ่ท้ายคาบ +${amount} เหรียญ (${winner.name})`
+        activePrize.coins,
+        `🎉 รางวัลใหญ่ท้ายคาบ +${activePrize.coins} เหรียญ (${winner.name}) [หัก 1 ตั๋วสุ่ม]`
       );
-    } else if (rewardType === 'ticket') {
-      onGiveReward(
-        [winner.id],
-        'ticket',
-        amount,
-        `🎟️ รางวัลใหญ่ท้ายคาบ +${amount} ตั๋วสุ่ม (${winner.name})`
-      );
-    } else if (rewardType === 'combo') {
-      onGiveReward(
-        [winner.id],
-        'coin',
-        20,
-        `🎉 รางวัลแชมป์ท้ายคาบ +20 เหรียญ (${winner.name})`
-      );
-      onGiveReward(
-        [winner.id],
-        'ticket',
-        1,
-        `🎟️ รางวัลแชมป์ท้ายคาบ +1 ตั๋วสุ่ม (${winner.name})`
-      );
+    } else if (activePrize.rewardType === 'ticket_draw') {
+      // 2. รางวัลเป็นตั๋วสุ่ม (Lucky Draw Ticket): คืนตั๋วสุ่ม (-1 +1 ตั๋วสุ่มเท่าเดิม)
+      // ไม่ต้องหักตั๋วสุ่ม (ตั๋วสะสมเดิมอยู่ครบถ้วน)
+      onPlaySound?.('fanfare');
+    } else if (activePrize.rewardType === 'ticket') {
+      // 3. รางวัลเป็นตั๋วกาชา (Gacha Ticket): หัก 1 ตั๋วสุ่ม และมอบตั๋วกาชา +1 ใบ
+      onConsumeTicket?.(winner.id);
+
+      if (isWeeklyGachaCapped) {
+        // หากโควตารายวิชาเต็มแล้ว ให้แปลงเป็น 100 เหรียญแจ็กพอตแทน
+        onGiveReward(
+          [winner.id],
+          'coin',
+          100,
+          `🎉 แจ็กพอต 100 เหรียญแทนตั๋วกาชา (โควตาสัปดาห์เต็ม) (${winner.name}) [หัก 1 ตั๋วสุ่ม]`
+        );
+      } else {
+        onGiveReward(
+          [winner.id],
+          'ticket',
+          activePrize.tickets,
+          `🎫 รางวัลใหญ่ท้ายคาบ ตั๋วกาชาบัดดี้ +${activePrize.tickets} ใบ (${winner.name}) [หัก 1 ตั๋วสุ่ม]`
+        );
+        if (classroomId) {
+          liveClassroomService.recordWeeklyGachaTicketsGiven(
+            classroomId,
+            subjectName || 'general',
+            activePrize.tickets
+          );
+          setWeeklyGachaGiven((prev) => prev + activePrize.tickets);
+        }
+      }
+    } else if (activePrize.rewardType === 'combo') {
+      // 4. รางวัลคอมโบ (เหรียญ + ตั๋วกาชา): หัก 1 ตั๋วสุ่ม, มอบเหรียญ และมอบตั๋วกาชา
+      onConsumeTicket?.(winner.id);
+
+      if (activePrize.coins > 0) {
+        onGiveReward(
+          [winner.id],
+          'coin',
+          activePrize.coins,
+          `🎉 รางวัลแชมป์ท้ายคาบ +${activePrize.coins} เหรียญ (${winner.name}) [หัก 1 ตั๋วสุ่ม]`
+        );
+      }
+
+      if (activePrize.tickets > 0) {
+        if (isWeeklyGachaCapped) {
+          onGiveReward(
+            [winner.id],
+            'coin',
+            100,
+            `🎉 โบนัส 100 เหรียญแทนตั๋วกาชา (โควตาสัปดาห์เต็ม) (${winner.name})`
+          );
+        } else {
+          onGiveReward(
+            [winner.id],
+            'ticket',
+            activePrize.tickets,
+            `🎫 รางวัลแชมป์ท้ายคาบ ตั๋วกาชาบัดดี้ +${activePrize.tickets} ใบ (${winner.name})`
+          );
+          if (classroomId) {
+            liveClassroomService.recordWeeklyGachaTicketsGiven(
+              classroomId,
+              subjectName || 'general',
+              activePrize.tickets
+            );
+            setWeeklyGachaGiven((prev) => prev + activePrize.tickets);
+          }
+        }
+      }
     }
 
     if (excludeWinners) {
@@ -219,7 +683,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
                 </span>
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                ยิ่งสะสมตั๋วสุ่มได้มาก ช่องบนวงล้อและโอกาสถูกรางวัลยิ่งกว้างขึ้นตามสัดส่วนจริง
+                สุ่มหรือเลือกของรางวัลก่อนหมุนคน • เมื่อได้รับรางวัลจะหัก 1 ตั๋วชิงโชค (หากได้ตั๋วกาชาจะเป็นการคืนตั๋ว = ไม่หักตั๋วเดิม)
               </p>
             </div>
           </div>
@@ -233,7 +697,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
         </div>
 
         {/* Settings Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 py-3.5 border-b border-slate-800/80 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-4 py-3 border-b border-slate-800/80 text-xs">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <span className="text-slate-400 font-medium">ใช้ตั๋วจาก:</span>
@@ -252,7 +716,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-slate-400 font-medium">ความเร็วการหมุน:</span>
+              <span className="text-slate-400 font-medium">ความเร็ว:</span>
               <select
                 value={spinDurationSec}
                 onChange={(e) => setSpinDurationSec(Number(e.target.value))}
@@ -274,7 +738,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
                 className="w-4 h-4 rounded accent-pink-500"
               />
               <span className="text-slate-300 font-medium">
-                ตัดสิทธิ์ผู้ชนะออกในการหมุนรอบถัดไป ({pastWinnerIds.length} คนได้รับแล้ว)
+                ตัดสิทธิ์ผู้ชนะออกในรอบถัดไป ({pastWinnerIds.length} คนได้รับแล้ว)
               </span>
             </label>
           </div>
@@ -289,13 +753,158 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
               className="flex items-center gap-1.5 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1 rounded-xl font-semibold text-slate-300 transition"
             >
               <Refresh1Regular className="w-3.5 h-3.5" />
-              <span>คืนสิทธิ์ผู้ชนะทั้งหมด</span>
+              <span>คืนสิทธิ์ผู้ชนะ</span>
             </button>
           )}
         </div>
 
+        {/* Section 2: Stepped Prize Pool Ladder & Pre-Draw Prize Selector */}
+        <div className="mt-4 p-4 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Gift className="w-4 h-4 text-amber-400" />
+              <span className="text-xs font-bold text-slate-200">รูปแบบของรางวัล (Prize Pool):</span>
+              <div className="flex flex-wrap gap-1.5">
+                {PRIZE_POOLS.map((pool) => (
+                  <button
+                    key={pool.id}
+                    onClick={() => {
+                      setSelectedPoolId(pool.id);
+                      setWinner(null);
+                    }}
+                    disabled={isSpinning || isRollingPrize}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition ${
+                      selectedPoolId === pool.id
+                        ? 'bg-amber-400 text-slate-950 shadow-sm'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    {pool.title.split(' ')[0]} {pool.title.split(' ')[1]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Weekly Gacha Quota Tracker Badge */}
+            <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-slate-900 border border-slate-800 text-[11px]">
+              <span className="text-pink-400 font-bold">🎫 โควตากาชาวิชานี้สัปดาห์นี้:</span>
+              <span className={`font-black ${isWeeklyGachaCapped ? 'text-rose-400' : 'text-emerald-400'}`}>
+                {weeklyGachaGiven} / {weeklyCapInfo.weeklyCap} ใบ
+              </span>
+              <span className="text-slate-500 hidden sm:inline">
+                ({weeklyCapInfo.periodsPerWeek} คาบ/สัปดาห์ • เพดาน {weeklyCapInfo.ticketsPerPeriod} ใบ/คาบ)
+              </span>
+              {isWeeklyGachaCapped && (
+                <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold text-[10px]">
+                  เต็มเพดาน (แปลงเป็น 100🪙)
+                </span>
+              )}
+            </div>
+
+            {/* Roll Prize Button */}
+            <button
+              onClick={handleRollPrize}
+              disabled={isSpinning || isRollingPrize}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-slate-950 text-xs font-black shadow-md transition active:scale-95 cursor-pointer"
+            >
+              <Dices className={`w-3.5 h-3.5 ${isRollingPrize ? 'animate-spin' : ''}`} />
+              <span>{isRollingPrize ? 'กำลังสุ่มของรางวัล...' : '🎲 สุ่มของรางวัลรอบนี้'}</span>
+            </button>
+          </div>
+
+          {/* Stepped Rate Ladder Tiers List */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 pt-1">
+            {currentPool.tiers.map((tier) => {
+              const isSelected = activePrize.id === tier.id;
+              const isCappedGacha = isWeeklyGachaCapped && tier.tickets > 0 && tier.rewardType !== 'ticket_draw';
+
+              return (
+                <button
+                  key={tier.id}
+                  onClick={() => {
+                    if (isCappedGacha) {
+                      setActivePrize({
+                        ...tier,
+                        convertedDueToCap: true,
+                        name: `${tier.name} (เต็มเพดาน ➔ 100 เหรียญ)`,
+                        rewardType: 'coin',
+                        coins: 100,
+                        tickets: 0,
+                        description: `🪙 รางวัลใหญ่ 100 เหรียญแทน (โควตาสัปดาห์เต็ม ${weeklyGachaGiven}/${weeklyCapInfo.weeklyCap} ใบ)`,
+                      });
+                    } else {
+                      setActivePrize(tier);
+                    }
+                    onPlaySound?.('tick', 700);
+                  }}
+                  disabled={isSpinning || isRollingPrize}
+                  className={`p-2.5 rounded-xl border text-left transition relative flex flex-col justify-between ${
+                    isSelected
+                      ? 'bg-amber-400/15 border-amber-400 ring-2 ring-amber-400/40 shadow-lg shadow-amber-500/10'
+                      : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-400'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1 w-full mb-1">
+                    <span
+                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                        isCappedGacha ? 'bg-rose-950 border border-rose-500/40 text-rose-300' : `${tier.badgeBg} ${tier.badgeText}`
+                      }`}
+                    >
+                      {isCappedGacha ? 'เต็มเพดาน ➔ 100🪙' : tier.badgeLabel}
+                    </span>
+                    {isSelected && (
+                      <span className="w-2 h-2 rounded-full bg-amber-400 shadow-sm animate-ping" />
+                    )}
+                  </div>
+                  <div className="text-xs font-black text-slate-100 flex items-center gap-1 mt-0.5">
+                    {tier.rewardType === 'ticket' ? (
+                      <TicketRegular className="w-3.5 h-3.5 text-pink-400 shrink-0" />
+                    ) : tier.rewardType === 'ticket_draw' ? (
+                      <TicketRegular className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                    ) : tier.rewardType === 'combo' ? (
+                      <SparklesRegular className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                    ) : (
+                      <Coin2Regular className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    )}
+                    <span className="truncate">{tier.name}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-1 truncate">
+                    {tier.rewardType === 'ticket_draw' && '🎟️ คืนตั๋วสุ่ม (ไม่หัก)'}
+                    {tier.rewardType === 'ticket' && (isCappedGacha ? '🪙 +100 เหรียญแทน' : '+1 🎫 ตั๋วกาชา')}
+                    {tier.rewardType === 'combo' && (isCappedGacha ? '+200 🪙 แจ็กพอต' : '+100🪙 +1🎫')}
+                    {tier.rewardType === 'coin' && `+${tier.coins} 🪙 เหรียญ`}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Active Round Prize Banner */}
+          <div className="flex items-center justify-between bg-gradient-to-r from-amber-500/20 via-pink-500/10 to-indigo-500/20 border border-amber-400/50 px-4 py-2 rounded-xl text-xs">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-sm">
+                🎁
+              </div>
+              <div>
+                <span className="text-[11px] text-amber-300 font-semibold block">
+                  ของรางวัลประจำรอบนี้ (พร้อมชิง):
+                </span>
+                <span className="text-sm font-black text-white">
+                  {activePrize.name}
+                </span>
+                <span className="text-[11px] text-slate-400 ml-2">
+                  ({activePrize.description})
+                </span>
+              </div>
+            </div>
+            <span className="text-xs font-black px-2.5 py-1 rounded-full bg-amber-400 text-slate-950">
+              โอกาสออก {activePrize.weight}%
+            </span>
+          </div>
+        </div>
+
         {/* Main Content Grid: Left Wheel / Right Odds Table */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-6 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-5 items-center">
           {/* Left: SVG Wheel */}
           <div className="lg:col-span-7 flex flex-col items-center justify-center relative">
             {segments.length > 0 ? (
@@ -318,7 +927,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
                     }}
                   >
                     {segments.length === 1 ? (
-                      /* Edge Case: นักเรียนถือตั๋วเพียง 1 คน (เต็ม 360 องศา) วาดวงกลมเต็มวง */
+                      /* Edge Case: นักเรียนถือตั๋วเพียง 1 คน (เต็ม 360 องศา) */
                       <g>
                         <circle cx="150" cy="150" r="145" fill={segments[0].color} />
                         <text
@@ -387,11 +996,15 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
 
                 <button
                   onClick={handleSpinWheel}
-                  disabled={isSpinning}
-                  className="mt-6 flex items-center gap-2.5 bg-gradient-to-r from-pink-600 to-indigo-600 hover:from-pink-500 hover:to-indigo-500 disabled:opacity-50 text-white font-extrabold text-base px-9 py-3 rounded-2xl shadow-xl shadow-pink-600/25 transition transform active:scale-95"
+                  disabled={isSpinning || isRollingPrize}
+                  className="mt-6 flex items-center gap-2.5 bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 hover:from-pink-500 hover:to-indigo-500 disabled:opacity-50 text-white font-extrabold text-base px-8 py-3 rounded-2xl shadow-xl shadow-pink-600/25 transition transform active:scale-95 cursor-pointer"
                 >
-                  <SparklesRegular className="w-5 h-5" />
-                  <span>{isSpinning ? 'กำลังหมุนวงล้อ...' : 'หมุนวงล้อจับรางวัล!'}</span>
+                  <SparklesRegular className="w-5 h-5 text-amber-300" />
+                  <span>
+                    {isSpinning
+                      ? 'กำลังหมุนวงล้อ...'
+                      : `หมุนวงล้อชิง [${activePrize.name}]!`}
+                  </span>
                 </button>
               </>
             ) : (
@@ -420,43 +1033,64 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
                 <div>
                   <p className="text-xs text-amber-300 font-semibold">#{winner.studentCode}</p>
                   <h3 className="text-2xl font-black text-white mt-0.5">{winner.name}</h3>
+                  <div className="mt-2 p-2 rounded-xl bg-slate-950/70 border border-amber-400/40 inline-block text-left text-xs text-amber-200">
+                    <span className="font-bold text-white">🎁 ของรางวัล: </span>
+                    {activePrize.name} ({activePrize.description})
+                  </div>
                 </div>
 
                 {!prizeClaimed ? (
                   <div className="space-y-2 pt-1">
-                    <p className="text-xs text-slate-300 font-medium">
-                      เลือกรางวัลที่ต้องการมอบให้ผู้โชคดี (ไม่หักตั๋วเดิมของนักเรียน):
+                    <button
+                      onClick={handleConfirmAward}
+                      className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black py-3 px-4 rounded-xl text-xs transition active:scale-95 shadow-md cursor-pointer"
+                    >
+                      <SparklesRegular className="w-4 h-4" />
+                      <span>
+                        {activePrize.rewardType === 'ticket_draw'
+                          ? `คืนตั๋วสุ่ม (-1 +1 ตั๋วสุ่มเท่าเดิม ไม่หักตั๋ว)`
+                          : activePrize.rewardType === 'ticket'
+                          ? `มอบ 🎫 ${activePrize.name} & หัก 1 ตั๋วสุ่ม`
+                          : activePrize.rewardType === 'combo'
+                          ? `มอบ 👑 ${activePrize.name} & หัก 1 ตั๋วสุ่ม`
+                          : `มอบ 🪙 ${activePrize.name} & หัก 1 ตั๋วสุ่ม`}
+                      </span>
+                    </button>
+                    <p className="text-[11px] text-slate-400">
+                      {activePrize.rewardType === 'ticket_draw'
+                        ? '🎟️ สุ่มได้ตั๋วสุ่ม: คืนตั๋วเข้าชิงโชค (-1 +1 ตั๋วเดิมอยู่ครบ) ไม่มีการหักตั๋วสะสม'
+                        : activePrize.rewardType === 'ticket'
+                        ? '🎫 ได้รับตั๋วกาชา: หัก 1 ตั๋วสุ่มชิงโชค และมอบตั๋วกาชาบัดดี้ 1 ใบเข้ากระเป๋า'
+                        : activePrize.rewardType === 'combo'
+                        ? '👑 รางวัลคอมโบ: หัก 1 ตั๋วสุ่มชิงโชค มอบเหรียญและตั๋วกาชาเข้ากระเป๋า'
+                        : '🪙 ระบบจะหัก 1 ตั๋วสุ่มออกจากกระเป๋า และมอบเหรียญรางวัลทันที'}
                     </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <button
-                        onClick={() => handleAwardWinner('coin', 10)}
-                        className="flex items-center justify-center gap-1.5 bg-amber-400 hover:bg-amber-300 text-amber-950 font-black py-2.5 px-2 rounded-xl text-xs transition active:scale-95 shadow-sm"
-                      >
-                        <Coin2Regular className="w-4 h-4" />
-                        <span>มอบ +10 🪙</span>
-                      </button>
-
-                      <button
-                        onClick={() => handleAwardWinner('ticket', 1)}
-                        className="flex items-center justify-center gap-1.5 bg-pink-500 hover:bg-pink-400 text-white font-extrabold py-2.5 px-2 rounded-xl text-xs transition active:scale-95 shadow-sm"
-                      >
-                        <TicketRegular className="w-4 h-4" />
-                        <span>มอบ +1 🎟️</span>
-                      </button>
-
-                      <button
-                        onClick={() => handleAwardWinner('combo')}
-                        className="flex items-center justify-center gap-1 bg-gradient-to-r from-amber-400 to-pink-500 hover:from-amber-300 hover:to-pink-400 text-slate-950 font-black py-2.5 px-2 rounded-xl text-xs transition active:scale-95 shadow-sm"
-                      >
-                        <TrophyRegular className="w-3.5 h-3.5" />
-                        <span>+20🪙 & +1🎟️</span>
-                      </button>
-                    </div>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center gap-2 text-emerald-400 font-bold text-xs py-2">
-                    <CheckCircleRegular className="w-4 h-4" />
-                    <span>มอบรางวัลและบันทึกเข้า Session Log เรียบร้อย (ตั๋วเดิมคงอยู่ครบ)!</span>
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-center gap-2 text-emerald-400 font-bold text-xs py-2 bg-emerald-950/40 border border-emerald-500/30 rounded-xl">
+                      <CheckCircleRegular className="w-4 h-4" />
+                      <span>
+                        {activePrize.rewardType === 'ticket_draw'
+                          ? 'คืนตั๋วสุ่มสำเร็จ (-1 +1 ตั๋วเท่าเดิม) เรียบร้อย!'
+                          : activePrize.rewardType === 'ticket'
+                          ? `มอบ 🎫 ${activePrize.name} & หัก 1 ตั๋วสุ่ม เรียบร้อย!`
+                          : activePrize.rewardType === 'combo'
+                          ? `มอบ 👑 ${activePrize.name} & หัก 1 ตั๋วสุ่ม เรียบร้อย!`
+                          : `มอบ +${activePrize.coins} เหรียญ & หัก 1 ตั๋วสุ่ม เรียบร้อย!`}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setWinner(null);
+                        setPrizeClaimed(false);
+                      }}
+                      className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition flex items-center justify-center gap-1.5"
+                    >
+                      <span>เตรียมหมุนรอบถัดไป</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 )}
               </div>

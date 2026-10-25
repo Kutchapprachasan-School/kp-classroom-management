@@ -31,6 +31,7 @@ import {
   calculateHarmonicProgress,
   prepareRaceContestants,
 } from '../src/utils/racePhysicsEngine';
+import { inferGradeLevelFromCourseCode } from '../src/services/coursesCurriculumService';
 
 async function runTests() {
   console.log('🧪 Running Live Classroom Ecosystem Tests...');
@@ -260,6 +261,17 @@ async function runTests() {
   assert.equal(raceHeat.contestants.length, 4);
   assert.ok(raceHeat.winner);
   assert.equal(raceHeat.contestants.find((c) => c.isWinner)?.id, raceHeat.winner.id);
+
+  // 13. ทดสอบการอนุมานระดับชั้นจากรหัสวิชา (inferGradeLevelFromCourseCode) ตามมาตรฐานกระทรวงฯ
+  assert.equal(inferGradeLevelFromCourseCode('ญ21202'), 'ม.1', 'ญ21202 ต้องเป็นชั้น ม.1');
+  assert.equal(inferGradeLevelFromCourseCode('ศ22101'), 'ม.2', 'ศ22101 ต้องเป็นชั้น ม.2');
+  assert.equal(inferGradeLevelFromCourseCode('ว23101'), 'ม.3', 'ว23101 ต้องเป็นชั้น ม.3');
+  assert.equal(inferGradeLevelFromCourseCode('ญ31202'), 'ม.4', 'ญ31202 ต้องเป็นชั้น ม.4');
+  assert.equal(inferGradeLevelFromCourseCode('ญ32202'), 'ม.5', 'ญ32202 ต้องเป็นชั้น ม.5');
+  assert.equal(inferGradeLevelFromCourseCode('ส30206'), 'ม.6', 'ส30206 ต้องเป็นชั้น ม.6');
+  assert.equal(inferGradeLevelFromCourseCode('ญ30206'), 'ม.6', 'ญ30206 ต้องเป็นชั้น ม.6');
+  assert.equal(inferGradeLevelFromCourseCode('ญ33202'), 'ม.6', 'ญ33202 ต้องเป็นชั้น ม.6');
+  assert.equal(inferGradeLevelFromCourseCode(''), null);
 
   console.log('✅ All Live Classroom Ecosystem tests passed!');
 }

@@ -57,6 +57,10 @@ export interface GachaAdminConfig {
     quizPerfectTickets: number;
     /** เพดานตั๋วฟรีที่รับจากภารกิจได้ต่อสัปดาห์ (0 = ไม่จำกัด) */
     weeklyFreeTicketCap: number;
+    /** เพดานตั๋วสุ่มที่ได้รับในแต่ละคาบเรียน (ป้องกันภาวะตั๋วเฟ้อ ค่าเริ่มต้น 5) */
+    sessionTicketCap?: number;
+    /** โควตาตั๋วกาชาต่อคาบสอน ผูกกับรายวิชา (เช่น 5 ใบ/คาบ -> 2 คาบ/สัปดาห์ = ไม่เกิน 10 ใบ/วิชา/สัปดาห์) */
+    gachaTicketsPerPeriod?: number;
   };
   quiz: {
     baseXpPerWeek: number;
@@ -109,7 +113,7 @@ export const DEFAULT_GACHA_CONFIG: GachaAdminConfig = {
     MYTHIC: 10000,
   },
   shop: {
-    shardsPerTicket: 50,
+    shardsPerTicket: 300, // ปรับเป็น 300 เศษดาวต่อ 1 ตั๋วกาชา (เชื่อมโยงกับหน้าร้านค้าของนักเรียน และแอดมินสามารถปรับได้ตลอดเวลา)
     coinsPerTicket: 200,
     foodPriceCoins: 50,
     snackPriceCoins: 80,
@@ -122,6 +126,8 @@ export const DEFAULT_GACHA_CONFIG: GachaAdminConfig = {
     submissionTickets: 1,
     quizPerfectTickets: 1,
     weeklyFreeTicketCap: 5,
+    sessionTicketCap: 5, // เพดานตั๋วสุ่มสูงสุด 5 ใบต่อคาบ ป้องกันภาวะตั๋วเฟ้อ
+    gachaTicketsPerPeriod: 5, // โควตาตั๋วกาชา 5 ใบต่อคาบสอน ผูกกับรายวิชาต่อสัปดาห์ (เช่น 2 คาบ/สัปดาห์ = ไม่เกิน 10 ใบ)
   },
   quiz: {
     baseXpPerWeek: 100,
@@ -147,8 +153,23 @@ const mergeConfig = (stored: Partial<GachaAdminConfig>): GachaAdminConfig => {
     shardsOnDuplicate: { ...base.shardsOnDuplicate, ...(stored.shardsOnDuplicate || {}) },
     starUpgradeCosts: { ...base.starUpgradeCosts, ...(stored.starUpgradeCosts || {}) },
     unlockCostShards: { ...base.unlockCostShards, ...(stored.unlockCostShards || {}) },
-    shop: { ...base.shop, ...(stored.shop || {}) },
-    rewards: { ...base.rewards, ...(stored.rewards || {}) },
+    shop: {
+      ...base.shop,
+      ...(stored.shop || {}),
+      // Auto-heal: หากเป็นค่าเดิม 50 หรือ 150 ให้ปรับเป็น 300 ตามนโยบายใหม่
+      shardsPerTicket:
+        stored.shop?.shardsPerTicket === 50 ||
+        stored.shop?.shardsPerTicket === 150 ||
+        !stored.shop?.shardsPerTicket
+          ? 300
+          : stored.shop.shardsPerTicket,
+    },
+    rewards: {
+      sessionTicketCap: 5,
+      gachaTicketsPerPeriod: 5,
+      ...base.rewards,
+      ...(stored.rewards || {}),
+    },
     quiz: {
       ...base.quiz,
       ...(stored.quiz || {}),
@@ -169,6 +190,12 @@ export const validateGachaConfig = (cfg: GachaAdminConfig): string[] => {
   if (cfg.shop.shardsPerTicket < 1 || cfg.shop.coinsPerTicket < 1) errors.push('ราคาแลกตั๋วต้องมากกว่า 0');
   if (cfg.rewards.attendanceDaysRequired < 1 || cfg.rewards.attendanceDaysRequired > 5) {
     errors.push('จำนวนวันเช็คชื่อที่ต้องมาเรียนต้องอยู่ระหว่าง 1–5 วัน');
+  }
+  if (
+    cfg.rewards.sessionTicketCap !== undefined &&
+    (!Number.isInteger(cfg.rewards.sessionTicketCap) || cfg.rewards.sessionTicketCap < 1)
+  ) {
+    errors.push('เพดานตั๋วต่อคาบเรียนต้องเป็นจำนวนเต็มตั้งแต่ 1 ใบขึ้นไป');
   }
   const pct = cfg.quiz.rewardPercentByCorrect;
   if (pct.length !== 4 || pct.some((p) => p < 0 || p > 100)) {

@@ -85,6 +85,13 @@ export const RandomTextSubTab: React.FC<RandomTextSubTabProps> = ({
     }
     return true;
   });
+  const [speakVocabWord, setSpeakVocabWord] = useState<boolean>(() => {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('cls_speak_vocab_word');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
   const [vocabSpeechLang, setVocabSpeechLang] = useState<'th-TH' | 'en-US' | 'ja-JP' | 'zh-CN'>(() => {
     if (typeof localStorage !== 'undefined') {
       const saved = localStorage.getItem('cls_vocab_speech_lang');
@@ -245,15 +252,22 @@ export const RandomTextSubTab: React.FC<RandomTextSubTabProps> = ({
 
           onPlaySound?.('fanfare');
 
-          // 🔊 อ่านออกเสียงเมื่อสุ่มเสร็จสิ้น
-          if (targetStudent && speakStudentName) {
+          // 🔊 อ่านออกเสียงเมื่อสุ่มเสร็จสิ้น (แยกการควบคุมเสียงเรียกชื่อนักเรียนและเสียงอ่านคำศัพท์ออกจากกัน)
+          let delayMs = 0;
+          if (targetStudent && isPairStudent && speakStudentName) {
             tts.speakStudentName(targetStudent.number, targetStudent.name, true);
-            const wordTimer = setTimeout(() => {
+            delayMs = 1200;
+          }
+
+          if (speakVocabWord) {
+            if (delayMs > 0) {
+              const wordTimer = setTimeout(() => {
+                tts.speakText(targetWord, vocabSpeechLang, true);
+              }, delayMs);
+              spinTimersRef.current.push(wordTimer);
+            } else {
               tts.speakText(targetWord, vocabSpeechLang, true);
-            }, 1200);
-            spinTimersRef.current.push(wordTimer);
-          } else {
-            tts.speakText(targetWord, vocabSpeechLang, true);
+            }
           }
         }
       }, stepTimeMs);
@@ -266,6 +280,7 @@ export const RandomTextSubTab: React.FC<RandomTextSubTabProps> = ({
     cancelSpinTimers,
     isPairStudent,
     speakStudentName,
+    speakVocabWord,
     vocabSpeechLang,
     presentStudents,
     spinSpeed,
@@ -487,7 +502,13 @@ export const RandomTextSubTab: React.FC<RandomTextSubTabProps> = ({
           </label>
 
           {isPairStudent && (
-            <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold select-none bg-blue-50/70 dark:bg-slate-800/80 px-2.5 py-1 rounded-xl border border-blue-100 dark:border-slate-700">
+            <label
+              className={`flex items-center gap-1.5 cursor-pointer text-xs font-semibold select-none px-2.5 py-1 rounded-xl border transition ${
+                isProjectorMode
+                  ? 'bg-slate-800 border-slate-700 text-slate-200'
+                  : 'bg-blue-50/80 border-blue-200 text-[#163A66]'
+              }`}
+            >
               <input
                 type="checkbox"
                 checked={speakStudentName}
@@ -498,39 +519,79 @@ export const RandomTextSubTab: React.FC<RandomTextSubTabProps> = ({
                 className="w-3.5 h-3.5 rounded accent-blue-600"
               />
               <Volume2 className="w-3.5 h-3.5 text-blue-500" />
-              <span className={isProjectorMode ? 'text-slate-200' : 'text-[#163A66]'}>
-                เรียกชื่อนักเรียนด้วยเสียงพูด
-              </span>
+              <span>เรียกชื่อนักเรียน</span>
             </label>
           )}
 
-          {/* ตัวเลือกภาษาสำหรับอ่านออกเสียงคำศัพท์ (ไทย, อังกฤษ, ญี่ปุ่น, จีน) */}
-          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700">
-            <span className="text-[11px] font-bold text-slate-500">ภาษาเสียง:</span>
-            <select
-              value={vocabSpeechLang}
+          {/* สวิตช์เลือกว่าจะให้อ่านออกเสียงคำศัพท์หรือไม่ */}
+          <label
+            className={`flex items-center gap-1.5 cursor-pointer text-xs font-semibold select-none px-2.5 py-1 rounded-xl border transition ${
+              isProjectorMode
+                ? 'bg-slate-800 border-slate-700 text-slate-200'
+                : 'bg-indigo-50/80 border-indigo-200 text-[#163A66]'
+            }`}
+            title="เปิด/ปิดการอ่านออกเสียงคำศัพท์ (หากต้องการให้นักเรียนอ่านหรืออธิบายเอง ให้ปิดตัวเลือกนี้)"
+          >
+            <input
+              type="checkbox"
+              checked={speakVocabWord}
               onChange={(e) => {
-                const val = e.target.value as any;
-                setVocabSpeechLang(val);
-                localStorage.setItem('cls_vocab_speech_lang', val);
+                setSpeakVocabWord(e.target.checked);
+                localStorage.setItem('cls_speak_vocab_word', String(e.target.checked));
               }}
-              className="text-xs font-bold bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer"
-            >
-              <option value="th-TH">🇹🇭 ไทย</option>
-              <option value="en-US">🇬🇧 English</option>
-              <option value="ja-JP">🇯🇵 日本語</option>
-              <option value="zh-CN">🇨🇳 中文</option>
-            </select>
-          </div>
+              className="w-3.5 h-3.5 rounded accent-indigo-600"
+            />
+            <Volume2 className="w-3.5 h-3.5 text-indigo-500" />
+            <span>อ่านออกเสียงคำศัพท์</span>
+          </label>
 
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl">
+          {/* ตัวเลือกภาษาสำหรับอ่านออกเสียงคำศัพท์ (ไทย, อังกฤษ, ญี่ปุ่น, จีน) */}
+          {speakVocabWord && (
+            <div
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl border transition ${
+                isProjectorMode
+                  ? 'bg-slate-800 border-slate-700 text-slate-200'
+                  : 'bg-white border-[#BFDBFE] text-[#163A66] shadow-xs'
+              }`}
+            >
+              <span className={`text-[11px] font-bold ${isProjectorMode ? 'text-slate-400' : 'text-[#6B7C93]'}`}>
+                ภาษาเสียง:
+              </span>
+              <select
+                value={vocabSpeechLang}
+                onChange={(e) => {
+                  const val = e.target.value as any;
+                  setVocabSpeechLang(val);
+                  localStorage.setItem('cls_vocab_speech_lang', val);
+                }}
+                className={`text-xs font-bold bg-transparent focus:outline-none cursor-pointer ${
+                  isProjectorMode ? 'text-slate-100' : 'text-[#163A66]'
+                }`}
+              >
+                <option value="th-TH">🇹🇭 ไทย</option>
+                <option value="en-US">🇬🇧 English</option>
+                <option value="ja-JP">🇯🇵 日本語</option>
+                <option value="zh-CN">🇨🇳 中文</option>
+              </select>
+            </div>
+          )}
+
+          <div
+            className={`flex items-center p-0.5 rounded-xl border transition ${
+              isProjectorMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'
+            }`}
+          >
             {(['fast', 'normal', 'dramatic'] as SpinSpeed[]).map((spd) => (
               <button
                 key={spd}
                 onClick={() => setSpinSpeed(spd)}
                 className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
                   spinSpeed === spd
-                    ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-xs'
+                    ? isProjectorMode
+                      ? 'bg-slate-700 text-blue-300 shadow-xs'
+                      : 'bg-white text-blue-600 shadow-xs'
+                    : isProjectorMode
+                    ? 'text-slate-400 hover:text-slate-200'
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
@@ -600,8 +661,12 @@ export const RandomTextSubTab: React.FC<RandomTextSubTabProps> = ({
                     {!isSpinning && displayWord && (
                       <button
                         type="button"
-                        onClick={() => tts.speakText(displayWord)}
-                        className="p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 transition active:scale-90 shadow-sm shrink-0"
+                        onClick={() => tts.speakText(displayWord, vocabSpeechLang, true)}
+                        className={`p-3 rounded-2xl transition active:scale-90 shadow-sm shrink-0 ${
+                          isProjectorMode
+                            ? 'bg-slate-800 hover:bg-slate-700 text-blue-300'
+                            : 'bg-blue-50 hover:bg-blue-100 text-blue-600'
+                        }`}
                         title="กดเพื่อฟังเสียงอ่านคำศัพท์นี้"
                       >
                         <Volume2 className="w-6 h-6" />
@@ -706,17 +771,19 @@ export const RandomTextSubTab: React.FC<RandomTextSubTabProps> = ({
                           <button
                             onClick={() => handleAwardStudent('coin', 1)}
                             className="flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-2 rounded-xl text-xs transition active:scale-95 shadow-sm"
+                            title="มอบเหรียญสะสม 1 เหรียญให้นักเรียนที่ตอบถูก"
                           >
                             <Coin2Regular className="w-4 h-4" />
-                            <span>+1 🪙 ตอบถูก</span>
+                            <span>+1 ตอบถูก</span>
                           </button>
 
                           <button
                             onClick={() => handleAwardStudent('ticket', 1)}
                             className="flex items-center justify-center gap-1.5 bg-pink-500 hover:bg-pink-400 text-white font-black py-2 rounded-xl text-xs transition active:scale-95 shadow-sm"
+                            title="มอบตั๋วสุ่มสำหรับหมุนชิงโชคท้ายคาบ 1 ใบ"
                           >
                             <TicketRegular className="w-4 h-4" />
-                            <span>+1 🎟️ ให้ตั๋ว</span>
+                            <span>+1 ให้ตั๋วสุ่ม</span>
                           </button>
                         </div>
                       ) : (

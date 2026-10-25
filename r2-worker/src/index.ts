@@ -16,6 +16,30 @@ export default {
     }
 
     const url = new URL(request.url);
+
+    // List objects endpoint (requires auth)
+    if (url.pathname === "/list" || url.pathname === "/__list") {
+      const authKey = request.headers.get("X-Custom-Auth-Key");
+      if (!env.UPLOAD_SECRET || authKey !== env.UPLOAD_SECRET) {
+        return new Response("Unauthorized", { status: 401, headers: corsHeaders });
+      }
+      const prefix = url.searchParams.get("prefix") || "";
+      const cursor = url.searchParams.get("cursor") || undefined;
+      const listed = await env.R2_BUCKET.list({ prefix, cursor, limit: 1000 });
+      return new Response(
+        JSON.stringify({
+          objects: listed.objects.map((o) => ({
+            key: o.key,
+            size: o.size,
+            uploaded: o.uploaded,
+          })),
+          truncated: listed.truncated,
+          cursor: listed.truncated ? listed.cursor : undefined,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const key = decodeURIComponent(url.pathname.slice(1));
 
     if (!key) {

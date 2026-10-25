@@ -455,5 +455,6 @@ export function useOptimisticRewards(props: {
     giveReward,
     undoReward,
     consumeTicket,
+    showToast,
   };
 }

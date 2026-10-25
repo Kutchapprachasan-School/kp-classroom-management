@@ -25,6 +25,7 @@ import { PageHeroBanner } from '../components/layout/PageHeroBanner';
 import {
   coursesCurriculumService,
   calculatePeriodsPerWeek,
+  inferGradeLevelFromCourseCode,
   type CourseCurriculumRecord,
   type MediaType,
   type TrashMediaItem,
@@ -315,11 +316,12 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
       courseForm.assignedClassrooms.length
     );
 
+    const effectiveLevel = inferGradeLevelFromCourseCode(courseForm.code.trim()) || courseForm.level;
     const created = coursesCurriculumService.createCourse({
       code: courseForm.code.trim(),
       name: courseForm.name.trim(),
       strand: courseForm.strand,
-      level: courseForm.level,
+      level: effectiveLevel,
       credits: Number(courseForm.credits),
       periodsPerWeek: periodsPerRoom,
       academicYear: courseForm.academicYear,
@@ -367,11 +369,12 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
       courseForm.assignedClassrooms.length
     );
 
+    const effectiveLevel = inferGradeLevelFromCourseCode(courseForm.code.trim()) || courseForm.level;
     coursesCurriculumService.updateCourse(selectedCourse.id, {
       code: courseForm.code.trim(),
       name: courseForm.name.trim(),
       strand: courseForm.strand,
-      level: courseForm.level,
+      level: effectiveLevel,
       credits: Number(courseForm.credits),
       periodsPerWeek: periodsPerRoom,
       academicYear: courseForm.academicYear,
@@ -1102,9 +1105,18 @@ export const CoursesCurriculumView: React.FC<CoursesCurriculumViewProps> = ({
                   <input
                     type="text"
                     required
-                    placeholder="เช่น ศ23101"
+                    placeholder="เช่น ศ23101 หรือ ญ21202"
                     value={courseForm.code}
-                    onChange={(e) => setCourseForm({ ...courseForm, code: e.target.value })}
+                    onChange={(e) => {
+                      const nextCode = e.target.value;
+                      const inferred = inferGradeLevelFromCourseCode(nextCode);
+                      if (inferred) {
+                        setCourseForm((prev) => ({ ...prev, code: nextCode, level: inferred }));
+                        setRoomFilterTab(inferred);
+                      } else {
+                        setCourseForm((prev) => ({ ...prev, code: nextCode }));
+                      }
+                    }}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold focus:border-blue-500 focus:outline-none"
                   />
                 </div>

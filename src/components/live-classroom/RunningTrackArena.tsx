@@ -1235,7 +1235,7 @@ export const RunningTrackArena: React.FC<RunningTrackArenaProps> = ({
                 className="flex items-center gap-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-300 font-bold px-4 py-2 rounded-xl text-xs transition"
               >
                 <Sparkles className="w-4 h-4" />
-                <span>แจก +1 🪙 ให้ Top 3 ทุกคน</span>
+                <span>แจก +1 เหรียญ ให้ Top 3 ทุกคน</span>
               </button>
 
               {onSkipWinner && (
@@ -1288,7 +1288,7 @@ export const RunningTrackArena: React.FC<RunningTrackArenaProps> = ({
                         className="flex-1 flex items-center justify-center gap-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold py-2 px-3 rounded-xl text-xs transition active:scale-95"
                       >
                         <Coins className="w-3.5 h-3.5" />
-                        <span>+{idx === 0 ? 2 : 1} 🪙</span>
+                        <span>+{idx === 0 ? 2 : 1} เหรียญ</span>
                       </button>
 
                       <button
@@ -1296,13 +1296,13 @@ export const RunningTrackArena: React.FC<RunningTrackArenaProps> = ({
                         className="flex-1 flex items-center justify-center gap-1 bg-pink-500/20 hover:bg-pink-500/30 border border-pink-400/40 text-pink-200 font-bold py-2 px-3 rounded-xl text-xs transition active:scale-95"
                       >
                         <Ticket className="w-3.5 h-3.5" />
-                        <span>+1 🎟️</span>
+                        <span>+1 ตั๋วสุ่ม</span>
                       </button>
                     </div>
 
                     {(rewardsGiven.coin > 0 || rewardsGiven.ticket > 0) && (
                       <span className="text-[11px] font-bold text-emerald-400 shrink-0">
-                        ได้รับ: +{rewardsGiven.coin}🪙
+                        ได้รับ: +{rewardsGiven.coin} เหรียญ
                       </span>
                     )}
                   </div>

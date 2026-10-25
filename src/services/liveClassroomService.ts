@@ -10,6 +10,23 @@ import { gachaService } from './gachaService';
 import { registerClassroomNames, formatClassroomLabel, studentService } from './studentService';
 import { getTeacherTaughtClassrooms, getDynamicTeachingSubjects } from './teacherCourseAssignmentService';
 import { authService } from './authService';
+import { coursesCurriculumService, inferGradeLevelFromCourseCode } from './coursesCurriculumService';
+import { gachaConfigService } from './gachaConfigService';
+import { getBangkokNow } from '../utils/timetableDateUtils';
+
+export const WEEKLY_GACHA_TICKETS_UPDATED_EVENT = 'kp-weekly-gacha-tickets-updated';
+
+/**
+ * คำนวณ ISO Week Key สำหรับประเทศไทย (Bangkok UTC+7) เช่น '2026-W43'
+ */
+export function getCurrentBangkokWeekKey(date: Date = getBangkokNow()): string {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
 
 export type StudentTier = 'high' | 'mid' | 'low';
 
@@ -283,18 +300,31 @@ export const liveClassroomService = {
         }
       }
 
-      // ค้นหารายวิชาที่ครูคนนี้สอนในห้องนี้
+      // ค้นหารายวิชาที่ครูคนนี้สอนในห้องนี้ พร้อม Grade-Level Guard ป้องกันวิชาข้ามระดับชั้น
       const taughtSubjects = getDynamicTeachingSubjects();
-      const matchedSubject = taughtSubjects.find((s) =>
-        s.classrooms.some(
+      const clsLevel = cls.name.match(/^(ม\.[1-6])/)?.[1] || (cls as any).level;
+      const matchedSubject = taughtSubjects.find((s) => {
+        const subjectLevel = inferGradeLevelFromCourseCode(s.code || s.courseCode);
+        if (clsLevel && subjectLevel && clsLevel !== subjectLevel) {
+          return false;
+        }
+        return s.classrooms.some(
           (r) =>
             formatClassroomLabel(r) === formatClassroomLabel(cls.name) ||
             r === cls.id ||
             r === cls.name
-        )
-      );
+        );
+      });
+      const isHomeroom =
+        Boolean(
+          (currentUser?.classroomName &&
+            formatClassroomLabel(currentUser.classroomName) === formatClassroomLabel(cls.name)) ||
+          (currentUser?.classroomId && currentUser.classroomId === cls.id)
+        );
       const subjectLabel = matchedSubject
         ? `${matchedSubject.code} ${matchedSubject.name}`
+        : isHomeroom
+        ? 'ห้องที่ปรึกษา (กิจกรรมโฮมรูม)'
         : (cls as any).subjectGroup || 'รายวิชาพื้นฐาน';
 
       return {
@@ -573,5 +603,126 @@ export const liveClassroomService = {
     const existing = this.getWordDecks(classroomId, teacherId, subject);
     const filtered = existing.filter((d) => d.id !== deckId);
     window.localStorage.setItem(key, JSON.stringify(filtered));
+  },
+
+  /**
+   * คำนวณจำนวนคาบต่อสัปดาห์ของรายวิชาสำหรับห้องเรียนนี้
+   */
+  getCoursePeriodsPerWeek(subjectName: string, classroomName?: string): number {
+    try {
+      const courses = coursesCurriculumService.getCourses();
+      if (!courses || courses.length === 0) return 2; // Default 1.0 หน่วยกิต = 2 คาบ/สัปดาห์
+
+      const cleanSub = (subjectName || '').trim().toLowerCase();
+      const cleanRoom = (classroomName || '').trim();
+
+      // ค้นหาคอร์สที่ตรงทั้งห้องและรหัส/ชื่อวิชา
+      let match = courses.find((c) => {
+        const matchesRoom = !cleanRoom || (c.assignedClassrooms && c.assignedClassrooms.includes(cleanRoom));
+        const matchesSub =
+          c.code.toLowerCase().includes(cleanSub) ||
+          cleanSub.includes(c.code.toLowerCase()) ||
+          c.name.toLowerCase().includes(cleanSub) ||
+          cleanSub.includes(c.name.toLowerCase());
+        return matchesRoom && matchesSub;
+      });
+
+      // ถ้าไม่เจอแบบเจาะจงห้อง ให้หาเฉพาะชื่อวิชา
+      if (!match) {
+        match = courses.find(
+          (c) =>
+            c.code.toLowerCase().includes(cleanSub) ||
+            cleanSub.includes(c.code.toLowerCase()) ||
+            c.name.toLowerCase().includes(cleanSub) ||
+            cleanSub.includes(c.name.toLowerCase())
+        );
+      }
+
+      if (match) {
+        if (match.credits) {
+          return Math.max(1, Math.round(Number(match.credits) * 2));
+        }
+        if (match.periodsPerWeek) {
+          const roomCount = match.assignedClassrooms?.length || 1;
+          return Math.max(1, Math.round(match.periodsPerWeek / roomCount));
+        }
+      }
+    } catch {
+      // Fallback
+    }
+    return 2;
+  },
+
+  /**
+   * คำนวณเพดานโควตาสูงสุดของตั๋วกาชาประจำสัปดาห์ (ผูกกับคาบเรียน: โควตาต่อคาบ x คาบต่อสัปดาห์)
+   * ตัวอย่าง: 5 ใบ/คาบ x 2 คาบ/สัปดาห์ = 10 ใบ/วิชา/ห้อง/สัปดาห์
+   */
+  getWeeklyGachaTicketCap(
+    subjectName: string,
+    classroomName?: string
+  ): { periodsPerWeek: number; ticketsPerPeriod: number; weeklyCap: number } {
+    const cfg = gachaConfigService.getConfig();
+    const ticketsPerPeriod = cfg.rewards?.gachaTicketsPerPeriod ?? 5;
+    const periodsPerWeek = this.getCoursePeriodsPerWeek(subjectName, classroomName);
+    const weeklyCap = ticketsPerPeriod * periodsPerWeek;
+    return { periodsPerWeek, ticketsPerPeriod, weeklyCap };
+  },
+
+  getWeeklyGachaTicketStorageKey(
+    classroomId: string,
+    subjectName: string,
+    weekKey?: string
+  ): string {
+    const wk = weekKey || getCurrentBangkokWeekKey();
+    const cleanSub = (subjectName || 'general').trim().replace(/[\s/:]+/g, '_');
+    return `kp_weekly_gacha_tickets:${wk}:${classroomId}:${cleanSub}`;
+  },
+
+  getWeeklyGachaTicketsGiven(
+    classroomId: string,
+    subjectName: string,
+    weekKey?: string
+  ): number {
+    if (typeof window === 'undefined') return 0;
+    try {
+      const key = this.getWeeklyGachaTicketStorageKey(classroomId, subjectName, weekKey);
+      const val = window.localStorage.getItem(key);
+      return val ? Math.max(0, parseInt(val, 10) || 0) : 0;
+    } catch {
+      return 0;
+    }
+  },
+
+  recordWeeklyGachaTicketsGiven(
+    classroomId: string,
+    subjectName: string,
+    amount: number = 1,
+    weekKey?: string
+  ): number {
+    if (typeof window === 'undefined') return 0;
+    try {
+      const current = this.getWeeklyGachaTicketsGiven(classroomId, subjectName, weekKey);
+      const next = current + Math.max(0, amount);
+      const key = this.getWeeklyGachaTicketStorageKey(classroomId, subjectName, weekKey);
+      window.localStorage.setItem(key, String(next));
+      window.dispatchEvent(
+        new CustomEvent(WEEKLY_GACHA_TICKETS_UPDATED_EVENT, {
+          detail: { classroomId, subjectName, amount, newTotal: next },
+        })
+      );
+      return next;
+    } catch {
+      return 0;
+    }
+  },
+
+  isWeeklyGachaTicketCapped(
+    classroomId: string,
+    subjectName: string,
+    classroomName?: string
+  ): boolean {
+    const given = this.getWeeklyGachaTicketsGiven(classroomId, subjectName);
+    const { weeklyCap } = this.getWeeklyGachaTicketCap(subjectName, classroomName);
+    return given >= weeklyCap;
   },
 };

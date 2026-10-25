@@ -5,6 +5,7 @@
 import React from 'react';
 import TrophyRegular from '@mingcute/react/core-regular/trophy';
 import TicketRegular from '@mingcute/react/core-regular/ticket';
+import Coin2Regular from '@mingcute/react/core-regular/coin-2';
 import {
   ClipboardList,
   PartyPopper,
@@ -124,11 +125,13 @@ export const RewardBoardSubTab: React.FC<RewardBoardSubTabProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2.5 font-bold text-xs">
-                    <span className="text-amber-500 bg-amber-500/10 px-2.5 py-0.5 rounded-lg border border-amber-500/20">
-                      +{st.sessionCoins} 🪙
+                    <span className="flex items-center gap-1 text-amber-500 bg-amber-500/10 px-2.5 py-0.5 rounded-lg border border-amber-500/20">
+                      <Coin2Regular className="w-3.5 h-3.5" />
+                      +{st.sessionCoins}
                     </span>
-                    <span className="text-pink-500 bg-pink-500/10 px-2.5 py-0.5 rounded-lg border border-pink-500/20">
-                      +{st.sessionTickets} 🎟️
+                    <span className="flex items-center gap-1 text-pink-500 bg-pink-500/10 px-2.5 py-0.5 rounded-lg border border-pink-500/20">
+                      <TicketRegular className="w-3.5 h-3.5" />
+                      +{st.sessionTickets}
                     </span>
                   </div>
                 </div>
@@ -191,8 +194,14 @@ export const RewardBoardSubTab: React.FC<RewardBoardSubTabProps> = ({
                     >
                       {item.description}
                     </span>
-                    <span className="font-bold text-amber-500">
-                      (+{item.amount} {item.rewardType === 'coin' ? '🪙' : '🎟️'})
+                    <span className="inline-flex items-center gap-1 font-bold text-amber-500">
+                      (+{item.amount}{' '}
+                      {item.rewardType === 'coin' ? (
+                        <Coin2Regular className="w-3.5 h-3.5 inline text-amber-500" />
+                      ) : (
+                        <TicketRegular className="w-3.5 h-3.5 inline text-pink-500" />
+                      )}
+                      )
                     </span>
 
                     {/* Status Badge */}
@@ -267,15 +276,22 @@ export const RewardBoardSubTab: React.FC<RewardBoardSubTabProps> = ({
             className="flex items-center gap-2 bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs shadow-md shadow-pink-500/25 transition active:scale-95"
           >
             <TicketRegular className="w-4 h-4" />
-            <span>หมุนวงล้อตั๋วสุ่ม ({sessionTotalTickets} 🎟️)</span>
+            <span>หมุนวงล้อตั๋วสุ่ม ({sessionTotalTickets} ใบ)</span>
           </button>
 
           <button
             onClick={onGiveClassBonus}
             className="flex items-center gap-2 bg-amber-400 hover:bg-amber-300 text-amber-950 font-black px-5 py-2.5 rounded-xl text-xs shadow-md shadow-amber-400/20 transition active:scale-95"
+            title="แจกเหรียญสะสม 1 เหรียญให้นักเรียนทุกคนที่มาเรียน"
           >
             <PartyPopper className="w-4 h-4" />
-            <span>แจกโบนัสทั้งห้อง (+1 🪙 ทุกคนที่มาเรียน)</span>
+            <span className="flex items-center gap-1.5">
+              <span>แจกโบนัสทั้งห้อง</span>
+              <span className="inline-flex items-center gap-1 bg-amber-500/30 px-2 py-0.5 rounded-lg text-amber-950 font-extrabold text-[11px]">
+                <Coin2Regular className="w-3.5 h-3.5" />
+                <span>+1 เหรียญ ทุกคนที่มาเรียน</span>
+              </span>
+            </span>
           </button>
         </div>
       </div>

@@ -23,6 +23,7 @@ import {
   User,
   Users,
   RefreshCw,
+  Ticket,
 } from 'lucide-react';
 import { SettingsSubModal } from '../settings/SettingsSubModal';
 import { gachaConfigService, type GachaAdminConfig } from '../../services/gachaConfigService';
@@ -116,7 +117,11 @@ export const AdminGachaSettingsModal: React.FC<AdminGachaSettingsModalProps> = (
       return;
     }
 
-    gachaConfigService.saveConfig(config);
+    const res = gachaConfigService.saveConfig(config);
+    if (!res.ok) {
+      showToast('error', res.errors.join(', '));
+      return;
+    }
     showToast('success', 'บันทึกการตั้งค่าระบบกาชาเรียบร้อยแล้ว');
   };
 
@@ -592,18 +597,21 @@ export const AdminGachaSettingsModal: React.FC<AdminGachaSettingsModalProps> = (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
                   <label className="text-xs font-black text-slate-800 block mb-1">
-                    เศษดาวแลกตั๋วสุ่ม (ชิ้น / 1 ตั๋ว)
+                    เศษดาวแลกตั๋วกาชา (ชิ้น / 1 ตั๋ว)
                   </label>
+                  <p className="text-[11px] text-slate-500 mb-2">
+                    กำหนดจำนวนเศษดาวที่นักเรียนใช้แลกตั๋วกาชาในร้านค้า (เชื่อมโยงกับหน้าร้านค้าของนักเรียนทันที)
+                  </p>
                   <input
                     type="number"
-                    min="1"
+                    min="10"
                     value={config.shop.shardsPerTicket}
                     onChange={(e) =>
                       setConfig({
                         ...config,
                         shop: {
                           ...config.shop,
-                          shardsPerTicket: parseInt(e.target.value, 10) || 1,
+                          shardsPerTicket: parseInt(e.target.value, 10) || 10,
                         },
                       })
                     }
@@ -723,6 +731,73 @@ export const AdminGachaSettingsModal: React.FC<AdminGachaSettingsModalProps> = (
                   className="w-32 px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-bold bg-white"
                 />
                 <span className="text-xs font-bold text-slate-600">ใบ / สัปดาห์</span>
+              </div>
+            </div>
+
+            {/* Live Session Ticket Cap */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
+              <div className="flex items-center gap-2">
+                <Ticket className="w-4 h-4 text-pink-600" />
+                <h4 className="text-sm font-black text-slate-900">
+                  เพดานตั๋วสุ่มในคาบเรียน (Live Session Ticket Cap)
+                </h4>
+              </div>
+              <p className="text-xs text-slate-500">
+                จำนวนตั๋วสุ่มสูงสุดที่นักเรียนแต่ละคนสามารถได้รับต่อ 1 คาบเรียน (ค่าเริ่มต้น: 5 ใบ / คาบ)
+                เพื่อป้องกันภาวะตั๋วเฟ้อจากการแจกรางวัลเกินขนาด
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  max="30"
+                  value={config.rewards.sessionTicketCap ?? 5}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      rewards: {
+                        ...config.rewards,
+                        sessionTicketCap: parseInt(e.target.value, 10) || 5,
+                      },
+                    })
+                  }
+                  className="w-32 px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-bold bg-white"
+                />
+                <span className="text-xs font-bold text-slate-600">ใบ / คาบเรียน</span>
+              </div>
+            </div>
+
+            {/* Course-Linked Gacha Ticket Cap */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
+              <div className="flex items-center gap-2">
+                <Gift className="w-4 h-4 text-purple-600" />
+                <h4 className="text-sm font-black text-slate-900">
+                  โควตาตั๋วกาชาต่อคาบสอน ผูกกับรายวิชา (Gacha Tickets per Course Period)
+                </h4>
+              </div>
+              <p className="text-xs text-slate-500">
+                โควตาตั๋วกาชาสูงสุดที่แจกได้ต่อ 1 คาบสอน โดยจะคูณกับจำนวนคาบต่อสัปดาห์ของวิชานั้นอัตโนมัติ
+                (เช่น ตั้งไว้ 5 ใบ/คาบ x วิชาที่มี 2 คาบ/สัปดาห์ = เพดานไม่เกิน 10 ใบ/วิชา/สัปดาห์/ห้อง)
+                หากแจกครบโควตาแล้ว การสุ่มจับรางวัลท้ายคาบจะไม่ได้รับตั๋วกาชาเพื่อป้องกันภาวะตั๋วเฟ้อ
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={config.rewards.gachaTicketsPerPeriod ?? 5}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      rewards: {
+                        ...config.rewards,
+                        gachaTicketsPerPeriod: parseInt(e.target.value, 10) || 5,
+                      },
+                    })
+                  }
+                  className="w-32 px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-bold bg-white"
+                />
+                <span className="text-xs font-bold text-slate-600">ใบ / คาบสอน / สัปดาห์</span>
               </div>
             </div>
 

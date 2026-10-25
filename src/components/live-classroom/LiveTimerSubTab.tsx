@@ -435,7 +435,7 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
                   >
                     <TrophyRegular className="w-4 h-4" />
                     <span>
-                      {awardedChallengerId === ch.id ? 'ได้รับรางวัลแล้ว (+2 🪙)' : 'ชนะดวล (+2 🪙)'}
+                      {awardedChallengerId === ch.id ? 'ได้รับรางวัลแล้ว (+2 เหรียญ)' : 'ชนะดวล (+2 เหรียญ)'}
                     </span>
                   </button>
                 </div>
