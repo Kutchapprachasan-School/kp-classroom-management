@@ -54,7 +54,7 @@ export const GoldQuestPlayView: React.FC = () => {
     if (typeof window === 'undefined') return null;
 
     const params = new URLSearchParams(window.location.search);
-    const roomFromUrl = params.get('room') || '';
+    const roomFromUrl = params.get('room') || params.get('roomId') || '';
     const pinFromUrl = params.get('pin') || '';
     const studentIdFromUrl = params.get('studentId') || '';
 

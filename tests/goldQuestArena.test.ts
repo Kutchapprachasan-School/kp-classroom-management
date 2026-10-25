@@ -162,4 +162,38 @@ describe('Gold Quest Arena & Service Suite', () => {
     });
     assert.strictEqual(rejectJoin.success, false);
   });
+
+  it('8. API Route /api/live-classroom/gold-quest/join ค้นหาห้องด้วย PIN และคืนค่ารายชื่อนักเรียน', async () => {
+    const { GET } = await import('../app/api/live-classroom/gold-quest/join/route');
+
+    const globalForGoldQuest = globalThis as unknown as {
+      goldQuestRooms?: Map<string, any>;
+    };
+    if (!globalForGoldQuest.goldQuestRooms) {
+      globalForGoldQuest.goldQuestRooms = new Map();
+    }
+    const apiPin = '918273';
+    globalForGoldQuest.goldQuestRooms.set('room-api-test', {
+      roomId: 'room-api-test',
+      pin: apiPin,
+      examTitle: 'ควิซภาษาญี่ปุ่นรายคาบ',
+      isActive: true,
+      status: 'active',
+      students: [
+        { id: 'st-1', name: 'กิตติพงษ์' },
+        { id: 'st-2', name: 'กานดา' },
+      ],
+    });
+
+    const req = new Request(`https://localhost/api/live-classroom/gold-quest/join?pin=${apiPin}`);
+    const res = await GET(req);
+    assert.strictEqual(res.status, 200);
+
+    const json = (await res.json()) as any;
+    assert.strictEqual(json.roomId, 'room-api-test');
+    assert.strictEqual(json.pin, apiPin);
+    assert.strictEqual(json.students.length, 2);
+    assert.strictEqual(json.students[0].number, 1);
+    assert.strictEqual(json.students[0].name, 'กิตติพงษ์');
+  });
 });
