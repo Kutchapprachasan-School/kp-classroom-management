@@ -31,7 +31,7 @@ export const TeacherMoreAccountMobileView: React.FC<TeacherMoreAccountMobileView
     {
       key: 'accounts' as TeacherViewKey,
       icon: User,
-      label: 'ข้อมูลส่วนตัว',
+      label: 'จัดการบัญชีผู้ใช้ & ทะเบียนนักเรียน (ย้ายเข้า/ออก/จบ/จำหน่าย)',
       iconColor: 'text-blue-600',
       bgColor: 'bg-blue-50',
     },
@@ -66,7 +66,7 @@ export const TeacherMoreAccountMobileView: React.FC<TeacherMoreAccountMobileView
     {
       key: 'settings' as TeacherViewKey,
       icon: Settings,
-      label: 'ตั้งค่า',
+      label: 'ตั้งค่าระบบ (ครบ 21 หมวด • แยกสิทธิ์ครู/แอดมิน)',
       iconColor: 'text-slate-600',
       bgColor: 'bg-slate-100',
     },

@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase.ts';
 import { studentService, formatClassroomLabel, registerClassroomNames } from './studentService.ts';
+import { studentLifecycleService } from './studentLifecycleService.ts';
 import { getSchoolSettings } from '../config/schoolSettings.ts';
 import { getSmsUsers } from '../config/schoolRoles.ts';
 import { scrypt, scryptAsync } from '@noble/hashes/scrypt.js';
@@ -222,6 +223,12 @@ export const authService = {
     }
     if (!trimmedPass) {
       throw new Error('กรุณากรอกรหัสผ่านเข้าใช้งาน');
+    }
+
+    // ตรวจสอบสถานะทะเบียนนักเรียน (ย้ายออก / ลาออก / พักการเรียน / จำหน่ายออก / จบการศึกษา / ระงับบัญชี)
+    const eligibility = studentLifecycleService.checkStudentLoginEligibility(trimmedCode);
+    if (!eligibility.allowed) {
+      throw new Error(eligibility.reason || 'บัญชีนักเรียนนี้ถูกระงับการใช้งาน กรุณาติดต่อห้องทะเบียน');
     }
 
     const executeStudentLogin = async (): Promise<AuthUser> => {

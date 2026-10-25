@@ -32,11 +32,6 @@ import {
   RefreshCw,
   Sparkles,
   Database,
-  ChevronRight,
-  Building2,
-  UserCheck,
-  Layers,
-  Settings,
   Pencil,
   Send,
   MessageSquare,
@@ -117,6 +112,13 @@ import { SettingsSubModal } from '../components/settings/SettingsSubModal';
 import { AdminTeacherBannerModal } from '../components/teacher/AdminTeacherBannerModal';
 import { ThaiMiniDatePicker } from '../components/common/ThaiMiniDatePicker';
 import { AdminGachaSettingsModal } from '../components/admin/AdminGachaSettingsModal';
+import { StudentLifecycleManagerPanel } from '../components/settings/StudentLifecycleManagerPanel';
+import {
+  canManageSystemAdminSettings,
+  canManageStudentLifecycle,
+  canRoleEditSetting,
+} from '../services/studentLifecycleService';
+import { authService } from '../services/authService';
 
 export type SettingsKey =
   | 'school_info'
@@ -160,11 +162,15 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
     return null;
   });
 
-  const [mobileActiveSubScreen, setMobileActiveSubScreen] = useState<'school_info' | null>(() => {
-    if (initialTab === 'BRANDING' || initialTab === 'LEAVE_SYSTEM') return 'school_info';
-    return null;
-  });
+  const [mobileActiveSubScreen, setMobileActiveSubScreen] = useState<'school_info' | null>(null);
 
+  const currentUser = authService.getCurrentUser();
+  const isAdmin = canManageSystemAdminSettings(activeRole) || currentUser?.role === 'ADMIN';
+  const canManageRegistrar = canManageStudentLifecycle(activeRole) || isAdmin;
+
+  const [selectedZone, setSelectedZone] = useState<
+    'all' | 'teacher' | 'registrar' | 'admin'
+  >('all');
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
 
   // School basic settings & branding
@@ -258,6 +264,15 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3200);
+  };
+
+  const handleOpenSettingModal = (key: SettingsKey) => {
+    // บล็อกการเข้าถึงหมวดตั้งค่าเชิงลึกของระบบ (แบนเนอร์ระบบ, กาชา/ควิซระดับโรงเรียน) หากไม่ใช่แอดมิน
+    if (!isAdmin && (key === 'theme' || key === 'gacha')) {
+      showToast('🛡️ หมวดนี้สงวนสิทธิ์เฉพาะผู้ดูแลระบบ (Admin Only)');
+      return;
+    }
+    setActiveModalKey(key);
   };
 
   // Clean Slate status
@@ -635,263 +650,108 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
       )}
 
       {/* ==================================================================== */}
-      {/* MOBILE VIEW (< lg) - Directly Matching Reference Image media_1792038351636_1276a162.jpg */}
+      {/* UNIFIED MOBILE & DESKTOP OVERVIEW DASHBOARD (ALL 21 SETTINGS CARDS) */}
       {/* ==================================================================== */}
-      <div className="lg:hidden">
-        {mobileActiveSubScreen === 'school_info' ? (
+      {mobileActiveSubScreen === 'school_info' ? (
+        <div className="lg:hidden">
           <TeacherMobileSchoolInfoScreen
             onNavigate={() => {}}
             onBack={() => setMobileActiveSubScreen(null)}
           />
-        ) : activeModalKey === null && (
-          <div className="w-full max-w-md mx-auto space-y-4 pb-24 font-sans select-none text-slate-800">
-            {/* Top Header Section */}
-            <div className="flex items-start gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-xs">
-                <Settings className="w-6 h-6 stroke-[2.2]" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-xl font-black text-[#163A66] tracking-tight">
-                    ตั้งค่าระบบ
-                  </h1>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                    <span>System Settings</span>
-                  </span>
+        </div>
+      ) : activeModalKey === null && (
+        <div className="space-y-6 pb-24 lg:pb-8">
+          {/* 1. TOP HERO BANNER */}
+          <SettingsHeroBanner schoolName={schoolSettings.nameTh} />
+
+          {/* 2. ROLE PERMISSION & DOMAIN FILTER BAR (แยกสิทธิ์ครู vs ทะเบียนนักเรียน vs แอดมินชัดเจน) */}
+          <div className="bg-white rounded-[18px] border border-[#E6EEF7] p-4 shadow-[0_4px_16px_rgba(40,90,140,0.06)] space-y-3.5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex items-start sm:items-center gap-3">
+                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border ${
+                  isAdmin
+                    ? 'bg-purple-50 text-purple-600 border-purple-200'
+                    : canManageRegistrar
+                    ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                    : 'bg-blue-50 text-blue-600 border-blue-200'
+                }`}>
+                  <ShieldCheck className="w-5 h-5" />
                 </div>
-                <p className="text-xs text-[#6B7C93] font-medium mt-1 leading-snug">
-                  จัดการข้อมูลพื้นฐานของโรงเรียน ผู้ใช้งาน และระบบต่างๆ
-                </p>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-sm sm:text-base font-extrabold text-[#163A66]">
+                      สิทธิ์การเข้าถึงการตั้งค่าระบบ (Role-Based Settings Access)
+                    </h2>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${
+                      isAdmin
+                        ? 'bg-purple-50 text-purple-700 border-purple-200'
+                        : canManageRegistrar
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-blue-50 text-blue-700 border-blue-200'
+                    }`}>
+                      {isAdmin
+                        ? '🛡️ แอดมินระบบ (ACADEMIC_ADMIN)'
+                        : (activeRole as string) === 'DIRECTOR'
+                        ? '🏛️ ผู้อำนวยการ (DIRECTOR)'
+                        : activeRole === 'STUDENT_AFFAIRS'
+                        ? '🎓 ฝ่ายกิจการ/ทะเบียนนักเรียน (STUDENT_AFFAIRS)'
+                        : (activeRole as string) === 'HOMEROOM_ADVISOR'
+                        ? '🧑‍🏫 ครูที่ปรึกษา (HOMEROOM_ADVISOR)'
+                        : '🧑‍🏫 ครูผู้สอน (TEACHER_GENERAL)'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#6B7C93] mt-0.5">
+                    {isAdmin
+                      ? 'คุณมีสิทธิ์จัดการได้ครบทุกส่วน: ส่วนของครูผู้สอน (9 หมวด) • ทะเบียนและสถานะนักเรียน ย้ายเข้า/ออก/จบ/จำหน่าย (5 หมวด) • แอดมินระบบ (7 หมวด)'
+                      : canManageRegistrar
+                      ? 'สิทธิ์ของคุณแก้ไขได้ในส่วนของครูผู้สอน และส่วนงานทะเบียน/กิจการนักเรียน (ส่วนโครงสร้างแอดมินระบบเปิดดูได้แบบอ่านอย่างเดียว)'
+                      : 'สิทธิ์ครูผู้สอนสามารถตั้งค่ารายวิชา งาน สอบ ปพ.5 แจ้งเตือน และรหัส PIN ส่วนตัวได้เต็มรูปแบบ (ส่วนทะเบียนและแอดมินระบบเปิดดูได้แบบอ่านอย่างเดียว)'}
+                  </p>
+                </div>
               </div>
+
+              {/* Quick Jump to Student Lifecycle Registry */}
+              <button
+                type="button"
+                onClick={() => setActiveModalKey('students')}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-extrabold bg-[#3B82F6] hover:bg-[#2563EB] text-white shadow-xs transition-all cursor-pointer shrink-0"
+              >
+                <UserCircle className="w-4 h-4" />
+                <span>จัดการทะเบียน & สถานะนักเรียน (ย้าย/จบ/จำหน่าย)</span>
+              </button>
             </div>
 
-            {/* Category Section: ข้อมูลพื้นฐาน */}
-            <div className="space-y-2.5 pt-1">
-              <div>
-                <h2 className="text-sm font-black text-[#163A66]">
-                  ข้อมูลพื้นฐาน
-                </h2>
-                <p className="text-xs text-[#6B7C93] font-medium">
-                  ข้อมูลสำคัญของโรงเรียนและการตั้งค่าระบบหลัก
-                </p>
-              </div>
-
-              {/* Category Cards Stacked */}
-              <div className="space-y-3">
-                {/* Card 0: ปีการศึกษา & ภาคเรียน (เปิด-ปิดเทอม / สลับเทอม) */}
-                <div
-                  onClick={() => setActiveModalKey('timetable')}
-                  className="bg-white rounded-2xl border border-blue-200 p-4 shadow-xs hover:border-blue-400 hover:shadow-sm transition-all cursor-pointer active:scale-[0.99]"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                        <CalendarDays className="w-5 h-5 stroke-[2.2]" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <h3 className="text-sm font-bold text-slate-900 truncate">
-                            ปีการศึกษา & ภาคเรียน
-                          </h3>
-                          {activeTerm && (
-                            <span className="text-[10px] font-bold px-2 py-0.2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">
-                              ภาค {activeTerm.semesterNo}/{activeTerm.year}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
-                          ตั้งค่าเปิด-ปิดเทอม สลับภาคเรียน และวันหยุด
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-bold text-blue-600 flex items-center shrink-0">
-                      จัดการ <ChevronRight className="w-4 h-4" />
+            {/* 4-Zone Filter Tabs (Responsive on Mobile & Desktop) */}
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+              {[
+                { id: 'all', label: 'ทั้งหมดครบทุกหมวด (21)', badge: 'ครบตรงกันทั้งมือถือ & คอม' },
+                { id: 'teacher', label: '🧑‍🏫 ส่วนของครูผู้สอน (9)', badge: 'แก้ไขได้ทุกบทบาท' },
+                { id: 'registrar', label: '🎓 ทะเบียน & กิจการนักเรียน (5)', badge: canManageRegistrar ? 'แก้ไขได้' : 'อ่านอย่างเดียว' },
+                { id: 'admin', label: '🛡️ ส่วนของผู้ดูแลระบบ/แอดมิน (7)', badge: isAdmin ? 'แก้ไขได้' : 'เฉพาะแอดมิน' },
+              ].map((tab) => {
+                const active = selectedZone === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setSelectedZone(tab.id as typeof selectedZone)}
+                    className={`inline-flex items-center gap-2 px-3.5 py-2 min-h-[40px] rounded-xl text-xs font-extrabold transition-all cursor-pointer border ${
+                      active
+                        ? 'bg-[#3B82F6] text-white border-[#3B82F6] shadow-xs'
+                        : 'bg-[#F7FAFF] text-[#163A66] border-[#E6EEF7] hover:bg-blue-50/60'
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      active ? 'bg-white/20 text-white' : 'bg-white text-[#6B7C93] border border-slate-200'
+                    }`}>
+                      {tab.badge}
                     </span>
-                  </div>
-                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 font-medium">
-                    <span className="inline-flex items-center gap-1.5 text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border border-blue-200">
-                      📅 {activeTerm ? `${activeTerm.startDate} – ${activeTerm.endDate}` : 'ยังไม่ระบุ'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Card 1: ข้อมูลโรงเรียน */}
-                <div
-                  onClick={() => setMobileActiveSubScreen('school_info')}
-                  className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer active:scale-[0.99]"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                        <Building2 className="w-5 h-5 stroke-[2.2]" />
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-bold text-slate-900 truncate">
-                          ข้อมูลโรงเรียน
-                        </h3>
-                        <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
-                          จัดการข้อมูลโรงเรียนและสังกัด
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-bold text-blue-600 flex items-center shrink-0">
-                      จัดการ <ChevronRight className="w-4 h-4" />
-                    </span>
-                  </div>
-                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 font-medium">
-                    <span className="inline-flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border border-emerald-200">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                      เชื่อมต่อ Supabase แล้ว
-                    </span>
-                  </div>
-                </div>
-
-                {/* Card 2: ผู้ใช้งานและสิทธิ์ */}
-                <div
-                  onClick={() => setActiveModalKey('users')}
-                  className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer active:scale-[0.99]"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-11 h-11 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
-                        <UserCheck className="w-5 h-5 stroke-[2.2]" />
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-bold text-slate-900 truncate">
-                          ผู้ใช้งานและสิทธิ์
-                        </h3>
-                        <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
-                          จัดการบัญชีผู้ใช้และสิทธิ์การใช้งาน
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-bold text-blue-600 flex items-center shrink-0">
-                      จัดการ <ChevronRight className="w-4 h-4" />
-                    </span>
-                  </div>
-                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 font-medium">
-                    <span className="inline-flex items-center gap-1.5 text-slate-600 bg-slate-50 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border border-slate-200">
-                      <Users className="w-3.5 h-3.5 text-slate-500" />
-                      ผู้ใช้งานทั้งหมด 12 คน
-                    </span>
-                  </div>
-                </div>
-
-                {/* Card 3: ห้องเรียน / ชั้น */}
-                <div
-                  onClick={() => setActiveModalKey('classrooms')}
-                  className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer active:scale-[0.99]"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                        <Layers className="w-5 h-5 stroke-[2.2]" />
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-bold text-slate-900 truncate">
-                          ห้องเรียน / ชั้น
-                        </h3>
-                        <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
-                          จัดการข้อมูลห้องเรียนและระดับชั้น
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-bold text-blue-600 flex items-center shrink-0">
-                      จัดการ <ChevronRight className="w-4 h-4" />
-                    </span>
-                  </div>
-                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 font-medium">
-                    <span className="inline-flex items-center gap-1.5 text-slate-600 bg-slate-50 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border border-slate-200">
-                      <Layers className="w-3.5 h-3.5 text-slate-500" />
-                      ห้องเรียนทั้งหมด 18 ห้อง • 8 ระดับชั้น
-                    </span>
-                  </div>
-                </div>
-
-                {/* Card 4: รายวิชา / โครงสร้างเวลาเรียน */}
-                <div
-                  onClick={() => setActiveModalKey('courses')}
-                  className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer active:scale-[0.99]"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                        <BookOpen className="w-5 h-5 stroke-[2.2]" />
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-bold text-slate-900 truncate">
-                          รายวิชา / โครงสร้างเวลาเรียน
-                        </h3>
-                        <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
-                          จัดการรายวิชาและกลุ่มสาระการเรียนรู้
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-bold text-blue-600 flex items-center shrink-0">
-                      จัดการ <ChevronRight className="w-4 h-4" />
-                    </span>
-                  </div>
-                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 font-medium">
-                    <span className="inline-flex items-center gap-1.5 text-slate-600 bg-slate-50 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border border-slate-200">
-                      <BookOpen className="w-3.5 h-3.5 text-slate-500" />
-                      รายวิชาทั้งหมด 8 กลุ่มสาระ
-                    </span>
-                  </div>
-                </div>
-
-                {/* Card 5: พื้นที่จัดเก็บ Cloudflare R2 & สำรองข้อมูล */}
-                <div
-                  onClick={() => setActiveModalKey('backup')}
-                  className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer active:scale-[0.99]"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                        <Cloud className="w-5 h-5 stroke-[2.2]" />
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-bold text-slate-900 truncate">
-                          สำรองข้อมูล & พื้นที่ Cloudflare R2
-                        </h3>
-                        <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
-                          จัดเก็บผลงานนักเรียน ซิงก์ไฟล์ และสำรองข้อมูล
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-bold text-blue-600 flex items-center shrink-0">
-                      จัดการ <ChevronRight className="w-4 h-4" />
-                    </span>
-                  </div>
-                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 font-medium">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
-                        r2StorageService.isConfigured()
-                          ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-                          : 'text-amber-800 bg-amber-50 border-amber-200'
-                      }`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          r2StorageService.isConfigured() ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
-                        }`}
-                      ></span>
-                      {r2StorageService.isConfigured() ? '✓ R2 เชื่อมต่อแล้ว (100 TB)' : '⚠️ รอตั้งค่า R2'}
-                    </span>
-                  </div>
-                </div>
-              </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
-        )}
-      </div>
-
-      {/* ==================================================================== */}
-      {/* DESKTOP VIEW (>= lg) - Full Overview Dashboard (NO POPUPS) */}
-      {/* ==================================================================== */}
-      {activeModalKey === null && (
-        <div className="hidden lg:block space-y-6">
-          {/* 1. TOP HERO BANNER (ตรงตาม Mockup: การตั้งค่าที่ถูกต้อง ช่วยให้การทำงานง่ายขึ้นนะคะ ♡) */}
-          <SettingsHeroBanner schoolName={schoolSettings.nameTh} />
 
       {/* ==================================================================== */}
       {/* CATEGORY 1: ข้อมูลพื้นฐาน (ข้อมูลทั่วไปของโรงเรียนและผู้ใช้งาน) */}
@@ -907,7 +767,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
               ข้อมูลพื้นฐาน
             </h2>
             <p className="text-xs font-medium text-[#6B7C93]">
-              ข้อมูลทั่วไปของโรงเรียนและผู้ใช้งาน
+              ข้อมูลทั่วไปของโรงเรียน โครงสร้างผู้ใช้ ห้องเรียน และรายวิชา
             </p>
           </div>
         </div>
@@ -915,81 +775,101 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         {/* Category 1 Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5">
           {/* Card 1.1: ปีการศึกษา & ภาคเรียน (สลับเทอม / เปิด-ปิดเทอม) */}
-          <SettingsCategoryCard
-            id="academic_terms"
-            title="ปีการศึกษา & ภาคเรียน"
-            subtitle="ตั้งค่าเปิด-ปิดเทอม สลับภาคเรียนปัจจุบัน วันหยุดพิเศษ"
-            icon={<CalendarDays className="w-5 h-5" />}
-            iconBgClass="bg-blue-50"
-            iconColorClass="text-blue-600"
-            onClick={() => setActiveModalKey('timetable')}
-            isExpanded={expandedCards['academic_terms']}
-            onToggleExpand={(e) => toggleExpand('academic_terms', e)}
-            badge={activeTerm ? `ภาค ${activeTerm.semesterNo}/${activeTerm.year}` : 'เปิดเทอม'}
-            quickInfo={activeTerm ? `${activeTerm.startDate} – ${activeTerm.endDate}` : 'สลับภาคเรียน'}
-          />
+          {(selectedZone === 'all' || selectedZone === 'admin') && (
+            <SettingsCategoryCard
+              id="academic_terms"
+              title="ปีการศึกษา & ภาคเรียน"
+              subtitle="ตั้งค่าเปิด-ปิดเทอม สลับภาคเรียนปัจจุบัน วันหยุดพิเศษ"
+              icon={<CalendarDays className="w-5 h-5" />}
+              iconBgClass="bg-blue-50"
+              iconColorClass="text-blue-600"
+              onClick={() => handleOpenSettingModal('timetable')}
+              isExpanded={expandedCards['academic_terms']}
+              onToggleExpand={(e) => toggleExpand('academic_terms', e)}
+              badge={activeTerm ? `ภาค ${activeTerm.semesterNo}/${activeTerm.year}` : 'เปิดเทอม'}
+              quickInfo={activeTerm ? `${activeTerm.startDate} – ${activeTerm.endDate}` : 'สลับภาคเรียน'}
+              permissionBadge={{ label: '🛡️ แอดมิน', tone: 'admin' }}
+              isReadOnly={!canRoleEditSetting(activeRole, 'academic_terms')}
+            />
+          )}
 
           {/* Card 1.2: ข้อมูลโรงเรียน */}
-          <SettingsCategoryCard
-            id="school_info"
-            title="ข้อมูลโรงเรียน"
-            subtitle="จัดการข้อมูลโรงเรียน"
-            icon={<School className="w-5 h-5" />}
-            iconBgClass="bg-indigo-50"
-            iconColorClass="text-indigo-600"
-            onClick={() => setActiveModalKey('school_info')}
-            isExpanded={expandedCards['school_info']}
-            onToggleExpand={(e) => toggleExpand('school_info', e)}
-            quickInfo={`${schoolSettings.nameTh} • ${schoolSettings.shortCode || schoolSettings.districtProvince}`}
-          />
+          {(selectedZone === 'all' || selectedZone === 'admin') && (
+            <SettingsCategoryCard
+              id="school_info"
+              title="ข้อมูลโรงเรียน"
+              subtitle="จัดการชื่อโรงเรียน ตราสัญลักษณ์ และข้อมูลพื้นฐานองค์กร"
+              icon={<School className="w-5 h-5" />}
+              iconBgClass="bg-indigo-50"
+              iconColorClass="text-indigo-600"
+              onClick={() => handleOpenSettingModal('school_info')}
+              isExpanded={expandedCards['school_info']}
+              onToggleExpand={(e) => toggleExpand('school_info', e)}
+              quickInfo={`${schoolSettings.nameTh} • ${schoolSettings.shortCode || schoolSettings.districtProvince}`}
+              permissionBadge={{ label: '🛡️ แอดมิน', tone: 'admin' }}
+              isReadOnly={!canRoleEditSetting(activeRole, 'school_info')}
+            />
+          )}
 
           {/* Card 1.3: ผู้ใช้งาน */}
-          <SettingsCategoryCard
-            id="users"
-            title="ผู้ใช้งาน"
-            subtitle="จัดการบัญชีผู้ใช้และสิทธิ์การใช้งาน"
-            icon={<User className="w-5 h-5" />}
-            iconBgClass="bg-sky-50"
-            iconColorClass="text-sky-600"
-            onClick={() => setActiveModalKey('users')}
-            isExpanded={expandedCards['users']}
-            onToggleExpand={(e) => toggleExpand('users', e)}
-            quickInfo={`บทบาทปัจจุบัน: ${activeRole}`}
-          />
+          {(selectedZone === 'all' || selectedZone === 'admin' || selectedZone === 'registrar') && (
+            <SettingsCategoryCard
+              id="users"
+              title="ผู้ใช้งาน & สิทธิ์ (RBAC)"
+              subtitle="จัดการบัญชีครู บุคลากร สิทธิ์ 5 บทบาท และบัญชีนักเรียน"
+              icon={<User className="w-5 h-5" />}
+              iconBgClass="bg-sky-50"
+              iconColorClass="text-sky-600"
+              onClick={() => handleOpenSettingModal('users')}
+              isExpanded={expandedCards['users']}
+              onToggleExpand={(e) => toggleExpand('users', e)}
+              quickInfo={`บทบาทปัจจุบัน: ${activeRole}`}
+              permissionBadge={{ label: '🛡️ แอดมิน / ทะเบียน', tone: 'admin' }}
+              isReadOnly={!canRoleEditSetting(activeRole, 'users') && !canManageRegistrar}
+            />
+          )}
 
           {/* Card 1.4: ห้องเรียน / ชั้น */}
-          <SettingsCategoryCard
-            id="classrooms"
-            title="ห้องเรียน / ชั้น"
-            subtitle="จัดการข้อมูลห้องเรียนและระดับชั้น"
-            icon={<Presentation className="w-5 h-5" />}
-            iconBgClass="bg-teal-50"
-            iconColorClass="text-teal-600"
-            onClick={() => setActiveModalKey('classrooms')}
-            isExpanded={expandedCards['classrooms']}
-            onToggleExpand={(e) => toggleExpand('classrooms', e)}
-            quickInfo="ม.1 ถึง ม.6 (รวม 8 ห้องเรียน)"
-          />
+          {(selectedZone === 'all' || selectedZone === 'registrar' || selectedZone === 'admin') && (
+            <SettingsCategoryCard
+              id="classrooms"
+              title="ห้องเรียน / ครูที่ปรึกษา"
+              subtitle="จัดการข้อมูลห้องเรียน ระดับชั้น และกำหนดครูที่ปรึกษา"
+              icon={<Presentation className="w-5 h-5" />}
+              iconBgClass="bg-teal-50"
+              iconColorClass="text-teal-600"
+              onClick={() => handleOpenSettingModal('classrooms')}
+              isExpanded={expandedCards['classrooms']}
+              onToggleExpand={(e) => toggleExpand('classrooms', e)}
+              quickInfo="ม.1 ถึง ม.6 • กำหนดครูที่ปรึกษาประจำชั้น"
+              permissionBadge={{ label: '🎓 ทะเบียน/แอดมิน', tone: 'registrar' }}
+              isReadOnly={!canRoleEditSetting(activeRole, 'classrooms')}
+            />
+          )}
 
           {/* Card 1.5: รายวิชา */}
-          <SettingsCategoryCard
-            id="courses"
-            title="รายวิชา"
-            subtitle="จัดการรายวิชาและกลุ่มสาระ"
-            icon={<BookOpen className="w-5 h-5" />}
-            iconBgClass="bg-purple-50"
-            iconColorClass="text-purple-600"
-            onClick={() => setActiveModalKey('courses')}
-            isExpanded={expandedCards['courses']}
-            onToggleExpand={(e) => toggleExpand('courses', e)}
-            quickInfo={`สอน ${TEACHER_SUBJECTS_LIST.length} รายวิชา`}
-          />
+          {(selectedZone === 'all' || selectedZone === 'teacher') && (
+            <SettingsCategoryCard
+              id="courses"
+              title="รายวิชาที่สอน"
+              subtitle="จัดการรายวิชา หน่วยกิต และกลุ่มสาระการเรียนรู้"
+              icon={<BookOpen className="w-5 h-5" />}
+              iconBgClass="bg-purple-50"
+              iconColorClass="text-purple-600"
+              onClick={() => handleOpenSettingModal('courses')}
+              isExpanded={expandedCards['courses']}
+              onToggleExpand={(e) => toggleExpand('courses', e)}
+              quickInfo={`สอน ${TEACHER_SUBJECTS_LIST.length} รายวิชา`}
+              permissionBadge={{ label: '🧑‍🏫 ส่วนของครู', tone: 'teacher' }}
+            />
+          )}
         </div>
       </section>
 
       {/* ==================================================================== */}
       {/* CATEGORY 2: การเรียนการสอน (เกี่ยวกับการจัดการเรียนการสอน) */}
       {/* ==================================================================== */}
+      {(selectedZone === 'all' || selectedZone === 'teacher' || selectedZone === 'admin') && (
       <section className="space-y-3">
         {/* Section Header */}
         <div className="flex items-center gap-3">
@@ -1001,7 +881,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
               การเรียนการสอน
             </h2>
             <p className="text-xs font-medium text-[#6B7C93]">
-              เกี่ยวกับการจัดการเรียนการสอน
+              โครงสร้างเวลาเรียน การสั่งงาน การสอบ และแบบประเมิน
             </p>
           </div>
         </div>
@@ -1009,67 +889,82 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         {/* 4 Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           {/* Card 2.1: เวลาเข้าแถว & โครงสร้างคาบเรียน */}
-          <SettingsCategoryCard
-            id="timetable"
-            title="เวลาเข้าแถว & โครงสร้างคาบเรียน"
-            subtitle="ตั้งค่าเวลาเข้าแถว เวลาเรียน เวลาพักเที่ยง และคาบเรียน"
-            icon={<Clock className="w-5 h-5" />}
-            iconBgClass="bg-amber-50"
-            iconColorClass="text-amber-600"
-            onClick={() => setActiveModalKey('timetable')}
-            isExpanded={expandedCards['timetable']}
-            onToggleExpand={(e) => toggleExpand('timetable', e)}
-            badge={`${bellSchedule.totalPeriodsPerDay} คาบ/วัน`}
-            quickInfo={`เข้าแถว ${bellSchedule.morningAssemblyStart} น. • เริ่มเรียน ${bellSchedule.firstPeriodStart} น.`}
-          />
+          {(selectedZone === 'all' || selectedZone === 'admin') && (
+            <SettingsCategoryCard
+              id="timetable"
+              title="เวลาเข้าแถว & โครงสร้างคาบเรียน"
+              subtitle="ตั้งค่าเวลาเข้าแถว เวลาเรียน เวลาพักเที่ยง และคาบเรียน"
+              icon={<Clock className="w-5 h-5" />}
+              iconBgClass="bg-amber-50"
+              iconColorClass="text-amber-600"
+              onClick={() => handleOpenSettingModal('timetable')}
+              isExpanded={expandedCards['timetable']}
+              onToggleExpand={(e) => toggleExpand('timetable', e)}
+              badge={`${bellSchedule.totalPeriodsPerDay} คาบ/วัน`}
+              quickInfo={`เข้าแถว ${bellSchedule.morningAssemblyStart} น. • เริ่มเรียน ${bellSchedule.firstPeriodStart} น.`}
+              permissionBadge={{ label: '🛡️ แอดมิน', tone: 'admin' }}
+              isReadOnly={!canRoleEditSetting(activeRole, 'timetable')}
+            />
+          )}
 
           {/* Card 2.2: งาน / แบบฝึกหัด */}
-          <SettingsCategoryCard
-            id="assignments"
-            title="งาน / แบบฝึกหัด"
-            subtitle="จัดการงานและแบบฝึกหัด"
-            icon={<ClipboardList className="w-5 h-5" />}
-            iconBgClass="bg-purple-50"
-            iconColorClass="text-purple-600"
-            onClick={() => setActiveModalKey('assignments')}
-            isExpanded={expandedCards['assignments']}
-            onToggleExpand={(e) => toggleExpand('assignments', e)}
-            quickInfo="ปัดเศษ >= 0.5 อัตโนมัติ"
-          />
+          {(selectedZone === 'all' || selectedZone === 'teacher') && (
+            <SettingsCategoryCard
+              id="assignments"
+              title="งาน / แบบฝึกหัด"
+              subtitle="ตั้งค่าเกณฑ์การส่งงาน การปัดเศษคะแนน และแจ้งเตือนงานค้าง"
+              icon={<ClipboardList className="w-5 h-5" />}
+              iconBgClass="bg-purple-50"
+              iconColorClass="text-purple-600"
+              onClick={() => handleOpenSettingModal('assignments')}
+              isExpanded={expandedCards['assignments']}
+              onToggleExpand={(e) => toggleExpand('assignments', e)}
+              quickInfo="ปัดเศษ >= 0.5 อัตโนมัติ"
+              permissionBadge={{ label: '🧑‍🏫 ส่วนของครู', tone: 'teacher' }}
+            />
+          )}
 
           {/* Card 2.3: การสอบ */}
-          <SettingsCategoryCard
-            id="exams"
-            title="การสอบ"
-            subtitle="จัดการข้อมูลการสอบและคะแนน"
-            icon={<FileText className="w-5 h-5" />}
-            iconBgClass="bg-rose-50"
-            iconColorClass="text-rose-600"
-            onClick={() => setActiveModalKey('exams')}
-            isExpanded={expandedCards['exams']}
-            onToggleExpand={(e) => toggleExpand('exams', e)}
-            quickInfo="สอบเก็บคะแนน • กลางภาค • ปลายภาค"
-          />
+          {(selectedZone === 'all' || selectedZone === 'teacher') && (
+            <SettingsCategoryCard
+              id="exams"
+              title="การสอบ"
+              subtitle="จัดการข้อมูลการสอบเก็บคะแนน กลางภาค และปลายภาค"
+              icon={<FileText className="w-5 h-5" />}
+              iconBgClass="bg-rose-50"
+              iconColorClass="text-rose-600"
+              onClick={() => handleOpenSettingModal('exams')}
+              isExpanded={expandedCards['exams']}
+              onToggleExpand={(e) => toggleExpand('exams', e)}
+              quickInfo="สอบเก็บคะแนน • กลางภาค • ปลายภาค"
+              permissionBadge={{ label: '🧑‍🏫 ส่วนของครู', tone: 'teacher' }}
+            />
+          )}
 
           {/* Card 2.4: แบบฟอร์ม / ประเมิน */}
-          <SettingsCategoryCard
-            id="forms"
-            title="แบบฟอร์ม / ประเมิน"
-            subtitle="จัดการแบบฟอร์มและการประเมิน"
-            icon={<CheckSquare className="w-5 h-5" />}
-            iconBgClass="bg-violet-50"
-            iconColorClass="text-violet-600"
-            onClick={() => setActiveModalKey('forms')}
-            isExpanded={expandedCards['forms']}
-            onToggleExpand={(e) => toggleExpand('forms', e)}
-            quickInfo="แบบประเมิน PA & คุณลักษณะ 8 ข้อ"
-          />
+          {(selectedZone === 'all' || selectedZone === 'teacher') && (
+            <SettingsCategoryCard
+              id="forms"
+              title="แบบฟอร์ม / ประเมิน"
+              subtitle="เกณฑ์ประเมินคุณลักษณะอันพึงประสงค์ 8 ข้อ และสมรรถนะ"
+              icon={<CheckSquare className="w-5 h-5" />}
+              iconBgClass="bg-violet-50"
+              iconColorClass="text-violet-600"
+              onClick={() => handleOpenSettingModal('forms')}
+              isExpanded={expandedCards['forms']}
+              onToggleExpand={(e) => toggleExpand('forms', e)}
+              quickInfo="แบบประเมิน PA & คุณลักษณะ 8 ข้อ"
+              permissionBadge={{ label: '🧑‍🏫 ส่วนของครู', tone: 'teacher' }}
+            />
+          )}
         </div>
       </section>
+      )}
 
       {/* ==================================================================== */}
-      {/* CATEGORY 3: การจัดการนักเรียน (ข้อมูลและพฤติกรรมนักเรียน) */}
+      {/* CATEGORY 3: การจัดการนักเรียน & ทะเบียนสถานะ (ย้ายเข้า/ออก/จบ/จำหน่าย) */}
       {/* ==================================================================== */}
+      {(selectedZone === 'all' || selectedZone === 'registrar' || selectedZone === 'admin') && (
       <section className="space-y-3">
         {/* Section Header */}
         <div className="flex items-center gap-3">
@@ -1078,78 +973,89 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
           </div>
           <div>
             <h2 className="text-base font-extrabold text-[#163A66]">
-              การจัดการนักเรียน
+              การจัดการนักเรียน & ทะเบียนสถานะ (Student Lifecycle & Affairs)
             </h2>
             <p className="text-xs font-medium text-[#6B7C93]">
-              ข้อมูลและพฤติกรรมนักเรียน
+              จัดการ User นักเรียน ย้ายเข้า-ออก จบการศึกษา ลาออก พักการเรียน จำหน่ายออก เช็คชื่อ และความประพฤติ
             </p>
           </div>
         </div>
 
         {/* 4 Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {/* Card 3.1: ข้อมูลนักเรียน */}
+          {/* Card 3.1: ข้อมูลนักเรียน & ทะเบียนสถานะ */}
           <SettingsCategoryCard
             id="students"
-            title="ข้อมูลนักเรียน"
-            subtitle="จัดการข้อมูลนักเรียน"
+            title="ทะเบียน & สถานะนักเรียน (User)"
+            subtitle="ย้ายเข้า-ย้ายออก จบการศึกษา จำหน่ายออก พักการเรียน รีเซ็ตรหัสผ่าน"
             icon={<UserCircle className="w-5 h-5" />}
             iconBgClass="bg-cyan-50"
             iconColorClass="text-cyan-600"
-            onClick={() => setActiveModalKey('students')}
+            onClick={() => handleOpenSettingModal('students')}
             isExpanded={expandedCards['students']}
             onToggleExpand={(e) => toggleExpand('students', e)}
-            quickInfo="ย้ายห้องเรียนอัตโนมัติพร้อมคะแนน"
+            badge="ครบวงจร"
+            quickInfo="ย้ายเข้า/ออก • จบ ม.3/ม.6 • จำหน่ายออก • ระงับสิทธิ์"
+            permissionBadge={{ label: '🎓 ทะเบียน/แอดมิน', tone: 'registrar' }}
+            isReadOnly={!canRoleEditSetting(activeRole, 'students')}
           />
 
           {/* Card 3.2: เช็คชื่อ/แถวเช้า */}
           <SettingsCategoryCard
             id="attendance"
-            title="เช็คชื่อ/แถวเช้า"
-            subtitle="ตั้งค่าการเช็คชื่อและแถวตอนเช้า"
+            title="เช็คชื่อ/แถวเช้า & โควตาลา"
+            subtitle="ตั้งค่าการเช็คชื่อแถวเช้า เกณฑ์เวลาเรียน 80% และโควตาวันลา"
             icon={<ClipboardCheck className="w-5 h-5" />}
             iconBgClass="bg-emerald-50"
             iconColorClass="text-emerald-600"
-            onClick={() => setActiveModalKey('attendance')}
+            onClick={() => handleOpenSettingModal('attendance')}
             isExpanded={expandedCards['attendance']}
             onToggleExpand={(e) => toggleExpand('attendance', e)}
             badge="กฎ 80%"
             quickInfo="Correlation แถวเช้า + คาบเรียน"
+            permissionBadge={{ label: '🎓 ทะเบียน/แอดมิน', tone: 'registrar' }}
+            isReadOnly={!canRoleEditSetting(activeRole, 'attendance')}
           />
 
           {/* Card 3.3: บันทึกความประพฤติ */}
           <SettingsCategoryCard
             id="behavior"
             title="บันทึกความประพฤติ"
-            subtitle="จัดการพฤติกรรมและการแจ้งเตือน"
+            subtitle="จัดการเกณฑ์คะแนนความประพฤติและการแจ้งเตือนฝ่ายกิจการ"
             icon={<Award className="w-5 h-5" />}
             iconBgClass="bg-amber-50"
             iconColorClass="text-amber-600"
-            onClick={() => setActiveModalKey('behavior')}
+            onClick={() => handleOpenSettingModal('behavior')}
             isExpanded={expandedCards['behavior']}
             onToggleExpand={(e) => toggleExpand('behavior', e)}
             quickInfo="คะแนนเริ่มต้น 100 คะแนน"
+            permissionBadge={{ label: '🎓 ทะเบียน/แอดมิน', tone: 'registrar' }}
+            isReadOnly={!canRoleEditSetting(activeRole, 'behavior')}
           />
 
           {/* Card 3.4: ผู้ปกครอง */}
           <SettingsCategoryCard
             id="parents"
-            title="ผู้ปกครอง"
-            subtitle="จัดการข้อมูลผู้ปกครอง"
+            title="ผู้ปกครอง & การติดต่อ"
+            subtitle="จัดการข้อมูลผู้ปกครองและช่องทางแจ้งเตือนอัตโนมัติ"
             icon={<Users className="w-5 h-5" />}
             iconBgClass="bg-purple-50"
             iconColorClass="text-purple-600"
-            onClick={() => setActiveModalKey('parents')}
+            onClick={() => handleOpenSettingModal('parents')}
             isExpanded={expandedCards['parents']}
             onToggleExpand={(e) => toggleExpand('parents', e)}
             quickInfo="ระบบแจ้งเตือนผ่าน Line / SMS"
+            permissionBadge={{ label: '🎓 ทะเบียน/แอดมิน', tone: 'registrar' }}
+            isReadOnly={!canRoleEditSetting(activeRole, 'parents')}
           />
         </div>
       </section>
+      )}
 
       {/* ==================================================================== */}
       {/* CATEGORY 4: ผลการเรียน & รายงาน (ดูผลการเรียนและสถิติ) */}
       {/* ==================================================================== */}
+      {(selectedZone === 'all' || selectedZone === 'teacher' || selectedZone === 'admin') && (
       <section className="space-y-3">
         {/* Section Header */}
         <div className="flex items-center gap-3">
@@ -1161,7 +1067,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
               ผลการเรียน & รายงาน
             </h2>
             <p className="text-xs font-medium text-[#6B7C93]">
-              ดูผลการเรียนและสถิติ
+              เกณฑ์การตัดเกรด รายงาน ปพ.5 สถิติ และสำรองข้อมูลระบบ
             </p>
           </div>
         </div>
@@ -1169,67 +1075,82 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         {/* 4 Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           {/* Card 4.1: ผลการเรียน */}
-          <SettingsCategoryCard
-            id="grades"
-            title="ผลการเรียน"
-            subtitle="ดูและแก้ไขผลการเรียน"
-            icon={<FileSpreadsheet className="w-5 h-5" />}
-            iconBgClass="bg-purple-50"
-            iconColorClass="text-purple-600"
-            onClick={() => setActiveModalKey('grades')}
-            isExpanded={expandedCards['grades']}
-            onToggleExpand={(e) => toggleExpand('grades', e)}
-            quickInfo="เกณฑ์ตัดเกรด 8 ระดับ (4.0 - 0.0)"
-          />
+          {(selectedZone === 'all' || selectedZone === 'teacher') && (
+            <SettingsCategoryCard
+              id="grades"
+              title="ผลการเรียน"
+              subtitle="ตั้งค่าสัดส่วนคะแนนและเกณฑ์การตัดเกรด 8 ระดับ"
+              icon={<FileSpreadsheet className="w-5 h-5" />}
+              iconBgClass="bg-purple-50"
+              iconColorClass="text-purple-600"
+              onClick={() => handleOpenSettingModal('grades')}
+              isExpanded={expandedCards['grades']}
+              onToggleExpand={(e) => toggleExpand('grades', e)}
+              quickInfo="เกณฑ์ตัดเกรด 8 ระดับ (4.0 - 0.0)"
+              permissionBadge={{ label: '🧑‍🏫 ส่วนของครู', tone: 'teacher' }}
+            />
+          )}
 
           {/* Card 4.2: รายงาน */}
-          <SettingsCategoryCard
-            id="reports"
-            title="รายงาน"
-            subtitle="รายงานต่าง ๆ ของนักเรียน"
-            icon={<BarChart2 className="w-5 h-5" />}
-            iconBgClass="bg-emerald-50"
-            iconColorClass="text-emerald-600"
-            onClick={() => setActiveModalKey('reports')}
-            isExpanded={expandedCards['reports']}
-            onToggleExpand={(e) => toggleExpand('reports', e)}
-            quickInfo="รายงาน ปพ.5 & สรุปผล SAR"
-          />
+          {(selectedZone === 'all' || selectedZone === 'teacher') && (
+            <SettingsCategoryCard
+              id="reports"
+              title="รายงาน ปพ.5 / SAR"
+              subtitle="รูปแบบรายงานผลการเรียนและเอกสารวิชาการ"
+              icon={<BarChart2 className="w-5 h-5" />}
+              iconBgClass="bg-emerald-50"
+              iconColorClass="text-emerald-600"
+              onClick={() => handleOpenSettingModal('reports')}
+              isExpanded={expandedCards['reports']}
+              onToggleExpand={(e) => toggleExpand('reports', e)}
+              quickInfo="รายงาน ปพ.5 & สรุปผล SAR"
+              permissionBadge={{ label: '🧑‍🏫 ส่วนของครู', tone: 'teacher' }}
+            />
+          )}
 
           {/* Card 4.3: สถิติ */}
-          <SettingsCategoryCard
-            id="analytics"
-            title="สถิติ"
-            subtitle="สถิติการเรียนและพฤติกรรม"
-            icon={<TrendingUp className="w-5 h-5" />}
-            iconBgClass="bg-blue-50"
-            iconColorClass="text-blue-600"
-            onClick={() => setActiveModalKey('analytics')}
-            isExpanded={expandedCards['analytics']}
-            onToggleExpand={(e) => toggleExpand('analytics', e)}
-            quickInfo="เกณฑ์แจ้งเตือนกลุ่มเสี่ยง"
-          />
+          {(selectedZone === 'all' || selectedZone === 'teacher') && (
+            <SettingsCategoryCard
+              id="analytics"
+              title="สถิติ & กลุ่มเสี่ยง"
+              subtitle="เกณฑ์แจ้งเตือนนักเรียนกลุ่มเสี่ยงเวลาเรียนและผลการเรียน"
+              icon={<TrendingUp className="w-5 h-5" />}
+              iconBgClass="bg-blue-50"
+              iconColorClass="text-blue-600"
+              onClick={() => handleOpenSettingModal('analytics')}
+              isExpanded={expandedCards['analytics']}
+              onToggleExpand={(e) => toggleExpand('analytics', e)}
+              quickInfo="เกณฑ์แจ้งเตือนกลุ่มเสี่ยง"
+              permissionBadge={{ label: '🧑‍🏫 ส่วนของครู', tone: 'teacher' }}
+            />
+          )}
 
           {/* Card 4.4: สำรองข้อมูล */}
-          <SettingsCategoryCard
-            id="backup"
-            title="สำรองข้อมูล"
-            subtitle="จัดการข้อมูลสำรองและกู้คืน"
-            icon={<Cloud className="w-5 h-5" />}
-            iconBgClass="bg-indigo-50"
-            iconColorClass="text-indigo-600"
-            onClick={() => setActiveModalKey('backup')}
-            isExpanded={expandedCards['backup']}
-            onToggleExpand={(e) => toggleExpand('backup', e)}
-            badge="R2 100TB"
-            quickInfo="Snapshot & Cloudflare R2"
-          />
+          {(selectedZone === 'all' || selectedZone === 'admin') && (
+            <SettingsCategoryCard
+              id="backup"
+              title="สำรองข้อมูล & R2 Cloud"
+              subtitle="จัดการข้อมูลสำรอง กู้คืน Snapshot และพื้นที่ Cloudflare R2"
+              icon={<Cloud className="w-5 h-5" />}
+              iconBgClass="bg-indigo-50"
+              iconColorClass="text-indigo-600"
+              onClick={() => handleOpenSettingModal('backup')}
+              isExpanded={expandedCards['backup']}
+              onToggleExpand={(e) => toggleExpand('backup', e)}
+              badge="R2 100TB"
+              quickInfo="Snapshot & Cloudflare R2"
+              permissionBadge={{ label: '🛡️ แอดมิน', tone: 'admin' }}
+              isReadOnly={!canRoleEditSetting(activeRole, 'backup')}
+            />
+          )}
         </div>
       </section>
+      )}
 
       {/* ==================================================================== */}
       {/* CATEGORY 5: อื่น ๆ (การตั้งค่าระบบเพิ่มเติม) */}
       {/* ==================================================================== */}
+      {(selectedZone === 'all' || selectedZone === 'teacher' || selectedZone === 'admin') && (
       <section className="space-y-3">
         {/* Section Header */}
         <div className="flex items-center gap-3">
@@ -1238,79 +1159,95 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
           </div>
           <div>
             <h2 className="text-base font-extrabold text-[#163A66]">
-              อื่น ๆ
+              อื่น ๆ & ความปลอดภัย
             </h2>
             <p className="text-xs font-medium text-[#6B7C93]">
-              การตั้งค่าระบบเพิ่มเติม
+              การแจ้งเตือน ธีมแบนเนอร์ รหัสความปลอดภัย PIN และกิจกรรมกาชา
             </p>
           </div>
         </div>
 
-        {/* 3 Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+        {/* 4 Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           {/* Card 5.1: แจ้งเตือน */}
-          <SettingsCategoryCard
-            id="notifications"
-            title="แจ้งเตือน"
-            subtitle="ตั้งค่าการแจ้งเตือน"
-            icon={<Bell className="w-5 h-5" />}
-            iconBgClass="bg-amber-50"
-            iconColorClass="text-amber-600"
-            onClick={() => setActiveModalKey('notifications')}
-            isExpanded={expandedCards['notifications']}
-            onToggleExpand={(e) => toggleExpand('notifications', e)}
-            quickInfo="Line Notify Token & กระดิ่งเตือน"
-          />
+          {(selectedZone === 'all' || selectedZone === 'teacher') && (
+            <SettingsCategoryCard
+              id="notifications"
+              title="แจ้งเตือน"
+              subtitle="ตั้งค่าการแจ้งเตือนส่วนตัวและ Line Notify"
+              icon={<Bell className="w-5 h-5" />}
+              iconBgClass="bg-amber-50"
+              iconColorClass="text-amber-600"
+              onClick={() => handleOpenSettingModal('notifications')}
+              isExpanded={expandedCards['notifications']}
+              onToggleExpand={(e) => toggleExpand('notifications', e)}
+              quickInfo="Line Notify Token & กระดิ่งเตือน"
+              permissionBadge={{ label: '🧑‍🏫 ส่วนของครู', tone: 'teacher' }}
+            />
+          )}
 
           {/* Card 5.2: ธีม / รูปแบบ (มีแบนเนอร์ 3 ส่วนอยู่ข้างใน) */}
-          <SettingsCategoryCard
-            id="theme"
-            title="ธีม / รูปแบบ"
-            subtitle="ปรับแต่งธีมและรูปแบบการแสดงผล"
-            icon={<Palette className="w-5 h-5" />}
-            iconBgClass="bg-purple-50"
-            iconColorClass="text-purple-600"
-            onClick={() => setActiveModalKey('theme')}
-            isExpanded={expandedCards['theme']}
-            onToggleExpand={(e) => toggleExpand('theme', e)}
-            badge="3 แบนเนอร์"
-            quickInfo="Hero, Sidebar, Bottom Banner"
-          />
+          {(selectedZone === 'all' || selectedZone === 'admin') && (
+            <SettingsCategoryCard
+              id="theme"
+              title="ธีม / แบนเนอร์โรงเรียน"
+              subtitle="ปรับแต่งธีมและภาพแบนเนอร์ 3 จุดของโรงเรียน"
+              icon={<Palette className="w-5 h-5" />}
+              iconBgClass="bg-purple-50"
+              iconColorClass="text-purple-600"
+              onClick={() => handleOpenSettingModal('theme')}
+              isExpanded={expandedCards['theme']}
+              onToggleExpand={(e) => toggleExpand('theme', e)}
+              badge="3 แบนเนอร์"
+              quickInfo="Hero, Sidebar, Bottom Banner"
+              permissionBadge={{ label: '🛡️ แอดมิน', tone: 'admin' }}
+              isReadOnly={!canRoleEditSetting(activeRole, 'theme')}
+            />
+          )}
 
           {/* Card 5.3: ความปลอดภัย */}
-          <SettingsCategoryCard
-            id="security"
-            title="ความปลอดภัย"
-            subtitle="ตั้งค่าความปลอดภัยของระบบ"
-            icon={<ShieldCheck className="w-5 h-5" />}
-            iconBgClass="bg-emerald-50"
-            iconColorClass="text-emerald-600"
-            onClick={() => setActiveModalKey('security')}
-            isExpanded={expandedCards['security']}
-            onToggleExpand={(e) => toggleExpand('security', e)}
-            quickInfo="Teacher PIN & สิทธิ์ RBAC"
-          />
+          {(selectedZone === 'all' || selectedZone === 'teacher') && (
+            <SettingsCategoryCard
+              id="security"
+              title="ความปลอดภัย & รหัส PIN"
+              subtitle="ตั้งค่ารหัส Teacher PIN 4 หลัก และความปลอดภัยบัญชี"
+              icon={<ShieldCheck className="w-5 h-5" />}
+              iconBgClass="bg-emerald-50"
+              iconColorClass="text-emerald-600"
+              onClick={() => handleOpenSettingModal('security')}
+              isExpanded={expandedCards['security']}
+              onToggleExpand={(e) => toggleExpand('security', e)}
+              quickInfo="Teacher PIN & สิทธิ์ RBAC"
+              permissionBadge={{ label: '🧑‍🏫 ส่วนของครู', tone: 'teacher' }}
+            />
+          )}
 
           {/* Card 5.4: ระบบกาชา & ควิซ 40 สัปดาห์ */}
-          <SettingsCategoryCard
-            id="gacha"
-            title="กาชา & ควิซ 40 สัปดาห์"
-            subtitle="อัตราสุ่ม, การันตี, ร้านค้า, จัดการโจทย์ 40 สัปดาห์ และรีเซ็ต/คืนค่า"
-            icon={<Sparkles className="w-5 h-5" />}
-            iconBgClass="bg-purple-50"
-            iconColorClass="text-purple-600"
-            onClick={() => setActiveModalKey('gacha')}
-            isExpanded={expandedCards['gacha']}
-            onToggleExpand={(e) => toggleExpand('gacha', e)}
-            badge="40 สัปดาห์"
-            quickInfo="Rates, Pity, Reset, Rollback, Quiz Bank"
-          />
+          {(selectedZone === 'all' || selectedZone === 'admin') && (
+            <SettingsCategoryCard
+              id="gacha"
+              title="กาชา & ควิซ 40 สัปดาห์"
+              subtitle="อัตราสุ่ม, การันตี, ร้านค้า, จัดการโจทย์ 40 สัปดาห์ และรีเซ็ต/คืนค่า"
+              icon={<Sparkles className="w-5 h-5" />}
+              iconBgClass="bg-purple-50"
+              iconColorClass="text-purple-600"
+              onClick={() => handleOpenSettingModal('gacha')}
+              isExpanded={expandedCards['gacha']}
+              onToggleExpand={(e) => toggleExpand('gacha', e)}
+              badge="40 สัปดาห์"
+              quickInfo="Rates, Pity, Reset, Rollback, Quiz Bank"
+              permissionBadge={{ label: '🛡️ แอดมิน', tone: 'admin' }}
+              isReadOnly={!canRoleEditSetting(activeRole, 'gacha')}
+            />
+          )}
         </div>
       </section>
+      )}
 
           {/* ==================================================================== */}
-          {/* CATEGORY 6: ผังโครงสร้างตาราง Supabase สำหรับการตั้งค่า (12 หมวดหมู่) */}
+          {/* CATEGORY 6: ผังโครงสร้างตาราง Supabase สำหรับการตั้งค่า (เฉพาะแอดมิน) */}
           {/* ==================================================================== */}
+          {isAdmin && (selectedZone === 'all' || selectedZone === 'admin') && (
           <section className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-card space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
               <div className="flex items-center gap-3">
@@ -1418,7 +1355,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
               ].map((item) => (
                 <div
                   key={item.table}
-                  onClick={() => setActiveModalKey(item.route)}
+                  onClick={() => handleOpenSettingModal(item.route)}
                   className="p-3.5 rounded-xl border border-slate-200/90 bg-slate-50/50 hover:bg-white hover:border-blue-300 hover:shadow-xs transition-all cursor-pointer group flex flex-col justify-between"
                 >
                   <div className="space-y-1.5">
@@ -1442,6 +1379,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
               ))}
             </div>
           </section>
+          )}
         </div>
       )}
 
@@ -1463,6 +1401,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         supabaseTable="school_profiles"
         categoryPath="หมวด 1: ข้อมูลองค์กรและอัตลักษณ์"
         onSave={handleSaveSchoolInfo}
+        isReadOnly={!isAdmin}
+        readOnlyMessage="โหมดอ่านอย่างเดียว (Read-Only): ข้อมูลโรงเรียนและอัตลักษณ์องค์กรสงวนสิทธิ์การแก้ไขเฉพาะผู้ดูแลระบบ (ACADEMIC_ADMIN)"
       >
         <div className="space-y-4">
           {/* Section 1: ตราสัญลักษณ์และอัตลักษณ์ประจำโรงเรียน */}
@@ -1882,33 +1822,38 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
       </SettingsSubModal>
 
       {/* ------------------------------------------------------------------ */}
-      {/* MODAL 1.2: ผู้ใช้งาน */}
+      {/* MODAL 1.2: ผู้ใช้งาน & สิทธิ์ (RBAC + ทะเบียนบัญชีนักเรียน) */}
       {/* ------------------------------------------------------------------ */}
       <SettingsSubModal
         isOpen={activeModalKey === 'users'}
         onClose={() => setActiveModalKey(null)}
         title="จัดการบัญชีผู้ใช้งาน & สิทธิ์ (RBAC)"
-        subtitle="จัดการสิทธิ์การเข้าถึง 5 บทบาท และบัญชีครูอาจารย์"
+        subtitle="แยกสิทธิ์ครูผู้สอน ฝ่ายทะเบียน/กิจการนักเรียน และผู้ดูแลระบบ พร้อมจัดการสถานะบัญชีนักเรียน"
         icon={<User className="w-5 h-5" />}
         iconBgClass="bg-sky-50"
         iconColorClass="text-sky-600"
-        supabaseTable="school_profiles & teachers"
+        supabaseTable="school_profiles & teachers & students"
         categoryPath="หมวด 1: บุคลากรและสิทธิ์"
         showSaveButton={false}
       >
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-            <h3 className="text-sm font-extrabold text-slate-900">สิทธิ์และบทบาทในระบบ</h3>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h3 className="text-sm font-extrabold text-slate-900">โครงสร้างการแยกสิทธิ์ 5 บทบาทในระบบ (Role Permission Matrix)</h3>
+              <span className="text-[11px] font-extrabold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+                บทบาทปัจจุบันของคุณ: {activeRole}
+              </span>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {[
-                { role: 'ACADEMIC_ADMIN', title: 'แอดมินฝ่ายวิชาการ', desc: 'จัดการระบบทั้งหมด อัปโหลดแบนเนอร์ สำรองข้อมูล' },
-                { role: 'DIRECTOR', title: 'ผู้อำนวยการโรงเรียน', desc: 'ดูรายงาน SAR ภาพรวมสถิติ และอนุมัติเกรด' },
-                { role: 'HOMEROOM_ADVISOR', title: 'ครูที่ปรึกษา (ม.3/1)', desc: 'เช็คแถวเช้า เยี่ยมบ้าน ติดตามพฤติกรรม' },
-                { role: 'SUBJECT_TEACHER', title: 'ครูผู้สอน', desc: 'เช็คชื่อเข้าเรียน ตรวจงาน กรอกคะแนน ปพ.5' },
-                { role: 'STUDENT_AFFAIRS', title: 'ครูกิจการนักเรียน', desc: 'จัดการใบลา ตัดคะแนนความประพฤติ สภานักเรียน' },
+                { role: 'ACADEMIC_ADMIN', title: '🛡️ แอดมินฝ่ายวิชาการ/ระบบ', desc: 'จัดการตั้งค่าระบบทั้งหมด ข้อมูลโรงเรียน คาบเรียน สำรองข้อมูล R2 แบนเนอร์ และสิทธิ์บุคลากร' },
+                { role: 'STUDENT_AFFAIRS', title: '🎓 ฝ่ายกิจการ/ทะเบียนนักเรียน', desc: 'จัดการทะเบียนนักเรียน (ย้ายเข้า/ออก จบการศึกษา ลาออก พักการเรียน จำหน่ายออก) โควตาวันลา และความประพฤติ' },
+                { role: 'DIRECTOR', title: '🏛️ ผู้อำนวยการโรงเรียน', desc: 'กำกับติดตามรายงาน SAR ภาพรวมสถิติทั้งโรงเรียน และอนุมัติผลการเรียน' },
+                { role: 'HOMEROOM_ADVISOR', title: '🧑‍🏫 ครูที่ปรึกษาประจำชั้น', desc: 'เช็คชื่อแถวเช้า ดูแลนักเรียนประจำชั้น ติดตามงานค้าง และประสานผู้ปกครอง' },
+                { role: 'SUBJECT_TEACHER', title: '🧑‍🏫 ครูผู้สอนประจำวิชา', desc: 'จัดการรายวิชา สั่งงาน ตรวจงาน สอบ ตัดเกรด ปพ.5 แจ้งเตือน และตั้งรหัส PIN ส่วนตัว' },
               ].map((item) => (
                 <div key={item.role} className="p-3 rounded-xl border border-slate-200 bg-slate-50/60 space-y-1">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="font-extrabold text-xs text-slate-900">{item.title}</span>
                     <span className="text-[10px] font-mono font-bold bg-white px-1.5 py-0.5 rounded border border-slate-200">
                       {item.role}
@@ -1919,6 +1864,9 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
               ))}
             </div>
           </div>
+
+          {/* ศูนย์จัดการทะเบียนและบัญชีนักเรียน (ย้ายเข้า/ออก/จบ/จำหน่าย) */}
+          <StudentLifecycleManagerPanel activeRole={activeRole} />
         </div>
       </SettingsSubModal>
 
@@ -2111,6 +2059,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         categoryPath="หมวด 2: โครงสร้างคาบเรียนและเสียงกริ่ง"
         onSave={handleSaveBellSchedule}
         saveButtonText="💾 บันทึกการตั้งค่าโครงสร้างเวลา"
+        isReadOnly={!isAdmin}
+        readOnlyMessage="โหมดอ่านอย่างเดียว (Read-Only): การเปิด-ปิดภาคเรียน วันหยุดพิเศษ และโครงสร้างคาบเรียนทั้งโรงเรียน สงวนสิทธิ์เฉพาะผู้ดูแลระบบ (ACADEMIC_ADMIN)"
       >
         <div className="space-y-5">
           {/* Section 0: ปีการศึกษา & ภาคเรียน (Academic Terms & Calendar) */}
@@ -2844,28 +2794,23 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
       </SettingsSubModal>
 
       {/* ------------------------------------------------------------------ */}
-      {/* MODAL 3.1: ข้อมูลนักเรียน */}
+      {/* MODAL 3.1: ข้อมูลนักเรียน & ทะเบียนสถานะ (ย้ายเข้า/ออก/จบ/จำหน่าย) */}
       {/* ------------------------------------------------------------------ */}
       <SettingsSubModal
         isOpen={activeModalKey === 'students'}
         onClose={() => setActiveModalKey(null)}
-        title="จัดการข้อมูลนักเรียน & ย้ายห้องเรียน"
-        subtitle="โครงสร้างบัญชีนักเรียน และระบบย้ายห้องเรียนอัตโนมัติ"
+        title="ทะเบียน & จัดการสถานะผู้ใช้งานนักเรียน (Student Lifecycle & User Management)"
+        subtitle="จัดการนักเรียนย้ายเข้า ย้ายห้อง ย้ายออก จบการศึกษา ลาออก พักการเรียน จำหน่ายออก และควบคุมสิทธิ์การเข้าสู่ระบบ"
         icon={<UserCircle className="w-5 h-5" />}
         iconBgClass="bg-cyan-50"
         iconColorClass="text-cyan-600"
-        supabaseTable="students"
-        categoryPath="หมวด 4: ข้อมูลทะเบียนและนักเรียน"
-        onSave={() => showToast('✓ บันทึกการตั้งค่านักเรียนเรียบร้อย')}
+        supabaseTable="students & StudentEnrollment"
+        categoryPath="หมวด 3: ทะเบียนและสถานะนักเรียน"
+        showSaveButton={false}
+        isReadOnly={!canManageRegistrar}
+        readOnlyMessage="โหมดอ่านอย่างเดียว (Read-Only): การเปลี่ยนสถานะทะเบียนนักเรียน (ย้ายเข้า/ออก/จบการศึกษา/จำหน่ายออก) สงวนสิทธิ์เฉพาะแอดมินวิชาการ (ACADEMIC_ADMIN) และฝ่ายกิจการนักเรียน (STUDENT_AFFAIRS)"
       >
-        <div className="space-y-4">
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-            <h3 className="text-sm font-extrabold text-slate-900">ระบบย้ายห้องเรียนอัตโนมัติ (Student Transfer Sync)</h3>
-            <p className="text-xs text-slate-500">
-              เมื่อนักเรียนย้ายห้องเรียน เช่น ม.1/1 ➔ ม.1/2 ระบบจะดึงนักเรียนเข้ากลุ่มแชทใหม่ และนำคะแนนสะสมติดตัวไปด้วยอัตโนมัติ
-            </p>
-          </div>
-        </div>
+        <StudentLifecycleManagerPanel activeRole={activeRole} />
       </SettingsSubModal>
 
       <SettingsSubModal

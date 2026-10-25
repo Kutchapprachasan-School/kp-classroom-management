@@ -13,6 +13,8 @@ export interface SettingsCategoryCardProps {
   onToggleExpand?: (e: React.MouseEvent) => void;
   badge?: string;
   quickInfo?: string;
+  permissionBadge?: string | { label: string; tone?: string };
+  isReadOnly?: boolean;
 }
 
 export const SettingsCategoryCard: React.FC<SettingsCategoryCardProps> = ({
@@ -26,6 +28,8 @@ export const SettingsCategoryCard: React.FC<SettingsCategoryCardProps> = ({
   onToggleExpand,
   badge,
   quickInfo,
+  permissionBadge,
+  isReadOnly = false,
 }) => {
   return (
     <div
@@ -98,7 +102,9 @@ export const SettingsCategoryCard: React.FC<SettingsCategoryCardProps> = ({
         </button>
 
         <span className="text-[10px] text-slate-400 group-hover:text-blue-500 font-semibold transition-colors">
-          คลิกเพื่อจัดการ
+          {typeof permissionBadge === 'string'
+            ? permissionBadge
+            : permissionBadge?.label || (isReadOnly ? '👁️ ดูข้อมูล' : 'คลิกเพื่อจัดการ')}
         </span>
       </div>
     </div>

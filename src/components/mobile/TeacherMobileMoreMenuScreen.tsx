@@ -125,15 +125,17 @@ export const TeacherMobileMoreMenuScreen: React.FC<TeacherMobileMoreMenuScreenPr
     },
     {
       id: 'school-info',
-      label: 'ข้อมูลโรงเรียนและบัญชี',
+      label: 'ทะเบียนนักเรียน (ย้าย/จบ/จำหน่าย) & บัญชีผู้ใช้',
       icon: School,
       viewKey: 'accounts',
+      badge: currentUser?.role === 'ADMIN' ? 'แอดมิน' : 'ทะเบียน',
     },
     {
       id: 'settings',
-      label: 'ตั้งค่าระบบ',
+      label: 'ตั้งค่าระบบ (แยกสิทธิ์ครู / แอดมิน)',
       icon: Settings,
       viewKey: 'settings',
+      badge: 'ครบ 21 หมวด',
     },
   ];
 

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { ArrowLeft, Check, Sparkles, Database } from 'lucide-react';
+import { ArrowLeft, Check, Sparkles, Database, Lock } from 'lucide-react';
 
 export interface SettingsSubModalProps {
   isOpen: boolean;
@@ -15,6 +15,8 @@ export interface SettingsSubModalProps {
   showSaveButton?: boolean;
   supabaseTable?: string;
   categoryPath?: string;
+  isReadOnly?: boolean;
+  readOnlyMessage?: string;
 }
 
 export const SettingsSubModal: React.FC<SettingsSubModalProps> = ({
@@ -31,6 +33,8 @@ export const SettingsSubModal: React.FC<SettingsSubModalProps> = ({
   showSaveButton = true,
   supabaseTable,
   categoryPath = 'การตั้งค่าระบบ',
+  isReadOnly = false,
+  readOnlyMessage,
 }) => {
   // ESC to return to overview
   useEffect(() => {
@@ -81,18 +85,36 @@ export const SettingsSubModal: React.FC<SettingsSubModalProps> = ({
             </span>
           )}
 
-          {showSaveButton && onSave && (
-            <button
-              type="button"
-              onClick={onSave}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
-            >
-              <Check className="w-4 h-4" />
-              <span>{saveButtonText}</span>
-            </button>
+          {isReadOnly ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold">
+              <Lock className="w-3.5 h-3.5 text-amber-600" />
+              <span>โหมดดูข้อมูล (เฉพาะแอดมินแก้ไขได้)</span>
+            </span>
+          ) : (
+            showSaveButton &&
+            onSave && (
+              <button
+                type="button"
+                onClick={onSave}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all cursor-pointer min-h-[42px]"
+              >
+                <Check className="w-4 h-4" />
+                <span>{saveButtonText}</span>
+              </button>
+            )
           )}
         </div>
       </div>
+
+      {isReadOnly && (
+        <div className="p-3.5 rounded-2xl bg-[#FFFBEB] border border-[#FDE68A] text-xs font-semibold text-[#92400E] flex items-center gap-2.5 shadow-2xs">
+          <Lock className="w-4 h-4 text-[#F59E0B] shrink-0" />
+          <span>
+            {readOnlyMessage ||
+              'คุณกำลังเปิดดูในสิทธิ์ครูผู้สอน (Read-Only) — การเปลี่ยนแปลงการตั้งค่าระดับโรงเรียนในหมวดนี้สงวนสิทธิ์เฉพาะผู้ดูแลระบบ (Admin)'}
+          </span>
+        </div>
+      )}
 
       {/* Main In-Page Card Container */}
       <div className="bg-white rounded-2xl shadow-card border border-slate-200/90 overflow-hidden">
@@ -139,15 +161,15 @@ export const SettingsSubModal: React.FC<SettingsSubModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-3.5 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold transition-colors cursor-pointer"
+              className="px-3.5 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold transition-colors cursor-pointer min-h-[42px]"
             >
               ← กลับไปหน้ารวม
             </button>
-            {showSaveButton && onSave && (
+            {!isReadOnly && showSaveButton && onSave && (
               <button
                 type="button"
                 onClick={onSave}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-xs transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-xs transition-colors cursor-pointer min-h-[42px]"
               >
                 <Check className="w-4 h-4" />
                 <span>{saveButtonText}</span>
