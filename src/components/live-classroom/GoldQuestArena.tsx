@@ -6,9 +6,10 @@ import GoldQuestArena, {
   type ArenaStudent,
   type ArenaLog,
   type ArenaQuestion,
+  type QuestionBankSet,
   type GoldQuestArenaProps,
 } from '../../../components/GoldQuestArena';
 
-export type { ArenaStudent, ArenaLog, ArenaQuestion, GoldQuestArenaProps };
+export type { ArenaStudent, ArenaLog, ArenaQuestion, QuestionBankSet, GoldQuestArenaProps };
 export { GoldQuestArena };
 export default GoldQuestArena;

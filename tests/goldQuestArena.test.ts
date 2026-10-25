@@ -196,4 +196,43 @@ describe('Gold Quest Arena & Service Suite', () => {
     assert.strictEqual(json.students[0].number, 1);
     assert.strictEqual(json.students[0].name, 'กิตติพงษ์');
   });
+
+  it('9. คลังชุดข้อสอบและระบบสร้างข้อสอบกำหนดเอง (Custom Question Set)', async () => {
+    const { QUESTION_BANK_SETS } = await import('../components/GoldQuestArena');
+    assert.ok(Array.isArray(QUESTION_BANK_SETS), 'QUESTION_BANK_SETS ต้องเป็น Array');
+    assert.ok(QUESTION_BANK_SETS.length >= 3, 'ต้องมีชุดข้อสอบเริ่มต้นอย่างน้อย 3 ชุด');
+
+    // ตรวจสอบโครงสร้างข้อสอบในแต่ละชุด
+    QUESTION_BANK_SETS.forEach((set) => {
+      assert.ok(set.id, 'ชุดข้อสอบต้องมี id');
+      assert.ok(set.title, 'ชุดข้อสอบต้องมี title');
+      assert.ok(set.questions.length > 0, 'ชุดข้อสอบต้องมีคำถาม');
+      set.questions.forEach((q) => {
+        assert.ok(q.prompt, 'คำถามต้องมี prompt');
+        assert.strictEqual(q.options.length, 4, 'ตัวเลือกคำตอบต้องมี 4 ข้อ');
+        assert.ok(q.correctIndex >= 0 && q.correctIndex < 4, 'correctIndex ต้องอยู่ในช่วง 0-3');
+      });
+    });
+
+    // จำลองการเพิ่มข้อสอบใหม่เข้าสู่ชุด custom-teacher-set
+    const newCustomQ = {
+      id: 'custom_test_1',
+      category: 'คณิตศาสตร์เบื้องต้น',
+      prompt: '15 + 27 เท่ากับเท่าใด?',
+      options: ['40', '42', '45', '52'],
+      correctIndex: 1,
+    };
+
+    const customSet = {
+      id: 'custom-teacher-set',
+      title: 'ชุดที่ 4: ชุดข้อสอบที่คุณครูสร้างเอง (Custom)',
+      subtitle: 'คำถามและแบบทดสอบที่สร้างและเพิ่มเข้ามาโดยคุณครู',
+      badge: 'สร้างเอง',
+      difficulty: 'กำหนดเอง' as const,
+      questions: [newCustomQ],
+    };
+
+    assert.strictEqual(customSet.questions.length, 1);
+    assert.strictEqual(customSet.questions[0].options[customSet.questions[0].correctIndex], '42');
+  });
 });

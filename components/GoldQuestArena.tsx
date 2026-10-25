@@ -1,11 +1,12 @@
 // components/GoldQuestArena.tsx
 // หน้าจอควบคุมและโปรเจกเตอร์ฝั่งคุณครู (Teacher Live Arena & Projector Dashboard)
 // พร้อมแผงตั้งค่าก่อนเริ่มห้องสอบ (Pre-Exam Setup Panel): เลือกชุดข้อสอบ 3 ชุด, เวลาสอบ 3-15 นาที, สลับลำดับข้อสอบ
+// และ Modal สร้างข้อสอบเองหน้าเว็บ (Custom Question Creator Modal) พร้อมเพิ่มเข้าชุด Custom อัตโนมัติ
 // เชื่อมต่อกับ RoomQRCodeModal.tsx และดึงข้อมูลจาก API /api/live-classroom/gold-quest แบบเรียลไทม์ทุกๆ 2 วินาที
 
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Coins,
   QrCode,
@@ -28,7 +29,9 @@ import {
   Timer,
   Shuffle,
   Eye,
+  PlusCircle,
   X,
+  Trash2,
   Volume2,
   VolumeX,
 } from 'lucide-react';
@@ -69,7 +72,7 @@ export interface QuestionBankSet {
   title: string;
   subtitle: string;
   badge: string;
-  difficulty: 'ง่าย' | 'ปานกลาง' | 'ท้าทาย';
+  difficulty: 'ง่าย' | 'ปานกลาง' | 'ท้าทาย' | 'กำหนดเอง';
   questions: ArenaQuestion[];
 }
 
@@ -90,7 +93,7 @@ export interface GoldQuestArenaProps {
 }
 
 // ============================================================================
-// คลังชุดข้อสอบให้คุณครูเลือกก่อนเปิดห้องสอบ (Question Bank Sets)
+// คลังชุดข้อสอบเริ่มต้น (Question Bank Sets)
 // ============================================================================
 export const QUESTION_BANK_SETS: QuestionBankSet[] = [
   {
@@ -227,6 +230,8 @@ export const QUESTION_BANK_SETS: QuestionBankSet[] = [
   },
 ];
 
+export const INITIAL_QUESTION_BANK_SETS = QUESTION_BANK_SETS;
+
 // ตัวเลือกเวลาสอบ (นาที)
 export const DURATION_OPTIONS = [
   { minutes: 3, label: '3 นาที', desc: 'โหมดสายฟ้าแลบ (Speed Run)' },
@@ -258,11 +263,11 @@ export default function GoldQuestArena({
   roomId = 'room-jp-101',
   initialPin = '849201',
   classroomId = 'class-m4-1',
-  classroomName = 'ห้องเรียน',
+  classroomName: _classroomName = 'ห้องเรียน',
   examTitle,
   presentStudents,
   students: propStudents,
-  isProjectorMode: initialProjectorMode = false,
+  isProjectorMode: _initialProjectorMode = false,
   soundEnabled: initialSoundEnabled = true,
   onToggleSound,
   onToggleProjector: _onToggleProjector,
@@ -270,16 +275,25 @@ export default function GoldQuestArena({
   onAwardSessionRewards,
 }: GoldQuestArenaProps) {
   // ==========================================================================
-  // State สำหรับการตั้งค่าก่อนเปิดห้องสอบ (Pre-Exam Settings)
+  // State สำหรับการตั้งค่าก่อนเปิดห้องสอบ (Pre-Exam Settings & Custom Questions)
   // ==========================================================================
+  const [questionSets, setQuestionSets] = useState<QuestionBankSet[]>(QUESTION_BANK_SETS);
   const [selectedSetId, setSelectedSetId] = useState<string>(QUESTION_BANK_SETS[0].id);
   const [selectedDurationMinutes, setSelectedDurationMinutes] = useState<number>(5);
   const [shuffleQuestions, setShuffleQuestions] = useState<boolean>(true);
   const [showQuestionPreview, setShowQuestionPreview] = useState<boolean>(false);
 
+  // สถานะ Modal สำหรับสร้างข้อสอบใหม่
+  const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
+  const [newPrompt, setNewPrompt] = useState<string>('');
+  const [newCategory, setNewCategory] = useState<string>('คำถามทั่วไป');
+  const [newOptions, setNewOptions] = useState<string[]>(['', '', '', '']);
+  const [newCorrectIndex, setNewCorrectIndex] = useState<number>(0);
+  const [addModalError, setAddModalError] = useState<string | null>(null);
+
   // ดึงชุดข้อสอบที่ครูเลือกในปัจจุบัน
   const currentQuestionSet =
-    QUESTION_BANK_SETS.find((s) => s.id === selectedSetId) || QUESTION_BANK_SETS[0];
+    questionSets.find((s) => s.id === selectedSetId) || questionSets[0];
   const activeExamTitle = examTitle || currentQuestionSet.title;
 
   // สถานะห้องสอบและ QR Code Modal
@@ -383,23 +397,20 @@ export default function GoldQuestArena({
       if (Array.isArray(data.logs)) {
         setLogs(data.logs);
       }
+
       if (data.status === 'ended' || data.isActive === false) {
         setIsRoomActive(false);
         setExamStatus('ended');
+        playSfx('whistle');
       }
-    } catch {
-      // Fallback Local goldQuestService
-      const localRoom = goldQuestService.findRoom(roomId, roomPinCode);
-      if (localRoom) {
-        if (Array.isArray(localRoom.students)) setStudents(localRoom.students);
-        if (Array.isArray(localRoom.logs)) setLogs(localRoom.logs);
-      }
+    } catch (error) {
+      console.error('ไม่สามารถซิงค์ข้อมูลห้องสอบได้:', error);
     } finally {
       setIsSyncing(false);
     }
-  }, [isRoomActive, roomId, roomPinCode]);
+  }, [isRoomActive, roomId, roomPinCode, playSfx]);
 
-  // ตั้งเวลา Polling ดึงข้อมูลทุกๆ 2 วินาทีเมื่อห้องสอบเปิดอยู่
+  // 2. Realtime Polling ทุกๆ 2 วินาทีเมื่อห้องสอบกำลังทำงาน
   useEffect(() => {
     if (!isRoomActive || examStatus !== 'active') return;
 
@@ -408,22 +419,77 @@ export default function GoldQuestArena({
     return () => clearInterval(interval);
   }, [isRoomActive, examStatus, fetchLiveArenaState]);
 
-  // ซิงค์ผ่าน goldQuestService bus เมื่อมีอัปเดตแบบเรียลไทม์ทันที
-  useEffect(() => {
-    const unsubscribe = goldQuestService.subscribe((updatedRoom) => {
-      if (updatedRoom.roomId === roomId || updatedRoom.pin === roomPinCode) {
-        if (Array.isArray(updatedRoom.students)) setStudents(updatedRoom.students);
-        if (Array.isArray(updatedRoom.logs)) setLogs(updatedRoom.logs);
-        if (updatedRoom.status === 'ended' || !updatedRoom.isActive) {
-          setIsRoomActive(false);
-          setExamStatus('ended');
-        }
+  // 3. ฟังก์ชันบันทึกข้อสอบใหม่ที่ครูสร้าง
+  const handleSaveCustomQuestion = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddModalError(null);
+
+    if (!newPrompt.trim()) {
+      setAddModalError('กรุณากรอกโจทย์คำถาม');
+      return;
+    }
+
+    if (newOptions.some((opt) => !opt.trim())) {
+      setAddModalError('กรุณากรอกตัวเลือกให้ครบทั้ง 4 ข้อ');
+      return;
+    }
+
+    const newQ: ArenaQuestion = {
+      id: `custom_q_${Date.now()}`,
+      category: newCategory.trim() || 'คำถามทั่วไป',
+      prompt: newPrompt.trim(),
+      options: [...newOptions],
+      correctIndex: newCorrectIndex,
+    };
+
+    // ค้นหาหรือสร้าง "ชุดข้อสอบที่คุณครูสร้างเอง" (custom-teacher-set)
+    setQuestionSets((prevSets) => {
+      const existingCustomSet = prevSets.find((s) => s.id === 'custom-teacher-set');
+      if (existingCustomSet) {
+        return prevSets.map((s) =>
+          s.id === 'custom-teacher-set'
+            ? { ...s, questions: [...s.questions, newQ] }
+            : s
+        );
+      } else {
+        const newCustomSet: QuestionBankSet = {
+          id: 'custom-teacher-set',
+          title: 'ชุดที่ 4: ชุดข้อสอบที่คุณครูสร้างเอง (Custom)',
+          subtitle: 'คำถามและแบบทดสอบที่สร้างและเพิ่มเข้ามาโดยคุณครู',
+          badge: 'สร้างเอง',
+          difficulty: 'กำหนดเอง',
+          questions: [newQ],
+        };
+        return [...prevSets, newCustomSet];
       }
     });
-    return () => unsubscribe();
-  }, [roomId, roomPinCode]);
 
-  // 2. ฟังก์ชันเปิดห้องสอบตามเวลาและชุดข้อสอบที่ครูเลือก
+    // เลือกชุดข้อสอบที่คุณครูสร้างให้อัตโนมัติทันที
+    setSelectedSetId('custom-teacher-set');
+    setShowQuestionPreview(true);
+    playSfx('coin');
+
+    // ล้างค่าในฟอร์มและปิด Modal
+    setNewPrompt('');
+    setNewOptions(['', '', '', '']);
+    setNewCorrectIndex(0);
+    setIsAddModalOpen(false);
+  };
+
+  // ฟังก์ชันลบข้อสอบในชุดที่ครูสร้าง
+  const handleDeleteCustomQuestion = (questionId: string) => {
+    setQuestionSets((prevSets) =>
+      prevSets.map((s) => {
+        if (s.id !== 'custom-teacher-set') return s;
+        return {
+          ...s,
+          questions: s.questions.filter((q) => q.id !== questionId),
+        };
+      })
+    );
+  };
+
+  // 4. ฟังก์ชันเปิดห้องสอบสด (Start Room)
   const handleStartExamRoom = async () => {
     const generatedPin = generateSecurePin();
     const totalSeconds = selectedDurationMinutes * 60;
@@ -432,10 +498,19 @@ export default function GoldQuestArena({
     setTimeLeftSeconds(totalSeconds);
     setIsRewardsAwarded(false);
 
-    // จัดเตรียมชุดข้อสอบ (สลับลำดับข้อหากคุณครูเปิดใช้งาน Shuffle)
+    // เตรียมชุดข้อสอบที่เลือก (ถ้าเปิด Shuffle ให้สุ่มข้อ)
     const preparedQuestions = shuffleQuestions
       ? [...currentQuestionSet.questions].sort(() => Math.random() - 0.5)
       : currentQuestionSet.questions;
+
+    // เริ่มต้นห้องใน Memory Service
+    goldQuestService.startRoom({
+      roomId,
+      pin: generatedPin,
+      examTitle: activeExamTitle,
+      students: defaultStudentsList,
+      questions: preparedQuestions,
+    });
 
     try {
       const res = await fetch('/api/live-classroom/gold-quest', {
@@ -458,28 +533,21 @@ export default function GoldQuestArena({
         if (data.room?.students) setStudents(data.room.students);
         if (data.room?.logs) setLogs(data.room.logs);
       }
-    } catch {
-      // Local fallback
+    } catch (err) {
+      console.error('เกิดข้อผิดพลาดในการเปิดห้องสอบ:', err);
     }
 
-    // ซิงค์ Local goldQuestService ด้วยเสมอ
-    goldQuestService.startRoom({
-      roomId,
-      pin: generatedPin,
-      classroomId,
-      examTitle: activeExamTitle,
-      students: defaultStudentsList,
-      questions: preparedQuestions,
-    });
-
+    playSfx('fanfare');
     setIsRoomActive(true);
     setExamStatus('active');
-    setIsQrModalOpen(true); // เปิด Modal QR Code ขึ้นจอโปรเจกเตอร์ทันที
-    playSfx('fanfare');
+    setIsQrModalOpen(true);
   };
 
-  // 3. ฟังก์ชันประกาศจบการสอบ
+  // 5. ฟังก์ชันปิดหรือจบการสอบ (End Room)
   const handleEndExamRoom = useCallback(async () => {
+    playSfx('whistle');
+    goldQuestService.endRoom(roomId, roomPinCode);
+
     try {
       await fetch('/api/live-classroom/gold-quest', {
         method: 'POST',
@@ -490,18 +558,16 @@ export default function GoldQuestArena({
           pin: roomPinCode,
         }),
       });
-    } catch {
-      // Local fallback
+    } catch (err) {
+      console.error('เกิดข้อผิดพลาดในการปิดห้องสอบ:', err);
     }
 
-    goldQuestService.endRoom(roomId, roomPinCode);
     setIsRoomActive(false);
     setExamStatus('ended');
     setIsQrModalOpen(false);
-    playSfx('fanfare');
   }, [roomId, roomPinCode, playSfx]);
 
-  // นับถอยหลังเวลาสอบทุก 1 วินาที
+  // 6. นับเวลาถอยหลัง 1 วินาที
   useEffect(() => {
     if (!isRoomActive || examStatus !== 'active') return;
 
@@ -512,7 +578,7 @@ export default function GoldQuestArena({
           handleEndExamRoom();
           return 0;
         }
-        if (prev <= 11) {
+        if (prev === 61 || prev === 31 || prev === 11) {
           playSfx('tick');
         }
         return prev - 1;
@@ -522,79 +588,73 @@ export default function GoldQuestArena({
     return () => clearInterval(timer);
   }, [isRoomActive, examStatus, handleEndExamRoom, playSfx]);
 
-  // จัดเรียงนักเรียนตามจำนวนทองคำจากมากไปน้อย
-  const sortedLeaderboard = [...students].sort((a, b) => {
-    if (b.gold !== a.gold) return b.gold - a.gold;
-    return b.correctCount - a.correctCount;
-  });
+  // ฟังก์ชันแปลงทองเป็นเหรียญจริงมอบให้นักเรียนในคาบ
+  const handleAwardSessionRewards = () => {
+    if (!onAwardSessionRewards || isRewardsAwarded) return;
 
-  // สถิติรวมในห้องสอบ
+    const awards = students
+      .filter((s) => s.gold > 0)
+      .map((s) => {
+        const coinsAwarded = Math.max(1, Math.floor(s.gold / 50));
+        const ticketsAwarded = s.streak >= 3 ? 1 : 0;
+        return {
+          studentId: s.studentId || s.id,
+          coins: coinsAwarded,
+          tickets: ticketsAwarded,
+        };
+      });
+
+    if (awards.length > 0) {
+      onAwardSessionRewards(awards);
+      setIsRewardsAwarded(true);
+      playSfx('coin');
+    }
+  };
+
+  // สรุปผลจัดอันดับ Leaderboard
+  const sortedLeaderboard = useMemo(() => {
+    return [...students].sort((a, b) => {
+      if (b.gold !== a.gold) return b.gold - a.gold;
+      if (b.correctCount !== a.correctCount) return b.correctCount - a.correctCount;
+      return a.wrongCount - b.wrongCount;
+    });
+  }, [students]);
+
   const joinedCount = students.filter((s) => s.isJoined).length;
   const totalRoomGold = students.reduce((sum, s) => sum + s.gold, 0);
   const totalCorrectAnswers = students.reduce((sum, s) => sum + s.correctCount, 0);
 
-  // แปลงวินาทีเป็นรูปแบบ MM:SS
   const formatTime = (sec: number) => {
     const mins = Math.floor(sec / 60);
     const remSec = sec % 60;
     return `${String(mins).padStart(2, '0')}:${String(remSec).padStart(2, '0')}`;
   };
 
-  // มอบเหรียญ/ตั๋วจริงเข้ากระเป๋าในคาบเรียน
-  const handleAwardSessionRewards = () => {
-    if (!onAwardSessionRewards || isRewardsAwarded) return;
-
-    const awards = sortedLeaderboard.map((st, idx) => {
-      let coins = 5;
-      let tickets = 0;
-      if (idx === 0) {
-        coins = 30;
-        tickets = 2;
-      } else if (idx === 1) {
-        coins = 20;
-        tickets = 1;
-      } else if (idx === 2) {
-        coins = 15;
-        tickets = 1;
-      } else if (idx < 10) {
-        coins = 10;
-        tickets = 0;
-      }
-      return {
-        studentId: st.id,
-        coins,
-        tickets,
-      };
-    });
-
-    onAwardSessionRewards(awards);
-    setIsRewardsAwarded(true);
-    playSfx('coin');
-  };
-
   return (
-    <div
-      className={`min-h-screen bg-slate-950 text-slate-100 p-4 md:p-6 space-y-6 ${
-        initialProjectorMode ? 'text-lg' : 'text-base'
-      }`}
-    >
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-6 space-y-6">
       {/* ================================================================= */}
-      {/* 1. แถบควบคุมด้านบน (Header Control Bar สำหรับจอโปรเจกเตอร์)       */}
+      {/* 1. แถบหัวข้อและเมนูควบคุมด้านบน (Teacher Header Bar)               */}
       {/* ================================================================= */}
       <div className="bg-slate-900/95 border-2 border-indigo-500/40 rounded-3xl p-4 md:p-6 shadow-2xl flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        {/* ข้อมูลประจำห้องและชื่อข้อสอบ */}
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
             <Coins className="w-8 h-8 stroke-[2.5]" />
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl md:text-2xl font-black text-white">
+              <h1 className="text-xl md:text-2xl font-black text-white tracking-wide">
                 {activeExamTitle}
               </h1>
               {examStatus === 'active' && (
                 <span className="inline-flex items-center gap-1.5 text-xs font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-3 py-0.5 rounded-full animate-pulse">
                   <span className="w-2 h-2 rounded-full bg-emerald-400" />
                   LIVE ARENA
+                </span>
+              )}
+              {examStatus === 'waiting' && (
+                <span className="text-xs font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 px-3 py-0.5 rounded-full">
+                  พร้อมเปิดห้อง
                 </span>
               )}
               {examStatus === 'ended' && (
@@ -604,42 +664,35 @@ export default function GoldQuestArena({
               )}
             </div>
             <p className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-2">
-              <span>{classroomName} • รหัสห้อง: {roomId}</span>
+              <span>รหัสห้อง: {roomId}</span>
+              <span>•</span>
+              <span>ชุดข้อสอบ: {currentQuestionSet.title}</span>
               <span>•</span>
               <span>จำนวน {currentQuestionSet.questions.length} ข้อ</span>
               <span>•</span>
               <span>เวลาสอบ {selectedDurationMinutes} นาที</span>
-              {examStatus === 'active' && (
-                <>
-                  <span>•</span>
-                  <span className="flex items-center gap-1 text-indigo-300">
-                    <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
-                    ซิงค์ข้อมูลอัตโนมัติ
-                  </span>
-                </>
-              )}
             </p>
           </div>
         </div>
 
-        {/* ปุ่มควบคุมฝั่งคุณครู */}
+        {/* แถบปุ่ม Action หลัก */}
         <div className="flex flex-wrap items-center gap-3">
-          {/* Sound Toggle */}
+          {/* ปุ่มเปิด/ปิดเสียง */}
           <button
             onClick={() => {
-              setIsSoundOn(!isSoundOn);
-              onToggleSound?.();
+              setIsSoundOn((prev) => !prev);
+              if (onToggleSound) onToggleSound();
             }}
-            title={isSoundOn ? 'ปิดเสียง' : 'เปิดเสียง'}
-            className="p-2.5 rounded-2xl bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 transition cursor-pointer"
+            title={isSoundOn ? 'ปิดเสียงเกม' : 'เปิดเสียงเกม'}
+            className="p-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer"
           >
-            {isSoundOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4 text-rose-400" />}
+            {isSoundOn ? <Volume2 className="w-4 h-4 text-emerald-400" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
           </button>
 
           {examStatus === 'active' && (
             <>
-              {/* ป้ายแสดงรหัส PIN 6 หลักขนาดย่อบนแถบ Header */}
-              <div className="bg-slate-950 border border-amber-500/40 rounded-2xl px-4 py-2 flex items-center gap-2.5">
+              {/* แสดงรหัส PIN 6 หลักขนาดใหญ่ */}
+              <div className="bg-slate-950 border border-amber-500/40 rounded-2xl px-4 py-2 flex items-center gap-2.5 shadow-inner">
                 <span className="text-xs font-bold text-slate-400 uppercase">PIN:</span>
                 <span className="text-xl font-mono font-black tracking-widest text-amber-400">
                   {roomPinCode}
@@ -660,7 +713,7 @@ export default function GoldQuestArena({
                 </span>
               </div>
 
-              {/* ปุ่มเรียก QR Code ขึ้นจอโปรเจกเตอร์ */}
+              {/* ปุ่มเปิด Modal แสดง QR Code บนจอโปรเจกเตอร์ */}
               <button
                 onClick={() => setIsQrModalOpen(true)}
                 className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2.5 rounded-2xl text-xs shadow-lg shadow-indigo-600/25 transition cursor-pointer"
@@ -740,23 +793,34 @@ export default function GoldQuestArena({
                   ตั้งค่าห้องสอบก่อนเริ่มแข่งขัน (Exam Room Setup)
                 </h2>
                 <p className="text-xs text-slate-400">
-                  เลือกชุดข้อสอบและกำหนดเวลาสอบก่อนกดเปิด QR Code ให้นักเรียนสแกน
+                  เลือกชุดข้อสอบ หรือสร้างข้อสอบใหม่เองได้ทันทีหน้าเว็บ
                 </p>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowQuestionPreview((prev) => !prev)}
-              className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer"
-            >
-              <Eye className="w-3.5 h-3.5 text-amber-400" />
-              <span>
-                {showQuestionPreview
-                  ? 'ซ่อนตัวอย่างข้อสอบ'
-                  : `ดูโจทย์ในชุดนี้ (${currentQuestionSet.questions.length} ข้อ)`}
-              </span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(true)}
+                className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 px-3.5 py-2 rounded-xl text-xs font-black transition shadow-md shadow-amber-500/20 cursor-pointer"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>สร้างข้อสอบใหม่เอง</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowQuestionPreview((prev) => !prev)}
+                className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                <Eye className="w-3.5 h-3.5 text-amber-400" />
+                <span>
+                  {showQuestionPreview
+                    ? 'ซ่อนตัวอย่างข้อสอบ'
+                    : `ดูโจทย์ (${currentQuestionSet.questions.length} ข้อ)`}
+                </span>
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -768,7 +832,7 @@ export default function GoldQuestArena({
               </label>
 
               <div className="grid grid-cols-1 gap-2.5">
-                {QUESTION_BANK_SETS.map((setItem) => {
+                {questionSets.map((setItem) => {
                   const isSelected = setItem.id === selectedSetId;
                   return (
                     <button
@@ -855,7 +919,7 @@ export default function GoldQuestArena({
                       สลับลำดับข้อสอบอัตโนมัติ (Shuffle)
                     </div>
                     <div className="text-[11px] text-slate-400">
-                      ป้องกันการลอกคำตอบระหว่างทำข้อสอบในห้องเรียน
+                      ป้องกันการลอกคำตอบระหว่างทำข้อสอบ
                     </div>
                   </div>
                 </div>
@@ -877,27 +941,48 @@ export default function GoldQuestArena({
           {/* กล่องแสดงตัวอย่างข้อสอบในชุดที่เลือก (เมื่อกดปุ่มดูโจทย์) */}
           {showQuestionPreview && (
             <div className="pt-4 border-t border-slate-800 space-y-2.5">
-              <div className="text-xs font-bold text-amber-300">
-                ตัวอย่างคำถามใน &ldquo;{currentQuestionSet.title}&rdquo;:
+              <div className="text-xs font-bold text-amber-300 flex items-center justify-between">
+                <span>ตัวอย่างคำถามใน &ldquo;{currentQuestionSet.title}&rdquo; ({currentQuestionSet.questions.length} ข้อ):</span>
+                {currentQuestionSet.id === 'custom-teacher-set' && (
+                  <span className="text-[11px] text-slate-400">ชุดที่คุณครูสร้างเอง</span>
+                )}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1">
-                {currentQuestionSet.questions.map((q, idx) => (
-                  <div
-                    key={q.id}
-                    className="bg-slate-950 border border-slate-800 rounded-2xl p-3 text-xs space-y-1.5"
-                  >
-                    <div className="flex items-center justify-between text-slate-400">
-                      <span className="font-bold text-indigo-300">
-                        ข้อที่ {idx + 1} ({q.category})
-                      </span>
-                      <span className="text-emerald-400 font-semibold">
-                        เฉลย: {q.options[q.correctIndex]}
-                      </span>
+              {currentQuestionSet.questions.length === 0 ? (
+                <div className="p-6 text-center text-slate-500 text-xs bg-slate-950 rounded-2xl border border-slate-800">
+                  ยังไม่มีข้อสอบในชุดนี้ กดปุ่ม &ldquo;สร้างข้อสอบใหม่เอง&rdquo; ด้านบนเพื่อเพิ่มข้อสอบ
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1">
+                  {currentQuestionSet.questions.map((q, idx) => (
+                    <div
+                      key={q.id}
+                      className="bg-slate-950 border border-slate-800 rounded-2xl p-3 text-xs space-y-1.5 relative group"
+                    >
+                      <div className="flex items-center justify-between text-slate-400">
+                        <span className="font-bold text-indigo-300">
+                          ข้อที่ {idx + 1} ({q.category})
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-emerald-400 font-semibold">
+                            เฉลย: {q.options[q.correctIndex]}
+                          </span>
+                          {currentQuestionSet.id === 'custom-teacher-set' && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCustomQuestion(q.id)}
+                              title="ลบข้อนี้"
+                              className="text-slate-500 hover:text-rose-400 p-0.5 rounded transition cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <p className="font-bold text-white">{q.prompt}</p>
                     </div>
-                    <p className="font-bold text-white">{q.prompt}</p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -907,6 +992,7 @@ export default function GoldQuestArena({
       {/* 3. การ์ดสรุปสถิติภาพรวมทั้งห้องเรียน (4 กล่อง)                     */}
       {/* ================================================================= */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* กล่องที่ 1: นักเรียนที่เข้าร่วม */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-slate-400 font-semibold">นักเรียนที่สแกนเข้าห้อง</p>
@@ -919,6 +1005,7 @@ export default function GoldQuestArena({
           </div>
         </div>
 
+        {/* กล่องที่ 2: ยอดทองคำสะสมรวม */}
         <div className="bg-slate-900 border border-amber-500/30 rounded-2xl p-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-amber-300/80 font-semibold">ทองคำสะสมรวมทั้งห้อง</p>
@@ -931,6 +1018,7 @@ export default function GoldQuestArena({
           </div>
         </div>
 
+        {/* กล่องที่ 3: จำนวนข้อที่ตอบถูกรวม */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-slate-400 font-semibold">จำนวนข้อที่ตอบถูกรวม</p>
@@ -943,6 +1031,7 @@ export default function GoldQuestArena({
           </div>
         </div>
 
+        {/* กล่องที่ 4: ผู้นำอันดับ 1 */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-slate-400 font-semibold">ผู้นำอันดับ 1 ตอนนี้</p>
@@ -964,7 +1053,7 @@ export default function GoldQuestArena({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* ฝั่งซ้าย: แท่นรางวัล Top 3 & ตาราง Leaderboard ทั้งห้อง */}
         <div className="lg:col-span-8 space-y-6">
-          {/* แท่นรางวัล Top 3 Podium */}
+          {/* แท่นรางวัล Top 3 (Podium) */}
           {sortedLeaderboard.length >= 3 && (
             <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5">
               <div className="flex items-center justify-between mb-4">
@@ -975,7 +1064,7 @@ export default function GoldQuestArena({
               </div>
 
               <div className="grid grid-cols-3 gap-3 items-end pt-2">
-                {/* อันดับ 2 */}
+                {/* อันดับ 2 (เงิน) */}
                 <div className="bg-slate-950/90 border border-slate-700 rounded-2xl p-4 text-center space-y-2">
                   <div className="text-xs font-extrabold text-slate-300">🥈 อันดับ 2</div>
                   <div className="text-3xl">{sortedLeaderboard[1].avatar || '⚔️'}</div>
@@ -987,7 +1076,7 @@ export default function GoldQuestArena({
                   </div>
                 </div>
 
-                {/* อันดับ 1 */}
+                {/* อันดับ 1 (ทองคำ) */}
                 <div className="bg-gradient-to-b from-amber-500/20 to-slate-950 border-2 border-amber-400 rounded-2xl p-5 text-center space-y-2 shadow-xl shadow-amber-500/10">
                   <div className="inline-flex items-center gap-1 text-xs font-black bg-amber-400 text-slate-950 px-3 py-0.5 rounded-full">
                     <Crown className="w-3.5 h-3.5" /> อันดับ 1
@@ -1001,7 +1090,7 @@ export default function GoldQuestArena({
                   </div>
                 </div>
 
-                {/* อันดับ 3 */}
+                {/* อันดับ 3 (ทองแดง) */}
                 <div className="bg-slate-950/90 border border-amber-700/50 rounded-2xl p-4 text-center space-y-2">
                   <div className="text-xs font-extrabold text-amber-500">🥉 อันดับ 3</div>
                   <div className="text-3xl">{sortedLeaderboard[2].avatar || '⚔️'}</div>
@@ -1016,16 +1105,14 @@ export default function GoldQuestArena({
             </div>
           )}
 
-          {/* รายชื่อนักเรียนและอันดับทั้งหมด */}
+          {/* ตารางแสดงคะแนนนักเรียนทุกคน (Leaderboard List) */}
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-black text-white flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-indigo-400" />
                 <span>กระดานคะแนนเรียลไทม์ (Live Leaderboard)</span>
               </h2>
-              <span className="text-xs text-slate-400">
-                เรียงตามจำนวนทองคำสูงสุด
-              </span>
+              <span className="text-xs text-slate-400">เรียงตามทองคำสูงสุด</span>
             </div>
 
             <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
@@ -1042,6 +1129,7 @@ export default function GoldQuestArena({
                         : 'bg-slate-950/40 border-slate-900 opacity-60'
                     }`}
                   >
+                    {/* ข้อมูลประจำตัว */}
                     <div className="flex items-center gap-3.5 min-w-0">
                       <span
                         className={`w-8 h-8 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 ${
@@ -1056,9 +1144,7 @@ export default function GoldQuestArena({
                       >
                         #{rank}
                       </span>
-
                       <span className="text-2xl shrink-0">{student.avatar || '⚔️'}</span>
-
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-black text-white truncate">
@@ -1082,6 +1168,7 @@ export default function GoldQuestArena({
                       </div>
                     </div>
 
+                    {/* แต้มทองคำและ Streak Combo */}
                     <div className="flex items-center gap-4 shrink-0">
                       {student.streak > 1 && (
                         <div className="hidden sm:flex items-center gap-1 bg-orange-500/15 border border-orange-500/30 text-orange-300 px-2.5 py-1 rounded-xl text-xs font-black">
@@ -1089,7 +1176,6 @@ export default function GoldQuestArena({
                           <span>x{student.streak}</span>
                         </div>
                       )}
-
                       <div className="text-right min-w-[90px]">
                         <span className="text-lg font-mono font-black text-amber-400">
                           {student.gold.toLocaleString()}
@@ -1104,7 +1190,7 @@ export default function GoldQuestArena({
           </div>
         </div>
 
-        {/* ฝั่งขวา: แถบเหตุการณ์สด (Real-time Activity Feed) */}
+        {/* ฝั่งขวา: กิจกรรมสดในสนามสอบ (Real-Time Live Logs) */}
         <div className="lg:col-span-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 h-full flex flex-col justify-between space-y-4">
             <div className="space-y-4">
@@ -1113,16 +1199,21 @@ export default function GoldQuestArena({
                   <Activity className="w-4 h-4 text-emerald-400" />
                   <span>เหตุการณ์สดในสนามสอบ</span>
                 </h2>
-                <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full">
-                  Real-time
-                </span>
+                <div className="flex items-center gap-2">
+                  {isSyncing && (
+                    <RefreshCw className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
+                  )}
+                  <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full">
+                    Real-time
+                  </span>
+                </div>
               </div>
 
               {logs.length === 0 ? (
                 <div className="py-16 text-center space-y-2 text-slate-500">
                   <Sparkles className="w-8 h-8 mx-auto text-slate-700" />
                   <p className="text-xs">
-                    เลือกชุดข้อสอบและเวลาสอบด้านบน จากนั้นกดปุ่ม &ldquo;เปิดห้องสอบ&rdquo;
+                    เลือกชุดข้อสอบและกดปุ่ม &ldquo;เปิดห้องสอบ&rdquo; เพื่อเริ่มเกม
                   </p>
                 </div>
               ) : (
@@ -1166,15 +1257,155 @@ export default function GoldQuestArena({
             </div>
 
             <div className="pt-3 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
-              <span>อัปเดตข้อมูลทุก 2 วินาที</span>
-              <span>รายการล่าสุด {logs.length} รายการ</span>
+              <span>อัปเดตทุก 2 วินาที</span>
+              <span>{logs.length} รายการ</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* ================================================================= */}
-      {/* 5. Modal แสดง QR Code และรหัส PIN 6 หลักสำหรับฉายขึ้นโปรเจกเตอร์   */}
+      {/* 5. Modal สร้างข้อสอบใหม่เองหน้าเว็บ (Add Custom Question Modal)     */}
+      {/* ================================================================= */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border-2 border-amber-500/50 rounded-3xl max-w-lg w-full p-6 md:p-8 shadow-2xl relative my-auto space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                  <PlusCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-white">
+                    สร้างคำถามข้อสอบใหม่
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    เพิ่มคำถามเข้าสู่ชุดข้อสอบที่คุณครูสร้างเองทันที
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCustomQuestion} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-indigo-300">
+                    หมวดหมู่คำถาม (Category)
+                  </label>
+                  <input
+                    type="text"
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    placeholder="เช่น คำศัพท์ N5"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl py-2.5 px-3.5 text-xs font-bold text-white focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-amber-300">
+                    เลือกข้อที่ถูกต้อง (Correct Option)
+                  </label>
+                  <select
+                    value={newCorrectIndex}
+                    onChange={(e) => setNewCorrectIndex(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-amber-400 rounded-xl py-2.5 px-3.5 text-xs font-bold text-amber-400 focus:outline-none cursor-pointer"
+                  >
+                    <option value={0}>ตัวเลือก A (ข้อที่ 1)</option>
+                    <option value={1}>ตัวเลือก B (ข้อที่ 2)</option>
+                    <option value={2}>ตัวเลือก C (ข้อที่ 3)</option>
+                    <option value={3}>ตัวเลือก D (ข้อที่ 4)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-indigo-300">
+                  โจทย์คำถาม (Prompt)
+                </label>
+                <textarea
+                  rows={2}
+                  value={newPrompt}
+                  onChange={(e) => setNewPrompt(e.target.value)}
+                  placeholder="พิมพ์โจทย์คำถามที่นี่..."
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl p-3 text-xs font-bold text-white focus:outline-none resize-none"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-indigo-300">
+                  ตัวเลือกคำตอบ 4 ข้อ (A, B, C, D)
+                </label>
+                <div className="grid grid-cols-1 gap-2">
+                  {newOptions.map((opt, idx) => {
+                    const isCorrect = newCorrectIndex === idx;
+                    const labels = ['A', 'B', 'C', 'D'];
+                    return (
+                      <div key={idx} className="flex items-center gap-2">
+                        <span
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-xs shrink-0 ${
+                            isCorrect
+                              ? 'bg-emerald-500 text-slate-950'
+                              : 'bg-slate-800 text-slate-400'
+                          }`}
+                        >
+                          {labels[idx]}
+                        </span>
+                        <input
+                          type="text"
+                          value={opt}
+                          onChange={(e) => {
+                            const updated = [...newOptions];
+                            updated[idx] = e.target.value;
+                            setNewOptions(updated);
+                          }}
+                          placeholder={`ตัวเลือก ${labels[idx]}...`}
+                          className={`w-full bg-slate-950 border rounded-xl py-2.5 px-3 text-xs font-bold text-white focus:outline-none ${
+                            isCorrect
+                              ? 'border-emerald-500/80 ring-1 ring-emerald-500/30'
+                              : 'border-slate-800 focus:border-indigo-500'
+                          }`}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {addModalError && (
+                <div className="bg-rose-500/15 border border-rose-500/40 text-rose-300 px-3.5 py-2.5 rounded-xl text-xs font-semibold">
+                  {addModalError}
+                </div>
+              )}
+
+              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-4 py-2.5 rounded-xl text-xs transition cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-6 py-2.5 rounded-xl text-xs shadow-lg shadow-amber-500/20 transition cursor-pointer"
+                >
+                  บันทึกข้อสอบและเลือกใช้
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* 6. Modal แสดง QR Code และรหัส PIN 6 หลักสำหรับฉายขึ้นโปรเจกเตอร์   */}
       {/* ================================================================= */}
       <RoomQRCodeModal
         isOpen={isQrModalOpen}

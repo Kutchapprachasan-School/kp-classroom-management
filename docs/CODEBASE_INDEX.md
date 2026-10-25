@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 25/10/2569 13:27:37 | รวมทั้งหมด 230 ไฟล์*
+*อัปเดตล่าสุด: 25/10/2569 13:35:47 | รวมทั้งหมด 230 ไฟล์*
 
 ---
 
@@ -133,7 +133,7 @@
 | [src/components/common/ThaiMiniDatePicker.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/common/ThaiMiniDatePicker.tsx) | 392 | `ThaiMiniDatePickerProps` (L6), `ThaiMiniDatePicker` (L88) |
 | [src/components/exam/RoomQRCodeModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/exam/RoomQRCodeModal.tsx) | 308 | `RoomQRCodeModalProps` (L20), `RoomQRCodeModal` (L31) |
 | [src/components/exam/StudentExamPlayerModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/exam/StudentExamPlayerModal.tsx) | 479 | `StudentExamPlayerModal` (L38) |
-| [src/components/live-classroom/GoldQuestArena.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/GoldQuestArena.tsx) | 15 | *(Internal / Default Export)* |
+| [src/components/live-classroom/GoldQuestArena.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/GoldQuestArena.tsx) | 16 | *(Internal / Default Export)* |
 | [src/components/live-classroom/GroupGeneratorSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/GroupGeneratorSubTab.tsx) | 550 | `GroupPresetItem` (L22), `GroupGeneratorSubTabProps` (L33), `swapStudentsBetweenGroups` (L47), `GroupGeneratorSubTab` (L84) |
 | [src/components/live-classroom/LiveClassroomHeader.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LiveClassroomHeader.tsx) | 273 | `SubTab` (L21), `LiveClassroomHeaderProps` (L23), `LiveClassroomHeader` (L45) |
 | [src/components/live-classroom/LiveTimerSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LiveTimerSubTab.tsx) | 480 | `LiveTimerSubTabProps` (L14), `formatTimerMMSS` (L31), `LiveTimerSubTab` (L38) |
