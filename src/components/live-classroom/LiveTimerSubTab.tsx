@@ -8,7 +8,7 @@ import PauseRegular from '@mingcute/react/core-regular/pause';
 import Refresh1Regular from '@mingcute/react/core-regular/refresh-1';
 import TrophyRegular from '@mingcute/react/core-regular/trophy';
 import RandomRegular from '@mingcute/react/core-regular/random';
-import { Swords } from 'lucide-react';
+import { Swords, Coins } from 'lucide-react';
 import type { LiveStudent } from '../../services/liveClassroomService';
 
 export interface LiveTimerSubTabProps {
@@ -25,6 +25,7 @@ export interface LiveTimerSubTabProps {
     description: string
   ) => void;
   onPlaySound?: (type: 'tick' | 'coin' | 'fanfare' | 'buzzer', freq?: number) => void;
+  onOpenGoldQuestArena?: () => void;
 }
 
 export function formatTimerMMSS(seconds: number): string {
@@ -43,6 +44,7 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
   setIsTimerRunning,
   onGiveReward,
   onPlaySound,
+  onOpenGoldQuestArena,
 }) => {
   const [configuredSeconds, setConfiguredSeconds] = useState<number>(120);
   const [totalSeconds, setTotalSeconds] = useState<number>(120);
@@ -461,6 +463,16 @@ export const LiveTimerSubTab: React.FC<LiveTimerSubTabProps> = ({
           <RandomRegular className="w-5 h-5" />
           <span>สุ่มคู่ท้าดวลใหม่ ({versusCount} คน)</span>
         </button>
+
+        {onOpenGoldQuestArena && (
+          <button
+            onClick={onOpenGoldQuestArena}
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm py-3 px-4 rounded-2xl shadow-lg shadow-amber-500/25 transition active:scale-95 cursor-pointer mt-3"
+          >
+            <Coins className="w-5 h-5 stroke-[2.5]" />
+            <span>⚔️ เปิดสมรภูมิตะลุยคำถาม Gold Quest Arena (ฉายจอโปรเจกเตอร์)</span>
+          </button>
+        )}
       </div>
     </div>
   );

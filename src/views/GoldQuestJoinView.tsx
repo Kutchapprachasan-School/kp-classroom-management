@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Users,
 } from 'lucide-react';
+import { goldQuestService } from '../services/goldQuestService';
 
 export interface RoomStudent {
   id: string;
@@ -136,28 +137,25 @@ function GoldQuestJoinContent() {
             setIsRoomVerified(false);
           }
         } else {
-          // หากไม่มี endpoint API ให้ตรวจสอบห้องจาก localStorage
-          if (typeof window !== 'undefined') {
-            const localRoom = localStorage.getItem(`gold_quest_room_${pin}`);
-            if (localRoom) {
-              try {
-                const parsed = JSON.parse(localRoom);
-                setIsRoomVerified(true);
-                if (parsed.roomId) setRoomId(parsed.roomId);
-                if (parsed.examTitle) setExamTitle(parsed.examTitle);
-                if (Array.isArray(parsed.students)) setAvailableStudents(parsed.students);
-              } catch {
-                setIsRoomVerified(true);
-              }
-            } else {
-              setIsRoomVerified(true);
-            }
+          // หากไม่มี endpoint API ให้ตรวจสอบห้องจาก goldQuestService
+          const localRoom = goldQuestService.findRoom(roomId, pin);
+          if (localRoom && localRoom.isActive) {
+            setIsRoomVerified(true);
+            if (localRoom.roomId) setRoomId(localRoom.roomId);
+            if (localRoom.examTitle) setExamTitle(localRoom.examTitle);
+            if (Array.isArray(localRoom.students)) setAvailableStudents(localRoom.students);
           } else {
             setIsRoomVerified(true);
           }
         }
       } catch {
         // กรณี API ยังไม่ได้สร้างหรือออฟไลน์ ให้ยังสามารถกรอกชื่อเข้าเล่นได้ตามปกติ
+        const localRoom = goldQuestService.findRoom(roomId, pin);
+        if (localRoom && localRoom.isActive) {
+          if (localRoom.roomId) setRoomId(localRoom.roomId);
+          if (localRoom.examTitle) setExamTitle(localRoom.examTitle);
+          if (Array.isArray(localRoom.students)) setAvailableStudents(localRoom.students);
+        }
         setIsRoomVerified(true);
       } finally {
         setIsCheckingRoom(false);
@@ -229,6 +227,17 @@ function GoldQuestJoinContent() {
       } catch {
         // Fallback Client Storage เมื่อไม่มี API Server
       }
+
+      // Sync ไปยัง local goldQuestService ด้วยเสมอ เพื่อให้ข้ามแท็บผ่าน BroadcastChannel / localStorage ทำงานทันที
+      goldQuestService.joinRoom({
+        roomId: data?.roomId || roomId || 'default-room',
+        pin,
+        student: {
+          id: generatedStudentId,
+          name: studentName.trim(),
+          avatar: selectedAvatar,
+        },
+      });
 
       // บันทึกข้อมูลผู้เล่นลง sessionStorage สำหรับหน้าทำข้อสอบ
       if (typeof window !== 'undefined') {

@@ -29,6 +29,7 @@ import { MorningAssemblyView } from './views/MorningAssemblyView';
 import { ClassroomAttendanceView } from './views/ClassroomAttendanceView';
 import { LiveClassroomView } from './views/LiveClassroomView';
 import { GoldQuestJoinView } from './views/GoldQuestJoinView';
+import { GoldQuestPlayView } from './views/GoldQuestPlayView';
 import { QuickSearchModal } from './components/common/QuickSearchModal';
 import { PwaInstallPrompt } from './components/common/PwaInstallPrompt';
 import type { AtRiskStudent } from './types/viewModels';
@@ -132,11 +133,21 @@ export const App: React.FC = () => {
     return path.includes('/gold-quest/join') || path.includes('/live-classroom/gold-quest/join');
   });
 
+  // Check if current URL is Gold Quest Play (student answering questions)
+  const [isGoldQuestPlayRoute, setIsGoldQuestPlayRoute] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const path = window.location.pathname.toLowerCase();
+    return path.includes('/gold-quest/play') || path.includes('/live-classroom/gold-quest/play');
+  });
+
   useEffect(() => {
     const handleLocationChange = () => {
       const path = window.location.pathname.toLowerCase();
       setIsGoldQuestRoute(
         path.includes('/gold-quest/join') || path.includes('/live-classroom/gold-quest/join')
+      );
+      setIsGoldQuestPlayRoute(
+        path.includes('/gold-quest/play') || path.includes('/live-classroom/gold-quest/play')
       );
     };
     window.addEventListener('popstate', handleLocationChange);
@@ -647,9 +658,11 @@ export const App: React.FC = () => {
       )}
 
 
-      {/* Gold Quest Live Classroom Student Join Screen */}
+      {/* Gold Quest Live Classroom Student Screens */}
       {isGoldQuestRoute ? (
         <GoldQuestJoinView />
+      ) : isGoldQuestPlayRoute ? (
+        <GoldQuestPlayView />
       ) : currentView === 'school-login' ? (
         <SchoolPortalView
           onEnterClassroomPortal={(target, channel, role) => {

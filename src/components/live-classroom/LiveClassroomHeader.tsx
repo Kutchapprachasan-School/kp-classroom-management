@@ -16,6 +16,7 @@ import FullscreenExitRegular from '@mingcute/react/core-regular/fullscreen-exit'
 import VolumeRegular from '@mingcute/react/core-regular/volume';
 import VolumeMuteRegular from '@mingcute/react/core-regular/volume-mute';
 import Book2Regular from '@mingcute/react/core-regular/book-2';
+import { Coins } from 'lucide-react';
 
 export type SubTab = 'picker' | 'words' | 'timer' | 'groups' | 'rewards';
 
@@ -38,6 +39,7 @@ export interface LiveClassroomHeaderProps {
   isFlushingQueue: boolean;
   onFlushQueue: () => void;
   onOpenLuckyDraw: () => void;
+  onOpenGoldQuestArena?: () => void;
 }
 
 export const LiveClassroomHeader: React.FC<LiveClassroomHeaderProps> = ({
@@ -59,6 +61,7 @@ export const LiveClassroomHeader: React.FC<LiveClassroomHeaderProps> = ({
   isFlushingQueue,
   onFlushQueue,
   onOpenLuckyDraw,
+  onOpenGoldQuestArena,
 }) => {
   return (
     <header
@@ -145,6 +148,18 @@ export const LiveClassroomHeader: React.FC<LiveClassroomHeaderProps> = ({
 
         {/* Right: Projector Controls & Session Summary */}
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Gold Quest Live Arena Launcher Button */}
+          {onOpenGoldQuestArena && (
+            <button
+              onClick={onOpenGoldQuestArena}
+              className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 px-3.5 py-2 rounded-xl text-xs font-black shadow-md shadow-amber-500/25 transition active:scale-95 cursor-pointer"
+              title="เปิดสนามสอบสด Gold Quest Arena (ฉายโปรเจกเตอร์ + สแกน QR Code)"
+            >
+              <Coins className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+              <span>Gold Quest Arena 🏆</span>
+            </button>
+          )}
+
           {/* Quick Lucky Draw Button */}
           <button
             onClick={onOpenLuckyDraw}

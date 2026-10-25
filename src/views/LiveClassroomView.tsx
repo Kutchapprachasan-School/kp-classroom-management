@@ -21,6 +21,7 @@ import { LiveTimerSubTab } from '../components/live-classroom/LiveTimerSubTab';
 import { GroupGeneratorSubTab } from '../components/live-classroom/GroupGeneratorSubTab';
 import { RewardBoardSubTab } from '../components/live-classroom/RewardBoardSubTab';
 import { LuckyTicketDrawModal } from '../components/live-classroom/LuckyTicketDrawModal';
+import { GoldQuestArena } from '../components/live-classroom/GoldQuestArena';
 import type { StudentGroup } from '../utils/liveClassroomAlgorithms';
 
 export interface LiveClassroomViewProps {
@@ -40,6 +41,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
   const [isProjectorMode, setIsProjectorMode] = useState<boolean>(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => !soundFX.getMuted());
   const [isLuckyDrawOpen, setIsLuckyDrawOpen] = useState<boolean>(false);
+  const [isGoldQuestArenaOpen, setIsGoldQuestArenaOpen] = useState<boolean>(false);
 
   // SubTab States
   const [selectedStudent, setSelectedStudent] = useState<LiveStudent | null>(null);
@@ -268,6 +270,21 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
     ]
   );
 
+  // มอบรางวัลเหรียญ/ตั๋วจริงจากการแข่งขัน Gold Quest Arena เข้าสู่กระเป๋าในคาบ
+  const handleAwardGoldQuestRewards = useCallback(
+    (awards: { studentId: string; coins: number; tickets: number }[]) => {
+      awards.forEach((a) => {
+        if (a.coins > 0) {
+          giveReward([a.studentId], 'coin', a.coins, 'รางวัลสมรภูมิ Gold Quest Arena');
+        }
+        if (a.tickets > 0) {
+          giveReward([a.studentId], 'ticket', a.tickets, 'รางวัลสมรภูมิ Gold Quest Arena');
+        }
+      });
+    },
+    [giveReward]
+  );
+
   // Global Hotkeys (Spacebar, F, M) พร้อม Input Field Guard
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -404,6 +421,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
         isFlushingQueue={isFlushingQueue}
         onFlushQueue={flushOfflineQueue}
         onOpenLuckyDraw={() => setIsLuckyDrawOpen(true)}
+        onOpenGoldQuestArena={() => setIsGoldQuestArenaOpen(true)}
       />
 
       {/* Main Sub-tool Workspace (Persistent Tab Containers to preserve Background Timer & Random Pool) */}
@@ -450,6 +468,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
             setIsTimerRunning={setIsTimerRunning}
             onGiveReward={giveReward}
             onPlaySound={triggerSound}
+            onOpenGoldQuestArena={() => setIsGoldQuestArenaOpen(true)}
           />
         </div>
 
@@ -494,6 +513,25 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
         onConsumeTicket={handleConsumeTicket}
         onPlaySound={triggerSound}
       />
+
+      {/* Gold Quest Live Arena Overlay (Projector Mode & Live Quiz Arena) */}
+      {isGoldQuestArenaOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <GoldQuestArena
+            roomId={selectedClassId || 'default-room'}
+            examTitle={`สมรภูมิ Gold Quest Arena • ${currentClassroom?.name || 'ห้องเรียน'}`}
+            classroomId={selectedClassId}
+            classroomName={currentClassroom?.name}
+            students={presentStudents}
+            isProjectorMode={isProjectorMode}
+            soundEnabled={soundEnabled}
+            onToggleSound={toggleSound}
+            onToggleProjector={toggleProjectorMode}
+            onClose={() => setIsGoldQuestArenaOpen(false)}
+            onAwardSessionRewards={handleAwardGoldQuestRewards}
+          />
+        </div>
+      )}
     </div>
   );
 };
