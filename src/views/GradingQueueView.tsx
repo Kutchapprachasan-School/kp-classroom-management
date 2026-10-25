@@ -59,7 +59,7 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
       setSelectedRoom('ALL');
     }
   }, [availableFilterRooms, selectedRoom]);
-  const [selectedStatus, setSelectedStatus] = useState<'ALL' | 'PENDING' | 'RETURNED' | 'GRADED'>('PENDING');
+  const [selectedStatus, setSelectedStatus] = useState<'ALL' | 'PENDING' | 'RETURNED' | 'GRADED'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Queue Data
@@ -97,7 +97,9 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
         if (normItemRoom !== normSelectedRoom) return false;
       }
       if (selectedTerm !== 'ALL' && item.academicYearTerm) {
-        if (item.academicYearTerm !== selectedTerm) return false;
+        const normItemTerm = item.academicYearTerm.replace(/^ภาคเรียนที่\s*/, '').trim();
+        const normSelTerm = selectedTerm.replace(/^ภาคเรียนที่\s*/, '').trim();
+        if (normItemTerm !== normSelTerm) return false;
       }
       return true;
     });

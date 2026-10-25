@@ -15,7 +15,7 @@ import {
   type TermAssignmentItem,
   type StudentWorkSubmission,
 } from '../../services/sgsRosterAndSubmissionService';
-import { TEACHER_SUBJECTS_LIST } from '../../services/teacherCourseAssignmentService';
+import { getDynamicTeachingSubjects } from '../../services/teacherCourseAssignmentService';
 
 interface SgsClassroomMatrixModalProps {
   isOpen: boolean;
@@ -30,9 +30,11 @@ export const SgsClassroomMatrixModal: React.FC<SgsClassroomMatrixModalProps> = (
   defaultSubjectCode = '',
   defaultRoom = '',
 }) => {
+  const [version, setVersion] = useState<number>(0);
+
   const teachingSubjects = useMemo(() => {
-    return Array.from(TEACHER_SUBJECTS_LIST);
-  }, []);
+    return getDynamicTeachingSubjects();
+  }, [isOpen, version]);
 
   const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>(() => {
     if (defaultSubjectCode && teachingSubjects.some((s) => s.code === defaultSubjectCode)) {
@@ -47,31 +49,39 @@ export const SgsClassroomMatrixModal: React.FC<SgsClassroomMatrixModalProps> = (
     return {
       code: selectedSubjectCode,
       name: selectedSubjectCode,
-      classrooms: defaultRoom ? [defaultRoom] : ['ม.1/1'],
+      classrooms: defaultRoom && defaultRoom !== 'ALL' ? [defaultRoom] : ['ม.1/1'],
     };
   }, [selectedSubjectCode, teachingSubjects, defaultRoom]);
 
   const [selectedRoom, setSelectedRoom] = useState<string>(() => {
-    if (defaultRoom) return defaultRoom;
-    return currentSubject?.classrooms?.[0] || '';
+    if (defaultRoom && defaultRoom !== 'ALL') return defaultRoom;
+    return currentSubject?.classrooms?.[0] || 'ม.1/1';
   });
 
   const availableRooms = useMemo(() => {
     const set = new Set<string>();
     if (currentSubject?.classrooms) {
-      currentSubject.classrooms.forEach((r) => set.add(r));
+      currentSubject.classrooms.forEach((r) => {
+        if (r && r !== 'ALL') set.add(r);
+      });
     }
-    if (defaultRoom) set.add(defaultRoom);
-    if (selectedRoom) set.add(selectedRoom);
+    if (defaultRoom && defaultRoom !== 'ALL') set.add(defaultRoom);
+    if (selectedRoom && selectedRoom !== 'ALL') set.add(selectedRoom);
     return Array.from(set);
   }, [currentSubject, defaultRoom, selectedRoom]);
 
   React.useEffect(() => {
     if (defaultSubjectCode) setSelectedSubjectCode(defaultSubjectCode);
-    if (defaultRoom) setSelectedRoom(defaultRoom);
+    if (defaultRoom && defaultRoom !== 'ALL') setSelectedRoom(defaultRoom);
   }, [defaultSubjectCode, defaultRoom, isOpen]);
+
+  React.useEffect(() => {
+    const validClassrooms = (currentSubject?.classrooms || []).filter((r) => r && r !== 'ALL');
+    if (validClassrooms.length > 0 && (!selectedRoom || selectedRoom === 'ALL' || !validClassrooms.includes(selectedRoom))) {
+      setSelectedRoom(validClassrooms[0]);
+    }
+  }, [selectedSubjectCode, currentSubject, selectedRoom]);
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [version, setVersion] = useState<number>(0);
 
   useEffect(() => {
     if (!isOpen) return;

@@ -31,21 +31,99 @@ const CLASSROOM_COLUMNS = 'id, name, gradeLevel, roomNumber, adviser, status, up
 const STUDENT_VIEW_COLUMNS =
   'id, studentCode, code, name, title, first_name, last_name, gender, status, classroom_id, seat_no, parent_phone, parent_name, updated_at';
 
+// Canonical DB ClassRoom ID <-> Thai Label mapping for rooms created with timestamp IDs
+export const CANONICAL_TIMESTAMP_ROOM_MAP: Record<string, string> = {
+  'room-1791986382424': 'ม.1/3',
+  'room-1791986989206': 'ม.1/4',
+  'room-1791986989299': 'ม.1/5',
+  'room-1791986989463': 'ม.1/6',
+  'room-1791986989821': 'ม.2/2',
+  'room-1791986989917': 'ม.2/3',
+  'room-1791986990077': 'ม.2/4',
+  'room-1791986990215': 'ม.2/5',
+  'room-1791986990304': 'ม.2/6',
+  'room-1791986990658': 'ม.3/3',
+  'room-1791986990739': 'ม.3/4',
+  'room-1791986991229': 'ม.4/2',
+  'room-1791986991311': 'ม.4/3',
+  'room-1791986991422': 'ม.4/4',
+  'room-1791986991588': 'ม.4/5',
+  'room-1791986991678': 'ม.4/6',
+  'room-1791986991897': 'ม.5/2',
+  'room-1791986991984': 'ม.5/3',
+  'room-1791986992100': 'ม.5/4',
+  'room-1791986992175': 'ม.5/5',
+  'room-1791986992256': 'ม.5/6',
+  'room-1791986992494': 'ม.6/2',
+  'room-1791986992580': 'ม.6/3',
+  'room-1791986992661': 'ม.6/4',
+  'room-1791986992750': 'ม.6/5',
+};
+
 export function resolveRoomCandidates(classroomId: string): string[] {
   const set = new Set<string>();
   const trimmed = (classroomId || '').trim();
   if (!trimmed) return [];
   set.add(trimmed);
 
+  if (CANONICAL_TIMESTAMP_ROOM_MAP[trimmed]) {
+    set.add(CANONICAL_TIMESTAMP_ROOM_MAP[trimmed]);
+  }
+
   const mThai = trimmed.match(/^ม\.?\s*(\d+)\s*\/\s*(\d+)$/);
-  const normalizedThai = mThai ? `ม.${mThai[1]}/${mThai[2]}` : null;
+  let normalizedThai = mThai ? `ม.${mThai[1]}/${mThai[2]}` : null;
+  if (!normalizedThai && CANONICAL_TIMESTAMP_ROOM_MAP[trimmed]) {
+    normalizedThai = CANONICAL_TIMESTAMP_ROOM_MAP[trimmed];
+  }
   if (mThai) {
     set.add(`room-${mThai[1]}-${mThai[2]}`);
     set.add(`ม.${mThai[1]}/${mThai[2]}`);
   }
   const mRoom = trimmed.match(/^room-(\d+)-(\d+)$/);
   if (mRoom) {
-    set.add(`ม.${mRoom[1]}/${mRoom[2]}`);
+    normalizedThai = `ม.${mRoom[1]}/${mRoom[2]}`;
+    set.add(normalizedThai);
+  }
+
+  if (normalizedThai) {
+    const mNorm = normalizedThai.match(/^ม\.?\s*(\d+)\s*\/\s*(\d+)$/);
+    if (mNorm) {
+      set.add(`room-${mNorm[1]}-${mNorm[2]}`);
+    }
+    for (const [tsId, thaiName] of Object.entries(CANONICAL_TIMESTAMP_ROOM_MAP)) {
+      if (thaiName === normalizedThai) {
+        set.add(tsId);
+      }
+    }
+  }
+
+  const scanRoomList = (rooms: any[]) => {
+    for (const r of rooms) {
+      if (!r) continue;
+      const rName = (r.name || '').trim();
+      const rId = (r.id || '').trim();
+      const rNum = (r.roomNumber ? String(r.roomNumber) : '').trim();
+      const rThai = rName.match(/^ม\.?\s*(\d+)\s*\/\s*(\d+)$/);
+      const rNorm = rThai ? `ม.${rThai[1]}/${rThai[2]}` : rName;
+
+      const isMatch =
+        rId === trimmed ||
+        rName === trimmed ||
+        rNum === trimmed ||
+        (normalizedThai && (rName === normalizedThai || rNorm === normalizedThai)) ||
+        (rName && rName.replace(/\s+/g, '') === trimmed.replace(/\s+/g, ''));
+
+      if (isMatch) {
+        if (rId) set.add(rId);
+        if (rName) set.add(rName);
+        if (rNum) set.add(rNum);
+        if (rNorm) set.add(rNorm);
+      }
+    }
+  };
+
+  if (memoryClassrooms.data && Array.isArray(memoryClassrooms.data)) {
+    scanRoomList(memoryClassrooms.data);
   }
 
   if (typeof localStorage !== 'undefined') {
@@ -54,27 +132,7 @@ export function resolveRoomCandidates(classroomId: string): string[] {
       if (raw) {
         const rooms = JSON.parse(raw);
         if (Array.isArray(rooms)) {
-          for (const r of rooms) {
-            const rName = (r.name || '').trim();
-            const rId = (r.id || '').trim();
-            const rNum = (r.roomNumber ? String(r.roomNumber) : '').trim();
-            const rThai = rName.match(/^ม\.?\s*(\d+)\s*\/\s*(\d+)$/);
-            const rNorm = rThai ? `ม.${rThai[1]}/${rThai[2]}` : rName;
-
-            const isMatch =
-              rId === trimmed ||
-              rName === trimmed ||
-              rNum === trimmed ||
-              (normalizedThai && (rName === normalizedThai || rNorm === normalizedThai)) ||
-              (rName && rName.replace(/\s+/g, '') === trimmed.replace(/\s+/g, ''));
-
-            if (isMatch) {
-              if (rId) set.add(rId);
-              if (rName) set.add(rName);
-              if (rNum) set.add(rNum);
-              if (rNorm) set.add(rNorm);
-            }
-          }
+          scanRoomList(rooms);
         }
       }
     } catch {

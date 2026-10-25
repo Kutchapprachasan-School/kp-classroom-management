@@ -484,6 +484,19 @@ export const teacherCourseAssignmentService = {
                   ? savedMatch.studentName
                   : `นักเรียน (${subCode})`;
 
+        const effectiveCourseCode =
+          asg?.courseCode ||
+          sub.courseCode ||
+          savedMatch?.subjectCode ||
+          '';
+
+        const matchedCourse = effectiveCourseCode
+          ? coursesCurriculumService.getCourses().find((c) => c.code === effectiveCourseCode)
+          : undefined;
+
+        const nonAllAsgRoom = asg?.targetClassrooms?.find((r) => r && r !== 'ALL');
+        const courseDefaultRoom = matchedCourse?.assignedClassrooms?.find((r) => r && r !== 'ALL');
+
         const realClassroom =
           foundInService?.classroomId
             ? formatClassroomLabel(foundInService.classroomId)
@@ -491,9 +504,13 @@ export const teacherCourseAssignmentService = {
               ? formatClassroomLabel(stu.classroom)
               : sub.classroom
                 ? formatClassroomLabel(sub.classroom)
-                : (asg?.targetClassrooms && asg.targetClassrooms.length === 1 && asg.targetClassrooms[0] !== 'ALL')
-                  ? formatClassroomLabel(asg.targetClassrooms[0])
-                  : savedMatch?.classroom || 'ม.3/1';
+                : nonAllAsgRoom
+                  ? formatClassroomLabel(nonAllAsgRoom)
+                  : courseDefaultRoom
+                    ? formatClassroomLabel(courseDefaultRoom)
+                    : savedMatch?.classroom
+                      ? formatClassroomLabel(savedMatch.classroom)
+                      : 'ม.3/1';
 
         const realSeatNo =
           foundInService?.student.no ?? stu?.sgsSeatNo ?? stu?.no ?? savedMatch?.seatNo ?? (idx + 1);
@@ -540,21 +557,8 @@ export const teacherCourseAssignmentService = {
             ? new Date(sub.submittedAt).getTime()
             : savedMatch?.submittedTimestamp || (Date.now() - idx * 60000);
 
-        const effectiveCourseCode =
-          asg?.courseCode ||
-          sub.courseCode ||
-          savedMatch?.subjectCode ||
-          '';
-
-        const matchedCourse = effectiveCourseCode
-          ? coursesCurriculumService.getCourses().find((c) => c.code === effectiveCourseCode)
-          : undefined;
-
         const effectiveCourseName =
-          asg?.courseName ||
-          matchedCourse?.name ||
-          savedMatch?.subjectName ||
-          (effectiveCourseCode ? `วิชา ${effectiveCourseCode}` : 'รายวิชา');
+          (asg?.courseName || matchedCourse?.name || savedMatch?.subjectName || (effectiveCourseCode ? `วิชา ${effectiveCourseCode}` : 'รายวิชา')).replace(/\u200b/g, '');
 
         const queueItem: GradingQueueItem = {
           id: savedMatch?.id || `q_${pairKey}`,
@@ -582,7 +586,7 @@ export const teacherCourseAssignmentService = {
           teacherFeedback: feedback,
           gradedAtText: savedMatch?.gradedAtText,
           studentAvatarUrl: savedMatch?.studentAvatarUrl || (stu as any)?.avatarUrl || (foundInService?.student as any)?.avatarUrl,
-          academicYearTerm: sub.academicYearTerm || '1/2569',
+          academicYearTerm: (sub.academicYearTerm || '2/2569').replace(/^ภาคเรียนที่\s*/, '').trim(),
           isResubmission,
         };
 

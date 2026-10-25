@@ -247,15 +247,97 @@ class CloudDataService {
     }
 
     const nowIso = new Date().toISOString();
+    let payloadToSave: any = data;
+
     try {
       this.syncState.pendingSyncCount++;
       this.notifyStateChange();
+
+      // Anti-clobbering merge for multi-device submission & grading queues
+      if (
+        (key === 'kp_work_submissions_v2' || key === 'kp_grading_queue_v2') &&
+        Array.isArray(data)
+      ) {
+        try {
+          const { data: remoteRow } = await supabase
+            .from('kps_cloud_store')
+            .select('data')
+            .eq('key', key)
+            .maybeSingle();
+
+          if (remoteRow && Array.isArray(remoteRow.data) && remoteRow.data.length > 0) {
+            let activeAsgIds: Set<string> | null = null;
+            try {
+              const rawAsgs =
+                this.inMemoryCache.get('kp_term_assignments_v2') ??
+                (typeof window !== 'undefined' ? window.localStorage?.getItem('kp_term_assignments_v2') : null);
+              const parsedAsgs = typeof rawAsgs === 'string' ? JSON.parse(rawAsgs) : rawAsgs;
+              if (Array.isArray(parsedAsgs) && parsedAsgs.length > 0) {
+                activeAsgIds = new Set<string>();
+                parsedAsgs.forEach((a: any) => {
+                  if (a?.id) activeAsgIds!.add(String(a.id));
+                  if (a?.unitId) activeAsgIds!.add(String(a.unitId));
+                });
+              }
+            } catch {
+              // ignore
+            }
+
+            const mergedMap = new Map<string, any>();
+            for (const rem of remoteRow.data) {
+              if (!rem || !rem.studentCode) continue;
+              if (activeAsgIds && rem.assignmentId && !activeAsgIds.has(String(rem.assignmentId))) {
+                continue;
+              }
+              const pKey = `${rem.assignmentId || ''}_${String(rem.studentCode).trim()}`;
+              mergedMap.set(pKey, rem);
+            }
+
+            for (const loc of data as any[]) {
+              if (!loc || !loc.studentCode) continue;
+              const pKey = `${loc.assignmentId || ''}_${String(loc.studentCode).trim()}`;
+              const prev = mergedMap.get(pKey);
+              if (prev) {
+                mergedMap.set(pKey, {
+                  ...prev,
+                  ...loc,
+                  id: loc.id || prev.id,
+                  classroom: loc.classroom || prev.classroom,
+                  studentName: loc.studentName || prev.studentName,
+                  courseCode: loc.courseCode || prev.courseCode,
+                  subjectCode: loc.subjectCode || prev.subjectCode,
+                  fileUrl: loc.fileUrl || prev.fileUrl,
+                  filePreviewUrl: loc.filePreviewUrl || prev.filePreviewUrl || loc.fileUrl || prev.fileUrl,
+                  r2ObjectKey: loc.r2ObjectKey || prev.r2ObjectKey,
+                  externalLinkUrl: loc.externalLinkUrl || prev.externalLinkUrl,
+                  textContent: loc.textContent || prev.textContent,
+                });
+              } else {
+                mergedMap.set(pKey, loc);
+              }
+            }
+
+            payloadToSave = Array.from(mergedMap.values());
+            this.inMemoryCache.set(key, payloadToSave);
+            if (typeof window !== 'undefined' && window.localStorage) {
+              try {
+                this.isHydratingFromCloud = true;
+                window.localStorage.setItem(key, JSON.stringify(payloadToSave));
+              } finally {
+                this.isHydratingFromCloud = false;
+              }
+            }
+          }
+        } catch {
+          // fallback to local data if remote fetch fails
+        }
+      }
 
       const upsertPromise = supabase
         .from('kps_cloud_store')
         .upsert({
           key,
-          data,
+          data: payloadToSave,
           updated_at: nowIso,
         });
 

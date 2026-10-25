@@ -722,7 +722,13 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
       const unitSubs = allSubmissions.filter((s) => {
         if (!taskIds.has(s.assignmentId)) return false;
-        if (roomStudentCodes && !roomStudentCodes.has(s.studentCode)) return false;
+        if (roomStudentCodes) {
+          if (roomStudentCodes.size > 0) {
+            if (!roomStudentCodes.has(s.studentCode)) return false;
+          } else if (s.classroom && formatClassroomLabel(s.classroom) !== formatClassroomLabel(selectedRoom)) {
+            return false;
+          }
+        }
         return true;
       });
 
@@ -769,7 +775,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         }
       }
 
-      const progressCount = fullyGradedStudents > 0 ? fullyGradedStudents : submittedStudents;
+      const progressCount = Math.max(fullyGradedStudents, submittedStudents);
       const progressPercent =
         totalStudents > 0
           ? Math.min(100, Math.round((progressCount / totalStudents) * 100))
@@ -835,7 +841,13 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
       const subs = allSubmissions.filter((s) => {
         if (s.assignmentId !== assign.id) return false;
-        if (roomStudentCodes && !roomStudentCodes.has(s.studentCode)) return false;
+        if (roomStudentCodes) {
+          if (roomStudentCodes.size > 0) {
+            if (!roomStudentCodes.has(s.studentCode)) return false;
+          } else if (s.classroom && formatClassroomLabel(s.classroom) !== formatClassroomLabel(selectedRoom)) {
+            return false;
+          }
+        }
         return true;
       });
       const gradedCount = subs.filter(
@@ -869,7 +881,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         }
       }
 
-      const progressCount = gradedCount > 0 ? gradedCount : submittedCount;
+      const progressCount = Math.max(gradedCount, submittedCount);
       const progressPercent =
         totalStudents > 0
           ? Math.min(100, Math.round((progressCount / totalStudents) * 100))
@@ -1320,12 +1332,14 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
   };
 
   const handleOpenCheckMatrix = (courseCode?: string, targetRooms?: string[]) => {
-    const roomToUse =
-      (targetRooms && targetRooms.length > 0 ? targetRooms[0] : undefined) ||
-      (selectedRoom !== 'ALL' ? selectedRoom : availableFilterRooms[0] || 'ม.1/1');
     const courseToUse =
       courseCode ||
       (selectedSubjectCode !== 'ALL' ? selectedSubjectCode : subjectsList[0]?.courseCode || 'ท23102');
+    const courseTaughtRooms = courseToUse ? getTeacherTaughtClassrooms(courseToUse) : [];
+    const specificTargetRoom = targetRooms?.find((r) => r && r !== 'ALL');
+    const roomToUse =
+      specificTargetRoom ||
+      (selectedRoom !== 'ALL' ? selectedRoom : courseTaughtRooms[0] || availableFilterRooms[0] || 'ม.1/1');
 
     if (courseToUse) {
       setSelectedSubjectCode(courseToUse);

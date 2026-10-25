@@ -2,7 +2,7 @@ import { supabase, isSupabaseConfigured, logDbOperation } from '../lib/supabase.
 import { StudentCreateSchema, type StudentCreateInput } from './types.ts';
 import { attendanceCorrelationService } from './attendanceCorrelationService.ts';
 import { activityAuditLogService } from './activityAuditLogService.ts';
-import { masterDataService, resolveRoomCandidates } from './masterDataService.ts';
+import { masterDataService, resolveRoomCandidates, CANONICAL_TIMESTAMP_ROOM_MAP } from './masterDataService.ts';
 import { localCacheDb } from './localCacheDb.ts';
 
 import { isGrade1SgsStudentCode, getM1SgsStudentInfo } from '../config/m1SgsLookup.ts';
@@ -77,7 +77,10 @@ export function formatClassroomLabel(classroomId?: string): string {
   if (!classroomId) return 'ม.1/1';
   const trimmed = classroomId.trim();
 
-  // 1. Direct match in in-memory cache
+  // 1. Direct match in in-memory cache or canonical timestamp room map
+  if (CANONICAL_TIMESTAMP_ROOM_MAP[trimmed]) {
+    return CANONICAL_TIMESTAMP_ROOM_MAP[trimmed];
+  }
   if (classroomNameCache.has(trimmed)) {
     const cachedName = classroomNameCache.get(trimmed)!;
     const matchThai = cachedName.match(/^ม\.?\s*(\d+)\s*\/\s*(\d+)$/);
@@ -255,8 +258,36 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
     }
   }
 
+  // 4. หากยังไม่มีข้อมูลใน local cache (เช่น เพิ่งล้างแคชแล้วล็อกอินใหม่) ให้ดึงจาก Neon DB / IndexedDB เบื้องหลังแบบไม่บล็อก UI
+  if (
+    classroomId !== 'ALL' &&
+    typeof window !== 'undefined' &&
+    !pendingRoomHydrationSet.has(classroomId)
+  ) {
+    pendingRoomHydrationSet.add(classroomId);
+    masterDataService
+      .getStudentsByRoom(classroomId)
+      .then((rows) => {
+        if (rows && rows.length > 0) {
+          saveLocalStudents(classroomId, rows as StudentRecord[]);
+          try {
+            window.dispatchEvent(new CustomEvent('kp-sgs-roster-updated'));
+            window.dispatchEvent(new CustomEvent('kp-grading-queue-updated'));
+          } catch {
+            // ignore
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        setTimeout(() => pendingRoomHydrationSet.delete(classroomId), 15000);
+      });
+  }
+
   return [];
 };
+
+const pendingRoomHydrationSet = new Set<string>();
 
 const saveLocalStudents = (classroomId: string, items: StudentRecord[]) => {
   if (!classroomId) return;
@@ -356,6 +387,16 @@ export const studentService = {
 
   // ค้นหานักเรียนและห้องเรียนปัจจุบันจากรหัส
   findStudentByCode(code: string): { student: StudentRecord; classroomId: string } | null {
+    const cleanCode = String(code || '').trim().replace(/^stu-/, '');
+    if (!cleanCode) return null;
+
+    const isStudentMatch = (s: StudentRecord) =>
+      s &&
+      (String(s.code || '').trim() === cleanCode ||
+        String(s.studentCode || '').trim() === cleanCode ||
+        String(s.id || '').trim() === cleanCode ||
+        String(s.id || '').trim() === `stu-${cleanCode}`);
+
     // 1. ตรวจสอบ keys ทั้งหมดใน localStorage ก่อน
     if (typeof window !== 'undefined') {
       try {
@@ -366,9 +407,13 @@ export const studentService = {
             if (raw) {
               const list = JSON.parse(raw);
               if (Array.isArray(list)) {
-                const match = list.find((s: StudentRecord) => s.code === code || s.id === code);
+                const match = list.find(isStudentMatch);
                 if (match) {
-                  return { student: match, classroomId: k.slice(STORAGE_PREFIX.length) };
+                  const rawRoom = k.slice(STORAGE_PREFIX.length);
+                  return {
+                    student: match,
+                    classroomId: match.classroomId || rawRoom,
+                  };
                 }
               }
             }
@@ -381,9 +426,12 @@ export const studentService = {
 
     // 2. Check in-memory cache
     for (const [room, list] of Object.entries(inMemoryStudentCache)) {
-      const match = list.find((s) => s.code === code || s.id === code);
+      const match = list.find(isStudentMatch);
       if (match) {
-        return { student: match, classroomId: room };
+        return {
+          student: match,
+          classroomId: match.classroomId || room,
+        };
       }
     }
 

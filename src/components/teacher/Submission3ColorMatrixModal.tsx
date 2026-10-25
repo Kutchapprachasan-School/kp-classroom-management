@@ -86,24 +86,33 @@ export const Submission3ColorMatrixModal: React.FC<Submission3ColorMatrixModalPr
   }, [selectedSubjectCode, teachingSubjects, defaultRoom]);
 
   const [selectedRoom, setSelectedRoom] = useState<string>(() => {
-    if (defaultRoom) return defaultRoom;
-    return currentSubjectInfo?.classrooms?.[0] || '';
+    if (defaultRoom && defaultRoom !== 'ALL') return defaultRoom;
+    return currentSubjectInfo?.classrooms?.[0] || 'ม.1/1';
   });
 
   const availableRooms = useMemo(() => {
     const set = new Set<string>();
     if (currentSubjectInfo?.classrooms) {
-      currentSubjectInfo.classrooms.forEach((r) => set.add(r));
+      currentSubjectInfo.classrooms.forEach((r) => {
+        if (r && r !== 'ALL') set.add(r);
+      });
     }
-    if (defaultRoom) set.add(defaultRoom);
-    if (selectedRoom) set.add(selectedRoom);
+    if (defaultRoom && defaultRoom !== 'ALL') set.add(defaultRoom);
+    if (selectedRoom && selectedRoom !== 'ALL') set.add(selectedRoom);
     return Array.from(set);
   }, [currentSubjectInfo, defaultRoom, selectedRoom]);
 
   React.useEffect(() => {
     if (defaultSubjectCode) setSelectedSubjectCode(defaultSubjectCode);
-    if (defaultRoom) setSelectedRoom(defaultRoom);
+    if (defaultRoom && defaultRoom !== 'ALL') setSelectedRoom(defaultRoom);
   }, [defaultSubjectCode, defaultRoom, isOpen]);
+
+  React.useEffect(() => {
+    const validClassrooms = (currentSubjectInfo?.classrooms || []).filter((r) => r && r !== 'ALL');
+    if (validClassrooms.length > 0 && (!selectedRoom || selectedRoom === 'ALL' || !validClassrooms.includes(selectedRoom))) {
+      setSelectedRoom(validClassrooms[0]);
+    }
+  }, [selectedSubjectCode, currentSubjectInfo, selectedRoom]);
 
   const [matrixSearch, setMatrixSearch] = useState<string>('');
 

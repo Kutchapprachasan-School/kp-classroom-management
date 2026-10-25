@@ -1417,24 +1417,187 @@ export const sgsRosterAndSubmissionService = {
         localStorage.getItem(STORAGE_KEY_WORK_SUBMISSIONS) ||
         localStorage.getItem('kp_work_submissions_v1');
       if (raw) {
-        const list: StudentWorkSubmission[] = JSON.parse(raw);
+        const rawList: StudentWorkSubmission[] = JSON.parse(raw);
+        if (!Array.isArray(rawList)) return [];
+
+        // Real R2 object paths verified in bucket for submissions whose metadata was clobbered/mismatched
+        const VERIFIED_R2_KEY_HEAL_MAP: Record<string, string> = {
+          'asg-1792562408331-0eual_14845':
+            'kp-classroom-submissions/ภาคเรียนที่ 2-2569/ม.5-4/asg-1792562408331-0eual/14845_Screenshot_20261025_190009_Samsung_Notes.webp',
+          'asg-1792551072984_15984':
+            'kp-classroom-submissions/ภาคเรียนที่ 2-2569/ม.5-4/asg-1792551072984/15984_15984_Screenshot_20261021_133246_Samsung_Notes.webp',
+          'asg-1792562408331-0eual_14993':
+            'kp-classroom-submissions/2-2569/all/asg-1792562408331-0eual/14993_work.webp',
+        };
+
+        let termAssignments: TermAssignmentItem[] = [];
+        try {
+          const rawAsg = localStorage.getItem(STORAGE_KEY_TERM_ASSIGNMENTS);
+          if (rawAsg) termAssignments = JSON.parse(rawAsg);
+        } catch {
+          // ignore
+        }
+        const asgById = new Map<string, TermAssignmentItem>();
+        if (Array.isArray(termAssignments)) {
+          termAssignments.forEach((a) => {
+            if (a && a.id) asgById.set(a.id, a);
+          });
+        }
+
+        // Normalize legacy assignment IDs & deduplicate by (assignmentId, studentCode)
+        const dedupMap = new Map<string, StudentWorkSubmission>();
+        for (const item of rawList) {
+          if (!item || !item.studentCode) continue;
+          const cleanCode = String(item.studentCode).trim();
+          let effectiveAsgId = item.assignmentId;
+          if (
+            effectiveAsgId === 'asg-1792550754281' &&
+            !asgById.has('asg-1792550754281') &&
+            asgById.has('asg-1792551072984')
+          ) {
+            effectiveAsgId = 'asg-1792551072984';
+          }
+
+          const pairKey = `${effectiveAsgId}_${cleanCode}`;
+          const healedR2Key = VERIFIED_R2_KEY_HEAL_MAP[pairKey];
+          const normalizedItem: StudentWorkSubmission = {
+            ...item,
+            id: item.id || `sub_${pairKey}`,
+            assignmentId: effectiveAsgId,
+            studentCode: cleanCode,
+            ...(healedR2Key
+              ? {
+                  r2ObjectKey: healedR2Key,
+                  fileUrl: r2StorageService.resolvePublicViewUrl(healedR2Key),
+                }
+              : {}),
+          };
+
+          const existing = dedupMap.get(pairKey);
+          if (!existing) {
+            dedupMap.set(pairKey, normalizedItem);
+          } else {
+            const isExistingGraded = existing.status === 'GRADED' || typeof existing.score === 'number';
+            const isNewGraded = normalizedItem.status === 'GRADED' || typeof normalizedItem.score === 'number';
+            dedupMap.set(pairKey, {
+              ...existing,
+              ...normalizedItem,
+              id: normalizedItem.id || existing.id || `sub_${pairKey}`,
+              status: isNewGraded || isExistingGraded ? 'GRADED' : normalizedItem.status || existing.status,
+              score:
+                typeof normalizedItem.score === 'number'
+                  ? normalizedItem.score
+                  : typeof existing.score === 'number'
+                    ? existing.score
+                    : null,
+              classroom: normalizedItem.classroom || existing.classroom,
+              courseCode: normalizedItem.courseCode || existing.courseCode,
+              studentId: normalizedItem.studentId || existing.studentId,
+              r2ObjectKey: healedR2Key || normalizedItem.r2ObjectKey || existing.r2ObjectKey,
+              fileUrl: normalizedItem.fileUrl || existing.fileUrl,
+              fileDataUrl: normalizedItem.fileDataUrl || existing.fileDataUrl,
+              externalLinkUrl: normalizedItem.externalLinkUrl || existing.externalLinkUrl,
+              textContent: normalizedItem.textContent || existing.textContent,
+              teacherFeedback: normalizedItem.teacherFeedback || existing.teacherFeedback,
+            });
+          }
+        }
+
+        // Recover verified orphaned R2 objects whose submission records were clobbered before anti-clobbering merge
+        const ORPHANED_R2_SUBMISSIONS: Array<{
+          assignmentId: string;
+          studentCode: string;
+          classroom: string;
+          courseCode: string;
+          r2ObjectKey: string;
+          workAttachmentLabel: string;
+          submittedAt: string;
+        }> = [
+          {
+            assignmentId: 'asg-1792565023646-7xycy',
+            studentCode: '14493',
+            classroom: 'ม.6/1',
+            courseCode: 'ส30206',
+            r2ObjectKey: 'kp-classroom-submissions/ภาคเรียนที่ 2-2569/all/asg-1792565023646-7xycy/14493_14493_submission.webp',
+            workAttachmentLabel: '14493_submission.webp',
+            submittedAt: '2026-10-24T08:00:00.000Z',
+          },
+          {
+            assignmentId: 'asg-1792565023646-7xycy',
+            studentCode: '15447',
+            classroom: 'ม.6/1',
+            courseCode: 'ส30206',
+            r2ObjectKey: 'kp-classroom-submissions/ภาคเรียนที่ 2-2569/ม.6-1/asg-1792565023646-7xycy/15447_Screenshot_20261022_140935_Samsung Notes.webp',
+            workAttachmentLabel: 'Screenshot_20261022_140935_Samsung Notes.webp',
+            submittedAt: '2026-10-25T10:15:39.000Z',
+          },
+        ];
+
+        for (const orphan of ORPHANED_R2_SUBMISSIONS) {
+          const orphanPairKey = `${orphan.assignmentId}_${orphan.studentCode}`;
+          if (!dedupMap.has(orphanPairKey) && asgById.has(orphan.assignmentId)) {
+            const matchedAsg = asgById.get(orphan.assignmentId);
+            dedupMap.set(orphanPairKey, {
+              id: `sub_${orphan.assignmentId}_${orphan.studentCode}`,
+              assignmentId: orphan.assignmentId,
+              workTitle: matchedAsg?.title || 'งานที่มอบหมาย',
+              courseCode: matchedAsg?.courseCode || orphan.courseCode,
+              studentId: `stu-${orphan.studentCode}`,
+              studentCode: orphan.studentCode,
+              classroom: orphan.classroom,
+              status: 'SUBMITTED_PENDING',
+              score: null,
+              maxScore: matchedAsg?.maxScore || 10,
+              submittedAt: orphan.submittedAt,
+              workAttachmentLabel: orphan.workAttachmentLabel,
+              r2ObjectKey: orphan.r2ObjectKey,
+            });
+          }
+        }
+
+        const list = Array.from(dedupMap.values());
+
         // Hydrate fileDataUrl if not present in item but present in separate scoped key or Cloudflare R2
         return list.map((sub) => {
           let fileUrl = sub.fileUrl || sub.fileDataUrl;
+          const matchedAsg = asgById.get(sub.assignmentId);
+          let resolvedClassroom = sub.classroom;
+          if (!resolvedClassroom) {
+            const foundStu = studentService.findStudentByCode(sub.studentCode);
+            if (foundStu?.classroomId) {
+              resolvedClassroom = formatClassroomLabel(foundStu.classroomId);
+            } else if (
+              matchedAsg?.targetClassrooms &&
+              matchedAsg.targetClassrooms.length === 1 &&
+              matchedAsg.targetClassrooms[0] !== 'ALL'
+            ) {
+              resolvedClassroom = formatClassroomLabel(matchedAsg.targetClassrooms[0]);
+            }
+          } else {
+            resolvedClassroom = formatClassroomLabel(resolvedClassroom);
+          }
+
+          const enrichedBase: StudentWorkSubmission = {
+            ...sub,
+            id: sub.id || `sub_${sub.assignmentId}_${sub.studentCode}`,
+            studentId: sub.studentId || `stu-${sub.studentCode}`,
+            classroom: resolvedClassroom || sub.classroom,
+            courseCode: sub.courseCode || matchedAsg?.courseCode,
+          };
 
           // ถ้ามี R2 Worker Configured และมี URL/Key ของ R2 ให้แปลงเป็น URL ที่เปิดดูได้จริง (ให้ความสำคัญกับ R2 Key ก่อน Base64 เสมอ)
-          if (r2StorageService.isConfigured() && (sub.r2ObjectKey || fileUrl)) {
-            const r2Target = sub.r2ObjectKey || (fileUrl && !fileUrl.startsWith('data:') ? fileUrl : undefined);
+          if (r2StorageService.isConfigured() && (enrichedBase.r2ObjectKey || fileUrl)) {
+            const r2Target = enrichedBase.r2ObjectKey || (fileUrl && !fileUrl.startsWith('data:') ? fileUrl : undefined);
             if (r2Target) {
               const resolvedR2 = r2StorageService.resolvePublicViewUrl(r2Target);
               if (resolvedR2 && (resolvedR2.startsWith('http://') || resolvedR2.startsWith('https://'))) {
-                const cleanObjKey = sub.r2ObjectKey
-                  ? r2StorageService.normalizeObjectKey(sub.r2ObjectKey)
+                const cleanObjKey = enrichedBase.r2ObjectKey
+                  ? r2StorageService.normalizeObjectKey(enrichedBase.r2ObjectKey)
                   : r2StorageService.isR2OrLocalFileUrl(r2Target)
                     ? r2StorageService.normalizeObjectKey(r2Target)
                     : undefined;
                 return {
-                  ...sub,
+                  ...enrichedBase,
                   fileDataUrl: resolvedR2,
                   fileUrl: resolvedR2,
                   ...(cleanObjKey ? { r2ObjectKey: cleanObjKey } : {}),
@@ -1455,18 +1618,18 @@ export const sgsRosterAndSubmissionService = {
           }
 
           if (!fileUrl) {
-            const cleanFileName = sub.r2ObjectKey ? sub.r2ObjectKey.split('/').pop() : undefined;
+            const cleanFileName = enrichedBase.r2ObjectKey ? enrichedBase.r2ObjectKey.split('/').pop() : undefined;
             const cachedUrl = this.getSubmissionFileUrl(
-              sub.assignmentId,
-              sub.studentCode,
-              cleanFileName || sub.workAttachmentLabel,
+              enrichedBase.assignmentId,
+              enrichedBase.studentCode,
+              cleanFileName || enrichedBase.workAttachmentLabel,
               true
             );
             if (cachedUrl) {
-              return { ...sub, fileDataUrl: cachedUrl, fileUrl: cachedUrl };
+              return { ...enrichedBase, fileDataUrl: cachedUrl, fileUrl: cachedUrl };
             }
           }
-          return { ...sub, fileDataUrl: fileUrl, fileUrl: sub.fileUrl || fileUrl };
+          return { ...enrichedBase, fileDataUrl: fileUrl, fileUrl: enrichedBase.fileUrl || fileUrl };
         });
       }
       return [];
@@ -2014,13 +2177,17 @@ export const sgsRosterAndSubmissionService = {
     // 1. บันทึกลง LocalStorage ของระบบ SGS
     this.saveSubmissions(submissions);
 
-    // 2. ซิงค์สถานะในคิวตรวจงานของครูให้เป็น GRADED ทันที (ป้องกันคิวค้างสถานะ PENDING_REVIEW)
+    // 2. ซิงค์สถานะในคิวตรวจงานของครูให้เป็น GRADED ทันที (ป้องกันคิวค้างสถานะ PENDING_REVIEW และรักษา URL ไฟล์เดิมไว้)
     this.syncGradingQueueItem({
       assignmentId: updatedSubmission.assignmentId,
       studentCode: updatedSubmission.studentCode,
       studentId: updatedSubmission.studentId,
+      classroom: updatedSubmission.classroom,
       workTitle: updatedSubmission.workTitle,
       courseCode: updatedSubmission.courseCode,
+      fileUrl: updatedSubmission.fileUrl || updatedSubmission.fileDataUrl,
+      externalLinkUrl: updatedSubmission.externalLinkUrl,
+      textContent: updatedSubmission.textContent,
       status: updatedSubmission.status === 'MISSING' ? 'PENDING_REVIEW' : 'GRADED',
       score: updatedSubmission.score,
       feedback: updatedSubmission.feedback,
@@ -2132,8 +2299,12 @@ export const sgsRosterAndSubmissionService = {
           assignmentId: item.assignmentId,
           studentCode: item.studentCode,
           studentId: item.studentId,
+          classroom: item.classroom,
           workTitle: item.workTitle,
           courseCode: item.courseCode,
+          fileUrl: item.fileUrl || item.fileDataUrl,
+          externalLinkUrl: item.externalLinkUrl,
+          textContent: item.textContent,
           status: 'GRADED',
           score: item.score,
           feedback: item.feedback || item.teacherFeedback,
