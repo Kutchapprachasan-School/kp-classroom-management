@@ -27,6 +27,10 @@ import {
   formatRewardTimeThai,
 } from '../src/components/live-classroom/RewardBoardSubTab';
 import { describeArcSlice } from '../src/components/live-classroom/LuckyTicketDrawModal';
+import {
+  calculateHarmonicProgress,
+  prepareRaceContestants,
+} from '../src/utils/racePhysicsEngine';
 
 async function runTests() {
   console.log('🧪 Running Live Classroom Ecosystem Tests...');
@@ -38,6 +42,7 @@ async function runTests() {
     soundFX.playCoin();
     soundFX.playFanfare();
     soundFX.playBuzzer();
+    soundFX.playWhistle();
   }, 'SoundFXEngine should safely execute without crashing in headless environment');
 
   // 2. ทดสอบการคำนวณขอบเขตวันตามเวลาประเทศไทย (UTC+7)
@@ -247,6 +252,14 @@ async function runTests() {
   const timeFormatted = formatRewardTimeThai('2026-10-24T06:30:00.000Z');
   assert.ok(typeof timeFormatted === 'string');
   assert.ok(timeFormatted.includes(':'), 'รูปแบบเวลาต้องมีเครื่องหมายทวิภาค (:)');
+
+  // 12. ทดสอบ Running Race Physics Engine & Heat Slicer
+  assert.equal(calculateHarmonicProgress(0, 0, 0.1, 0.05, 1), 0);
+  assert.equal(calculateHarmonicProgress(1, 0.9, 0.1, 0.05, 1), 1);
+  const raceHeat = prepareRaceContestants(sampleRoster, 4, 5000);
+  assert.equal(raceHeat.contestants.length, 4);
+  assert.ok(raceHeat.winner);
+  assert.equal(raceHeat.contestants.find((c) => c.isWinner)?.id, raceHeat.winner.id);
 
   console.log('✅ All Live Classroom Ecosystem tests passed!');
 }

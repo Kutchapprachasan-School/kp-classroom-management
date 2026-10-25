@@ -153,6 +153,39 @@ export class SoundFXEngine {
       gain.disconnect();
     };
   }
+
+  public playWhistle(): void {
+    if (this.isMuted) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const duration = 0.38;
+    // เสียงนกหวีดคู่ฮาร์โมนิก (2400 Hz & 2750 Hz) พร้อม Tremolo เล็กน้อย
+    const freqs = [2400, 2750];
+
+    freqs.forEach((freq) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.06, now + duration);
+
+      gain.gain.setValueAtTime(0.16, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + duration);
+      osc.onended = () => {
+        osc.disconnect();
+        gain.disconnect();
+      };
+    });
+  }
 }
 
 export const soundFX = new SoundFXEngine();

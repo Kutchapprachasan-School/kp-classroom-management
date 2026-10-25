@@ -64,12 +64,13 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
 
   // Sound triggering helper
   const triggerSound = useCallback(
-    (type: 'tick' | 'coin' | 'fanfare' | 'buzzer', freq?: number) => {
+    (type: 'tick' | 'coin' | 'fanfare' | 'buzzer' | 'whistle', freq?: number) => {
       if (!soundEnabled) return;
       if (type === 'tick') soundFX.playTick(freq);
       if (type === 'coin') soundFX.playCoin();
       if (type === 'fanfare') soundFX.playFanfare();
       if (type === 'buzzer') soundFX.playBuzzer();
+      if (type === 'whistle') soundFX.playWhistle();
     },
     [soundEnabled]
   );

@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 25/10/2569 10:10:00 | รวมทั้งหมด 223 ไฟล์*
+*อัปเดตล่าสุด: 25/10/2569 10:22:29 | รวมทั้งหมด 225 ไฟล์*
 
 ---
 
@@ -25,7 +25,7 @@
 | [src/views/GradingQueueView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/GradingQueueView.tsx) | 549 | `GradingQueueView` (L37) |
 | [src/views/HomeVisitSdqView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/HomeVisitSdqView.tsx) | 1355 | `HomeVisitSdqView` (L27) |
 | [src/views/LessonPlansView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/LessonPlansView.tsx) | 1776 | `UnitStatus` (L33), `EvaluationItem` (L35), `UnitPlanItem` (L42), `CourseFilterOption` (L87), `LessonPlansView` (L96) |
-| [src/views/LiveClassroomView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/LiveClassroomView.tsx) | 501 | `LiveClassroomViewProps` (L26), `LiveClassroomView` (L30) |
+| [src/views/LiveClassroomView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/LiveClassroomView.tsx) | 502 | `LiveClassroomViewProps` (L26), `LiveClassroomView` (L30) |
 | [src/views/MessagesView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/MessagesView.tsx) | 1455 | `MessagesView` (L47) |
 | [src/views/MorningAssemblyView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/MorningAssemblyView.tsx) | 1323 | `MorningAssemblyViewProps` (L54), `MorningAssemblyView` (L90) |
 | [src/views/SchoolLeaveExecutiveDashboardView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/SchoolLeaveExecutiveDashboardView.tsx) | 292 | `SchoolLeaveExecutiveDashboardView` (L43) |
@@ -134,9 +134,10 @@
 | [src/components/live-classroom/LiveClassroomHeader.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LiveClassroomHeader.tsx) | 258 | `SubTab` (L20), `LiveClassroomHeaderProps` (L22), `LiveClassroomHeader` (L43) |
 | [src/components/live-classroom/LiveTimerSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LiveTimerSubTab.tsx) | 468 | `LiveTimerSubTabProps` (L14), `formatTimerMMSS` (L30), `LiveTimerSubTab` (L37) |
 | [src/components/live-classroom/LuckyTicketDrawModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LuckyTicketDrawModal.tsx) | 517 | `LuckyTicketDrawModalProps` (L20), `createSlicePath` (L43), `describeArcSlice` (L66), `LuckyTicketDrawModal` (L68) |
-| [src/components/live-classroom/RandomPickerSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RandomPickerSubTab.tsx) | 706 | `SpinSpeed` (L17), `RandomPickerSubTabProps` (L19), `getAvailablePool` (L38), `restoreSkippedStudent` (L48), `RandomPickerSubTab` (L52) |
+| [src/components/live-classroom/RandomPickerSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RandomPickerSubTab.tsx) | 730 | `PickerMode` (L18), `SpinSpeed` (L19), `RandomPickerSubTabProps` (L21), `getAvailablePool` (L40), `restoreSkippedStudent` (L50), `RandomPickerSubTab` (L54) |
 | [src/components/live-classroom/RandomTextSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RandomTextSubTab.tsx) | 804 | `SpinSpeed` (L29), `RandomTextSubTabProps` (L31), `RandomTextSubTab` (L48) |
 | [src/components/live-classroom/RewardBoardSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RewardBoardSubTab.tsx) | 285 | `RewardBoardSubTabProps` (L16), `calculateTopEarners` (L26), `formatRewardTimeThai` (L38), `RewardBoardSubTab` (L52) |
+| [src/components/live-classroom/RunningTrackArena.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RunningTrackArena.tsx) | 863 | `RunningTrackArenaProps` (L19), `RaceSpeed` (L31), `RunningTrackArena` (L45) |
 | [src/components/mobile/index.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/mobile/index.ts) | 12 | *(Internal / Default Export)* |
 | [src/components/mobile/TeacherMobileBottomNav.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/mobile/TeacherMobileBottomNav.tsx) | 250 | `TeacherMobileBottomNav` (L17) |
 | [src/components/mobile/TeacherMobileCalendarScreen.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/mobile/TeacherMobileCalendarScreen.tsx) | 212 | `TeacherMobileCalendarScreen` (L17) |
@@ -220,7 +221,7 @@
 | [src/services/sgsImportExportService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/sgsImportExportService.ts) | 499 | `SgsImportRowStatus` (L11), `SgsParsedRow` (L13), `SgsImportDryRunSummary` (L32), `SgsScoreExportRow` (L48), `ExistingStudentLookup` (L61), `ParsedThaiName` (L81), `parseThaiFullName` (L89), `parseSgsClipboardText` (L156), `evaluateSgsImportDryRun` (L295), `generateSgsScoreExportRows` (L407) *(+2 รายการ)* |
 | [src/services/sgsRosterAndSubmissionService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/sgsRosterAndSubmissionService.ts) | 3870 | `RosterIdentityRecord` (L20), `SubmissionMatchCandidate` (L28), `AssignmentMatchTarget` (L46), `normalizeClassroomCode` (L62), `isSameClassroom` (L131), `resolveStudentIdentity` (L155), `matchSubmissionToAssignment` (L242), `StudentTransferState` (L315), `StudentGender` (L316), `SgsInsertPosition` (L317) *(+19 รายการ)* |
 | [src/services/smsNotificationService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/smsNotificationService.ts) | 872 | `SmsCategory` (L12), `SmsDeliveryRecord` (L21), `SendSmsPayload` (L39), `StudentContactRecord` (L49), `normalizeThaiPhoneNumber` (L69), `SMS_OUTBOX_SYNC_EVENT` (L114), `smsNotificationService` (L871) |
-| [src/services/soundFXEngine.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/soundFXEngine.ts) | 159 | `SoundFXEngine` (L5), `soundFX` (L158) |
+| [src/services/soundFXEngine.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/soundFXEngine.ts) | 192 | `SoundFXEngine` (L5), `soundFX` (L191) |
 | [src/services/studentAffairsCouncilService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentAffairsCouncilService.ts) | 585 | `AssemblyExceptionRecord` (L9), `DisciplineRecord` (L18), `StudentLeaveRequest` (L31), `CouncilCandidateParty` (L46), `CouncilActivity` (L58), `StudentSuggestion` (L68), `AffairsTeacherRole` (L80), `AffairsRolePermission` (L82), `DEFAULT_ROLE_PERMISSIONS` (L103), `studentAffairsCouncilService` (L150) |
 | [src/services/studentBannerService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentBannerService.ts) | 258 | `StudentBannerKey` (L7), `StudentBannerItem` (L9), `STUDENT_BANNERS_EVENT` (L24), `DEFAULT_STUDENT_BANNERS` (L26), `studentBannerService` (L65) |
 | [src/services/studentEnrollmentService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentEnrollmentService.ts) | 232 | `EnrollmentStatus` (L5), `StudentEnrollmentRecord` (L13), `CourseTranscriptItem` (L29), `TermTranscript` (L36), `AlumniStudentSummary` (L48), `studentEnrollmentService` (L61) |
@@ -259,6 +260,7 @@
 | [src/utils/indexedDbAdapter.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/indexedDbAdapter.ts) | 392 | `OutboxSyncStatus` (L9), `OutboxItem` (L11), `RetryPolicyConfig` (L23), `DEFAULT_RETRY_CONFIG` (L31), `computeNextBackoffMs` (L42), `canonicalJsonStringify` (L58), `indexedDbAdapter` (L391) |
 | [src/utils/liveClassroomAlgorithms.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/liveClassroomAlgorithms.ts) | 205 | `StudentGroup` (L7), `WeightedWheelSegment` (L14), `generateBalancedGroups` (L42), `buildWeightedWheelSegments` (L143), `pickWeightedWheelWinner` (L186) |
 | [src/utils/promotionDryRunEngine.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/promotionDryRunEngine.ts) | 376 | `PromotionActionType` (L11), `GraduationApprovalStatus` (L19), `ClassroomMappingRule` (L25), `StudentDryRunInput` (L33), `StudentPromotionDecision` (L50), `PromotionDryRunConfig` (L62), `PromotionDryRunReport` (L69), `parseGradeLevelFromRoom` (L90), `generateDefaultClassroomMappings` (L107), `evaluateStudentPromotion` (L148) *(+2 รายการ)* |
+| [src/utils/racePhysicsEngine.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/racePhysicsEngine.ts) | 204 | `LanePalette` (L7), `RACE_LANE_PALETTES` (L15), `RaceContestant` (L28), `calculateHarmonicProgress` (L54), `prepareRaceContestants` (L80), `updateContestantsFrame` (L161) |
 | [src/utils/speechTTS.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/speechTTS.ts) | 130 | `JapanesePraise` (L5), `tts` (L129) |
 | [src/utils/studentIdentityUtils.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/studentIdentityUtils.ts) | 24 | `StudentIdentityCandidate` (L16) |
 | [src/utils/timetableDateUtils.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/timetableDateUtils.ts) | 797 | `TimetableColorTheme` (L6), `TimetableMatrixSlot` (L15), `TaskWidgetItem` (L38), `CalendarEventItem` (L47), `THAI_MONTHS_SHORT` (L54), `WeekDayInfo` (L69), `ComputedWeekInfo` (L75), `BANGKOK_TIMEZONE` (L87), `getBangkokNow` (L89), `getBangkokTodayString` (L95) *(+8 รายการ)* |

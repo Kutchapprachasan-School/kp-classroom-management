@@ -13,7 +13,9 @@ import CloseRegular from '@mingcute/react/core-regular/close';
 import { Crown, SkipForward } from 'lucide-react';
 import type { LiveStudent } from '../../services/liveClassroomService';
 import { tts, type JapanesePraise } from '../../utils/speechTTS';
+import { RunningTrackArena } from './RunningTrackArena';
 
+export type PickerMode = 'slot' | 'card' | 'race';
 export type SpinSpeed = 'fast' | 'normal' | 'dramatic';
 
 export interface RandomPickerSubTabProps {
@@ -30,7 +32,7 @@ export interface RandomPickerSubTabProps {
     amount: number,
     description: string
   ) => void;
-  onPlaySound?: (type: 'tick' | 'coin' | 'fanfare' | 'buzzer', freq?: number) => void;
+  onPlaySound?: (type: 'tick' | 'coin' | 'fanfare' | 'buzzer' | 'whistle', freq?: number) => void;
   onToggleAttendance: (studentId: string) => Promise<void>;
   syncingAttendanceIds: string[];
 }
@@ -62,7 +64,7 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
   onToggleAttendance,
   syncingAttendanceIds,
 }) => {
-  const [pickerMode, setPickerMode] = useState<'slot' | 'card'>('slot');
+  const [pickerMode, setPickerMode] = useState<PickerMode>('slot');
   const [spinSpeed, setSpinSpeed] = useState<SpinSpeed>('normal');
   const [noRepeat, setNoRepeat] = useState<boolean>(true);
   const [pickedIds, setPickedIds] = useState<string[]>([]);
@@ -245,7 +247,7 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
             </span>
             <select
               value={pickerMode}
-              onChange={(e) => setPickerMode(e.target.value as 'slot' | 'card')}
+              onChange={(e) => setPickerMode(e.target.value as PickerMode)}
               className={`rounded-xl px-3 py-1.5 font-semibold text-xs transition-colors ${
                 isProjectorMode
                   ? 'bg-slate-800 border border-slate-700 text-slate-100'
@@ -254,6 +256,7 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
             >
               <option value="slot">🎰 สล็อตแมชชีน (Slot Reel)</option>
               <option value="card">🃏 สุ่มเปิดการ์ด (Card Flip)</option>
+              <option value="race">🏃💨 วิ่งแข่งชิงแชมป์ (Running Race)</option>
             </select>
           </div>
 
@@ -400,6 +403,27 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
               กรุณาเช็กสถานะการมาเรียนในแถบด้านล่าง หรือเลือกห้องเรียนที่มีนักเรียนค่ะ
             </p>
           </div>
+        ) : pickerMode === 'race' ? (
+          <RunningTrackArena
+            students={availablePool.length > 0 ? availablePool : presentStudents}
+            onWinnerConfirmed={(winner) => {
+              setSelectedStudent(winner);
+              setRollingStudent(winner);
+              if (noRepeat) {
+                setPickedIds((prev) => (prev.includes(winner.id) ? prev : [...prev, winner.id]));
+              }
+            }}
+            onAwardCoin={(studentId, amount) => {
+              onGiveReward([studentId], 'coin', amount, 'รางวัลวิ่งแข่งชิงแชมป์');
+            }}
+            onAwardTicket={(studentId, amount) => {
+              onGiveReward([studentId], 'ticket', amount, 'รางวัลวิ่งแข่งชิงแชมป์');
+            }}
+            isProjectorMode={isProjectorMode}
+            onPlaySound={onPlaySound}
+            ttsEnabled={ttsEnabled}
+            selectedPraise={selectedPraise}
+          />
         ) : pickerMode === 'slot' ? (
           <>
             {/* Slot Display Box */}
