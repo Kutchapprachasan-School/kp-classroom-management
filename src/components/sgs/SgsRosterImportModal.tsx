@@ -17,6 +17,7 @@ import * as XLSX from 'xlsx';
 import {
   parseSgsClipboardText,
   evaluateSgsImportDryRun,
+  normalizeClassroomName,
   type SgsParsedRow,
   type SgsImportDryRunSummary,
   type ExistingStudentLookup
@@ -552,17 +553,36 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
                     const fileName = file.name.toLowerCase();
                     let tsvText = '';
 
+                    // ตรวจจับชื่อห้องจากชื่อไฟล์ (เช่น "ม.4-4.xlsx", "4_4.csv", "รายชื่อ ม.4_4") เพื่อใช้เป็น fallback
+                    const fileNameRoom = normalizeClassroomName(file.name, '');
+                    const effectiveDefaultRoom =
+                      fileNameRoom && /ม\.\d+\/\d+/.test(fileNameRoom) ? fileNameRoom : targetClassroom;
+
                     if (fileName.endsWith('.csv')) {
                       tsvText = await file.text();
                     } else {
-                      // Binary Excel parsing via SheetJS (xlsx)
+                      // Binary Excel parsing via SheetJS (xlsx) ครอบคลุมทุก Sheet ใน Workbook
                       const arrayBuffer = await file.arrayBuffer();
                       const wb = XLSX.read(arrayBuffer, { type: 'array' });
                       if (!wb.SheetNames || wb.SheetNames.length === 0) {
                         throw new Error('ไม่พบแผ่นงาน (Sheet) ในไฟล์ Excel นี้');
                       }
-                      const sheet = wb.Sheets[wb.SheetNames[0]];
-                      tsvText = XLSX.utils.sheet_to_csv(sheet, { FS: '\t' });
+
+                      const sheetTexts: string[] = [];
+                      for (const sheetName of wb.SheetNames) {
+                        const sheet = wb.Sheets[sheetName];
+                        if (!sheet) continue;
+                        const csv = XLSX.utils.sheet_to_csv(sheet, { FS: '\t' });
+                        if (!csv.trim()) continue;
+
+                        const normalizedSheetRoom = normalizeClassroomName(sheetName, '');
+                        if (normalizedSheetRoom && /ม\.\d+\/\d+/.test(normalizedSheetRoom)) {
+                          sheetTexts.push(`ชั้น ${normalizedSheetRoom}\n${csv}`);
+                        } else {
+                          sheetTexts.push(csv);
+                        }
+                      }
+                      tsvText = sheetTexts.join('\n\n');
                     }
 
                     if (!tsvText.trim()) {
@@ -570,7 +590,7 @@ export const SgsRosterImportModal: React.FC<SgsRosterImportModalProps> = ({
                     }
 
                     setRawText(tsvText);
-                    const parsed = parseSgsClipboardText(tsvText, targetClassroom);
+                    const parsed = parseSgsClipboardText(tsvText, effectiveDefaultRoom);
                     const summary = evaluateSgsImportDryRun(parsed, targetClassroom, existingStudents);
                     setDryRunSummary(summary);
                     if (summary.isMultiRoomFile) {

@@ -441,35 +441,47 @@ export function parseThaiStudentName(fullName: string): {
   lastName: string;
   gender: 'MALE' | 'FEMALE';
 } {
-  const trimmed = (fullName || '').trim();
-  let title = 'ด.ช.';
-  let firstName = trimmed;
-  let lastName = '';
-  const parts = trimmed.split(/\s+/);
+  const trimmed = (fullName || '').trim().replace(/\s+/g, ' ');
+  let title = '';
+  let gender: 'MALE' | 'FEMALE' = 'MALE';
+  let remaining = trimmed;
 
-  if (parts[0].startsWith('ด.ช.') || parts[0].startsWith('เด็กชาย')) {
-    title = 'ด.ช.';
-    firstName = parts[0].replace(/^(ด\.ช\.|เด็กชาย)/, '') || parts[1] || '';
-    lastName = parts.slice(1).join(' ').replace(firstName, '').trim();
-  } else if (parts[0].startsWith('ด.ญ.') || parts[0].startsWith('เด็กหญิง')) {
-    title = 'ด.ญ.';
-    firstName = parts[0].replace(/^(ด\.ญ\.|เด็กหญิง)/, '') || parts[1] || '';
-    lastName = parts.slice(1).join(' ').replace(firstName, '').trim();
-  } else if (parts[0].startsWith('นาย')) {
-    title = 'นาย';
-    firstName = parts[0].replace(/^นาย/, '') || parts[1] || '';
-    lastName = parts.slice(1).join(' ').replace(firstName, '').trim();
-  } else if (parts[0].startsWith('น.ส.') || parts[0].startsWith('นางสาว')) {
-    title = 'นางสาว';
-    firstName = parts[0].replace(/^(น\.ส\.|นางสาว)/, '') || parts[1] || '';
-    lastName = parts.slice(1).join(' ').replace(firstName, '').trim();
-  } else if (parts.length >= 2) {
-    firstName = parts[0];
-    lastName = parts.slice(1).join(' ');
+  const femaleTitles = ['เด็กหญิง', 'ด.ญ.', 'ด.ญ', 'นางสาว', 'น.ส.', 'น.ส', 'นาง'];
+  const maleTitles = ['เด็กชาย', 'ด.ช.', 'ด.ช', 'นาย'];
+
+  for (const t of femaleTitles) {
+    if (remaining.startsWith(t)) {
+      title = t;
+      gender = 'FEMALE';
+      remaining = remaining.substring(t.length).trim();
+      break;
+    }
   }
 
-  const gender: 'MALE' | 'FEMALE' = (title === 'ด.ญ.' || title === 'นางสาว') ? 'FEMALE' : 'MALE';
-  return { title, firstName: firstName || trimmed, lastName, gender };
+  if (!title) {
+    for (const t of maleTitles) {
+      if (remaining.startsWith(t)) {
+        title = t;
+        gender = 'MALE';
+        remaining = remaining.substring(t.length).trim();
+        break;
+      }
+    }
+  }
+
+  // Normalize Title
+  if (title === 'ด.ช' || title === 'ด.ช.' || title === 'เด็กชาย') title = 'ด.ช.';
+  else if (title === 'ด.ญ' || title === 'ด.ญ.' || title === 'เด็กหญิง') title = 'ด.ญ.';
+  else if (title === 'น.ส.' || title === 'น.ส' || title === 'นางสาว') title = 'นางสาว';
+  else if (title === 'นาย') title = 'นาย';
+  else if (title === 'นาง') title = 'นางสาว';
+  else title = 'ด.ช.';
+
+  const remParts = remaining.split(/\s+/).filter(Boolean);
+  const firstName = remParts[0] || trimmed;
+  const lastName = remParts.slice(1).join(' ').trim();
+
+  return { title, firstName, lastName, gender };
 }
 
 export interface BatchImportProgress {

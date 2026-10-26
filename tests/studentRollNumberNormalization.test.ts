@@ -5,6 +5,10 @@ import {
   studentService,
   type StudentRecord,
 } from '../src/services/studentService';
+import {
+  normalizeClassroomName,
+  parseSgsClipboardText,
+} from '../src/services/sgsImportExportService';
 
 describe('studentService - Roll Number Normalization & Prevention Guards', () => {
   it('should return empty array when input is empty', () => {
@@ -166,5 +170,75 @@ describe('studentService - Roll Number Normalization & Prevention Guards', () =>
     const allCodes = check2.map((s) => s.code);
     initialBatch.forEach((s) => expect(allCodes).toContain(s.code));
     secondBatch.forEach((s) => expect(allCodes).toContain(s.code));
+  });
+
+  describe('normalizeClassroomName - Canonical Room Normalizer', () => {
+    it('normalizes various classroom naming conventions to canonical ม.4/4', () => {
+      expect(normalizeClassroomName('4/4')).toBe('ม.4/4');
+      expect(normalizeClassroomName('ม. 4 / 4')).toBe('ม.4/4');
+      expect(normalizeClassroomName('ม4/4')).toBe('ม.4/4');
+      expect(normalizeClassroomName('ชั้นมัธยมศึกษาปีที่ 4 ห้องที่ 4')).toBe('ม.4/4');
+      expect(normalizeClassroomName('ชั้น ม.4 ห้อง 4')).toBe('ม.4/4');
+      expect(normalizeClassroomName('room-1791986991422')).toBe('ม.4/4');
+      expect(normalizeClassroomName('room-4-4')).toBe('ม.4/4');
+      expect(normalizeClassroomName('M.4/4')).toBe('ม.4/4');
+      expect(normalizeClassroomName('ห้อง ม.4/4')).toBe('ม.4/4');
+    });
+
+    it('normalizes other grade levels accurately', () => {
+      expect(normalizeClassroomName('1/1')).toBe('ม.1/1');
+      expect(normalizeClassroomName('ม. 1 / 1')).toBe('ม.1/1');
+      expect(normalizeClassroomName('room-1791986382424')).toBe('ม.1/3');
+      expect(normalizeClassroomName('room-1-1')).toBe('ม.1/1');
+      expect(normalizeClassroomName('6/6')).toBe('ม.6/6');
+    });
+
+    it('falls back safely when input is falsy or blank', () => {
+      expect(normalizeClassroomName(null)).toBe('ม.1/1');
+      expect(normalizeClassroomName(undefined)).toBe('ม.1/1');
+      expect(normalizeClassroomName('', 'ม.4/4')).toBe('ม.4/4');
+    });
+  });
+
+  describe('parseSgsClipboardText - Quoted CSV & Batch Seat Auto-Sequencing', () => {
+    it('handles quoted CSV lines with duplicate seat numbers (boys 1..5 + girls 1..5) into sequential 1..10 in canonical ม.4/4', () => {
+      const csvText = [
+        '"เลขที่","รหัสนักเรียน","คำนำหน้า","ชื่อ","นามสกุล","ห้อง"',
+        '"1","16001","นาย","สมชาย","เข็มกลัด","4/4"',
+        '"2","16002","นาย","สมศักดิ์","รักเรียน","4/4"',
+        '"3","16003","นาย","วิชัย","มีชัย","4/4"',
+        '"4","16004","นาย","อนุชา","กล้าหาญ","4/4"',
+        '"5","16005","นาย","ธีรเดช","วงษ์พัวพันธ์","4/4"',
+        '"1","16006","นางสาว","กานดา","ใจดี","4/4"',
+        '"2","16007","นางสาว","ศศิธร","เรืองรอง","4/4"',
+        '"3","16008","นางสาว","พิมพา","ทองแท้","4/4"',
+        '"4","16009","นางสาว","นิภา","ผ่องใส","4/4"',
+        '"5","16010","นางสาว","อุษา","ดาวเรือง","4/4"',
+      ].join('\n');
+
+      const parsed = parseSgsClipboardText(csvText, 'ม.4/4');
+      expect(parsed.length).toBe(10);
+
+      // Verify canonical room is ม.4/4 for all rows
+      parsed.forEach((row) => {
+        expect(row.classroom).toBe('ม.4/4');
+      });
+
+      // Verify names are clean without quotation marks and titles are preserved
+      expect(parsed[0].fullName).toBe('นายสมชาย เข็มกลัด');
+      expect(parsed[0].gender).toBe('MALE');
+      expect(parsed[5].fullName).toBe('นางสาวกานดา ใจดี');
+      expect(parsed[5].gender).toBe('FEMALE');
+
+      // Verify roll numbers are re-sequenced sequentially 1..10 because 1..5 was duplicated
+      const seatNumbers = parsed.map((r) => r.parsedSeatNo);
+      expect(seatNumbers).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+      // Verify all student codes are intact without quotes
+      expect(parsed.map((r) => r.studentCode)).toEqual([
+        '16001', '16002', '16003', '16004', '16005',
+        '16006', '16007', '16008', '16009', '16010',
+      ]);
+    });
   });
 });

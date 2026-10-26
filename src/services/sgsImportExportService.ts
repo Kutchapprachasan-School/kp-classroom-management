@@ -8,7 +8,48 @@
  * - Dual Reverse Sync (Excel template & 1-click clipboard copy)
  */
 
-import { resolveRoomCandidates } from './masterDataService';
+import { resolveRoomCandidates, CANONICAL_TIMESTAMP_ROOM_MAP } from './masterDataService';
+
+/**
+ * แปลงชื่อหรือรหัสห้องเรียนทุกรูปแบบให้เป็นมาตรฐานเดียวกัน "ม.X/Y" เสมอ
+ * เช่น "4/4", "ม. 4 / 4", "ม4/4", "room-4-4", "room-1791986991422", "ชั้นมัธยมศึกษาปีที่ 4 ห้องที่ 4" -> "ม.4/4"
+ */
+export function normalizeClassroomName(raw?: string | null, fallback = 'ม.1/1'): string {
+  if (!raw) return fallback;
+  const trimmed = String(raw).trim();
+  if (!trimmed) return fallback;
+
+  // 1. Direct match in canonical timestamp room map
+  if (CANONICAL_TIMESTAMP_ROOM_MAP[trimmed]) {
+    return CANONICAL_TIMESTAMP_ROOM_MAP[trimmed];
+  }
+
+  // 2. Direct Thai pattern "ม.4/4", "ม. 4 / 4", "ม4/4", "4/4", "4 / 4"
+  const slashMatch = trimmed.match(/^(?:ม\.?\s*)?(\d+)\s*\/\s*(\d+)$/);
+  if (slashMatch) {
+    return `ม.${slashMatch[1]}/${slashMatch[2]}`;
+  }
+
+  // 3. Verbose Thai pattern "ชั้นมัธยมศึกษาปีที่ 4 ห้องที่ 4", "ชั้น ม.4 ห้อง 4", "ม.4 ห้องที่ 4"
+  const verboseMatch =
+    trimmed.match(/(?:ชั้น\s*(?:มัธยมศึกษาปีที่|ม\.?)\s*(\d+)\s*(?:ห้องที่|ห้อง|\/)\s*(\d+))|(?:ห้อง\s*(?:ม\.?)?\s*(\d+)\s*\/\s*(\d+))/i) ||
+    trimmed.match(/ม\.?\s*(\d+)\s*(?:ห้องที่|ห้อง|\/)\s*(\d+)/i);
+  if (verboseMatch) {
+    const g = verboseMatch[1] || verboseMatch[3];
+    const r = verboseMatch[2] || verboseMatch[4];
+    if (g && r) return `ม.${g}/${r}`;
+  }
+
+  // 4. English / Room code "room-4-4", "room_4_4", "M.4/4", "m4/4"
+  const roomCodeMatch =
+    trimmed.match(/^room[-_](\d+)[-_](\d+)$/i) ||
+    trimmed.match(/^m\.?\s*(\d+)\s*[-_\/]\s*(\d+)$/i);
+  if (roomCodeMatch) {
+    return `ม.${roomCodeMatch[1]}/${roomCodeMatch[2]}`;
+  }
+
+  return trimmed;
+}
 
 export type SgsImportRowStatus = 'NEW' | 'EXISTS' | 'CONFLICT' | 'INVALID';
 
@@ -158,14 +199,16 @@ export function parseThaiFullName(rawName: string): ParsedThaiName {
 export function parseSgsClipboardText(rawText: string, defaultClassroom?: string): SgsParsedRow[] {
   if (!rawText || !rawText.trim()) return [];
 
+  const canonicalDefaultClassroom = normalizeClassroomName(defaultClassroom);
+
   const lines = rawText
     .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(line => line.length > 0);
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
 
   const parsedRows: SgsParsedRow[] = [];
   let physicalRowCounter = 1;
-  let currentRoom = defaultClassroom;
+  let currentRoom = canonicalDefaultClassroom;
 
   for (const line of lines) {
     // 1. Detect Room Section Headers in SGS files (e.g. ชั้น ม.1  ห้องที่ 1, ชั้นมัธยมศึกษาปีที่ 4 ห้องที่ 4, ชั้น ม.4/4, ม.4 ห้อง 4)
@@ -185,7 +228,7 @@ export function parseSgsClipboardText(rawText: string, defaultClassroom?: string
     const summaryRoomMatch = line.match(/ห้องที่\s*(\d+)\s*รวม\s*\d+\s*คน/i);
     if (summaryRoomMatch) {
       const finishedRoomNum = parseInt(summaryRoomMatch[1], 10);
-      const gradeLevel = (currentRoom || defaultClassroom || 'ม.1').split('/')[0] || 'ม.1';
+      const gradeLevel = (currentRoom || canonicalDefaultClassroom || 'ม.1').split('/')[0] || 'ม.1';
       currentRoom = `${gradeLevel}/${finishedRoomNum + 1}`;
       continue;
     }
@@ -204,31 +247,30 @@ export function parseSgsClipboardText(rawText: string, defaultClassroom?: string
       continue;
     }
 
+    // Strip CSV quotes helper: '"16001"' -> '16001', "'นายสมชาย'" -> "นายสมชาย"
+    const cleanToken = (t: string) => t.trim().replace(/^["']+|["']+$/g, '').trim();
+
     // Delimiter detection: Tab takes precedence, then Comma, then multi-space
-    let tokens: string[] = [];
+    let rawTokens: string[] = [];
     if (line.includes('\t')) {
-      tokens = line.split('\t').map(t => t.trim()).filter(Boolean);
+      rawTokens = line.split('\t');
     } else if (line.includes(',')) {
-      tokens = line.split(',').map(t => t.trim()).filter(Boolean);
+      rawTokens = line.split(',');
     } else {
-      tokens = line.split(/\s{2,}|\s+/).map(t => t.trim()).filter(Boolean);
+      rawTokens = line.split(/\s{2,}|\s+/);
     }
+    const tokens = rawTokens.map(cleanToken).filter(Boolean);
 
     if (tokens.length === 0) continue;
 
-    // Pattern Matching for Tokens:
-    // Typical SGS Row formats:
-    // Format 1: [SeatNo] [StudentCode] [Title] [FirstName] [LastName] [Room?]
-    // Format 2: [SeatNo] [StudentCode] [FullName] [Room?]
-    // Format 3: [StudentCode] [FullName] [SeatNo?]
     let rawSeatNo: string | undefined;
     let parsedSeatNo: number | null = null;
     let studentCode = '';
     let rawNameTokens: string[] = [];
-    let detectedClassroom = currentRoom || defaultClassroom;
+    let detectedClassroom = currentRoom || canonicalDefaultClassroom;
 
     // Find Student Code (usually 5 digits, but can be 4-7 digits string)
-    const codeIndex = tokens.findIndex(t => /^\d{4,7}$/.test(t) && t.length >= 4);
+    const codeIndex = tokens.findIndex((t) => /^\d{4,7}$/.test(t) && t.length >= 4);
 
     if (codeIndex !== -1) {
       studentCode = tokens[codeIndex];
@@ -242,12 +284,29 @@ export function parseSgsClipboardText(rawText: string, defaultClassroom?: string
       // Remaining tokens after codeIndex are likely Name and possibly Classroom
       const remainingTokens = tokens.filter((_, idx) => idx !== codeIndex && idx !== 0);
 
-      // Check last token for classroom (e.g. ม.1/1, ม.3/2, 1/1, 3/1)
-      if (remainingTokens.length > 1) {
-        const lastToken = remainingTokens[remainingTokens.length - 1];
-        if (/^(?:ม\.?\s*)?\d+\/\d+$/.test(lastToken)) {
-          detectedClassroom = lastToken.startsWith('ม.') ? lastToken : `ม.${lastToken}`;
-          rawNameTokens = remainingTokens.slice(0, remainingTokens.length - 1);
+      // Check last tokens for classroom: Support two-token (e.g. "ม.4" "4") and single-token ("4/4", "ม.4/4")
+      if (remainingTokens.length >= 2) {
+        const last1 = remainingTokens[remainingTokens.length - 1];
+        const last2 = remainingTokens[remainingTokens.length - 2];
+        const twoTokenTest = `${last2} ${last1}`;
+        const twoTokenNorm = normalizeClassroomName(twoTokenTest, '');
+        if (twoTokenNorm && /ม\.\d+\/\d+/.test(twoTokenNorm)) {
+          detectedClassroom = twoTokenNorm;
+          rawNameTokens = remainingTokens.slice(0, remainingTokens.length - 2);
+        } else {
+          const oneTokenNorm = normalizeClassroomName(last1, '');
+          if (oneTokenNorm && /ม\.\d+\/\d+/.test(oneTokenNorm)) {
+            detectedClassroom = oneTokenNorm;
+            rawNameTokens = remainingTokens.slice(0, remainingTokens.length - 1);
+          } else {
+            rawNameTokens = remainingTokens;
+          }
+        }
+      } else if (remainingTokens.length === 1) {
+        const oneTokenNorm = normalizeClassroomName(remainingTokens[0], '');
+        if (oneTokenNorm && /ม\.\d+\/\d+/.test(oneTokenNorm)) {
+          detectedClassroom = oneTokenNorm;
+          rawNameTokens = [];
         } else {
           rawNameTokens = remainingTokens;
         }
@@ -255,13 +314,11 @@ export function parseSgsClipboardText(rawText: string, defaultClassroom?: string
         rawNameTokens = remainingTokens;
       }
     } else {
-      // If no valid student code was found, skip line if it looks like arbitrary non-student text
       if (/^\d{1,3}$/.test(tokens[0]) && tokens.length >= 2) {
         rawSeatNo = tokens[0];
         parsedSeatNo = parseInt(tokens[0], 10);
         rawNameTokens = tokens.slice(1);
       } else {
-        // Skip decorative / unparsable rows without a code
         continue;
       }
     }
@@ -285,14 +342,74 @@ export function parseSgsClipboardText(rawText: string, defaultClassroom?: string
       lastName: parsedName.lastName,
       fullName: parsedName.fullName,
       gender: parsedName.gender,
-      classroom: detectedClassroom,
+      classroom: normalizeClassroomName(detectedClassroom, canonicalDefaultClassroom),
       status: isInvalid ? 'INVALID' : 'NEW',
       conflictReason: isInvalid ? 'ไม่พบรหัสนักเรียนหรือชื่อไม่สมบูรณ์' : undefined,
-      selectedAction: isInvalid ? 'SKIP' : 'IMPORT'
+      selectedAction: isInvalid ? 'SKIP' : 'IMPORT',
     });
   }
 
-  return parsedRows;
+  // Within-Batch Roll Number Auto-Sequencing per Room
+  const rowsByRoom = new Map<string, SgsParsedRow[]>();
+  for (const row of parsedRows) {
+    const roomKey = normalizeClassroomName(row.classroom || canonicalDefaultClassroom);
+    row.classroom = roomKey;
+    if (!rowsByRoom.has(roomKey)) {
+      rowsByRoom.set(roomKey, []);
+    }
+    rowsByRoom.get(roomKey)!.push(row);
+  }
+
+  const resultRows: SgsParsedRow[] = [];
+
+  for (const [, roomRows] of rowsByRoom.entries()) {
+    // 1. Deduplicate rows with exact same studentCode within this batch
+    const seenCodes = new Set<string>();
+    const uniqueRoomRows: SgsParsedRow[] = [];
+    for (const r of roomRows) {
+      const codeKey = (r.studentCode || '').trim();
+      if (!codeKey || r.status === 'INVALID') {
+        uniqueRoomRows.push(r);
+        continue;
+      }
+      if (!seenCodes.has(codeKey)) {
+        seenCodes.add(codeKey);
+        uniqueRoomRows.push(r);
+      }
+    }
+
+    // 2. Check for duplicate or missing/invalid parsedSeatNo within valid rows
+    const validRows = uniqueRoomRows.filter((r) => r.status !== 'INVALID');
+    const seenNos = new Set<number>();
+    let hasDuplicateOrInvalidSeat = false;
+
+    for (const r of validRows) {
+      const seat = r.parsedSeatNo;
+      if (seat === null || seat === undefined || seat <= 0 || isNaN(seat) || seenNos.has(seat)) {
+        hasDuplicateOrInvalidSeat = true;
+        break;
+      }
+      seenNos.add(seat);
+    }
+
+    if (hasDuplicateOrInvalidSeat) {
+      let seatCounter = 1;
+      for (const r of uniqueRoomRows) {
+        if (r.status !== 'INVALID') {
+          r.parsedSeatNo = seatCounter;
+          r.rawSeatNo = String(seatCounter);
+          seatCounter++;
+        }
+      }
+    }
+
+    resultRows.push(...uniqueRoomRows);
+  }
+
+  return resultRows.map((row, index) => ({
+    ...row,
+    rowIndex: index + 1,
+  }));
 }
 
 // ==========================================

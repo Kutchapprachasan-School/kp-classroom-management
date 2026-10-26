@@ -45,7 +45,8 @@ import { getGradeLevelTheme } from '../utils/gradeLevelTheme';
 import { SgsRosterImportModal } from '../components/sgs/SgsRosterImportModal';
 import { SgsScoreExportModal } from '../components/sgs/SgsScoreExportModal';
 import { activityAuditLogService } from '../services/activityAuditLogService';
-import type { SgsParsedRow } from '../services/sgsImportExportService';
+import { normalizeClassroomName, type SgsParsedRow } from '../services/sgsImportExportService';
+import { resolveRoomCandidates } from '../services/masterDataService';
 import { authService } from '../services/authService';
 import { getM1SgsStudentInfo, isGrade1SgsStudentCode } from '../config/m1SgsLookup';
 import { Pagination, type PageSizeOption } from '../components/common/Pagination';
@@ -620,8 +621,15 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
       // 2. Ensure each M1 classroom exists and import students
       const allRooms = await classroomService.getAll();
       for (const [roomName, list] of byRoom.entries()) {
+        const candidates = resolveRoomCandidates(roomName);
         let room = allRooms.find(
-          (c) => c.name === roomName || c.roomNumber === roomName || c.id === roomName
+          (c) =>
+            candidates.includes(c.id) ||
+            candidates.includes(c.name) ||
+            candidates.includes(c.roomNumber) ||
+            c.name === roomName ||
+            c.roomNumber === roomName ||
+            c.id === roomName
         );
         if (!room) {
           const levelMatch = roomName.match(/ม\.?\s*(\d+)/);
@@ -683,7 +691,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
       // Group confirmed rows by their actual detected classroom
       const rowsByRoom = new Map<string, SgsParsedRow[]>();
       for (const row of confirmedRows) {
-        const roomName = row.classroom || selectedClass.name || 'ม.1/1';
+        const roomName = normalizeClassroomName(row.classroom || selectedClass.name || 'ม.1/1');
         if (!rowsByRoom.has(roomName)) rowsByRoom.set(roomName, []);
         rowsByRoom.get(roomName)!.push(row);
       }
@@ -693,8 +701,15 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
       let processedStudents = 0;
 
       for (const [roomName, rows] of rowsByRoom.entries()) {
+        const candidates = resolveRoomCandidates(roomName);
         let room = allRooms.find(
-          (c) => c.name === roomName || c.roomNumber === roomName || c.id === roomName
+          (c) =>
+            candidates.includes(c.id) ||
+            candidates.includes(c.name) ||
+            candidates.includes(c.roomNumber) ||
+            c.name === roomName ||
+            c.roomNumber === roomName ||
+            c.id === roomName
         );
         if (!room) {
           const levelMatch = roomName.match(/ม\.?\s*(\d+)/);
@@ -811,6 +826,46 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
     }
   };
 
+  // รวมรายชื่อนักเรียนจากทุกห้องเรียนสำหรับ SgsRosterImportModal เพื่อให้ตรวจจับการย้ายห้องและเลขที่ซ้ำข้ามห้องได้แม่นยำ 100%
+  const allExistingStudentsForImport = useMemo(() => {
+    if (!isImportModalOpen) return [];
+    const result: Array<{ id: string; studentCode: string; name: string; classroomId: string; sgsSeatNo?: number }> = [];
+    const seenCodes = new Set<string>();
+
+    for (const room of allClassrooms) {
+      const roomStudents = studentService.getStudents(room.id);
+      for (const s of roomStudents) {
+        const code = (s.code || s.studentCode || '').trim();
+        if (code && !seenCodes.has(code)) {
+          seenCodes.add(code);
+          result.push({
+            id: s.id,
+            studentCode: code,
+            name: s.name,
+            classroomId: room.name || room.id,
+            sgsSeatNo: s.no,
+          });
+        }
+      }
+    }
+
+    if (selectedClass) {
+      for (const s of students) {
+        const code = (s.code || s.studentCode || '').trim();
+        if (code && !seenCodes.has(code)) {
+          seenCodes.add(code);
+          result.push({
+            id: s.id,
+            studentCode: code,
+            name: s.name,
+            classroomId: selectedClass.name,
+            sgsSeatNo: s.no,
+          });
+        }
+      }
+    }
+    return result;
+  }, [isImportModalOpen, allClassrooms, selectedClass, students]);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-24 animate-fade-in font-sans text-slate-800 select-none">
@@ -2256,13 +2311,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
           isOpen={isImportModalOpen}
           onClose={() => setIsImportModalOpen(false)}
           targetClassroom={selectedClass.name}
-          existingStudents={students.map((s) => ({
-            id: s.id,
-            studentCode: s.code,
-            name: s.name,
-            classroomId: selectedClass.name,
-            sgsSeatNo: s.no
-          }))}
+          existingStudents={allExistingStudentsForImport}
           onImportComplete={handleSgsImportConfirmed}
         />
       )}
