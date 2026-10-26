@@ -23,6 +23,7 @@ import {
   GraduationCap,
   Sparkles,
   AlertTriangle,
+  Hash,
 } from 'lucide-react';
 import { classroomService } from '../services/classroomService';
 import { studentService, getAlternateRoomKey, type StudentRecord } from '../services/studentService';
@@ -295,6 +296,26 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
     } catch (err) {
       console.error('Error saving reorder:', err);
       alert('เกิดข้อผิดพลาดในการบันทึกลำดับเลขที่');
+    } finally {
+      setIsSavingReorder(false);
+    }
+  };
+
+  // จัดเรียงเลขที่ใหม่ 1..N อัตโนมัติ (แก้ปัญหาเลขที่ซ้ำซ้อน)
+  const handleAutoNormalizeRollNumbers = async () => {
+    if (!selectedClass || students.length === 0) return;
+    setIsSavingReorder(true);
+    try {
+      const studentIds = students.map((s) => s.id);
+      const reordered = await studentService.reorderStudents(selectedClass.id, studentIds);
+      setStudents(reordered);
+      setOriginalStudentsOrder(reordered);
+      setHasUnsavedReorder(false);
+      setTransferSuccessNotice(`✓ จัดเรียงเลขที่ใหม่ 1 ถึง ${reordered.length} ห้อง ${selectedClass.name} สำเร็จเรียบร้อย`);
+      setTimeout(() => setTransferSuccessNotice(null), 3500);
+    } catch (err) {
+      console.error('Error auto-sorting roll numbers:', err);
+      alert('เกิดข้อผิดพลาดในการจัดเรียงเลขที่');
     } finally {
       setIsSavingReorder(false);
     }
@@ -1166,6 +1187,17 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                 >
                   <ArrowLeft className="w-3.5 h-3.5 text-slate-600" />
                   <span>หน้ารวมห้องเรียน</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleAutoNormalizeRollNumbers}
+                  disabled={isSavingReorder}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl text-xs font-bold shadow-2xs transition-all cursor-pointer active:scale-95 whitespace-nowrap disabled:opacity-50"
+                  title="จัดเรียงเลขที่นักเรียนใหม่ 1 ถึง N อัตโนมัติ ป้องกันและแก้ไขปัญหาเลขที่ซ้ำซ้อน"
+                >
+                  <Hash className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>🔢 จัดเรียงเลขที่ใหม่ (1..N)</span>
                 </button>
 
                 <button

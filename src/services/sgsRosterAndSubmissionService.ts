@@ -658,7 +658,7 @@ export const sgsRosterAndSubmissionService = {
       };
 
       if (students && students.length > 0) {
-        return students.map((stu, idx) => {
+        const mapped = students.map((stu, idx) => {
           const code = String(stu.code).trim();
           const saved = savedMap.get(code);
           const inferredGender = (stu.gender ||
@@ -697,6 +697,13 @@ export const sgsRosterAndSubmissionService = {
           };
           return enrichRecord(baseRec, idx);
         }).sort((a, b) => Number(a.sgsSeatNo ?? a.no ?? 999) - Number(b.sgsSeatNo ?? b.no ?? 999));
+
+        // ป้องกันและจัดระเบียบเลขที่ SGS / roll number (1..N) อัตโนมัติ ป้องกันเลขที่ซ้ำซ้อน
+        return mapped.map((stu, idx) => ({
+          ...stu,
+          sgsSeatNo: idx + 1,
+          no: idx + 1,
+        }));
       }
 
       if (savedList.length > 0) {
@@ -956,6 +963,7 @@ export const sgsRosterAndSubmissionService = {
     ].map((stu, idx) => ({
       ...stu,
       sgsSeatNo: idx + 1, // รันเลขที่ SGS ใหม่ให้เรียงต่อเนื่องโดยคะแนนยังผูกตามรหัสนักเรียน (studentCode) 100%
+      no: idx + 1,
     }));
 
     this.saveSgsRoster(nextRoster, 'งานทะเบียน / ครูที่ปรึกษา');

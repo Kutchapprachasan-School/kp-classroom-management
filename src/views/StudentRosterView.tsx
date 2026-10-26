@@ -33,6 +33,7 @@ import {
   KeyRound,
   Printer,
   Copy,
+  Hash,
 } from 'lucide-react';
 import { classroomService } from '../services/classroomService';
 import { studentService, getAlternateRoomKey, type StudentRecord } from '../services/studentService';
@@ -388,13 +389,32 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
     setIsSavingReorder(true);
     try {
       const studentIds = students.map((s) => s.id);
-      await studentService.reorderStudents(selectedClass.id, studentIds);
-      setOriginalStudentsOrder(students);
+      const reordered = await studentService.reorderStudents(selectedClass.id, studentIds);
+      setOriginalStudentsOrder(reordered);
+      setStudents(reordered);
       setHasUnsavedReorder(false);
       setIsReorderMode(false);
       setToastMessage('บันทึกการจัดเรียงลำดับเลขที่นักเรียนเรียบร้อย');
     } catch (err: any) {
       alert(err.message || 'เกิดข้อผิดพลาดในการบันทึกลำดับเลขที่');
+    } finally {
+      setIsSavingReorder(false);
+    }
+  };
+
+  const handleAutoNormalizeRollNumbers = async () => {
+    if (!selectedClass || students.length === 0) return;
+    setIsSavingReorder(true);
+    try {
+      const studentIds = students.map((s) => s.id);
+      const reordered = await studentService.reorderStudents(selectedClass.id, studentIds);
+      setStudents(reordered);
+      setOriginalStudentsOrder(reordered);
+      setHasUnsavedReorder(false);
+      setIsReorderMode(false);
+      setToastMessage(`✓ จัดเรียงเลขที่ใหม่ 1 ถึง ${reordered.length} สำเร็จเรียบร้อย`);
+    } catch (err: any) {
+      alert(err.message || 'เกิดข้อผิดพลาดในการจัดเรียงเลขที่');
     } finally {
       setIsSavingReorder(false);
     }
@@ -1242,15 +1262,27 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
             {(isFullAccess || canResetPassword) && (
               <div className="flex items-center gap-1.5">
                 {!isReorderMode ? (
-                  <button
-                    type="button"
-                    onClick={() => setIsReorderMode(true)}
-                    className="px-3 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors cursor-pointer"
-                    title="สลับลำดับเลขที่นักเรียน"
-                  >
-                    <ArrowUpDown className="w-3.5 h-3.5 inline mr-1" />
-                    จัดเลขที่
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsReorderMode(true)}
+                      className="px-3 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                      title="สลับลำดับเลขที่นักเรียน"
+                    >
+                      <ArrowUpDown className="w-3.5 h-3.5 inline mr-1" />
+                      จัดเลขที่
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAutoNormalizeRollNumbers}
+                      disabled={isSavingReorder}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl font-bold text-xs transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
+                      title="จัดเรียงเลขที่นักเรียนใหม่ 1 ถึง N อัตโนมัติ แก้ปัญหาเลขที่ซ้ำซ้อน"
+                    >
+                      <Hash className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>🔢 จัดเรียงเลขที่ใหม่ (1..N)</span>
+                    </button>
+                  </>
                 ) : (
                   <>
                     <button

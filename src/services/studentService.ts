@@ -180,6 +180,96 @@ function relocateMisplacedM1Students(misplaced: StudentRecord[]): void {
   });
 }
 
+/**
+ * ตรวจสอบและดึงระดับชั้น (gradeLevel) และห้อง (roomNumber) เป็นตัวเลขอัตโนมัติ
+ * เพื่อใช้กับตาราง StudentEnrollment ในฐานข้อมูล Neon / PostgreSQL
+ */
+export function parseGradeAndRoom(classroomId: string): { gradeLevel: number; roomNumber: number } {
+  if (!classroomId) return { gradeLevel: 1, roomNumber: 1 };
+  const label = formatClassroomLabel(classroomId);
+  const matchThai = label.match(/ม\.?\s*(\d+)\s*\/\s*(\d+)/);
+  if (matchThai) {
+    return {
+      gradeLevel: parseInt(matchThai[1], 10),
+      roomNumber: parseInt(matchThai[2], 10),
+    };
+  }
+  const matchRoom = classroomId.match(/room-(\d+)-(\d+)/i);
+  if (matchRoom) {
+    return {
+      gradeLevel: parseInt(matchRoom[1], 10),
+      roomNumber: parseInt(matchRoom[2], 10),
+    };
+  }
+  return { gradeLevel: 1, roomNumber: 1 };
+}
+
+/**
+ * ตรวจจับและจัดเรียงเลขที่นักเรียนใหม่ (1..N) อัตโนมัติเมื่อพบเลขที่ซ้ำซ้อน (Duplicate Roll Numbers)
+ * หรือเลขที่ผิดปกติ (<=0, NaN) โดยไม่ลบหรือไม่ทำให้นักเรียนสูญหายเด็ดขาด
+ * ยึดรหัสนักเรียน (code/studentCode/id) เป็น Identity หลักเสมอ (Zero-Mock & Zero-Loss)
+ */
+export function normalizeRoomRollNumbers(students: StudentRecord[]): {
+  students: StudentRecord[];
+  hasRepaired: boolean;
+} {
+  if (!Array.isArray(students) || students.length === 0) {
+    return { students: [], hasRepaired: false };
+  }
+
+  // 1. Deduplicate by unique identity: studentCode / code / id
+  const uniqueStudents: StudentRecord[] = [];
+  const seenKeys = new Set<string>();
+
+  for (const stu of students) {
+    const key = (stu.code || stu.studentCode || stu.id || '').trim();
+    if (!key) {
+      uniqueStudents.push(stu);
+      continue;
+    }
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      uniqueStudents.push(stu);
+    }
+  }
+
+  // 2. Check for duplicate roll numbers, non-positive, or NaN
+  const seenNos = new Set<number>();
+  let hasCollisionOrInvalid = false;
+
+  for (const stu of uniqueStudents) {
+    const num = Number(stu.no);
+    if (!Number.isFinite(num) || num <= 0 || seenNos.has(num)) {
+      hasCollisionOrInvalid = true;
+      break;
+    }
+    seenNos.add(num);
+  }
+
+  if (!hasCollisionOrInvalid && uniqueStudents.length === students.length) {
+    const sorted = [...uniqueStudents].sort(
+      (a, b) => Number(a.no || 999999) - Number(b.no || 999999)
+    );
+    return { students: sorted, hasRepaired: false };
+  }
+
+  // 3. ซ่อมแซมและจัดเรียงเลขที่ใหม่ 1..N อย่างแม่นยำ
+  const sorted = [...uniqueStudents].sort((a, b) => {
+    const diff = Number(a.no || 999999) - Number(b.no || 999999);
+    if (diff !== 0) return diff;
+    const aKey = String(a.code || a.id || '');
+    const bKey = String(b.code || b.id || '');
+    return aKey.localeCompare(bKey, 'th');
+  });
+
+  const normalized = sorted.map((stu, index) => ({
+    ...stu,
+    no: index + 1,
+  }));
+
+  return { students: normalized, hasRepaired: true };
+}
+
 const getLocalStudents = (classroomId: string): StudentRecord[] => {
   if (!classroomId) return [];
   const candidates = resolveRoomCandidates(classroomId);
@@ -228,8 +318,14 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
                 }
               }
             }
-            parsed.sort((a: StudentRecord, b: StudentRecord) => Number(a.no || 999) - Number(b.no || 999));
-            return parsed;
+            const { students: normalized, hasRepaired } = normalizeRoomRollNumbers(parsed);
+            if (hasRepaired || parsed.length !== normalized.length) {
+              for (const cand of candidates) {
+                localStorage.setItem(`${STORAGE_PREFIX}${cand}`, JSON.stringify(normalized));
+                inMemoryStudentCache[cand] = normalized;
+              }
+            }
+            return normalized;
           }
         } catch {
           // fallback
@@ -291,18 +387,18 @@ const pendingRoomHydrationSet = new Set<string>();
 
 const saveLocalStudents = (classroomId: string, items: StudentRecord[]) => {
   if (!classroomId) return;
-  const sortedItems = [...items].sort((a, b) => Number(a.no || 999) - Number(b.no || 999));
+  const { students: normalizedItems } = normalizeRoomRollNumbers(items);
   const candidates = resolveRoomCandidates(classroomId);
 
   for (const c of candidates) {
-    inMemoryStudentCache[c] = sortedItems;
+    inMemoryStudentCache[c] = normalizedItems;
   }
   // L2 IndexedDB persistence
-  localCacheDb.putStudents(sortedItems as any).catch(() => {});
+  localCacheDb.putStudents(normalizedItems as any).catch(() => {});
 
   if (typeof localStorage !== 'undefined') {
     for (const c of candidates) {
-      localStorage.setItem(`${STORAGE_PREFIX}${c}`, JSON.stringify(sortedItems));
+      localStorage.setItem(`${STORAGE_PREFIX}${c}`, JSON.stringify(normalizedItems));
     }
     try {
       window.dispatchEvent(new CustomEvent('kps-students-updated', { detail: { classroomId } }));
@@ -631,6 +727,7 @@ export const studentService = {
       }
 
       try {
+        const { gradeLevel, roomNumber } = parseGradeAndRoom(classroomId);
         await supabase.from('StudentEnrollment').upsert({
           id: `enr-${studentId}`,
           studentId: studentId,
@@ -638,6 +735,8 @@ export const studentService = {
           term: 1,
           classRoomId: classroomId,
           rollNumber: newStudent.no,
+          gradeLevel,
+          roomNumber,
           status: 'ENROLLED',
           updatedAt: new Date().toISOString(),
         }, { onConflict: 'id' });
@@ -706,40 +805,61 @@ export const studentService = {
     return updated;
   },
 
-  // REORDER STUDENTS: Move up / Move down with Save Confirmation
+  // REORDER STUDENTS: Move up / Move down with Save Confirmation & Zero Student Loss
   async reorderStudents(classroomId: string, orderedStudentIds: string[]): Promise<StudentRecord[]> {
     const current = getLocalStudents(classroomId);
     const reordered: StudentRecord[] = [];
+    const usedKeys = new Set<string>();
 
     for (let i = 0; i < orderedStudentIds.length; i++) {
       const id = orderedStudentIds[i];
       const found = current.find((s) => s.id === id || s.code === id);
       if (found) {
-        reordered.push({ ...found, no: i + 1 });
+        const key = (found.code || found.id).trim();
+        if (!usedKeys.has(key)) {
+          usedKeys.add(key);
+          reordered.push({ ...found, no: reordered.length + 1 });
+        }
       }
     }
 
-    saveLocalStudents(classroomId, reordered);
+    // ป้องกันนักเรียนตกหล่น (Zero Student Loss): รวมนักเรียนที่ไม่อยู่ใน orderedStudentIds ต่อท้าย
+    for (const stu of current) {
+      const key = (stu.code || stu.id).trim();
+      if (!usedKeys.has(key)) {
+        usedKeys.add(key);
+        reordered.push({ ...stu, no: reordered.length + 1 });
+      }
+    }
+
+    const { students: finalStudents } = normalizeRoomRollNumbers(reordered);
+    saveLocalStudents(classroomId, finalStudents);
 
     activityAuditLogService.recordLog({
       actionType: 'BATCH_UPDATE',
       entityType: 'นักเรียน',
       title: `จัดเรียงลำดับเลขที่นักเรียนห้อง ${classroomId}`,
-      summary: `จัดเรียงเลขที่ใหม่ 1 ถึง ${reordered.length} สำเร็จเรียบร้อย ในห้อง ${classroomId}`,
-      itemCount: reordered.length,
+      summary: `จัดเรียงเลขที่ใหม่ 1 ถึง ${finalStudents.length} สำเร็จเรียบร้อย ในห้อง ${classroomId}`,
+      itemCount: finalStudents.length,
       targetScope: classroomId,
       actor: 'ครูผู้สอน',
     }).catch(() => {});
 
     if (isSupabaseConfigured) {
-      logDbOperation('REORDER STUDENTS in StudentEnrollment', { count: orderedStudentIds.length });
+      logDbOperation('REORDER STUDENTS in StudentEnrollment', { count: finalStudents.length });
       try {
-        for (let i = 0; i < orderedStudentIds.length; i++) {
-          const id = orderedStudentIds[i];
+        const { gradeLevel, roomNumber } = parseGradeAndRoom(classroomId);
+        for (let i = 0; i < finalStudents.length; i++) {
+          const stu = finalStudents[i];
           await supabase
             .from('StudentEnrollment')
-            .update({ rollNumber: i + 1, updatedAt: new Date().toISOString() })
-            .eq('studentId', id)
+            .update({
+              rollNumber: i + 1,
+              gradeLevel,
+              roomNumber,
+              updatedAt: new Date().toISOString(),
+            })
+            .eq('studentId', stu.id)
             .eq('classRoomId', classroomId);
         }
       } catch (err) {
@@ -747,7 +867,7 @@ export const studentService = {
       }
     }
 
-    return reordered;
+    return finalStudents;
   },
 
   // UPDATE PERSONAL INFO: Edit personal details (Name, Code, Gender, etc.)
@@ -858,7 +978,7 @@ export const studentService = {
       const studentCode = s.code || `${Date.now()}-${idx}`;
       return {
         ...s,
-        id: `stu-${studentCode}`,
+        id: (s as any).id || `stu-${studentCode}`,
         code: studentCode,
         gender: s.gender || parsed.gender,
         avatarUrl:
@@ -874,20 +994,22 @@ export const studentService = {
     // ให้แทนที่รายชื่อห้องเรียนด้วยชุดข้อมูลใหม่ที่ถูกต้อง แทนที่จะนำเข้าต่อท้ายขยะข้อมูลเก่า
     const isFullRosterImport = newItems.length >= 15;
     const combined = isFullRosterImport
-      ? newItems.sort((a, b) => Number(a.no || 999) - Number(b.no || 999))
+      ? newItems
       : [
-          ...current.filter((c) => !newItems.some((n) => n.code === c.code)),
+          ...current.filter((c) => !newItems.some((n) => n.code === c.code || n.id === c.id)),
           ...newItems,
-        ].sort((a, b) => Number(a.no || 999) - Number(b.no || 999));
-    saveLocalStudents(classroomId, combined);
+        ];
+    const { students: normalizedCombined } = normalizeRoomRollNumbers(combined);
+    saveLocalStudents(classroomId, normalizedCombined);
 
     if (isSupabaseConfigured) {
-      logDbOperation('BATCH UPSERT INTO Student', { count: newItems.length });
+      logDbOperation('BATCH UPSERT INTO Student', { count: normalizedCombined.length });
       let processed = 0;
       const CHUNK_SIZE = 15;
+      const { gradeLevel, roomNumber } = parseGradeAndRoom(classroomId);
 
-      for (let i = 0; i < newItems.length; i += CHUNK_SIZE) {
-        const chunk = newItems.slice(i, i + CHUNK_SIZE);
+      for (let i = 0; i < normalizedCombined.length; i += CHUNK_SIZE) {
+        const chunk = normalizedCombined.slice(i, i + CHUNK_SIZE);
         await Promise.all(
           chunk.map(async (item) => {
             const parsed = parseThaiStudentName(item.name);
@@ -901,7 +1023,6 @@ export const studentService = {
                   lastName: parsed.lastName,
                   gender: item.gender || parsed.gender,
                   status: item.status || 'ACTIVE',
-                  academic_status: 'STUDYING',
                   updatedAt: new Date().toISOString(),
                 },
                 { onConflict: 'studentCode' }
@@ -915,13 +1036,15 @@ export const studentService = {
                   term,
                   classRoomId: classroomId,
                   rollNumber: item.no,
+                  gradeLevel,
+                  roomNumber,
                   status: 'ENROLLED',
                   updatedAt: new Date().toISOString(),
                 },
                 { onConflict: 'studentId,academicYear,term' }
               );
-            } catch {
-              // continue
+            } catch (err) {
+              console.warn('[studentService] batchImport upsert error:', err);
             }
           })
         );

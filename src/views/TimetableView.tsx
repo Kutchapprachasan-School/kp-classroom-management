@@ -266,6 +266,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
     const loaded = studentService.getStudents(roomId);
     if (loaded && loaded.length > 0) {
       return loaded.map((s, idx) => ({
+        id: s.id,
         no: s.no || idx + 1,
         code: s.code,
         name: s.name,
@@ -275,15 +276,16 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
   }, [selectedSlot]);
 
   const [attendanceRecords, setAttendanceRecords] = useState<
-    Record<number, 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE'>
+    Record<string, 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE'>
   >({});
 
   useEffect(() => {
     if (studentsList.length > 0) {
-      const initial: Record<number, 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE'> = {};
+      const initial: Record<string, 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE'> = {};
       for (const stu of studentsList) {
         const morning = studentAffairsCouncilService.getMorningStatusForStudent(stu.name, stu.code);
-        initial[stu.no] = morning.hasApprovedLeave ? 'LEAVE' : 'PRESENT';
+        const stuKey = stu.code || stu.id || String(stu.no);
+        initial[stuKey] = morning.hasApprovedLeave ? 'LEAVE' : 'PRESENT';
       }
       setAttendanceRecords(initial);
     } else {
@@ -639,10 +641,11 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
 
 
   const handleMarkAllPresent = () => {
-    const updated: Record<number, 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE'> = {};
+    const updated: Record<string, 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE'> = {};
     for (const stu of studentsList) {
       const morning = studentAffairsCouncilService.getMorningStatusForStudent(stu.name, stu.code);
-      updated[stu.no] = morning.hasApprovedLeave ? 'LEAVE' : 'PRESENT';
+      const stuKey = stu.code || stu.id || String(stu.no);
+      updated[stuKey] = morning.hasApprovedLeave ? 'LEAVE' : 'PRESENT';
     }
     setAttendanceRecords(updated);
     setOverrideConfirmConflicts([]);
@@ -1677,11 +1680,12 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                   ยังไม่มีรายชื่อนักเรียนในห้องนี้ (สามารถเพิ่มนักเรียนได้ที่เมนู 'นักเรียน')
                 </div>
               ) : (
-                studentsList.map((stu) => {
-                  const currentStatus = attendanceRecords[stu.no] || 'PRESENT';
+                studentsList.map((stu, stuIdx) => {
+                  const stuKey = stu.code || stu.id || `stu-${stu.no}-${stuIdx}`;
+                  const currentStatus = attendanceRecords[stuKey] || 'PRESENT';
                   return (
                     <div
-                      key={stu.no}
+                      key={stuKey}
                       className="p-2.5 rounded-2xl border border-slate-100 bg-slate-50/50 flex items-center justify-between text-xs"
                     >
                       <div>
@@ -1695,7 +1699,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                             key={st}
                             type="button"
                             onClick={() =>
-                              setAttendanceRecords((prev) => ({ ...prev, [stu.no]: st }))
+                              setAttendanceRecords((prev) => ({ ...prev, [stuKey]: st }))
                             }
                             className={`px-2 py-0.5 rounded-lg transition-colors cursor-pointer ${
                               currentStatus === st
