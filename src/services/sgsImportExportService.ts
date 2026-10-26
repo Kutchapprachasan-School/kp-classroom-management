@@ -8,6 +8,8 @@
  * - Dual Reverse Sync (Excel template & 1-click clipboard copy)
  */
 
+import { resolveRoomCandidates } from './masterDataService';
+
 export type SgsImportRowStatus = 'NEW' | 'EXISTS' | 'CONFLICT' | 'INVALID';
 
 export interface SgsParsedRow {
@@ -166,12 +168,17 @@ export function parseSgsClipboardText(rawText: string, defaultClassroom?: string
   let currentRoom = defaultClassroom;
 
   for (const line of lines) {
-    // 1. Detect Room Section Headers in SGS files (e.g. ชั้น ม.1  ห้องที่ 1)
-    const fullRoomMatch = line.match(/ชั้น\s*(?:ม\.?)?\s*(\d+)\s*ห้องที่\s*(\d+)/i) ||
-                          line.match(/ห้อง\s*(?:ม\.?)?\s*(\d+)\s*\/\s*(\d+)/i);
+    // 1. Detect Room Section Headers in SGS files (e.g. ชั้น ม.1  ห้องที่ 1, ชั้นมัธยมศึกษาปีที่ 4 ห้องที่ 4, ชั้น ม.4/4, ม.4 ห้อง 4)
+    const fullRoomMatch =
+      line.match(/(?:ชั้น\s*(?:มัธยมศึกษาปีที่|ม\.?)\s*(\d+)\s*(?:ห้องที่|ห้อง|\/)\s*(\d+))|(?:ห้อง\s*(?:ม\.?)?\s*(\d+)\s*\/\s*(\d+))/i) ||
+      line.match(/ม\.?\s*(\d+)\s*(?:ห้องที่|ห้อง|\/)\s*(\d+)/i);
     if (fullRoomMatch) {
-      currentRoom = `ม.${fullRoomMatch[1]}/${fullRoomMatch[2]}`;
-      continue;
+      const g = fullRoomMatch[1] || fullRoomMatch[3];
+      const r = fullRoomMatch[2] || fullRoomMatch[4];
+      if (g && r) {
+        currentRoom = `ม.${g}/${r}`;
+        continue;
+      }
     }
 
     // 2. Detect Room Summary Footer (e.g. ห้องที่  1  รวม  35  คน -> Next room is ม.1/2)
@@ -337,8 +344,10 @@ export function evaluateSgsImportDryRun(
     }
 
     // Student exists in DB
+    const roomCandidates = resolveRoomCandidates(studentRoom);
     const isSameRoom =
       !existing.classroomId ||
+      roomCandidates.includes(existing.classroomId) ||
       existing.classroomId === studentRoom ||
       existing.classroomId === `room-${studentRoom.replace('ม.', '').replace('/', '-')}`;
 

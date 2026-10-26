@@ -124,4 +124,47 @@ describe('studentService - Roll Number Normalization & Prevention Guards', () =>
     expect(merged.length).toBe(4);
     expect(merged.map((s) => s.no)).toEqual([1, 2, 3, 4]);
   });
+
+  it('batchImport preserves 100% of existing students when importing a second batch of >= 15 students with overlapping roll numbers', async () => {
+    const roomId = 'room-test-batch-preserve';
+    // 1st batch: 20 existing students (numbers 1..20)
+    const initialBatch: StudentRecord[] = Array.from({ length: 20 }, (_, i) => ({
+      id: `stu-init-${i + 1}`,
+      no: i + 1,
+      code: `CODE-1-${1000 + i + 1}`,
+      name: `นักเรียนเดิมชุดที่ 1 คนที่ ${i + 1}`,
+      attendance: '100%',
+      score: 80,
+      status: 'NORMAL',
+      classroomId: roomId,
+    }));
+    await studentService.batchImport(roomId, initialBatch);
+
+    const check1 = studentService.getStudents(roomId);
+    expect(check1.length).toBe(20);
+
+    // 2nd batch: 16 new students (also numbered 1..16, e.g. female batch from SGS)
+    const secondBatch: StudentRecord[] = Array.from({ length: 16 }, (_, i) => ({
+      id: `stu-sec-${i + 1}`,
+      no: i + 1, // overlapping roll numbers 1..16!
+      code: `CODE-2-${2000 + i + 1}`,
+      name: `นักเรียนใหม่ชุดที่ 2 คนที่ ${i + 1}`,
+      attendance: '100%',
+      score: 85,
+      status: 'NORMAL',
+      classroomId: roomId,
+    }));
+    await studentService.batchImport(roomId, secondBatch);
+
+    const check2 = studentService.getStudents(roomId);
+    // 20 + 16 = 36 total students; NO existing students wiped out!
+    expect(check2.length).toBe(36);
+    // Roll numbers must be strictly sequential 1..36 without duplicates
+    expect(check2.map((s) => s.no)).toEqual(Array.from({ length: 36 }, (_, i) => i + 1));
+
+    // Verify all 20 initial students and 16 new students are retained
+    const allCodes = check2.map((s) => s.code);
+    initialBatch.forEach((s) => expect(allCodes).toContain(s.code));
+    secondBatch.forEach((s) => expect(allCodes).toContain(s.code));
+  });
 });

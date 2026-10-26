@@ -1029,15 +1029,37 @@ export const studentService = {
       };
     });
 
-    // หากเป็นการนำเข้าบัญชีรายชื่อห้องเรียนขนาดเต็ม (เช่น ไฟล์ SGS >= 15 คน)
-    // ให้แทนที่รายชื่อห้องเรียนด้วยชุดข้อมูลใหม่ที่ถูกต้อง แทนที่จะนำเข้าต่อท้ายขยะข้อมูลเก่า
-    const isFullRosterImport = newItems.length >= 15;
-    const combined = isFullRosterImport
-      ? newItems
-      : [
-          ...current.filter((c) => !newItems.some((n) => n.code === c.code || n.id === c.id)),
-          ...newItems,
-        ];
+    const newByKey = new Map<string, StudentRecord>();
+    for (const item of newItems) {
+      const k = String(item.code || item.studentCode || item.id || '').trim();
+      if (k) newByKey.set(k, item);
+    }
+    const retainedCurrent = current.filter((c) => {
+      const ck = String(c.code || c.studentCode || c.id || '').trim();
+      return !ck || !newByKey.has(ck);
+    });
+
+    // หาก newItems มีเลขที่ชนกับนักเรียนเดิมที่มีอยู่แล้ว (เช่น นำเข้ารายชื่อแยกชาย/หญิง หรือนำเข้าชุดที่สอง)
+    // ให้ offset เลขที่ของ newItems ต่อจาก maxNo เดิมเพื่อคงลำดับนักเรียนเดิมไว้ก่อน
+    const existingNos = new Set(retainedCurrent.map((c) => Number(c.no)));
+    let maxNo = retainedCurrent.reduce((max, c) => Math.max(max, Number(c.no) || 0), 0);
+    const adjustedNewItems = newItems.map((item) => {
+      const existingMatch = current.find(
+        (c) => String(c.code || c.studentCode || c.id || '').trim() === String(item.code || item.studentCode || item.id || '').trim()
+      );
+      if (existingMatch) {
+        return { ...existingMatch, ...item, no: item.no || existingMatch.no };
+      }
+      if (existingNos.has(Number(item.no))) {
+        maxNo += 1;
+        return { ...item, no: maxNo };
+      }
+      existingNos.add(Number(item.no));
+      maxNo = Math.max(maxNo, Number(item.no) || 0);
+      return item;
+    });
+
+    const combined = [...retainedCurrent, ...adjustedNewItems];
     const { students: normalizedCombined } = normalizeRoomRollNumbers(combined);
     saveLocalStudents(classroomId, normalizedCombined);
 

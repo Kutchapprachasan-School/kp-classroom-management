@@ -210,7 +210,7 @@
 - **[WRITE:UPSERT]** [`src/services/studentService.ts:754`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L754)
 - **[WRITE:UPDATE]** [`src/services/studentService.ts:820`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L820)
 - **[WRITE:UPDATE]** [`src/services/studentService.ts:978`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L978)
-- **[WRITE:UPSERT]** [`src/services/studentService.ts:1056`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L1056)
+- **[WRITE:UPSERT]** [`src/services/studentService.ts:1078`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L1078)
 
 #### 🗂️ ตาราง/View: `StudentEnrollment` (9 จุดเรียกใช้)
 - **[READ:SELECT]** [`src/services/authService.ts:263`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L263)
@@ -221,7 +221,7 @@
 - **[WRITE:UPDATE]** [`src/services/studentService.ts:824`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L824)
 - **[WRITE:UPDATE]** [`src/services/studentService.ts:894`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L894)
 - **[WRITE:UPDATE]** [`src/services/studentService.ts:972`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L972)
-- **[WRITE:UPSERT]** [`src/services/studentService.ts:1070`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L1070)
+- **[WRITE:UPSERT]** [`src/services/studentService.ts:1092`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts#L1092)
 
 #### 🗂️ ตาราง/View: `student_enrollments` (2 จุดเรียกใช้)
 - **[READ:SELECT]** [`src/services/studentEnrollmentService.ts:71`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentEnrollmentService.ts#L71)

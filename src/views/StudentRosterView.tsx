@@ -95,9 +95,9 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
   // Checkbox selection
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
 
-  // Pagination state (รองรับ 10, 20, 30, 50, ทั้งหมด)
+  // Pagination state (รองรับ 10, 20, 30, 50, ทั้งหมด) - ตั้งค่าเริ่มต้นเป็น 'ALL' เพื่อแสดงนักเรียนทั้งห้องครบถ้วน 1..N ทันที
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState<PageSizeOption>(10);
+  const [pageSize, setPageSize] = useState<PageSizeOption>('ALL');
 
   // Modals state
   const [gradeModalStudent, setGradeModalStudent] = useState<StudentRecord | null>(null);
