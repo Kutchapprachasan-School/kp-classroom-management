@@ -96,4 +96,32 @@ describe('studentService - Roll Number Normalization & Prevention Guards', () =>
     expect(result[2].id).toBe('stu-B'); // student B was NOT dropped!
     expect(result[2].no).toBe(3);
   });
+
+  it('getLocalStudents merges across candidate IDs (e.g. room-4-4 and room-1791986991422) without dropping students', () => {
+    if (typeof localStorage === 'undefined' || !localStorage.setItem) {
+      const store: Record<string, string> = {};
+      (globalThis as any).localStorage = {
+        getItem: (k: string) => store[k] ?? null,
+        setItem: (k: string, v: string) => { store[k] = v; },
+        removeItem: (k: string) => { delete store[k]; },
+        clear: () => { Object.keys(store).forEach((k) => delete store[k]); },
+      };
+    }
+
+    const listPart1: StudentRecord[] = [
+      { id: 'stu-401', no: 1, code: '40001', name: 'นายสี่หนึ่ง', attendance: '100%', score: 80, status: 'NORMAL', classroomId: 'room-4-4' },
+      { id: 'stu-402', no: 2, code: '40002', name: 'นายสี่สอง', attendance: '100%', score: 85, status: 'NORMAL', classroomId: 'room-4-4' },
+    ];
+    const listPart2: StudentRecord[] = [
+      { id: 'stu-403', no: 1, code: '40003', name: 'นางสาวสี่สาม', attendance: '100%', score: 90, status: 'NORMAL', classroomId: 'room-1791986991422' },
+      { id: 'stu-404', no: 2, code: '40004', name: 'นางสาวสี่สี่', attendance: '100%', score: 95, status: 'NORMAL', classroomId: 'room-1791986991422' },
+    ];
+
+    localStorage.setItem('cls_students_room-4-4', JSON.stringify(listPart1));
+    localStorage.setItem('cls_students_room-1791986991422', JSON.stringify(listPart2));
+
+    const merged = studentService.getStudents('ม.4/4');
+    expect(merged.length).toBe(4);
+    expect(merged.map((s) => s.no)).toEqual([1, 2, 3, 4]);
+  });
 });

@@ -275,75 +275,101 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
   const candidates = resolveRoomCandidates(classroomId);
   const isGrade1Room = candidates.some((c) => c.includes('1-') || c.includes('1/'));
 
-  // 1. ตรวจสอบใน localStorage ตามรหัสแทนกันทุกตัว
+  // 1. ตรวจสอบใน localStorage ตามรหัสแทนกันทุกตัว โดยรวมข้อมูลจากทุก candidate (ป้องกัน Candidate-Split)
   if (typeof localStorage !== 'undefined') {
+    const candidateArrays: StudentRecord[][] = [];
     for (const c of candidates) {
       const raw = localStorage.getItem(`${STORAGE_PREFIX}${c}`);
       if (raw !== null) {
         try {
-          let parsed = JSON.parse(raw);
+          const parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            // หากเป็นห้องที่ไม่ใช่ ม.1 แต่มีนักเรียน ม.1 ปะปนอยู่ ให้ทำการ sanitize
-            if (!isGrade1Room && parsed.some((s: StudentRecord) => isGrade1SgsStudentCode(s.code || s.id))) {
-              const misplaced = parsed.filter((s: StudentRecord) => isGrade1SgsStudentCode(s.code || s.id));
-              parsed = parsed.filter((s: StudentRecord) => !isGrade1SgsStudentCode(s.code || s.id));
-              for (const cand of candidates) {
-                localStorage.setItem(`${STORAGE_PREFIX}${cand}`, JSON.stringify(parsed));
-                inMemoryStudentCache[cand] = parsed;
-              }
-              relocateMisplacedM1Students(misplaced);
-            } else if (isGrade1Room) {
-              const beforeLen = parsed.length;
-              // กรองนักเรียนที่ไม่ใช่ ม.1 ออก (เช่น คำนำหน้า ม.ปลาย 'นาย', 'นางสาว' หรือรหัสนักเรียนรุ่นก่อน)
-              parsed = parsed.filter((s: StudentRecord) => {
-                const name = (s.name || '').trim();
-                const code = (s.code || s.id || '').trim();
-                if (name.startsWith('นาย') || name.startsWith('นางสาว') || name.startsWith('น.ส.')) return false;
-                if (/^(12|13|14|15)\d{3}$/.test(code)) return false;
-                if (/^16\d{3}$/.test(code) && !isGrade1SgsStudentCode(code)) return false;
-                return true;
-              });
-              const seen = new Set<string>();
-              parsed = parsed.filter((s: StudentRecord) => {
-                const k = s.code || s.id;
-                if (seen.has(k)) return false;
-                seen.add(k);
-                return true;
-              });
-              parsed.sort((a: StudentRecord, b: StudentRecord) => Number(a.no || 999) - Number(b.no || 999));
-              if (parsed.length !== beforeLen) {
-                for (const cand of candidates) {
-                  localStorage.setItem(`${STORAGE_PREFIX}${cand}`, JSON.stringify(parsed));
-                  inMemoryStudentCache[cand] = parsed;
-                }
-              }
-            }
-            const { students: normalized, hasRepaired } = normalizeRoomRollNumbers(parsed);
-            if (hasRepaired || parsed.length !== normalized.length) {
-              for (const cand of candidates) {
-                localStorage.setItem(`${STORAGE_PREFIX}${cand}`, JSON.stringify(normalized));
-                inMemoryStudentCache[cand] = normalized;
-              }
-            }
-            return normalized;
+            candidateArrays.push(parsed);
           }
         } catch {
-          // fallback
+          // ignore
         }
       }
     }
+
+    if (candidateArrays.length > 0) {
+      // รวมนักเรียนจากทุก candidate เข้าด้วยกันโดยใช้ Identity (code || studentCode || id)
+      const mergedMap = new Map<string, StudentRecord>();
+      for (const arr of candidateArrays) {
+        for (const s of arr) {
+          const key = (s.code || s.studentCode || s.id || '').trim();
+          if (key) {
+            if (!mergedMap.has(key)) {
+              mergedMap.set(key, s);
+            } else {
+              const existing = mergedMap.get(key)!;
+              mergedMap.set(key, { ...existing, ...s });
+            }
+          }
+        }
+      }
+
+      let parsed = Array.from(mergedMap.values());
+
+      // หากเป็นห้องที่ไม่ใช่ ม.1 แต่มีนักเรียน ม.1 ปะปนอยู่ ให้ทำการ sanitize
+      if (!isGrade1Room && parsed.some((s: StudentRecord) => isGrade1SgsStudentCode(s.code || s.id))) {
+        const misplaced = parsed.filter((s: StudentRecord) => isGrade1SgsStudentCode(s.code || s.id));
+        parsed = parsed.filter((s: StudentRecord) => !isGrade1SgsStudentCode(s.code || s.id));
+        relocateMisplacedM1Students(misplaced);
+      } else if (isGrade1Room) {
+        // กรองนักเรียนที่ไม่ใช่ ม.1 ออก (เช่น คำนำหน้า ม.ปลาย 'นาย', 'นางสาว' หรือรหัสนักเรียนรุ่นก่อน)
+        parsed = parsed.filter((s: StudentRecord) => {
+          const name = (s.name || '').trim();
+          const code = (s.code || s.id || '').trim();
+          if (name.startsWith('นาย') || name.startsWith('นางสาว') || name.startsWith('น.ส.')) return false;
+          if (/^(12|13|14|15)\d{3}$/.test(code)) return false;
+          if (/^16\d{3}$/.test(code) && !isGrade1SgsStudentCode(code)) return false;
+          return true;
+        });
+      }
+
+      const { students: normalized, hasRepaired } = normalizeRoomRollNumbers(parsed);
+
+      // ตรวจสอบว่ามีความจำเป็นต้อง sync กลับไปบันทึกยัง candidates ทั้งหมดหรือไม่
+      const needsSync = hasRepaired || candidateArrays.some((arr) => arr.length !== normalized.length);
+      if (needsSync) {
+        for (const cand of candidates) {
+          localStorage.setItem(`${STORAGE_PREFIX}${cand}`, JSON.stringify(normalized));
+          inMemoryStudentCache[cand] = normalized;
+        }
+      }
+
+      return normalized;
+    }
   }
 
-  // 2. ตรวจสอบใน inMemoryStudentCache
+  // 2. ตรวจสอบใน inMemoryStudentCache รวบรวมจากทุก candidate (ป้องกัน Candidate-Split)
+  const memoryCandidates: StudentRecord[][] = [];
   for (const c of candidates) {
     if (c in inMemoryStudentCache && inMemoryStudentCache[c]?.length > 0) {
-      let cached = inMemoryStudentCache[c];
-      if (!isGrade1Room && cached.some((s) => isGrade1SgsStudentCode(s.code || s.id))) {
-        cached = cached.filter((s) => !isGrade1SgsStudentCode(s.code || s.id));
-        inMemoryStudentCache[c] = cached;
-      }
-      return cached;
+      memoryCandidates.push(inMemoryStudentCache[c]);
     }
+  }
+  if (memoryCandidates.length > 0) {
+    const memMap = new Map<string, StudentRecord>();
+    for (const arr of memoryCandidates) {
+      for (const s of arr) {
+        const key = (s.code || s.studentCode || s.id || '').trim();
+        if (key) {
+          if (!memMap.has(key)) memMap.set(key, s);
+          else memMap.set(key, { ...memMap.get(key)!, ...s });
+        }
+      }
+    }
+    let cached = Array.from(memMap.values());
+    if (!isGrade1Room && cached.some((s) => isGrade1SgsStudentCode(s.code || s.id))) {
+      cached = cached.filter((s) => !isGrade1SgsStudentCode(s.code || s.id));
+    }
+    const { students: normalized } = normalizeRoomRollNumbers(cached);
+    for (const c of candidates) {
+      inMemoryStudentCache[c] = normalized;
+    }
+    return normalized;
   }
 
   // 3. ตรวจสอบใน L1 memory masterDataService
@@ -664,21 +690,34 @@ export const studentService = {
     return true;
   },
 
-  // READ: List students in classroom (3-Tier Cache + Watermark Delta Sync)
+  // READ: List students in classroom (3-Tier Cache + Watermark Delta Sync + Candidate Merge)
   async getByClassroom(classroomId: string, forceRefresh?: boolean): Promise<StudentRecord[]> {
+    const local = getLocalStudents(classroomId);
     try {
-      const students = await masterDataService.getStudentsByRoom(classroomId, forceRefresh);
-      if (students && students.length > 0) {
-        const sorted = (students as StudentRecord[]).sort(
-          (a, b) => Number(a.no || 999) - Number(b.no || 999)
-        );
-        saveLocalStudents(classroomId, sorted);
-        return sorted;
+      const remote = await masterDataService.getStudentsByRoom(classroomId, forceRefresh);
+      if (remote && remote.length > 0) {
+        // รวมนักเรียนจาก Remote กับ Local โดยไม่ทำให้นักเรียนสูญหาย (Zero Student Loss)
+        const mergedMap = new Map<string, StudentRecord>();
+        for (const loc of local) {
+          const key = (loc.code || loc.studentCode || loc.id || '').trim();
+          if (key) mergedMap.set(key, loc);
+        }
+        for (const rem of remote as StudentRecord[]) {
+          const key = (rem.code || rem.studentCode || rem.id || '').trim();
+          if (key) {
+            const existing = mergedMap.get(key);
+            mergedMap.set(key, existing ? { ...existing, ...rem } : rem);
+          }
+        }
+
+        const { students: normalized } = normalizeRoomRollNumbers(Array.from(mergedMap.values()));
+        saveLocalStudents(classroomId, normalized);
+        return normalized;
       }
     } catch (err) {
       console.warn('[studentService] masterDataService fallback to local students:', err);
     }
-    return getLocalStudents(classroomId);
+    return local;
   },
 
   // CREATE: Add new student

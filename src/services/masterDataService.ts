@@ -172,6 +172,42 @@ function mapStudentViewToCached(s: any, fallbackRoomId: string): CachedStudent {
   };
 }
 
+/**
+ * รวบรวมข้อมูลนักเรียนจากทุก candidate ID ของห้องเรียนจาก localCacheDb
+ * เพื่อป้องกันปัญหา Candidate-Split (ข้อมูลกระจายระหว่าง room-X-Y vs UUID vs ชื่อภาษาไทย)
+ * พร้อมทำ Deduplication ตาม Identity (studentCode/code/id) และจัดเรียงเลขที่ใหม่ 1..N
+ */
+async function collectAndNormalizeCandidatesFromDb(candidates: string[]): Promise<CachedStudent[]> {
+  const mergedMap = new Map<string, CachedStudent>();
+  for (const c of candidates) {
+    const list = await localCacheDb.getStudentsByClassroom(c);
+    if (list && list.length > 0) {
+      for (const s of list) {
+        const key = (s.studentCode || s.code || s.id || '').trim();
+        if (key) {
+          if (!mergedMap.has(key)) {
+            mergedMap.set(key, s);
+          } else {
+            const existing = mergedMap.get(key)!;
+            mergedMap.set(key, { ...existing, ...s });
+          }
+        }
+      }
+    }
+  }
+
+  const merged = Array.from(mergedMap.values());
+  const sorted = merged.sort(
+    (a, b) => Number(a.no ?? a.number ?? 999999) - Number(b.no ?? b.number ?? 999999)
+  );
+  return sorted.map((stu, idx) => ({
+    ...stu,
+    no: idx + 1,
+    number: idx + 1,
+    seatNo: idx + 1,
+  }));
+}
+
 export const masterDataService = {
   /**
    * 1. ดึงรายชื่อห้องเรียนทั้งหมด (Classroom)
@@ -302,14 +338,7 @@ export const masterDataService = {
 
     const task = (async (): Promise<CachedStudent[]> => {
       try {
-        let cachedStudents: CachedStudent[] = [];
-        for (const c of candidates) {
-          const list = await localCacheDb.getStudentsByClassroom(c);
-          if (list && list.length > 0) {
-            cachedStudents = list;
-            break;
-          }
-        }
+        let cachedStudents: CachedStudent[] = await collectAndNormalizeCandidatesFromDb(candidates);
         const syncMeta = await localCacheDb.getSyncMeta(scopeKey);
 
         const now = Date.now();
@@ -341,7 +370,7 @@ export const masterDataService = {
           .select(STUDENT_VIEW_COLUMNS)
           .in('classroom_id', candidates);
 
-        if (cachedStudents.length > 0 && syncMeta?.lastSyncedIso) {
+        if (!forceRefresh && cachedStudents.length > 0 && syncMeta?.lastSyncedIso) {
           query = query.gt('updated_at', syncMeta.lastSyncedIso);
         }
 
@@ -371,15 +400,15 @@ export const masterDataService = {
 
         let finalStudents: CachedStudent[] = [];
         if (deltaStudents && deltaStudents.length > 0) {
-          for (const c of candidates) {
-            const list = await localCacheDb.getStudentsByClassroom(c);
-            if (list && list.length > 0) {
-              finalStudents = list;
-              break;
-            }
-          }
+          finalStudents = await collectAndNormalizeCandidatesFromDb(candidates);
           if (finalStudents.length === 0) {
-            finalStudents = deltaStudents.map((s: any) => mapStudentViewToCached(s, classroomId));
+            const mapped = deltaStudents.map((s: any) => mapStudentViewToCached(s, classroomId));
+            finalStudents = mapped.map((stu, idx) => ({
+              ...stu,
+              no: idx + 1,
+              number: idx + 1,
+              seatNo: idx + 1,
+            }));
           }
         } else {
           finalStudents = cachedStudents;
@@ -392,14 +421,7 @@ export const masterDataService = {
         return finalStudents;
       } catch (err) {
         console.warn(`[masterDataService] โหลดนักเรียนห้อง ${classroomId} จากเซิร์ฟเวอร์ไม่สำเร็จ ใช้ข้อมูลออฟไลน์:`, err);
-        let fallback: CachedStudent[] = [];
-        for (const c of candidates) {
-          const list = await localCacheDb.getStudentsByClassroom(c);
-          if (list && list.length > 0) {
-            fallback = list;
-            break;
-          }
-        }
+        let fallback: CachedStudent[] = await collectAndNormalizeCandidatesFromDb(candidates);
         fallback.sort((a, b) => Number(a.no ?? a.number ?? 999) - Number(b.no ?? b.number ?? 999));
         for (const c of candidates) {
           memoryStudentsByRoom.set(c, fallback);
