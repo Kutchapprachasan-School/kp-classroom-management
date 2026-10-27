@@ -3,7 +3,7 @@
 // Backed by remote Supabase PostgreSQL (public.kps_cloud_store)
 // Ensures data is NEVER locked to a single device's localStorage.
 
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase.ts';
 
 export interface CloudStoreRecord<T = unknown> {
   key: string;

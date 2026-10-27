@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 27/10/2569 16:36:02 | รวมทั้งหมด 241 ไฟล์*
+*อัปเดตล่าสุด: 27/10/2569 19:39:25 | รวมทั้งหมด 241 ไฟล์*
 
 ---
 
@@ -28,7 +28,7 @@
 | [src/views/HomeVisitSdqView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/HomeVisitSdqView.tsx) | 1355 | `HomeVisitSdqView` (L27) |
 | [src/views/LessonPlansView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/LessonPlansView.tsx) | 1776 | `UnitStatus` (L33), `EvaluationItem` (L35), `UnitPlanItem` (L42), `CourseFilterOption` (L87), `LessonPlansView` (L96) |
 | [src/views/LiveClassroomView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/LiveClassroomView.tsx) | 619 | `LiveClassroomViewProps` (L28), `LiveClassroomView` (L32) |
-| [src/views/MessagesView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/MessagesView.tsx) | 1646 | `MessagesViewProps` (L74), `MessagesView` (L82) |
+| [src/views/MessagesView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/MessagesView.tsx) | 1624 | `MessagesViewProps` (L52), `MessagesView` (L60) |
 | [src/views/MorningAssemblyView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/MorningAssemblyView.tsx) | 1323 | `MorningAssemblyViewProps` (L54), `MorningAssemblyView` (L90) |
 | [src/views/SchoolLeaveExecutiveDashboardView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/SchoolLeaveExecutiveDashboardView.tsx) | 292 | `SchoolLeaveExecutiveDashboardView` (L43) |
 | [src/views/SchoolPortalView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/SchoolPortalView.tsx) | 722 | `TeacherLoginChannel` (L23), `SchoolPortalView` (L38) |
@@ -218,7 +218,7 @@
 | [src/services/liveClassroomService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/liveClassroomService.ts) | 810 | `WEEKLY_GACHA_TICKETS_UPDATED_EVENT` (L17), `getCurrentBangkokWeekKey` (L22), `StudentTier` (L31), `detectStudentGender` (L33), `LiveStudent` (L52), `WordDeckItem` (L68), `extractCourseCode` (L85), `LiveClassroomData` (L96), `getThailandTodayRange` (L111), `calculateStudentTierMap` (L134) *(+1 รายการ)* |
 | [src/services/localCacheDb.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/localCacheDb.ts) | 292 | `CachedClassroom` (L9), `CachedStudent` (L20), `SyncMeta` (L42), `localCacheDb` (L113) |
 | [src/services/masterDataService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/masterDataService.ts) | 554 | `CANONICAL_TIMESTAMP_ROOM_MAP` (L35), `resolveRoomCandidates` (L63), `masterDataService` (L211) |
-| [src/services/messagingService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/messagingService.ts) | 1839 | `ChatGroupType` (L36), `ChatMember` (L38), `ChatMessage` (L49), `ChatGroup` (L78), `StudentTransferPayload` (L98), `StudentTransferResult` (L106), `CHAT_GROUPS_EVENT` (L121), `STUDENT_TRANSFERRED_EVENT` (L122), `CourseClassroomMapping` (L124), `CurrentChatUserContext` (L132) *(+3 รายการ)* |
+| [src/services/messagingService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/messagingService.ts) | 1848 | `ChatGroupType` (L36), `ChatMember` (L38), `ChatMessage` (L49), `ChatGroup` (L78), `StudentTransferPayload` (L98), `StudentTransferResult` (L106), `CHAT_GROUPS_EVENT` (L121), `STUDENT_TRANSFERRED_EVENT` (L122), `CourseClassroomMapping` (L124), `CurrentChatUserContext` (L132) *(+3 รายการ)* |
 | [src/services/onlineQuizService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/onlineQuizService.ts) | 388 | `QuizOptionItem` (L12), `QuizQuestionItem` (L17), `StudentQuizAttemptRecord` (L27), `OnlineQuizConfig` (L44), `DEFAULT_SAMPLE_QUESTIONS` (L65), `onlineQuizService` (L387) |
 | [src/services/phoneNotificationService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/phoneNotificationService.ts) | 165 | `PhoneNotificationPayload` (L4), `PHONE_NOTI_SYNC_EVENT` (L16), `phoneNotificationService` (L164) |
 | [src/services/qrAttendanceService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/qrAttendanceService.ts) | 306 | `DynamicQrPayload` (L11), `StudentCardQrPayload` (L24), `QrVerificationResult` (L32), `QR_ROTATION_INTERVAL_SECONDS` (L40), `qrAttendanceService` (L305) |

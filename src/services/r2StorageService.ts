@@ -2,7 +2,7 @@
 // Cloudflare R2 Object Storage Client for Student Submissions & School Documents
 // Follows Pillar 6: R2-Only Storage for All Assets & Documents
 
-import { uploadToR2WithProgress, type UploadProgressInfo } from './cloudDataService';
+import { uploadToR2WithProgress, type UploadProgressInfo } from './cloudDataService.ts';
 
 export type { UploadProgressInfo };
 

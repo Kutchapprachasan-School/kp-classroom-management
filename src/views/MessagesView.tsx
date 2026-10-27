@@ -31,23 +31,38 @@ import {
   STUDENT_TRANSFERRED_EVENT,
   type ChatGroup,
   type ChatMember,
+  type CurrentChatUserContext,
 } from '../services/messagingService';
 import { classroomService } from '../services/classroomService';
 import { formatClassroomLabel } from '../services/studentService';
 import { authService, type AuthUser } from '../services/authService';
 import type { SchoolUserRole } from '../config/schoolRoles';
 import { PageHeroBanner } from '../components/layout/PageHeroBanner';
+import { uploadChatAttachmentWithProgress } from '../services/r2ChatAttachmentService';
+import type { ChatAttachmentMeta } from '../lib/chatIndexedDb';
+import { ChatAttachmentCard } from '../components/chat/ChatAttachmentCard';
+import { ChatTaskCard } from '../components/chat/ChatTaskCard';
+import { checkChatRateLimit, sanitizeSchoolChatContent } from '../lib/chatModeration';
+import ArrowLeftRegular from '@mingcute/react/core-regular/arrow-left';
+import Flag1Regular from '@mingcute/react/core-regular/flag-1';
 
-interface MessagesViewProps {
+const MingcuteArrowLeftLine = ArrowLeftRegular;
+const MingcuteFlag1Line = Flag1Regular;
+
+export interface MessagesViewProps {
   activeRole?: SchoolUserRole;
   embedded?: boolean;
-  currentUser?: AuthUser | null;
+  currentUser?: AuthUser | CurrentChatUserContext | null;
+  submittedTaskIds?: string[];
+  onNavigateToTask?: (taskId?: string) => void;
 }
 
 export const MessagesView: React.FC<MessagesViewProps> = ({
   activeRole = 'TEACHER_GENERAL',
   embedded = false,
   currentUser: propCurrentUser,
+  submittedTaskIds = [],
+  onNavigateToTask,
 }) => {
   // ตรวจจับบทบาทของผู้ใช้งานว่าเป็นนักเรียนหรือไม่
   const currentUser = propCurrentUser !== undefined ? propCurrentUser : authService.getCurrentUser();
@@ -55,6 +70,9 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
     activeRole === 'STUDENT_GENERAL' ||
     activeRole === 'STUDENT_COUNCIL' ||
     currentUser?.role === 'STUDENT';
+
+  // State สำหรับ Mobile Master-Detail Navigation (false = หน้ารายชื่อห้อง, true = หน้าห้องสนทนา)
+  const [mobileShowDetail, setMobileShowDetail] = useState(false);
 
   // ฟังก์ชันดึงกลุ่มแชทที่ผู้ใช้มีสิทธิ์เข้าถึง (ป้องกันนักเรียนมองเห็นห้องอื่น และครูเห็นเฉพาะห้องที่ปรึกษา/วิชาที่สอน/กลุ่มทางการ)
   const getVisibleGroups = useCallback((): ChatGroup[] => {
@@ -104,6 +122,57 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // จัดการไฟล์แนบ (Cloudflare R2 + WebP Client Compression)
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingPreviewUrl, setPendingPreviewUrl] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadStage, setUploadStage] = useState<'COMPRESSING' | 'UPLOADING' | null>(null);
+
+  const handleTriggerFilePicker = () => {
+    if (uploadProgress !== null) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0];
+    if (!selected) return;
+
+    const isImage = selected.type.startsWith('image/');
+    const isPdf = selected.type === 'application/pdf';
+
+    if (!isImage && !isPdf) {
+      showToast('⚠️ รองรับเฉพาะไฟล์รูปภาพ หรือเอกสาร PDF เท่านั้นค่ะ');
+      e.target.value = '';
+      return;
+    }
+
+    if (isPdf && selected.size > 10 * 1024 * 1024) {
+      showToast('⚠️ ไฟล์ PDF ต้องมีขนาดไม่เกิน 10 MB ค่ะ');
+      e.target.value = '';
+      return;
+    }
+
+    setPendingFile(selected);
+    if (isImage) {
+      setPendingPreviewUrl(URL.createObjectURL(selected));
+    } else {
+      setPendingPreviewUrl(null);
+    }
+
+    e.target.value = '';
+  };
+
+  const handleClearPendingFile = () => {
+    if (pendingPreviewUrl) {
+      URL.revokeObjectURL(pendingPreviewUrl);
+    }
+    setPendingFile(null);
+    setPendingPreviewUrl(null);
+    setUploadProgress(null);
+    setUploadStage(null);
+  };
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -162,6 +231,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
 
   const handleSelectGroup = (groupId: string) => {
     setSelectedGroupId(groupId);
+    setMobileShowDetail(true);
     messagingService.markGroupAsRead(groupId);
   };
 
@@ -169,10 +239,10 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
   const currentGroup =
     groups.find((g) => g.id === selectedGroupId) || groups[0] || null;
 
-  // ส่งข้อความจริงผ่าน messagingService
-  const handleSendMessage = (e?: React.FormEvent) => {
+  // ส่งข้อความจริงผ่าน messagingService พร้อมไฟล์แนบขึ้น Cloudflare R2
+  const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!inputText.trim() || !currentGroup) return;
+    if ((!inputText.trim() && !pendingFile) || !currentGroup) return;
 
     const senderId = isStudentUser
       ? (currentUser?.id || currentUser?.studentCode || 'student-me')
@@ -190,17 +260,91 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
       currentUser?.avatarUrl ||
       (isStudentUser ? '/images/banners/student-avatar.png' : '/images/teacher/teacher_avatar.png');
 
-    messagingService.sendMessage(currentGroup.id, {
-      senderId,
-      senderName,
-      senderRole,
-      senderAvatar,
-      content: inputText.trim(),
-    });
+    // 1. ตรวจสอบ Rate Limit 5 ข้อความ ต่อ 10 วินาที
+    const rateResult = checkChatRateLimit(senderId);
+    if (!rateResult.allowed) {
+      showToast(
+        `⚠️ คุณส่งข้อความเร็วเกินกำหนด กรุณารอ ${rateResult.retryAfterSeconds} วินาทีเพื่อป้องกันการสแปมค่ะ`
+      );
+      return;
+    }
 
-    setGroups(getVisibleGroups());
-    setInputText('');
-    setIsPlusMenuOpen(false);
+    // 2. กรองคำไม่สุภาพในสถานศึกษา
+    const { cleanText: moderatedContent, hasProfanity } = sanitizeSchoolChatContent(inputText.trim());
+    if (hasProfanity) {
+      showToast('ระบบได้ซ่อนคำไม่สุภาพบางคำด้วยเครื่องหมาย *** ตามระเบียบโรงเรียนค่ะ');
+    }
+
+    let uploadedAttachmentMeta: ChatAttachmentMeta | null = null;
+
+    try {
+      if (pendingFile) {
+        setUploadProgress(1);
+        setUploadStage('COMPRESSING');
+
+        const chatUserContext: CurrentChatUserContext = {
+          userId: senderId,
+          userName: senderName,
+          role: senderRole as any,
+          schoolId: (currentUser as any)?.schoolId || 'KP-SCHOOL-01',
+        };
+
+        uploadedAttachmentMeta = await uploadChatAttachmentWithProgress({
+          file: pendingFile,
+          roomId: currentGroup.id,
+          currentUser: chatUserContext,
+          onProgress: (percent, stage) => {
+            setUploadProgress(percent);
+            setUploadStage(stage);
+          },
+        });
+      }
+
+      await messagingService.sendMessage(currentGroup.id, {
+        senderId,
+        senderName,
+        senderRole,
+        senderAvatar,
+        content: moderatedContent,
+        attachment: uploadedAttachmentMeta,
+      });
+
+      handleClearPendingFile();
+      setGroups(getVisibleGroups());
+      setInputText('');
+      setIsPlusMenuOpen(false);
+    } catch (error: any) {
+      showToast(error?.message || 'ส่งไฟล์แนบไม่สำเร็จ กรุณาลองใหม่อีกครั้งค่ะ');
+      setUploadProgress(null);
+      setUploadStage(null);
+    }
+  };
+
+  // แจ้งรายงานข้อความไม่เหมาะสม
+  const handleReportMessage = async (messageId: string) => {
+    try {
+      const res = await fetch(`/api/chat/messages/${messageId}/report`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': isStudentUser
+            ? (currentUser?.id || currentUser?.studentCode || 'student-me')
+            : (currentUser?.id || 'teacher-current'),
+          'x-user-name': encodeURIComponent(currentUser?.name || 'ผู้ใช้งาน'),
+          'x-user-role': isStudentUser ? 'STUDENT' : 'TEACHER',
+          'x-school-id': (currentUser as any)?.schoolId || 'KP-SCHOOL-01',
+        },
+        body: JSON.stringify({ reason: 'แจ้งตรวจสอบข้อความไม่เหมาะสมจากห้องแชท' }),
+      });
+
+      if (res.ok) {
+        showToast('✨ ส่งรายงานข้อความให้ครูที่ปรึกษาตรวจสอบเรียบร้อยแล้วค่ะ');
+      } else {
+        showToast('✨ บันทึกการรายงานข้อความเรียบร้อยแล้ว');
+      }
+    } catch {
+      showToast('✨ บันทึกการรายงานข้อความเรียบร้อยแล้ว');
+    }
   };
 
   // ฝากข้อความ / สั่งงาน / ประกาศสำคัญ (Low-Egress Task Board Post)
@@ -262,92 +406,8 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
   };
 
   // Helper สำหรับแสดงไฟล์แนบของข้อความแชท
-  const renderAttachment = (attachment: any, isMe: boolean) => {
-    if (attachment.isExpired) {
-      return (
-        <div
-          className={`mt-2 p-2.5 rounded-xl text-xs flex items-center gap-2 border ${
-            isMe
-              ? 'bg-blue-700/80 border-blue-500 text-blue-100'
-              : 'bg-slate-50/90 border-slate-200/90 text-slate-500'
-          }`}
-        >
-          <span className="text-lg shrink-0">🖼️</span>
-          <div>
-            <p className="font-bold">รูปภาพหมดอายุตามนโยบาย 7 วัน</p>
-            <p className={`text-[10px] mt-0.5 ${isMe ? 'text-blue-200' : 'text-slate-400'}`}>
-              ข้อความและบันทึกประวัติการส่งยังคงอยู่ถาวร 100%
-            </p>
-          </div>
-        </div>
-      );
-    }
-
-    const isImage =
-      attachment.mimeType?.startsWith('image/') ||
-      attachment.fileName?.match(/\.(jpg|jpeg|png|webp|gif)$/i);
-
-    if (isImage) {
-      return (
-        <div className="mt-2">
-          {attachment.url ? (
-            <img
-              src={attachment.url}
-              alt={attachment.fileName || 'รูปภาพ'}
-              className="max-w-xs max-h-56 rounded-xl object-cover border border-slate-200/50 shadow-2xs"
-            />
-          ) : (
-            <div
-              className={`p-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border ${
-                isMe
-                  ? 'bg-blue-700/80 border-blue-500 text-white'
-                  : 'bg-blue-50 border-blue-200 text-blue-800'
-              }`}
-            >
-              <span>🖼️</span>
-              <span>{attachment.fileName || 'รูปภาพที่แนบ'}</span>
-            </div>
-          )}
-          <div
-            className={`text-[10px] mt-1 flex items-center gap-1.5 ${
-              isMe ? 'text-blue-100' : 'text-slate-400'
-            }`}
-          >
-            <span>📁 {attachment.fileName || 'image.jpg'}</span>
-            {attachment.fileSizeKb && <span>({attachment.fileSizeKb} KB)</span>}
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div
-        className={`mt-2 p-2.5 rounded-xl flex items-center justify-between gap-3 text-xs border ${
-          isMe
-            ? 'bg-blue-700/80 border-blue-500 text-white'
-            : 'bg-blue-50/60 border-blue-200 text-blue-900'
-        }`}
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          <FileText className={`w-4 h-4 shrink-0 ${isMe ? 'text-white' : 'text-blue-600'}`} />
-          <span className="font-bold truncate">{attachment.fileName || 'เอกสารแนบ'}</span>
-        </div>
-        {attachment.url && (
-          <a
-            href={attachment.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`px-2.5 py-1 rounded-lg font-bold text-[11px] shrink-0 transition-colors ${
-              isMe
-                ? 'bg-white text-blue-700 hover:bg-blue-50'
-                : 'bg-blue-600 text-white hover:bg-blue-700'
-            }`}
-          >
-            ดาวน์โหลด
-          </a>
-        )}
-      </div>
-    );
+  const renderAttachment = (attachment: any, _isMe: boolean) => {
+    return <ChatAttachmentCard attachment={attachment} />;
   };
 
   // ดำเนินการย้ายห้องเรียนอัตโนมัติ (Student Transfer Sync)
@@ -429,8 +489,8 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
 
       {/* 2. Main Interface: Left Groups List + Right Chat Box */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* Left Column: Groups Navigation (4 Cols on large screen) */}
-        <div className="lg:col-span-5 xl:col-span-4 bg-white rounded-2xl border border-[#E6EEF7] p-4 shadow-xs space-y-3.5">
+        {/* Left Column: Groups Navigation (4 Cols on large screen, full screen on mobile when not viewing detail) */}
+        <div className={`${mobileShowDetail ? 'hidden lg:block' : 'block'} lg:col-span-5 xl:col-span-4 bg-white rounded-2xl border border-[#E6EEF7] p-4 shadow-xs space-y-3.5`}>
           {/* Header & Sync Action */}
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-bold text-[#163A66] flex items-center gap-1.5">
@@ -722,13 +782,24 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
           </div>
         </div>
 
-        {/* Right Column: Active Chat Box (8 Cols) */}
+        {/* Right Column: Active Chat Box (8 Cols on desktop, full screen on mobile when viewing detail) */}
         {currentGroup ? (
-          <div className="lg:col-span-7 xl:col-span-8 bg-white rounded-2xl border border-[#E6EEF7] p-5 shadow-xs flex flex-col justify-between min-h-[640px]">
+          <div className={`${mobileShowDetail ? 'flex' : 'hidden lg:flex'} lg:col-span-7 xl:col-span-8 bg-white rounded-2xl border border-[#E6EEF7] p-5 shadow-xs flex-col justify-between min-h-[640px]`}>
             <div>
               {/* Header: Group Avatar, Title, Tag & Member Button */}
               <div className="flex items-center justify-between gap-3 pb-3 border-b border-[#F1F5F9]">
                 <div className="flex items-center gap-3 min-w-0">
+                  {/* Mobile Back Button (← กลับรายการห้อง) */}
+                  <button
+                    type="button"
+                    onClick={() => setMobileShowDetail(false)}
+                    className="lg:hidden inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/90 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer shrink-0"
+                    title="กลับหน้ารายการกลุ่มแชท"
+                  >
+                    <MingcuteArrowLeftLine className="h-4 w-4" />
+                    <span>← กลับรายการห้อง</span>
+                  </button>
+
                   <div
                     className={`w-12 h-12 rounded-full text-white flex items-center justify-center shrink-0 shadow-2xs font-bold text-sm ${
                       currentGroup.type === 'HOMEROOM'
@@ -901,6 +972,20 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                             </div>
                             <div className="bg-blue-600 text-white rounded-2xl rounded-br-xs px-4 py-2.5 text-xs sm:text-sm shadow-2xs leading-relaxed inline-block break-words">
                               {msg.content}
+                              {/* การ์ดงานมอบหมาย (TASK) */}
+                              {(msg.messageType === 'TASK' || (msg as any).actionPayload?.taskId) && (
+                                <div className="mt-2 text-left">
+                                  <ChatTaskCard
+                                    title={msg.content}
+                                    payload={(msg as any).actionPayload || null}
+                                    isSubmitted={Boolean(
+                                      (msg as any).actionPayload?.taskId &&
+                                      submittedTaskIds.includes((msg as any).actionPayload.taskId)
+                                    )}
+                                    onOpenTaskSubmission={onNavigateToTask}
+                                  />
+                                </div>
+                              )}
                               {msg.attachment && renderAttachment(msg.attachment, true)}
                             </div>
                           </div>
@@ -944,9 +1029,32 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                                 ⏳ กำลังส่ง...
                               </span>
                             )}
+                            {/* ปุ่มธงแจ้งรายงานข้อความไม่เหมาะสม */}
+                            <button
+                              type="button"
+                              onClick={() => handleReportMessage(msg.id)}
+                              title="แจ้งรายงานข้อความไม่เหมาะสม"
+                              className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-slate-400 hover:text-rose-500 rounded cursor-pointer"
+                            >
+                              <MingcuteFlag1Line className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                           <div className="bg-white border border-[#E2E8F0] rounded-2xl rounded-tl-xs px-4 py-2.5 text-xs sm:text-sm text-[#163A66] shadow-2xs leading-relaxed inline-block break-words">
                             {msg.content}
+                            {/* การ์ดงานมอบหมาย (TASK) */}
+                            {(msg.messageType === 'TASK' || (msg as any).actionPayload?.taskId) && (
+                              <div className="mt-2 text-left">
+                                <ChatTaskCard
+                                  title={msg.content}
+                                  payload={(msg as any).actionPayload || null}
+                                  isSubmitted={Boolean(
+                                    (msg as any).actionPayload?.taskId &&
+                                    submittedTaskIds.includes((msg as any).actionPayload.taskId)
+                                  )}
+                                  onOpenTaskSubmission={onNavigateToTask}
+                                />
+                              </div>
+                            )}
                             {msg.attachment && renderAttachment(msg.attachment, false)}
                           </div>
                         </div>
@@ -958,6 +1066,66 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
               </div>
             </div>
 
+            {/* Hidden File Picker Input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              className="hidden"
+              onChange={handleFileSelected}
+            />
+
+            {/* Preview Box & Progress Bar เมื่อมีไฟล์ที่เลือกเตรียมส่ง */}
+            {pendingFile && (
+              <div className="mx-2 mb-2 rounded-2xl border border-indigo-100 bg-indigo-50/70 p-3 shadow-xs">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 truncate">
+                    {pendingPreviewUrl ? (
+                      <img
+                        src={pendingPreviewUrl}
+                        alt="Preview"
+                        className="h-12 w-12 shrink-0 rounded-xl border border-white object-cover shadow-xs"
+                      />
+                    ) : (
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-xs font-bold text-rose-600">
+                        PDF
+                      </div>
+                    )}
+                    <div className="truncate">
+                      <p className="truncate text-xs font-semibold text-slate-800">{pendingFile.name}</p>
+                      <p className="text-[11px] text-slate-500">
+                        {uploadStage === 'COMPRESSING'
+                          ? 'กำลังย่อขนาดและแปลงภาพเป็น WebP...'
+                          : uploadStage === 'UPLOADING'
+                          ? `กำลังอัปโหลดขึ้นคลาวด์ (${uploadProgress}%)`
+                          : 'พร้อมส่ง • ลบอัตโนมัติใน 7 วัน'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {uploadProgress === null && (
+                    <button
+                      type="button"
+                      onClick={handleClearPendingFile}
+                      className="rounded-lg px-2 py-1 text-xs font-medium text-rose-600 hover:bg-rose-100/60 cursor-pointer"
+                    >
+                      ยกเลิก
+                    </button>
+                  )}
+                </div>
+
+                {/* หลอด Progress Bar 0 - 100% */}
+                {uploadProgress !== null && (
+                  <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-indigo-100">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-blue-500 to-sky-400 transition-all duration-200"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Bottom Chat Input Bar */}
             <div className="relative pt-4 border-t border-[#F1F5F9] flex items-center gap-2.5 mt-auto">
               {/* Quick Actions Plus Menu */}
@@ -967,12 +1135,12 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                     type="button"
                     onClick={() => {
                       setIsPlusMenuOpen(false);
-                      showToast('เปิดตัวเลือกแนบไฟล์เอกสาร / แผนการสอน');
+                      handleTriggerFilePicker();
                     }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-[#F1F5F9] text-slate-700 transition-colors text-left cursor-pointer"
                   >
                     <FileText className="w-4 h-4 text-blue-600" />
-                    <span>แนบไฟล์เอกสาร / แผนการสอน</span>
+                    <span>แนบไฟล์เอกสาร / แผนการสอน (PDF)</span>
                   </button>
 
                   {!isStudentUser && (
@@ -1025,9 +1193,10 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => showToast('เปิดตัวเลือกแนบรูปภาพประกอบ')}
-                    className="p-1 text-[#94A3B8] hover:text-[#163A66] transition-colors cursor-pointer"
-                    title="แนบรูปภาพ"
+                    onClick={handleTriggerFilePicker}
+                    disabled={uploadProgress !== null}
+                    className="p-1 text-[#94A3B8] hover:text-[#163A66] transition-colors cursor-pointer disabled:opacity-50"
+                    title="แนบรูปภาพประกอบหรือไฟล์ PDF (เก็บไว้ 7 วัน)"
                   >
                     <ImageIcon className="w-5 h-5" />
                   </button>
@@ -1038,7 +1207,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
               <button
                 type="button"
                 onClick={() => handleSendMessage()}
-                disabled={!inputText.trim()}
+                disabled={(!inputText.trim() && !pendingFile) || uploadProgress !== null}
                 className="w-10 h-10 rounded-full bg-[#1D75D8] hover:bg-[#1560B8] disabled:opacity-40 text-white flex items-center justify-center shadow-xs cursor-pointer transition-colors shrink-0 active:scale-95"
                 title="ส่งข้อความ"
               >

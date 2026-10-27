@@ -8,7 +8,7 @@
 import { cleanSlateService } from './cleanSlateService.ts';
 import { studentService, formatClassroomLabel } from './studentService.ts';
 import { resolveRoomCandidates } from './masterDataService.ts';
-import { isGrade1SgsStudentCode } from '../config/m1SgsLookup';
+import { isGrade1SgsStudentCode } from '../config/m1SgsLookup.ts';
 import { r2StorageService } from './r2StorageService.ts';
 import { cloudDataService, type UploadProgressInfo } from './cloudDataService.ts';
 import { gradeService } from './gradeService.ts';

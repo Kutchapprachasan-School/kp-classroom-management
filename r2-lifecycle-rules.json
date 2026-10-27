@@ -1,0 +1,17 @@
+{
+  "Rules": [
+    {
+      "ID": "kp-chat-ephemeral-7-days-ttl",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "ephemeral/chat/"
+      },
+      "Expiration": {
+        "Days": 7
+      },
+      "AbortIncompleteMultipartUpload": {
+        "DaysAfterInitiation": 1
+      }
+    }
+  ]
+}

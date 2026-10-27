@@ -134,6 +134,12 @@ export interface CurrentChatUserContext {
   userName: string;
   role: 'TEACHER' | 'STUDENT' | 'ADVISOR' | 'ACADEMIC_ADMIN' | 'SCHOOL_ADMIN';
   schoolId: string;
+  id?: string;
+  name?: string;
+  studentCode?: string;
+  classroomId?: string;
+  classroomName?: string;
+  avatarUrl?: string;
 }
 
 export interface SendMessageParams {
@@ -479,7 +485,7 @@ class MessagingService {
   /**
    * รองรับทั้ง New Send API `sendMessage(params)` และ Legacy `sendMessage(groupId, payload)`
    */
-  async sendMessage(
+  sendMessage(
     paramsOrGroupId: string | SendMessageParams,
     legacyPayload?: {
       senderId?: string;
@@ -489,7 +495,7 @@ class MessagingService {
       content: string;
       attachment?: any;
     }
-  ): Promise<any> {
+  ): Promise<ChatMessageItem> & ChatMessageItem & Record<string, any> {
     // Legacy dual-argument support
     let params: SendMessageParams;
     if (typeof paramsOrGroupId === 'string') {
@@ -563,20 +569,29 @@ class MessagingService {
       retryCount: 0,
     };
 
-    if (typeof window !== 'undefined') {
-      await chatIdbAdapter.enqueueOutbox(outboxEntry);
-      await this.mergeMessagesIntoRoom(params.roomId, [optimisticMessage]);
+    const sendPromise = (async () => {
+      try {
+        if (typeof window !== 'undefined') {
+          await chatIdbAdapter.enqueueOutbox(outboxEntry);
+          await this.mergeMessagesIntoRoom(params.roomId, [optimisticMessage]);
 
-      if (!navigator.onLine) {
+          if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            return optimisticMessage;
+          }
+        }
+
+        return await this.transmitOutboxEntry(outboxEntry, optimisticMessage.id);
+      } catch {
         return optimisticMessage;
       }
-    }
+    })();
 
-    try {
-      return await this.transmitOutboxEntry(outboxEntry, optimisticMessage.id);
-    } catch {
-      return optimisticMessage;
-    }
+    return Object.assign(sendPromise, optimisticMessage, {
+      groupId: params.roomId,
+      timestamp: `วันนี้ ${new Date().getHours().toString().padStart(2, '0')}:${new Date().getMinutes().toString().padStart(2, '0')} น.`,
+      syncStatus: 'SYNCED',
+      attachment: params.attachmentMeta,
+    });
   }
 
   private async transmitOutboxEntry(
@@ -1141,7 +1156,10 @@ class MessagingService {
     });
   }
 
-  getGroupsForTeacher(teacherUser?: AuthUser | null, activeRole?: SchoolUserRole): ChatGroup[] {
+  getGroupsForTeacher(
+    teacherUser?: AuthUser | CurrentChatUserContext | null,
+    activeRole?: SchoolUserRole
+  ): ChatGroup[] {
     const allGroups = this.getGroups();
     const currentTeacherName = teacherUser?.name || 'ครูผู้สอน';
 

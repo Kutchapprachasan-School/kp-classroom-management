@@ -8,7 +8,7 @@
  * - Dual Reverse Sync (Excel template & 1-click clipboard copy)
  */
 
-import { resolveRoomCandidates, CANONICAL_TIMESTAMP_ROOM_MAP } from './masterDataService';
+import { resolveRoomCandidates, CANONICAL_TIMESTAMP_ROOM_MAP } from './masterDataService.ts';
 
 /**
  * แปลงชื่อหรือรหัสห้องเรียนทุกรูปแบบให้เป็นมาตรฐานเดียวกัน "ม.X/Y" เสมอ
@@ -212,9 +212,13 @@ export function parseSgsClipboardText(rawText: string, defaultClassroom?: string
 
   for (const line of lines) {
     // 1. Detect Room Section Headers in SGS files (e.g. ชั้น ม.1  ห้องที่ 1, ชั้นมัธยมศึกษาปีที่ 4 ห้องที่ 4, ชั้น ม.4/4, ม.4 ห้อง 4)
-    const fullRoomMatch =
-      line.match(/(?:ชั้น\s*(?:มัธยมศึกษาปีที่|ม\.?)\s*(\d+)\s*(?:ห้องที่|ห้อง|\/)\s*(\d+))|(?:ห้อง\s*(?:ม\.?)?\s*(\d+)\s*\/\s*(\d+))/i) ||
-      line.match(/ม\.?\s*(\d+)\s*(?:ห้องที่|ห้อง|\/)\s*(\d+)/i);
+    // Only detect as standalone header if line is not a tabular student row (does not have tab or multiple columns)
+    const hasMultipleColumns = line.includes('\t') || (line.includes(',') && line.split(',').length >= 3);
+    const fullRoomMatch = !hasMultipleColumns && (
+      line.match(/^\s*(?:ชั้น\s*(?:มัธยมศึกษาปีที่|ม\.?)\s*(\d+)\s*(?:ห้องที่|ห้อง|\/)\s*(\d+))/i) ||
+      line.match(/^\s*(?:ห้อง\s*(?:ม\.?)?\s*(\d+)\s*\/\s*(\d+))/i) ||
+      line.match(/^\s*ม\.?\s*(\d+)\s*(?:ห้องที่|ห้อง|\/)\s*(\d+)\s*$/i)
+    );
     if (fullRoomMatch) {
       const g = fullRoomMatch[1] || fullRoomMatch[3];
       const r = fullRoomMatch[2] || fullRoomMatch[4];
@@ -284,29 +288,24 @@ export function parseSgsClipboardText(rawText: string, defaultClassroom?: string
       // Remaining tokens after codeIndex are likely Name and possibly Classroom
       const remainingTokens = tokens.filter((_, idx) => idx !== codeIndex && idx !== 0);
 
-      // Check last tokens for classroom: Support two-token (e.g. "ม.4" "4") and single-token ("4/4", "ม.4/4")
-      if (remainingTokens.length >= 2) {
-        const last1 = remainingTokens[remainingTokens.length - 1];
+      // Check last tokens for classroom:
+      // First check if last1 alone is a valid classroom (e.g. "ม.1/1", "1/1", "room-1-1")
+      const last1 = remainingTokens[remainingTokens.length - 1];
+      const oneTokenNorm = normalizeClassroomName(last1, '');
+      if (oneTokenNorm && /^ม\.\d+\/\d+$/.test(oneTokenNorm)) {
+        detectedClassroom = oneTokenNorm;
+        rawNameTokens = remainingTokens.slice(0, remainingTokens.length - 1);
+      } else if (remainingTokens.length >= 2) {
         const last2 = remainingTokens[remainingTokens.length - 2];
-        const twoTokenTest = `${last2} ${last1}`;
-        const twoTokenNorm = normalizeClassroomName(twoTokenTest, '');
-        if (twoTokenNorm && /ม\.\d+\/\d+/.test(twoTokenNorm)) {
-          detectedClassroom = twoTokenNorm;
-          rawNameTokens = remainingTokens.slice(0, remainingTokens.length - 2);
-        } else {
-          const oneTokenNorm = normalizeClassroomName(last1, '');
-          if (oneTokenNorm && /ม\.\d+\/\d+/.test(oneTokenNorm)) {
-            detectedClassroom = oneTokenNorm;
-            rawNameTokens = remainingTokens.slice(0, remainingTokens.length - 1);
+        if (/^(?:ม\.?|ชั้น)?\s*\d+$/i.test(last2)) {
+          const twoTokenTest = `${last2} ${last1}`;
+          const twoTokenNorm = normalizeClassroomName(twoTokenTest, '');
+          if (twoTokenNorm && /^ม\.\d+\/\d+$/.test(twoTokenNorm)) {
+            detectedClassroom = twoTokenNorm;
+            rawNameTokens = remainingTokens.slice(0, remainingTokens.length - 2);
           } else {
             rawNameTokens = remainingTokens;
           }
-        }
-      } else if (remainingTokens.length === 1) {
-        const oneTokenNorm = normalizeClassroomName(remainingTokens[0], '');
-        if (oneTokenNorm && /ม\.\d+\/\d+/.test(oneTokenNorm)) {
-          detectedClassroom = oneTokenNorm;
-          rawNameTokens = [];
         } else {
           rawNameTokens = remainingTokens;
         }

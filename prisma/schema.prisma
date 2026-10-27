@@ -334,5 +334,89 @@ model StudentScore {
   @@index([studentId])
 }
 
+// ============================================================================
+// KP CLASSROOM MESSAGING & CHAT SYSTEM (PRODUCTION SCHEMA)
+// ============================================================================
+
+enum ChatRoomType {
+  HOMEROOM
+  COURSE
+  OFFICIAL
+  DEPARTMENT
+}
+
+enum ChatMessageType {
+  TEXT
+  TASK
+  ANNOUNCEMENT
+  TRANSFER
+  SYSTEM
+}
+
+model ChatRoom {
+  id                 String         @id @default(uuid())
+  schoolId           String         @map("school_id")
+  academicYear       Int            @map("academic_year")
+  type               ChatRoomType
+  name               String
+  description        String?
+  classroomId        String?        @map("classroom_id")
+  courseCode         String?        @map("course_code")
+  isReadOnly         Boolean        @default(false) @map("is_read_only")
+
+  lastMessageAt      DateTime?      @map("last_message_at")
+  lastMessagePreview String?        @map("last_message_preview")
+  lastMessageSender  String?        @map("last_message_sender")
+
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+
+  members            ChatRoomMember[]
+  messages           ChatMessage[]
+
+  @@index([schoolId, academicYear, type])
+  @@index([classroomId])
+  @@index([courseCode])
+  @@map("chat_rooms")
+}
+
+model ChatRoomMember {
+  id           String    @id @default(uuid())
+  roomId       String    @map("room_id")
+  userId       String    @map("user_id")
+  role         String    // TEACHER, STUDENT, ADVISOR, ACADEMIC_ADMIN, SCHOOL_ADMIN
+  isMuted      Boolean   @default(false) @map("is_muted")
+  lastReadAt   DateTime? @map("last_read_at")
+  joinedAt     DateTime  @default(now()) @map("joined_at")
+
+  room         ChatRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([userId])
+  @@map("chat_room_members")
+}
+
+model ChatMessage {
+  id             String          @id @default(uuid())
+  roomId         String          @map("room_id")
+  senderId       String          @map("sender_id")
+  senderName     String          @map("sender_name")
+  senderRole     String          @map("sender_role")
+  messageType    ChatMessageType @default(TEXT) @map("message_type")
+  content        String          @db.Text
+  idempotencyKey String?         @unique @map("idempotency_key")
+  
+  attachmentMeta Json?           @map("attachment_meta")
+  actionPayload  Json?           @map("action_payload")
+  
+  createdAt      DateTime        @default(now()) @map("created_at")
+
+  room           ChatRoom        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt(sort: Desc)])
+  @@map("chat_messages")
+}
+
+
 
 
