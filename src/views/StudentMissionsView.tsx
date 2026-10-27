@@ -352,6 +352,20 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
     }
 
     try {
+      let effectiveFileDataUrl = selectedFileDataUrl;
+      if (!effectiveFileDataUrl && selectedRawFile && selectedRawFile.size <= 5 * 1024 * 1024) {
+        try {
+          effectiveFileDataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve((reader.result as string) || '');
+            reader.onerror = () => resolve('');
+            reader.readAsDataURL(selectedRawFile as Blob);
+          });
+        } catch {
+          // ignore
+        }
+      }
+
       // 1. อัปโหลดไฟล์ขึ้น Cloudflare R2 และบันทึกผลงานลงฐานข้อมูลก่อนเสมอ
       await sgsRosterAndSubmissionService.submitStudentWorkToR2Async({
         assignmentId: selectedQuest.id,
@@ -363,20 +377,20 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
           selectedFileName ||
           (selectedRawFile && 'name' in selectedRawFile && selectedRawFile.name
             ? selectedRawFile.name
-            : selectedFileDataUrl
+            : effectiveFileDataUrl
             ? `work_${studentCode}.webp`
             : undefined),
         originalSizeKb: selectedRawFile
           ? Math.max(1, Math.round(selectedRawFile.size / 1024))
-          : selectedFileDataUrl
-          ? Math.round(selectedFileDataUrl.length / 1024)
+          : effectiveFileDataUrl
+          ? Math.round(effectiveFileDataUrl.length / 1024)
           : 0,
         compressedSizeKb: selectedRawFile
           ? Math.max(1, Math.round(selectedRawFile.size / 1024))
-          : selectedFileDataUrl
-          ? Math.round(selectedFileDataUrl.length / 1365)
+          : effectiveFileDataUrl
+          ? Math.round(effectiveFileDataUrl.length / 1365)
           : 0,
-        fileDataUrl: selectedFileDataUrl || undefined,
+        fileDataUrl: effectiveFileDataUrl || undefined,
         fileBlob: selectedRawFile || undefined,
         externalLinkUrl: hasLink ? trimmedLink : undefined,
         textContent: hasText ? trimmedText : undefined,
@@ -1528,7 +1542,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                             setIsCompressingImage(true);
 
                             // 1. ถ้านักเรียนเลือกรูปภาพ ให้บีบอัดและแปลงเป็น WebP อัตโนมัติก่อน
-                            const { file: processedFile, originalSize, compressedSize, wasCompressed } =
+                            const { file: processedFile, originalSize, compressedSize, wasCompressed, dataUrl: compressedDataUrl } =
                               await compressImageToWebP(f, {
                                 maxWidthOrHeight: 1920,
                                 quality: 0.82,
@@ -1588,7 +1602,9 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                             }
 
                             // DataUrl สำรองเฉพาะไฟล์ขนาดไม่เกิน 5 MB เพื่อไม่ให้กินหน่วยความจำเครื่อง
-                            if (processedFile.size <= 5 * 1024 * 1024) {
+                            if (compressedDataUrl) {
+                              setSelectedFileDataUrl(compressedDataUrl);
+                            } else if (processedFile.size <= 5 * 1024 * 1024) {
                               const reader = new FileReader();
                               reader.onload = (event) => {
                                 const resultStr = event.target?.result as string;

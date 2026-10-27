@@ -3118,14 +3118,46 @@ export const sgsRosterAndSubmissionService = {
       // 1. ตรวจสอบคีย์ตรง kp_sub_file_${cleanAsg}_${cleanStu}
       if (cleanAsg && cleanStu) {
         const direct1 = localStorage.getItem(`kp_sub_file_${cleanAsg}_${cleanStu}`);
-        if (isValidDataUrl(direct1)) return direct1!;
+        if (isValidDataUrl(direct1)) {
+          if (direct1!.includes('STALE')) {
+            try {
+              const rawSubs = localStorage.getItem('kp_work_submissions_v2');
+              if (rawSubs) {
+                const subs: any[] = JSON.parse(rawSubs);
+                const found = subs.find((s) => s.assignmentId === cleanAsg && s.studentCode === cleanStu);
+                const r2 = found?.fileDataUrl || found?.fileUrl;
+                if (r2 && (r2.startsWith('http://') || r2.startsWith('https://'))) {
+                  return r2;
+                }
+              }
+            } catch {
+              // ignore
+            }
+          } else {
+            return direct1!;
+          }
+        }
 
         const direct2 = localStorage.getItem(`kp_sub_file_${assignmentId}_${studentCode}`);
-        if (isValidDataUrl(direct2)) return direct2!;
+        if (isValidDataUrl(direct2) && !direct2!.includes('STALE')) return direct2!;
 
         if (typeof sessionStorage !== 'undefined') {
           const sess = sessionStorage.getItem(`kp_sub_file_${cleanAsg}_${cleanStu}`);
-          if (isValidDataUrl(sess)) return sess!;
+          if (isValidDataUrl(sess) && !sess!.includes('STALE')) return sess!;
+        }
+
+        try {
+          const rawSubs = localStorage.getItem('kp_work_submissions_v2');
+          if (rawSubs) {
+            const subs: any[] = JSON.parse(rawSubs);
+            const found = subs.find((s) => s.assignmentId === cleanAsg && s.studentCode === cleanStu);
+            const r2 = found?.fileDataUrl || found?.fileUrl;
+            if (r2 && (r2.startsWith('http://') || r2.startsWith('https://'))) {
+              return r2;
+            }
+          }
+        } catch {
+          // ignore
         }
       }
 
@@ -3405,13 +3437,13 @@ export const sgsRosterAndSubmissionService = {
       resolvedFileUrl = URL.createObjectURL(fileToUpload);
     }
 
-    // แคชไฟล์ภาพ / preview URL ลง localStorage เพื่อให้ครูเปิดดูออฟไลน์ได้ทันที (ให้ความสำคัญกับ R2 URL ก่อน Base64 เสมอ)
+    // แคชไฟล์ภาพ / preview URL ลง localStorage เพื่อให้ครูเปิดดูออฟไลน์ได้ทันที (เก็บทั้ง Data URL และ R2 URL)
     if ((payload.fileDataUrl || resolvedFileUrl) && typeof localStorage !== 'undefined') {
       try {
         const cleanAsg = String(payload.assignmentId).trim();
         const cleanStu = String(verifiedStudentCode).trim();
         const isR2Url = resolvedFileUrl && (resolvedFileUrl.startsWith('http://') || resolvedFileUrl.startsWith('https://'));
-        const cacheUrl = isR2Url ? resolvedFileUrl : (resolvedFileUrl || payload.fileDataUrl);
+        const cacheUrl = payload.fileDataUrl || (isR2Url ? resolvedFileUrl : '');
         if (cacheUrl && !cacheUrl.startsWith('blob:')) {
           localStorage.setItem(`kp_sub_file_${cleanAsg}_${cleanStu}`, cacheUrl);
           if (cleanFileName) {
@@ -3462,8 +3494,8 @@ export const sgsRosterAndSubmissionService = {
       workAttachmentLabel: attachmentLabel,
       classroom: payload.classroom || identity?.student?.classroom || (existingIdx !== -1 ? submissions[existingIdx].classroom : undefined),
       academicYearTerm: payload.academicYearTerm || term,
-      fileUrl: hasIncomingFile ? (resolvedFileUrl || (existingIdx !== -1 ? submissions[existingIdx].fileUrl : '')) : '',
-      fileDataUrl: hasIncomingFile ? (resolvedFileUrl || (existingIdx !== -1 ? submissions[existingIdx].fileDataUrl : '')) : '',
+      fileUrl: hasIncomingFile ? (resolvedFileUrl || payload.fileUrl || payload.fileDataUrl || (existingIdx !== -1 ? submissions[existingIdx].fileUrl : '')) : '',
+      fileDataUrl: hasIncomingFile ? (payload.fileDataUrl || (existingIdx !== -1 ? submissions[existingIdx].fileDataUrl : resolvedFileUrl)) : '',
       r2ObjectKey: hasIncomingFile ? resolvedR2Key : undefined,
       externalLinkUrl: payload.externalLinkUrl,
       textContent: payload.textContent !== undefined ? payload.textContent : (existingIdx !== -1 ? submissions[existingIdx].textContent : undefined),
@@ -3496,7 +3528,7 @@ export const sgsRosterAndSubmissionService = {
       classroom: identity?.student?.classroom || payload.classroom,
       courseCode: resolvedCourseCode,
       workTitle: payload.workTitle,
-      fileUrl: submissionRecord.fileUrl,
+      fileUrl: submissionRecord.fileUrl || payload.fileDataUrl || submissionRecord.fileDataUrl,
       externalLinkUrl: payload.externalLinkUrl,
       textContent: payload.textContent,
       status: 'PENDING_REVIEW',
@@ -3539,7 +3571,9 @@ export const sgsRosterAndSubmissionService = {
       (idx !== -1 ? subs[idx].unitId : undefined);
 
     const term = payload.academicYearTerm || '2/2569';
-    const cleanFileName = payload.fileName ? payload.fileName.trim() : undefined;
+    const cleanFileName = payload.fileName
+      ? payload.fileName.trim().replace(/\.(png|jpg|jpeg|bmp|heic|heif)$/i, '.webp')
+      : undefined;
     const cleanRoom = (payload.classroom ? formatClassroomLabel(payload.classroom).toLowerCase().replace(/\s+/g, '').replace('/', '-') : 'all');
     const isAlreadyUploadedR2Url = Boolean(
       payload.fileDataUrl &&

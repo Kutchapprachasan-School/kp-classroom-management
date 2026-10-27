@@ -679,7 +679,8 @@ export const teacherCourseAssignmentService = {
   submitGrade(
     queueId: string,
     score: number,
-    feedback: string
+    feedback: string,
+    fromIndex?: number
   ): { updatedQueue: GradingQueueItem[]; nextPendingItem: GradingQueueItem | null } {
     const list = this.getGradingQueue();
     let targetItem: GradingQueueItem | null = null;
@@ -736,10 +737,50 @@ export const teacherCourseAssignmentService = {
       }
     }
 
-    // หางานถัดไปที่ยังรอตรวจ (FIFO)
-    const nextPending = updated.find((it) => it.status === 'PENDING_REVIEW') || null;
+    // หางานถัดไปที่ยังรอตรวจ (ค้นหาเดินหน้า forward ก่อนเสมอ ไม่วนกลับไปข้อ 1 ที่ข้ามมา)
+    const targetIdx = list.findIndex(
+      (i) =>
+        i.id === queueId ||
+        i.id === `q_${queueId}` ||
+        `${i.assignmentId}_${i.studentCode}` === queueId.replace(/^q_/, '')
+    );
+    const startIdx = fromIndex !== undefined && fromIndex >= 0 ? fromIndex : targetIdx;
+    const forwardList = startIdx >= 0 ? updated.slice(startIdx + 1) : [];
+    const nextPending =
+      forwardList.find((it) => it.status === 'PENDING_REVIEW') ||
+      updated.find((it) => it.status === 'PENDING_REVIEW' && it.id !== queueId) ||
+      null;
 
     return { updatedQueue: updated, nextPendingItem: nextPending };
+  },
+
+  updateQueueItemFile(
+    queueId: string,
+    fileUrl: string
+  ): GradingQueueItem | null {
+    const list = this.getGradingQueue();
+    let updatedItem: GradingQueueItem | null = null;
+    const updated: GradingQueueItem[] = list.map((item) => {
+      const isIdMatch = item.id === queueId || item.id === `q_${queueId}`;
+      const isPairMatch =
+        (queueId.startsWith('q_') && queueId.slice(2) === `${item.assignmentId}_${item.studentCode}`) ||
+        queueId === `${item.assignmentId}_${item.studentCode}`;
+
+      if (isIdMatch || isPairMatch) {
+        const newItem: GradingQueueItem = {
+          ...item,
+          filePreviewUrl: fileUrl,
+        };
+        updatedItem = newItem;
+        return newItem;
+      }
+      return item;
+    });
+
+    if (updatedItem) {
+      this.saveGradingQueue(updated);
+    }
+    return updatedItem;
   },
 
   returnSubmission(

@@ -195,7 +195,9 @@ export const r2StorageService = {
       .replace(/\//g, '-');
     const cleanAsg = params.assignmentId.trim();
     const cleanStu = params.studentCode.trim();
-    const rawFile = this.normalizeObjectKey(params.fileName || `work_${cleanStu}.webp`).trim();
+    const rawFile = this.normalizeObjectKey(params.fileName || `work_${cleanStu}.webp`)
+      .trim()
+      .replace(/\.(png|jpg|jpeg|bmp|heic|heif)$/i, '.webp');
     const cleanFileWithoutStu = rawFile.startsWith(`${cleanStu}_`)
       ? rawFile.slice(cleanStu.length + 1)
       : rawFile;

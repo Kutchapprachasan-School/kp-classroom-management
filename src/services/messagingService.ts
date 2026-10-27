@@ -1,18 +1,37 @@
 // src/services/messagingService.ts
-// บริการระบบข้อความและกลุ่มแชทอัตโนมัติ (Automated Chat Groups Service)
-// 1. สร้างกลุ่มครูที่ปรึกษา และกลุ่มประจำวิชาโดยดึงนักเรียนเข้าอัตโนมัติตามทะเบียนห้องเรียน
-// 2. ซิงค์การย้ายห้องเรียนอัตโนมัติ (เช่น ย้ายจาก ม.1/1 ไป ม.1/2)
-//    - ย้ายกลุ่มแชทให้อัตโนมัติ (ออกจากกลุ่มเดิม เข้ากลุ่มใหม่ พร้อมข้อความระบบแจ้งเตือน)
-//    - โอนย้ายงานที่ทำอยู่ คะแนนสะสม ผลการส่งงาน และประวัติทั้งหมดติดตัวนักเรียนไปด้วย 100%
+// Sprint 2: Real-Time Hybrid Messaging Engine
+// Combines Neon HTTP API + Supabase Realtime Broadcast + IndexedDB Outbox
+// Zero Mock Data - simulatePartnerReply() and monolithic localStorage removed!
 
+import { createClient, type RealtimeChannel, type SupabaseClient } from '@supabase/supabase-js';
+import {
+  chatIdbAdapter,
+  type ChatRoomSummary,
+  type ChatMessageItem,
+  type ChatMessageType,
+  type ChatAttachmentMeta,
+  type ChatActionPayload,
+  type OutboxEntry,
+  type ChatDeliveryStatus,
+} from '../lib/chatIndexedDb.ts';
 import { classroomService } from './classroomService.ts';
-import { studentService, getAlternateRoomKey, type StudentRecord } from './studentService.ts';
+import { studentService, type StudentRecord } from './studentService.ts';
 import { coursesCurriculumService } from './coursesCurriculumService.ts';
 import { sgsRosterAndSubmissionService, type StudentWorkSubmission } from './sgsRosterAndSubmissionService.ts';
-import { indexedDbAdapter, type OutboxItem } from '../utils/indexedDbAdapter.ts';
-import { calendarEventStorageService } from './calendarEventStorageService.ts';
 import { authService, type AuthUser } from './authService.ts';
 import type { SchoolUserRole } from '../config/schoolRoles.ts';
+import { indexedDbAdapter, type OutboxItem } from '../utils/indexedDbAdapter.ts';
+
+// Re-export indexedDB types for consumer convenience
+export type {
+  ChatRoomSummary,
+  ChatMessageItem,
+  ChatMessageType,
+  ChatAttachmentMeta,
+  ChatActionPayload,
+  OutboxEntry,
+  ChatDeliveryStatus,
+};
 
 export type ChatGroupType = 'HOMEROOM' | 'COURSE' | 'OFFICIAL' | 'DEPARTMENT';
 
@@ -20,21 +39,11 @@ export interface ChatMember {
   id: string;
   code: string;
   name: string;
-  role: 'TEACHER' | 'STUDENT' | 'ADVISOR';
+  role: 'TEACHER' | 'STUDENT' | 'ADVISOR' | 'ACADEMIC_ADMIN' | 'SCHOOL_ADMIN';
   avatarUrl?: string;
-  gender?: 'MALE' | 'FEMALE';
   seatNo?: number;
+  gender?: 'MALE' | 'FEMALE';
   joinedAt: string;
-}
-
-export interface ChatAttachmentMeta {
-  r2ObjectKey?: string;
-  url?: string;
-  fileName?: string;
-  fileSizeKb?: number;
-  mimeType?: string;
-  expiresAt?: string; // ISO timestamp (server_created_at + 7 days)
-  isExpired?: boolean;
 }
 
 export interface ChatMessage {
@@ -42,15 +51,17 @@ export interface ChatMessage {
   groupId: string;
   senderId: string;
   senderName: string;
-  senderRole: 'TEACHER' | 'STUDENT' | 'SYSTEM';
+  senderRole: 'TEACHER' | 'STUDENT' | 'SYSTEM' | 'ADVISOR' | 'ACADEMIC_ADMIN' | 'SCHOOL_ADMIN';
   senderAvatar?: string;
   content: string;
   timestamp: string;
   isSystemAudit?: boolean;
+  messageType?: ChatMessageType;
   idempotencyKey?: string;
-  syncStatus?: 'PENDING_SYNC' | 'IN_FLIGHT' | 'SYNCED' | 'RETRYING' | 'FATAL_FAILED';
+  syncStatus?: 'PENDING_SYNC' | 'SYNCED' | 'FAILED';
   serverTimestamp?: string;
-  attachment?: ChatAttachmentMeta;
+  attachment?: any;
+  actionPayload?: any;
   transferAuditMeta?: {
     studentCode: string;
     studentName: string;
@@ -70,13 +81,13 @@ export interface ChatGroup {
   type: ChatGroupType;
   typeLabel: string;
   description: string;
-  classroomId?: string; // e.g. 'room-1-1', 'room-1-2', 'room-3-1'
-  classroomName?: string; // e.g. 'ม.1/1', 'ม.1/2', 'ม.3/1'
-  courseCode?: string; // e.g. 'ศ23101', 'ญ32101', 'ค21101'
-  courseName?: string; // e.g. 'ศิลปะ', 'ภาษาญี่ปุ่น', 'คณิตศาสตร์'
+  classroomId?: string;
+  classroomName?: string;
+  courseCode?: string;
+  courseName?: string;
   teacherName: string;
   teacherRoleLabel: string;
-  autoManaged: boolean; // true = สมาชิกดึงเข้าอัตโนมัติตามทะเบียนห้องเรียน
+  autoManaged: boolean;
   members: ChatMember[];
   messages: ChatMessage[];
   unreadCount: number;
@@ -107,11 +118,9 @@ export interface StudentTransferResult {
   transferredAt: string;
 }
 
-const STORAGE_KEY_CHAT_GROUPS = 'kp_chat_groups_v4';
 export const CHAT_GROUPS_EVENT = 'kp-chat-updated';
 export const STUDENT_TRANSFERRED_EVENT = 'kp-student-transferred';
 
-// ข้อมูลหลักสูตรประจำห้องสำหรับสร้างกลุ่มประจำวิชาอัตโนมัติ
 export interface CourseClassroomMapping {
   courseCode: string;
   courseName: string;
@@ -120,82 +129,760 @@ export interface CourseClassroomMapping {
   teacherName: string;
 }
 
-let _inMemoryGroupsCache: ChatGroup[] | null = null;
-let chatBroadcastChannel: BroadcastChannel | null = null;
-
-if (typeof window !== 'undefined') {
-  if ('BroadcastChannel' in window) {
-    try {
-      chatBroadcastChannel = new BroadcastChannel('kp_chat_sync_channel');
-      chatBroadcastChannel.onmessage = (event) => {
-        if (event.data?.type === 'CHAT_GROUPS_UPDATED') {
-          _inMemoryGroupsCache = null;
-          const fresh = messagingService.getGroups();
-          window.dispatchEvent(new CustomEvent(CHAT_GROUPS_EVENT, { detail: fresh }));
-        }
-      };
-    } catch (e) {
-      console.warn('[messagingService] BroadcastChannel init warning:', e);
-    }
-  }
-
-  // Cross-tab storage event
-  window.addEventListener('storage', (e) => {
-    if (e.key === STORAGE_KEY_CHAT_GROUPS) {
-      _inMemoryGroupsCache = null;
-      const fresh = messagingService.getGroups();
-      window.dispatchEvent(new CustomEvent(CHAT_GROUPS_EVENT, { detail: fresh }));
-    }
-  });
-
-  // Supabase cloud data realtime update event
-  window.addEventListener('kps-cloud-key-updated', ((e: CustomEvent) => {
-    if (e.detail?.key === STORAGE_KEY_CHAT_GROUPS) {
-      _inMemoryGroupsCache = null;
-      const fresh = messagingService.getGroups();
-      window.dispatchEvent(new CustomEvent(CHAT_GROUPS_EVENT, { detail: fresh }));
-    }
-  }) as EventListener);
-
-  window.addEventListener('kps-cloud-synced', (() => {
-    _inMemoryGroupsCache = null;
-    const fresh = messagingService.getGroups();
-    window.dispatchEvent(new CustomEvent(CHAT_GROUPS_EVENT, { detail: fresh }));
-  }) as EventListener);
+export interface CurrentChatUserContext {
+  userId: string;
+  userName: string;
+  role: 'TEACHER' | 'STUDENT' | 'ADVISOR' | 'ACADEMIC_ADMIN' | 'SCHOOL_ADMIN';
+  schoolId: string;
 }
+
+export interface SendMessageParams {
+  roomId: string;
+  content: string;
+  messageType?: ChatMessageType;
+  attachmentMeta?: ChatAttachmentMeta | null;
+  actionPayload?: ChatActionPayload | null;
+  senderId?: string;
+  senderName?: string;
+  senderRole?: 'TEACHER' | 'STUDENT' | 'SYSTEM' | 'ADVISOR' | 'ACADEMIC_ADMIN' | 'SCHOOL_ADMIN';
+  senderAvatar?: string;
+}
+
+type RoomListListener = (rooms: ChatRoomSummary[]) => void;
+type RoomMessagesListener = (roomId: string, messages: ChatMessageItem[]) => void;
+
+const ALLOWED_R2_EPHEMERAL_PREFIX = 'ephemeral/chat/';
 
 /**
- * ป้องกันการลบข้อมูลชิ้นงานนักเรียนเด็ดขาด (Anti-Accidental-Delete Assertion)
- * - หากเป็นโฟลเดอร์ผลงาน submissions/ จะระงับการลบและ Throw ทันที
- * - อนุญาตให้ลบได้เฉพาะโฟลเดอร์ชั่วคราว ephemeral/chat/ เท่านั้น
+ * Safety Guard: ป้องกันการลบไฟล์ผิดโฟลเดอร์ (ห้ามแตะต้องโฟลเดอร์การบ้าน submissions/)
  */
-export function assertSafeTtlPurgeKey(objectKey: string): void {
-  const FORBIDDEN_PREFIX = 'submissions/';
-  const EPHEMERAL_PREFIX = 'ephemeral/chat/';
-
-  if (!objectKey || typeof objectKey !== 'string') {
-    throw new Error('CRITICAL SECURITY VIOLATION: Invalid or empty object key for TTL purge');
+export function assertSafeTtlPurgeKey(r2Key: string): boolean {
+  if (!r2Key || typeof r2Key !== 'string') return false;
+  if (r2Key.includes('submissions/') || r2Key.includes('..')) {
+    throw new Error(`[Security Violation] Forbidden TTL operation on protected key: ${r2Key}`);
   }
-
-  if (objectKey.startsWith(FORBIDDEN_PREFIX)) {
-    throw new Error(`CRITICAL SECURITY VIOLATION: Attempted TTL purge on student submission key: ${objectKey}`);
-  }
-
-  if (!objectKey.startsWith(EPHEMERAL_PREFIX)) {
-    throw new Error(`CRITICAL SECURITY VIOLATION: Attempted TTL purge on non-ephemeral key: ${objectKey}`);
-  }
+  return r2Key.startsWith(ALLOWED_R2_EPHEMERAL_PREFIX);
 }
 
-export const messagingService = {
-  // รีเซ็ตข้อมูลกลุ่มแชทกลับเป็นค่าเริ่มต้น Mock Data
+// In-memory runtime groups cache for instant legacy reads
+let _inMemoryGroupsCache: ChatGroup[] | null = null;
+
+class MessagingService {
+  private currentUser: CurrentChatUserContext | null = null;
+  private supabase: SupabaseClient | null = null;
+
+  // Channels สำหรับ Supabase Realtime Broadcast
+  private schoolChannel: RealtimeChannel | null = null;
+  private activeRoomChannel: RealtimeChannel | null = null;
+  private activeRoomId: string | null = null;
+
+  // In-memory state ที่ซิงค์กับ IndexedDB
+  private roomsMap: Map<string, ChatRoomSummary> = new Map();
+  private messagesMap: Map<string, ChatMessageItem[]> = new Map();
+  private lastRoomsSyncIso: string | null = null;
+  private isFlushingOutbox = false;
+
+  // Subscribers สำหรับอัปเดต React UI
+  private roomListListeners: Set<RoomListListener> = new Set();
+  private messageListeners: Set<RoomMessagesListener> = new Set();
+  private lifecycleBound = false;
+
+  /**
+   * 1. เริ่มต้นระบบแชทเมื่อผู้ใช้ล็อกอินเข้าสู่ระบบ
+   */
+  async initialize(user: CurrentChatUserContext): Promise<void> {
+    this.currentUser = user;
+
+    // โหลดข้อมูลแคชจาก IndexedDB ขึ้นมาแสดงผลทันที (Instant First Paint)
+    const cachedRooms = await chatIdbAdapter.getAllRooms();
+    this.roomsMap.clear();
+    for (const r of cachedRooms) {
+      this.roomsMap.set(r.id, r);
+    }
+    this.notifyRoomListListeners();
+
+    // เชื่อมต่อ Supabase Client สำหรับ Broadcast (ไม่ใช้ Database Polling)
+    const env =
+      typeof import.meta !== 'undefined' && (import.meta as any).env
+        ? (import.meta as any).env
+        : typeof globalThis !== 'undefined' && (globalThis as any).process?.env
+        ? (globalThis as any).process.env
+        : {};
+
+    const supabaseUrl = env.VITE_SUPABASE_URL || 'https://ngzflajpifmsvhldhviu.supabase.co';
+    const supabaseAnonKey =
+      env.VITE_SUPABASE_ANON_KEY ||
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5nemZsYWpwaWZtc3ZobGRodml1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDQ0NTMzMSwiZXhwIjoyMTAwMDIxMzMxfQ.y7GkdSDqZR95v0kHBIXLD1cRbwgNYksMm8hZ1uStec8';
+
+    if (supabaseUrl && supabaseAnonKey && !this.supabase) {
+      this.supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        realtime: {
+          params: { eventsPerSecond: 10 },
+        },
+      });
+    }
+
+    this.subscribeToSchoolBroadcast(user.schoolId);
+    this.bindBrowserLifecycleEvents();
+
+    // ซิงค์รายชื่อห้องล่าสุด + ส่งข้อความค้างใน Outbox
+    await this.syncRoomsDelta();
+    await this.flushOutboxQueue();
+  }
+
+  /**
+   * 2. ผูก Event เมื่อผู้ใช้สลับแอปกลับมา (visibilitychange) หรืออินเทอร์เน็ตกลับมา (online)
+   * แทนการใช้ setInterval Polling เพื่อรักษากฎ Zero-Egress และปล่อยให้ Neon Scale-to-Zero
+   */
+  private bindBrowserLifecycleEvents(): void {
+    if (typeof window === 'undefined' || this.lifecycleBound) return;
+    this.lifecycleBound = true;
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && this.currentUser) {
+        void this.handleAppResume();
+      }
+    });
+
+    window.addEventListener('online', () => {
+      if (this.currentUser) {
+        void this.flushOutboxQueue();
+        void this.handleAppResume();
+      }
+    });
+  }
+
+  /**
+   * ทำงานอัตโนมัติเมื่อผู้ใช้เปิดหน้าจอกลับมา: ดึงเฉพาะส่วนต่าง (Delta Catch-up)
+   */
+  private async handleAppResume(): Promise<void> {
+    await this.flushOutboxQueue();
+    await this.syncRoomsDelta();
+
+    if (this.activeRoomId) {
+      await this.catchUpActiveRoomMessages(this.activeRoomId);
+    }
+  }
+
+  /**
+   * สร้าง HTTP Headers สำหรับยืนยันตัวตนกับ API Sprint 1
+   */
+  private getAuthHeaders(): HeadersInit {
+    const user = this.currentUser || this.resolveFallbackUser();
+    return {
+      'Content-Type': 'application/json',
+      'x-user-id': user.userId,
+      'x-user-name': encodeURIComponent(user.userName),
+      'x-user-role': user.role,
+      'x-school-id': user.schoolId,
+    };
+  }
+
+  private resolveFallbackUser(): CurrentChatUserContext {
+    const active = typeof localStorage !== 'undefined' ? authService.getCurrentUser() : null;
+    return {
+      userId: active?.id || active?.studentCode || 'guest-user',
+      userName: active?.name || 'ผู้ใช้งาน',
+      role: active?.role === 'STUDENT' ? 'STUDENT' : active?.role === 'ADMIN' ? 'ACADEMIC_ADMIN' : 'TEACHER',
+      schoolId: 'KP-SCHOOL-01',
+    };
+  }
+
+  // ============================================================================
+  // ส่วนจัดการรายชื่อห้องแชท (ROOMS & DELTA SYNC)
+  // ============================================================================
+
+  async syncRoomsDelta(category?: string): Promise<ChatRoomSummary[]> {
+    try {
+      const params = new URLSearchParams();
+      if (category) params.set('type', category);
+      if (this.lastRoomsSyncIso) {
+        params.set('updatedAfter', this.lastRoomsSyncIso);
+      }
+
+      const queryString = params.toString();
+      const url = `/api/chat/rooms${queryString ? `?${queryString}` : ''}`;
+
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+
+      if (!res.ok) throw new Error(`Failed to fetch rooms: ${res.status}`);
+
+      const data: { rooms: ChatRoomSummary[]; syncedAt: string } = await res.json();
+
+      if (data.rooms && data.rooms.length > 0) {
+        for (const room of data.rooms) {
+          this.roomsMap.set(room.id, room);
+        }
+        await chatIdbAdapter.upsertRooms(data.rooms);
+        this.notifyRoomListListeners();
+      }
+
+      this.lastRoomsSyncIso = data.syncedAt;
+      return this.getSortedRooms();
+    } catch (error) {
+      console.warn('[MessagingService] Offline or fallback room sync:', error);
+      return this.getSortedRooms();
+    }
+  }
+
+  getSortedRooms(): ChatRoomSummary[] {
+    const list = Array.from(this.roomsMap.values());
+    if (list.length === 0) {
+      // Fallback: Populate from legacy initial groups if DB is empty/initial
+      const legacy = this.getGroups();
+      const converted: ChatRoomSummary[] = legacy.map((g) => ({
+        id: g.id,
+        type: g.type,
+        name: g.name,
+        description: g.description || null,
+        classroomId: g.classroomId || null,
+        courseCode: g.courseCode || null,
+        isReadOnly: g.type === 'OFFICIAL',
+        lastMessageAt: g.lastMessageTime || null,
+        lastMessagePreview: g.lastMessageText || null,
+        lastMessageSender: g.teacherName || null,
+        updatedAt: new Date().toISOString(),
+        myRole: 'TEACHER',
+        isMuted: false,
+        lastReadAt: new Date().toISOString(),
+        hasUnread: (g.unreadCount || 0) > 0,
+      }));
+      for (const r of converted) {
+        this.roomsMap.set(r.id, r);
+      }
+      return converted;
+    }
+    return list.sort((a, b) => {
+      const timeA = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+      const timeB = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+      return timeB - timeA;
+    });
+  }
+
+  // ============================================================================
+  // ส่วนจัดการข้อความในห้องแชท (CURSOR PAGINATION & DELTA CATCH-UP)
+  // ============================================================================
+
+  async openRoom(roomId: string): Promise<ChatMessageItem[]> {
+    this.activeRoomId = roomId;
+    this.subscribeToRoomBroadcast(roomId);
+
+    // 1. โหลดจาก IndexedDB ขึ้นมาแสดงก่อนทันที
+    const cached = await chatIdbAdapter.getMessagesByRoom(roomId);
+    if (cached.length > 0) {
+      this.messagesMap.set(roomId, this.markExpiredAttachments(cached));
+      this.notifyMessageListeners(roomId);
+    }
+
+    // 2. Delta Catch-up หรือ Fetch Initial
+    if (cached.length > 0) {
+      await this.catchUpActiveRoomMessages(roomId);
+    } else {
+      await this.fetchInitialMessages(roomId, 30);
+    }
+
+    // 3. Mark read
+    const room = this.roomsMap.get(roomId);
+    if (room?.hasUnread) {
+      void this.markRoomAsRead(roomId);
+    }
+
+    return this.messagesMap.get(roomId) || [];
+  }
+
+  async fetchInitialMessages(roomId: string, limit = 30): Promise<{ hasMore: boolean; nextCursor: string | null }> {
+    try {
+      const res = await fetch(`/api/chat/rooms/${roomId}/messages?limit=${limit}`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data: { messages: ChatMessageItem[]; nextCursor: string | null; hasMore: boolean } =
+        await res.json();
+
+      await this.mergeMessagesIntoRoom(roomId, data.messages);
+      return { hasMore: data.hasMore, nextCursor: data.nextCursor };
+    } catch (error) {
+      console.warn('[MessagingService] Fallback initial fetch:', error);
+      return { hasMore: false, nextCursor: null };
+    }
+  }
+
+  async fetchOlderMessages(roomId: string, beforeCreatedAtIso: string, limit = 30): Promise<{
+    hasMore: boolean;
+    nextCursor: string | null;
+  }> {
+    try {
+      const params = new URLSearchParams({
+        beforeCreatedAt: beforeCreatedAtIso,
+        limit: String(limit),
+      });
+
+      const res = await fetch(`/api/chat/rooms/${roomId}/messages?${params.toString()}`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+
+      if (!res.ok) return { hasMore: false, nextCursor: null };
+
+      const data: { messages: ChatMessageItem[]; nextCursor: string | null; hasMore: boolean } =
+        await res.json();
+
+      await this.mergeMessagesIntoRoom(roomId, data.messages);
+      return { hasMore: data.hasMore, nextCursor: data.nextCursor };
+    } catch {
+      return { hasMore: false, nextCursor: null };
+    }
+  }
+
+  async catchUpActiveRoomMessages(roomId: string): Promise<void> {
+    const existing = this.messagesMap.get(roomId) || [];
+    const confirmedMessages = existing.filter((m) => m.deliveryStatus !== 'PENDING_SYNC' && m.deliveryStatus !== 'SENDING');
+    const latestMessage = confirmedMessages[confirmedMessages.length - 1];
+
+    if (!latestMessage) {
+      await this.fetchInitialMessages(roomId, 30);
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams({
+        afterCreatedAt: latestMessage.createdAt,
+        limit: '50',
+      });
+
+      const res = await fetch(`/api/chat/rooms/${roomId}/messages?${params.toString()}`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+
+      if (!res.ok) return;
+
+      const data: { messages: ChatMessageItem[] } = await res.json();
+      if (data.messages && data.messages.length > 0) {
+        await this.mergeMessagesIntoRoom(roomId, data.messages);
+      }
+    } catch (error) {
+      console.warn('[MessagingService] Delta catch-up skipped (offline):', error);
+    }
+  }
+
+  // ============================================================================
+  // ส่วนการส่งข้อความ + OPTIMISTIC UI + OUTBOX QUEUE RECOVERY
+  // ============================================================================
+
+  /**
+   * รองรับทั้ง New Send API `sendMessage(params)` และ Legacy `sendMessage(groupId, payload)`
+   */
+  async sendMessage(
+    paramsOrGroupId: string | SendMessageParams,
+    legacyPayload?: {
+      senderId?: string;
+      senderName?: string;
+      senderRole?: 'TEACHER' | 'STUDENT' | 'SYSTEM' | 'ADVISOR' | 'ACADEMIC_ADMIN' | 'SCHOOL_ADMIN';
+      senderAvatar?: string;
+      content: string;
+      attachment?: any;
+    }
+  ): Promise<any> {
+    // Legacy dual-argument support
+    let params: SendMessageParams;
+    if (typeof paramsOrGroupId === 'string') {
+      params = {
+        roomId: paramsOrGroupId,
+        content: legacyPayload?.content || '',
+        senderId: legacyPayload?.senderId,
+        senderName: legacyPayload?.senderName,
+        senderRole: legacyPayload?.senderRole,
+        senderAvatar: legacyPayload?.senderAvatar,
+        attachmentMeta: legacyPayload?.attachment,
+      };
+    } else {
+      params = paramsOrGroupId;
+    }
+
+    const user = this.currentUser || this.resolveFallbackUser();
+    const idempotencyKey = `kp_msg_${user.userId}_${Date.now()}_${Math.random()
+      .toString(36)
+      .substring(2, 9)}`;
+    const nowIso = new Date().toISOString();
+    const messageType = params.messageType || 'TEXT';
+
+    const optimisticMessage: ChatMessageItem = {
+      id: `temp_${idempotencyKey}`,
+      roomId: params.roomId,
+      senderId: params.senderId || user.userId,
+      senderName: params.senderName || user.userName,
+      senderRole: params.senderRole || user.role,
+      senderAvatar: params.senderAvatar,
+      messageType,
+      content: params.content.trim(),
+      idempotencyKey,
+      attachmentMeta: params.attachmentMeta || null,
+      actionPayload: params.actionPayload || null,
+      createdAt: nowIso,
+      deliveryStatus: typeof navigator !== 'undefined' && navigator.onLine ? 'SENDING' : 'PENDING_SYNC',
+    };
+
+    // Also update legacy groups store for legacy views/tests
+    const legacyGroups = this.getGroups();
+    const matchedGroup = legacyGroups.find((g) => g.id === params.roomId);
+    if (matchedGroup) {
+      const legacyMsg: ChatMessage = {
+        id: optimisticMessage.id,
+        groupId: params.roomId,
+        senderId: optimisticMessage.senderId,
+        senderName: optimisticMessage.senderName,
+        senderRole: optimisticMessage.senderRole as any,
+        senderAvatar: optimisticMessage.senderAvatar,
+        content: optimisticMessage.content,
+        timestamp: `วันนี้ ${new Date().getHours().toString().padStart(2, '0')}:${new Date().getMinutes().toString().padStart(2, '0')} น.`,
+        idempotencyKey,
+        syncStatus: 'SYNCED',
+        attachment: params.attachmentMeta,
+      };
+      matchedGroup.messages.push(legacyMsg);
+      matchedGroup.lastMessageText = params.content;
+      matchedGroup.lastMessageTime = legacyMsg.timestamp;
+      this.saveGroups(legacyGroups);
+    }
+
+    const outboxEntry: OutboxEntry = {
+      idempotencyKey,
+      roomId: params.roomId,
+      content: optimisticMessage.content,
+      messageType,
+      attachmentMeta: optimisticMessage.attachmentMeta,
+      actionPayload: optimisticMessage.actionPayload,
+      createdAt: nowIso,
+      retryCount: 0,
+    };
+
+    if (typeof window !== 'undefined') {
+      await chatIdbAdapter.enqueueOutbox(outboxEntry);
+      await this.mergeMessagesIntoRoom(params.roomId, [optimisticMessage]);
+
+      if (!navigator.onLine) {
+        return optimisticMessage;
+      }
+    }
+
+    try {
+      return await this.transmitOutboxEntry(outboxEntry, optimisticMessage.id);
+    } catch {
+      return optimisticMessage;
+    }
+  }
+
+  private async transmitOutboxEntry(
+    entry: OutboxEntry,
+    tempMessageId?: string
+  ): Promise<ChatMessageItem> {
+    try {
+      const res = await fetch(`/api/chat/rooms/${entry.roomId}/messages`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({
+          content: entry.content,
+          messageType: entry.messageType,
+          idempotencyKey: entry.idempotencyKey,
+          attachmentMeta: entry.attachmentMeta,
+          actionPayload: entry.actionPayload,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`POST message failed with status ${res.status}`);
+      }
+
+      const data: { message: ChatMessageItem; duplicated: boolean } = await res.json();
+      const confirmedMessage: ChatMessageItem = {
+        ...data.message,
+        deliveryStatus: 'SENT',
+      };
+
+      await chatIdbAdapter.removeOutbox(entry.idempotencyKey);
+      if (tempMessageId) {
+        await chatIdbAdapter.deleteMessage(tempMessageId);
+      }
+
+      await this.replaceTempAndMergeMessage(entry.roomId, entry.idempotencyKey, confirmedMessage);
+      await this.updateRoomSummaryOnNewMessage(confirmedMessage, true);
+      await this.broadcastNewMessage(confirmedMessage);
+
+      return confirmedMessage;
+    } catch (error) {
+      console.warn('[MessagingService] Message queued in Outbox for retry:', error);
+      await this.markMessageDeliveryStatus(entry.roomId, entry.idempotencyKey, 'PENDING_SYNC');
+      throw error;
+    }
+  }
+
+  async flushOutboxQueue(): Promise<void> {
+    if (this.isFlushingOutbox || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
+    this.isFlushingOutbox = true;
+
+    try {
+      const pendingItems = await chatIdbAdapter.getAllOutbox();
+      for (const item of pendingItems) {
+        try {
+          await this.transmitOutboxEntry(item, `temp_${item.idempotencyKey}`);
+        } catch {
+          // Keep in queue
+        }
+      }
+    } finally {
+      this.isFlushingOutbox = false;
+    }
+  }
+
+  // ============================================================================
+  // ส่วนจัดการ SUPABASE REALTIME BROADCAST
+  // ============================================================================
+
+  private subscribeToSchoolBroadcast(schoolId: string): void {
+    if (!this.supabase) return;
+
+    if (this.schoolChannel) {
+      void this.supabase.removeChannel(this.schoolChannel);
+    }
+
+    this.schoolChannel = this.supabase
+      .channel(`kp-school-chat:${schoolId}`, {
+        config: { broadcast: { self: false } },
+      })
+      .on('broadcast', { event: 'room-activity' }, (payload) => {
+        const incomingMessage = payload.payload as ChatMessageItem;
+        if (!incomingMessage || !this.roomsMap.has(incomingMessage.roomId)) return;
+
+        const isCurrentlyReading =
+          this.activeRoomId === incomingMessage.roomId &&
+          typeof document !== 'undefined' &&
+          document.visibilityState === 'visible';
+
+        void this.updateRoomSummaryOnNewMessage(incomingMessage, isCurrentlyReading);
+      })
+      .subscribe();
+  }
+
+  private subscribeToRoomBroadcast(roomId: string): void {
+    if (!this.supabase) return;
+
+    if (this.activeRoomChannel) {
+      void this.supabase.removeChannel(this.activeRoomChannel);
+    }
+
+    this.activeRoomChannel = this.supabase
+      .channel(`kp-room-chat:${roomId}`, {
+        config: { broadcast: { self: false } },
+      })
+      .on('broadcast', { event: 'new-message' }, (payload) => {
+        const incomingMessage = payload.payload as ChatMessageItem;
+        if (!incomingMessage || incomingMessage.roomId !== roomId) return;
+
+        void this.mergeMessagesIntoRoom(roomId, [
+          { ...incomingMessage, deliveryStatus: 'SENT' },
+        ]);
+
+        if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+          void this.markRoomAsRead(roomId);
+        }
+      })
+      .subscribe();
+  }
+
+  private async broadcastNewMessage(message: ChatMessageItem): Promise<void> {
+    if (!this.supabase) return;
+
+    try {
+      if (this.activeRoomChannel && this.activeRoomId === message.roomId) {
+        await this.activeRoomChannel.send({
+          type: 'broadcast',
+          event: 'new-message',
+          payload: message,
+        });
+      }
+
+      if (this.schoolChannel) {
+        await this.schoolChannel.send({
+          type: 'broadcast',
+          event: 'room-activity',
+          payload: message,
+        });
+      }
+    } catch (error) {
+      console.warn('[MessagingService] Realtime broadcast warning:', error);
+    }
+  }
+
+  // ============================================================================
+  // ส่วนจัดการสถานะการอ่าน (READ RECEIPT) & ไฟล์หมดอายุ 7 วัน
+  // ============================================================================
+
+  async markRoomAsRead(roomId: string): Promise<void> {
+    const room = this.roomsMap.get(roomId);
+    if (!room) return;
+
+    const nowIso = new Date().toISOString();
+    const updatedRoom: ChatRoomSummary = {
+      ...room,
+      hasUnread: false,
+      lastReadAt: nowIso,
+    };
+
+    this.roomsMap.set(roomId, updatedRoom);
+    await chatIdbAdapter.upsertRooms([updatedRoom]);
+    this.notifyRoomListListeners();
+
+    try {
+      await fetch(`/api/chat/rooms/${roomId}/read`, {
+        method: 'PATCH',
+        headers: this.getAuthHeaders(),
+      });
+    } catch {
+      // Ignore
+    }
+  }
+
+  private markExpiredAttachments(messages: ChatMessageItem[]): ChatMessageItem[] {
+    const now = Date.now();
+    return messages.map((msg) => {
+      if (!msg.attachmentMeta?.expiresAt) return msg;
+      const isExpired = new Date(msg.attachmentMeta.expiresAt).getTime() <= now;
+      return {
+        ...msg,
+        attachmentMeta: {
+          ...msg.attachmentMeta,
+          isExpired,
+        },
+      };
+    });
+  }
+
+  // ============================================================================
+  // INTERNAL STATE MERGERS & LISTENERS
+  // ============================================================================
+
+  private async mergeMessagesIntoRoom(roomId: string, incoming: ChatMessageItem[]): Promise<void> {
+    const current = this.messagesMap.get(roomId) || [];
+    const byId = new Map<string, ChatMessageItem>();
+
+    for (const msg of current) {
+      byId.set(msg.idempotencyKey || msg.id, msg);
+    }
+
+    for (const msg of incoming) {
+      byId.set(msg.idempotencyKey || msg.id, msg);
+    }
+
+    const merged = this.markExpiredAttachments(Array.from(byId.values())).sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+
+    this.messagesMap.set(roomId, merged);
+    await chatIdbAdapter.upsertMessages(merged);
+    this.notifyMessageListeners(roomId);
+  }
+
+  private async replaceTempAndMergeMessage(
+    roomId: string,
+    idempotencyKey: string,
+    confirmed: ChatMessageItem
+  ): Promise<void> {
+    const current = (this.messagesMap.get(roomId) || []).filter(
+      (m) => m.idempotencyKey !== idempotencyKey && m.id !== `temp_${idempotencyKey}`
+    );
+    current.push(confirmed);
+
+    const sorted = this.markExpiredAttachments(current).sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+
+    this.messagesMap.set(roomId, sorted);
+    await chatIdbAdapter.upsertMessages([confirmed]);
+    this.notifyMessageListeners(roomId);
+  }
+
+  private async markMessageDeliveryStatus(
+    roomId: string,
+    idempotencyKey: string,
+    status: ChatMessageItem['deliveryStatus']
+  ): Promise<void> {
+    const current = this.messagesMap.get(roomId) || [];
+    const updated = current.map((m) =>
+      m.idempotencyKey === idempotencyKey ? { ...m, deliveryStatus: status } : m
+    );
+    this.messagesMap.set(roomId, updated);
+    this.notifyMessageListeners(roomId);
+  }
+
+  private async updateRoomSummaryOnNewMessage(msg: ChatMessageItem, isReadByMe: boolean): Promise<void> {
+    const room = this.roomsMap.get(msg.roomId);
+    if (!room) return;
+
+    const preview =
+      msg.messageType === 'TASK'
+        ? `[งานมอบหมาย] ${msg.content.slice(0, 90)}`
+        : msg.messageType === 'ANNOUNCEMENT'
+        ? `[ประกาศ] ${msg.content.slice(0, 90)}`
+        : msg.content || '[แนบไฟล์รูปภาพ/เอกสาร]';
+
+    const updatedRoom: ChatRoomSummary = {
+      ...room,
+      lastMessageAt: msg.createdAt,
+      lastMessagePreview: preview,
+      lastMessageSender: msg.senderName,
+      updatedAt: msg.createdAt,
+      hasUnread: !isReadByMe,
+      ...(isReadByMe ? { lastReadAt: msg.createdAt } : {}),
+    };
+
+    this.roomsMap.set(msg.roomId, updatedRoom);
+    await chatIdbAdapter.upsertRooms([updatedRoom]);
+    this.notifyRoomListListeners();
+  }
+
+  subscribeRooms(listener: RoomListListener): () => void {
+    this.roomListListeners.add(listener);
+    listener(this.getSortedRooms());
+    return () => this.roomListListeners.delete(listener);
+  }
+
+  subscribeRoomMessages(listener: RoomMessagesListener): () => void {
+    this.messageListeners.add(listener);
+    return () => this.messageListeners.delete(listener);
+  }
+
+  private notifyRoomListListeners(): void {
+    const sorted = this.getSortedRooms();
+    for (const listener of this.roomListListeners) {
+      listener(sorted);
+    }
+  }
+
+  private notifyMessageListeners(roomId: string): void {
+    const list = this.messagesMap.get(roomId) || [];
+    for (const listener of this.messageListeners) {
+      listener(roomId, list);
+    }
+  }
+
+  // ============================================================================
+  // BACKWARD-COMPATIBLE HELPER METHODS (STUDENT ROSTER & TRANSFER INTERACTION)
+  // ============================================================================
+
   resetToDefaultData(): ChatGroup[] {
     _inMemoryGroupsCache = null;
     const initial = this.generateInitialGroups();
     this.saveGroups(initial);
     return initial;
-  },
+  }
 
-  // ดึงห้องเรียนที่ตรงกับ ID หรือชื่อห้อง
   resolveClassroom(roomKey: string) {
     const list = classroomService.getClassroomsSync();
     const match = list.find(
@@ -210,9 +897,8 @@ export const messagingService = {
       studentCount: 0,
       level: 'ม.1',
     };
-  },
+  }
 
-  // แปลง StudentRecord เป็น ChatMember
   studentToChatMember(s: StudentRecord): ChatMember {
     const isMale = s.gender === 'MALE' || s.name.startsWith('ด.ช.') || s.name.startsWith('นาย');
     return {
@@ -229,9 +915,8 @@ export const messagingService = {
           : '/images/banners/student-avatar-girl.png'),
       joinedAt: 'ภาคเรียนที่ 1/2569',
     };
-  },
+  }
 
-  // ดึง Mapping รายวิชาจริงจาก coursesCurriculumService
   getCourseClassroomMappings(): CourseClassroomMapping[] {
     const curriculumCourses = coursesCurriculumService.getCourses();
     if (!curriculumCourses || curriculumCourses.length === 0) {
@@ -260,29 +945,29 @@ export const messagingService = {
     });
 
     return mappings;
-  },
+  }
 
-  // สร้างกลุ่มเริ่มต้นโดยดึงสมาชิกจากทะเบียนห้องเรียนและหลักสูตรจริงอัตโนมัติ (Zero Mock Data)
   generateInitialGroups(): ChatGroup[] {
+    const classrooms = classroomService.getClassroomsSync();
     const groups: ChatGroup[] = [];
 
-    // 1. กลุ่มทางการ & ข่าวสารโรงเรียน (Official Announcements)
+    // 1. กลุ่มทางการระดับโรงเรียน
     groups.push({
       id: 'grp-official-announcements',
-      name: '📢 ข่าวสารและประกาศทางการ รร.กุดจับประชาสรรค์',
+      name: '📢 ประกาศและข่าวสารทางการโรงเรียน',
       type: 'OFFICIAL',
       typeLabel: 'ประกาศทางการ',
-      description: 'ช่องทางสื่อสารข้อมูลข่าวสารและคำสั่งราชการสำหรับครู บุคลากร และนักเรียนทุกคน',
-      teacherName: 'ฝ่ายบริหารงานโรงเรียน',
-      teacherRoleLabel: 'ผู้ดูแลระบบกลาง',
+      description: 'ช่องทางสื่อสารหลักของโรงเรียน สำหรับประกาศด่วน ข้อมูลกิจกรรม และแจ้งเตือนสำคัญจากฝ่ายบริหาร',
+      teacherName: 'ผู้อำนวยการและฝ่ายบริหาร',
+      teacherRoleLabel: 'ผู้ดูแลระบบ',
       autoManaged: true,
       unreadCount: 0,
       members: [
         {
-          id: 'u-admin',
-          code: 'ADMIN-01',
-          name: 'ฝ่ายบริหารและงานสารบรรณ',
-          role: 'TEACHER',
+          id: 'u-director',
+          code: 'DIR-01',
+          name: 'ฝ่ายบริหารโรงเรียนกุดจับประชาสรรค์',
+          role: 'SCHOOL_ADMIN',
           joinedAt: 'ต้นภาคเรียน',
         },
       ],
@@ -291,7 +976,7 @@ export const messagingService = {
       lastMessageTime: '',
     });
 
-    // 2. กลุ่มข่าวสารและประกาศงานวิชาการ (Academic Affairs Announcements)
+    // 2. กลุ่มวิชาการ
     groups.push({
       id: 'grp-academic-announcements',
       name: '📚 ข่าวสารและประกาศงานวิชาการ',
@@ -307,7 +992,7 @@ export const messagingService = {
           id: 'u-academic',
           code: 'ACADEMIC-01',
           name: 'ฝ่ายบริหารงานวิชาการ',
-          role: 'TEACHER',
+          role: 'ACADEMIC_ADMIN',
           joinedAt: 'ต้นภาคเรียน',
         },
       ],
@@ -316,231 +1001,91 @@ export const messagingService = {
       lastMessageTime: '',
     });
 
-    // 3. กลุ่มประสานงานครูและบุคลากรทางการศึกษา
-    groups.push({
-      id: 'grp-all-teachers',
-      name: '👥 กลุ่มประสานงานครูและบุคลากรทางการศึกษา',
-      type: 'DEPARTMENT',
-      typeLabel: 'กลุ่มครูและบุคลากร',
-      description: 'กลุ่มประสานงานภาระงานสอน วิชาการ และงานบริหารงานทั่วไปของโรงเรียน',
-      teacherName: 'ฝ่ายบริหารงานวิชาการ',
-      teacherRoleLabel: 'ผู้ดูแลกลุ่ม',
-      autoManaged: true,
-      unreadCount: 0,
-      members: [],
-      messages: [],
-      lastMessageText: '',
-      lastMessageTime: '',
-    });
-
-    // 3. กลุ่มครูที่ปรึกษา (Homeroom Advisor Groups) - ดึงนักเรียนในห้องเข้าอัตโนมัติตามทะเบียนห้องเรียนจริง
-    const classrooms = classroomService.getClassroomsSync();
-    const homeroomClasses = classrooms.map((cls) => ({
-      id: cls.id,
-      name: cls.roomNumber || cls.name,
-      adviser: cls.adviser,
-    }));
-
-    homeroomClasses.forEach((cls) => {
-      // ดึงรายชื่อนักเรียนจาก studentService (ตามห้องเรียนจริง ไม่ใช้ Mock Data)
-      const rawStudents = this.getStudentsForClassroom(cls.id);
-      const studentMembers = rawStudents.map((s) => this.studentToChatMember(s));
+    // 3. กลุ่มครูที่ปรึกษาประจำชั้น (HOMEROOM)
+    classrooms.forEach((c) => {
+      const students = this.getStudentsForClassroom(c.id);
+      const studentMembers: ChatMember[] = students.map((s) => this.studentToChatMember(s));
 
       const teacherMember: ChatMember = {
-        id: `advisor-${cls.id}`,
-        code: `ADV-${cls.name}`,
-        name: cls.adviser,
+        id: `advisor-${c.id}`,
+        code: `ADV-${c.roomNumber || c.name}`,
+        name: c.adviser || 'ครูที่ปรึกษาประจำชั้น',
         role: 'ADVISOR',
+        avatarUrl: '/images/teacher/teacher_avatar.png',
         joinedAt: 'ต้นภาคเรียน',
       };
 
-      const groupMembers = [teacherMember, ...studentMembers];
-
       groups.push({
-        id: `grp-homeroom-${cls.id}`,
-        name: `กลุ่มที่ปรึกษา ${cls.name}`,
+        id: `grp-homeroom-${c.id}`,
+        name: `กลุ่มที่ปรึกษา ${c.roomNumber || c.name}`,
         type: 'HOMEROOM',
         typeLabel: 'กลุ่มครูที่ปรึกษา',
-        description: `กลุ่มสำหรับติดต่อประสานงาน แจ้งข่าวสาร และดูแลช่วยเหลือนักเรียนห้อง ${cls.name} (ดึงสมาชิกอัตโนมัติ)`,
-        classroomId: cls.id,
-        classroomName: cls.name,
-        teacherName: cls.adviser,
+        description: `กลุ่มสำหรับติดต่อประสานงาน แจ้งข่าวสาร และดูแลช่วยเหลือนักเรียนห้อง ${c.name || c.roomNumber} (ดึงสมาชิกอัตโนมัติ)`,
+        classroomId: c.id,
+        classroomName: c.roomNumber || c.name,
+        teacherName: c.adviser || 'ครูที่ปรึกษาประจำชั้น',
         teacherRoleLabel: 'ครูที่ปรึกษาประจำชั้น',
         autoManaged: true,
-        members: groupMembers,
+        members: [teacherMember, ...studentMembers],
         unreadCount: 0,
         messages: [],
-        lastMessageText: '',
-        lastMessageTime: '',
       });
     });
 
-    // 4. กลุ่มประจำวิชา (Course Groups) - สร้างจากหลักสูตรรายวิชาจริง (จาก coursesCurriculumService)
-    const courseMappings = this.getCourseClassroomMappings();
-    courseMappings.forEach((mapping) => {
-      const rawStudents = this.getStudentsForClassroom(mapping.classroomId);
-      const studentMembers = rawStudents.map((s) => this.studentToChatMember(s));
+    // 4. กลุ่มประจำวิชา (COURSE)
+    const mappings = this.getCourseClassroomMappings();
+    mappings.forEach((m) => {
+      const students = this.getStudentsForClassroom(m.classroomId);
+      const studentMembers: ChatMember[] = students.map((s) => this.studentToChatMember(s));
 
       const teacherMember: ChatMember = {
-        id: `teacher-${mapping.courseCode}-${mapping.classroomId}`,
-        code: `TCH-${mapping.courseCode}`,
-        name: mapping.teacherName,
+        id: `teacher-${m.courseCode}-${m.classroomId}`,
+        code: `TCH-${m.courseCode}`,
+        name: m.teacherName,
         role: 'TEACHER',
+        avatarUrl: '/images/teacher/teacher_avatar.png',
         joinedAt: 'ต้นภาคเรียน',
       };
 
-      const groupMembers = [teacherMember, ...studentMembers];
-
       groups.push({
-        id: `grp-course-${mapping.courseCode}-${mapping.classroomId}`,
-        name: `กลุ่มวิชา ${mapping.courseCode} ${mapping.courseName} (${mapping.classroomName})`,
+        id: `grp-course-${m.courseCode}-${m.classroomId}`,
+        name: `กลุ่มวิชา ${m.courseCode} ${m.courseName} (${m.classroomName})`,
         type: 'COURSE',
         typeLabel: 'กลุ่มประจำวิชา',
-        description: `กลุ่มการเรียนการสอน สั่งงาน ส่งการบ้าน และแจ้งคะแนนวิชา ${mapping.courseCode} ห้อง ${mapping.classroomName}`,
-        classroomId: mapping.classroomId,
-        classroomName: mapping.classroomName,
-        courseCode: mapping.courseCode,
-        courseName: mapping.courseName,
-        teacherName: mapping.teacherName,
+        description: `กลุ่มการเรียนการสอน สั่งงาน ส่งการบ้าน และแจ้งคะแนนวิชา ${m.courseCode} ห้อง ${m.classroomName}`,
+        classroomId: m.classroomId,
+        classroomName: m.classroomName,
+        courseCode: m.courseCode,
+        courseName: m.courseName,
+        teacherName: m.teacherName,
         teacherRoleLabel: 'ครูประจำวิชา',
         autoManaged: true,
-        members: groupMembers,
+        members: [teacherMember, ...studentMembers],
         unreadCount: 0,
         messages: [],
-        lastMessageText: '',
-        lastMessageTime: '',
       });
     });
 
     return groups;
-  },
+  }
 
-  // Helper อ่านรายชื่อนักเรียนของห้องจาก studentService จริง
   getStudentsForClassroom(classroomId: string): StudentRecord[] {
     const list = studentService.getStudents(classroomId);
     if (list && list.length > 0) return list;
     return [];
-  },
+  }
 
-  // ดึงรายการกลุ่มแชททั้งหมด (พร้อมตัวตรวจจับและล้างข้อมูลจำลองเก่าที่หลงเหลือ)
   getGroups(): ChatGroup[] {
-    if (typeof localStorage !== 'undefined') {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY_CHAT_GROUPS);
-        if (raw) {
-          const parsed = JSON.parse(raw) as ChatGroup[];
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            // ตรวจจับและล้างข้อมูลจำลองเก่าที่หลงเหลือ (เช่น ข้อความทักทายจำลอง หรือกลุ่ม mock ศ23101 / ภาสภูมิ)
-            const hasLegacyMock = parsed.some(
-              (g) =>
-                g.id === 'grp-dept-art' ||
-                g.id.includes('grp-course-ศ23101') ||
-                g.name.includes('กลุ่มวิชา ศ23101 ศิลปะ') ||
-                g.messages.some(
-                  (m) =>
-                    m.content.includes('อย่าลืมติดตามกำหนดส่งงานในระบบนะครับ') ||
-                    m.timestamp === 'สัปดาห์ก่อน 09:15 น.'
-                )
-            );
-            if (!hasLegacyMock) {
-              if (!parsed.some((g) => g.id === 'grp-academic-announcements')) {
-                parsed.splice(1, 0, {
-                  id: 'grp-academic-announcements',
-                  name: '📚 ข่าวสารและประกาศงานวิชาการ',
-                  type: 'OFFICIAL',
-                  typeLabel: 'ประกาศงานวิชาการ',
-                  description: 'ช่องทางสื่อสารข้อมูลฝ่ายวิชาการ กำหนดการสอบ ปฏิทินวิชาการ และงานวัดผลการเรียนสำหรับนักเรียนและบุคลากรทุกคน',
-                  teacherName: 'ฝ่ายบริหารงานวิชาการ',
-                  teacherRoleLabel: 'ผู้ดูแลกลุ่มวิชาการ',
-                  autoManaged: true,
-                  unreadCount: 0,
-                  members: [
-                    {
-                      id: 'u-academic',
-                      code: 'ACADEMIC-01',
-                      name: 'ฝ่ายบริหารงานวิชาการ',
-                      role: 'TEACHER',
-                      joinedAt: 'ต้นภาคเรียน',
-                    },
-                  ],
-                  messages: [],
-                  lastMessageText: '',
-                  lastMessageTime: '',
-                });
-                this.saveGroups(parsed);
-              }
-              _inMemoryGroupsCache = parsed;
-              return parsed;
-            } else {
-              localStorage.removeItem(STORAGE_KEY_CHAT_GROUPS);
-              localStorage.removeItem('kp_chat_groups_v3');
-              _inMemoryGroupsCache = null;
-            }
-          }
-        }
-      } catch {
-        // fallback
-      }
-    }
-
     if (_inMemoryGroupsCache && _inMemoryGroupsCache.length > 0) {
-      const hasLegacyMock = _inMemoryGroupsCache.some(
-        (g) =>
-          g.id === 'grp-dept-art' ||
-          g.id.includes('grp-course-ศ23101') ||
-          g.name.includes('กลุ่มวิชา ศ23101 ศิลปะ') ||
-          g.messages.some(
-            (m) =>
-              m.content.includes('อย่าลืมติดตามกำหนดส่งงานในระบบนะครับ') ||
-              m.timestamp === 'สัปดาห์ก่อน 09:15 น.'
-          )
-      );
-      if (!hasLegacyMock) {
-        if (!_inMemoryGroupsCache.some((g) => g.id === 'grp-academic-announcements')) {
-          _inMemoryGroupsCache.splice(1, 0, {
-            id: 'grp-academic-announcements',
-            name: '📚 ข่าวสารและประกาศงานวิชาการ',
-            type: 'OFFICIAL',
-            typeLabel: 'ประกาศงานวิชาการ',
-            description: 'ช่องทางสื่อสารข้อมูลฝ่ายวิชาการ กำหนดการสอบ ปฏิทินวิชาการ และงานวัดผลการเรียนสำหรับนักเรียนและบุคลากรทุกคน',
-            teacherName: 'ฝ่ายบริหารงานวิชาการ',
-            teacherRoleLabel: 'ผู้ดูแลกลุ่มวิชาการ',
-            autoManaged: true,
-            unreadCount: 0,
-            members: [
-              {
-                id: 'u-academic',
-                code: 'ACADEMIC-01',
-                name: 'ฝ่ายบริหารงานวิชาการ',
-                role: 'TEACHER',
-                joinedAt: 'ต้นภาคเรียน',
-              },
-            ],
-            messages: [],
-            lastMessageText: '',
-            lastMessageTime: '',
-          });
-          this.saveGroups(_inMemoryGroupsCache);
-        }
-        return _inMemoryGroupsCache;
-      }
-      _inMemoryGroupsCache = null;
+      return _inMemoryGroupsCache;
     }
-
     const initial = this.generateInitialGroups();
     this.saveGroups(initial);
     return initial;
-  },
+  }
 
-  // ดึงรายการกลุ่มแชทเฉพาะที่นักเรียนมีสิทธิ์เข้าถึง (Student Chat Scope Guard)
-  // - กลุ่มห้องประจำชั้น: เฉพาะห้องตนเองเท่านั้น
-  // - กลุ่มรายวิชาเรียน: เฉพาะวิชาของห้องตนเองเท่านั้น
-  // - กลุ่มรวมทั้งโรงเรียน และวิชาการ (OFFICIAL): มองเห็นได้ทุกคน
-  // - กลุ่มแชทห้องอื่นๆ และกลุ่มบุคลากร (DEPARTMENT): ไม่แสดงเด็ดขาด
   getGroupsForStudent(studentCodeOrId?: string, classroomIdOrName?: string): ChatGroup[] {
     const allGroups = this.getGroups();
-
-    // 1. ระบุห้องเรียนและรหัสนักเรียน
     let resolvedClassroomId = classroomIdOrName;
     let resolvedStudentCode = studentCodeOrId;
 
@@ -551,237 +1096,162 @@ export const messagingService = {
       }
     }
 
-    // หากไม่มีห้องเรียนระบุ ให้ดึงจาก AuthUser ปัจจุบันใน LocalStorage
-    if (!resolvedClassroomId && typeof localStorage !== 'undefined') {
-      try {
-        const rawUser = localStorage.getItem('cls_current_auth_user');
-        if (rawUser) {
-          const u = JSON.parse(rawUser);
-          if (u.role === 'STUDENT') {
-            resolvedClassroomId = u.classroomId;
-            if (!resolvedStudentCode) resolvedStudentCode = u.studentCode || u.id;
-          }
-        }
-      } catch {
-        // fallback
-      }
-    }
-
-    // หากยังไม่มี ให้ลองค้นหาห้องแรกที่นักเรียนผู้นี้เป็นสมาชิกในกลุ่มแชท
-    if (!resolvedClassroomId && resolvedStudentCode) {
-      const memberGroup = allGroups.find(
-        (g) =>
-          (g.type === 'HOMEROOM' || g.type === 'COURSE') &&
-          g.members.some((m) => m.code === resolvedStudentCode || m.id === resolvedStudentCode)
-      );
-      if (memberGroup) {
-        resolvedClassroomId = memberGroup.classroomId || memberGroup.classroomName;
-      }
-    }
-
-    // Fallback หากไม่พบข้อมูลเพื่อความปลอดภัยในโหมดพรีวิว
-    if (!resolvedClassroomId) {
-      resolvedClassroomId = classroomService.getClassroomsSync()[0]?.id || 'room-1-1';
-    }
-
-    // รวบรวมชุดคีย์ระบุห้องเรียนที่ตรงกัน (เช่น 'room-3-1', 'ม.3/1', '3/1')
-    const allowedRoomKeys = new Set<string>();
+    let targetRoom: { id: string; name: string; roomNumber?: string } | null = null;
     if (resolvedClassroomId) {
-      const cleanKey = resolvedClassroomId.trim();
-      allowedRoomKeys.add(cleanKey);
-
-      const alt = getAlternateRoomKey(cleanKey);
-      if (alt) allowedRoomKeys.add(alt);
-
-      const allCls = classroomService.getClassroomsSync();
-      const matched = allCls.find(
-        (c) => c.id === cleanKey || c.roomNumber === cleanKey || c.name === cleanKey
+      const list = classroomService.getClassroomsSync();
+      const match = list.find(
+        (c) =>
+          c.id === resolvedClassroomId ||
+          c.name === resolvedClassroomId ||
+          c.roomNumber === resolvedClassroomId
       );
-      if (matched) {
-        if (matched.id) allowedRoomKeys.add(matched.id);
-        if (matched.roomNumber) allowedRoomKeys.add(matched.roomNumber);
-        if (matched.name) allowedRoomKeys.add(matched.name);
-      }
+      if (match) targetRoom = match;
+    }
+
+    const allowedHomeroomKeys = new Set<string>();
+    if (targetRoom) {
+      if (targetRoom.id) allowedHomeroomKeys.add(targetRoom.id);
+      if (targetRoom.name) allowedHomeroomKeys.add(targetRoom.name);
+      if (targetRoom.roomNumber) allowedHomeroomKeys.add(targetRoom.roomNumber);
+    } else if (resolvedClassroomId) {
+      allowedHomeroomKeys.add(resolvedClassroomId);
     }
 
     return allGroups.filter((g) => {
-      // 1. กลุ่มรวมทั้งโรงเรียน และวิชาการ (OFFICIAL) -> นักเรียนทุกคนมองเห็นได้
-      if (g.type === 'OFFICIAL') {
-        return true;
-      }
+      if (g.type === 'OFFICIAL') return true;
+      if (g.type === 'DEPARTMENT') return false;
 
-      // 2. กลุ่มประสานงานบุคลากร/ครู (DEPARTMENT) -> นักเรียนต้องไม่เห็นเด็ดขาด
-      if (g.type === 'DEPARTMENT') {
-        return false;
-      }
-
-      // 3. ตรวจสอบว่านักเรียนอยู่ในสมาชิกกลุ่มนี้หรือไม่
-      const isExplicitMember = Boolean(
-        resolvedStudentCode &&
-        g.members.some(
-          (m) =>
-            m.code === resolvedStudentCode ||
-            m.id === resolvedStudentCode ||
-            (m.role === 'STUDENT' && (m.name.includes(resolvedStudentCode) || m.id.includes(resolvedStudentCode)))
-        )
-      );
-
-      // 4. ตรวจสอบว่ากลุ่มผูกกับห้องประจำชั้นของนักเรียนหรือไม่
-      const isRoomMatch = Boolean(
-        (g.classroomId && allowedRoomKeys.has(g.classroomId)) ||
-        (g.classroomName && allowedRoomKeys.has(g.classroomName))
-      );
-
-      // สำหรับกลุ่มห้องประจำชั้น (HOMEROOM): ต้องเป็นห้องของตนเองเท่านั้น
       if (g.type === 'HOMEROOM') {
-        return isExplicitMember || isRoomMatch;
+        return Boolean(
+          (g.classroomId && allowedHomeroomKeys.has(g.classroomId)) ||
+          (g.classroomName && allowedHomeroomKeys.has(g.classroomName)) ||
+          (resolvedStudentCode && g.members.some((m) => m.code === resolvedStudentCode || m.id === resolvedStudentCode))
+        );
       }
 
-      // สำหรับกลุ่มรายวิชาเรียน (COURSE): ต้องเป็นวิชาของห้องตนเองเท่านั้น
       if (g.type === 'COURSE') {
-        return isExplicitMember || isRoomMatch;
+        return Boolean(
+          (g.classroomId && allowedHomeroomKeys.has(g.classroomId)) ||
+          (g.classroomName && allowedHomeroomKeys.has(g.classroomName)) ||
+          (resolvedStudentCode && g.members.some((m) => m.code === resolvedStudentCode || m.id === resolvedStudentCode))
+        );
       }
 
       return false;
     });
-  },
+  }
 
-  /**
-   * ดึงรายการกลุ่มแชทสำหรับครูผู้สอนตามขอบเขตภาระงานจริง:
-   * - ห้องที่ปรึกษา (Homeroom): แสดงเฉพาะห้องที่ครูเป็นที่ปรึกษา
-   * - ห้องที่สอนตามรายวิชา (Courses): แสดงเฉพาะห้องและวิชาที่ครูท่านนี้สอน
-   * - แชทรวมทั้งโรงเรียนและประกาศวิชาการ (OFFICIAL): แสดงให้ครูทุกคน
-   * - กลุ่มสาระและประสานงานบุคลากร (DEPARTMENT): แสดงให้ครูทุกคน
-   * - แอดมิน / ผอ. (ACADEMIC_ADMIN): มองเห็นได้ทุกกลุ่ม
-   */
   getGroupsForTeacher(teacherUser?: AuthUser | null, activeRole?: SchoolUserRole): ChatGroup[] {
     const allGroups = this.getGroups();
+    const currentTeacherName = teacherUser?.name || 'ครูผู้สอน';
 
-    // หากเป็นผู้บริหาร / แอดมิน (Admin / Director): มองเห็นได้ทั้งหมด
-    if (activeRole === 'ACADEMIC_ADMIN' || teacherUser?.role === 'ADMIN') {
+    if (
+      (activeRole as string) === 'SCHOOL_ADMIN' ||
+      activeRole === 'ACADEMIC_ADMIN' ||
+      teacherUser?.role === 'ADMIN'
+    ) {
       return allGroups;
     }
 
-    const currentTeacherName = teacherUser?.name?.trim() || '';
-    const allCls = classroomService.getClassroomsSync();
-
-    // 1. ระบุห้องที่ปรึกษาของครูท่านนี้ (Homeroom)
-    const homeroom = currentTeacherName
-      ? allCls.find(
-          (c) =>
-            c.id === teacherUser?.classroomId ||
-            c.adviser === currentTeacherName ||
-            (c.advisers && c.advisers.some((adv) => adv && (adv.includes(currentTeacherName) || currentTeacherName.includes(adv)))) ||
-            (c.adviser && c.adviser.includes(currentTeacherName.split(' ')[0]))
-        )
-      : (teacherUser?.classroomId ? allCls.find((c) => c.id === teacherUser.classroomId) : null);
-
-    const allowedHomeroomKeys = new Set<string>();
-    if (homeroom) {
-      if (homeroom.id) allowedHomeroomKeys.add(homeroom.id);
-      if (homeroom.name) allowedHomeroomKeys.add(homeroom.name);
-      if (homeroom.roomNumber) allowedHomeroomKeys.add(homeroom.roomNumber);
-    }
-    if (teacherUser?.classroomId) {
-      allowedHomeroomKeys.add(teacherUser.classroomId);
-    }
-
-    // 2. ระบุรายวิชาและห้องที่ครูสอน (จาก coursesCurriculumService และ timetable slots)
-    const curriculumCourses = coursesCurriculumService.getCourses();
-    const teacherCourses = curriculumCourses.filter(
-      (c) =>
-        !c.teacherName ||
-        c.teacherName === currentTeacherName ||
-        (teacherUser?.name && c.teacherName.includes(teacherUser.name.split(' ')[0]))
-    );
-    const teacherCourseCodes = new Set<string>(teacherCourses.map((c) => c.code.trim()));
-
-    // เพิ่มรหัสวิชาจากตารางสอน matrixSlots
-    const matrixSlots = calendarEventStorageService.loadMatrixSlots();
-    matrixSlots.forEach((s) => {
-      if (s.subjectCode && !s.isFreePeriod && !s.isLunchSlot) {
-        teacherCourseCodes.add(s.subjectCode.trim());
-      }
+    const classrooms = classroomService.getClassroomsSync();
+    const teacherAdvisedRooms = classrooms.filter((c) => {
+      if (!c.adviser) return false;
+      return (
+        c.adviser === currentTeacherName ||
+        (teacherUser?.name && c.adviser.includes(teacherUser.name.split(' ')[0]))
+      );
     });
 
+    const allowedHomeroomKeys = new Set<string>();
+    teacherAdvisedRooms.forEach((c) => {
+      if (c.id) allowedHomeroomKeys.add(c.id);
+      if (c.name) allowedHomeroomKeys.add(c.name);
+      if (c.roomNumber) allowedHomeroomKeys.add(c.roomNumber);
+    });
+
+    const curriculumCourses = coursesCurriculumService.getCourses();
+    const teacherCourses = curriculumCourses.filter((c) => {
+      if (!c.teacherName) return false;
+      return (
+        c.teacherName === currentTeacherName ||
+        (teacherUser?.name && c.teacherName.includes(teacherUser.name.split(' ')[0]))
+      );
+    });
+    const teacherCourseCodes = new Set(teacherCourses.map((c) => c.code.trim()));
+
     return allGroups.filter((g) => {
-      // 1. แชทรวมทั้งโรงเรียน (OFFICIAL) -> แสดงให้ครูทุกคน
-      if (g.type === 'OFFICIAL') {
-        return true;
-      }
-
-      // 2. กลุ่มสาระ & ประสานงานครูและบุคลากร (DEPARTMENT) -> แสดงให้ครูทุกคน
-      if (g.type === 'DEPARTMENT') {
-        return true;
-      }
-
-      // 3. ห้องที่ปรึกษา (HOMEROOM) -> แสดงเฉพาะห้องที่ครูเป็นที่ปรึกษา
+      if (g.type === 'OFFICIAL' || g.type === 'DEPARTMENT') return true;
       if (g.type === 'HOMEROOM') {
-        const isRoomMatch = Boolean(
+        return Boolean(
           (g.classroomId && allowedHomeroomKeys.has(g.classroomId)) ||
           (g.classroomName && allowedHomeroomKeys.has(g.classroomName)) ||
           g.teacherName === currentTeacherName ||
           (teacherUser?.name && g.teacherName.includes(teacherUser.name.split(' ')[0]))
         );
-        return isRoomMatch;
       }
-
-      // 4. ห้องที่สอนตามรายวิชา (COURSE) -> แสดงเฉพาะห้องและวิชาที่ครูท่านนี้สอน
       if (g.type === 'COURSE') {
-        const isTeacherCourse = Boolean(
+        return Boolean(
           g.teacherName === currentTeacherName ||
           (teacherUser?.name && g.teacherName.includes(teacherUser.name.split(' ')[0])) ||
           (g.courseCode && teacherCourseCodes.has(g.courseCode.trim()))
         );
-        return isTeacherCourse;
       }
-
       return false;
     });
-  },
+  }
 
-  // บันทึกรายการกลุ่มแชท (พร้อม Sync Async ลง IndexedDB ป้องกัน LocalStorage เต็ม)
   saveGroups(groups: ChatGroup[]): ChatGroup[] {
     _inMemoryGroupsCache = groups;
-
-    if (typeof localStorage !== 'undefined') {
-      try {
-        localStorage.setItem(STORAGE_KEY_CHAT_GROUPS, JSON.stringify(groups));
-      } catch (err) {
-        console.warn('LocalStorage write failed, relying on IndexedDB:', err);
-      }
-    }
-
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent(CHAT_GROUPS_EVENT, { detail: groups }));
     }
-
-    try {
-      chatBroadcastChannel?.postMessage({ type: 'CHAT_GROUPS_UPDATED', timestamp: Date.now() });
-    } catch {
-      // ignore
-    }
-
-    // Mirror asynchronous write to high-capacity IndexedDB
-    indexedDbAdapter.setItem('chat_groups', 'active_groups', groups).catch((err) => {
-      console.warn('IndexedDB mirror error:', err);
-    });
-
     return groups;
-  },
+  }
 
-  // ดึงกลุ่มเดียวตาม ID
   getGroupById(groupId: string): ChatGroup | undefined {
     return this.getGroups().find((g) => g.id === groupId);
-  },
+  }
 
-  // สร้างข้อความผ่าน Outbox พร้อม Idempotency Key (UUID v4)
+  getTotalUnreadCount(user?: AuthUser | null, role?: SchoolUserRole): number {
+    const activeUser =
+      user !== undefined
+        ? user
+        : typeof localStorage !== 'undefined'
+        ? authService.getCurrentUser()
+        : null;
+
+    let visibleGroups: ChatGroup[];
+    if (
+      role === 'STUDENT_GENERAL' ||
+      role === 'STUDENT_COUNCIL' ||
+      activeUser?.role === 'STUDENT'
+    ) {
+      visibleGroups = this.getGroupsForStudent(
+        activeUser?.studentCode || activeUser?.id,
+        activeUser?.classroomId
+      );
+    } else {
+      visibleGroups = this.getGroupsForTeacher(activeUser, role);
+    }
+    return visibleGroups.reduce((acc, g) => acc + (g.unreadCount || 0), 0);
+  }
+
+  markGroupAsRead(groupId: string): void {
+    void this.markRoomAsRead(groupId);
+    const groups = this.getGroups();
+    const group = groups.find((g) => g.id === groupId);
+    if (group && (group.unreadCount || 0) > 0) {
+      group.unreadCount = 0;
+      this.saveGroups(groups);
+    }
+  }
+
   async createOutboxMessage(
     groupId: string,
     payload: {
       senderId: string;
       senderName: string;
-      senderRole: 'TEACHER' | 'STUDENT' | 'SYSTEM';
+      senderRole: 'TEACHER' | 'STUDENT' | 'SYSTEM' | 'ADVISOR' | 'ACADEMIC_ADMIN' | 'SCHOOL_ADMIN';
       senderAvatar?: string;
       content: string;
       attachment?: ChatAttachmentMeta;
@@ -823,7 +1293,6 @@ export const messagingService = {
     group.lastMessageTime = timeStr;
     this.saveGroups(groups);
 
-    // Enqueue Outbox
     const outboxItem: OutboxItem = {
       idempotencyKey,
       groupId,
@@ -840,14 +1309,9 @@ export const messagingService = {
     };
 
     await indexedDbAdapter.enqueueOutbox(outboxItem, effectiveUser);
-
-    // Trigger sync in background
-    this.syncOutboxMessage(outboxItem, effectiveUser).catch(() => {});
-
     return newMsg;
-  },
+  }
 
-  // ซิงก์ข้อความ Outbox ขึ้น Cloud
   async syncOutboxMessage(outboxItem: OutboxItem, userId?: string): Promise<boolean> {
     const effectiveUser = userId || outboxItem.senderId;
     const groups = this.getGroups();
@@ -866,9 +1330,8 @@ export const messagingService = {
 
     await indexedDbAdapter.markOutboxSynced(outboxItem.idempotencyKey, effectiveUser);
     return true;
-  },
+  }
 
-  // ซิงก์รายการ Outbox ทั้งหมดที่ค้างอยู่
   async syncAllPendingOutbox(userId?: string): Promise<number> {
     const pending = await indexedDbAdapter.getPendingOutbox(userId);
     let count = 0;
@@ -877,30 +1340,14 @@ export const messagingService = {
       if (ok) count++;
     }
     return count;
-  },
+  }
 
-  // ฟื้นฟูข้อมูลจาก Cloud เมื่อย้ายเครื่องใหม่ (Hydration from Cloud DB to new device)
-  async hydrateFromCloud(userId: string = 'default_user'): Promise<ChatGroup[]> {
-    // 1. อ่านจาก IndexedDB หากมีอยู่แล้ว
-    const cached = await indexedDbAdapter.getItem<ChatGroup[]>(
-      'chat_groups',
-      'active_groups',
-      userId
-    );
-    if (cached && Array.isArray(cached) && cached.length > 0) {
-      this.saveGroups(cached);
-      return cached;
-    }
-
-    // 2. หากเครื่องใหม่ยังไม่มีแคช ให้สร้างกลุ่มและซิงก์จาก Authoritative Database
+  async hydrateFromCloud(_userId: string = 'default_user'): Promise<ChatGroup[]> {
     const initial = this.generateInitialGroups();
-    await indexedDbAdapter.setItem('chat_groups', 'active_groups', initial, userId);
     this.saveGroups(initial);
     return initial;
-  },
+  }
 
-  // ล้างไฟล์ภาพ/เอกสารแชทที่หมดอายุ 7 วัน (Server TTL Purge Simulation)
-  // แต่รักษาข้อความและบันทึกประวัติการส่งไว้ถาวร 100%
   executeServerTtlPurge(olderThanDays: number = 7): {
     purgedCount: number;
     preservedTextCount: number;
@@ -916,7 +1363,6 @@ export const messagingService = {
         preservedTextCount++;
         if (msg.attachment && !msg.attachment.isExpired) {
           let shouldPurge = false;
-
           if (msg.attachment.expiresAt) {
             shouldPurge = new Date(msg.attachment.expiresAt).getTime() <= now;
           } else if (msg.serverTimestamp) {
@@ -925,12 +1371,10 @@ export const messagingService = {
           }
 
           if (shouldPurge) {
-            // Guard against accidental student submission purge!
-            const key = msg.attachment.r2ObjectKey || 'ephemeral/chat/sample.jpg';
+            const key = msg.attachment.r2ObjectKey || msg.attachment.r2Key || 'ephemeral/chat/sample.jpg';
             assertSafeTtlPurgeKey(key);
-
             msg.attachment.isExpired = true;
-            msg.attachment.url = undefined; // Remove direct binary download URL
+            msg.attachment.url = undefined;
             purgedCount++;
           }
         }
@@ -942,156 +1386,16 @@ export const messagingService = {
     }
 
     return { purgedCount, preservedTextCount };
-  },
+  }
 
-  // ส่งข้อความใหม่ในกลุ่ม
-  sendMessage(
-    groupId: string,
-    payload: {
-      senderId: string;
-      senderName: string;
-      senderRole: 'TEACHER' | 'STUDENT' | 'SYSTEM';
-      senderAvatar?: string;
-      content: string;
-    }
-  ): ChatMessage | null {
-    const groups = this.getGroups();
-    const group = groups.find((g) => g.id === groupId);
-    if (!group) return null;
-
-    const now = new Date();
-    const timeStr = `วันนี้ ${String(now.getHours()).padStart(2, '0')}:${String(
-      now.getMinutes()
-    ).padStart(2, '0')} น.`;
-
-    const newMsg: ChatMessage = {
-      id: `msg-${Date.now()}`,
-      groupId,
-      senderId: payload.senderId,
-      senderName: payload.senderName,
-      senderRole: payload.senderRole,
-      senderAvatar: payload.senderAvatar,
-      content: payload.content,
-      timestamp: timeStr,
-    };
-
-    group.messages.push(newMsg);
-    group.lastMessageText = payload.content;
-    group.lastMessageTime = timeStr;
-
-    this.saveGroups(groups);
-    return newMsg;
-  },
-
-  // คำนวณจำนวนข้อความที่ยังไม่ได้อ่านทั้งหมด (เฉพาะกลุ่มที่ผู้ใช้มีสิทธิ์และมีข้อความใหม่จริง)
-  getTotalUnreadCount(user?: AuthUser | null, role?: SchoolUserRole): number {
-    const activeUser =
-      user !== undefined
-        ? user
-        : typeof localStorage !== 'undefined'
-        ? authService.getCurrentUser()
-        : null;
-    let visibleGroups: ChatGroup[];
-    if (
-      role === 'STUDENT_GENERAL' ||
-      role === 'STUDENT_COUNCIL' ||
-      activeUser?.role === 'STUDENT'
-    ) {
-      visibleGroups = this.getGroupsForStudent(
-        activeUser?.studentCode || activeUser?.id,
-        activeUser?.classroomId
-      );
-    } else {
-      visibleGroups = this.getGroupsForTeacher(activeUser, role);
-    }
-    return visibleGroups.reduce((acc, g) => acc + (g.unreadCount || 0), 0);
-  },
-
-  // ทำเครื่องหมายว่าอ่านข้อความในกลุ่มนี้แล้ว
-  markGroupAsRead(groupId: string): void {
-    const groups = this.getGroups();
-    const group = groups.find((g) => g.id === groupId);
-    if (group && (group.unreadCount || 0) > 0) {
-      group.unreadCount = 0;
-      this.saveGroups(groups);
-    }
-  },
-
-  // จำลองข้อความตอบกลับจากคู่สนทนา (Simulation Partner Reply for Easy Testing)
-  simulatePartnerReply(
-    groupId: string,
-    currentRole: 'TEACHER' | 'STUDENT'
-  ): ChatMessage | null {
-    const groups = this.getGroups();
-    const group = groups.find((g) => g.id === groupId);
-    if (!group) return null;
-
-    if (currentRole === 'TEACHER') {
-      // ผู้ส่งปัจจุบันคือครู -> ฝั่งตอบกลับคือนักเรียน
-      const studentMember = group.members.find((m) => m.role === 'STUDENT');
-      if (!studentMember) return null;
-
-      const replies = [
-        'รับทราบครับคุณครู จะรีบดำเนินการส่งงานให้เรียบร้อยครับ! ✨',
-        'สวัสดีครับคุณครู งานชิ้นนี้ส่งผ่านระบบพอร์ทัลแล้วนะครับ ขอบคุณครับ 🙏',
-        'เข้าใจเนื้อหาบทเรียนแล้วครับ ขอบคุณครูมากครับ 😊',
-        'คุณครูครับ แบบฝึกหัดข้อ 3 ส่งไฟล์ PDF หรือภาพถ่ายได้ไหมครับ?',
-      ];
-      const randomContent = replies[Math.floor(Math.random() * replies.length)];
-
-      return this.sendMessage(groupId, {
-        senderId: studentMember.id,
-        senderName: studentMember.name,
-        senderRole: 'STUDENT',
-        senderAvatar: studentMember.avatarUrl || '/images/banners/student-avatar.png',
-        content: randomContent,
-      });
-    } else {
-      // ผู้ส่งปัจจุบันคือนักเรียน -> ฝั่งตอบกลับคือครู
-      const teacherName = group.teacherName || 'ครูผู้สอน';
-      const replies = [
-        'สวัสดีครับนักเรียน มีข้อสงสัยเรื่องบทเรียนสอบถามครูได้ตลอดเวลานะครับ 📚',
-        'ครูตรวจงานให้แล้วนะครับ ทำได้ดีมาก พัฒนาต่อไปนะ! ⭐',
-        'อย่าลืมตรวจสอบกำหนดส่งงานในสัปดาห์นี้นะครับ ขอให้ทุกคนตั้งใจเรียนนะ 😊',
-        'รับทราบครับ เดี๋ยวครูจะประสานงานและตรวจเช็คข้อมูลให้ทันทีครับ 👍',
-      ];
-      const randomContent = replies[Math.floor(Math.random() * replies.length)];
-
-      return this.sendMessage(groupId, {
-        senderId: `teacher-${group.id}`,
-        senderName: teacherName,
-        senderRole: 'TEACHER',
-        senderAvatar: '/images/teacher/teacher_avatar.png',
-        content: randomContent,
-      });
-    }
-  },
-
-  // ซิงค์สมาชิกทุกกลุ่มให้ตรงกับทะเบียนห้องเรียนล่าสุด
   resyncAllGroupMembers(_actorLabel = 'ระบบอัตโนมัติ'): ChatGroup[] {
-    const groups = this.getGroups().map((group) => {
-      if (!group.autoManaged || !group.classroomId) return group;
-
-      const currentStudents = this.getStudentsForClassroom(group.classroomId);
-      const studentMembers = currentStudents.map((s) => this.studentToChatMember(s));
-
-      // เก็บสมาชิกที่ไม่ใช่นักเรียนไว้ (เช่น ครูที่ปรึกษา, ครูประจำวิชา)
-      const nonStudentMembers = group.members.filter((m) => m.role !== 'STUDENT');
-
-      return {
-        ...group,
-        members: [...nonStudentMembers, ...studentMembers],
-      };
-    });
-
-    this.saveGroups(groups);
-    return groups;
-  },
+    const initial = this.generateInitialGroups();
+    this.saveGroups(initial);
+    return initial;
+  }
 
   // ========================================================================
-  // ⭐ ฟังก์ชันหัวใจสำคัญ: ย้ายห้องเรียนอัตโนมัติ (Student Transfer Sync)
-  // "เช่น นักเรียน A อยู่ชั้น ม.1/1 ย้ายไปห้อง ม.1/2 ให้ย้ายกลุ่มเองอัตโนมัติเลย
-  // และงานที่ทำอยู่ยังคงเหมือนเดิม เอาคะแนนเอางานทุกอย่างติดตัวนักเรียนไปด้วย"
+  // STUDENT TRANSFER SYNCHRONIZATION WITH DATA PRESERVATION
   // ========================================================================
   executeStudentTransfer(payload: StudentTransferPayload): StudentTransferResult {
     let fromRoom = this.resolveClassroom(payload.fromClassroomId);
@@ -1101,20 +1405,16 @@ export const messagingService = {
       throw new Error('ห้องเรียนต้นทางและปลายทางเป็นห้องเดียวกัน ไม่สามารถย้ายได้');
     }
 
-    // อ่านกลุ่มแชทปัจจุบันก่อนปรับเปลี่ยนรายชื่อนักเรียนในทะเบียน
     let currentGroups = this.getGroups();
 
-    // 1. ค้นหานักเรียนในห้องต้นทาง หรือค้นหาทั่วระบบ
     let fromRoomStudents = this.getStudentsForClassroom(fromRoom.id);
     let student = fromRoomStudents.find((s) => s.code === payload.studentCode || s.id === payload.studentCode);
 
-    // หากไม่พบใน id ให้ลองค้นหาด้วย roomNumber
     if (!student && fromRoom.roomNumber) {
       fromRoomStudents = this.getStudentsForClassroom(fromRoom.roomNumber);
       student = fromRoomStudents.find((s) => s.code === payload.studentCode || s.id === payload.studentCode);
     }
 
-    // หากยังไม่พบ ให้ค้นหาจากทุกห้องในระบบ
     if (!student) {
       const foundGlobal = studentService.findStudentByCode(payload.studentCode);
       if (foundGlobal) {
@@ -1125,12 +1425,9 @@ export const messagingService = {
     }
 
     if (!student) {
-      throw new Error(
-        `ไม่พบนักเรียนรหัส ${payload.studentCode} ในระบบทะเบียนห้องเรียน`
-      );
+      throw new Error(`ไม่พบนักเรียนรหัส ${payload.studentCode} ในระบบทะเบียนห้องเรียน`);
     }
 
-    // 2. นำนักเรียนออกจากห้องต้นทาง และบันทึกเข้าห้องปลายทางใน studentService (อัปเดตทั้ง key id และ roomNumber)
     const updatedFromStudents = fromRoomStudents.filter(
       (s) => s.code !== payload.studentCode && s.id !== payload.studentCode
     );
@@ -1169,7 +1466,6 @@ export const messagingService = {
       studentService.saveLocalStudents(toRoom.roomNumber, updatedToStudents);
     }
 
-    // 3. ตรวจสอบและรักษา "งานที่ส่งแล้ว และคะแนนทั้งหมด" ให้ติดตัวนักเรียนไป 100%
     const allSubmissions: StudentWorkSubmission[] = sgsRosterAndSubmissionService.getSubmissions();
     const studentSubmissions = allSubmissions.filter(
       (sub) => sub.studentCode === payload.studentCode
@@ -1178,7 +1474,6 @@ export const messagingService = {
     const preservedSubmissionsCount = preservedAssignmentsCount;
     const preservedScore = student.score;
 
-    // อัปเดตข้อมูลใน SGS Roster Service ให้ระบุห้องเรียนใหม่ (เพิ่มหากยังไม่มี)
     const sgsRoster = sgsRosterAndSubmissionService.getSgsRoster();
     const sgsStudent = sgsRoster.find((s) => s.studentCode === payload.studentCode);
     if (sgsStudent) {
@@ -1219,7 +1514,6 @@ export const messagingService = {
       );
     }
 
-    // ซิงค์ข้อมูลคะแนนใน scoreService (cls_scores_data)
     if (typeof window !== 'undefined') {
       try {
         const rawScores = localStorage.getItem('cls_scores_data');
@@ -1243,7 +1537,6 @@ export const messagingService = {
         // ignore
       }
 
-      // ซิงค์ข้อมูลประวัติการเช็คชื่อ attendanceService (cls_attendance_records)
       try {
         const rawAtt = localStorage.getItem('cls_attendance_records');
         if (rawAtt) {
@@ -1266,7 +1559,6 @@ export const messagingService = {
         // ignore
       }
 
-      // ซิงค์ข้อมูลประวัติเช็คชื่อใน attendanceCorrelationService (kp_morning_assembly_records & kp_period_attendance_records)
       try {
         const rawMorning = localStorage.getItem('kp_morning_assembly_records');
         if (rawMorning) {
@@ -1307,7 +1599,6 @@ export const messagingService = {
         // ignore
       }
 
-      // ซิงค์ข้อมูลเยี่ยมบ้าน (homeVisitService)
       try {
         const rawHv = localStorage.getItem('cms_home_visit_nor01_cct_v2');
         if (rawHv) {
@@ -1326,9 +1617,6 @@ export const messagingService = {
       }
     }
 
-    // 4. ซิงค์กลุ่มแชทอัตโนมัติ (Automated Chat Group Membership Update)
-
-    // ตรวจสอบและสร้างกลุ่มครูที่ปรึกษาปลายทางอัตโนมัติหากยังไม่มี
     const hasToHomeroom = currentGroups.some(
       (g) =>
         g.type === 'HOMEROOM' &&
@@ -1344,7 +1632,6 @@ export const messagingService = {
         role: 'ADVISOR',
         joinedAt: 'ต้นภาคเรียน',
       };
-      // ดึงนักเรียนที่มีอยู่เดิมในห้องปลายทาง (ไม่รวมนักเรียนที่กำลังย้าย)
       const existingStudents = this.getStudentsForClassroom(toRoom.id).filter(
         (s) => s.code !== payload.studentCode && s.id !== payload.studentCode
       );
@@ -1368,7 +1655,6 @@ export const messagingService = {
       currentGroups.push(newHomeroomGroup);
     }
 
-    // ตรวจสอบและสร้างกลุ่มประจำวิชาปลายทางอัตโนมัติหากยังไม่มี
     const toCourseMappings = this.getCourseClassroomMappings().filter(
       (m) =>
         m.classroomId === toRoom.id ||
@@ -1390,7 +1676,6 @@ export const messagingService = {
           role: 'TEACHER',
           joinedAt: 'ต้นภาคเรียน',
         };
-        // ดึงนักเรียนที่มีอยู่เดิมในวิชานี้ (ไม่รวมนักเรียนที่กำลังย้าย)
         const existingStudents = this.getStudentsForClassroom(mapping.classroomId).filter(
           (s) => s.code !== payload.studentCode && s.id !== payload.studentCode
         );
@@ -1426,7 +1711,6 @@ export const messagingService = {
     const joinedGroupNames: string[] = [];
 
     const updatedGroups = currentGroups.map((group) => {
-      // กลุ่มที่ผูกกับห้องเดิม (fromRoom) -> นำนักเรียนออก + โพสต์ข้อความระบบแจ้งการย้ายออก
       const isFromGroup =
         group.classroomId === fromRoom.id ||
         group.classroomName === fromRoom.name ||
@@ -1470,7 +1754,6 @@ export const messagingService = {
         }
       }
 
-      // กลุ่มที่ผูกกับห้องใหม่ (toRoom) -> เพิ่มนักเรียนเข้า + โพสต์ข้อความระบบต้อนรับ
       const isToGroup =
         group.classroomId === toRoom.id ||
         group.classroomName === toRoom.name ||
@@ -1520,7 +1803,6 @@ export const messagingService = {
 
     this.saveGroups(updatedGroups);
 
-    // 5. ส่ง Event แจ้งเตือนทุก View ทั่วทั้งระบบ
     const result: StudentTransferResult = {
       success: true,
       message: `ย้ายนักเรียน ${student.name} จากห้อง ${fromRoom.name} ไป ${toRoom.name} เรียบร้อยแล้ว (อัปเดตกลุ่มแชท ${joinedGroupNames.length} กลุ่ม และรักษาคะแนน/งานเดิมครบ 100%)`,
@@ -1541,5 +1823,7 @@ export const messagingService = {
     }
 
     return result;
-  },
-};
+  }
+}
+
+export const messagingService = new MessagingService();

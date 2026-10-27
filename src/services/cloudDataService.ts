@@ -266,29 +266,9 @@ class CloudDataService {
             .maybeSingle();
 
           if (remoteRow && Array.isArray(remoteRow.data) && remoteRow.data.length > 0) {
-            let activeAsgIds: Set<string> | null = null;
-            try {
-              const rawAsgs =
-                this.inMemoryCache.get('kp_term_assignments_v2') ??
-                (typeof window !== 'undefined' ? window.localStorage?.getItem('kp_term_assignments_v2') : null);
-              const parsedAsgs = typeof rawAsgs === 'string' ? JSON.parse(rawAsgs) : rawAsgs;
-              if (Array.isArray(parsedAsgs) && parsedAsgs.length > 0) {
-                activeAsgIds = new Set<string>();
-                parsedAsgs.forEach((a: any) => {
-                  if (a?.id) activeAsgIds!.add(String(a.id));
-                  if (a?.unitId) activeAsgIds!.add(String(a.unitId));
-                });
-              }
-            } catch {
-              // ignore
-            }
-
             const mergedMap = new Map<string, any>();
             for (const rem of remoteRow.data) {
               if (!rem || !rem.studentCode) continue;
-              if (activeAsgIds && rem.assignmentId && !activeAsgIds.has(String(rem.assignmentId))) {
-                continue;
-              }
               const pKey = `${rem.assignmentId || ''}_${String(rem.studentCode).trim()}`;
               mergedMap.set(pKey, rem);
             }
@@ -887,6 +867,7 @@ export interface CompressionResult {
   originalSize: number;
   compressedSize: number;
   wasCompressed: boolean;
+  dataUrl?: string;
 }
 
 /**
@@ -990,11 +971,19 @@ export async function compressImageToWebP(
           const isSmaller = compressedFile.size < inputFile.size;
           const finalFile = isSmaller ? compressedFile : inputFile;
 
+          let dataUrl: string | undefined;
+          try {
+            dataUrl = canvas.toDataURL('image/webp', quality);
+          } catch {
+            // ignore
+          }
+
           resolve({
             file: finalFile,
             originalSize: inputFile.size,
             compressedSize: finalFile.size,
             wasCompressed: isSmaller,
+            dataUrl,
           });
         },
         'image/webp',

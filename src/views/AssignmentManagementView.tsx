@@ -29,7 +29,6 @@ import {
   SlidersHorizontal,
   MoreVertical,
   BarChart2,
-  Send,
   RefreshCw,
 } from 'lucide-react';
 import {
@@ -42,6 +41,9 @@ import {
 } from '../services/sgsRosterAndSubmissionService';
 import { coursesCurriculumService } from '../services/coursesCurriculumService';
 import { studentService, formatClassroomLabel } from '../services/studentService';
+import { classroomService, getLocalClassrooms } from '../services/classroomService';
+import { normalizeClassroomName } from '../services/sgsImportExportService';
+import { resolveRoomCandidates } from '../services/masterDataService';
 import {
   teacherCourseAssignmentService,
   getDynamicTeachingSubjects,
@@ -86,6 +88,25 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
   // 1. Dynamic Subjects & Real Classrooms
   const subjectsList = useMemo(() => getDynamicTeachingSubjects(), []);
   const allSystemClassrooms = useMemo(() => getAllAvailableClassroomLabels(), []);
+  const [allClassroomsList, setAllClassroomsList] = useState<any[]>(() => {
+    try {
+      return getLocalClassrooms();
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    classroomService.getAll().then((data) => {
+      if (isMounted && Array.isArray(data) && data.length > 0) {
+        setAllClassroomsList(data);
+      }
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // 2. Queue & Filtering State
   const [queueItems, setQueueItems] = useState<GradingQueueItem[]>(() =>
@@ -620,11 +641,29 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
   const classroomStudentCounts = useMemo(() => {
     const map: Record<string, number> = {};
+    allClassroomsList.forEach((c) => {
+      const roomKey = c.name || c.id;
+      const count = c.studentCount || c.student_count || 0;
+      if (roomKey && count > 0) {
+        map[roomKey] = count;
+        const norm = normalizeClassroomName(roomKey);
+        map[norm] = count;
+      }
+    });
+
     allSystemClassrooms.forEach((r) => {
-      map[r] = studentService.countStudents(r) || sgsRosterAndSubmissionService.getSgsRoster(r).length || 0;
+      const normR = normalizeClassroomName(r);
+      const existing = map[r] || map[normR] || 0;
+      if (existing > 0) {
+        map[r] = existing;
+      } else {
+        const fromStudentSvc = studentService.countStudents(r);
+        const fromRoster = sgsRosterAndSubmissionService.getSgsRoster(r).length;
+        map[r] = fromStudentSvc || fromRoster || 0;
+      }
     });
     return map;
-  }, [allSystemClassrooms]);
+  }, [allSystemClassrooms, allClassroomsList]);
 
   const enrichedAssignmentCards = useMemo(() => {
     const unitMap = new Map<
@@ -709,12 +748,14 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
           ? u.targetClassrooms
           : availableFilterRooms;
 
-      const totalStudents = targetRooms.reduce((sum, r) => {
+      const totalStudentsRaw = targetRooms.reduce((sum, r) => {
         if (r === 'ALL') return sum;
-        return sum + (classroomStudentCounts[r] || 0);
+        const norm = normalizeClassroomName(r);
+        return sum + (classroomStudentCounts[r] || classroomStudentCounts[norm] || 0);
       }, 0);
 
       const taskIds = new Set(u.tasks.map((t) => t.id));
+      const roomCandidates = selectedRoom !== 'ALL' ? resolveRoomCandidates(selectedRoom) : null;
       const roomStudentCodes =
         selectedRoom !== 'ALL'
           ? new Set(sgsRosterAndSubmissionService.getSgsRoster(selectedRoom).map((s) => s.studentCode))
@@ -722,10 +763,15 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
       const unitSubs = allSubmissions.filter((s) => {
         if (!taskIds.has(s.assignmentId)) return false;
-        if (roomStudentCodes) {
-          if (roomStudentCodes.size > 0) {
-            if (!roomStudentCodes.has(s.studentCode)) return false;
-          } else if (s.classroom && formatClassroomLabel(s.classroom) !== formatClassroomLabel(selectedRoom)) {
+        if (selectedRoom !== 'ALL') {
+          const sRoomNorm = s.classroom ? normalizeClassroomName(s.classroom) : '';
+          const selRoomNorm = normalizeClassroomName(selectedRoom);
+          const matchesRoomName = !!(
+            (sRoomNorm && selRoomNorm && sRoomNorm === selRoomNorm) ||
+            (roomCandidates && s.classroom && roomCandidates.includes(s.classroom))
+          );
+          const matchesRoster = !!(roomStudentCodes && roomStudentCodes.has(s.studentCode));
+          if (!matchesRoomName && !matchesRoster) {
             return false;
           }
         }
@@ -749,6 +795,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         if (isAnySubmitted) submittedStudents += 1;
         if (isAllGraded) fullyGradedStudents += 1;
       });
+
+      const totalStudents = Math.max(totalStudentsRaw, submittedStudents, fullyGradedStudents);
 
       const pendingReviewCount = unitSubs.filter(
         (s) => s.status === 'SUBMITTED_PENDING' || (s.status !== 'GRADED' && s.score === null)
@@ -829,11 +877,13 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
           ? assign.targetClassrooms
           : availableFilterRooms;
 
-      const totalStudents = targetRooms.reduce((sum, r) => {
+      const totalStudentsRaw = targetRooms.reduce((sum, r) => {
         if (r === 'ALL') return sum;
-        return sum + (classroomStudentCounts[r] || 0);
+        const norm = normalizeClassroomName(r);
+        return sum + (classroomStudentCounts[r] || classroomStudentCounts[norm] || 0);
       }, 0);
 
+      const roomCandidates = selectedRoom !== 'ALL' ? resolveRoomCandidates(selectedRoom) : null;
       const roomStudentCodes =
         selectedRoom !== 'ALL'
           ? new Set(sgsRosterAndSubmissionService.getSgsRoster(selectedRoom).map((s) => s.studentCode))
@@ -841,10 +891,15 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
       const subs = allSubmissions.filter((s) => {
         if (s.assignmentId !== assign.id) return false;
-        if (roomStudentCodes) {
-          if (roomStudentCodes.size > 0) {
-            if (!roomStudentCodes.has(s.studentCode)) return false;
-          } else if (s.classroom && formatClassroomLabel(s.classroom) !== formatClassroomLabel(selectedRoom)) {
+        if (selectedRoom !== 'ALL') {
+          const sRoomNorm = s.classroom ? normalizeClassroomName(s.classroom) : '';
+          const selRoomNorm = normalizeClassroomName(selectedRoom);
+          const matchesRoomName = !!(
+            (sRoomNorm && selRoomNorm && sRoomNorm === selRoomNorm) ||
+            (roomCandidates && s.classroom && roomCandidates.includes(s.classroom))
+          );
+          const matchesRoster = !!(roomStudentCodes && roomStudentCodes.has(s.studentCode));
+          if (!matchesRoomName && !matchesRoster) {
             return false;
           }
         }
@@ -859,6 +914,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       const pendingReviewCount = subs.filter(
         (s) => s.status === 'SUBMITTED_PENDING' || (s.status !== 'GRADED' && s.score === null)
       ).length;
+
+      const totalStudents = Math.max(totalStudentsRaw, submittedCount, gradedCount);
 
       let displayStatus: 'PENDING_REVIEW' | 'PENDING_SCORE' | 'IN_PROGRESS' | 'GRADED' = 'PENDING_SCORE';
       if (pendingReviewCount > 0) {
@@ -1273,7 +1330,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     const targetItem = queueItems.find((i) => i.id === itemId);
     if (!targetItem) return;
 
-    const { nextPendingItem } = teacherCourseAssignmentService.submitGrade(itemId, score, feedback);
+    const currentQueueIdx = queueItems.findIndex((i) => i.id === itemId);
+    const { nextPendingItem } = teacherCourseAssignmentService.submitGrade(itemId, score, feedback, currentQueueIdx);
 
     sgsRosterAndSubmissionService.gradeSubmission(
       targetItem.assignmentId,
@@ -1295,7 +1353,11 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       }
     }
 
-    const nextInFilter = filteredSubmissions.find(
+    const currentFilteredIdx = filteredSubmissions.findIndex((i) => i.id === itemId);
+    const forwardInFilter = currentFilteredIdx >= 0
+      ? filteredSubmissions.slice(currentFilteredIdx + 1).find((i) => i.status === 'PENDING_REVIEW')
+      : undefined;
+    const nextInFilter = forwardInFilter || filteredSubmissions.find(
       (i) => i.id !== itemId && i.status === 'PENDING_REVIEW'
     );
     if (nextInFilter) {
@@ -1321,7 +1383,11 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     setQueueItems(teacherCourseAssignmentService.getGradingQueue());
     showToast(`✓ ส่งงานกลับให้ ${targetItem.studentName} แก้ไขเรียบร้อยแล้ว (${reason})`);
 
-    const nextInFilter = filteredSubmissions.find(
+    const currentFilteredIdx = filteredSubmissions.findIndex((i) => i.id === itemId);
+    const forwardInFilter = currentFilteredIdx >= 0
+      ? filteredSubmissions.slice(currentFilteredIdx + 1).find((i) => i.status === 'PENDING_REVIEW')
+      : undefined;
+    const nextInFilter = forwardInFilter || filteredSubmissions.find(
       (i) => i.id !== itemId && i.status === 'PENDING_REVIEW'
     );
     if (nextInFilter) {
@@ -2001,7 +2067,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                           {item.displayStatus === 'PENDING_SCORE' && (
                             <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#FFFBEB] text-[#92400E] border border-[#FDE68A] flex items-center gap-1.5 shrink-0">
                               <Clock className="w-3.5 h-3.5 text-[#F59E0B]" />
-                              <span>รอส่งคะแนน</span>
+                              <span>{item.submittedCount > 0 || (item.progressCount > 0) ? 'รอส่งคะแนน' : 'รอนักเรียนส่งงาน'}</span>
                             </span>
                           )}
 
@@ -2148,8 +2214,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                                 onClick={() => handleRowPrimaryAction(item)}
                                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-blue-50 border border-blue-200 text-[#3B82F6] text-xs sm:text-sm font-bold transition-all shadow-2xs cursor-pointer"
                               >
-                                <Send className="w-3.5 h-3.5 text-[#3B82F6]" />
-                                <span>สั่งงาน / ส่งคะแนน</span>
+                                <ClipboardList className="w-3.5 h-3.5 text-[#3B82F6]" />
+                                <span>รายการส่งงาน</span>
                               </button>
                             ))}
 

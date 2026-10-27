@@ -15,7 +15,10 @@ import {
   Copy,
 } from 'lucide-react';
 import { ArtworkPreviewModal } from './ArtworkPreviewModal';
-import type { GradingQueueItem } from '../../services/teacherCourseAssignmentService';
+import {
+  teacherCourseAssignmentService,
+  type GradingQueueItem,
+} from '../../services/teacherCourseAssignmentService';
 import { studentService, formatClassroomLabel } from '../../services/studentService';
 import {
   sgsRosterAndSubmissionService,
@@ -112,21 +115,45 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
     }
   }, [currentItem]);
 
+  // แท็บตัวกรองคิวในหน้าต่างตรวจงาน (ค่าเริ่มต้น: 'PENDING' รอตรวจเท่านั้น เพื่อให้ 8 งานรอตรวจ แสดง 1/8 ทันที)
+  const [modalFilter, setModalFilter] = useState<'PENDING' | 'GRADED' | 'ALL'>('PENDING');
+
+  useEffect(() => {
+    if (isOpen) {
+      setModalFilter('PENDING');
+    }
+  }, [isOpen]);
+
   if (!isOpen || !currentItem) return null;
 
-  const currentIndex = allItems.findIndex((i) => i.id === currentItem.id);
+  const pendingItemsCount = allItems.filter((i) => i.status === 'PENDING_REVIEW').length;
+  const gradedItemsCount = allItems.filter((i) => i.status === 'GRADED').length;
+
+  const filteredModalItems = React.useMemo(() => {
+    if (modalFilter === 'PENDING') {
+      const p = allItems.filter((i) => i.status === 'PENDING_REVIEW');
+      return p.length > 0 ? p : allItems;
+    }
+    if (modalFilter === 'GRADED') {
+      const g = allItems.filter((i) => i.status === 'GRADED');
+      return g.length > 0 ? g : allItems;
+    }
+    return allItems;
+  }, [allItems, modalFilter]);
+
+  const currentIndex = filteredModalItems.findIndex((i) => i.id === currentItem.id);
   const hasPrev = currentIndex > 0;
-  const hasNext = currentIndex < allItems.length - 1;
+  const hasNext = currentIndex < filteredModalItems.length - 1;
 
   const handlePrev = () => {
     if (hasPrev) {
-      onSelectQueueItem(allItems[currentIndex - 1]);
+      onSelectQueueItem(filteredModalItems[currentIndex - 1]);
     }
   };
 
   const handleNext = () => {
     if (hasNext) {
-      onSelectQueueItem(allItems[currentIndex + 1]);
+      onSelectQueueItem(filteredModalItems[currentIndex + 1]);
     }
   };
 
@@ -220,7 +247,52 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Filter pills inside grading workspace */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => {
+                  setModalFilter('PENDING');
+                  const firstP = allItems.find((i) => i.status === 'PENDING_REVIEW');
+                  if (firstP) onSelectQueueItem(firstP);
+                }}
+                className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-[11px] font-bold ${
+                  modalFilter === 'PENDING'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                ⏳ รอตรวจ ({pendingItemsCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setModalFilter('GRADED');
+                  const firstG = allItems.find((i) => i.status === 'GRADED');
+                  if (firstG) onSelectQueueItem(firstG);
+                }}
+                className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-[11px] font-bold ${
+                  modalFilter === 'GRADED'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                ✓ ตรวจแล้ว ({gradedItemsCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalFilter('ALL')}
+                className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-[11px] font-bold ${
+                  modalFilter === 'ALL'
+                    ? 'bg-slate-700 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                ทั้งหมด ({allItems.length})
+              </button>
+            </div>
+
             {/* Prev / Next queue navigation */}
             <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
               <button
@@ -233,7 +305,7 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <span className="text-[11px] font-bold text-slate-600 px-1.5 tabular-nums">
-                {currentIndex + 1} / {allItems.length}
+                {currentIndex >= 0 ? currentIndex + 1 : 1} / {filteredModalItems.length}
               </span>
               <button
                 type="button"
@@ -370,19 +442,24 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
                     <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mx-auto text-2xl shadow-2xs">
                       🖼️
                     </div>
-                    <span className="inline-block px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-bold">
-                      ไฟล์ผลงานภาพ ({currentItem.submissionChannel || 'รูปภาพ'})
+                    <span className="inline-block px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[11px] font-bold">
+                      {imgError ? '⚠️ ไม่พบไฟล์ภาพบนคลาวด์ R2' : `ไฟล์ผลงานภาพ (${currentItem.submissionChannel || 'รูปภาพ'})`}
                     </span>
                     <h4 className="text-sm font-bold text-slate-800 break-all">
                       {currentItem.fileName || 'ไฟล์ผลงานนักเรียน'}
                     </h4>
+                    {imgError && (
+                      <p className="text-xs text-rose-600 font-medium">
+                        (อาจเกิดจากสัญญาณเน็ตหรือสิทธิ์ CORS บนมือถือของนักเรียนขณะส่งงาน)
+                      </p>
+                    )}
                     <p className="text-xs text-slate-500">
                       ชิ้นงานที่ส่งของ {resolvedName}
                     </p>
                     <div className="pt-2">
                       <label className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs">
                         <Upload className="w-3.5 h-3.5" />
-                        <span>เลือกรูปภาพจากเครื่องเพื่อดูพรีวิว</span>
+                        <span>เลือกรูปภาพจากเครื่องเพื่อดูพรีวิวและบันทึกแทน</span>
                         <input
                           type="file"
                           accept="image/*,.pdf"
@@ -403,6 +480,8 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
                                   }
                                 } catch {}
 
+                                teacherCourseAssignmentService.updateQueueItemFile(currentItem.id, res);
+
                                 // อัปโหลดขึ้น Cloudflare R2 ทันทีหาก R2 พร้อมใช้งาน
                                 if (r2StorageService.isConfigured()) {
                                   try {
@@ -417,6 +496,7 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
                                     const uploadRes = await r2StorageService.uploadFile(r2Key, f, f.type);
                                     if (uploadRes.success && uploadRes.url) {
                                       setLocalOverrideFileUrl(uploadRes.url);
+                                      teacherCourseAssignmentService.updateQueueItemFile(currentItem.id, uploadRes.url);
                                       const subs = sgsRosterAndSubmissionService.getSubmissions();
                                       const targetIdx = subs.findIndex(
                                         (s) => s.assignmentId === currentItem.assignmentId && s.studentCode === currentItem.studentCode
