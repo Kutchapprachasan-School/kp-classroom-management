@@ -202,3 +202,85 @@ export function pickWeightedWheelWinner(
 
   return { winnerSegment, nextRotationDeg };
 }
+
+export interface GenericTierItem {
+  id: string;
+  name: string;
+  weight: number;
+  [key: string]: any;
+}
+
+export interface GenericPrizeWheelSegment<T extends GenericTierItem = GenericTierItem> {
+  tier: T;
+  weightRatio: number;
+  startAngle: number;
+  endAngle: number;
+  midAngle: number;
+  color: string;
+}
+
+export const PASTEL_PRIZE_COLORS = [
+  '#3B82F6', // Blue (10 coins)
+  '#10B981', // Emerald (20 coins)
+  '#8B5CF6', // Purple (50 coins)
+  '#EC4899', // Pink (+1 ticket)
+  '#F59E0B', // Amber (100 coins)
+  '#06B6D4', // Cyan (Gacha ticket)
+  '#EF4444', // Red (Combo Jackpot)
+  '#14B8A6', // Teal
+];
+
+/**
+ * คำนวณช่องวงล้อของรางวัลตามน้ำหนักเปอร์เซ็นต์ (Stepped Probability Ladder)
+ */
+export function buildPrizeWheelSegments<T extends GenericTierItem>(
+  tiers: T[],
+  customColors?: string[]
+): GenericPrizeWheelSegment<T>[] {
+  const totalWeight = tiers.reduce((sum, t) => sum + Math.max(0, t.weight), 0);
+  if (totalWeight <= 0) return [];
+
+  const palette = customColors && customColors.length > 0 ? customColors : PASTEL_PRIZE_COLORS;
+
+  let currentAngle = 0;
+  return tiers.map((tier, idx) => {
+    const weightRatio = Math.max(0, tier.weight) / totalWeight;
+    const angleSpan = weightRatio * 360;
+    const startAngle = currentAngle;
+    const endAngle = currentAngle + angleSpan;
+    const midAngle = startAngle + angleSpan / 2;
+    currentAngle = endAngle;
+
+    return {
+      tier,
+      weightRatio,
+      startAngle,
+      endAngle,
+      midAngle,
+      color: palette[idx % palette.length],
+    };
+  });
+}
+
+/**
+ * สุ่มของรางวัลตามน้ำหนัก และคำนวณองศาการหมุนวงล้อให้หยุดตรงเข็มชี้ด้านบน
+ */
+export function pickPrizeWheelWinner<T extends GenericTierItem>(
+  segments: GenericPrizeWheelSegment<T>[],
+  currentRotation: number,
+  extraSpins: number = 6
+): { winnerSegment: GenericPrizeWheelSegment<T>; nextRotationDeg: number } | null {
+  if (segments.length === 0) return null;
+
+  const r = Math.random() * 360;
+  const winnerSegment =
+    segments.find((seg) => r >= seg.startAngle && r < seg.endAngle) ||
+    segments[segments.length - 1];
+
+  const targetNormalized = (360 - winnerSegment.midAngle + 360) % 360;
+  const baseSpins = Math.ceil(currentRotation / 360) * 360 + extraSpins * 360;
+  const nextRotationDeg = baseSpins + targetNormalized;
+
+  return { winnerSegment, nextRotationDeg };
+}
+

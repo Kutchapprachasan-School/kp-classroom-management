@@ -42,7 +42,13 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
   const [isProjectorMode, setIsProjectorMode] = useState<boolean>(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => !soundFX.getMuted());
   const [isLuckyDrawOpen, setIsLuckyDrawOpen] = useState<boolean>(false);
+  const [luckyDrawStudentId, setLuckyDrawStudentId] = useState<string | null>(null);
   const [isGoldQuestArenaOpen, setIsGoldQuestArenaOpen] = useState<boolean>(false);
+
+  const handleOpenLuckyDraw = useCallback((studentId?: string) => {
+    setLuckyDrawStudentId(studentId || null);
+    setIsLuckyDrawOpen(true);
+  }, []);
 
   // SubTab States
   const [selectedStudent, setSelectedStudent] = useState<LiveStudent | null>(null);
@@ -493,7 +499,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
         pendingQueueCount={pendingQueueCount}
         isFlushingQueue={isFlushingQueue}
         onFlushQueue={flushOfflineQueue}
-        onOpenLuckyDraw={() => setIsLuckyDrawOpen(true)}
+        onOpenLuckyDraw={() => handleOpenLuckyDraw()}
         onOpenGoldQuestArena={() => setIsGoldQuestArenaOpen(true)}
       />
 
@@ -514,6 +520,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
             onToggleAttendance={handleToggleAttendance}
             syncingAttendanceIds={syncingAttendanceIds}
             isActive={activeTab === 'picker'}
+            onOpenLuckyDraw={(studentId) => handleOpenLuckyDraw(studentId)}
           />
         </div>
 
@@ -573,7 +580,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
             ledger={ledger}
             sessionTotalTickets={sessionTotalTickets}
             isProjectorMode={isProjectorMode}
-            onOpenLuckyDraw={() => setIsLuckyDrawOpen(true)}
+            onOpenLuckyDraw={(studentId) => handleOpenLuckyDraw(studentId)}
             onUndo={undoReward}
             onGiveClassBonus={handleGiveClassBonus}
           />
@@ -583,8 +590,12 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
       {/* Lucky Ticket Draw Modal */}
       <LuckyTicketDrawModal
         isOpen={isLuckyDrawOpen}
-        onClose={() => setIsLuckyDrawOpen(false)}
+        onClose={() => {
+          setIsLuckyDrawOpen(false);
+          setLuckyDrawStudentId(null);
+        }}
         students={students}
+        initialStudentId={luckyDrawStudentId}
         classroomId={selectedClassId}
         classroomName={currentClassroom?.name}
         subjectName={currentClassroom?.subject}

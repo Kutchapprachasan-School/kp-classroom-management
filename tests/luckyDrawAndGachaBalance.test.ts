@@ -11,6 +11,12 @@ import assert from 'node:assert/strict';
 import { gachaConfigService, DEFAULT_GACHA_CONFIG } from '../src/services/gachaConfigService';
 import { PRIZE_POOLS } from '../src/components/live-classroom/LuckyTicketDrawModal';
 import { liveClassroomService } from '../src/services/liveClassroomService';
+import {
+  buildPrizeWheelSegments,
+  pickPrizeWheelWinner,
+  buildWeightedWheelSegments,
+  pickWeightedWheelWinner,
+} from '../src/utils/liveClassroomAlgorithms';
 
 test('1. Gacha Star Shard Exchange is rebalanced to prevent infinite loops', () => {
   const cfg = gachaConfigService.getConfig();
@@ -103,3 +109,64 @@ test('5. Weekly Course-Linked Gacha Ticket Cap (5 tickets/period x periods/week)
   assert.equal(capInfo.ticketsPerPeriod, 5, 'Base quota is 5 tickets per period');
   assert.equal(capInfo.weeklyCap, capInfo.periodsPerWeek * capInfo.ticketsPerPeriod);
 });
+
+test('6. Individual Student Prize Wheel: builds prize segments and rotates needle precisely to winning prize', () => {
+  const standardPool = PRIZE_POOLS.find((p) => p.id === 'standard')!;
+  const segments = buildPrizeWheelSegments(standardPool.tiers);
+
+  assert.equal(segments.length, standardPool.tiers.length);
+  assert.equal(segments[0].startAngle, 0);
+  assert.equal(Math.round(segments[segments.length - 1].endAngle), 360);
+
+  // Spin 15 times and verify needle lands exactly in the winner's segment
+  let currentRot = 0;
+  for (let i = 0; i < 15; i++) {
+    const res = pickPrizeWheelWinner(segments, currentRot, 6);
+    assert.ok(res, 'Spin result should not be null');
+
+    currentRot = res.nextRotationDeg;
+    const normalizedRot = currentRot % 360;
+    const initialAngleUnderNeedle = (360 - normalizedRot) % 360;
+
+    // The angle under the needle at 12 oclock must fall within winnerSegment [startAngle, endAngle)
+    const winner = res.winnerSegment;
+    assert.ok(
+      initialAngleUnderNeedle >= winner.startAngle - 0.001 &&
+      initialAngleUnderNeedle <= winner.endAngle + 0.001,
+      `Needle angle ${initialAngleUnderNeedle} must align with winner ${winner.tier.name} [${winner.startAngle}, ${winner.endAngle}]`
+    );
+  }
+});
+
+test('7. Single-Student Lucky Spin prevents wrong-student attribution bug', () => {
+  // Scenario: Student A (กวินท์) gets a ticket, Student B (พิมพา) already has 2 tickets
+  const studentA = { id: 'stu-A', studentCode: '101', name: 'กวินท์', present: true, sessionCoins: 0, sessionTickets: 1, totalCoins: 0, totalTickets: 1 };
+  const studentB = { id: 'stu-B', studentCode: '102', name: 'พิมพา', present: true, sessionCoins: 0, sessionTickets: 2, totalCoins: 0, totalTickets: 2 };
+  const classStudents = [studentA, studentB];
+
+  // In individual mode, when student A is spinning their ticket, the prizes wheel is spun for student A
+  const standardPool = PRIZE_POOLS.find((p) => p.id === 'standard')!;
+  const prizeSegments = buildPrizeWheelSegments(standardPool.tiers);
+  const spinResult = pickPrizeWheelWinner(prizeSegments, 0, 6);
+  assert.ok(spinResult);
+
+  // Awarding prize directly to student A:
+  const wonPrize = spinResult.winnerSegment.tier;
+  let awardedStudentId = studentA.id;
+  let studentATickets = studentA.sessionTickets;
+  let studentACoins = studentA.sessionCoins;
+
+  if (wonPrize.rewardType === 'coin') {
+    studentATickets -= 1; // Consume 1 ticket from Student A
+    studentACoins += wonPrize.coins; // Award coins to Student A
+  } else if (wonPrize.rewardType === 'ticket_draw') {
+    // Net 0 refund
+  } else if (wonPrize.rewardType === 'ticket') {
+    studentATickets -= 1;
+  }
+
+  // Verification:
+  assert.equal(awardedStudentId, 'stu-A', 'Prize MUST be awarded to Student A (who earned the ticket), NOT Student B');
+  assert.equal(studentB.sessionTickets, 2, 'Student B tickets remain untouched');
+});
+

@@ -36,6 +36,7 @@ export interface RandomPickerSubTabProps {
   onToggleAttendance: (studentId: string) => Promise<void>;
   syncingAttendanceIds: string[];
   isActive?: boolean;
+  onOpenLuckyDraw?: (studentId?: string) => void;
 }
 
 export function getAvailablePool(
@@ -65,6 +66,7 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
   onToggleAttendance,
   syncingAttendanceIds,
   isActive = true,
+  onOpenLuckyDraw,
 }) => {
   const [pickerMode, setPickerMode] = useState<PickerMode>('slot');
   const [spinSpeed, setSpinSpeed] = useState<SpinSpeed>('normal');
@@ -665,11 +667,27 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
                 `${selectedStudent.name} ได้ตั๋วสุ่มรางวัล`
               )
             }
-            className="flex items-center gap-1.5 bg-pink-500/15 hover:bg-pink-500/25 disabled:opacity-40 border border-pink-300 text-pink-600 font-bold px-3.5 py-1.5 rounded-xl text-xs transition"
+            className="flex items-center gap-1.5 bg-pink-500/15 hover:bg-pink-500/25 disabled:opacity-40 border border-pink-300 text-pink-600 font-bold px-3.5 py-1.5 rounded-xl text-xs transition cursor-pointer"
           >
             <TicketRegular className="w-4 h-4 text-pink-500" />
             <span>+1 ตั๋วสุ่ม</span>
           </button>
+
+          {selectedStudent &&
+            (selectedStudent.sessionTickets > 0 || selectedStudent.totalTickets > 0) &&
+            onOpenLuckyDraw && (
+              <button
+                disabled={isSpinning}
+                onClick={() => onOpenLuckyDraw(selectedStudent.id)}
+                className="flex items-center gap-1.5 bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white font-extrabold px-3.5 py-1.5 rounded-xl text-xs shadow-md shadow-pink-500/25 transition active:scale-95 animate-pulse cursor-pointer"
+                title={`หมุนวงล้อชิงรางวัลให้ ${selectedStudent.name}`}
+              >
+                <SparklesRegular className="w-4 h-4 text-amber-300" />
+                <span>
+                  หมุนรางวัล ({selectedStudent.sessionTickets || selectedStudent.totalTickets} 🎟️)
+                </span>
+              </button>
+            )}
 
           <button
             disabled={!selectedStudent || isSpinning}

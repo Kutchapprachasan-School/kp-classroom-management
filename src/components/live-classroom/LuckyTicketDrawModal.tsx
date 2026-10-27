@@ -12,7 +12,7 @@ import SparklesRegular from '@mingcute/react/core-regular/sparkles';
 import CloseRegular from '@mingcute/react/core-regular/close';
 import CheckCircleRegular from '@mingcute/react/core-regular/check-circle';
 import Refresh1Regular from '@mingcute/react/core-regular/refresh-1';
-import { Users, Dices, Gift, ArrowRight } from 'lucide-react';
+import { Users, Dices, Gift, ArrowRight, UserCheck, Sparkles } from 'lucide-react';
 import type { LiveStudent } from '../../services/liveClassroomService';
 import {
   liveClassroomService,
@@ -21,6 +21,8 @@ import {
 import {
   buildWeightedWheelSegments,
   pickWeightedWheelWinner,
+  buildPrizeWheelSegments,
+  pickPrizeWheelWinner,
 } from '../../utils/liveClassroomAlgorithms';
 
 export interface PrizeTier {
@@ -307,6 +309,7 @@ export interface LuckyTicketDrawModalProps {
   isOpen: boolean;
   onClose: () => void;
   students: LiveStudent[];
+  initialStudentId?: string | null;
   classroomId?: string;
   classroomName?: string;
   subjectName?: string;
@@ -358,6 +361,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
   isOpen,
   onClose,
   students,
+  initialStudentId,
   classroomId,
   classroomName,
   subjectName,
@@ -365,10 +369,20 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
   onConsumeTicket,
   onPlaySound,
 }) => {
+  const [drawMode, setDrawMode] = useState<'individual' | 'class'>('individual');
+  const [selectedStudentId, setSelectedStudentId] = useState<string>(initialStudentId || '');
   const [ticketSource, setTicketSource] = useState<'session' | 'total'>('session');
   const [spinDurationSec, setSpinDurationSec] = useState<number>(4.5);
   const [excludeWinners, setExcludeWinners] = useState<boolean>(true);
   const [pastWinnerIds, setPastWinnerIds] = useState<string[]>([]);
+
+  // อัปเดต selectedStudentId เมื่อ initialStudentId ส่งเข้ามา
+  useEffect(() => {
+    if (initialStudentId) {
+      setSelectedStudentId(initialStudentId);
+      setDrawMode('individual');
+    }
+  }, [initialStudentId, isOpen]);
 
   // ระบบติดตามเพดานโควตาสูงสุดของตั๋วกาชาประจำสัปดาห์ (ผูกกับคาบเรียน: 5 ใบ/คาบ x คาบต่อสัปดาห์)
   const [weeklyGachaGiven, setWeeklyGachaGiven] = useState<number>(0);
@@ -419,7 +433,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
     setActivePrize(currentPool.tiers[0]);
   }, [currentPool]);
 
-  // วงล้อหมุนนักเรียน
+  // วงล้อหมุน
   const [rotation, setRotation] = useState<number>(0);
   const [isSpinning, setIsSpinning] = useState<boolean>(false);
   const [winner, setWinner] = useState<LiveStudent | null>(null);
@@ -453,7 +467,51 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
     };
   }, [isOpen, cancelActiveSpin]);
 
-  // คำนวณช่องวงล้อถ่วงน้ำหนักตามจำนวนตั๋ว
+  // นักเรียนเป้าหมายที่เลือกสำหรับโหมดหมุนตั๋วรายคน
+  const selectedStudent = useMemo(() => {
+    if (selectedStudentId) {
+      const found = students.find((s) => s.id === selectedStudentId);
+      if (found) return found;
+    }
+    // Fallback: หาคนแรกที่มีตั๋วในห้อง
+    const withTickets = students.find(
+      (s) => s.present && (ticketSource === 'session' ? s.sessionTickets : s.totalTickets) > 0
+    );
+    if (withTickets) return withTickets;
+    return students.find((s) => s.present) || students[0] || null;
+  }, [students, selectedStudentId, ticketSource]);
+
+  const selectedStudentTickets = useMemo(() => {
+    if (!selectedStudent) return 0;
+    return ticketSource === 'session'
+      ? selectedStudent.sessionTickets
+      : selectedStudent.totalTickets;
+  }, [selectedStudent, ticketSource]);
+
+  // รายการรางวัลที่ปรับตามโควตาเพดานกาชารายสัปดาห์
+  const effectiveTiers: PrizeTier[] = useMemo(() => {
+    return currentPool.tiers.map((t) => {
+      if (isWeeklyGachaCapped && t.tickets > 0 && t.rewardType !== 'ticket_draw') {
+        return {
+          ...t,
+          convertedDueToCap: true,
+          name: `${t.name} (โควตาสัปดาห์เต็ม ➔ แปลงเป็น 100 เหรียญ)`,
+          rewardType: 'coin',
+          coins: 100,
+          tickets: 0,
+          description: `🪙 รางวัลใหญ่ 100 เหรียญแทน (โควตาสัปดาห์นี้เต็ม ${weeklyGachaGiven}/${weeklyCapInfo.weeklyCap} ใบ)`,
+        };
+      }
+      return t;
+    });
+  }, [currentPool, isWeeklyGachaCapped, weeklyGachaGiven, weeklyCapInfo.weeklyCap]);
+
+  // วงล้อของรางวัลสำหรับโหมดเดี่ยว
+  const prizeSegments = useMemo(() => {
+    return buildPrizeWheelSegments(effectiveTiers);
+  }, [effectiveTiers]);
+
+  // วงล้อรายชื่อนักเรียนสำหรับโหมดจับฉลากรวมทั้งห้อง
   const segments = useMemo(() => {
     return buildWeightedWheelSegments(
       students,
@@ -472,22 +530,6 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
 
     setIsRollingPrize(true);
     onPlaySound?.('tick', 600);
-
-    // หากโควตากาชาของวิชาประจำสัปดาห์นี้เต็มแล้ว รางวัลกาชาจะแปลงเป็น 100 เหรียญแจ็กพอตแทน
-    const effectiveTiers: PrizeTier[] = currentPool.tiers.map((t) => {
-      if (isWeeklyGachaCapped && t.tickets > 0 && t.rewardType !== 'ticket_draw') {
-        return {
-          ...t,
-          convertedDueToCap: true,
-          name: `${t.name} (โควตาสัปดาห์เต็ม ➔ แปลงเป็น 100 เหรียญ)`,
-          rewardType: 'coin',
-          coins: 100,
-          tickets: 0,
-          description: `🪙 รางวัลใหญ่ 100 เหรียญแทน (โควตาสัปดาห์นี้เต็ม ${weeklyGachaGiven}/${weeklyCapInfo.weeklyCap} ใบ)`,
-        };
-      }
-      return t;
-    });
 
     const totalWeight = effectiveTiers.reduce((sum, t) => sum + t.weight, 0);
     const rand = Math.random() * totalWeight;
@@ -521,14 +563,64 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
   }, [
     isSpinning,
     isRollingPrize,
-    currentPool,
-    isWeeklyGachaCapped,
-    weeklyGachaGiven,
-    weeklyCapInfo.weeklyCap,
+    effectiveTiers,
     onPlaySound,
   ]);
 
-  // ฟังก์ชันหมุนวงล้อหานักเรียนผู้โชคดี
+  // ฟังก์ชันหมุนวงล้อชิงรางวัลรายคน (หมุนตั๋วที่นักเรียนถือ)
+  const handleSpinIndividual = useCallback(() => {
+    if (
+      isSpinning ||
+      prizeSegments.length === 0 ||
+      !selectedStudent ||
+      selectedStudentTickets <= 0
+    ) {
+      return;
+    }
+
+    setIsSpinning(true);
+    setWinner(null);
+    setPrizeClaimed(false);
+
+    const spinResult = pickPrizeWheelWinner(prizeSegments, rotation, 6);
+    if (!spinResult) {
+      setIsSpinning(false);
+      return;
+    }
+
+    setRotation(spinResult.nextRotationDeg);
+
+    tickTimersRef.current.forEach(clearTimeout);
+    tickTimersRef.current = [];
+    const totalTicks = Math.round(spinDurationSec * 6.5);
+    const spinDurationMs = spinDurationSec * 1000;
+
+    for (let i = 1; i <= totalTicks; i++) {
+      const progress = i / totalTicks;
+      const timeOffset = Math.pow(progress, 2.2) * spinDurationMs * 0.96;
+      const timer = setTimeout(() => {
+        onPlaySound?.('tick', 500 + i * 12);
+      }, timeOffset);
+      tickTimersRef.current.push(timer);
+    }
+
+    spinTimeoutRef.current = setTimeout(() => {
+      setIsSpinning(false);
+      setActivePrize(spinResult.winnerSegment.tier);
+      setWinner(selectedStudent);
+      onPlaySound?.('fanfare');
+    }, spinDurationMs);
+  }, [
+    isSpinning,
+    prizeSegments,
+    selectedStudent,
+    selectedStudentTickets,
+    rotation,
+    spinDurationSec,
+    onPlaySound,
+  ]);
+
+  // ฟังก์ชันหมุนวงล้อหานักเรียนผู้โชคดี (โหมดจับฉลากรวมทั้งห้อง)
   const handleSpinWheel = useCallback(() => {
     if (isSpinning || segments.length === 0 || isRollingPrize) return;
 
@@ -677,28 +769,117 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
             </div>
             <div>
               <h2 className="text-xl md:text-2xl font-extrabold text-white flex items-center gap-2">
-                <span>วงล้อจับรางวัลตั๋วสุ่มท้ายคาบ</span>
+                <span>{drawMode === 'individual' ? 'วงล้อหมุนตั๋วรางวัล (รายคน)' : 'วงล้อจับรางวัลตั๋วสุ่ม (ทั้งห้อง)'}</span>
                 <span className="text-xs font-bold bg-pink-500/20 border border-pink-500/40 text-pink-300 px-3 py-1 rounded-full">
-                  รวม {totalTicketsInPool} 🎟️ ในกองสุ่ม
+                  {drawMode === 'individual'
+                    ? selectedStudent
+                      ? `ตั๋วของ ${selectedStudent.name}: ${selectedStudentTickets} 🎟️`
+                      : 'เลือกนักเรียนเพื่อหมุน'
+                    : `รวม ${totalTicketsInPool} 🎟️ ในกองสุ่ม`}
                 </span>
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                สุ่มหรือเลือกของรางวัลก่อนหมุนคน • เมื่อได้รับรางวัลจะหัก 1 ตั๋วชิงโชค (หากได้ตั๋วกาชาจะเป็นการคืนตั๋ว = ไม่หักตั๋วเดิม)
+                {drawMode === 'individual'
+                  ? 'หมุนของรางวัลให้นักเรียนที่ได้รับตั๋วสุ่ม • หัก 1 ตั๋วเมื่อได้รับรางวัล (หากได้ตั๋วสุ่มคืนจะไม่หักตั๋ว)'
+                  : 'จับฉลากผู้โชคดีท้ายคาบจากตั๋วสะสมทุกคนในห้อง • สุ่มหรือเลือกของรางวัลก่อนหมุนคน'}
               </p>
             </div>
           </div>
 
-          <button
-            onClick={handleClose}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
-          >
-            <CloseRegular className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Draw Mode Switcher Tabs */}
+            <div className="flex items-center bg-slate-950 p-1 rounded-2xl border border-slate-800">
+              <button
+                onClick={() => {
+                  if (isSpinning) return;
+                  setDrawMode('individual');
+                  setWinner(null);
+                  setPrizeClaimed(false);
+                }}
+                disabled={isSpinning}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black transition cursor-pointer ${
+                  drawMode === 'individual'
+                    ? 'bg-gradient-to-r from-pink-500 to-indigo-600 text-white shadow-md shadow-pink-500/20'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>หมุนตั๋วรายคน</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (isSpinning) return;
+                  setDrawMode('class');
+                  setWinner(null);
+                  setPrizeClaimed(false);
+                }}
+                disabled={isSpinning}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black transition cursor-pointer ${
+                  drawMode === 'class'
+                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <TrophyRegular className="w-3.5 h-3.5" />
+                <span>จับฉลากทั้งห้อง</span>
+              </button>
+            </div>
+
+            <button
+              onClick={handleClose}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition cursor-pointer"
+            >
+              <CloseRegular className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
-        {/* Settings Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 py-3 border-b border-slate-800/80 text-xs">
-          <div className="flex flex-wrap items-center gap-4">
+        {/* Mode-Specific Settings & Bar */}
+        {drawMode === 'individual' ? (
+          /* Individual Student Selector Bar */
+          <div className="flex flex-wrap items-center justify-between gap-3 py-3 px-4 mt-3 bg-slate-950/70 border border-slate-800 rounded-2xl text-xs">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <UserCheck className="w-4 h-4 text-pink-400 shrink-0" />
+                <span className="text-slate-300 font-bold">นักเรียนที่ใช้ตั๋วหมุน:</span>
+                <select
+                  value={selectedStudent?.id || ''}
+                  onChange={(e) => {
+                    setSelectedStudentId(e.target.value);
+                    setWinner(null);
+                    setPrizeClaimed(false);
+                  }}
+                  disabled={isSpinning}
+                  className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-1 font-bold text-white text-xs max-w-[260px] truncate"
+                >
+                  {students
+                    .filter((s) => s.present)
+                    .map((st) => {
+                      const tCount =
+                        ticketSource === 'session' ? st.sessionTickets : st.totalTickets;
+                      return (
+                        <option key={st.id} value={st.id}>
+                          #{st.studentCode} {st.name} ({tCount} 🎟️)
+                        </option>
+                      );
+                    })}
+                </select>
+              </div>
+
+              {selectedStudent && (
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 rounded-xl font-extrabold text-pink-300 bg-pink-500/20 border border-pink-500/40">
+                    🎟️ ตั๋วคงเหลือ: {selectedStudentTickets} ใบ
+                  </span>
+                  {selectedStudentTickets <= 0 && (
+                    <span className="text-amber-400 font-semibold">
+                      (ไม่มีตั๋วสุ่มในคาบนี้ สามารถแจกเพิ่มที่หน้ากิจกรรมได้ค่ะ)
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="flex items-center gap-2">
               <span className="text-slate-400 font-medium">ใช้ตั๋วจาก:</span>
               <select
@@ -706,57 +887,79 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
                 onChange={(e) => {
                   setTicketSource(e.target.value as 'session' | 'total');
                   setWinner(null);
+                  setPrizeClaimed(false);
                 }}
                 disabled={isSpinning}
                 className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-1 font-semibold text-slate-100 text-xs"
               >
-                <option value="session">🎟️ ตั๋วที่ได้ในคาบนี้ (Session Tickets)</option>
-                <option value="total">🏆 ตั๋วสะสมรวมทั้งหมด (Total Tickets)</option>
+                <option value="session">🎟️ ตั๋วในคาบนี้ (Session)</option>
+                <option value="total">🏆 ตั๋วสะสมรวมทั้งหมด (Total)</option>
               </select>
             </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-slate-400 font-medium">ความเร็ว:</span>
-              <select
-                value={spinDurationSec}
-                onChange={(e) => setSpinDurationSec(Number(e.target.value))}
-                disabled={isSpinning}
-                className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-1 font-semibold text-slate-100 text-xs"
-              >
-                <option value={3.0}>⚡ ด่วน (3.0 วินาที)</option>
-                <option value={4.5}>🎲 ปกติ (4.5 วินาที)</option>
-                <option value={6.0}>🎭 ลุ้นระทึก (6.0 วินาที)</option>
-              </select>
-            </div>
-
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={excludeWinners}
-                onChange={(e) => setExcludeWinners(e.target.checked)}
-                disabled={isSpinning}
-                className="w-4 h-4 rounded accent-pink-500"
-              />
-              <span className="text-slate-300 font-medium">
-                ตัดสิทธิ์ผู้ชนะออกในรอบถัดไป ({pastWinnerIds.length} คนได้รับแล้ว)
-              </span>
-            </label>
           </div>
+        ) : (
+          /* All-Class Settings Bar */
+          <div className="flex flex-wrap items-center justify-between gap-4 py-3 border-b border-slate-800/80 text-xs">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400 font-medium">ใช้ตั๋วจาก:</span>
+                <select
+                  value={ticketSource}
+                  onChange={(e) => {
+                    setTicketSource(e.target.value as 'session' | 'total');
+                    setWinner(null);
+                  }}
+                  disabled={isSpinning}
+                  className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-1 font-semibold text-slate-100 text-xs"
+                >
+                  <option value="session">🎟️ ตั๋วที่ได้ในคาบนี้ (Session Tickets)</option>
+                  <option value="total">🏆 ตั๋วสะสมรวมทั้งหมด (Total Tickets)</option>
+                </select>
+              </div>
 
-          {pastWinnerIds.length > 0 && (
-            <button
-              onClick={() => {
-                setPastWinnerIds([]);
-                setWinner(null);
-              }}
-              disabled={isSpinning}
-              className="flex items-center gap-1.5 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1 rounded-xl font-semibold text-slate-300 transition"
-            >
-              <Refresh1Regular className="w-3.5 h-3.5" />
-              <span>คืนสิทธิ์ผู้ชนะ</span>
-            </button>
-          )}
-        </div>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400 font-medium">ความเร็ว:</span>
+                <select
+                  value={spinDurationSec}
+                  onChange={(e) => setSpinDurationSec(Number(e.target.value))}
+                  disabled={isSpinning}
+                  className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-1 font-semibold text-slate-100 text-xs"
+                >
+                  <option value={3.0}>⚡ ด่วน (3.0 วินาที)</option>
+                  <option value={4.5}>🎲 ปกติ (4.5 วินาที)</option>
+                  <option value={6.0}>🎭 ลุ้นระทึก (6.0 วินาที)</option>
+                </select>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={excludeWinners}
+                  onChange={(e) => setExcludeWinners(e.target.checked)}
+                  disabled={isSpinning}
+                  className="w-4 h-4 rounded accent-pink-500"
+                />
+                <span className="text-slate-300 font-medium">
+                  ตัดสิทธิ์ผู้ชนะออกในรอบถัดไป ({pastWinnerIds.length} คนได้รับแล้ว)
+                </span>
+              </label>
+            </div>
+
+            {pastWinnerIds.length > 0 && (
+              <button
+                onClick={() => {
+                  setPastWinnerIds([]);
+                  setWinner(null);
+                }}
+                disabled={isSpinning}
+                className="flex items-center gap-1.5 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1 rounded-xl font-semibold text-slate-300 transition"
+              >
+                <Refresh1Regular className="w-3.5 h-3.5" />
+                <span>คืนสิทธิ์ผู้ชนะ</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Section 2: Stepped Prize Pool Ladder & Pre-Draw Prize Selector */}
         <div className="mt-4 p-4 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-3">
@@ -773,7 +976,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
                       setWinner(null);
                     }}
                     disabled={isSpinning || isRollingPrize}
-                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition ${
+                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
                       selectedPoolId === pool.id
                         ? 'bg-amber-400 text-slate-950 shadow-sm'
                         : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
@@ -801,20 +1004,22 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
               )}
             </div>
 
-            {/* Roll Prize Button */}
-            <button
-              onClick={handleRollPrize}
-              disabled={isSpinning || isRollingPrize}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-slate-950 text-xs font-black shadow-md transition active:scale-95 cursor-pointer"
-            >
-              <Dices className={`w-3.5 h-3.5 ${isRollingPrize ? 'animate-spin' : ''}`} />
-              <span>{isRollingPrize ? 'กำลังสุ่มของรางวัล...' : '🎲 สุ่มของรางวัลรอบนี้'}</span>
-            </button>
+            {drawMode === 'class' && (
+              /* Roll Prize Button for All-Class Raffle */
+              <button
+                onClick={handleRollPrize}
+                disabled={isSpinning || isRollingPrize}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-slate-950 text-xs font-black shadow-md transition active:scale-95 cursor-pointer"
+              >
+                <Dices className={`w-3.5 h-3.5 ${isRollingPrize ? 'animate-spin' : ''}`} />
+                <span>{isRollingPrize ? 'กำลังสุ่มของรางวัล...' : '🎲 สุ่มของรางวัลรอบนี้'}</span>
+              </button>
+            )}
           </div>
 
           {/* Stepped Rate Ladder Tiers List */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 pt-1">
-            {currentPool.tiers.map((tier) => {
+            {effectiveTiers.map((tier) => {
               const isSelected = activePrize.id === tier.id;
               const isCappedGacha = isWeeklyGachaCapped && tier.tickets > 0 && tier.rewardType !== 'ticket_draw';
 
@@ -822,24 +1027,14 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
                 <button
                   key={tier.id}
                   onClick={() => {
-                    if (isCappedGacha) {
-                      setActivePrize({
-                        ...tier,
-                        convertedDueToCap: true,
-                        name: `${tier.name} (เต็มเพดาน ➔ 100 เหรียญ)`,
-                        rewardType: 'coin',
-                        coins: 100,
-                        tickets: 0,
-                        description: `🪙 รางวัลใหญ่ 100 เหรียญแทน (โควตาสัปดาห์เต็ม ${weeklyGachaGiven}/${weeklyCapInfo.weeklyCap} ใบ)`,
-                      });
-                    } else {
+                    if (drawMode === 'class') {
                       setActivePrize(tier);
+                      onPlaySound?.('tick', 700);
                     }
-                    onPlaySound?.('tick', 700);
                   }}
                   disabled={isSpinning || isRollingPrize}
                   className={`p-2.5 rounded-xl border text-left transition relative flex flex-col justify-between ${
-                    isSelected
+                    isSelected && drawMode === 'class'
                       ? 'bg-amber-400/15 border-amber-400 ring-2 ring-amber-400/40 shadow-lg shadow-amber-500/10'
                       : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-400'
                   }`}
@@ -852,7 +1047,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
                     >
                       {isCappedGacha ? 'เต็มเพดาน ➔ 100🪙' : tier.badgeLabel}
                     </span>
-                    {isSelected && (
+                    {isSelected && drawMode === 'class' && (
                       <span className="w-2 h-2 rounded-full bg-amber-400 shadow-sm animate-ping" />
                     )}
                   </div>
@@ -879,39 +1074,41 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
             })}
           </div>
 
-          {/* Active Round Prize Banner */}
-          <div className="flex items-center justify-between bg-gradient-to-r from-amber-500/20 via-pink-500/10 to-indigo-500/20 border border-amber-400/50 px-4 py-2 rounded-xl text-xs">
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-sm">
-                🎁
+          {/* Active Round Prize Banner (For Class Mode) */}
+          {drawMode === 'class' && (
+            <div className="flex items-center justify-between bg-gradient-to-r from-amber-500/20 via-pink-500/10 to-indigo-500/20 border border-amber-400/50 px-4 py-2 rounded-xl text-xs">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-sm">
+                  🎁
+                </div>
+                <div>
+                  <span className="text-[11px] text-amber-300 font-semibold block">
+                    ของรางวัลประจำรอบนี้ (พร้อมชิง):
+                  </span>
+                  <span className="text-sm font-black text-white">
+                    {activePrize.name}
+                  </span>
+                  <span className="text-[11px] text-slate-400 ml-2">
+                    ({activePrize.description})
+                  </span>
+                </div>
               </div>
-              <div>
-                <span className="text-[11px] text-amber-300 font-semibold block">
-                  ของรางวัลประจำรอบนี้ (พร้อมชิง):
-                </span>
-                <span className="text-sm font-black text-white">
-                  {activePrize.name}
-                </span>
-                <span className="text-[11px] text-slate-400 ml-2">
-                  ({activePrize.description})
-                </span>
-              </div>
+              <span className="text-xs font-black px-2.5 py-1 rounded-full bg-amber-400 text-slate-950">
+                โอกาสออก {activePrize.weight}%
+              </span>
             </div>
-            <span className="text-xs font-black px-2.5 py-1 rounded-full bg-amber-400 text-slate-950">
-              โอกาสออก {activePrize.weight}%
-            </span>
-          </div>
+          )}
         </div>
 
         {/* Main Content Grid: Left Wheel / Right Odds Table */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-5 items-center">
           {/* Left: SVG Wheel */}
           <div className="lg:col-span-7 flex flex-col items-center justify-center relative">
-            {segments.length > 0 ? (
+            {(drawMode === 'individual' ? prizeSegments.length > 0 : segments.length > 0) ? (
               <>
                 <div className="relative w-72 h-72 sm:w-80 sm:h-80 md:w-[350px] md:h-[350px] flex items-center justify-center">
-                  {/* Top Pointer Arrow */}
-                  <div className="absolute -top-3 z-20 flex flex-col items-center drop-shadow-xl">
+                  {/* Top Pointer Arrow (Strict 50% Centering) */}
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center drop-shadow-xl pointer-events-none">
                     <div className="w-0 h-0 border-l-[14px] border-l-transparent border-r-[14px] border-r-transparent border-t-[26px] border-t-amber-400" />
                   </div>
 
@@ -926,8 +1123,52 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
                         : 'none',
                     }}
                   >
-                    {segments.length === 1 ? (
-                      /* Edge Case: นักเรียนถือตั๋วเพียง 1 คน (เต็ม 360 องศา) */
+                    {drawMode === 'individual' ? (
+                      /* Individual Mode: Wheel segments are the PRIZES */
+                      prizeSegments.map((seg) => {
+                        const pathData = createSlicePath(
+                          150,
+                          150,
+                          145,
+                          seg.startAngle,
+                          seg.endAngle
+                        );
+                        const labelPos = polarToCartesian(150, 150, 96, seg.midAngle);
+                        const angleDiff = seg.endAngle - seg.startAngle;
+
+                        return (
+                          <g key={seg.tier.id}>
+                            <path
+                              d={pathData}
+                              fill={seg.color}
+                              stroke="#0f172a"
+                              strokeWidth="2.5"
+                            />
+                            {angleDiff >= 12 && (
+                              <text
+                                x={labelPos.x}
+                                y={labelPos.y}
+                                fill="#ffffff"
+                                fontSize={angleDiff >= 28 ? '10' : '8'}
+                                fontWeight="bold"
+                                textAnchor="middle"
+                                dominantBaseline="middle"
+                                transform={`rotate(${seg.midAngle - 90}, ${labelPos.x}, ${labelPos.y})`}
+                              >
+                                {seg.tier.rewardType === 'combo'
+                                  ? '👑 100🪙+1🎫'
+                                  : seg.tier.rewardType === 'ticket'
+                                  ? '🎫 1 ตั๋ว'
+                                  : seg.tier.rewardType === 'ticket_draw'
+                                  ? '🎟️ คืนตั๋ว'
+                                  : `+${seg.tier.coins} 🪙`}
+                              </text>
+                            )}
+                          </g>
+                        );
+                      })
+                    ) : segments.length === 1 ? (
+                      /* Class Mode Edge Case: 1 Student */
                       <g>
                         <circle cx="150" cy="150" r="145" fill={segments[0].color} />
                         <text
@@ -942,6 +1183,7 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
                         </text>
                       </g>
                     ) : (
+                      /* Class Mode: Wheel segments are the STUDENTS */
                       segments.map((seg) => {
                         const pathData = createSlicePath(
                           150,
@@ -989,23 +1231,51 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
                       r="24"
                       fill="#0f172a"
                       stroke="#f59e0b"
-                      strokeWidth="4"
+                      strokeWidth="3.5"
                     />
+                    <text
+                      x="150"
+                      y="155"
+                      fill="#fbbf24"
+                      fontSize="14"
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                    >
+                      {drawMode === 'individual' ? '🎁' : '👑'}
+                    </text>
                   </svg>
                 </div>
 
-                <button
-                  onClick={handleSpinWheel}
-                  disabled={isSpinning || isRollingPrize}
-                  className="mt-6 flex items-center gap-2.5 bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 hover:from-pink-500 hover:to-indigo-500 disabled:opacity-50 text-white font-extrabold text-base px-8 py-3 rounded-2xl shadow-xl shadow-pink-600/25 transition transform active:scale-95 cursor-pointer"
-                >
-                  <SparklesRegular className="w-5 h-5 text-amber-300" />
-                  <span>
-                    {isSpinning
-                      ? 'กำลังหมุนวงล้อ...'
-                      : `หมุนวงล้อชิง [${activePrize.name}]!`}
-                  </span>
-                </button>
+                {/* Spin Action Button */}
+                {drawMode === 'individual' ? (
+                  <button
+                    onClick={handleSpinIndividual}
+                    disabled={isSpinning || !selectedStudent || selectedStudentTickets <= 0}
+                    className="mt-6 flex items-center gap-2.5 bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 hover:from-pink-500 hover:to-indigo-500 disabled:opacity-40 text-white font-extrabold text-base px-8 py-3 rounded-2xl shadow-xl shadow-pink-600/25 transition transform active:scale-95 cursor-pointer"
+                  >
+                    <SparklesRegular className="w-5 h-5 text-amber-300" />
+                    <span>
+                      {isSpinning
+                        ? 'กำลังหมุนวงล้อชิงรางวัล...'
+                        : selectedStudentTickets > 0
+                        ? `หมุนวงล้อชิงรางวัลให้ ${selectedStudent?.name || 'นักเรียน'} (ใช้ 1 ตั๋ว)!`
+                        : 'ตั๋วสุ่มไม่เพียงพอ (ต้องการ 1 🎟️)'}
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSpinWheel}
+                    disabled={isSpinning || isRollingPrize || segments.length === 0}
+                    className="mt-6 flex items-center gap-2.5 bg-gradient-to-r from-amber-500 via-orange-500 to-pink-600 hover:from-amber-400 hover:to-pink-500 disabled:opacity-40 text-slate-950 font-extrabold text-base px-8 py-3 rounded-2xl shadow-xl shadow-amber-500/25 transition transform active:scale-95 cursor-pointer"
+                  >
+                    <TrophyRegular className="w-5 h-5" />
+                    <span>
+                      {isSpinning
+                        ? 'กำลังหมุนวงล้อ...'
+                        : `หมุนวงล้อชิง [${activePrize.name}]!`}
+                    </span>
+                  </button>
+                )}
               </>
             ) : (
               <div className="py-14 px-6 text-center bg-slate-950/50 border border-slate-800 rounded-3xl w-full space-y-2">
@@ -1027,14 +1297,18 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
               <div className="bg-gradient-to-b from-amber-500/20 to-slate-900 border-2 border-amber-400 rounded-2xl p-5 text-center space-y-3 animate-fade-in shadow-xl">
                 <div className="inline-flex items-center gap-1.5 bg-amber-400 text-amber-950 text-xs font-black px-3 py-1 rounded-full shadow-sm">
                   <TrophyRegular className="w-4 h-4" />
-                  <span>ผู้โชคดีได้รับรางวัลท้ายคาบ!</span>
+                  <span>
+                    {drawMode === 'individual'
+                      ? 'ผลการหมุนตั๋วรางวัล!'
+                      : 'ผู้โชคดีได้รับรางวัลท้ายคาบ!'}
+                  </span>
                 </div>
 
                 <div>
                   <p className="text-xs text-amber-300 font-semibold">#{winner.studentCode}</p>
                   <h3 className="text-2xl font-black text-white mt-0.5">{winner.name}</h3>
                   <div className="mt-2 p-2 rounded-xl bg-slate-950/70 border border-amber-400/40 inline-block text-left text-xs text-amber-200">
-                    <span className="font-bold text-white">🎁 ของรางวัล: </span>
+                    <span className="font-bold text-white">🎁 ได้รับของรางวัล: </span>
                     {activePrize.name} ({activePrize.description})
                   </div>
                 </div>
@@ -1048,12 +1322,12 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
                       <SparklesRegular className="w-4 h-4" />
                       <span>
                         {activePrize.rewardType === 'ticket_draw'
-                          ? `คืนตั๋วสุ่ม (-1 +1 ตั๋วสุ่มเท่าเดิม ไม่หักตั๋ว)`
+                          ? `คืนตั๋วสุ่มให้ ${winner.name} (-1 +1 ตั๋วเท่าเดิม)`
                           : activePrize.rewardType === 'ticket'
-                          ? `มอบ 🎫 ${activePrize.name} & หัก 1 ตั๋วสุ่ม`
+                          ? `มอบ 🎫 ${activePrize.name} & หัก 1 ตั๋ว (${winner.name})`
                           : activePrize.rewardType === 'combo'
-                          ? `มอบ 👑 ${activePrize.name} & หัก 1 ตั๋วสุ่ม`
-                          : `มอบ 🪙 ${activePrize.name} & หัก 1 ตั๋วสุ่ม`}
+                          ? `มอบ 👑 ${activePrize.name} & หัก 1 ตั๋ว (${winner.name})`
+                          : `มอบ 🪙 ${activePrize.name} & หัก 1 ตั๋ว (${winner.name})`}
                       </span>
                     </button>
                     <p className="text-[11px] text-slate-400">
@@ -1072,76 +1346,133 @@ export const LuckyTicketDrawModal: React.FC<LuckyTicketDrawModalProps> = ({
                       <CheckCircleRegular className="w-4 h-4" />
                       <span>
                         {activePrize.rewardType === 'ticket_draw'
-                          ? 'คืนตั๋วสุ่มสำเร็จ (-1 +1 ตั๋วเท่าเดิม) เรียบร้อย!'
+                          ? `คืนตั๋วสุ่มให้ ${winner.name} (-1 +1 ตั๋วเท่าเดิม) เรียบร้อย!`
                           : activePrize.rewardType === 'ticket'
-                          ? `มอบ 🎫 ${activePrize.name} & หัก 1 ตั๋วสุ่ม เรียบร้อย!`
+                          ? `มอบ 🎫 ${activePrize.name} & หัก 1 ตั๋ว ให้ ${winner.name} เรียบร้อย!`
                           : activePrize.rewardType === 'combo'
-                          ? `มอบ 👑 ${activePrize.name} & หัก 1 ตั๋วสุ่ม เรียบร้อย!`
-                          : `มอบ +${activePrize.coins} เหรียญ & หัก 1 ตั๋วสุ่ม เรียบร้อย!`}
+                          ? `มอบ 👑 ${activePrize.name} & หัก 1 ตั๋ว ให้ ${winner.name} เรียบร้อย!`
+                          : `มอบ +${activePrize.coins} เหรียญ & หัก 1 ตั๋ว ให้ ${winner.name} เรียบร้อย!`}
                       </span>
                     </div>
 
-                    <button
-                      onClick={() => {
-                        setWinner(null);
-                        setPrizeClaimed(false);
-                      }}
-                      className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition flex items-center justify-center gap-1.5"
-                    >
-                      <span>เตรียมหมุนรอบถัดไป</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                    {drawMode === 'individual' &&
+                    selectedStudentTickets - (activePrize.rewardType === 'ticket_draw' ? 0 : 1) > 0 ? (
+                      <button
+                        onClick={() => {
+                          setWinner(null);
+                          setPrizeClaimed(false);
+                        }}
+                        className="w-full py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-400 hover:to-indigo-500 text-white text-xs font-black transition flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                      >
+                        <SparklesRegular className="w-4 h-4 text-amber-300" />
+                        <span>
+                          หมุนตั๋วใบถัดไป (เหลือ{' '}
+                          {selectedStudentTickets -
+                            (activePrize.rewardType === 'ticket_draw' ? 0 : 1)}{' '}
+                          ใบ)
+                        </span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setWinner(null);
+                          setPrizeClaimed(false);
+                        }}
+                        className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <span>{drawMode === 'individual' ? 'เสร็จสิ้น (ใช้ตั๋วครบแล้ว)' : 'เตรียมหมุนรอบถัดไป'}</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
             )}
 
-            {/* Ticket Holders & Odds List */}
-            <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 flex flex-col max-h-72">
-              <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-800">
-                <h4 className="font-bold text-xs text-slate-200 flex items-center gap-2">
-                  <Users className="w-4 h-4 text-pink-400" />
-                  <span>รายชื่อผู้มีสิทธิ์ลุ้น ({segments.length} คน)</span>
-                </h4>
-                <span className="text-[11px] text-slate-400">โอกาสชนะ (%)</span>
-              </div>
+            {/* Right Card: Odds Table */}
+            {drawMode === 'individual' ? (
+              /* Individual Mode: Prize Odds Ladder */
+              <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 flex flex-col max-h-72">
+                <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-800">
+                  <h4 className="font-bold text-xs text-slate-200 flex items-center gap-2">
+                    <Gift className="w-4 h-4 text-pink-400" />
+                    <span>ตารางของรางวัลบนวงล้อ ({effectiveTiers.length} รายการ)</span>
+                  </h4>
+                  <span className="text-[11px] text-slate-400">โอกาสได้รับ (%)</span>
+                </div>
 
-              <div className="overflow-y-auto space-y-1.5 pr-1">
-                {segments.length > 0 ? (
-                  [...segments]
-                    .sort((a, b) => b.tickets - a.tickets)
-                    .map((seg) => (
-                      <div
-                        key={seg.student.id}
-                        className="flex items-center justify-between bg-slate-900/90 border border-slate-800/80 px-3 py-1.5 rounded-xl text-xs"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="w-2.5 h-2.5 rounded-full shrink-0"
-                            style={{ backgroundColor: seg.color }}
-                          />
-                          <span className="font-bold text-slate-200">
-                            #{seg.student.studentCode} {seg.student.name}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-pink-400 bg-pink-500/10 px-2 py-0.5 rounded-lg text-[11px]">
-                            {seg.tickets} 🎟️
-                          </span>
-                          <span className="font-mono font-semibold text-slate-400 w-12 text-right text-[11px]">
-                            {(seg.weightRatio * 100).toFixed(1)}%
-                          </span>
-                        </div>
+                <div className="overflow-y-auto space-y-1.5 pr-1">
+                  {prizeSegments.map((seg) => (
+                    <div
+                      key={seg.tier.id}
+                      className="flex items-center justify-between bg-slate-900/90 border border-slate-800/80 px-3 py-1.5 rounded-xl text-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: seg.color }}
+                        />
+                        <span className="font-bold text-slate-200">{seg.tier.name}</span>
                       </div>
-                    ))
-                ) : (
-                  <p className="text-xs text-slate-500 text-center py-6">
-                    ไม่มีรายการตั๋วสุ่มในขณะนี้
-                  </p>
-                )}
+
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-semibold text-slate-400 w-12 text-right text-[11px]">
+                          {(seg.weightRatio * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : (
+              /* Class Mode: Ticket Holders & Odds List */
+              <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 flex flex-col max-h-72">
+                <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-800">
+                  <h4 className="font-bold text-xs text-slate-200 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-pink-400" />
+                    <span>รายชื่อผู้มีสิทธิ์ลุ้น ({segments.length} คน)</span>
+                  </h4>
+                  <span className="text-[11px] text-slate-400">โอกาสชนะ (%)</span>
+                </div>
+
+                <div className="overflow-y-auto space-y-1.5 pr-1">
+                  {segments.length > 0 ? (
+                    [...segments]
+                      .sort((a, b) => b.tickets - a.tickets)
+                      .map((seg) => (
+                        <div
+                          key={seg.student.id}
+                          className="flex items-center justify-between bg-slate-900/90 border border-slate-800/80 px-3 py-1.5 rounded-xl text-xs"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full shrink-0"
+                              style={{ backgroundColor: seg.color }}
+                            />
+                            <span className="font-bold text-slate-200">
+                              #{seg.student.studentCode} {seg.student.name}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-pink-400 bg-pink-500/10 px-2 py-0.5 rounded-lg text-[11px]">
+                              {seg.tickets} 🎟️
+                            </span>
+                            <span className="font-mono font-semibold text-slate-400 w-12 text-right text-[11px]">
+                              {(seg.weightRatio * 100).toFixed(1)}%
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                  ) : (
+                    <p className="text-xs text-slate-500 text-center py-6">
+                      ไม่มีรายการตั๋วสุ่มในขณะนี้
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
