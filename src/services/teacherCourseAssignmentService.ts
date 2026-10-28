@@ -228,6 +228,7 @@ export interface GradingQueueItem {
   studentAvatarUrl?: string;
   academicYearTerm?: string;
   isResubmission?: boolean;
+  gradedTimestamp?: number;
 }
 
 // ============================================================================
@@ -407,6 +408,11 @@ export const teacherCourseAssignmentService = {
         const foundInService = studentService.findStudentByCode(subCode);
         const studentRoom = stu?.classroom || foundInService?.classroomId || foundInService?.student.classroomId || sub.classroom || '';
 
+        const subTimestamp =
+          sub.submittedAt && !isNaN(new Date(sub.submittedAt).getTime())
+            ? new Date(sub.submittedAt).getTime()
+            : savedMatch?.submittedTimestamp || (Date.now() - idx * 60000);
+
         // ค้นหาชิ้นงาน: ให้ความสำคัญกับการจับคู่ตรงด้วย assignmentId ก่อนเสมอ
         // หากไม่ตรงด้วย ID จึงค่อยพิจารณา unitId หรือชื่อชิ้นงานร่วมกับ Classroom guard
         const asg =
@@ -427,9 +433,33 @@ export const teacherCourseAssignmentService = {
             );
           });
 
-        const isResubmission = Boolean(sub.isResubmission || (savedMatch && savedMatch.isResubmission && sub.status === 'SUBMITTED_PENDING'));
-        const isGraded = !isResubmission && (sub.status === 'GRADED' || (savedMatch && savedMatch.status === 'GRADED' && sub.status !== 'SUBMITTED_PENDING'));
-        const isReturned = !isResubmission && (sub.status === 'RETURNED_REVISION' || (savedMatch && (savedMatch.status === 'RETURNED' || (savedMatch as any).status === 'RETURNED_REVISION') && sub.status !== 'SUBMITTED_PENDING'));
+        // 1. ตรวจสอบการส่งงานใหม่ของนักเรียน (เช่น ส่งใหม่หลังถูกส่งกลับแก้ไข)
+        const isFreshStudentSubmission =
+          sub.status === 'SUBMITTED_PENDING' &&
+          sub.score === null &&
+          (!savedMatch || savedMatch.status === 'PENDING_REVIEW' || !savedMatch.gradedTimestamp || subTimestamp > (savedMatch.gradedTimestamp || 0));
+
+        // 2. ตรวจสอบสถานะการตรวจคะแนน (GRADED) - ไม่ว่าจะเป็นงานรอบแรกหรืองานซ่อม เมื่อตรวจแล้วต้องเป็น GRADED เสมอ
+        const isGraded =
+          !isFreshStudentSubmission &&
+          (sub.status === 'GRADED' || (savedMatch && savedMatch.status === 'GRADED'));
+
+        // 3. ตรวจสอบสถานะการส่งกลับแก้ไข (RETURNED) - เมื่อถูกส่งกลับและยังไม่ส่งใหม่ ต้องแสดงในแท็บส่งกลับแก้ไข
+        const isReturned =
+          !isFreshStudentSubmission &&
+          !isGraded &&
+          (sub.status === 'RETURNED_REVISION' ||
+            (sub.status as string) === 'RETURNED' ||
+            (savedMatch && (savedMatch.status === 'RETURNED' || (savedMatch as any).status === 'RETURNED_REVISION')));
+
+        // 4. บ่งชี้สถานะงานส่งซ่อม/แก้ไข (isResubmission)
+        const isResubmission = Boolean(
+          sub.isResubmission ||
+          savedMatch?.isResubmission ||
+          sub.status === 'RETURNED_REVISION' ||
+          savedMatch?.status === 'RETURNED'
+        );
+
         const score = isGraded ? (sub.score !== null && sub.score !== undefined ? sub.score : savedMatch?.score ?? null) : null;
         const feedback = sub.teacherFeedback || savedMatch?.teacherFeedback || '';
 
@@ -552,11 +582,6 @@ export const teacherCourseAssignmentService = {
           r2FromDataUrl ||
           undefined;
 
-        const subTimestamp =
-          sub.submittedAt && !isNaN(new Date(sub.submittedAt).getTime())
-            ? new Date(sub.submittedAt).getTime()
-            : savedMatch?.submittedTimestamp || (Date.now() - idx * 60000);
-
         const effectiveCourseName =
           (asg?.courseName || matchedCourse?.name || savedMatch?.subjectName || (effectiveCourseCode ? `วิชา ${effectiveCourseCode}` : 'รายวิชา')).replace(/\u200b/g, '');
 
@@ -588,6 +613,7 @@ export const teacherCourseAssignmentService = {
           studentAvatarUrl: savedMatch?.studentAvatarUrl || (stu as any)?.avatarUrl || (foundInService?.student as any)?.avatarUrl,
           academicYearTerm: (sub.academicYearTerm || '2/2569').replace(/^ภาคเรียนที่\s*/, '').trim(),
           isResubmission,
+          gradedTimestamp: savedMatch?.gradedTimestamp,
         };
 
         mergedQueue.push(queueItem);
@@ -684,22 +710,24 @@ export const teacherCourseAssignmentService = {
   ): { updatedQueue: GradingQueueItem[]; nextPendingItem: GradingQueueItem | null } {
     const list = this.getGradingQueue();
     let targetItem: GradingQueueItem | null = null;
-    const updated = list.map((item) => {
+    const updated: GradingQueueItem[] = list.map((item) => {
       const isIdMatch = item.id === queueId || item.id === `q_${queueId}`;
       const isPairMatch =
         (queueId.startsWith('q_') && queueId.slice(2) === `${item.assignmentId}_${item.studentCode}`) ||
         queueId === `${item.assignmentId}_${item.studentCode}`;
 
       if (isIdMatch || isPairMatch) {
-        targetItem = {
+        const mappedItem: GradingQueueItem = {
           ...item,
           status: 'GRADED' as const,
           score,
           teacherFeedback: feedback.trim(),
           isResubmission: false,
+          gradedTimestamp: Date.now(),
           gradedAtText: 'วันนี้ ' + new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
         };
-        return targetItem;
+        targetItem = mappedItem;
+        return mappedItem;
       }
       return item;
     });
@@ -791,18 +819,20 @@ export const teacherCourseAssignmentService = {
     const list = this.getGradingQueue();
     let targetItem: GradingQueueItem | null = null;
     const note = `[ส่งงานกลับเนื่องจาก: ${reason}] ${feedback || ''}`.trim();
-    const updated = list.map((item) => {
+    const updated: GradingQueueItem[] = list.map((item) => {
       const isPairMatch =
         (queueId.startsWith('q_') && queueId.slice(2) === `${item.assignmentId}_${item.studentCode}`) ||
         queueId === `${item.assignmentId}_${item.studentCode}`;
       if (item.id === queueId || item.id === `q_${queueId}` || isPairMatch) {
-        targetItem = {
+        const mappedItem: GradingQueueItem = {
           ...item,
           status: 'RETURNED' as any,
           score: null,
           teacherFeedback: note,
+          gradedTimestamp: Date.now(),
         };
-        return targetItem;
+        targetItem = mappedItem;
+        return mappedItem;
       }
       return item;
     });

@@ -1996,10 +1996,13 @@ export const sgsRosterAndSubmissionService = {
             gradedTimestamp:
               queueStatus === 'GRADED' ? now : current.gradedTimestamp,
             isResubmission:
-              params.isResubmission ??
-              (current.status === 'RETURNED' ||
-                current.status === 'RETURNED_REVISION' ||
-                Boolean(current.isResubmission)),
+              params.isResubmission !== undefined
+                ? Boolean(params.isResubmission)
+                : queueStatus === 'GRADED'
+                ? false
+                : (current.status === 'RETURNED' ||
+                  current.status === 'RETURNED_REVISION' ||
+                  Boolean(current.isResubmission)),
           };
         } else if (queueStatus === 'PENDING_REVIEW' || queueStatus === 'GRADED') {
           const rawUrl = params.fileUrl || '';
@@ -2111,19 +2114,25 @@ export const sgsRosterAndSubmissionService = {
     const submissions = this.getSubmissions();
     const roster = this.getRoster() as RosterIdentityRecord[];
 
+    const cleanStudentCode = String(options?.studentCode || (isLegacyCall ? scoreOrStudentCode : '')).trim();
+    const cleanAssignmentId = String(options?.assignmentId || (isLegacyCall ? submissionIdOrAsgId : '')).trim();
+
     // รองรับการค้นหาทั้งจาก submission.id, คีย์ผสม หรือคู่ (studentCode + assignmentId)
     let targetIdx = submissions.findIndex((s: any) => s.id === submissionIdOrKey);
 
-    if (targetIdx === -1 && options?.studentCode && options?.assignmentId) {
-      targetIdx = submissions.findIndex(
-        (s: any) =>
-          s.studentCode === options.studentCode &&
-          matchSubmissionToAssignment(s, {
-            id: options.assignmentId!,
-            unitId: options.unitId,
-            title: options.workTitle,
-          })
-      );
+    if (targetIdx === -1 && cleanStudentCode) {
+      targetIdx = submissions.findIndex((s: any) => {
+        const sStu = String(s.studentCode || '').trim();
+        if (sStu !== cleanStudentCode) return false;
+        const sAsg = String(s.assignmentId || '').trim();
+        if (cleanAssignmentId && sAsg === cleanAssignmentId) return true;
+        if (options?.unitId && (s.unitId === options.unitId || sAsg === options.unitId)) return true;
+        return matchSubmissionToAssignment(s, {
+          id: cleanAssignmentId || options?.assignmentId!,
+          unitId: options?.unitId,
+          title: options?.workTitle,
+        });
+      });
     }
 
     const nowIso = new Date().toISOString();
@@ -2148,6 +2157,8 @@ export const sgsRosterAndSubmissionService = {
         teacherFeedback: feedback || existing.teacherFeedback || '',
         status: score === null ? 'MISSING' : 'GRADED',
         gradedAt: nowIso,
+        returnReason: undefined,
+        returnedAt: undefined,
       };
       submissions[targetIdx] = updatedSubmission;
     } else if (options?.studentCode && options?.assignmentId) {
@@ -2221,10 +2232,14 @@ export const sgsRosterAndSubmissionService = {
   ): StudentWorkSubmission[] {
     const subs = this.getSubmissions();
     const asg = this.getTermAssignments().find((a) => a.id === assignmentId);
-    // BUG-3 FIX: ค้นหา submission ด้วย matchSubmissionToAssignment(s, asg) เพื่อรองรับกรณีงานระดับหน่วย (unitId)
+    const cleanStudentCode = String(studentCode || '').trim();
+    const cleanAssignmentId = String(assignmentId || '').trim();
     const idx = subs.findIndex((s) => {
-      if (s.studentCode !== studentCode) return false;
-      if (s.assignmentId === assignmentId) return true;
+      const sStu = String(s.studentCode || '').trim();
+      if (sStu !== cleanStudentCode) return false;
+      const sAsg = String(s.assignmentId || '').trim();
+      if (sAsg === cleanAssignmentId) return true;
+      if (s.unitId && s.unitId === cleanAssignmentId) return true;
       if (asg && matchSubmissionToAssignment(s, asg)) return true;
       return false;
     });

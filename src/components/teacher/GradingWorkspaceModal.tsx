@@ -13,6 +13,7 @@ import {
   Layers,
   Upload,
   Copy,
+  RotateCcw,
 } from 'lucide-react';
 import { ArtworkPreviewModal } from './ArtworkPreviewModal';
 import {
@@ -115,19 +116,29 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
     }
   }, [currentItem]);
 
-  // แท็บตัวกรองคิวในหน้าต่างตรวจงาน (ค่าเริ่มต้น: 'PENDING' รอตรวจเท่านั้น เพื่อให้ 8 งานรอตรวจ แสดง 1/8 ทันที)
-  const [modalFilter, setModalFilter] = useState<'PENDING' | 'GRADED' | 'ALL'>('PENDING');
+  // แท็บตัวกรองคิวในหน้าต่างตรวจงาน (รองรับ: รอตรวจ, ส่งกลับแก้ไข, ตรวจแล้ว, ทั้งหมด)
+  const [modalFilter, setModalFilter] = useState<'PENDING' | 'RETURNED' | 'GRADED' | 'ALL'>('PENDING');
 
   useEffect(() => {
     if (isOpen) {
-      setModalFilter('PENDING');
+      if (currentItem?.status === 'RETURNED' || (currentItem as any)?.status === 'RETURNED_REVISION') {
+        setModalFilter('RETURNED');
+      } else if (currentItem?.status === 'GRADED') {
+        setModalFilter('GRADED');
+      } else {
+        setModalFilter('PENDING');
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, currentItem?.id]);
 
   const filteredModalItems = React.useMemo(() => {
     if (modalFilter === 'PENDING') {
       const p = allItems.filter((i) => i.status === 'PENDING_REVIEW');
       return p.length > 0 ? p : allItems;
+    }
+    if (modalFilter === 'RETURNED') {
+      const r = allItems.filter((i) => i.status === 'RETURNED' || (i as any).status === 'RETURNED_REVISION');
+      return r.length > 0 ? r : allItems;
     }
     if (modalFilter === 'GRADED') {
       const g = allItems.filter((i) => i.status === 'GRADED');
@@ -139,6 +150,7 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
   if (!isOpen || !currentItem) return null;
 
   const pendingItemsCount = allItems.filter((i) => i.status === 'PENDING_REVIEW').length;
+  const returnedItemsCount = allItems.filter((i) => i.status === 'RETURNED' || (i as any).status === 'RETURNED_REVISION').length;
   const gradedItemsCount = allItems.filter((i) => i.status === 'GRADED').length;
 
   const currentIndex = filteredModalItems.findIndex((i) => i.id === currentItem.id);
@@ -265,6 +277,25 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
               >
                 ⏳ รอตรวจ ({pendingItemsCount})
               </button>
+              {returnedItemsCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalFilter('RETURNED');
+                    const firstR = allItems.find(
+                      (i) => i.status === 'RETURNED' || (i as any).status === 'RETURNED_REVISION'
+                    );
+                    if (firstR) onSelectQueueItem(firstR);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-[11px] font-bold ${
+                    modalFilter === 'RETURNED'
+                      ? 'bg-amber-500 text-white shadow-xs'
+                      : 'text-amber-800 hover:text-amber-950'
+                  }`}
+                >
+                  🔄 ส่งกลับแก้ไข ({returnedItemsCount})
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -376,6 +407,15 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
             </div>
 
             {/* Viewer Display */}
+            {(currentItem.status === 'RETURNED' || (currentItem as any)?.status === 'RETURNED_REVISION') && (
+              <div className="mt-2.5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
+                <RotateCcw className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-bold">งานนี้ส่งกลับให้นักเรียนแก้ไข:</div>
+                  <div className="text-amber-800 mt-0.5">{currentItem.teacherFeedback || 'รอนักเรียนแก้ไขและส่งใหม่'}</div>
+                </div>
+              </div>
+            )}
             <div className="flex-1 mt-3 rounded-2xl border border-slate-200 bg-slate-900/5 flex flex-col items-center justify-center overflow-auto p-3 min-h-[280px]">
               {/* ข้อความคำตอบของนักเรียน (ถ้ามี) */}
               {hasText && (

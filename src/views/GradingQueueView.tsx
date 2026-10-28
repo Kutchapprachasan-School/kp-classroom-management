@@ -164,7 +164,23 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
     }
   };
 
+  const handleStartReturnedGrading = () => {
+    setSelectedStatus('RETURNED');
+    const firstReturned = scopedQueue.find(
+      (i) => i.status === 'RETURNED' || (i as any).status === 'RETURNED_REVISION'
+    );
+    if (firstReturned) {
+      setGradingModalItem(firstReturned);
+    } else {
+      showToast('ℹ️ ไม่มีงานที่ส่งกลับไปแก้ไขในเงื่อนไขนี้');
+    }
+  };
+
   const handleSaveGrade = (itemId: string, score: number, feedback: string) => {
+    const isCurrentReturned =
+      gradingModalItem?.status === 'RETURNED' ||
+      (gradingModalItem as any)?.status === 'RETURNED_REVISION';
+
     const { nextPendingItem } = teacherCourseAssignmentService.submitGrade(
       itemId,
       score,
@@ -172,7 +188,20 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
     );
     showToast(`✓ บันทึกคะแนน (${score} คะแนน) เรียบร้อยแล้ว`);
 
-    if (nextPendingItem) {
+    if (isCurrentReturned) {
+      // หากครูกำลังตรวจงานในกลุ่มที่ส่งกลับไปแก้ไข ให้ไล่ตรวจงานที่ส่งกลับแก้ไขชิ้นถัดไป
+      const updatedQueue = teacherCourseAssignmentService.getGradingQueue();
+      const nextReturned = updatedQueue.find(
+        (i) =>
+          (i.status === 'RETURNED' || (i as any).status === 'RETURNED_REVISION') &&
+          i.id !== itemId &&
+          `${i.assignmentId}_${i.studentCode}` !== itemId.replace(/^q_/, '')
+      );
+      if (nextReturned) {
+        setGradingModalItem(nextReturned);
+        return;
+      }
+    } else if (nextPendingItem) {
       setGradingModalItem(nextPendingItem);
       return;
     }
@@ -333,6 +362,18 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
             <Play className="w-4 h-4 fill-white" />
             <span>เริ่มตรวจงานทันที ({stats.pending} งานรอตรวจ)</span>
           </button>
+
+          {stats.returned > 0 && (
+            <button
+              type="button"
+              onClick={handleStartReturnedGrading}
+              className="px-4 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs sm:text-sm flex items-center gap-2 shadow-2xs cursor-pointer transition-all active:scale-[0.98]"
+              title="เปิดหน้าตรวจงานเฉพาะรายการที่ส่งกลับไปแก้ไข เพื่อตรวจซ้ำหรือแก้ไขคะแนน"
+            >
+              <RotateCcw className="w-4 h-4 text-amber-700" />
+              <span>ตรวจงานแก้ไข ({stats.returned} งาน)</span>
+            </button>
+          )}
         </div>
 
         {/* Status Pills */}
