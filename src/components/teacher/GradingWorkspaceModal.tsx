@@ -124,11 +124,6 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
     }
   }, [isOpen]);
 
-  if (!isOpen || !currentItem) return null;
-
-  const pendingItemsCount = allItems.filter((i) => i.status === 'PENDING_REVIEW').length;
-  const gradedItemsCount = allItems.filter((i) => i.status === 'GRADED').length;
-
   const filteredModalItems = React.useMemo(() => {
     if (modalFilter === 'PENDING') {
       const p = allItems.filter((i) => i.status === 'PENDING_REVIEW');
@@ -140,6 +135,11 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
     }
     return allItems;
   }, [allItems, modalFilter]);
+
+  if (!isOpen || !currentItem) return null;
+
+  const pendingItemsCount = allItems.filter((i) => i.status === 'PENDING_REVIEW').length;
+  const gradedItemsCount = allItems.filter((i) => i.status === 'GRADED').length;
 
   const currentIndex = filteredModalItems.findIndex((i) => i.id === currentItem.id);
   const hasPrev = currentIndex > 0;
