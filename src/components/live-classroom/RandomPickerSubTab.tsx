@@ -37,6 +37,7 @@ export interface RandomPickerSubTabProps {
   syncingAttendanceIds: string[];
   isActive?: boolean;
   onOpenLuckyDraw?: (studentId?: string) => void;
+  onOpenVolunteerModal?: () => void;
 }
 
 export function getAvailablePool(
@@ -67,6 +68,7 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
   syncingAttendanceIds,
   isActive = true,
   onOpenLuckyDraw,
+  onOpenVolunteerModal,
 }) => {
   const [pickerMode, setPickerMode] = useState<PickerMode>('slot');
   const [spinSpeed, setSpinSpeed] = useState<SpinSpeed>('normal');
@@ -618,6 +620,17 @@ export const RandomPickerSubTab: React.FC<RandomPickerSubTabProps> = ({
             </span>
           ) : (
             <span className="text-xs text-slate-400">(สุ่มชื่อก่อนเพื่อให้รางวัล)</span>
+          )}
+          {onOpenVolunteerModal && (
+            <button
+              type="button"
+              onClick={onOpenVolunteerModal}
+              className="ml-2 flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 font-bold px-3 py-1 rounded-xl text-xs transition cursor-pointer active:scale-95 shadow-2xs"
+              title="ให้รางวัลนักเรียนที่ยกมืออาสาตอบเอง โดยไม่ต้องสุ่มชื่อ"
+            >
+              <span>🙋‍♂️</span>
+              <span>นักเรียนอาสาตอบ</span>
+            </button>
           )}
         </div>
 

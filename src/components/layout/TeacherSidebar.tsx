@@ -44,6 +44,7 @@ import { messagingService, CHAT_GROUPS_EVENT } from '../../services/messagingSer
 import { AdminTeacherBannerModal } from '../teacher/AdminTeacherBannerModal';
 import { attendanceCorrelationService } from '../../services/attendanceCorrelationService';
 import { sgsRosterAndSubmissionService } from '../../services/sgsRosterAndSubmissionService';
+import { teacherCourseAssignmentService } from '../../services/teacherCourseAssignmentService';
 import { academicCalendarService, ACADEMIC_CALENDAR_EVENT } from '../../services/academicCalendarService';
 import { getLocalClassrooms } from '../../services/classroomService';
 import { authService } from '../../services/authService';
@@ -204,9 +205,15 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
   };
 
   const getPendingAssignmentsCount = () => {
-    return sgsRosterAndSubmissionService
-      .getSubmissions()
-      .filter((s) => s.status === 'SUBMITTED_PENDING').length;
+    try {
+      return teacherCourseAssignmentService
+        .getGradingQueue()
+        .filter((i) => i.status === 'PENDING_REVIEW').length;
+    } catch {
+      return sgsRosterAndSubmissionService
+        .getSubmissions()
+        .filter((s) => s.status === 'SUBMITTED_PENDING').length;
+    }
   };
 
   const getTrashCount = () => {
@@ -248,6 +255,8 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     window.addEventListener(ACADEMIC_CALENDAR_EVENT, handleSync);
     window.addEventListener(TRASH_SYNC_EVENT, handleSync);
     window.addEventListener('kps-data-sync-event', handleSync);
+    window.addEventListener('kp-grading-queue-updated', handleSync);
+    window.addEventListener('kp-sgs-roster-updated', handleSync);
     return () => {
       window.removeEventListener(CHAT_GROUPS_EVENT, handleSync);
       window.removeEventListener('kp-copilot-updated', handleSync);
@@ -255,6 +264,8 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       window.removeEventListener(ACADEMIC_CALENDAR_EVENT, handleSync);
       window.removeEventListener(TRASH_SYNC_EVENT, handleSync);
       window.removeEventListener('kps-data-sync-event', handleSync);
+      window.removeEventListener('kp-grading-queue-updated', handleSync);
+      window.removeEventListener('kp-sgs-roster-updated', handleSync);
     };
   }, []);
 

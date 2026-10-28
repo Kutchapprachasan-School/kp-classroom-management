@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 28/10/2569 11:53:15 | รวมทั้งหมด 241 ไฟล์*
+*อัปเดตล่าสุด: 28/10/2569 13:20:54 | รวมทั้งหมด 242 ไฟล์*
 
 ---
 
@@ -27,7 +27,7 @@
 | [src/views/GradingQueueView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/GradingQueueView.tsx) | 565 | `GradingQueueView` (L37) |
 | [src/views/HomeVisitSdqView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/HomeVisitSdqView.tsx) | 1355 | `HomeVisitSdqView` (L27) |
 | [src/views/LessonPlansView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/LessonPlansView.tsx) | 1776 | `UnitStatus` (L33), `EvaluationItem` (L35), `UnitPlanItem` (L42), `CourseFilterOption` (L87), `LessonPlansView` (L96) |
-| [src/views/LiveClassroomView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/LiveClassroomView.tsx) | 630 | `LiveClassroomViewProps` (L28), `LiveClassroomView` (L32) |
+| [src/views/LiveClassroomView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/LiveClassroomView.tsx) | 648 | `LiveClassroomViewProps` (L29), `LiveClassroomView` (L33) |
 | [src/views/MessagesView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/MessagesView.tsx) | 1624 | `MessagesViewProps` (L52), `MessagesView` (L60) |
 | [src/views/MorningAssemblyView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/MorningAssemblyView.tsx) | 1323 | `MorningAssemblyViewProps` (L54), `MorningAssemblyView` (L90) |
 | [src/views/SchoolLeaveExecutiveDashboardView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/SchoolLeaveExecutiveDashboardView.tsx) | 292 | `SchoolLeaveExecutiveDashboardView` (L43) |
@@ -57,7 +57,7 @@
 | :--- | :---: | :--- |
 | [src/components/layout/PageHeroBanner.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/layout/PageHeroBanner.tsx) | 196 | `PageHeroBannerProps` (L19), `PageHeroBanner` (L50) |
 | [src/components/layout/TeacherHeader.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/layout/TeacherHeader.tsx) | 1173 | `TeacherHeader` (L76) |
-| [src/components/layout/TeacherSidebar.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/layout/TeacherSidebar.tsx) | 623 | `TeacherViewKey` (L53), `TeacherSidebar` (L116) |
+| [src/components/layout/TeacherSidebar.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/layout/TeacherSidebar.tsx) | 634 | `TeacherViewKey` (L54), `TeacherSidebar` (L117) |
 
 ## Dashboard Components
 
@@ -138,13 +138,14 @@
 | [src/components/exam/StudentExamPlayerModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/exam/StudentExamPlayerModal.tsx) | 479 | `StudentExamPlayerModal` (L38) |
 | [src/components/live-classroom/GoldQuestArena.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/GoldQuestArena.tsx) | 16 | *(Internal / Default Export)* |
 | [src/components/live-classroom/GroupGeneratorSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/GroupGeneratorSubTab.tsx) | 553 | `GroupPresetItem` (L23), `GroupGeneratorSubTabProps` (L34), `swapStudentsBetweenGroups` (L48), `GroupGeneratorSubTab` (L85) |
-| [src/components/live-classroom/LiveClassroomHeader.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LiveClassroomHeader.tsx) | 283 | `SubTab` (L21), `LiveClassroomHeaderProps` (L23), `LiveClassroomHeader` (L45) |
+| [src/components/live-classroom/LiveClassroomHeader.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LiveClassroomHeader.tsx) | 301 | `SubTab` (L21), `LiveClassroomHeaderProps` (L23), `LiveClassroomHeader` (L46) |
 | [src/components/live-classroom/LiveTimerSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LiveTimerSubTab.tsx) | 483 | `LiveTimerSubTabProps` (L14), `formatTimerMMSS` (L32), `LiveTimerSubTab` (L39) |
 | [src/components/live-classroom/LuckyTicketDrawModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/LuckyTicketDrawModal.tsx) | 1482 | `PrizeTier` (L28), `PrizePoolPreset` (L42), `PRIZE_POOLS` (L49), `LuckyTicketDrawModalProps` (L308), `createSlicePath` (L335), `describeArcSlice` (L358), `LuckyTicketDrawModal` (L360) |
-| [src/components/live-classroom/RandomPickerSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RandomPickerSubTab.tsx) | 751 | `PickerMode` (L18), `SpinSpeed` (L19), `RandomPickerSubTabProps` (L21), `getAvailablePool` (L42), `restoreSkippedStudent` (L52), `RandomPickerSubTab` (L56) |
+| [src/components/live-classroom/RandomPickerSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RandomPickerSubTab.tsx) | 764 | `PickerMode` (L18), `SpinSpeed` (L19), `RandomPickerSubTabProps` (L21), `getAvailablePool` (L43), `restoreSkippedStudent` (L53), `RandomPickerSubTab` (L57) |
 | [src/components/live-classroom/RandomTextSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RandomTextSubTab.tsx) | 985 | `SpinSpeed` (L29), `RandomTextSubTabProps` (L31), `RandomTextSubTab` (L49) |
 | [src/components/live-classroom/RewardBoardSubTab.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RewardBoardSubTab.tsx) | 312 | `RewardBoardSubTabProps` (L18), `calculateTopEarners` (L28), `formatRewardTimeThai` (L40), `RewardBoardSubTab` (L54) |
 | [src/components/live-classroom/RunningTrackArena.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/RunningTrackArena.tsx) | 1320 | `RaceCandidate` (L40), `RunningTrackArenaProps` (L77), `RunningTrackArena` (L240) |
+| [src/components/live-classroom/VolunteerRewardModal.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/live-classroom/VolunteerRewardModal.tsx) | 285 | `VolunteerRewardModalProps` (L10), `VolunteerRewardModal` (L25) |
 | [src/components/mobile/index.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/mobile/index.ts) | 12 | *(Internal / Default Export)* |
 | [src/components/mobile/TeacherMobileBottomNav.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/mobile/TeacherMobileBottomNav.tsx) | 250 | `TeacherMobileBottomNav` (L17) |
 | [src/components/mobile/TeacherMobileCalendarScreen.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/mobile/TeacherMobileCalendarScreen.tsx) | 212 | `TeacherMobileCalendarScreen` (L17) |

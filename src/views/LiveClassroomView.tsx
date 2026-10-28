@@ -21,6 +21,7 @@ import { LiveTimerSubTab } from '../components/live-classroom/LiveTimerSubTab';
 import { GroupGeneratorSubTab } from '../components/live-classroom/GroupGeneratorSubTab';
 import { RewardBoardSubTab } from '../components/live-classroom/RewardBoardSubTab';
 import { LuckyTicketDrawModal } from '../components/live-classroom/LuckyTicketDrawModal';
+import { VolunteerRewardModal } from '../components/live-classroom/VolunteerRewardModal';
 import { GoldQuestArena } from '../components/live-classroom/GoldQuestArena';
 import { gachaConfigService } from '../services/gachaConfigService';
 import type { StudentGroup } from '../utils/liveClassroomAlgorithms';
@@ -43,6 +44,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => !soundFX.getMuted());
   const [isLuckyDrawOpen, setIsLuckyDrawOpen] = useState<boolean>(false);
   const [luckyDrawStudentId, setLuckyDrawStudentId] = useState<string | null>(null);
+  const [isVolunteerModalOpen, setIsVolunteerModalOpen] = useState<boolean>(false);
   const [isGoldQuestArenaOpen, setIsGoldQuestArenaOpen] = useState<boolean>(false);
 
   const handleOpenLuckyDraw = useCallback((studentId?: string) => {
@@ -501,6 +503,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
         onFlushQueue={flushOfflineQueue}
         onOpenLuckyDraw={() => handleOpenLuckyDraw()}
         onOpenGoldQuestArena={() => setIsGoldQuestArenaOpen(true)}
+        onOpenVolunteerModal={() => setIsVolunteerModalOpen(true)}
       />
 
       {/* Main Sub-tool Workspace (Persistent Tab Containers to preserve Background Timer & Random Pool) */}
@@ -521,6 +524,7 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
             syncingAttendanceIds={syncingAttendanceIds}
             isActive={activeTab === 'picker'}
             onOpenLuckyDraw={(studentId) => handleOpenLuckyDraw(studentId)}
+            onOpenVolunteerModal={() => setIsVolunteerModalOpen(true)}
           />
         </div>
 
@@ -602,6 +606,20 @@ export const LiveClassroomView: React.FC<LiveClassroomViewProps> = ({
         onGiveReward={guardedGiveReward}
         onConsumeTicket={handleConsumeTicket}
         onPlaySound={triggerSound}
+      />
+
+      {/* Volunteer Answer Reward Modal */}
+      <VolunteerRewardModal
+        isOpen={isVolunteerModalOpen}
+        onClose={() => setIsVolunteerModalOpen(false)}
+        students={students}
+        isProjectorMode={isProjectorMode}
+        onGiveReward={guardedGiveReward}
+        onPlaySound={triggerSound}
+        onOpenLuckyDraw={(studentId) => {
+          setIsVolunteerModalOpen(false);
+          handleOpenLuckyDraw(studentId);
+        }}
       />
 
       {/* Gold Quest Live Arena Overlay (Projector Mode & Live Quiz Arena) */}

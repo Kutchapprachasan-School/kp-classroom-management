@@ -59,7 +59,7 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
       setSelectedRoom('ALL');
     }
   }, [availableFilterRooms, selectedRoom]);
-  const [selectedStatus, setSelectedStatus] = useState<'ALL' | 'PENDING' | 'RETURNED' | 'GRADED'>('ALL');
+  const [selectedStatus, setSelectedStatus] = useState<'ALL' | 'PENDING' | 'RETURNED' | 'GRADED'>('PENDING');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Queue Data
@@ -337,7 +337,7 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
 
         {/* Status Pills */}
         <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 self-start sm:self-auto overflow-x-auto">
-          {(['ALL', 'PENDING', 'RETURNED', 'GRADED'] as const).map((st) => (
+          {(['PENDING', 'ALL', 'RETURNED', 'GRADED'] as const).map((st) => (
             <button
               key={st}
               type="button"

@@ -68,7 +68,7 @@ export const TeacherMobileHomeScreen: React.FC<TeacherMobileHomeScreenProps> = (
   const { pendingGradingCount, gradedCount } = useMemo(() => {
     try {
       const queue = teacherCourseAssignmentService.getGradingQueue();
-      const pending = queue.filter((item) => item.status !== 'GRADED').length;
+      const pending = queue.filter((item) => item.status === 'PENDING_REVIEW').length;
       const graded = queue.filter((item) => item.status === 'GRADED').length;
       return {
         pendingGradingCount: pending,
