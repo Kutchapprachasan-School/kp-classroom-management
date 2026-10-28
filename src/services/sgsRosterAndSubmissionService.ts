@@ -1171,6 +1171,9 @@ export const sgsRosterAndSubmissionService = {
           scoringMethod: updates.scoringMethod !== undefined ? updates.scoringMethod : item.scoringMethod,
           autoRoundUp: updates.autoRoundUp !== undefined ? updates.autoRoundUp : item.autoRoundUp,
           scorePart: updates.scorePart !== undefined ? updates.scorePart : item.scorePart,
+          unitKey: updates.unitKey !== undefined ? updates.unitKey : item.unitKey,
+          indicatorCode: updates.indicatorCode !== undefined ? updates.indicatorCode : item.indicatorCode,
+          targetClassrooms: updates.targetClassrooms !== undefined ? updates.targetClassrooms : item.targetClassrooms,
         };
       }
 

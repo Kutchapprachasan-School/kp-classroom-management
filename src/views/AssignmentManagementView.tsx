@@ -182,6 +182,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
   // 3. Create & Edit Assignment Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<TermAssignmentConfig | null>(null);
+  const [editScope, setEditScope] = useState<'SUB_TASK' | 'UNIT' | 'STANDALONE' | null>(null);
   const [matrixModalDefaultSubject, setMatrixModalDefaultSubject] = useState<string | undefined>(undefined);
   const [matrixModalDefaultRoom, setMatrixModalDefaultRoom] = useState<string | undefined>(undefined);
   const [formCourseCode, setFormCourseCode] = useState<string>(
@@ -288,6 +289,16 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
     return Array.from(map.values());
   }, [termAssignments, formCourseCode]);
+
+  // รายการงานย่อยที่สังกัดหน่วยที่กำลังเลือก/แก้ไขอยู่
+  const currentUnitSubTasks = useMemo(() => {
+    if (!formUnitTitle) return [];
+    return termAssignments.filter(
+      (a) =>
+        a.courseCode === formCourseCode &&
+        (a.unitTitle === formUnitTitle || (formUnitId && a.unitId === formUnitId))
+    );
+  }, [termAssignments, formCourseCode, formUnitTitle, formUnitId]);
 
   const handleSelectExistingUnit = (unit: (typeof existingCourseUnitDetails)[0]) => {
     setFormUnitTitle(unit.unitTitle);
@@ -420,6 +431,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     isNewUnit?: boolean;
   }) => {
     setEditingAssignment(null);
+    setEditScope(null);
     setIsAddingToExistingUnit(prefill?.isAddingToExistingUnit ?? false);
     setFormUnitId(prefill?.unitId || '');
     setFormDescription('');
@@ -470,10 +482,97 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     setIsCreateModalOpen(true);
   };
 
-  const handleOpenEditModal = (assign: TermAssignmentConfig) => {
-    setEditingAssignment(assign);
+  // เปิด Modal แก้ไขชิ้นงานย่อยในหน่วย (ไม่แสดงฟอร์มตั้งค่าหน่วยให้เกะกะ)
+  const handleOpenEditSubTaskModal = (
+    task: TermAssignmentConfig,
+    parentUnit?: {
+      unitTitle?: string;
+      maxScore?: number;
+      courseCode?: string;
+      scorePart?: FourScorePart;
+      targetClassrooms?: string[];
+      scoringMethod?: 'SUBMISSION_COUNT_RATIO' | 'RAW_SCORE_AVERAGE';
+    }
+  ) => {
+    setEditingAssignment(task);
+    setEditScope('SUB_TASK');
     setIsAddingToExistingUnit(false);
-    setFormUnitId(assign.unitId || '');
+    setFormUnitId(task.unitId || '');
+    setFormDescription(task.description || '');
+    setFormAttachments(task.attachments || []);
+    setFormCourseCode(task.courseCode || parentUnit?.courseCode || subjectsList[0]?.courseCode || 'ท23102');
+    setFormTitle(task.title);
+    setFormScorePart(task.scorePart || parentUnit?.scorePart || 'PRE_MIDTERM');
+    setFormMaxScore(task.maxScore || 10);
+    setFormDueDate(task.dueDate || getBangkokTodayString());
+    const isTargetSpecific = Boolean(
+      task.targetClassrooms &&
+      task.targetClassrooms.length > 0 &&
+      !task.targetClassrooms.includes('ALL')
+    );
+    setFormScopeMode(isTargetSpecific ? 'SELECTED_ROOMS' : 'ALL_SUBJECT_ROOMS');
+    setFormSelectedRooms(isTargetSpecific ? task.targetClassrooms || [] : []);
+    setFormAssignmentMode('UNIT_BUNDLE');
+    setFormUnitTab('EXISTING');
+    setFormUnitTitle(task.unitTitle || parentUnit?.unitTitle || '');
+    setFormUnitMaxScore(task.unitMaxScore ?? parentUnit?.maxScore ?? 10);
+    setFormScoringMethod((task.scoringMethod as any) || (parentUnit?.scoringMethod as any) || 'SUBMISSION_COUNT_RATIO');
+    setFormIsDynamicTasks(!task.totalTasksInUnit || task.totalTasksInUnit <= 0);
+    setFormTotalTasksInUnit(
+      task.totalTasksInUnit && task.totalTasksInUnit > 0 ? task.totalTasksInUnit : 5
+    );
+    setFormAutoRoundUp(task.autoRoundUp ?? true);
+    setIsCreateModalOpen(true);
+  };
+
+  // เปิด Modal แก้ไขการตั้งค่าหน่วยการเรียนรู้ (อัปเดตเกณฑ์คะแนน/ชื่อหน่วย มีผลกับทุกงานในหน่วย)
+  const handleOpenEditUnitModal = (unitItem: typeof enrichedAssignmentCards[0]) => {
+    const refAssign = unitItem.rawAssignment || unitItem.subTasks[0];
+    if (!refAssign) return;
+    setEditingAssignment(refAssign);
+    setEditScope('UNIT');
+    setIsAddingToExistingUnit(false);
+    setFormUnitId(unitItem.unitId || refAssign.unitId || '');
+    setFormDescription(refAssign.description || '');
+    setFormAttachments(refAssign.attachments || []);
+    setFormCourseCode(unitItem.courseCode || refAssign.courseCode || subjectsList[0]?.courseCode || 'ท23102');
+    setFormTitle(unitItem.unitTitle || refAssign.unitTitle || refAssign.title);
+    setFormScorePart(unitItem.scorePart || refAssign.scorePart || 'PRE_MIDTERM');
+    setFormMaxScore(unitItem.maxScore ?? refAssign.unitMaxScore ?? 10);
+    setFormDueDate(unitItem.dueDate || refAssign.dueDate || getBangkokTodayString());
+    const isTargetSpecific = Boolean(
+      unitItem.targetClassrooms &&
+      unitItem.targetClassrooms.length > 0 &&
+      !unitItem.targetClassrooms.includes('ALL')
+    );
+    setFormScopeMode(isTargetSpecific ? 'SELECTED_ROOMS' : 'ALL_SUBJECT_ROOMS');
+    setFormSelectedRooms(isTargetSpecific ? unitItem.targetClassrooms || [] : []);
+    setFormAssignmentMode('UNIT_BUNDLE');
+    setFormUnitTab('EXISTING');
+    setFormUnitTitle(unitItem.unitTitle || refAssign.unitTitle || '');
+    setFormUnitMaxScore(unitItem.maxScore ?? refAssign.unitMaxScore ?? 10);
+    setFormScoringMethod((unitItem.scoringMethod as any) || (refAssign.scoringMethod as any) || 'SUBMISSION_COUNT_RATIO');
+    setFormIsDynamicTasks(!unitItem.totalTasksInUnit || unitItem.totalTasksInUnit <= 0);
+    setFormTotalTasksInUnit(
+      unitItem.totalTasksInUnit && unitItem.totalTasksInUnit > 0 ? unitItem.totalTasksInUnit : 5
+    );
+    setFormAutoRoundUp(refAssign.autoRoundUp ?? true);
+    setIsCreateModalOpen(true);
+  };
+
+  const handleOpenEditModal = (assign: TermAssignmentConfig) => {
+    const isUnit = Boolean(
+      assign.unitTitle ||
+      (assign.scoringMethod && assign.scoringMethod !== 'DIRECT_SCORE')
+    );
+    if (isUnit) {
+      handleOpenEditSubTaskModal(assign);
+      return;
+    }
+    setEditingAssignment(assign);
+    setEditScope('STANDALONE');
+    setIsAddingToExistingUnit(false);
+    setFormUnitId('');
     setFormDescription(assign.description || '');
     setFormAttachments(assign.attachments || []);
     setFormCourseCode(assign.courseCode || subjectsList[0]?.courseCode || 'ท23102');
@@ -488,19 +587,13 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     );
     setFormScopeMode(isTargetSpecific ? 'SELECTED_ROOMS' : 'ALL_SUBJECT_ROOMS');
     setFormSelectedRooms(isTargetSpecific ? assign.targetClassrooms || [] : []);
-    const isUnit = Boolean(
-      assign.unitTitle ||
-      (assign.scoringMethod && assign.scoringMethod !== 'DIRECT_SCORE')
-    );
-    setFormAssignmentMode(isUnit ? 'UNIT_BUNDLE' : 'DIRECT');
-    setFormUnitTab(isUnit ? 'NEW' : 'EXISTING');
-    setFormUnitTitle(assign.unitTitle || '');
-    setFormUnitMaxScore(assign.unitMaxScore ?? 10);
-    setFormScoringMethod((assign.scoringMethod as any) || 'SUBMISSION_COUNT_RATIO');
-    setFormIsDynamicTasks(!assign.totalTasksInUnit || assign.totalTasksInUnit <= 0);
-    setFormTotalTasksInUnit(
-      assign.totalTasksInUnit && assign.totalTasksInUnit > 0 ? assign.totalTasksInUnit : 5
-    );
+    setFormAssignmentMode('DIRECT');
+    setFormUnitTab('EXISTING');
+    setFormUnitTitle('');
+    setFormUnitMaxScore(10);
+    setFormScoringMethod('SUBMISSION_COUNT_RATIO');
+    setFormIsDynamicTasks(true);
+    setFormTotalTasksInUnit(5);
     setFormAutoRoundUp(assign.autoRoundUp ?? true);
     setIsCreateModalOpen(true);
   };
@@ -550,6 +643,54 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         : Math.max(1, Number(formMaxScore) || 10);
 
     if (editingAssignment) {
+      if (editScope === 'UNIT') {
+        // อัปเดตข้อมูลระดับหน่วย และกระจายผล (Cascade) ไปยังงานย่อยทุกงานในหน่วย
+        sgsRosterAndSubmissionService.updateTermAssignment(editingAssignment.id, {
+          unitTitle: formUnitTitle.trim(),
+          unitMaxScore: Math.max(1, Number(formUnitMaxScore) || 10),
+          scoringMethod: formScoringMethod,
+          scorePart: formScorePart,
+          unitKey: partToUnitMap[formScorePart],
+          indicatorCode: SCORE_PART_LABELS[formScorePart].label,
+          totalTasksInUnit: finalTotalTasks,
+          autoRoundUp: formAutoRoundUp,
+          targetClassrooms: targetRooms,
+          courseCode: effectiveCourseCode,
+          courseName: effectiveCourseName,
+        });
+
+        refreshTermAssignments();
+        setIsCreateModalOpen(false);
+        setEditingAssignment(null);
+        setEditScope(null);
+        setIsAddingToExistingUnit(false);
+        showToast(`✓ บันทึกการตั้งค่าหน่วย "${formUnitTitle.trim()}" เรียบร้อยแล้ว (อัปเดตทุกงานในหน่วย)`);
+        return;
+      }
+
+      if (editScope === 'SUB_TASK') {
+        // อัปเดตเฉพาะงานย่อยนี้ โดยไม่กระทบโครงสร้างของหน่วย
+        sgsRosterAndSubmissionService.updateTermAssignment(editingAssignment.id, {
+          title: formTitle.trim(),
+          description: formDescription.trim() || undefined,
+          attachments: formAttachments,
+          maxScore:
+            formScoringMethod === 'RAW_SCORE_AVERAGE'
+              ? Math.max(1, Number(formMaxScore) || 10)
+              : Math.max(1, Number(formUnitMaxScore) || 10),
+          dueDate: formDueDate || getBangkokTodayString(),
+          targetClassrooms: targetRooms,
+        });
+
+        refreshTermAssignments();
+        setIsCreateModalOpen(false);
+        setEditingAssignment(null);
+        setEditScope(null);
+        setIsAddingToExistingUnit(false);
+        showToast(`✓ บันทึกการแก้ไขงานย่อย "${formTitle.trim()}" เรียบร้อยแล้ว`);
+        return;
+      }
+
       sgsRosterAndSubmissionService.updateTermAssignment(editingAssignment.id, {
         title: formTitle.trim(),
         description: formDescription.trim() || undefined,
@@ -562,23 +703,18 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         courseCode: effectiveCourseCode,
         courseName: effectiveCourseName,
         targetClassrooms: targetRooms,
-        unitId:
-          formAssignmentMode === 'UNIT_BUNDLE' && formUnitTitle.trim()
-            ? resolvedGeneratedUnitId
-            : undefined,
-        unitTitle: formAssignmentMode === 'UNIT_BUNDLE' ? formUnitTitle.trim() : undefined,
-        unitMaxScore:
-          formAssignmentMode === 'UNIT_BUNDLE'
-            ? Math.max(1, Number(formUnitMaxScore) || 10)
-            : undefined,
-        scoringMethod: formAssignmentMode === 'UNIT_BUNDLE' ? formScoringMethod : 'DIRECT_SCORE',
-        totalTasksInUnit: finalTotalTasks,
+        unitId: undefined,
+        unitTitle: undefined,
+        unitMaxScore: undefined,
+        scoringMethod: 'DIRECT_SCORE',
+        totalTasksInUnit: undefined,
         autoRoundUp: formAutoRoundUp,
       });
 
       refreshTermAssignments();
       setIsCreateModalOpen(false);
       setEditingAssignment(null);
+      setEditScope(null);
       setIsAddingToExistingUnit(false);
       showToast(`✓ บันทึกการแก้ไขชิ้นงาน "${formTitle.trim()}" เรียบร้อยแล้ว`);
     } else {
@@ -798,6 +934,9 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       subTasks: TermAssignmentConfig[];
       rawAssignment?: TermAssignmentConfig;
       academicYearTerm?: string;
+      scoringMethod?: 'SUBMISSION_COUNT_RATIO' | 'RAW_SCORE_AVERAGE';
+      totalTasksInUnit?: number;
+      autoRoundUp?: boolean;
     }[] = [];
 
     unitMap.forEach((u) => {
@@ -925,7 +1064,11 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         progressCount,
         progressPercent,
         subTasks: u.tasks,
+        rawAssignment: u.tasks[0],
         academicYearTerm: u.academicYearTerm,
+        scoringMethod: (u.tasks[0]?.scoringMethod as any) || 'SUBMISSION_COUNT_RATIO',
+        totalTasksInUnit: u.tasks[0]?.totalTasksInUnit,
+        autoRoundUp: u.tasks[0]?.autoRoundUp ?? true,
       });
     });
 
@@ -2159,11 +2302,12 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                               <h3 className="text-sm sm:text-base font-bold text-[#163A66] break-words">
                                 {item.displayTitle}
                               </h3>
-                              {item.isUnitBundle && item.subTasks.length > 1 && (
+                              {item.isUnitBundle && item.subTasks.length >= 1 && (
                                 <button
                                   type="button"
                                   onClick={() => toggleUnitExpand(item.key)}
                                   className="px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-slate-100 hover:bg-blue-50 text-[#6B7C93] hover:text-[#3B82F6] flex items-center gap-1 cursor-pointer transition-colors"
+                                  title={isExpanded ? 'ย่อรายการงานย่อย' : 'ขยายดูรายการงานย่อย'}
                                 >
                                   <span>{item.subTasks.length} งานย่อย</span>
                                   <ChevronDown
@@ -2333,41 +2477,83 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                                 onClick={(e) => e.stopPropagation()}
                                 className="absolute right-0 top-10 z-40 w-52 bg-white rounded-2xl border border-[#E6EEF7] shadow-xl py-1.5 text-xs font-semibold animate-scale-in"
                               >
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setOpenMeatballMenuId(null);
-                                    if (item.rawAssignment) {
-                                      handleOpenEditModal(item.rawAssignment);
-                                    } else if (item.subTasks[0]) {
-                                      handleOpenEditModal(item.subTasks[0]);
-                                    }
-                                  }}
-                                  className="w-full px-3.5 py-2 text-left hover:bg-slate-50 flex items-center gap-2 text-[#163A66] cursor-pointer"
-                                >
-                                  <Edit3 className="w-3.5 h-3.5 text-[#3B82F6]" />
-                                  <span>แก้ไขงาน</span>
-                                </button>
+                                {item.isUnitBundle ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenMeatballMenuId(null);
+                                        handleOpenEditUnitModal(item);
+                                      }}
+                                      className="w-full px-3.5 py-2 text-left hover:bg-blue-50 flex items-center gap-2 text-[#163A66] cursor-pointer font-bold"
+                                    >
+                                      <Layers className="w-3.5 h-3.5 text-[#3B82F6]" />
+                                      <span>⚙️ แก้ไขการตั้งค่าหน่วย</span>
+                                    </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setOpenMeatballMenuId(null);
-                                    handleOpenCreateModal({
-                                      courseCode: item.courseCode,
-                                      unitTitle: item.unitTitle,
-                                      unitId: item.unitId,
-                                      unitMaxScore: item.maxScore,
-                                      scorePart: item.scorePart,
-                                      targetClassrooms: item.targetClassrooms,
-                                      isAddingToExistingUnit: true,
-                                    });
-                                  }}
-                                  className="w-full px-3.5 py-2 text-left hover:bg-slate-50 flex items-center gap-2 text-[#163A66] cursor-pointer"
-                                >
-                                  <Plus className="w-3.5 h-3.5 text-[#3B82F6]" />
-                                  <span>สั่งงานย่อยเพิ่มในหน่วยนี้</span>
-                                </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenMeatballMenuId(null);
+                                        handleOpenCreateModal({
+                                          courseCode: item.courseCode,
+                                          unitTitle: item.unitTitle,
+                                          unitId: item.unitId,
+                                          unitMaxScore: item.maxScore,
+                                          scorePart: item.scorePart,
+                                          targetClassrooms: item.targetClassrooms,
+                                          isAddingToExistingUnit: true,
+                                        });
+                                      }}
+                                      className="w-full px-3.5 py-2 text-left hover:bg-blue-50 flex items-center gap-2 text-[#163A66] cursor-pointer"
+                                    >
+                                      <Plus className="w-3.5 h-3.5 text-[#3B82F6]" />
+                                      <span>➕ สั่งงานย่อยเพิ่มในหน่วยนี้</span>
+                                    </button>
+
+                                    {item.subTasks.length === 1 ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setOpenMeatballMenuId(null);
+                                          handleOpenEditSubTaskModal(item.subTasks[0], item);
+                                        }}
+                                        className="w-full px-3.5 py-2 text-left hover:bg-blue-50 flex items-center gap-2 text-[#163A66] cursor-pointer"
+                                      >
+                                        <Edit3 className="w-3.5 h-3.5 text-[#3B82F6]" />
+                                        <span>✏️ แก้ไขงานย่อย ({item.subTasks[0].title})</span>
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setOpenMeatballMenuId(null);
+                                          if (!isExpanded) {
+                                            toggleUnitExpand(item.key);
+                                          }
+                                        }}
+                                        className="w-full px-3.5 py-2 text-left hover:bg-blue-50 flex items-center gap-2 text-[#163A66] cursor-pointer"
+                                      >
+                                        <ClipboardList className="w-3.5 h-3.5 text-[#3B82F6]" />
+                                        <span>📝 แสดง/แก้ไขงานย่อย ({item.subTasks.length} งาน)</span>
+                                      </button>
+                                    )}
+                                  </>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenMeatballMenuId(null);
+                                      if (item.rawAssignment) {
+                                        handleOpenEditModal(item.rawAssignment);
+                                      }
+                                    }}
+                                    className="w-full px-3.5 py-2 text-left hover:bg-slate-50 flex items-center gap-2 text-[#163A66] cursor-pointer font-bold"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5 text-[#3B82F6]" />
+                                    <span>แก้ไขชิ้นงาน</span>
+                                  </button>
+                                )}
 
                                 <button
                                   type="button"
@@ -2475,11 +2661,12 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => handleOpenEditModal(task)}
-                                    className="p-1 rounded-lg text-slate-400 hover:text-[#3B82F6] hover:bg-blue-50"
-                                    title="แก้ไขงานย่อย"
+                                    onClick={() => handleOpenEditSubTaskModal(task, item)}
+                                    className="px-2.5 py-1 rounded-lg font-semibold text-[11px] text-[#163A66] bg-slate-100 hover:bg-blue-50 hover:text-[#3B82F6] border border-slate-200/80 transition-colors flex items-center gap-1 cursor-pointer"
+                                    title={`แก้ไขงานย่อย "${task.title}"`}
                                   >
-                                    <Edit3 className="w-3.5 h-3.5" />
+                                    <Edit3 className="w-3 h-3 text-[#3B82F6]" />
+                                    <span>แก้ไขงานย่อย</span>
                                   </button>
                                 </div>
                               </div>
@@ -3428,7 +3615,17 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
             <div className="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white rounded-t-[22px]">
               <div>
                 <h3 className="text-base sm:text-lg font-bold text-[#163A66] flex items-center gap-2">
-                  {editingAssignment ? (
+                  {editScope === 'UNIT' ? (
+                    <>
+                      <Layers className="w-5 h-5 text-[#3B82F6]" />
+                      <span>⚙️ แก้ไขการตั้งค่าหน่วยการเรียนรู้</span>
+                    </>
+                  ) : editScope === 'SUB_TASK' ? (
+                    <>
+                      <Edit3 className="w-5 h-5 text-[#3B82F6]" />
+                      <span>✏️ แก้ไขชิ้นงานย่อย / ภาระงาน</span>
+                    </>
+                  ) : editingAssignment ? (
                     <>
                       <Edit3 className="w-5 h-5 text-[#3B82F6]" />
                       <span>แก้ไขชิ้นงาน / ภาระงาน</span>
@@ -3446,16 +3643,24 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                   )}
                 </h3>
                 <p className="text-xs text-[#6B7C93] mt-0.5">
-                  {editingAssignment
+                  {editScope === 'UNIT'
+                    ? `ปรับแต่งข้อมูลหน่วย "${formUnitTitle}" (จะมีผลกับทุกงานย่อยในหน่วยนี้)`
+                    : editScope === 'SUB_TASK'
+                    ? `แก้ไขรายละเอียดงาน "${formTitle}" (สังกัดหน่วย "${formUnitTitle}")`
+                    : editingAssignment
                     ? `แก้ไขรายละเอียดของ "${editingAssignment.title}"`
                     : isAddingToExistingUnit
-                    ? `เพิ่มชิ้นงานย่อยลงในหน่วย "${formUnitTitle}" (ระบบจะรวมคะแนนตามเกณฑ์ของหน่วยอัตโนมัติ)`
+                    ? `เพิ่มชิ้นงานย่อยลงในหน่วย "${formUnitTitle}" (รวมคะแนนตามเกณฑ์ของหน่วยอัตโนมัติ)`
                     : 'เชื่อมคะแนนเข้ากับสมุดคะแนน ปพ.5 อัตโนมัติ'}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setIsCreateModalOpen(false)}
+                onClick={() => {
+                  setIsCreateModalOpen(false);
+                  setEditingAssignment(null);
+                  setEditScope(null);
+                }}
                 className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -3465,20 +3670,359 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
             {/* Scrollable Form Body (เลื่อนดูข้อมูลได้สะดวก ไม่ตกขอบจอ) */}
             <div className="px-5 sm:px-6 py-4 overflow-y-auto flex-1 space-y-4">
               {/* ====================================================================
-                  CASE 1: สั่งงานเพิ่มในหน่วยย่อยที่มีอยู่แล้ว (ล็อคข้อมูลหน่วย ไม่ให้แก้รายละเอียดหน่วย)
+                  CASE 1: แก้ไขการตั้งค่าหน่วยการเรียนรู้ (UNIT SETTINGS MODE)
                  ==================================================================== */}
-              {isAddingToExistingUnit ? (
+              {editScope === 'UNIT' ? (
                 <>
-                  {/* กล่องสรุปข้อมูลหน่วยการเรียนรู้ (อ่านได้อย่างเดียว ไม่ต้องแก้) */}
+                  {/* กล่องสรุปวิชาและสถานะหน่วย */}
+                  <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-50 to-[#F0FDF4] border border-[#BFDBFE] space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-bold text-[#163A66]">
+                        <Layers className="w-4 h-4 text-[#3B82F6]" />
+                        <span>การตั้งค่าหน่วยการเรียนรู้ (Unit Configuration)</span>
+                      </div>
+                      <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-[#3B82F6] text-white font-bold">
+                        อัปเดตทั้งหน่วย ({currentUnitSubTasks.length} งาน)
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#6B7C93]">
+                      การแก้ไขการตั้งค่าในหน้านี้ จะมีผลกับเกณฑ์คิดคะแนนและส่วนคะแนนของทุกงานย่อยในหน่วยนี้โดยอัตโนมัติ
+                    </p>
+                  </div>
+
+                  {/* 1. รายวิชา */}
+                  <div>
+                    <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                      1. รายวิชา *
+                    </label>
+                    <select
+                      value={formCourseCode}
+                      onChange={(e) => {
+                        setFormCourseCode(e.target.value);
+                        setFormSelectedRooms([]);
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-[#163A66]"
+                    >
+                      {subjectsList.map((subj) => (
+                        <option key={subj.courseCode} value={subj.courseCode}>
+                          {subj.courseCode} — {subj.courseName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 2. ชื่อหน่วยการเรียนรู้ / จุดประสงค์ */}
+                  <div>
+                    <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                      2. ชื่อหน่วยการเรียนรู้ / จุดประสงค์ *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formUnitTitle}
+                      onChange={(e) => setFormUnitTitle(e.target.value)}
+                      placeholder="เช่น บทที่ 8, หน่วยที่ 1 ทัศนธาตุ หรือ จุดประสงค์ที่ 2"
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+                    />
+                  </div>
+
+                  {/* 3. ส่วนคะแนน ปพ.5 & คะแนนเต็มประจำหน่วย */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                        3. เก็บเข้าส่วนคะแนนใดของ ปพ.5 *
+                      </label>
+                      <select
+                        value={formScorePart}
+                        onChange={(e) => setFormScorePart(e.target.value as FourScorePart)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-[#163A66]"
+                      >
+                        <option value="PRE_MIDTERM">ก่อนกลางภาค (เต็ม {currentFormCourseWeights.preMidterm})</option>
+                        <option value="MIDTERM">กลางภาค (เต็ม {currentFormCourseWeights.midterm})</option>
+                        <option value="POST_MIDTERM">หลังกลางภาค (เต็ม {currentFormCourseWeights.postMidterm})</option>
+                        <option value="FINAL">ปลายภาค (เต็ม {currentFormCourseWeights.final})</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-[#163A66] mb-1">
+                        คะแนนเต็มประจำหน่วย *
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={formUnitMaxScore}
+                        onChange={(e) => setFormUnitMaxScore(Number(e.target.value) || 10)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-[#163A66]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 4. วิธีคิดคะแนนประจำหน่วย */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold text-[#163A66]">
+                      4. วิธีคิดคะแนนประจำหน่วย:
+                    </label>
+                    <div className="space-y-2">
+                      <label className={`flex items-start gap-2.5 p-3 rounded-2xl border transition-all cursor-pointer ${
+                        formScoringMethod === 'SUBMISSION_COUNT_RATIO'
+                          ? 'border-[#3B82F6] bg-[#EFF6FF]'
+                          : 'border-slate-200 bg-white'
+                      }`}>
+                        <input
+                          type="radio"
+                          name="scoringMethodUnitEdit"
+                          value="SUBMISSION_COUNT_RATIO"
+                          checked={formScoringMethod === 'SUBMISSION_COUNT_RATIO'}
+                          onChange={() => setFormScoringMethod('SUBMISSION_COUNT_RATIO')}
+                          className="mt-0.5 text-[#3B82F6]"
+                        />
+                        <div className="space-y-1 text-xs">
+                          <span className="font-bold text-[#163A66] block">
+                            เก็บสัดส่วนการส่งงาน (คะแนนความรับผิดชอบ)
+                          </span>
+                          <span className="text-[11px] text-[#6B7C93] block">
+                            นับงานที่ส่งจริงเทียบกับงานทั้งหมดที่สั่งในหน่วยนี้ แล้วเทียบเป็นเต็ม {formUnitMaxScore} คะแนนอัตโนมัติ
+                          </span>
+                          <div className="pt-1.5 flex items-center gap-2">
+                            <label className="flex items-center gap-1.5 text-xs text-[#163A66] cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={formIsDynamicTasks}
+                                onChange={(e) => setFormIsDynamicTasks(e.target.checked)}
+                                className="rounded text-[#3B82F6]"
+                              />
+                              <span className="font-semibold">ไม่กำหนดจำนวนงานล่วงหน้า (Dynamic Tasks)</span>
+                            </label>
+                          </div>
+                          {!formIsDynamicTasks && (
+                            <div className="flex items-center gap-2 pt-1">
+                              <span className="text-[11px] text-[#6B7C93]">กำหนดจำนวนงาน:</span>
+                              <input
+                                type="number"
+                                min={1}
+                                max={50}
+                                value={formTotalTasksInUnit}
+                                onChange={(e) => setFormTotalTasksInUnit(Math.max(1, Number(e.target.value) || 1))}
+                                className="w-16 px-2 py-1 rounded-lg border border-slate-200 text-xs font-bold text-center"
+                              />
+                              <span className="text-[11px] text-[#6B7C93]">งาน</span>
+                            </div>
+                          )}
+                        </div>
+                      </label>
+
+                      <label className={`flex items-start gap-2.5 p-3 rounded-2xl border transition-all cursor-pointer ${
+                        formScoringMethod === 'RAW_SCORE_AVERAGE'
+                          ? 'border-[#3B82F6] bg-[#EFF6FF]'
+                          : 'border-slate-200 bg-white'
+                      }`}>
+                        <input
+                          type="radio"
+                          name="scoringMethodUnitEdit"
+                          value="RAW_SCORE_AVERAGE"
+                          checked={formScoringMethod === 'RAW_SCORE_AVERAGE'}
+                          onChange={() => setFormScoringMethod('RAW_SCORE_AVERAGE')}
+                          className="mt-0.5 text-[#3B82F6]"
+                        />
+                        <div className="text-xs">
+                          <span className="font-bold text-[#163A66] block">
+                            หารเฉลี่ยคะแนนดิบของงานทั้งหมดในหน่วย
+                          </span>
+                          <span className="text-[11px] text-[#6B7C93] block mt-0.5">
+                            นำคะแนนที่ได้จากทุกงานในหน่วยมารวมแล้วเทียบเป็นสัดส่วนเต็ม {formUnitMaxScore} คะแนน
+                          </span>
+                        </div>
+                      </label>
+                    </div>
+
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                      <span className="text-xs font-semibold text-[#163A66]">
+                        ปัดเศษทศนิยม &gt;= 0.5 ขึ้นอัตโนมัติ
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={formAutoRoundUp}
+                        onChange={(e) => setFormAutoRoundUp(e.target.checked)}
+                        className="w-4 h-4 text-[#3B82F6] rounded cursor-pointer"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 5. รายการงานย่อยที่อยู่ในหน่วยนี้ */}
+                  <div className="p-3.5 sm:p-4 rounded-2xl bg-white border border-[#BFDBFE] space-y-2.5 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-bold text-[#163A66] flex items-center gap-1.5">
+                        <ClipboardList className="w-4 h-4 text-[#3B82F6]" />
+                        <span>รายการงานย่อยในหน่วยนี้ ({currentUnitSubTasks.length} งาน)</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCreateModalOpen(false);
+                          handleOpenCreateModal({
+                            courseCode: formCourseCode,
+                            unitTitle: formUnitTitle,
+                            unitId: formUnitId,
+                            unitMaxScore: formUnitMaxScore,
+                            scorePart: formScorePart,
+                            targetClassrooms: formScopeMode === 'ALL_SUBJECT_ROOMS' ? ['ALL'] : formSelectedRooms,
+                            isAddingToExistingUnit: true,
+                          });
+                        }}
+                        className="text-[11px] font-bold text-[#3B82F6] hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ สั่งงานย่อยเพิ่ม</span>
+                      </button>
+                    </div>
+
+                    {currentUnitSubTasks.length === 0 ? (
+                      <div className="p-3 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                        ยังไม่มีงานย่อยในหน่วยนี้
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                        {currentUnitSubTasks.map((t, idx) => (
+                          <div
+                            key={t.id}
+                            className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2 text-xs"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="w-5 h-5 rounded-full bg-blue-100 text-[#1D4ED8] font-bold flex items-center justify-center text-[10px] shrink-0">
+                                {idx + 1}
+                              </span>
+                              <span className="font-semibold text-[#163A66] truncate">{t.title}</span>
+                              <span className="text-[11px] text-[#6B7C93] shrink-0">
+                                (ส่ง {formatDueDateThai(t.dueDate)})
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleOpenEditSubTaskModal(t, {
+                                  unitTitle: formUnitTitle,
+                                  maxScore: formUnitMaxScore,
+                                  courseCode: formCourseCode,
+                                  scorePart: formScorePart,
+                                })
+                              }
+                              className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-[#3B82F6] bg-white border border-blue-200 hover:bg-blue-50 transition-colors flex items-center gap-1 shrink-0 cursor-pointer"
+                            >
+                              <Edit3 className="w-3 h-3" />
+                              <span>แก้ไขงานย่อย</span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 6. ห้องเรียนที่ได้รับมอบหมาย */}
+                  <div className="space-y-2 pt-2 border-t border-slate-100">
+                    <label className="block text-xs font-semibold text-[#163A66]">
+                      6. ห้องเรียนที่ได้รับมอบหมาย:
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormScopeMode('ALL_SUBJECT_ROOMS')}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                          formScopeMode === 'ALL_SUBJECT_ROOMS'
+                            ? 'border-[#3B82F6] bg-[#EFF6FF] text-[#163A66]'
+                            : 'border-slate-200 bg-white text-[#6B7C93]'
+                        }`}
+                      >
+                        <p className="text-xs font-bold">
+                          สั่งทุกห้องในรายวิชานี้ ({currentFormSubjectRooms.length} ห้อง)
+                        </p>
+                        <p className="text-[11px] opacity-80 mt-0.5">
+                          สั่งครั้งเดียวใช้กับทุกห้องที่เรียนวิชานี้
+                        </p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormScopeMode('SELECTED_ROOMS');
+                          if (formSelectedRooms.length === 0 && currentFormSubjectRooms[0]) {
+                            setFormSelectedRooms([currentFormSubjectRooms[0]]);
+                          }
+                        }}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                          formScopeMode === 'SELECTED_ROOMS'
+                            ? 'border-[#3B82F6] bg-[#EFF6FF] text-[#163A66]'
+                            : 'border-slate-200 bg-white text-[#6B7C93]'
+                        }`}
+                      >
+                        <p className="text-xs font-bold">เลือกเฉพาะห้องเรียน</p>
+                        <p className="text-[11px] opacity-80 mt-0.5">
+                          ติ๊กเลือกเฉพาะห้องที่ต้องการสั่งงาน
+                        </p>
+                      </button>
+                    </div>
+
+                    {formScopeMode === 'SELECTED_ROOMS' && (
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
+                        {currentFormSubjectRooms.map((room) => {
+                          const checked = formSelectedRooms.includes(room);
+                          return (
+                            <button
+                              key={room}
+                              type="button"
+                              onClick={() => {
+                                setFormSelectedRooms((prev) =>
+                                  checked ? prev.filter((r) => r !== room) : [...prev, room]
+                                );
+                              }}
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer ${
+                                checked
+                                  ? 'bg-[#3B82F6] text-white border-[#3B82F6]'
+                                  : 'bg-white text-[#6B7C93] border-slate-200'
+                              }`}
+                            >
+                              {checked && <Check className="w-3 h-3" />}
+                              <span>{room}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : isAddingToExistingUnit || editScope === 'SUB_TASK' ? (
+                <>
+                  {/* กล่องสรุปข้อมูลหน่วยการเรียนรู้ (อ่านได้อย่างเดียว พร้อมปุ่มลัดสลับไปแก้หน่วย) */}
                   <div className="p-3.5 rounded-2xl bg-[#EFF6FF] border border-[#BFDBFE] space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 text-xs font-bold text-[#163A66]">
                         <Layers className="w-4 h-4 text-[#3B82F6]" />
                         <span>หน่วยการเรียนรู้: {formUnitTitle}</span>
                       </div>
-                      <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-[#3B82F6] text-white font-bold">
-                        ผูกเข้าหน่วยนี้
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {editScope === 'SUB_TASK' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const matchingCard = enrichedAssignmentCards.find(
+                                (c) => c.isUnitBundle && c.unitTitle === formUnitTitle && c.courseCode === formCourseCode
+                              );
+                              if (matchingCard) {
+                                handleOpenEditUnitModal(matchingCard);
+                              }
+                            }}
+                            className="text-[10px] px-2 py-0.5 rounded-lg bg-white border border-blue-200 text-[#3B82F6] font-bold hover:bg-blue-50 flex items-center gap-1 cursor-pointer transition-colors"
+                            title="สลับไปแก้ไขการตั้งค่าหน่วย"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                            <span>แก้ไขการตั้งค่าหน่วย</span>
+                          </button>
+                        )}
+                        <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-[#3B82F6] text-white font-bold">
+                          {editScope === 'SUB_TASK' ? 'แก้ไขงานย่อย' : 'ผูกเข้าหน่วยนี้'}
+                        </span>
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] text-[#6B7C93] pt-1.5 border-t border-blue-200/60">
                       <div>
@@ -3508,10 +4052,10 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                     </div>
                   </div>
 
-                  {/* 1. ชื่องานที่สั่งเพิ่ม */}
+                  {/* 1. ชื่องาน / ภาระงานย่อย */}
                   <div>
                     <label className="block text-xs font-semibold text-[#163A66] mb-1">
-                      1. ชื่องาน / ภาระงานที่สั่งเพิ่ม *
+                      1. ชื่องาน / ภาระงานย่อย *
                     </label>
                     <input
                       type="text"
@@ -3677,6 +4221,78 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                         className="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-xs text-[#163A66]"
                       />
                     </div>
+                  </div>
+
+                  {/* 5. ห้องเรียนที่ได้รับมอบหมาย */}
+                  <div className="space-y-2 pt-2 border-t border-slate-100">
+                    <label className="block text-xs font-semibold text-[#163A66]">
+                      5. ห้องเรียนที่ได้รับมอบหมาย:
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormScopeMode('ALL_SUBJECT_ROOMS')}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                          formScopeMode === 'ALL_SUBJECT_ROOMS'
+                            ? 'border-[#3B82F6] bg-[#EFF6FF] text-[#163A66]'
+                            : 'border-slate-200 bg-white text-[#6B7C93]'
+                        }`}
+                      >
+                        <p className="text-xs font-bold">
+                          สั่งทุกห้องในรายวิชานี้ ({currentFormSubjectRooms.length} ห้อง)
+                        </p>
+                        <p className="text-[11px] opacity-80 mt-0.5">
+                          สั่งครั้งเดียวใช้กับทุกห้องที่เรียนวิชานี้
+                        </p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormScopeMode('SELECTED_ROOMS');
+                          if (formSelectedRooms.length === 0 && currentFormSubjectRooms[0]) {
+                            setFormSelectedRooms([currentFormSubjectRooms[0]]);
+                          }
+                        }}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                          formScopeMode === 'SELECTED_ROOMS'
+                            ? 'border-[#3B82F6] bg-[#EFF6FF] text-[#163A66]'
+                            : 'border-slate-200 bg-white text-[#6B7C93]'
+                        }`}
+                      >
+                        <p className="text-xs font-bold">เลือกเฉพาะห้องเรียน</p>
+                        <p className="text-[11px] opacity-80 mt-0.5">
+                          ติ๊กเลือกเฉพาะห้องที่ต้องการสั่งงาน
+                        </p>
+                      </button>
+                    </div>
+
+                    {formScopeMode === 'SELECTED_ROOMS' && (
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
+                        {currentFormSubjectRooms.map((room) => {
+                          const checked = formSelectedRooms.includes(room);
+                          return (
+                            <button
+                              key={room}
+                              type="button"
+                              onClick={() => {
+                                setFormSelectedRooms((prev) =>
+                                  checked ? prev.filter((r) => r !== room) : [...prev, room]
+                                );
+                              }}
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer ${
+                                checked
+                                  ? 'bg-[#3B82F6] text-white border-[#3B82F6]'
+                                  : 'bg-white text-[#6B7C93] border-slate-200'
+                              }`}
+                            >
+                              {checked && <Check className="w-3 h-3" />}
+                              <span>{room}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </>
               ) : (
@@ -4461,7 +5077,12 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
             <div className="px-5 sm:px-6 py-3.5 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0 bg-slate-50/80 rounded-b-[22px]">
               <button
                 type="button"
-                onClick={() => setIsCreateModalOpen(false)}
+                onClick={() => {
+                  setIsCreateModalOpen(false);
+                  setEditingAssignment(null);
+                  setEditScope(null);
+                  setIsAddingToExistingUnit(false);
+                }}
                 className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-[#6B7C93] hover:bg-slate-100 cursor-pointer transition-colors"
               >
                 ยกเลิก
@@ -4470,8 +5091,12 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                 type="submit"
                 className="px-5 py-2 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-semibold shadow-xs cursor-pointer transition-colors"
               >
-                {editingAssignment
-                  ? 'บันทึกการแก้ไข'
+                {editScope === 'UNIT'
+                  ? 'บันทึกการตั้งค่าหน่วย'
+                  : editScope === 'SUB_TASK'
+                  ? 'บันทึกการแก้ไขงานย่อย'
+                  : editingAssignment
+                  ? 'บันทึกการแก้ไขชิ้นงาน'
                   : isAddingToExistingUnit
                   ? 'บันทึกและสั่งงานเพิ่มในหน่วยนี้'
                   : 'บันทึกและสั่งงาน'}
