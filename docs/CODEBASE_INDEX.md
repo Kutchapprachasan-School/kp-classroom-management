@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 27/10/2569 21:23:43 | รวมทั้งหมด 241 ไฟล์*
+*อัปเดตล่าสุด: 28/10/2569 08:45:23 | รวมทั้งหมด 241 ไฟล์*
 
 ---
 
@@ -33,7 +33,7 @@
 | [src/views/SchoolLeaveExecutiveDashboardView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/SchoolLeaveExecutiveDashboardView.tsx) | 292 | `SchoolLeaveExecutiveDashboardView` (L43) |
 | [src/views/SchoolPortalView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/SchoolPortalView.tsx) | 722 | `TeacherLoginChannel` (L23), `SchoolPortalView` (L38) |
 | [src/views/ScoreMatrixPrapanView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ScoreMatrixPrapanView.tsx) | 1031 | `ScoreMatrixPrapanView` (L32) |
-| [src/views/SettingsBackupView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/SettingsBackupView.tsx) | 4071 | `SettingsKey` (L123), `SettingsBackupView` (L150) |
+| [src/views/SettingsBackupView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/SettingsBackupView.tsx) | 4135 | `SettingsKey` (L123), `SettingsBackupView` (L150) |
 | [src/views/StudentAffairsCouncilView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentAffairsCouncilView.tsx) | 875 | `StudentAffairsCouncilView` (L38) |
 | [src/views/StudentArenaView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentArenaView.tsx) | 457 | `StudentArenaView` (L47) |
 | [src/views/StudentCouncilAffairsPortalView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentCouncilAffairsPortalView.tsx) | 505 | `StudentCouncilAffairsPortalView` (L28) |
@@ -47,7 +47,7 @@
 | [src/views/StudentTrophyView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentTrophyView.tsx) | 484 | `TrophyBadgeItem` (L28), `StudentTrophyView` (L88) |
 | [src/views/TeacherGlobalDashboardView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/TeacherGlobalDashboardView.tsx) | 118 | `TeacherGlobalDashboardView` (L31) |
 | [src/views/TeacherOverviewView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/TeacherOverviewView.tsx) | 2032 | `ClassSubTab` (L54), `TeacherOverviewView` (L105) |
-| [src/views/TimetableView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/TimetableView.tsx) | 1854 | `TimetableView` (L110) |
+| [src/views/TimetableView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/TimetableView.tsx) | 1929 | `TimetableView` (L105) |
 | [src/views/TrashManagementView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/TrashManagementView.tsx) | 1045 | `TrashManagementView` (L34) |
 | [src/views/UserAccountsView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/UserAccountsView.tsx) | 784 | `UserAccountsView` (L45) |
 
@@ -93,7 +93,7 @@
 | [src/components/student/StudentSidebar.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentSidebar.tsx) | 313 | `StudentTabKey` (L28), `StudentSidebar` (L60) |
 | [src/components/student/StudentSubmissionUploader.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentSubmissionUploader.tsx) | 180 | `formatBytes` (L10), `StudentSubmissionUploaderProps` (L16), `StudentSubmissionUploader` (L22), `ValidatedStudentUploader` (L177) |
 | [src/components/student/StudentSubmissionWithPreview.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentSubmissionWithPreview.tsx) | 388 | `formatFileSizeMB` (L11), `StudentSubmissionWithPreviewProps` (L17), `StudentSubmissionWithPreview` (L24) |
-| [src/components/student/StudentTimetableView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentTimetableView.tsx) | 213 | `StudentTimetableView` (L25) |
+| [src/components/student/StudentTimetableView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentTimetableView.tsx) | 239 | `StudentTimetableView` (L24) |
 
 ## General Components
 
@@ -194,12 +194,12 @@
 | [src/services/academicCalendarService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/academicCalendarService.ts) | 612 | `HolidayType` (L7), `DayOfWeek` (L8), `AcademicTermRecord` (L10), `SpecialHolidayRecord` (L24), `WeekendMakeupDayRecord` (L34), `AcademicCalendarConfig` (L46), `ACADEMIC_CALENDAR_EVENT` (L55), `THAI_MONTH_SHORT_MAP` (L57), `parseThaiDateToIso` (L75), `calculate20WeeksEndDate` (L95) *(+4 รายการ)* |
 | [src/services/activityAuditLogService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/activityAuditLogService.ts) | 224 | `AuditActionType` (L6), `AuditEntityType` (L15), `AuditChangeItem` (L23), `AuditLogEntry` (L32), `AUDIT_LOG_SYNC_EVENT` (L49), `activityAuditLogService` (L223) |
 | [src/services/assignmentService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/assignmentService.ts) | 205 | `AssignmentRecord` (L25), `assignmentService` (L65) |
-| [src/services/attendanceCorrelationService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/attendanceCorrelationService.ts) | 1564 | `AttendanceStatusCode` (L23), `AttendanceRecordSource` (L31), `AttendanceAuditLog` (L36), `MorningAssemblyRecord` (L46), `PeriodAttendanceRecord` (L63), `ApprovedSchoolActivity` (L84), `ApprovedStudentLeave` (L94), `Attendance80Summary` (L106), `CorrelationChange` (L122), `CorrelationResult` (L134) *(+16 รายการ)* |
+| [src/services/attendanceCorrelationService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/attendanceCorrelationService.ts) | 1594 | `AttendanceStatusCode` (L23), `AttendanceRecordSource` (L31), `AttendanceAuditLog` (L36), `MorningAssemblyRecord` (L46), `PeriodAttendanceRecord` (L63), `ApprovedSchoolActivity` (L84), `ApprovedStudentLeave` (L94), `Attendance80Summary` (L106), `CorrelationChange` (L122), `CorrelationResult` (L134) *(+16 รายการ)* |
 | [src/services/attendanceService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/attendanceService.ts) | 801 | `AttendanceStatus` (L22), `AttendanceRecord` (L24), `AttendanceSyncMeta` (L37), `localAttendanceDb` (L113), `SyncStatusListener` (L316), `AttendanceRecordItem` (L347), `attendanceService` (L369) |
 | [src/services/authService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts) | 567 | `AuthUser` (L9), `authService` (L84) |
 | [src/services/behaviorService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/behaviorService.ts) | 234 | `BehaviorRecord` (L5), `XpTransactionRecord` (L16), `behaviorService` (L66) |
 | [src/services/bellScheduleService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/bellScheduleService.ts) | 345 | `SchoolBellScheduleConfig` (L8), `BELL_SCHEDULE_STORAGE_KEY` (L19), `BELL_SCHEDULE_UPDATED_EVENT` (L20), `DEFAULT_BELL_SCHEDULE_CONFIG` (L22), `BellScheduleTimelineItem` (L33), `addMinutesToTimeStr` (L45), `calculateMinutesDifference` (L54), `generateBellScheduleTimeline` (L62), `bellScheduleService` (L344) |
-| [src/services/calendarEventStorageService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/calendarEventStorageService.ts) | 308 | `CALENDAR_EVENTS_STORAGE_KEY` (L19), `MATRIX_STORAGE_KEY` (L20), `MATRIX_SLOTS_UPDATED_EVENT` (L21), `getMatrixStorageKey` (L26), `CalendarLegendColor` (L31), `CalendarEventItem` (L33), `INITIAL_OCTOBER_EVENTS` (L55), `parseThaiDateString` (L57), `convertHolidayToCalendarEvent` (L84), `convertMakeupDayToCalendarEvent` (L105) *(+1 รายการ)* |
+| [src/services/calendarEventStorageService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/calendarEventStorageService.ts) | 372 | `CALENDAR_EVENTS_STORAGE_KEY` (L19), `MATRIX_STORAGE_KEY` (L20), `MATRIX_SLOTS_UPDATED_EVENT` (L21), `getMatrixStorageKey` (L26), `CalendarLegendColor` (L31), `CalendarEventItem` (L33), `INITIAL_OCTOBER_EVENTS` (L55), `parseThaiDateString` (L57), `convertHolidayToCalendarEvent` (L84), `convertMakeupDayToCalendarEvent` (L105) *(+1 รายการ)* |
 | [src/services/chatBackendService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/chatBackendService.ts) | 268 | `ChatRoomType` (L8), `ChatMessageType` (L9), `ChatRoomSummary` (L11), `ChatAttachmentMeta` (L29), `ChatMessageRecord` (L39), `FetchMessagesResponse` (L53), `SendMessagePayload` (L59), `chatBackendService` (L97) |
 | [src/services/classroomService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts) | 846 | `getDeletedRoomsSet` (L10), `saveDeletedRoomsSet` (L25), `getLocalClassrooms` (L36), `TeacherAccountItem` (L90), `DEFAULT_TEACHER_ACCOUNTS` (L100), `INITIAL_SEED_CLASSROOMS` (L102), `invalidateClassroomCache` (L125), `classroomService` (L132) |
 | [src/services/cleanSlateService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/cleanSlateService.ts) | 211 | `CleanSlatePurgeResult` (L5), `TRANSACTIONAL_STORAGE_KEYS` (L16), `PRESERVED_INFRASTRUCTURE_KEYS` (L61), `cleanSlateService` (L210) |
@@ -276,7 +276,7 @@
 | [src/utils/speechTTS.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/speechTTS.ts) | 249 | `JapanesePraise` (L5), `EnglishPraise` (L6), `ChinesePraise` (L7), `SpeechLanguage` (L8), `formatStudentNameForSpeech` (L17), `tts` (L248) |
 | [src/utils/studentIdentityUtils.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/studentIdentityUtils.ts) | 24 | `StudentIdentityCandidate` (L16) |
 | [src/utils/submissionPreviewUtils.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/submissionPreviewUtils.ts) | 442 | `FilePreviewCategory` (L4), `ExternalPlatformType` (L14), `ExternalLinkPreviewInfo` (L23), `ResolvedSubmissionMedia` (L34), `extractFileExtension` (L49), `detectFileCategory` (L71), `getOfficeViewerUrls` (L134), `parseExternalLinkInfo` (L149), `resolveSubmissionMedia` (L335) |
-| [src/utils/timetableDateUtils.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/timetableDateUtils.ts) | 797 | `TimetableColorTheme` (L6), `TimetableMatrixSlot` (L15), `TaskWidgetItem` (L38), `CalendarEventItem` (L47), `THAI_MONTHS_SHORT` (L54), `WeekDayInfo` (L69), `ComputedWeekInfo` (L75), `BANGKOK_TIMEZONE` (L87), `getBangkokNow` (L89), `getBangkokTodayString` (L95) *(+8 รายการ)* |
+| [src/utils/timetableDateUtils.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/utils/timetableDateUtils.ts) | 800 | `TimetableColorTheme` (L6), `TimetableMatrixSlot` (L15), `TaskWidgetItem` (L38), `CalendarEventItem` (L47), `THAI_MONTHS_SHORT` (L54), `WeekDayInfo` (L69), `ComputedWeekInfo` (L76), `BANGKOK_TIMEZONE` (L88), `getBangkokNow` (L90), `getBangkokTodayString` (L96) *(+8 รายการ)* |
 
 ## Type Definitions
 

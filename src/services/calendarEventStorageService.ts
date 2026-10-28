@@ -229,6 +229,70 @@ export const calendarEventStorageService = {
     return bellScheduleService.syncMatrixSlotsWithBellSchedule(initial);
   },
 
+  // รวมตารางสอนของห้องเรียนเป้าหมาย (เช่น 'ม.6/3', 'ม.3/1') จากครูผู้สอนทุกคน
+  loadMatrixSlotsForRoom(roomLabel: string): TimetableMatrixSlot[] {
+    if (typeof window === 'undefined') {
+      return [];
+    }
+    const targetRoomNorm = roomLabel.trim();
+    const cleanRoom = targetRoomNorm.replace(/ห้อง/g, '').trim();
+    const collectedSlots: TimetableMatrixSlot[] = [];
+    const visitedSlotKeys = new Set<string>();
+
+    const checkAndAddSlot = (slot: TimetableMatrixSlot) => {
+      if (!slot || slot.isFreePeriod || !slot.subjectCode) return;
+      const slotRoom = (slot.room || '').replace(/ห้อง/g, '').trim();
+      const isMatch =
+        slotRoom === cleanRoom ||
+        slotRoom.startsWith(cleanRoom) ||
+        cleanRoom.startsWith(slotRoom) ||
+        slotRoom.includes(cleanRoom) ||
+        cleanRoom.includes(slotRoom);
+
+      if (isMatch) {
+        const key = `${slot.day}_${slot.period}`;
+        if (!visitedSlotKeys.has(key)) {
+          visitedSlotKeys.add(key);
+          collectedSlots.push(slot);
+        }
+      }
+    };
+
+    try {
+      // 1. ตรวจสอบตารางสอนส่วนกลาง
+      const globalRaw = localStorage.getItem(MATRIX_STORAGE_KEY);
+      if (globalRaw) {
+        const parsed = JSON.parse(globalRaw);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(checkAndAddSlot);
+        }
+      }
+
+      // 2. ตรวจสอบตารางสอนแยกรายบุคคลของครูทุกคน (kp_teacher_matrix_slots_*)
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(MATRIX_STORAGE_KEY + '_')) {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            try {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed)) {
+                parsed.forEach(checkAndAddSlot);
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch {}
+
+    // 3. หากยังไม่พบ และไม่ใช่ clean slate ให้ตรวจสอบค่าเริ่มต้น INITIAL_MATRIX_SLOTS
+    if (collectedSlots.length === 0 && !cleanSlateService.isCleanSlateActive()) {
+      INITIAL_MATRIX_SLOTS.forEach(checkAndAddSlot);
+    }
+
+    return bellScheduleService.syncMatrixSlotsWithBellSchedule(collectedSlots);
+  },
+
   // คำนวณจำนวนคาบสอนจริงของวันนี้จาก Matrix Slots (ตัดคาบว่าง, คาบพักเที่ยงออก)
   // หากอยู่นอกช่วงเปิดภาคเรียน หรือเป็นวันหยุด จะคืนค่า 0 ทันที ไม่แจ้งเตือน
   getTodayTeachingPeriodsCount(

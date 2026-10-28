@@ -257,12 +257,21 @@ const writeStorage = <T>(key: string, value: T): void => {
 export const normalizeClassroomId = (id: string): string => {
   if (!id) return '';
   const trimmed = id.trim();
-  if (trimmed === 'ม.3/1' || trimmed === 'room-3-1') return 'room-3-1';
-  if (trimmed === 'ม.3/2' || trimmed === 'room-3-2') return 'room-3-2';
-  if (trimmed === 'ม.1/8' || trimmed === 'room-1-8') return 'room-1-8';
-  if (trimmed === 'ม.2/8' || trimmed === 'room-2-8') return 'room-2-8';
-  if (trimmed === 'ม.3/8' || trimmed === 'room-3-8') return 'room-3-8';
-  return trimmed;
+  const clean = trimmed.split('•')[0].replace(/^ห้อง\s*/, '').trim();
+  const roomMatch = clean.match(/^[มป]\.?\s*(\d+)\s*[\/\-]\s*(\d+)$/);
+  if (roomMatch) {
+    return `room-${roomMatch[1]}-${roomMatch[2]}`;
+  }
+  const directRoomMatch = clean.match(/^room-(\d+)-(\d+)$/);
+  if (directRoomMatch) {
+    return `room-${directRoomMatch[1]}-${directRoomMatch[2]}`;
+  }
+  if (clean === 'ม.3/1' || clean === 'room-3-1') return 'room-3-1';
+  if (clean === 'ม.3/2' || clean === 'room-3-2') return 'room-3-2';
+  if (clean === 'ม.1/8' || clean === 'room-1-8') return 'room-1-8';
+  if (clean === 'ม.2/8' || clean === 'room-2-8') return 'room-2-8';
+  if (clean === 'ม.3/8' || clean === 'room-3-8') return 'room-3-8';
+  return clean;
 };
 
 export const normalizeCourseCode = (code: string): string => {
@@ -612,6 +621,27 @@ export const attendanceCorrelationService = {
     }
 
     return [];
+  },
+
+  hasPeriodAttendance(
+    courseCode: string,
+    classroomId: string,
+    date: string,
+    periodNo: number
+  ): boolean {
+    const list = readStorage<PeriodAttendanceRecord[]>(STORAGE_KEYS.PERIOD_ATTENDANCE, []);
+    const targetRoom = normalizeClassroomId(classroomId);
+    const targetCourse = normalizeCourseCode(courseCode);
+
+    return list.some(
+      (r) =>
+        r.date === date &&
+        r.periodNo === periodNo &&
+        (normalizeClassroomId(r.classroomId) === targetRoom ||
+          (targetRoom && normalizeClassroomId(r.classroomId).includes(targetRoom)) ||
+          (targetRoom && targetRoom.includes(normalizeClassroomId(r.classroomId)))) &&
+        (!targetCourse || normalizeCourseCode(r.courseCode) === targetCourse)
+    );
   },
 
   getPeriodRecordsByDateAndRoom(classroomId: string, date: string): PeriodAttendanceRecord[] {

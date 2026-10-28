@@ -70,6 +70,7 @@ export interface WeekDayInfo {
   key: 'จันทร์' | 'อังคาร' | 'พุธ' | 'พฤหัสบดี' | 'ศุกร์';
   dateLabel: string;
   isToday: boolean;
+  isoDate: string;
 }
 
 export interface ComputedWeekInfo {
@@ -215,11 +216,13 @@ export const computeWeekInfo = (
       cur.getFullYear() === todayBangkok.getFullYear() &&
       cur.getMonth() === todayBangkok.getMonth() &&
       cur.getDate() === todayBangkok.getDate();
+    const isoDate = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
 
     return {
       key,
       dateLabel: formatThaiDate(cur),
       isToday,
+      isoDate,
     };
   });
 
@@ -329,8 +332,8 @@ export const INITIAL_MATRIX_SLOTS: TimetableMatrixSlot[] = [
     subjectCode: 'ศ23101',
     room: 'ม.3/1 • ห้อง 324',
     subjectName: 'ศิลปะ 3 (ทัศนศิลป์)',
-    isConducted: true,
-    status: 'CHECKED',
+    isConducted: false,
+    status: 'UNCHECKED',
     colorTheme: 'pink',
     category: 'subject',
     credits: '1.5',
@@ -346,8 +349,8 @@ export const INITIAL_MATRIX_SLOTS: TimetableMatrixSlot[] = [
     subjectCode: 'ศ23101',
     room: 'ม.3/1 • ห้อง 324',
     subjectName: 'ศิลปะ 3 (ทัศนศิลป์)',
-    isConducted: true,
-    status: 'CHECKED',
+    isConducted: false,
+    status: 'UNCHECKED',
     colorTheme: 'pink',
     category: 'subject',
     credits: '1.5',
@@ -363,8 +366,8 @@ export const INITIAL_MATRIX_SLOTS: TimetableMatrixSlot[] = [
     subjectCode: 'ศ23101',
     room: 'ม.3/1 • ห้อง 324',
     subjectName: 'ศิลปะ 3 (ทัศนศิลป์)',
-    isConducted: true,
-    status: 'CHECKED',
+    isConducted: false,
+    status: 'UNCHECKED',
     colorTheme: 'pink',
     category: 'subject',
     credits: '1.5',
@@ -380,8 +383,8 @@ export const INITIAL_MATRIX_SLOTS: TimetableMatrixSlot[] = [
     subjectCode: 'ญ31201',
     room: 'ม.3/1 • ห้อง 324',
     subjectName: 'ภาษาญี่ปุ่น 1',
-    isConducted: true,
-    status: 'CHECKED',
+    isConducted: false,
+    status: 'UNCHECKED',
     colorTheme: 'blue',
     category: 'subject',
     credits: '1.0',
@@ -418,8 +421,8 @@ export const INITIAL_MATRIX_SLOTS: TimetableMatrixSlot[] = [
     subjectCode: 'ศ23101',
     room: 'ม.3/2 • ห้อง 325',
     subjectName: 'ศิลปะ 3 (ทัศนศิลป์)',
-    isConducted: true,
-    status: 'CHECKED',
+    isConducted: false,
+    status: 'UNCHECKED',
     colorTheme: 'pink',
     category: 'subject',
     credits: '1.5',
@@ -435,8 +438,8 @@ export const INITIAL_MATRIX_SLOTS: TimetableMatrixSlot[] = [
     subjectCode: 'ศ23101',
     room: 'ม.3/2 • ห้อง 325',
     subjectName: 'ศิลปะ 3 (ทัศนศิลป์)',
-    isConducted: true,
-    status: 'CHECKED',
+    isConducted: false,
+    status: 'UNCHECKED',
     colorTheme: 'pink',
     category: 'subject',
     credits: '1.5',
@@ -466,8 +469,8 @@ export const INITIAL_MATRIX_SLOTS: TimetableMatrixSlot[] = [
     subjectCode: 'ญ31201',
     room: 'ม.3/2 • ห้อง 325',
     subjectName: 'ภาษาญี่ปุ่น 1',
-    isConducted: true,
-    status: 'CHECKED',
+    isConducted: false,
+    status: 'UNCHECKED',
     colorTheme: 'blue',
     category: 'subject',
     credits: '1.0',
@@ -501,8 +504,8 @@ export const INITIAL_MATRIX_SLOTS: TimetableMatrixSlot[] = [
     subjectCode: 'ศ23101',
     room: 'ม.3/8 • ห้อง 326',
     subjectName: 'ศิลปะ 3 (ทัศนศิลป์)',
-    isConducted: true,
-    status: 'CHECKED',
+    isConducted: false,
+    status: 'UNCHECKED',
     colorTheme: 'pink',
     category: 'subject',
     credits: '1.5',

@@ -3,7 +3,6 @@ import { Calendar, Clock, Utensils, Flag } from 'lucide-react';
 import type { AuthUser } from '../../services/authService';
 import type { SchoolSettingsConfig } from '../../config/schoolSettings';
 import { bellScheduleService, type BellScheduleTimelineItem } from '../../services/bellScheduleService';
-import { TEACHER_SUBJECTS_LIST } from '../../services/teacherCourseAssignmentService';
 import { cleanSlateService } from '../../services/cleanSlateService';
 import { formatClassroomLabel } from '../../services/studentService';
 import { calendarEventStorageService } from '../../services/calendarEventStorageService';
@@ -32,7 +31,7 @@ export const StudentTimetableView: React.FC<StudentTimetableViewProps> = ({
 
   // Load configured timeline from bell schedule service
   const timeline = bellScheduleService.getPeriodsTimeline();
-  const matrixSlots = calendarEventStorageService.loadMatrixSlots();
+  const matrixSlots = calendarEventStorageService.loadMatrixSlotsForRoom(studentRoom);
   const scheduleDays = [
     { key: 'MON' as const, label: 'จันทร์', isToday: new Date().getDay() === 1 },
     { key: 'TUE' as const, label: 'อังคาร', isToday: new Date().getDay() === 2 },
@@ -40,15 +39,6 @@ export const StudentTimetableView: React.FC<StudentTimetableViewProps> = ({
     { key: 'THU' as const, label: 'พฤหัสบดี', isToday: new Date().getDay() === 4 },
     { key: 'FRI' as const, label: 'ศุกร์', isToday: new Date().getDay() === 5 },
   ];
-
-  // Matched subjects for this student's classroom
-  const roomSubjects = TEACHER_SUBJECTS_LIST.filter((s) =>
-    s.classrooms.some((c) => {
-      const normC = formatClassroomLabel(c);
-      const normRoom = formatClassroomLabel(studentRoom);
-      return normC === normRoom || normC.includes(normRoom) || normRoom.includes(normC);
-    })
-  );
 
   return (
     <div className="font-['Prompt',sans-serif] space-y-5 animate-fade-in select-none">
@@ -97,7 +87,7 @@ export const StudentTimetableView: React.FC<StudentTimetableViewProps> = ({
 
       {/* Timeline Periods List */}
       <div className="space-y-3">
-        {timeline.map((slot: BellScheduleTimelineItem, index: number) => {
+        {timeline.map((slot: BellScheduleTimelineItem) => {
           if (slot.type === 'ASSEMBLY') {
             return (
               <div
@@ -148,7 +138,7 @@ export const StudentTimetableView: React.FC<StudentTimetableViewProps> = ({
             );
           }
 
-          // Regular period matching matrix slots or day-offset subjects
+          // Regular period matching matrix slots for this room
           const thaiDay = DAY_MAP[selectedDay];
           const matchedMatrix = matrixSlots.find(
             (m) =>
@@ -161,13 +151,43 @@ export const StudentTimetableView: React.FC<StudentTimetableViewProps> = ({
                 studentRoom.includes(formatClassroomLabel(m.room)))
           );
 
-          const dayIndex = ['MON', 'TUE', 'WED', 'THU', 'FRI'].indexOf(selectedDay);
-          const fallbackSubject =
-            roomSubjects.length > 0 ? roomSubjects[(index + dayIndex * 2) % roomSubjects.length] : null;
+          if (!matchedMatrix || !matchedMatrix.subjectCode) {
+            // คาบว่าง (Zero Mock Policy: ห้ามสุ่มหรือใส่ข้อมูลหลอก)
+            return (
+              <div
+                key={slot.id}
+                className="bg-slate-50/60 border border-dashed border-slate-200/90 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 border border-slate-200/60 flex items-center justify-center font-bold text-sm shrink-0">
+                    {slot.periodNumber}
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-500 text-sm">
+                      คาบว่าง / ไม่มีวิชาเรียน
+                    </span>
+                    <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{slot.timeRange} น.</span>
+                      <span className="text-slate-300">•</span>
+                      <span>ห้อง {studentRoom}</span>
+                    </p>
+                  </div>
+                </div>
 
-          const code = matchedMatrix?.subjectCode || fallbackSubject?.code;
-          const name = matchedMatrix?.subjectName || fallbackSubject?.name;
-          const credits = matchedMatrix?.credits || fallbackSubject?.credits;
+                <div className="flex items-center gap-2 self-end sm:self-center">
+                  <span className="text-xs font-bold px-3 py-1 rounded-xl bg-slate-100 text-slate-400 border border-slate-200">
+                    คาบว่าง
+                  </span>
+                </div>
+              </div>
+            );
+          }
+
+          const code = matchedMatrix.subjectCode;
+          const name = matchedMatrix.subjectName;
+          const credits = matchedMatrix.credits;
+          const teacherName = matchedMatrix.teacherName;
 
           return (
             <div
@@ -194,6 +214,12 @@ export const StudentTimetableView: React.FC<StudentTimetableViewProps> = ({
                     <span>{slot.timeRange} น.</span>
                     <span className="text-slate-300">•</span>
                     <span>ห้อง {studentRoom}</span>
+                    {teacherName && (
+                      <>
+                        <span className="text-slate-300">•</span>
+                        <span>ครูผู้สอน: {teacherName}</span>
+                      </>
+                    )}
                   </p>
                 </div>
               </div>

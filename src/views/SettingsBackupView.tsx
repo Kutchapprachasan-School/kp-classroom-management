@@ -2388,6 +2388,70 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
             </div>
           </div>
 
+          {/* Quick Bell Schedule Presets */}
+          <div className="bg-blue-50/70 rounded-2xl border border-blue-200 p-4 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-blue-950 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>ชุดตั้งค่าเวลาเรียนสำเร็จรูป (Quick Presets)</span>
+              </span>
+              <button
+                type="button"
+                onClick={handleResetBellSchedule}
+                className="text-[11px] font-bold text-blue-600 hover:text-blue-800 underline cursor-pointer"
+              >
+                🔄 คืนค่าเริ่มต้น สพฐ.
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() =>
+                  setBellSchedule({
+                    ...bellSchedule,
+                    morningAssemblyStart: '07:45',
+                    morningAssemblyEnd: '08:15',
+                    firstPeriodStart: '08:30',
+                    periodDurationMinutes: 50,
+                  })
+                }
+                className="px-3 py-1.5 rounded-xl bg-white hover:bg-blue-100/70 border border-blue-200 text-blue-900 shadow-2xs transition-all cursor-pointer"
+              >
+                มาตรฐาน สพฐ. (แถว 07:45 - 08:15 • เริ่มเรียน 08:30 น.)
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setBellSchedule({
+                    ...bellSchedule,
+                    morningAssemblyStart: '07:50',
+                    morningAssemblyEnd: '08:20',
+                    firstPeriodStart: '08:30',
+                    periodDurationMinutes: 50,
+                  })
+                }
+                className="px-3 py-1.5 rounded-xl bg-white hover:bg-blue-100/70 border border-blue-200 text-blue-900 shadow-2xs transition-all cursor-pointer"
+              >
+                แถว 07:50 - 08:20 • เริ่มเรียน 08:30 น.
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setBellSchedule({
+                    ...bellSchedule,
+                    morningAssemblyStart: '08:00',
+                    morningAssemblyEnd: '08:30',
+                    firstPeriodStart: '08:30',
+                    periodDurationMinutes: 50,
+                  })
+                }
+                className="px-3 py-1.5 rounded-xl bg-white hover:bg-blue-100/70 border border-blue-200 text-blue-900 shadow-2xs transition-all cursor-pointer"
+              >
+                แถว 08:00 - 08:30 • เริ่มเรียน 08:30 น.
+              </button>
+            </div>
+          </div>
+
           {/* Section 1: เวลาเข้าแถวเคารพธงชาติ */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-3">
             <div className="flex items-center gap-2">

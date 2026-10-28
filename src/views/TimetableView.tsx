@@ -61,6 +61,7 @@ import {
 } from '../services/calendarEventStorageService';
 import { authService } from '../services/authService';
 import { attendanceCorrelationService } from '../services/attendanceCorrelationService';
+import { attendanceService } from '../services/attendanceService';
 
 import {
   type TimetableColorTheme,
@@ -72,6 +73,8 @@ import {
   computeWeekInfo,
   getBangkokDayName,
   getBangkokNow,
+  getBangkokTodayString,
+  formatThaiDateShort,
 } from '../utils/timetableDateUtils';
 
 export type {
@@ -92,14 +95,6 @@ interface TimetableViewProps {
 
 const loadSavedMatrixSlots = (teacherId?: string): TimetableMatrixSlot[] => {
   return calendarEventStorageService.loadMatrixSlots(teacherId);
-};
-
-const DAY_ORDER: Record<string, number> = {
-  'จันทร์': 1,
-  'อังคาร': 2,
-  'พุธ': 3,
-  'พฤหัสบดี': 4,
-  'ศุกร์': 5,
 };
 
 const THAI_MONTH_NAMES = [
@@ -249,10 +244,25 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
 
   // Modals state
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [selectedSlotDateIso, setSelectedSlotDateIso] = useState<string>('');
+  const [attendanceRefreshKey, setAttendanceRefreshKey] = useState<number>(0);
   const [, setIsDetailSummaryModalOpen] = useState<boolean>(false);
   const [, setOverrideConfirmConflicts] = useState<
     Array<{ no: number; name: string; leaveReason: string; chosenStatus: string }>
   >([]);
+
+  // Sync attendance updates from other views or local operations
+  useEffect(() => {
+    const handleAttendanceUpdate = () => {
+      setAttendanceRefreshKey((k) => k + 1);
+    };
+    window.addEventListener('kp_period_attendance_updated', handleAttendanceUpdate);
+    window.addEventListener('storage', handleAttendanceUpdate);
+    return () => {
+      window.removeEventListener('kp_period_attendance_updated', handleAttendanceUpdate);
+      window.removeEventListener('storage', handleAttendanceUpdate);
+    };
+  }, []);
 
   // Dynamic Student Roll-Call State inside Modal from studentService
   const studentsList = useMemo(() => {
@@ -306,8 +316,11 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
 
   const todayTotalPeriods = todayTeachingSlots.length;
   const todayCheckedCount = useMemo(() => {
-    return todayTeachingSlots.filter((s) => s.status === 'CHECKED' || s.isConducted).length;
-  }, [todayTeachingSlots]);
+    const todayIso = getBangkokTodayString();
+    return todayTeachingSlots.filter((s) =>
+      attendanceCorrelationService.hasPeriodAttendance(s.subjectCode, s.room, todayIso, s.period)
+    ).length;
+  }, [todayTeachingSlots, attendanceRefreshKey]);
   const todayUncheckedCount = Math.max(0, todayTotalPeriods - todayCheckedCount);
   const checkedPercent = todayTotalPeriods > 0 ? Math.round((todayCheckedCount / todayTotalPeriods) * 100) : 0;
   const uncheckedPercent = todayTotalPeriods > 0 ? Math.round((todayUncheckedCount / todayTotalPeriods) * 100) : 0;
@@ -331,37 +344,59 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
   // - ยังไม่เช็ค: กล่องสีแดงเข้ม (bg-rose-600 text-white)
   // - ยังไม่ถึงวันเช็ค: กล่องสีเทาอ่อน (bg-slate-100 text-slate-800)
   // ------------------------------------------
-  const getSlotStatus = (slot: TimetableMatrixSlot): 'CHECKED' | 'UNCHECKED' | 'FUTURE' | 'LUNCH' => {
+  const getSlotStatus = (
+    slot: TimetableMatrixSlot,
+    targetDateIso?: string
+  ): 'CHECKED' | 'UNCHECKED' | 'FUTURE' | 'LUNCH' => {
     if (slot.status === 'LUNCH' || slot.isLunchSlot || slot.subjectCode === 'พักกลางวัน') {
       return 'LUNCH';
     }
     if (slot.isFreePeriod || slot.category === 'free' || !slot.subjectCode) {
       return 'FUTURE';
     }
-    if (slot.status === 'CHECKED' || slot.isConducted) {
-      return 'CHECKED';
-    }
-    const dayIdx = DAY_ORDER[slot.day] || 1;
-    const todayIdx = DAY_ORDER[todayDayKey] || 0;
+
+    const effectiveDate = targetDateIso || getBangkokTodayString();
+    const todayIso = getBangkokTodayString();
     const currentPeriod = bellScheduleService.getCurrentPeriodNumber();
 
-    if (dayIdx < todayIdx) {
-      return 'UNCHECKED'; // วันที่ผ่านมาแล้ว ยังไม่เช็ค -> สีแดงเข้ม
+    // 1. ตรวจสอบการเช็คชื่อจริงใน attendanceCorrelationService ประจำวันและคาบนั้น
+    const isChecked = attendanceCorrelationService.hasPeriodAttendance(
+      slot.subjectCode,
+      slot.room,
+      effectiveDate,
+      slot.period
+    );
+
+    if (isChecked) {
+      return 'CHECKED';
     }
-    if (dayIdx === todayIdx) {
+
+    // 2. วันที่ผ่านมาแล้ว ยังไม่เช็คชื่อ -> สีแดงเข้ม (UNCHECKED)
+    if (effectiveDate < todayIso) {
+      return 'UNCHECKED';
+    }
+
+    // 3. วันนี้
+    if (effectiveDate === todayIso) {
       return slot.period <= currentPeriod ? 'UNCHECKED' : 'FUTURE';
     }
-    return 'FUTURE'; // ยังไม่ถึงวันเช็ค -> สีเทาอ่อน
+
+    // 4. วันในอนาคต (สัปดาห์ที่ 2 เป็นต้นไป หรือวันข้างหน้า) -> สีเทาอ่อน (FUTURE)
+    return 'FUTURE';
   };
 
-  const getSlotBoxStyle = (slot: TimetableMatrixSlot, isLunchRow?: boolean) => {
+  const getSlotBoxStyle = (
+    slot: TimetableMatrixSlot,
+    isLunchRow?: boolean,
+    targetDateIso?: string
+  ) => {
     if (isLunchRow || slot.status === 'LUNCH') {
       return 'bg-amber-50/70 border-amber-200 text-amber-900';
     }
     if (slot.isFreePeriod || slot.category === 'free' || !slot.subjectCode) {
       return 'bg-slate-50/50 border-dashed border-slate-200 text-slate-400 hover:border-blue-400 hover:bg-blue-50/30';
     }
-    const status = getSlotStatus(slot);
+    const status = getSlotStatus(slot, targetDateIso);
     switch (status) {
       case 'CHECKED':
         return 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 shadow-sm';
@@ -462,12 +497,13 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
   // ------------------------------------------
   // Interactive Slot Management: Add, Delete, Unassign, Move
   // ------------------------------------------
-  const handleOpenSlot = (slot: TimetableMatrixSlot) => {
+  const handleOpenSlot = (slot: TimetableMatrixSlot, targetDateIso?: string) => {
     if (slot.isFreePeriod || slot.category === 'free' || slot.status === 'LUNCH') {
       return;
     }
     setOverrideConfirmConflicts([]);
     setSelectedSlot(slot);
+    setSelectedSlotDateIso(targetDateIso || getBangkokTodayString());
   };
 
   const handleOpenFreeSlot = (day: string, period: number) => {
@@ -653,11 +689,47 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
 
   const handleSaveAttendance = () => {
     if (!selectedSlot) return;
-    const updatedSlots = matrixSlots.map((s) =>
-      s.id === selectedSlot.id ? { ...s, status: 'CHECKED' as const, isConducted: true } : s
-    );
-    saveMatrixSlotsWithDispatch(updatedSlots);
-    showToast(`บันทึกการเช็คชื่อวิชา ${selectedSlot.subjectCode} (${selectedSlot.room}) เรียบร้อย`);
+    const targetDate = selectedSlotDateIso || getBangkokTodayString();
+    const cleanRoom = selectedSlot.room.split('•')[0].replace(/ห้อง/g, '').trim();
+
+    if (studentsList.length > 0) {
+      const recordsToSave = studentsList.map((stu, stuIdx) => {
+        const stuKey = stu.code || stu.id || `stu-${stu.no}-${stuIdx}`;
+        const chosenStatus = attendanceRecords[stuKey] || 'PRESENT';
+        return {
+          id: `period_${targetDate}_${selectedSlot.period}_${stu.id || stu.code}`,
+          date: targetDate,
+          classroomId: cleanRoom,
+          courseCode: selectedSlot.subjectCode,
+          courseName: selectedSlot.subjectName || selectedSlot.subjectCode,
+          periodNo: selectedSlot.period,
+          studentId: stu.id,
+          studentCode: stu.code,
+          studentName: stu.name,
+          status: chosenStatus as any,
+          source: 'MANUAL' as const,
+          isOverridden: false,
+          markedAt: new Date().toISOString(),
+        };
+      });
+
+      attendanceCorrelationService.savePeriodRecords(recordsToSave);
+
+      void attendanceService.markWholeClassroom({
+        studentIds: studentsList.map((s) => s.id),
+        classroomId: cleanRoom,
+        date: targetDate,
+        period: selectedSlot.period,
+        status: 'PRESENT',
+        recordedBy: currentTeacherId || 'TEACHER',
+      });
+    }
+
+    setAttendanceRefreshKey((k) => k + 1);
+    window.dispatchEvent(new CustomEvent('kp_period_attendance_updated'));
+    window.dispatchEvent(new Event('storage'));
+
+    showToast(`บันทึกการเช็คชื่อวิชา ${selectedSlot.subjectCode} (${selectedSlot.room}) ประจำวันที่ ${formatThaiDateShort(targetDate)} เรียบร้อย`);
     setSelectedSlot(null);
   };
 
@@ -963,6 +1035,8 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
 
               const pNum = periodDef.period || 1;
               const slot = getSlot(selectedDayTab, pNum);
+              const dayObj = weekInfo.days.find((d) => d.key === selectedDayTab);
+              const targetDateIso = dayObj?.isoDate || getBangkokTodayString();
 
               if (!slot || slot.isFreePeriod || !slot.subjectCode) {
                 return (
@@ -982,13 +1056,13 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                 );
               }
 
-              const boxStyle = getSlotBoxStyle(slot);
-              const status = getSlotStatus(slot);
+              const boxStyle = getSlotBoxStyle(slot, false, targetDateIso);
+              const status = getSlotStatus(slot, targetDateIso);
 
               return (
                 <div
                   key={periodDef.id || `period-${pNum}`}
-                  onClick={() => handleOpenSlot(slot)}
+                  onClick={() => handleOpenSlot(slot, targetDateIso)}
                   className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between min-h-[120px] ${boxStyle}`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -1081,7 +1155,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                     เวลา / วัน
                   </th>
                   {weekInfo.days.map((dayObj) => {
-                    const isToday = dayObj.key === todayDayKey;
+                    const isToday = dayObj.isToday;
                     return (
                       <th
                         key={dayObj.key}
@@ -1144,7 +1218,8 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                       {/* Mon - Fri Period Slots */}
                       {weekInfo.days.map((dayObj) => {
                         const slot = getSlot(dayObj.key, pNum);
-                        const isToday = dayObj.key === todayDayKey;
+                        const isToday = dayObj.isToday;
+                        const targetDateIso = dayObj.isoDate;
                         const colBg = isToday ? 'bg-blue-50/20' : '';
 
                         if (!slot || slot.isFreePeriod || !slot.subjectCode) {
@@ -1162,13 +1237,13 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                           );
                         }
 
-                        const boxStyle = getSlotBoxStyle(slot);
-                        const status = getSlotStatus(slot);
+                        const boxStyle = getSlotBoxStyle(slot, false, targetDateIso);
+                        const status = getSlotStatus(slot, targetDateIso);
 
                         return (
                           <td
                             key={dayObj.key}
-                            onClick={() => handleOpenSlot(slot)}
+                            onClick={() => handleOpenSlot(slot, targetDateIso)}
                             className={`p-1.5 align-middle cursor-pointer group ${colBg}`}
                           >
                             <div
@@ -1237,7 +1312,8 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                   Boolean(s.subjectCode) &&
                   s.subjectCode !== 'พักกลางวัน'
               );
-              const isToday = dayObj.key === todayDayKey;
+              const isToday = dayObj.isToday;
+              const targetDateIso = dayObj.isoDate;
 
               return (
                 <div
@@ -1265,13 +1341,13 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                   ) : (
                     <div className="space-y-2">
                       {dayTeaching.map((slot) => {
-                        const status = getSlotStatus(slot);
-                        const boxStyle = getSlotBoxStyle(slot);
+                        const status = getSlotStatus(slot, targetDateIso);
+                        const boxStyle = getSlotBoxStyle(slot, false, targetDateIso);
                         const dynamicTime = bellScheduleService.getTimeRangeForPeriod(slot.period) || slot.timeRange;
                         return (
                           <div
                             key={slot.id}
-                            onClick={() => handleOpenSlot(slot)}
+                            onClick={() => handleOpenSlot(slot, targetDateIso)}
                             className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${boxStyle}`}
                           >
                             <div className="flex items-center gap-2.5">
@@ -1425,8 +1501,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                   .getAllPeriodRecords()
                   .filter((r) => r.date === thisDateIso);
                 const isAllChecked =
-                  hasClasses &&
-                  (dateRecords.length > 0 || scheduledSlots.every((s) => s.status === 'CHECKED'));
+                  hasClasses && dateRecords.length > 0;
 
                 // Visual styling logic: Green = checked, Red = unchecked past, Amber = term break
                 let cellBorderBg = 'border-slate-100 bg-slate-50/60 opacity-60';
@@ -1615,7 +1690,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
                     คาบที่ {selectedSlot.period}
                   </span>
                   <span className="text-xs text-slate-500 font-bold">
-                    {selectedSlot.day} • {selectedSlot.timeRange || bellScheduleService.getTimeRangeForPeriod(selectedSlot.period)}
+                    {selectedSlot.day} • {formatThaiDateShort(selectedSlotDateIso || getBangkokTodayString())} • {selectedSlot.timeRange || bellScheduleService.getTimeRangeForPeriod(selectedSlot.period)}
                   </span>
                 </div>
                 <h2 className="text-base sm:text-lg font-black text-slate-900 mt-1">
