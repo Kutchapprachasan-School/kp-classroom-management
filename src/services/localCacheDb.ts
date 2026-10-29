@@ -263,6 +263,40 @@ export const localCacheDb = {
     }
   },
 
+  async pruneStudentsByClassroom(classroomId: string, validIds: Set<string>): Promise<void> {
+    if (!classroomId) return;
+
+    for (const [id, s] of memoryFallback.students.entries()) {
+      if (s.classroomId === classroomId && !validIds.has(id)) {
+        memoryFallback.students.delete(id);
+      }
+    }
+
+    if (!isIndexedDBAvailable()) return;
+
+    try {
+      const db = await openCacheDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_STUDENTS, 'readwrite');
+        const store = tx.objectStore(STORE_STUDENTS);
+        const index = store.index('by_classroom');
+        const req = index.getAll(IDBKeyRange.only(classroomId));
+        req.onsuccess = () => {
+          const list = (req.result as CachedStudent[]) || [];
+          for (const item of list) {
+            if (!validIds.has(item.id)) {
+              store.delete(item.id);
+            }
+          }
+        };
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch {
+      // In-memory fallback updated
+    }
+  },
+
   // ล้างแคชทั้งหมด
   async clearAll(): Promise<void> {
     memoryFallback.classrooms.clear();

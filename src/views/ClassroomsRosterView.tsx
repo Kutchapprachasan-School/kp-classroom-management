@@ -668,12 +668,22 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
     }
   };
 
-  // ตรวจจับนักเรียนชั้น ม.1 ที่ค้างอยู่ในห้อง ม.3/1 จากการนำเข้าครั้งก่อน
+  // ตรวจจับนักเรียนชั้น ม.1 ที่ค้างอยู่ในห้อง ม.3/1 หรือห้อง ม.1 อื่นๆ จากการนำเข้าครั้งก่อน
   const misplacedM1Students = useMemo(() => {
     if (!selectedClass) return [];
     const isRoom31 = selectedClass.id === 'room-3-1' || selectedClass.name === 'ม.3/1';
-    if (!isRoom31) return [];
-    return students.filter((s) => isGrade1SgsStudentCode(s.code));
+    if (isRoom31) {
+      return students.filter((s) => isGrade1SgsStudentCode(s.code));
+    }
+    const match = selectedClass.name?.match(/ม\.?1\/(\d+)/) || selectedClass.id?.match(/room-1-(\d+)/);
+    if (match) {
+      const curRoom = `ม.1/${match[1]}`;
+      return students.filter((s) => {
+        const info = getM1SgsStudentInfo(s.code);
+        return info && info.room !== curRoom;
+      });
+    }
+    return [];
   }, [selectedClass, students]);
 
   // ฟังก์ชันย้ายนักเรียน ม.1 ทั้งหมด 204 คน กลับเข้าห้อง ม.1/1 - ม.1/6 อัตโนมัติ (1 คลิก)
@@ -813,6 +823,15 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
   const filteredStudents = useMemo(() => {
     return students
       .filter((s) => {
+        // หากเลือกดูห้อง ม.1 ให้กรองนักเรียนที่สังกัดห้อง ม.1 อื่นออกทันที
+        if (selectedClass) {
+          const match = selectedClass.name?.match(/ม\.?1\/(\d+)/) || selectedClass.id?.match(/room-1-(\d+)/);
+          if (match) {
+            const curRoom = `ม.1/${match[1]}`;
+            const info = getM1SgsStudentInfo(s.code);
+            if (info && info.room !== curRoom) return false;
+          }
+        }
         if (!searchTerm) return true;
         const term = searchTerm.toLowerCase();
         return (

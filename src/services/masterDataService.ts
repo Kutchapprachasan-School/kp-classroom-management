@@ -15,6 +15,7 @@ import {
   type CachedClassroom,
   type CachedStudent,
 } from './localCacheDb.ts';
+import { getM1SgsStudentInfo } from '../config/m1SgsLookup.ts';
 
 // Cooldown TTL: ตรวจสอบการอัปเดตข้อมูลนักเรียนและห้องเรียนจาก Server ทุก 12 ชั่วโมง
 const MASTER_DATA_TTL_MS = 12 * 60 * 60 * 1000;
@@ -178,6 +179,16 @@ function mapStudentViewToCached(s: any, fallbackRoomId: string): CachedStudent {
  * พร้อมทำ Deduplication ตาม Identity (studentCode/code/id) และจัดเรียงเลขที่ใหม่ 1..N
  */
 async function collectAndNormalizeCandidatesFromDb(candidates: string[]): Promise<CachedStudent[]> {
+  // ตรวจสอบห้องเรียน ม.1 ที่คาดหวังเพื่อป้องกันนักเรียน ม.1 ห้องอื่นปะปน
+  let expectedM1Room: string | null = null;
+  for (const c of candidates) {
+    const match = c.match(/1[-/](\d+)/);
+    if (match) {
+      expectedM1Room = `ม.1/${match[1]}`;
+      break;
+    }
+  }
+
   const mergedMap = new Map<string, CachedStudent>();
   for (const c of candidates) {
     const list = await localCacheDb.getStudentsByClassroom(c);
@@ -185,6 +196,17 @@ async function collectAndNormalizeCandidatesFromDb(candidates: string[]): Promis
       for (const s of list) {
         const key = (s.studentCode || s.code || s.id || '').trim();
         if (key) {
+          // หากเป็นห้อง ม.1 ให้ตรวจสอบว่านักเรียนสังกัดห้องนี้จริงตาม SGS หรือไม่
+          if (expectedM1Room) {
+            const info = getM1SgsStudentInfo(key);
+            if (info && info.room !== expectedM1Room) {
+              // นักเรียนสังกัดห้องอื่น (เช่น ม.1/2 มาอยู่ใน ม.1/1) ให้คัดออก
+              continue;
+            }
+            if (!info && (key.startsWith('16') || key.startsWith('15833'))) {
+              continue;
+            }
+          }
           if (!mergedMap.has(key)) {
             mergedMap.set(key, s);
           } else {
@@ -341,9 +363,14 @@ export const masterDataService = {
         let cachedStudents: CachedStudent[] = await collectAndNormalizeCandidatesFromDb(candidates);
         const syncMeta = await localCacheDb.getSyncMeta(scopeKey);
 
+        const isM1Room = candidates.some((c) => c.includes('1-') || c.includes('1/'));
+        // หากจำนวนนักเรียนในห้อง ม.1 ผิดปกติ (> 35 คน) ให้ถือว่าแคชเสียและดึงใหม่จาก Server ทันที
+        const hasSuspiciousCount = isM1Room && cachedStudents.length > 35;
+
         const now = Date.now();
         const isCacheFresh =
           !forceRefresh &&
+          !hasSuspiciousCount &&
           cachedStudents.length > 0 &&
           syncMeta &&
           now - syncMeta.lastCheckedMs < MASTER_DATA_TTL_MS;
@@ -370,7 +397,7 @@ export const masterDataService = {
           .select(STUDENT_VIEW_COLUMNS)
           .in('classroom_id', candidates);
 
-        if (!forceRefresh && cachedStudents.length > 0 && syncMeta?.lastSyncedIso) {
+        if (!forceRefresh && !hasSuspiciousCount && cachedStudents.length > 0 && syncMeta?.lastSyncedIso) {
           query = query.gt('updated_at', syncMeta.lastSyncedIso);
         }
 
@@ -384,6 +411,14 @@ export const masterDataService = {
           );
 
           await localCacheDb.putStudents(sanitized);
+
+          // หากเป็นการดึงข้อมูลเต็มห้อง (forceRefresh หรือแก้แคชผิดปกติ) ให้ตัดนักเรียนแปลกปลอมใน IndexedDB ออก
+          if (forceRefresh || hasSuspiciousCount || !syncMeta?.lastSyncedIso) {
+            const validIds = new Set(sanitized.map((s) => s.id));
+            for (const c of candidates) {
+              await localCacheDb.pruneStudentsByClassroom(c, validIds);
+            }
+          }
 
           for (const std of sanitized) {
             if (std.updatedAt && std.updatedAt > latestIso) {

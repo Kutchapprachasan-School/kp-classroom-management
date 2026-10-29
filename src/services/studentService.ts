@@ -150,7 +150,8 @@ function relocateMisplacedM1Students(misplaced: StudentRecord[]): void {
     if (!info) return; // ป้องกันการดึงนักเรียนที่ไม่ใช่ ม.1 เข้ามาใน ม.1/1 โดยเด็ดขาด
     const targetThaiRoom = info.room;
     const match = targetThaiRoom.match(/(\d+)\/(\d+)/);
-    const targetRoomId = match ? `room-${match[1]}-${match[2]}` : 'room-1-1';
+    if (!match) return;
+    const targetRoomId = `room-${match[1]}-${match[2]}`;
 
     if (!byRoom[targetRoomId]) byRoom[targetRoomId] = [];
     byRoom[targetRoomId].push({
@@ -321,15 +322,37 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
         parsed = parsed.filter((s: StudentRecord) => !isGrade1SgsStudentCode(s.code || s.id));
         relocateMisplacedM1Students(misplaced);
       } else if (isGrade1Room) {
-        // กรองนักเรียนที่ไม่ใช่ ม.1 ออก (เช่น คำนำหน้า ม.ปลาย 'นาย', 'นางสาว' หรือรหัสนักเรียนรุ่นก่อน)
+        // หาชื่อห้อง ม.1 ที่แท้จริงของห้องนี้ (เช่น ม.1/1)
+        let expectedM1Room: string | null = null;
+        for (const c of candidates) {
+          const m = c.match(/1[-/](\d+)/);
+          if (m) {
+            expectedM1Room = `ม.1/${m[1]}`;
+            break;
+          }
+        }
+
+        const misplacedM1: StudentRecord[] = [];
         parsed = parsed.filter((s: StudentRecord) => {
           const name = (s.name || '').trim();
           const code = (s.code || s.id || '').trim();
           if (name.startsWith('นาย') || name.startsWith('นางสาว') || name.startsWith('น.ส.')) return false;
           if (/^(12|13|14|15)\d{3}$/.test(code)) return false;
+
           if (/^16\d{3}$/.test(code) && !isGrade1SgsStudentCode(code)) return false;
+
+          const sgsInfo = getM1SgsStudentInfo(code);
+          if (sgsInfo && expectedM1Room && sgsInfo.room !== expectedM1Room) {
+            // นักเรียนสังกัดห้อง ม.1 ห้องอื่น (เช่น ม.1/2 มาอยู่ใน ม.1/1) ให้แยกออกเพื่อย้ายเข้าห้องที่ถูกต้อง
+            misplacedM1.push(s);
+            return false;
+          }
           return true;
         });
+
+        if (misplacedM1.length > 0) {
+          relocateMisplacedM1Students(misplacedM1);
+        }
       }
 
       const { students: normalized, hasRepaired } = normalizeRoomRollNumbers(parsed);
@@ -720,21 +743,53 @@ export const studentService = {
     try {
       const remote = await masterDataService.getStudentsByRoom(classroomId, forceRefresh);
       if (remote && remote.length > 0) {
-        // รวมนักเรียนจาก Remote กับ Local โดยไม่ทำให้นักเรียนสูญหาย (Zero Student Loss)
-        const mergedMap = new Map<string, StudentRecord>();
-        for (const loc of local) {
-          const key = (loc.code || loc.studentCode || loc.id || '').trim();
-          if (key) mergedMap.set(key, loc);
-        }
-        for (const rem of remote as StudentRecord[]) {
-          const key = (rem.code || rem.studentCode || rem.id || '').trim();
-          if (key) {
-            const existing = mergedMap.get(key);
-            mergedMap.set(key, existing ? { ...existing, ...rem } : rem);
+        // หาชื่อห้อง ม.1 ที่คาดหวังเพื่อคัดกรองนักเรียนที่ปะปน
+        const candidates = resolveRoomCandidates(classroomId);
+        let expectedM1Room: string | null = null;
+        for (const c of candidates) {
+          const m = c.match(/1[-/](\d+)/);
+          if (m) {
+            expectedM1Room = `ม.1/${m[1]}`;
+            break;
           }
         }
 
-        const { students: normalized } = normalizeRoomRollNumbers(Array.from(mergedMap.values()));
+        // Remote (จาก Neon DB) คือ Source of Truth ที่ถูกต้องที่สุด
+        const authoritativeList: StudentRecord[] = [...(remote as StudentRecord[])];
+        const existingKeys = new Set(
+          authoritativeList.map((r) => (r.code || r.studentCode || r.id || '').trim())
+        );
+
+        for (const loc of local) {
+          const key = (loc.code || loc.studentCode || loc.id || '').trim();
+          if (!key) continue;
+          if (existingKeys.has(key)) {
+            const idx = authoritativeList.findIndex(
+              (r) => (r.code || r.studentCode || r.id || '').trim() === key
+            );
+            if (idx >= 0) {
+              authoritativeList[idx] = {
+                ...loc,
+                ...authoritativeList[idx],
+                avatarUrl: loc.avatarUrl || authoritativeList[idx].avatarUrl,
+              };
+            }
+          } else {
+            // หากเป็นนักเรียน ม.1 ให้ตรวจสอบว่าสังกัดห้องนี้จริงหรือไม่
+            const sgsInfo = getM1SgsStudentInfo(key);
+            if (sgsInfo && expectedM1Room && sgsInfo.room !== expectedM1Room) {
+              // นักเรียนสังกัดห้องอื่น (เช่น ม.1/2 มาอยู่ใน ม.1/1) ให้คัดทิ้งทันที
+              continue;
+            }
+            if (/^16\d{3}$/.test(key) && !sgsInfo) {
+              // นักเรียนชั้นอื่นที่หลุดมา ให้คัดทิ้ง
+              continue;
+            }
+            authoritativeList.push(loc);
+          }
+        }
+
+        const { students: normalized } = normalizeRoomRollNumbers(authoritativeList);
         saveLocalStudents(classroomId, normalized);
         return normalized;
       }
