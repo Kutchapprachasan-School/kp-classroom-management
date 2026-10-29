@@ -26,7 +26,7 @@ import {
   Hash,
 } from 'lucide-react';
 import { classroomService } from '../services/classroomService';
-import { studentService, getAlternateRoomKey, type StudentRecord } from '../services/studentService';
+import { studentService, getAlternateRoomKey, parseThaiStudentName, type StudentRecord } from '../services/studentService';
 import { authService } from '../services/authService';
 import { messagingService, STUDENT_TRANSFERRED_EVENT } from '../services/messagingService';
 import type { ClassroomRosterItem, AtRiskStudent } from '../types/viewModels';
@@ -331,35 +331,28 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
   // เปิด Modal แก้ไขข้อมูลส่วนตัวนักเรียน
   const handleOpenEditStudent = (stu: StudentRecord) => {
     setEditingStudent(stu);
-    const parts = (stu.name || '').trim().split(/\s+/);
-    let title = 'ด.ช.';
-    let firstName = parts[0] || '';
-    let lastName = parts.slice(1).join(' ') || '';
 
-    if (parts[0]?.startsWith('ด.ช.') || parts[0]?.startsWith('เด็กชาย')) {
-      title = 'ด.ช.';
-      firstName = parts[0].replace(/^(ด\.ช\.|เด็กชาย)/, '') || parts[1] || '';
-      lastName = parts.slice(parts[0].replace(/^(ด\.ช\.|เด็กชาย)/, '') ? 1 : 2).join(' ');
-    } else if (parts[0]?.startsWith('ด.ญ.') || parts[0]?.startsWith('เด็กหญิง')) {
-      title = 'ด.ญ.';
-      firstName = parts[0].replace(/^(ด\.ญ\.|เด็กหญิง)/, '') || parts[1] || '';
-      lastName = parts.slice(parts[0].replace(/^(ด\.ญ\.|เด็กหญิง)/, '') ? 1 : 2).join(' ');
-    } else if (parts[0]?.startsWith('นาย')) {
-      title = 'นาย';
-      firstName = parts[0].replace(/^นาย/, '') || parts[1] || '';
-      lastName = parts.slice(parts[0].replace(/^นาย/, '') ? 1 : 2).join(' ');
-    } else if (parts[0]?.startsWith('นางสาว') || parts[0]?.startsWith('น.ส.')) {
-      title = 'นางสาว';
-      firstName = parts[0].replace(/^(นางสาว|น\.ส\.)/, '') || parts[1] || '';
-      lastName = parts.slice(parts[0].replace(/^(นางสาว|น\.ส\.)/, '') ? 1 : 2).join(' ');
+    // 1. ตรวจสอบข้อมูลจาก structured fields ที่ส่งมาจากฐานข้อมูลก่อน
+    let title = stu.title || stu.prefix || '';
+    let firstName = stu.firstName || '';
+    let lastName = stu.lastName || '';
+    let gender = stu.gender || 'MALE';
+
+    // 2. หากยังไม่มี ให้ใช้ parseThaiStudentName ถอดจากชื่อเต็มอย่างถูกต้อง
+    if (!title || !firstName) {
+      const parsed = parseThaiStudentName(stu.name || '');
+      if (!title) title = parsed.title;
+      if (!firstName) firstName = parsed.firstName;
+      if (!lastName) lastName = parsed.lastName;
+      if (!stu.gender) gender = parsed.gender;
     }
 
     setEditStudentForm({
-      title,
+      title: title || 'ด.ช.',
       firstName,
       lastName,
       code: stu.code || stu.studentCode || '',
-      gender: stu.gender || (title === 'ด.ญ.' || title === 'นางสาว' ? 'FEMALE' : 'MALE'),
+      gender,
     });
     setIsEditStudentOpen(true);
     setOpenActionMenuId(null);
@@ -1574,13 +1567,24 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
                   <label className="block font-semibold text-slate-700 mb-1">คำนำหน้า</label>
                   <select
                     value={editStudentForm.title}
-                    onChange={(e) => setEditStudentForm({ ...editStudentForm, title: e.target.value })}
+                    onChange={(e) => {
+                      const newTitle = e.target.value;
+                      const isFemale = ['ด.ญ.', 'เด็กหญิง', 'นางสาว', 'น.ส.'].includes(newTitle);
+                      setEditStudentForm({
+                        ...editStudentForm,
+                        title: newTitle,
+                        gender: isFemale ? 'FEMALE' : 'MALE',
+                      });
+                    }}
                     className="w-full px-2.5 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 bg-white"
                   >
                     <option value="ด.ช.">ด.ช.</option>
                     <option value="ด.ญ.">ด.ญ.</option>
                     <option value="นาย">นาย</option>
                     <option value="นางสาว">นางสาว</option>
+                    <option value="น.ส.">น.ส.</option>
+                    <option value="เด็กชาย">เด็กชาย</option>
+                    <option value="เด็กหญิง">เด็กหญิง</option>
                   </select>
                 </div>
                 <div className="col-span-2">

@@ -22,6 +22,10 @@ export interface StudentRecord {
   passwordHash?: string | null;
   isPasswordChanged?: boolean;
   lastLoginAt?: string;
+  title?: string;
+  prefix?: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 const STORAGE_PREFIX = 'cls_students_';
@@ -470,11 +474,13 @@ export function parseThaiStudentName(fullName: string): {
   }
 
   // Normalize Title
-  if (title === 'ด.ช' || title === 'ด.ช.' || title === 'เด็กชาย') title = 'ด.ช.';
-  else if (title === 'ด.ญ' || title === 'ด.ญ.' || title === 'เด็กหญิง') title = 'ด.ญ.';
-  else if (title === 'น.ส.' || title === 'น.ส' || title === 'นางสาว') title = 'นางสาว';
+  if (title === 'ด.ช' || title === 'ด.ช.') title = 'ด.ช.';
+  else if (title === 'ด.ญ' || title === 'ด.ญ.') title = 'ด.ญ.';
+  else if (title === 'น.ส.' || title === 'น.ส') title = 'น.ส.';
+  else if (title === 'เด็กชาย') title = 'เด็กชาย';
+  else if (title === 'เด็กหญิง') title = 'เด็กหญิง';
+  else if (title === 'นางสาว' || title === 'นาง') title = 'นางสาว';
   else if (title === 'นาย') title = 'นาย';
-  else if (title === 'นาง') title = 'นางสาว';
   else title = 'ด.ช.';
 
   const remParts = remaining.split(/\s+/).filter(Boolean);
@@ -752,6 +758,10 @@ export const studentService = {
       no: finalStudentNo,
       code: validated.studentCode,
       name: validated.name,
+      title: parsedName.title,
+      prefix: parsedName.title,
+      firstName: parsedName.firstName,
+      lastName: parsedName.lastName,
       attendance: '0/0',
       score: 0,
       status: validated.status,
@@ -823,10 +833,13 @@ export const studentService = {
         const payload: Record<string, unknown> = { updatedAt: new Date().toISOString() };
         if (updates.name) {
           const parsed = parseThaiStudentName(updates.name);
-          payload.title = parsed.title;
-          payload.firstName = parsed.firstName;
-          payload.lastName = parsed.lastName;
+          payload.title = updates.title || parsed.title;
+          payload.firstName = updates.firstName || parsed.firstName;
+          payload.lastName = updates.lastName || parsed.lastName;
         }
+        if (updates.title) payload.title = updates.title;
+        if (updates.firstName) payload.firstName = updates.firstName;
+        if (updates.lastName) payload.lastName = updates.lastName;
         if (updates.code) payload.studentCode = updates.code;
         if (updates.gender) payload.gender = updates.gender;
         await supabase.from('Student').update(payload).eq('id', id);
@@ -948,6 +961,10 @@ export const studentService = {
 
     const fullName = info.name || `${title || ''} ${firstName || ''} ${lastName || ''}`.trim();
     return this.update(classroomId, studentId, {
+      title,
+      prefix: title,
+      firstName,
+      lastName,
       name: fullName,
       code: info.code,
       gender,
