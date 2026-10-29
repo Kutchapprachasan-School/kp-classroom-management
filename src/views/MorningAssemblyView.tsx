@@ -1108,7 +1108,7 @@ export const MorningAssemblyView: React.FC<MorningAssemblyViewProps> = ({ onDeep
                     {personalStatsStudent.studentName}
                   </h3>
                   <p className="text-xs text-slate-500 font-medium">
-                    รหัสประจำตัว: {personalStatsStudent.studentCode} • ม.3/1
+                    รหัสประจำตัว: {personalStatsStudent.studentCode} • {selectedClassroomName || 'ห้องเรียน'}
                   </p>
                 </div>
               </div>

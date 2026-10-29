@@ -107,7 +107,7 @@ export const StudentAffairsCouncilView: React.FC<
     const updated = studentAffairsCouncilService.addDisciplineLog({
       studentCode: stu.code || stu.id,
       studentName: stu.name,
-      classroom: formatClassroomLabel(stu.classroomId) || 'ม.3/1',
+      classroom: formatClassroomLabel(stu.classroomId) || 'ไม่ระบุห้อง',
       type: newDiscType,
       points: Number(newDiscPoints),
       reason: newDiscReason.trim(),

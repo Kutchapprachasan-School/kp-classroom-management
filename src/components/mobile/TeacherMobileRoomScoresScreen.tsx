@@ -37,7 +37,7 @@ export const TeacherMobileRoomScoresScreen: React.FC<TeacherMobileRoomScoresScre
   onNavigate,
   onBack,
 }) => {
-  const [selectedRoom, setSelectedRoom] = useState<string>('ม.3/1');
+  const [selectedRoom, setSelectedRoom] = useState<string>(DEFAULT_ROOM_OPTIONS[0]);
   const [selectedTerm, setSelectedTerm] = useState<string>('ภาคเรียนที่ 1/2569');
   const [isRoomDropdownOpen, setIsRoomDropdownOpen] = useState(false);
   const [isTermDropdownOpen, setIsTermDropdownOpen] = useState(false);

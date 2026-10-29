@@ -434,7 +434,10 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
                 item.studentName && item.studentName !== item.studentCode
                   ? item.studentName
                   : resolvedStu?.student.name || `นักเรียน (${item.studentCode})`;
-              const displayRoom = item.classroom || (resolvedStu?.classroomId ? formatClassroomLabel(resolvedStu.classroomId) : 'ม.3/1');
+              const displayRoom =
+                (item.classroom && item.classroom !== 'all' ? formatClassroomLabel(item.classroom) : '') ||
+                (resolvedStu?.classroomId ? formatClassroomLabel(resolvedStu.classroomId) : '') ||
+                'ไม่ระบุห้อง';
               const displaySeat = item.seatNo ?? resolvedStu?.student.no ?? idx + 1;
 
               return (

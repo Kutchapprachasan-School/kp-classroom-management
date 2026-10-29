@@ -529,7 +529,7 @@ export const teacherCourseAssignmentService = {
         const nonAllAsgRoom = asg?.targetClassrooms?.find((r) => r && r !== 'ALL');
         const courseDefaultRoom = matchedCourse?.assignedClassrooms?.find((r) => r && r !== 'ALL');
 
-        const realClassroom =
+        let realClassroom =
           foundInService?.classroomId
             ? formatClassroomLabel(foundInService.classroomId)
             : stu?.classroom
@@ -542,7 +542,17 @@ export const teacherCourseAssignmentService = {
                     ? formatClassroomLabel(courseDefaultRoom)
                     : savedMatch?.classroom
                       ? formatClassroomLabel(savedMatch.classroom)
-                      : 'ม.3/1';
+                      : '';
+
+        // การป้องกันขั้นเด็ดขาด: หากห้องที่ได้ตกเป็น ม.3/1 แต่ข้อมูลจริงของนักเรียนชี้ไปห้องอื่น
+        if (
+          (realClassroom === 'ม.3/1' || realClassroom === '3/1') &&
+          foundInService?.classroomId &&
+          !foundInService.classroomId.includes('3-1') &&
+          !foundInService.classroomId.includes('3/1')
+        ) {
+          realClassroom = formatClassroomLabel(foundInService.classroomId);
+        }
 
         const realSeatNo =
           foundInService?.student.no ?? stu?.sgsSeatNo ?? stu?.no ?? savedMatch?.seatNo ?? (idx + 1);

@@ -384,6 +384,33 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
         const misplaced = parsed.filter((s: StudentRecord) => isGrade1SgsStudentCode(s.code || s.id));
         parsed = parsed.filter((s: StudentRecord) => !isGrade1SgsStudentCode(s.code || s.id));
         relocateMisplacedM1Students(misplaced);
+      }
+
+      // ระบบ Self-Healing: ป้องกันห้อง ม.3/1 รับนักเรียนจากระดับชั้นอื่นหรือห้องอื่นมาค้างใน Local Cache
+      const isRoom31 = candidates.some((c) => c.includes('3-1') || c.includes('3/1'));
+      if (isRoom31) {
+        const nonRoom31 = parsed.filter((s) => {
+          const cId = s.classroomId;
+          return cId && !cId.includes('3-1') && !cId.includes('3/1');
+        });
+        if (nonRoom31.length > 0) {
+          parsed = parsed.filter((s) => !nonRoom31.includes(s));
+          // ส่งนักเรียนกลับเข้าสู่แคชห้องจริงทันที
+          nonRoom31.forEach((st) => {
+            if (st.classroomId) {
+              const targetRoom = st.classroomId;
+              try {
+                const rawT = localStorage.getItem(`${STORAGE_PREFIX}${targetRoom}`);
+                const existT: StudentRecord[] = rawT ? JSON.parse(rawT) : [];
+                if (!existT.some((e) => (e.code || e.id) === (st.code || st.id))) {
+                  localStorage.setItem(`${STORAGE_PREFIX}${targetRoom}`, JSON.stringify([...existT, st]));
+                }
+              } catch {
+                // ignore
+              }
+            }
+          });
+        }
       } else if (isGrade1Room) {
         // หาชื่อห้อง ม.1 ที่แท้จริงของห้องนี้ (เช่น ม.1/1)
         let expectedM1Room: string | null = null;
@@ -620,12 +647,53 @@ export const studentService = {
     const cleanCode = String(code || '').trim().replace(/^stu-/, '');
     if (!cleanCode) return null;
 
+    // 0. ตรวจสอบจากฐานข้อมูลทางการของ SGS ม.1 ทันที (Authoritative Lookup)
+    if (isGrade1SgsStudentCode(cleanCode)) {
+      const sgsInfo = getM1SgsStudentInfo(cleanCode);
+      if (sgsInfo) {
+        const targetRoom = sgsInfo.room;
+        const candidates = resolveRoomCandidates(targetRoom);
+        for (const c of candidates) {
+          const list = getLocalStudents(c);
+          const found = list.find((s) => (s.code || s.id) === cleanCode);
+          if (found) {
+            return {
+              student: found,
+              classroomId: targetRoom,
+            };
+          }
+        }
+        return {
+          student: {
+            id: `stu-${cleanCode}`,
+            no: sgsInfo.seatNo,
+            code: cleanCode,
+            name: sgsInfo.name,
+            gender: sgsInfo.name.includes('หญิง') ? 'FEMALE' : 'MALE',
+            attendance: '8/8',
+            score: 0,
+            status: 'NORMAL',
+            classroomId: targetRoom,
+          },
+          classroomId: targetRoom,
+        };
+      }
+    }
+
     const isStudentMatch = (s: StudentRecord) =>
       s &&
       (String(s.code || '').trim() === cleanCode ||
         String(s.studentCode || '').trim() === cleanCode ||
         String(s.id || '').trim() === cleanCode ||
         String(s.id || '').trim() === `stu-${cleanCode}`);
+
+    // Helper: ป้องกันห้อง ม.3/1 ดึงนักเรียนห้องอื่นไปแสดงผิดพลาด
+    const sanitizeFoundRoom = (rawRoom: string, match: StudentRecord): string => {
+      if (match.classroomId && !match.classroomId.includes('3-1') && !match.classroomId.includes('3/1')) {
+        return match.classroomId;
+      }
+      return match.classroomId || rawRoom;
+    };
 
     // 1. ตรวจสอบ keys ทั้งหมดใน localStorage ก่อน
     if (typeof window !== 'undefined') {
@@ -640,9 +708,10 @@ export const studentService = {
                 const match = list.find(isStudentMatch);
                 if (match) {
                   const rawRoom = k.slice(STORAGE_PREFIX.length);
+                  const effectiveRoom = sanitizeFoundRoom(rawRoom, match);
                   return {
                     student: match,
-                    classroomId: match.classroomId || rawRoom,
+                    classroomId: effectiveRoom,
                   };
                 }
               }
@@ -658,9 +727,10 @@ export const studentService = {
     for (const [room, list] of Object.entries(inMemoryStudentCache)) {
       const match = list.find(isStudentMatch);
       if (match) {
+        const effectiveRoom = sanitizeFoundRoom(room, match);
         return {
           student: match,
-          classroomId: match.classroomId || room,
+          classroomId: effectiveRoom,
         };
       }
     }

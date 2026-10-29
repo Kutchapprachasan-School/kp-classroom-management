@@ -62,7 +62,7 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = ({
 }) => {
   const effectiveUser = currentUser || authService.getCurrentUser();
   const studentCode = effectiveUser?.studentCode || '45101';
-  const studentRoom = formatClassroomLabel(effectiveUser?.classroomName || effectiveUser?.classroomId) || 'ม.3/1';
+  const studentRoom = formatClassroomLabel(effectiveUser?.classroomName || effectiveUser?.classroomId) || 'ไม่ระบุห้อง';
   const bellConfig = bellScheduleService.getConfig();
 
   const [quests, setQuests] = useState<StudentQuestItem[]>([]);

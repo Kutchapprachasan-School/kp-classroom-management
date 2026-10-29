@@ -47,7 +47,7 @@ interface StudentArenaViewProps {
 export const StudentArenaView: React.FC<StudentArenaViewProps> = ({ currentUser }) => {
   const effectiveUser = currentUser || authService.getCurrentUser();
   const studentName = effectiveUser?.name || 'นักเรียน';
-  const studentRoom = formatClassroomLabel(effectiveUser?.classroomName || effectiveUser?.classroomId) || 'ม.3/1';
+  const studentRoom = formatClassroomLabel(effectiveUser?.classroomName || effectiveUser?.classroomId) || 'ไม่ระบุห้อง';
   const [streakDays, setStreakDays] = useState<number>(() =>
     gamificationService.getStreak(effectiveUser?.id || '')
   );

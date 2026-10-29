@@ -888,8 +888,10 @@ export const sgsRosterAndSubmissionService = {
     transferDate: string;
     transferredU1Score: number;
     manualNetAccumulatedScore?: number | null;
+    classroomId?: string;
   }): SgsStudentRecord[] {
-    const roster = [...this.getSgsRoster()].sort(
+    const targetRoom = payload.classroomId ? formatClassroomLabel(payload.classroomId) : '';
+    const roster = [...this.getSgsRoster(payload.classroomId)].sort(
       (a, b) => a.sgsSeatNo - b.sgsSeatNo
     );
 
@@ -935,7 +937,7 @@ export const sgsRosterAndSubmissionService = {
       studentName: payload.studentName,
       fullName: payload.studentName,
       gender: payload.gender,
-      classroom: 'ม.3/1',
+      classroom: targetRoom || 'ไม่ระบุห้อง',
       transferState: 'TRANSFERRED_IN',
       transferDate: payload.transferDate,
       transferNote: `ย้ายเข้าใหม่ (${payload.transferDate}) — ${positionLabel}`,

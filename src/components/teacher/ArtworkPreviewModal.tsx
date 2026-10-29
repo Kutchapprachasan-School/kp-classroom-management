@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { sgsRosterAndSubmissionService } from '../../services/sgsRosterAndSubmissionService';
 import { r2StorageService } from '../../services/r2StorageService';
+import { formatClassroomLabel } from '../../services/studentService';
 import {
   resolveSubmissionMedia,
   getOfficeViewerUrls,
@@ -51,7 +52,7 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
   studentName,
   studentCode = '-',
   assignmentId,
-  classroom = 'ม.3/1',
+  classroom = '',
   seatNo = 1,
   type,
   url,
@@ -86,6 +87,7 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
 
   const imagesList = fileUrls && fileUrls.length > 0 ? fileUrls : url ? [url] : [];
   const currentImageUrl = imagesList[activeImageIndex] || url;
+  const displayClassroom = classroom && classroom !== 'all' ? formatClassroomLabel(classroom) : 'ไม่ระบุห้อง';
 
   // Keyboard navigation for multi-image viewing
   useEffect(() => {
@@ -321,7 +323,7 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
               </div>
               <p className="text-xs text-slate-400 truncate">
                 ผู้ส่ง: <span className="text-slate-200 font-bold">{studentName}</span> • เลขที่{' '}
-                {seatNo} • ชั้น {classroom} • รหัส {studentCode}
+                {seatNo} • ชั้น {displayClassroom} • รหัส {studentCode}
               </p>
             </div>
           </div>
@@ -629,7 +631,7 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                         </span>
                       </div>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        ผลงานของ {studentName} (เลขที่ {seatNo} • ชั้น {classroom})
+                        ผลงานของ {studentName} (เลขที่ {seatNo} • ชั้น {displayClassroom})
                       </p>
                     </div>
                   </div>
@@ -865,7 +867,7 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                     </h3>
                     <p className="text-xs text-slate-400">
                       ผลงานของ: <span className="text-teal-300 font-semibold">{studentName}</span> (เลขที่{' '}
-                      {seatNo} • ชั้น {classroom} • รหัส {studentCode})
+                      {seatNo} • ชั้น {displayClassroom} • รหัส {studentCode})
                     </p>
                   </div>
 

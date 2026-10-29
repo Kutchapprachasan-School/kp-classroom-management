@@ -22,7 +22,7 @@ export interface StudentSubmissionUploaderProps {
 export const StudentSubmissionUploader: React.FC<StudentSubmissionUploaderProps> = ({
   onUploadSuccess,
   assignmentId = 'asg-001',
-  classroom = 'm3-1',
+  classroom = '',
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);

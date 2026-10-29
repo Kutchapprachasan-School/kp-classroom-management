@@ -224,8 +224,9 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
       ? currentItem.studentName
       : resolvedStu?.student.name || `นักเรียน (${currentItem?.studentCode})`;
   const resolvedRoom =
-    currentItem?.classroom ||
-    (resolvedStu?.classroomId ? formatClassroomLabel(resolvedStu.classroomId) : 'ม.3/1');
+    (currentItem?.classroom && currentItem.classroom !== 'all' ? formatClassroomLabel(currentItem.classroom) : '') ||
+    (resolvedStu?.classroomId ? formatClassroomLabel(resolvedStu.classroomId) : '') ||
+    'ไม่ระบุห้อง';
   const resolvedSeat = currentItem?.seatNo ?? resolvedStu?.student.no ?? '-';
 
   const resolvedSubjectCode = currentItem.subjectCode || (currentItem as any).courseCode || '';

@@ -31,7 +31,7 @@ export const StudentCouncilAffairsPortalView: React.FC<
   const effectiveUser = currentUser || authService.getCurrentUser();
   const studentCode = effectiveUser?.studentCode || 'STD-001';
   const studentName = effectiveUser?.name || 'นักเรียน';
-  const classroom = formatClassroomLabel(effectiveUser?.classroomName || effectiveUser?.classroomId) || 'ม.3/1';
+  const classroom = formatClassroomLabel(effectiveUser?.classroomName || effectiveUser?.classroomId) || 'ไม่ระบุห้อง';
 
   const disciplineInfo = useMemo(
     () => studentAffairsCouncilService.getStudentDisciplineScore(studentCode),

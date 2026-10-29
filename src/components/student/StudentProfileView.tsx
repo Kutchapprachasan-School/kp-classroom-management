@@ -53,7 +53,7 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
   const settings = schoolSettings || getSchoolSettings();
   const studentName = currentUser?.name || 'นักเรียน';
   const studentCode = currentUser?.studentCode || 'STD-001';
-  const classroomId = currentUser?.classroomName || currentUser?.classroomId || 'ม.3/1';
+  const classroomId = currentUser?.classroomName || currentUser?.classroomId || '';
 
   // Avatar state - loaded from studentService (localStorage/cloud cache prioritized)
   const [currentAvatar, setCurrentAvatar] = useState<string>(() =>

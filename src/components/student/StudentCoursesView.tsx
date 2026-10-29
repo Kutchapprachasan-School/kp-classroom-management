@@ -21,7 +21,7 @@ export const StudentCoursesView: React.FC<StudentCoursesViewProps> = ({
   onSelectCourse,
   currentUser,
 }) => {
-  const studentRoom = formatClassroomLabel(currentUser?.classroomName || currentUser?.classroomId) || 'ม.3/1';
+  const studentRoom = formatClassroomLabel(currentUser?.classroomName || currentUser?.classroomId) || 'ไม่ระบุห้อง';
   const studentCode = currentUser?.studentCode || 'STD-001';
 
   const rosterStudent = sgsRosterAndSubmissionService.getSgsRoster(studentRoom).find((s) => s.studentCode === studentCode) || {

@@ -786,7 +786,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
   // Data for Section C: Assignment Breakdown Matrix (ตารางแจกแจงคะแนนตามงานที่มอบหมาย)
   const matrixClassroom = useMemo(() => {
     if (selectedRoom !== 'ALL') return selectedRoom;
-    return availableFilterRooms[0] || 'ม.3/1';
+    return availableFilterRooms[0] || '';
   }, [selectedRoom, availableFilterRooms]);
 
   const [matrixStudents, setMatrixStudents] = useState<SgsStudentRecord[]>([]);
@@ -2859,8 +2859,9 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                       ? item.studentName
                       : resolvedStu?.student.name || `นักเรียน (${item.studentCode})`;
                   const displayRoom =
-                    item.classroom ||
-                    (resolvedStu?.classroomId ? formatClassroomLabel(resolvedStu.classroomId) : 'ม.3/1');
+                    (item.classroom && item.classroom !== 'all' ? formatClassroomLabel(item.classroom) : '') ||
+                    (resolvedStu?.classroomId ? formatClassroomLabel(resolvedStu.classroomId) : '') ||
+                    'ไม่ระบุห้อง';
                   const displaySeat = item.seatNo ?? resolvedStu?.student.no ?? '-';
 
                   // ตรวจสอบข้อมูลคะแนนก่อนกลางภาคของชิ้นงานและนักเรียนคนนี้

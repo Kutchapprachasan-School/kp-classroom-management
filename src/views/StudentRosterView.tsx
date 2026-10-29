@@ -987,7 +987,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
             </div>
             <div>
               <h4 className="font-bold text-amber-950 text-sm sm:text-base flex items-center gap-2">
-                ตรวจพบนักเรียนชั้น ม.1 จำนวน {misplacedM1Students.length} คน อยู่ในห้อง {selectedClass?.name || 'ม.3/1'}
+                ตรวจพบนักเรียนชั้น ม.1 จำนวน {misplacedM1Students.length} คน อยู่ในห้อง {selectedClass?.name || 'ห้องเรียน'}
                 <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-200/80 text-amber-900 border border-amber-300">
                   จากการนำเข้าครั้งก่อน
                 </span>

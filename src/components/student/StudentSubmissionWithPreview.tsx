@@ -24,7 +24,7 @@ export interface StudentSubmissionWithPreviewProps {
 export const StudentSubmissionWithPreview: React.FC<StudentSubmissionWithPreviewProps> = ({
   onUploadSuccess,
   assignmentId = 'asg-001',
-  classroom = 'm3-1',
+  classroom = '',
   academicYearTerm = 'ภาคเรียนที่-2-2569',
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);

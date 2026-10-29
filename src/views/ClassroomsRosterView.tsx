@@ -907,10 +907,10 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
         subtitle={
           viewMode === 'CLASSROOMS_TABLE'
             ? 'การจัดการโครงสร้างห้องเรียน ครูที่ปรึกษา และบัญชีรายชื่อนักเรียน (ระบบฐานข้อมูลกลาง)'
-            : `บัญชีรายชื่อนักเรียน ห้อง ${selectedClass?.name || 'ม.3/1'} (ครูที่ปรึกษา: ${selectedClass?.adviser || 'ยังไม่ได้กำหนด'})`
+            : `บัญชีรายชื่อนักเรียน ห้อง ${selectedClass?.name || 'ห้องเรียน'} (ครูที่ปรึกษา: ${selectedClass?.adviser || 'ยังไม่ได้กำหนด'})`
         }
         icon={<GraduationCap className="w-8 h-8 text-blue-600" />}
-        badgeText={viewMode === 'CLASSROOMS_TABLE' ? `${allClassrooms.length} ห้องเรียน` : selectedClass?.name || 'ม.3/1'}
+        badgeText={viewMode === 'CLASSROOMS_TABLE' ? `${allClassrooms.length} ห้องเรียน` : selectedClass?.name || 'ห้องเรียน'}
         quoteText="การศึกษา คือการเปิดโลกให้กับนักเรียน"
       />
 
@@ -2127,7 +2127,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
               <div className="flex-1 min-w-0">
                 <div className="font-bold text-slate-800 text-sm truncate">{transferringStudent.name}</div>
                 <div className="text-xs text-slate-500 font-mono">
-                  รหัส {transferringStudent.code || transferringStudent.studentCode} • ห้องเดิม: {selectedClass?.name || 'ม.3/1'}
+                  รหัส {transferringStudent.code || transferringStudent.studentCode} • ห้องเดิม: {selectedClass?.name || 'ห้องเรียน'}
                 </div>
               </div>
             </div>

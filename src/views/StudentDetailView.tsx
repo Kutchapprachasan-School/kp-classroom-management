@@ -99,11 +99,11 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({
       );
       if (match) return match;
     }
-    return allClassrooms.find((c) => c.roomNumber === 'ม.3/1') || allClassrooms[0] || {
-      id: 'room-3-1',
-      name: 'ม.3/1',
-      level: 'ม.3',
-      roomNumber: 'ม.3/1',
+    return allClassrooms[0] || {
+      id: '',
+      name: 'ไม่ระบุห้อง',
+      level: '',
+      roomNumber: 'ไม่ระบุห้อง',
       studentCount: 0,
       adviser: 'ครูที่ปรึกษา',
     };

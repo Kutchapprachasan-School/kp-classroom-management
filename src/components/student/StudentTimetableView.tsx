@@ -26,7 +26,7 @@ export const StudentTimetableView: React.FC<StudentTimetableViewProps> = ({
   currentUser,
 }) => {
   const [selectedDay, setSelectedDay] = useState<'MON' | 'TUE' | 'WED' | 'THU' | 'FRI'>('MON');
-  const studentRoom = formatClassroomLabel(currentUser?.classroomName || currentUser?.classroomId) || 'ม.3/1';
+  const studentRoom = formatClassroomLabel(currentUser?.classroomName || currentUser?.classroomId) || 'ไม่ระบุห้อง';
   const isClean = cleanSlateService.isCleanSlateActive();
 
   // Load configured timeline from bell schedule service

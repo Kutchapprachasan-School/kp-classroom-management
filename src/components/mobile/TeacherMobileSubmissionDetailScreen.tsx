@@ -10,6 +10,7 @@ import {
   Edit3,
 } from 'lucide-react';
 import type { TeacherViewKey } from '../layout/TeacherSidebar';
+import { formatClassroomLabel } from '../../services/studentService';
 
 interface TeacherMobileSubmissionDetailScreenProps {
   onBack?: () => void;
@@ -34,7 +35,7 @@ export const TeacherMobileSubmissionDetailScreen: React.FC<
   onBack,
   onNavigate,
   studentName = 'ด.ญ.กมลวรรณ แก้วใส',
-  studentRoom = 'ม.3/1',
+  studentRoom = '',
   seatNumber = 5,
   assignmentTitle = 'ใบงานที่ 5: ศิลปะร่วมสมัยไทย (กิจกรรมสีฟ้า)',
   subjectCode = 'ญ31201',
@@ -97,7 +98,7 @@ export const TeacherMobileSubmissionDetailScreen: React.FC<
             {studentName}
           </h2>
           <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-            {studentRoom} เลขที่ {seatNumber}
+            {studentRoom ? formatClassroomLabel(studentRoom) : 'ไม่ระบุห้อง'} เลขที่ {seatNumber}
           </p>
         </div>
       </div>

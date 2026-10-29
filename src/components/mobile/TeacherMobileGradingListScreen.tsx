@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import type { TeacherViewKey } from '../layout/TeacherSidebar';
 import { cleanSlateService } from '../../services/cleanSlateService';
+import { formatClassroomLabel } from '../../services/studentService';
 
 export interface MobileGradingAssignmentItem {
   id: string;
@@ -46,7 +47,7 @@ export const TeacherMobileGradingListScreen: React.FC<
       if (!Array.isArray(parsed)) return [];
       return parsed.map((a: any) => ({
         id: a.id,
-        classroom: a.classroomId || 'ม.3/1',
+        classroom: a.classroomId ? formatClassroomLabel(a.classroomId) : 'ไม่ระบุห้อง',
         subjectCode: a.subjectCode || 'ญ31201',
         subjectName: a.subjectName || 'ภาษาญี่ปุ่น',
         unitTitle: a.title || 'ใบงานใหม่',

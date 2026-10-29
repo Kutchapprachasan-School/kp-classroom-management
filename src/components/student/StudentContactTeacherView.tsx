@@ -20,7 +20,7 @@ export const StudentContactTeacherView: React.FC<StudentContactTeacherViewProps>
 }) => {
   const [activeTab, setActiveTab] = useState<'CHAT' | 'DIRECTORY'>('CHAT');
   const settings = schoolSettings || getSchoolSettings();
-  const studentRoom = formatClassroomLabel(currentUser?.classroomName || currentUser?.classroomId) || 'ม.3/1';
+  const studentRoom = formatClassroomLabel(currentUser?.classroomName || currentUser?.classroomId) || 'ไม่ระบุห้อง';
 
   // Find homeroom advisor
   const rooms = classroomService.getClassroomsSync();

@@ -29,7 +29,7 @@ export const MobileVerticalAttendanceSheet: React.FC<
   MobileVerticalAttendanceSheetProps
 > = ({
   defaultRoom = 'ม.2/1',
-  availableRooms = ['ม.2/1', 'ม.3/1', 'ม.1/8'],
+  availableRooms = ['ม.2/1', 'ม.3/1', 'ม.1/1'],
   activityLine,
   dateLine = 'ประจำวันจันทร์ ที่ 28 กันยายน 2569',
   defaultStatus = 'PRESENT',

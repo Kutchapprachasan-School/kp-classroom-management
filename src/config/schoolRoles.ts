@@ -494,10 +494,10 @@ export function authenticateSmsUnifiedUser(inputUsername: string): SmsUserAccoun
       passwordOrPin: '2510',
       fullName: isCouncil
         ? `น.ส. พิมพ์ชนก วงศ์สวัสดิ์ (รหัส ${clean})`
-        : `ด.ช. ทัตธน คำฝั้น (รหัส ${clean})`,
+        : `นักเรียน (รหัส ${clean})`,
       role: isCouncil ? 'STUDENT_COUNCIL' : 'STUDENT_GENERAL',
-      departmentOrClass: isCouncil ? 'คณะกรรมการสภานักเรียน • ม.5/1' : 'นักเรียนชั้น ม.3/1',
-      positionTitle: isCouncil ? 'กรรมการสภานักเรียน' : 'นักเรียนทั่วไป',
+      departmentOrClass: isCouncil ? 'คณะกรรมการสภานักเรียน • ม.5/1' : 'นักเรียน',
+      positionTitle: isCouncil ? 'กรรมการสภานักเรียน' : 'นักเรียน',
       smsGroup: 'STUDENT',
       smsSynced: true,
     };
@@ -590,12 +590,12 @@ export const SCHOOL_ROLE_PROFILES: Record<SchoolUserRole, SchoolRoleProfile> = {
     role: 'STUDENT_GENERAL',
     shortLabel: 'นักเรียนทั่วไป',
     title: 'นักเรียนทั่วไป (โรงเรียนกุดจับประชาสรรค์)',
-    badgeText: 'นักเรียน ม.3/1',
+    badgeText: 'นักเรียนทั่วไป',
     badgeColor: 'bg-emerald-600 text-white',
     userName: 'ด.ช. ทัตธน คำฝั้น',
-    userPosition: 'นักเรียนชั้นมัธยมศึกษาปีที่ 3/1 • เลขที่ 15',
+    userPosition: 'นักเรียน • โรงเรียนกุดจับประชาสรรค์',
     emailOrCode: '45102',
-    department: 'ชั้นมัธยมศึกษาปีที่ 3/1 • รร.กุดจับประชาสรรค์',
+    department: 'นักเรียน • รร.กุดจับประชาสรรค์',
     defaultView: 'student-portal',
     description:
       'ส่งการบ้าน/ชิ้นงาน (อัปโหลดรูป/PDF ขึ้น R2 หรือแนบลิงก์ Canva) ตรวจสอบคะแนน/เวลาเรียน ยื่นใบลา กรอกข้อมูลเยี่ยมบ้าน กสศ. และลงคะแนนเลือกตั้งสภานักเรียน',
