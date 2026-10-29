@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 29/10/2569 10:59:41 | รวมทั้งหมด 242 ไฟล์*
+*อัปเดตล่าสุด: 29/10/2569 11:21:33 | รวมทั้งหมด 242 ไฟล์*
 
 ---
 
@@ -17,7 +17,7 @@
 | [src/views/AssignmentManagementView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/AssignmentManagementView.tsx) | 5478 | `QuickFilterMode` (L68), `AssignmentManagementView` (L83) |
 | [src/views/ClassroomAttendanceView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomAttendanceView.tsx) | 1885 | `ClassroomAttendanceViewProps` (L56), `TeacherCourseOption` (L61), `ClassroomAttendanceView` (L85) |
 | [src/views/ClassroomManagementView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomManagementView.tsx) | 1523 | `ImportPreviewRow` (L51), `ClassroomManagementView` (L63) |
-| [src/views/ClassroomsRosterView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomsRosterView.tsx) | 2167 | `ClassroomsRosterView` (L64) |
+| [src/views/ClassroomsRosterView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomsRosterView.tsx) | 2203 | `ClassroomsRosterView` (L64) |
 | [src/views/CoursesCurriculumView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/CoursesCurriculumView.tsx) | 2112 | `CoursesCurriculumViewProps` (L39), `CoursesCurriculumView` (L43) |
 | [src/views/CrossClassSarView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/CrossClassSarView.tsx) | 1627 | `CrossClassSarView` (L79) |
 | [src/views/EndTermReadinessView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/EndTermReadinessView.tsx) | 1192 | `EndTermReadinessViewProps` (L32), `StudentWithGrades` (L36), `EndTermReadinessView` (L66) |
@@ -37,7 +37,7 @@
 | [src/views/StudentAffairsCouncilView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentAffairsCouncilView.tsx) | 875 | `StudentAffairsCouncilView` (L38) |
 | [src/views/StudentArenaView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentArenaView.tsx) | 457 | `StudentArenaView` (L47) |
 | [src/views/StudentCouncilAffairsPortalView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentCouncilAffairsPortalView.tsx) | 505 | `StudentCouncilAffairsPortalView` (L28) |
-| [src/views/StudentDetailView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentDetailView.tsx) | 607 | `StudentDetailView` (L33) |
+| [src/views/StudentDetailView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentDetailView.tsx) | 672 | `StudentDetailView` (L35) |
 | [src/views/StudentGachaView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentGachaView.tsx) | 1292 | `StudentGachaView` (L32) |
 | [src/views/StudentGradebookView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentGradebookView.tsx) | 1294 | `StudentGradebookView` (L82) |
 | [src/views/StudentHomeVisitFormView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentHomeVisitFormView.tsx) | 584 | `StudentHomeVisitFormView` (L28) |
@@ -202,7 +202,7 @@
 | [src/services/bellScheduleService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/bellScheduleService.ts) | 345 | `SchoolBellScheduleConfig` (L8), `BELL_SCHEDULE_STORAGE_KEY` (L19), `BELL_SCHEDULE_UPDATED_EVENT` (L20), `DEFAULT_BELL_SCHEDULE_CONFIG` (L22), `BellScheduleTimelineItem` (L33), `addMinutesToTimeStr` (L45), `calculateMinutesDifference` (L54), `generateBellScheduleTimeline` (L62), `bellScheduleService` (L344) |
 | [src/services/calendarEventStorageService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/calendarEventStorageService.ts) | 372 | `CALENDAR_EVENTS_STORAGE_KEY` (L19), `MATRIX_STORAGE_KEY` (L20), `MATRIX_SLOTS_UPDATED_EVENT` (L21), `getMatrixStorageKey` (L26), `CalendarLegendColor` (L31), `CalendarEventItem` (L33), `INITIAL_OCTOBER_EVENTS` (L55), `parseThaiDateString` (L57), `convertHolidayToCalendarEvent` (L84), `convertMakeupDayToCalendarEvent` (L105) *(+1 รายการ)* |
 | [src/services/chatBackendService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/chatBackendService.ts) | 268 | `ChatRoomType` (L8), `ChatMessageType` (L9), `ChatRoomSummary` (L11), `ChatAttachmentMeta` (L29), `ChatMessageRecord` (L39), `FetchMessagesResponse` (L53), `SendMessagePayload` (L59), `chatBackendService` (L97) |
-| [src/services/classroomService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts) | 893 | `getDeletedRoomsSet` (L10), `saveDeletedRoomsSet` (L25), `getLocalClassrooms` (L36), `TeacherAccountItem` (L102), `DEFAULT_TEACHER_ACCOUNTS` (L112), `INITIAL_SEED_CLASSROOMS` (L114), `invalidateClassroomCache` (L172), `classroomService` (L179) |
+| [src/services/classroomService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts) | 914 | `getDeletedRoomsSet` (L10), `saveDeletedRoomsSet` (L25), `getLocalClassrooms` (L36), `TeacherAccountItem` (L109), `DEFAULT_TEACHER_ACCOUNTS` (L119), `INITIAL_SEED_CLASSROOMS` (L121), `invalidateClassroomCache` (L177), `classroomService` (L184) |
 | [src/services/cleanSlateService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/cleanSlateService.ts) | 211 | `CleanSlatePurgeResult` (L5), `TRANSACTIONAL_STORAGE_KEYS` (L16), `PRESERVED_INFRASTRUCTURE_KEYS` (L61), `cleanSlateService` (L210) |
 | [src/services/cloudDataService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/cloudDataService.ts) | 1235 | `CloudStoreRecord` (L8), `CloudSyncState` (L14), `cloudDataService` (L707), `FileValidationResult` (L709), `MAX_IMAGE_SIZE_MB` (L717), `MAX_DOC_SIZE_MB` (L718), `MAX_MEDIA_SIZE_MB` (L719), `ALLOWED_IMAGE_EXTENSIONS` (L722), `ALLOWED_DOC_EXTENSIONS` (L735), `ALLOWED_MEDIA_EXTENSIONS` (L762) *(+8 รายการ)* |
 | [src/services/coursesCurriculumService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/coursesCurriculumService.ts) | 871 | `MediaType` (L12), `UnitMediaItem` (L14), `CurriculumUnit` (L28), `CourseCurriculumRecord` (L40), `TrashMediaItem` (L57), `calculatePeriodsPerWeek` (L76), `inferGradeLevelFromCourseCode` (L95), `coursesCurriculumService` (L869) |
@@ -241,7 +241,7 @@
 | [src/services/studentLifecycleService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentLifecycleService.ts) | 879 | `StudentLifecycleStatus` (L18), `StudentAccountAccessStatus` (L28), `StudentLifecycleReasonCode` (L33), `StudentLifecycleMeta` (L48), `StudentLifecycleTransitionInput` (L70), `UnifiedStudentUserRecord` (L90), `LIFECYCLE_STATUS_CONFIG` (L112), `LIFECYCLE_REASON_OPTIONS` (L198), `STUDENT_LIFECYCLE_UPDATED_EVENT` (L271), `canManageSystemAdminSettings` (L276) *(+6 รายการ)* |
 | [src/services/studentPromotionService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentPromotionService.ts) | 290 | `PromotionAction` (L6), `StudentPromotionTransition` (L8), `ClassroomMappingRule` (L22), `PromotionDryRunResult` (L30), `ExecutePromotionRpcResponse` (L43), `RollbackPromotionRpcResponse` (L51), `PromotionBatchHistoryItem` (L60), `studentPromotionService` (L78) |
 | [src/services/studentPurgeService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentPurgeService.ts) | 37 | `PurgeStudentRpcResponse` (L5), `studentPurgeService` (L14) |
-| [src/services/studentService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts) | 1177 | `StudentRecord` (L10), `defaultStudents` (L33), `mockStudentsByRoom` (L36), `getAlternateRoomKey` (L40), `registerClassroomNames` (L63), `formatClassroomLabel` (L80), `parseGradeAndRoom` (L191), `normalizeRoomRollNumbers` (L216), `parseThaiStudentName` (L442), `BatchImportProgress` (L493) *(+2 รายการ)* |
+| [src/services/studentService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/studentService.ts) | 1183 | `StudentRecord` (L10), `defaultStudents` (L33), `mockStudentsByRoom` (L36), `getAlternateRoomKey` (L40), `registerClassroomNames` (L63), `formatClassroomLabel` (L80), `parseGradeAndRoom` (L191), `normalizeRoomRollNumbers` (L216), `parseThaiStudentName` (L448), `BatchImportProgress` (L499) *(+2 รายการ)* |
 | [src/services/teacherBannerService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/teacherBannerService.ts) | 294 | `TeacherBannerKey` (L7), `TeacherBannerItem` (L9), `TEACHER_BANNERS_EVENT` (L29), `DEFAULT_TEACHER_BANNERS` (L31), `teacherBannerService` (L85) |
 | [src/services/teacherCalendarTodoService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/teacherCalendarTodoService.ts) | 448 | `DayWorkStatus` (L3), `DayTaskDetail` (L5), `CalendarDayStatus` (L17), `DailyTodoItem` (L30), `UpcomingMilestone` (L45), `teacherCalendarTodoService` (L85) |
 | [src/services/teacherCopilotService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/teacherCopilotService.ts) | 811 | `TimeOfDayScenario` (L19), `UrgentPriorityLevel` (L25), `DeepLinkTargetView` (L27), `CrossViewNavigationPayload` (L47), `UrgentTriageItem` (L58), `DailyStepItem` (L74), `GrillMeRoundRecord` (L86), `GRILL_ME_8_ROUNDS_LOG` (L137), `teacherCopilotService` (L293) |
@@ -283,13 +283,13 @@
 
 | ไฟล์ (File Path) | จำนวนบรรทัด | สัญลักษณ์หลัก & ช่วงบรรทัด (Key Exports & Line Numbers) |
 | :--- | :---: | :--- |
-| [src/types/viewModels.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/types/viewModels.ts) | 237 | `AtRiskStudent` (L5), `IncompleteGradingItem` (L17), `LowestAssignmentItem` (L25), `GradeDistributionItem` (L32), `RadarDimensionMetric` (L38), `StudentProfileDetail` (L45), `StudentQuestItem` (L64), `SarCourseSummary` (L75), `SarGradeMatrixRow` (L88), `TeachingClassSummary` (L107) *(+10 รายการ)* |
+| [src/types/viewModels.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/types/viewModels.ts) | 241 | `AtRiskStudent` (L5), `IncompleteGradingItem` (L21), `LowestAssignmentItem` (L29), `GradeDistributionItem` (L36), `RadarDimensionMetric` (L42), `StudentProfileDetail` (L49), `StudentQuestItem` (L68), `SarCourseSummary` (L79), `SarGradeMatrixRow` (L92), `TeachingClassSummary` (L111) *(+10 รายการ)* |
 
 ## Other
 
 | ไฟล์ (File Path) | จำนวนบรรทัด | สัญลักษณ์หลัก & ช่วงบรรทัด (Key Exports & Line Numbers) |
 | :--- | :---: | :--- |
-| [src/App.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/App.tsx) | 1041 | `App` (L87) |
+| [src/App.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/App.tsx) | 1048 | `App` (L87) |
 | [src/hooks/useClassroomChat.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/hooks/useClassroomChat.ts) | 69 | `useClassroomChat` (L10) |
 | [src/hooks/useOptimisticRewards.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/hooks/useOptimisticRewards.ts) | 461 | `SyncStatus` (L7), `RewardBatch` (L9), `OfflineQueueItem` (L23), `applyDirectGachaStateUpdate` (L35), `useOptimisticRewards` (L83) |
 | [src/lib/chatIndexedDb.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/lib/chatIndexedDb.ts) | 240 | `ChatRoomType` (L3), `ChatMessageType` (L4), `ChatDeliveryStatus` (L5), `ChatAttachmentMeta` (L7), `ChatActionPayload` (L18), `ChatRoomSummary` (L32), `ChatMessageItem` (L50), `OutboxEntry` (L66), 📌 *ROOMS* (L130), 📌 *MESSAGES* (L157) *(+2 รายการ)* |

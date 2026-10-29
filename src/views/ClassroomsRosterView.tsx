@@ -209,6 +209,28 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
     return () => window.removeEventListener(STUDENT_TRANSFERRED_EVENT, handleTransferred);
   }, [loadClassrooms, selectedClass, loadStudentsForClass]);
 
+  // ซิงค์รูปภาพโปรไฟล์นักเรียนแบบเรียลไทม์
+  useEffect(() => {
+    const handleAvatarUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<{ studentCode: string; avatarUrl: string }>;
+      const { studentCode, avatarUrl } = customEvent.detail || {};
+      if (!studentCode) return;
+      const cleanTarget = String(studentCode).trim().replace(/^stu-/, '');
+      setStudents((prev) =>
+        prev.map((s) => {
+          const sCode = String(s.code || s.studentCode || '').trim();
+          const sId = String(s.id || '').trim().replace(/^stu-/, '');
+          if (sCode === cleanTarget || sId === cleanTarget) {
+            return { ...s, avatarUrl };
+          }
+          return s;
+        })
+      );
+    };
+    window.addEventListener('kps-student-avatar-updated', handleAvatarUpdated);
+    return () => window.removeEventListener('kps-student-avatar-updated', handleAvatarUpdated);
+  }, []);
+
   // ปิด Action menu เมื่อคลิกนอกเมนู
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -1415,41 +1437,55 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
 
                         {/* ชื่อ - นามสกุล */}
                         <td className="py-2.5 px-4">
-                          <div
-                            onClick={() =>
-                              onSelectStudent({
-                                enrollmentId: stu.id,
-                                studentNo: stu.no,
-                                name: stu.name,
-                                tags: [
-                                  {
-                                    text: stu.status === 'AT_RISK' ? 'กลุ่มเสี่ยง' : 'ปกติ',
-                                    type: stu.status === 'AT_RISK' ? 'danger' : 'info',
-                                  },
-                                ],
-                                attendanceRatio: stu.attendance || '8/8',
-                                totalScore: stu.score || 80,
-                              })
-                            }
-                            className="flex items-center gap-2.5 cursor-pointer group/name hover:text-blue-600 transition-colors"
-                            title="คลิกที่ชื่อนักเรียนเพื่อดู Radar Chart 5 มิติ"
-                          >
-                            <img
-                              src={
-                                stu.gender === 'FEMALE'
-                                  ? '/images/banners/student-avatar-girl.png'
-                                  : '/images/banners/student-avatar.png'
-                              }
-                              alt={stu.name}
-                              className="w-7 h-7 rounded-full object-cover border border-slate-200"
-                              onError={(e) => {
-                                (e.currentTarget as HTMLImageElement).src = '/images/banners/student-avatar.png';
-                              }}
-                            />
-                            <span className="font-bold text-slate-900 group-hover/name:text-blue-600 group-hover/name:underline underline-offset-2 transition-colors">
-                              {stu.name}
-                            </span>
-                          </div>
+                          {(() => {
+                            const defaultAvatar =
+                              stu.gender === 'FEMALE'
+                                ? '/images/banners/student-avatar-girl.png'
+                                : '/images/banners/student-avatar.png';
+                            const studentAvatar =
+                              stu.avatarUrl ||
+                              studentService.getStudentAvatar(
+                                stu.code || stu.studentCode || stu.id,
+                                defaultAvatar
+                              );
+                            return (
+                              <div
+                                onClick={() =>
+                                  onSelectStudent({
+                                    enrollmentId: stu.id,
+                                    studentNo: stu.no,
+                                    name: stu.name,
+                                    code: stu.code || stu.studentCode,
+                                    studentCode: stu.code || stu.studentCode,
+                                    gender: stu.gender,
+                                    avatarUrl: studentAvatar,
+                                    tags: [
+                                      {
+                                        text: stu.status === 'AT_RISK' ? 'กลุ่มเสี่ยง' : 'ปกติ',
+                                        type: stu.status === 'AT_RISK' ? 'danger' : 'info',
+                                      },
+                                    ],
+                                    attendanceRatio: stu.attendance || '8/8',
+                                    totalScore: stu.score || 80,
+                                  })
+                                }
+                                className="flex items-center gap-2.5 cursor-pointer group/name hover:text-blue-600 transition-colors"
+                                title="คลิกที่ชื่อนักเรียนเพื่อดู Radar Chart 5 มิติ"
+                              >
+                                <img
+                                  src={studentAvatar}
+                                  alt={stu.name}
+                                  className="w-7 h-7 rounded-full object-cover border border-slate-200 shrink-0"
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLImageElement).src = defaultAvatar;
+                                  }}
+                                />
+                                <span className="font-bold text-slate-900 group-hover/name:text-blue-600 group-hover/name:underline underline-offset-2 transition-colors">
+                                  {stu.name}
+                                </span>
+                              </div>
+                            );
+                          })()}
                         </td>
 
                         {/* เพศ */}

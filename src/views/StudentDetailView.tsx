@@ -23,14 +23,21 @@ import {
   KeyRound,
 } from 'lucide-react';
 import { authService } from '../services/authService';
+import type { AtRiskStudent } from '../types/viewModels';
 
 interface StudentDetailViewProps {
   studentCode?: string;
+  initialStudent?: AtRiskStudent | null;
   onOpenHomeVisit?: () => void;
   onBack?: () => void;
 }
 
-export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ studentCode, onOpenHomeVisit, onBack }) => {
+export const StudentDetailView: React.FC<StudentDetailViewProps> = ({
+  studentCode,
+  initialStudent,
+  onOpenHomeVisit,
+  onBack,
+}) => {
   const [visitRecord, setVisitRecord] = useState<HomeVisitRecord | null>(null);
   const [allClassrooms, setAllClassrooms] = useState<ClassroomRosterItem[]>(() => classroomService.getClassroomsSync());
 
@@ -40,12 +47,30 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ studentCod
     });
   }, []);
 
-  const targetCode = studentCode || '';
+  const targetCode = (
+    studentCode ||
+    initialStudent?.code ||
+    initialStudent?.studentCode ||
+    initialStudent?.enrollmentId ||
+    ''
+  ).trim();
   const found = targetCode ? studentService.findStudentByCode(targetCode) : null;
   const currentStudent = found?.student;
   const currentClassroomId = found?.classroomId;
-  const studentName = currentStudent?.name || (targetCode ? `นักเรียนรหัส ${targetCode}` : 'ไม่พบข้อมูลนักเรียน');
-  const studentNo = currentStudent?.no || 1;
+  const studentName =
+    currentStudent?.name ||
+    initialStudent?.name ||
+    (targetCode ? `นักเรียนรหัส ${targetCode}` : 'ไม่พบข้อมูลนักเรียน');
+  const studentNo = currentStudent?.no || initialStudent?.studentNo || 1;
+  const studentGender = currentStudent?.gender || initialStudent?.gender;
+  const defaultAvatar =
+    studentGender === 'FEMALE'
+      ? '/images/banners/student-avatar-girl.png'
+      : '/images/banners/student-avatar.png';
+  const studentAvatarUrl =
+    currentStudent?.avatarUrl ||
+    initialStudent?.avatarUrl ||
+    studentService.getStudentAvatar(targetCode, defaultAvatar);
 
   const resolveCurrentRoom = (): ClassroomRosterItem => {
     if (currentClassroomId) {
@@ -77,8 +102,28 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ studentCod
   const [transferReason, setTransferReason] = useState('');
   const [transferSuccessNotice, setTransferSuccessNotice] = useState<string | null>(null);
 
+  const scoreValue =
+    currentStudent?.score != null
+      ? Math.min(100, Math.round(currentStudent.score * 10))
+      : initialStudent?.totalScore != null
+      ? Math.min(100, Math.round(initialStudent.totalScore))
+      : 0;
+
+  let attendancePct = 0;
+  const rawAtt = currentStudent?.attendance || initialStudent?.attendanceRatio;
+  if (rawAtt) {
+    if (rawAtt.includes('/')) {
+      const parts = rawAtt.split('/');
+      const num = parseFloat(parts[0]);
+      const den = parseFloat(parts[1]);
+      if (den > 0) attendancePct = Math.round((num / den) * 100);
+    } else if (rawAtt.includes('%')) {
+      attendancePct = parseFloat(rawAtt) || 0;
+    }
+  }
+
   const dynamicProfile: StudentProfileDetail = {
-    id: currentStudent?.id || (targetCode ? `stu-${targetCode}` : 'unknown'),
+    id: currentStudent?.id || initialStudent?.enrollmentId || (targetCode ? `stu-${targetCode}` : 'unknown'),
     name: studentName,
     studentNo: studentNo,
     classroomName: currentRoomName,
@@ -86,10 +131,20 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ studentCod
     subjectName: 'ดนตรีปฏิบัติตามความถนัด 1',
     peerCount: currentRoom.studentCount || 0,
     radarMetrics: [
-      { dimension: 'คะแนนเก็บ', studentScore: currentStudent?.score ? Math.min(100, Math.round(currentStudent.score * 10)) : 0, classAverage: 0, diff: 0 },
+      {
+        dimension: 'คะแนนเก็บ',
+        studentScore: scoreValue,
+        classAverage: scoreValue > 0 ? 70 : 0,
+        diff: scoreValue > 0 ? scoreValue - 70 : 0,
+      },
       { dimension: 'คะแนนสอบ', studentScore: 0, classAverage: 0, diff: 0 },
       { dimension: 'ส่งงานตรงเวลา', studentScore: 0, classAverage: 0, diff: 0 },
-      { dimension: 'เวลาเรียน', studentScore: 0, classAverage: 0, diff: 0 },
+      {
+        dimension: 'เวลาเรียน',
+        studentScore: attendancePct,
+        classAverage: attendancePct > 0 ? 80 : 0,
+        diff: attendancePct > 0 ? attendancePct - 80 : 0,
+      },
       { dimension: 'พฤติกรรม', studentScore: 0, classAverage: 0, diff: 0 },
     ],
     weakestPoint: { dimension: '-', diff: 0 },
@@ -203,9 +258,19 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ studentCod
 
       {/* Student Profile Quick Action Bar */}
       <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-sm">
-            #{dynamicProfile.studentNo}
+        <div className="flex items-center gap-3.5">
+          <div className="relative shrink-0">
+            <img
+              src={studentAvatarUrl}
+              alt={dynamicProfile.name}
+              className="w-12 h-12 rounded-2xl object-cover border-2 border-slate-100 shadow-2xs"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = defaultAvatar;
+              }}
+            />
+            <span className="absolute -bottom-1 -right-1 px-1.5 py-0.5 rounded-full bg-blue-600 text-white font-bold text-[10px] shadow-2xs">
+              #{dynamicProfile.studentNo}
+            </span>
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -217,7 +282,7 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ studentCod
               </span>
             </div>
             <p className="text-xs text-slate-500 font-mono">
-              รหัสนักเรียน: {targetCode} • รายวิชา: {dynamicProfile.subjectCode} {dynamicProfile.subjectName}
+              รหัสนักเรียน: {targetCode || '-'} • รายวิชา: {dynamicProfile.subjectCode} {dynamicProfile.subjectName}
             </p>
           </div>
         </div>

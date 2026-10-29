@@ -6,6 +6,10 @@ export interface AtRiskStudent {
   enrollmentId: string;
   studentNo: number; // เลขที่ เช่น 10
   name: string; // เช่น ด.ช. อัศวิน วนเกษตรกุล
+  code?: string;
+  studentCode?: string;
+  gender?: 'MALE' | 'FEMALE';
+  avatarUrl?: string;
   tags: Array<{
     text: string;
     type: 'danger' | 'warning' | 'info';

@@ -347,7 +347,7 @@ export const StudentAffairsCouncilView: React.FC<
                 ) : (
                   <MobileVerticalAttendanceSheet
                     defaultRoom="ม.3/1"
-                    availableRooms={['ม.3/1', 'ม.3/2', 'ม.2/1', 'ม.1/8']}
+                    availableRooms={['ม.3/1', 'ม.3/2', 'ม.2/1', 'ม.1/1']}
                     activityLine="การเช็คชื่อตอนเช้า กิจกรรมหน้าเสาธง (ห้องที่ปรึกษา ม.3/1)"
                     dateLine="ประจำวันจันทร์ ที่ 28 กันยายน 2569"
                     defaultStatus="ABSENT"
@@ -515,7 +515,7 @@ export const StudentAffairsCouncilView: React.FC<
                       className="text-xs font-semibold px-2 py-1 rounded-lg border border-slate-200 bg-white text-slate-700"
                     >
                       <option value="ALL">ทุกห้องเรียน</option>
-                      <option value="ม.1/8">ม.1/8</option>
+                      <option value="ม.1/1">ม.1/1</option>
                       <option value="ม.2/1">ม.2/1</option>
                       <option value="ม.3/1">ม.3/1</option>
                     </select>

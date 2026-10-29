@@ -343,7 +343,13 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
         }
       }
 
-      return normalized;
+      const withAvatars = normalized.map((s) => {
+        if (s.avatarUrl) return s;
+        const sCode = (s.code || s.studentCode || s.id || '').trim();
+        const savedAvatar = typeof localStorage !== 'undefined' ? localStorage.getItem(`kp_student_avatar_${sCode}`) : null;
+        return savedAvatar ? { ...s, avatarUrl: savedAvatar } : s;
+      });
+      return withAvatars;
     }
   }
 

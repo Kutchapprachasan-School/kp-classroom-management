@@ -35,6 +35,9 @@ export const saveDeletedRoomsSet = (set: Set<string>) => {
 // Helper to get local persisted classrooms
 export const getLocalClassrooms = (): ClassroomRosterItem[] => {
   const deletedSet = getDeletedRoomsSet();
+  const isGhostRoom = (c: { id?: string; name?: string }) =>
+    c.name === 'ม.1/8' || c.name === 'ม.6/6' || c.id === 'room-1-8' || c.id === 'room-6-6';
+
   let result: ClassroomRosterItem[] = INITIAL_SEED_CLASSROOMS;
   if (typeof localStorage !== 'undefined') {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -42,12 +45,13 @@ export const getLocalClassrooms = (): ClassroomRosterItem[] => {
       try {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length >= INITIAL_SEED_CLASSROOMS.length) {
-          result = parsed;
+          result = parsed.filter((c: any) => !isGhostRoom(c));
         } else if (Array.isArray(parsed) && parsed.length > 0) {
           // If stored cache is incomplete (e.g. legacy 12 rooms), merge in missing classrooms from authoritative list
-          const existingIds = new Set(parsed.map((p: any) => p.id || p.name));
-          const existingNames = new Set(parsed.map((p: any) => p.name));
-          const merged = [...parsed];
+          const cleanParsed = parsed.filter((c: any) => !isGhostRoom(c));
+          const existingIds = new Set(cleanParsed.map((p: any) => p.id || p.name));
+          const existingNames = new Set(cleanParsed.map((p: any) => p.name));
+          const merged = [...cleanParsed];
           INITIAL_SEED_CLASSROOMS.forEach((seed) => {
             if (!existingIds.has(seed.id) && !existingNames.has(seed.name)) {
               merged.push(seed);
@@ -66,7 +70,7 @@ export const getLocalClassrooms = (): ClassroomRosterItem[] => {
     }
   }
   const mappedResult = result
-    .filter((c) => !deletedSet.has(c.id) && !deletedSet.has(c.name))
+    .filter((c) => !deletedSet.has(c.id) && !deletedSet.has(c.name) && !isGhostRoom(c))
     .map((c) => {
       const advisers = c.advisers || [c.adviser, c.coAdviser, c.thirdAdviser].filter(Boolean) as string[];
       let studentCount = c.studentCount || 0;
@@ -91,11 +95,14 @@ export const getLocalClassrooms = (): ClassroomRosterItem[] => {
 };
 
 const saveLocalClassrooms = (items: ClassroomRosterItem[]) => {
-  cachedClassrooms = items;
+  const cleaned = items.filter(
+    (c) => c.name !== 'ม.1/8' && c.name !== 'ม.6/6' && c.id !== 'room-1-8' && c.id !== 'room-6-6'
+  );
+  cachedClassrooms = cleaned;
   cachedClassroomsTimestamp = Date.now();
-  registerClassroomNames(items);
+  registerClassroomNames(cleaned);
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
   }
 };
 
@@ -112,14 +119,13 @@ export interface TeacherAccountItem {
 export const DEFAULT_TEACHER_ACCOUNTS: TeacherAccountItem[] = [];
 
 export const INITIAL_SEED_CLASSROOMS: ClassroomRosterItem[] = [
-  // มัธยมศึกษาปีที่ 1 (7 ห้อง)
+  // มัธยมศึกษาปีที่ 1 (6 ห้อง: ม.1/1 - ม.1/6)
   { id: 'room-1-1', name: 'ม.1/1', level: 'ม.1', roomNumber: 'ม.1/1', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 35 },
   { id: 'room-1-2', name: 'ม.1/2', level: 'ม.1', roomNumber: 'ม.1/2', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 35 },
   { id: 'room-1-3', name: 'ม.1/3', level: 'ม.1', roomNumber: 'ม.1/3', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 30 },
   { id: 'room-1-4', name: 'ม.1/4', level: 'ม.1', roomNumber: 'ม.1/4', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 35 },
   { id: 'room-1-5', name: 'ม.1/5', level: 'ม.1', roomNumber: 'ม.1/5', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 35 },
   { id: 'room-1-6', name: 'ม.1/6', level: 'ม.1', roomNumber: 'ม.1/6', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 34 },
-  { id: 'room-1-8', name: 'ม.1/8', level: 'ม.1', roomNumber: 'ม.1/8', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
 
   // มัธยมศึกษาปีที่ 2 (6 ห้อง)
   { id: 'room-2-1', name: 'ม.2/1', level: 'ม.2', roomNumber: 'ม.2/1', adviser: 'นายปัญจพล เกษรัตน์', studentCount: 32 },
@@ -152,13 +158,12 @@ export const INITIAL_SEED_CLASSROOMS: ClassroomRosterItem[] = [
   { id: 'room-5-5', name: 'ม.5/5', level: 'ม.5', roomNumber: 'ม.5/5', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 22 },
   { id: 'room-5-6', name: 'ม.5/6', level: 'ม.5', roomNumber: 'ม.5/6', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 29 },
 
-  // มัธยมศึกษาปีที่ 6 (6 ห้อง)
+  // มัธยมศึกษาปีที่ 6 (5 ห้อง: ม.6/1 - ม.6/5)
   { id: 'room-6-1', name: 'ม.6/1', level: 'ม.6', roomNumber: 'ม.6/1', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 30 },
   { id: 'room-6-2', name: 'ม.6/2', level: 'ม.6', roomNumber: 'ม.6/2', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 33 },
   { id: 'room-6-3', name: 'ม.6/3', level: 'ม.6', roomNumber: 'ม.6/3', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 19 },
   { id: 'room-6-4', name: 'ม.6/4', level: 'ม.6', roomNumber: 'ม.6/4', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 21 },
   { id: 'room-6-5', name: 'ม.6/5', level: 'ม.6', roomNumber: 'ม.6/5', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 23 },
-  { id: 'room-6-6', name: 'ม.6/6', level: 'ม.6', roomNumber: 'ม.6/6', adviser: 'ครูประจำชั้น', studentCount: 0 },
 ];
 
 const TEACHERS_CACHE_KEY = 'kp_teacher_accounts_cache';
@@ -244,7 +249,7 @@ export const classroomService = {
       try {
         // Lightweight fingerprint check: only fetch count and max(updated_at)
         const storedFp = typeof localStorage !== 'undefined' ? localStorage.getItem(storedFpKey) : null;
-        if (!forceRefresh && localItems.length >= 36 && storedFp) {
+        if (!forceRefresh && localItems.length >= 34 && storedFp) {
           const { data: fpData, error: fpErr } = await supabase
             .from('classrooms')
             .select('count(*) as count, max(updated_at) as max_updated_at')
@@ -270,7 +275,15 @@ export const classroomService = {
 
         if (!error && data && data.length > 0) {
           const mapped: ClassroomRosterItem[] = data
-            .filter((item) => !deletedSet.has(item.id) && !deletedSet.has(item.name))
+            .filter(
+              (item) =>
+                !deletedSet.has(item.id) &&
+                !deletedSet.has(item.name) &&
+                item.name !== 'ม.1/8' &&
+                item.name !== 'ม.6/6' &&
+                item.id !== 'room-1-8' &&
+                item.id !== 'room-6-6'
+            )
             .map((item) => {
               const adviser = item.adviser || 'ยังไม่ได้กำหนด';
               const coAdviser = item.co_adviser || item.coAdviser || undefined;
@@ -328,7 +341,15 @@ export const classroomService = {
 
         if (!tErr && tData && tData.length > 0) {
           const mapped: ClassroomRosterItem[] = tData
-            .filter((item) => !deletedSet.has(item.id) && !deletedSet.has(item.name))
+            .filter(
+              (item) =>
+                !deletedSet.has(item.id) &&
+                !deletedSet.has(item.name) &&
+                item.name !== 'ม.1/8' &&
+                item.name !== 'ม.6/6' &&
+                item.id !== 'room-1-8' &&
+                item.id !== 'room-6-6'
+            )
             .map((item) => {
               const adviser = item.adviser || 'ยังไม่ได้กำหนด';
               const coAdviser = item.coAdviser || undefined;

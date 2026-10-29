@@ -177,6 +177,8 @@ export const App: React.FC = () => {
   const [isDevToolbarVisible, setIsDevToolbarVisible] = useState(false);
   const [selectedTaskForModal, setSelectedTaskForModal] = useState<DailyTodoItem | null>(null);
   const [selectedClassroomIdForRoster, setSelectedClassroomIdForRoster] = useState<string | undefined>(undefined);
+  const [selectedStudent, setSelectedStudent] = useState<AtRiskStudent | null>(null);
+  const [selectedStudentCode, setSelectedStudentCode] = useState<string | undefined>(undefined);
 
   // Toggle sidebar for both mobile drawer and desktop collapsible panel
   const handleToggleSidebar = React.useCallback(() => {
@@ -456,7 +458,10 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleSelectStudent = (_student: AtRiskStudent) => {
+  const handleSelectStudent = (student: AtRiskStudent) => {
+    const code = (student.code || student.studentCode || student.enrollmentId || '').trim();
+    setSelectedStudent(student);
+    setSelectedStudentCode(code);
     setCurrentView('student');
   };
 
@@ -876,6 +881,8 @@ export const App: React.FC = () => {
 
               {currentView === 'student' && (
                 <StudentDetailView
+                  studentCode={selectedStudentCode}
+                  initialStudent={selectedStudent}
                   onOpenHomeVisit={() => setCurrentView('home-visit')}
                   onBack={() => setCurrentView('roster')}
                 />
