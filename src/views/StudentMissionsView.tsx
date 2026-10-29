@@ -19,6 +19,8 @@ import {
   Eye,
   BookOpen,
   RefreshCw,
+  Plus,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { gamificationService } from '../services/gamificationService';
 import {
@@ -89,6 +91,18 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
   const [selectedFileDataUrl, setSelectedFileDataUrl] = useState<string | null>(null);
   const [selectedRawFile, setSelectedRawFile] = useState<File | Blob | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // Multi-image state: รองรับแนบภาพผลงาน 1-3 ภาพ
+  const [selectedImages, setSelectedImages] = useState<Array<{
+    id: string;
+    file: File;
+    name: string;
+    previewUrl: string;
+    size: number;
+    originalSize?: number;
+    compressedSize?: number;
+    savedPercent?: number;
+  }>>([]);
+  const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
   const [fileTypeCategory, setFileTypeCategory] = useState<'image' | 'pdf' | 'doc' | 'video' | 'audio' | 'archive' | 'other'>('other');
   const [fileValidationError, setFileValidationError] = useState<string | null>(null);
   const [compressionNotice, setCompressionNotice] = useState<string | null>(null);
@@ -108,19 +122,61 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
       }
+      for (const img of selectedImages) {
+        if (img.previewUrl) URL.revokeObjectURL(img.previewUrl);
+      }
     };
-  }, [previewUrl]);
+  }, [previewUrl, selectedImages]);
 
   const handleOpenFullscreenPreview = () => {
-    if (previewUrl) {
-      window.open(previewUrl, '_blank', 'noopener,noreferrer');
+    const targetUrl =
+      fileTypeCategory === 'image' && selectedImages[activeImageIndex]
+        ? selectedImages[activeImageIndex].previewUrl
+        : previewUrl;
+    if (targetUrl) {
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
     }
+  };
+
+  const handleRemoveSingleImage = (indexToRemove: number) => {
+    setSelectedImages((prev) => {
+      const removed = prev[indexToRemove];
+      if (removed?.previewUrl) {
+        URL.revokeObjectURL(removed.previewUrl);
+      }
+      const next = prev.filter((_, idx) => idx !== indexToRemove);
+      if (next.length === 0) {
+        handleClearFile();
+      } else {
+        if (activeImageIndex >= next.length) {
+          setActiveImageIndex(Math.max(0, next.length - 1));
+        }
+        setSelectedRawFile(next[0].file);
+        setSelectedFileName(next.length > 1 ? `รูปภาพผลงาน (${next.length} ภาพ)` : next[0].name);
+        const totalOriginal = next.reduce((acc, img) => acc + (img.originalSize || img.size), 0);
+        const totalCompressed = next.reduce((acc, img) => acc + (img.compressedSize || img.size), 0);
+        const totalSaved = totalOriginal > totalCompressed
+          ? Math.round(((totalOriginal - totalCompressed) / totalOriginal) * 100)
+          : 0;
+        setCompressionNotice(
+          totalSaved > 0
+            ? `⚡ บีบอัด WebP รวม ${next.length} ภาพ (ขนาดรวม ${formatBytes(totalCompressed)}, ประหยัด ${totalSaved}%)`
+            : null
+        );
+      }
+      return next;
+    });
   };
 
   const handleClearFile = () => {
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
     }
+    for (const img of selectedImages) {
+      if (img.previewUrl) URL.revokeObjectURL(img.previewUrl);
+    }
+    setSelectedImages([]);
+    setActiveImageIndex(0);
     setPreviewUrl(null);
     setSelectedFileName('');
     setSelectedFileDataUrl(null);
@@ -322,7 +378,8 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
 
     const trimmedLink = submitLink.trim();
     const trimmedText = submitText.trim();
-    const hasFile = Boolean(selectedRawFile || selectedFileDataUrl || selectedFileName);
+    const hasImages = selectedImages.length > 0;
+    const hasFile = Boolean(hasImages || selectedRawFile || selectedFileDataUrl || selectedFileName);
     const hasLink = Boolean(trimmedLink);
     const hasText = Boolean(trimmedText);
 
@@ -344,16 +401,19 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
     setIsSubmitting(true);
     if (hasFile) {
       setIsUploadingR2(true);
+      const totalBytesToUpload = hasImages
+        ? selectedImages.reduce((sum, img) => sum + img.size, 0)
+        : (selectedRawFile ? selectedRawFile.size : (selectedFileDataUrl ? Math.round(selectedFileDataUrl.length * 0.75) : 0));
       setUploadProgressInfo({
         percent: 0,
         loadedBytes: 0,
-        totalBytes: selectedRawFile ? selectedRawFile.size : (selectedFileDataUrl ? Math.round(selectedFileDataUrl.length * 0.75) : 0),
+        totalBytes: totalBytesToUpload,
       });
     }
 
     try {
       let effectiveFileDataUrl = selectedFileDataUrl;
-      if (!effectiveFileDataUrl && selectedRawFile && selectedRawFile.size <= 5 * 1024 * 1024) {
+      if (!effectiveFileDataUrl && !hasImages && selectedRawFile && selectedRawFile.size <= 5 * 1024 * 1024) {
         try {
           effectiveFileDataUrl = await new Promise<string>((resolve) => {
             const reader = new FileReader();
@@ -366,6 +426,14 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
         }
       }
 
+      const origSizeKb = hasImages
+        ? Math.max(1, Math.round(selectedImages.reduce((sum, img) => sum + (img.originalSize || img.size), 0) / 1024))
+        : (selectedRawFile ? Math.max(1, Math.round(selectedRawFile.size / 1024)) : (effectiveFileDataUrl ? Math.round(effectiveFileDataUrl.length / 1024) : 0));
+
+      const compSizeKb = hasImages
+        ? Math.max(1, Math.round(selectedImages.reduce((sum, img) => sum + (img.compressedSize || img.size), 0) / 1024))
+        : (selectedRawFile ? Math.max(1, Math.round(selectedRawFile.size / 1024)) : (effectiveFileDataUrl ? Math.round(effectiveFileDataUrl.length / 1365) : 0));
+
       // 1. อัปโหลดไฟล์ขึ้น Cloudflare R2 และบันทึกผลงานลงฐานข้อมูลก่อนเสมอ
       await sgsRosterAndSubmissionService.submitStudentWorkToR2Async({
         assignmentId: selectedQuest.id,
@@ -373,25 +441,15 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
         courseCode: selectedQuest.courseCode,
         studentCode,
         workTitle: selectedQuest.title,
-        fileName:
-          selectedFileName ||
-          (selectedRawFile && 'name' in selectedRawFile && selectedRawFile.name
-            ? selectedRawFile.name
-            : effectiveFileDataUrl
-            ? `work_${studentCode}.webp`
-            : undefined),
-        originalSizeKb: selectedRawFile
-          ? Math.max(1, Math.round(selectedRawFile.size / 1024))
-          : effectiveFileDataUrl
-          ? Math.round(effectiveFileDataUrl.length / 1024)
-          : 0,
-        compressedSizeKb: selectedRawFile
-          ? Math.max(1, Math.round(selectedRawFile.size / 1024))
-          : effectiveFileDataUrl
-          ? Math.round(effectiveFileDataUrl.length / 1365)
-          : 0,
+        file: hasImages ? selectedImages[0].file : (selectedRawFile || undefined),
+        files: hasImages ? selectedImages.map((img) => img.file) : (selectedRawFile ? [selectedRawFile] : undefined),
+        fileBlob: hasImages ? selectedImages[0].file : (selectedRawFile || undefined),
+        fileName: hasImages
+          ? (selectedImages.length > 1 ? `work_${studentCode}_${selectedImages.length}imgs.webp` : selectedImages[0].name)
+          : (selectedFileName || (selectedRawFile && 'name' in selectedRawFile && (selectedRawFile as File).name ? (selectedRawFile as File).name : effectiveFileDataUrl ? `work_${studentCode}.webp` : undefined)),
+        originalSizeKb: origSizeKb,
+        compressedSizeKb: compSizeKb,
         fileDataUrl: effectiveFileDataUrl || undefined,
-        fileBlob: selectedRawFile || undefined,
         externalLinkUrl: hasLink ? trimmedLink : undefined,
         textContent: hasText ? trimmedText : undefined,
         academicYearTerm,
@@ -433,6 +491,11 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
       setSelectedFileName('');
       setSelectedFileDataUrl(null);
       setSelectedRawFile(null);
+      for (const img of selectedImages) {
+        if (img.previewUrl) URL.revokeObjectURL(img.previewUrl);
+      }
+      setSelectedImages([]);
+      setActiveImageIndex(0);
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
         setPreviewUrl(null);
@@ -1158,7 +1221,36 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                       </div>
 
                       {/* Display File Preview if student attached a file */}
-                      {filePreview && (() => {
+                      {submission?.fileUrls && submission.fileUrls.length > 1 ? (
+                        <div className="p-3 bg-white rounded-xl border border-emerald-200 space-y-2">
+                          <span className="text-[11px] font-bold text-slate-700 block">
+                            🖼️ รูปภาพผลงานที่ส่ง ({submission.fileUrls.length} ภาพ):
+                          </span>
+                          <div className="grid grid-cols-3 gap-2">
+                            {submission.fileUrls.map((imgUrl, idx) => (
+                              <a
+                                key={idx}
+                                href={imgUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="group relative block rounded-xl overflow-hidden border border-slate-200 aspect-square shadow-2xs hover:border-blue-400 transition-all bg-slate-50"
+                              >
+                                <img
+                                  src={imgUrl}
+                                  alt={`ผลงานภาพที่ ${idx + 1}`}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                />
+                                <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-slate-900/75 text-white text-[9px] font-bold">
+                                  ภาพที่ {idx + 1}
+                                </span>
+                              </a>
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-slate-500 font-medium">
+                            {submission.workAttachmentLabel || `แนบภาพผลงานครบทั้ง ${submission.fileUrls.length} ภาพ`}
+                          </p>
+                        </div>
+                      ) : filePreview ? (() => {
                         const attachedCat = detectFileCategory(filePreview, submission?.workAttachmentLabel);
                         return (
                           <div className="p-3 bg-white rounded-xl border border-emerald-200 space-y-2">
@@ -1242,7 +1334,7 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                             )}
                           </div>
                         );
-                      })()}
+                      })() : null}
 
                       {/* Display External Link Preview if student attached a link */}
                       {submission?.externalLinkUrl && (
@@ -1390,47 +1482,135 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                     </span>
                   </div>
 
-                  {selectedRawFile || previewUrl || selectedFileDataUrl ? (
+                  {selectedImages.length > 0 || selectedRawFile || previewUrl || selectedFileDataUrl ? (
                     /* Display Selected File Preview (RAM optimized via ObjectURL) */
                     <div className="space-y-3 bg-white p-3.5 rounded-2xl border border-blue-200/80 shadow-2xs animate-fade-in">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-[#163A66] flex items-center gap-1.5">
-                          <span>🖼️ ตรวจสอบตัวอย่างไฟล์ก่อนส่ง</span>
+                          <span>
+                            {selectedImages.length > 0
+                              ? `🖼️ ตรวจสอบภาพผลงานก่อนส่ง (${selectedImages.length}/3 ภาพ)`
+                              : '📁 ตรวจสอบตัวอย่างไฟล์ก่อนส่ง'}
+                          </span>
                         </span>
                         {!isSubmitting && !isUploadingR2 && (
                           <button
                             type="button"
                             onClick={handleClearFile}
                             className="text-xs font-semibold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer transition-colors p-1 rounded-lg hover:bg-rose-50"
-                            title="ลบไฟล์และเลือกใหม่"
+                            title="ลบไฟล์และเลือกใหม่ทั้งหมด"
                           >
                             <RefreshCw className="w-3.5 h-3.5" />
-                            <span>เปลี่ยนไฟล์ / ลบออก</span>
+                            <span>ล้างทั้งหมด</span>
                           </button>
                         )}
                       </div>
 
-                      {/* 1. กรณีเป็นไฟล์รูปภาพ: แสดง Image Preview */}
-                      {fileTypeCategory === 'image' && (previewUrl || selectedFileDataUrl) && (
-                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-900/5 shadow-2xs">
-                          <img
-                            src={previewUrl || selectedFileDataUrl || ''}
-                            alt="ตัวอย่างผลงานนักเรียน"
-                            className="mx-auto max-h-64 w-full object-contain p-1.5"
-                          />
-                          <div className="border-t border-slate-200/80 bg-slate-50 px-3 py-2 flex items-center justify-between">
-                            <span className="text-[11px] text-slate-500 font-medium">ภาพไม่เบลอ ไม่กลับหัว พร้อมส่ง</span>
-                            {previewUrl && (
+                      {/* 1. กรณีเป็นไฟล์รูปภาพ (รองรับ 1-3 ภาพ) */}
+                      {fileTypeCategory === 'image' && (selectedImages.length > 0 || previewUrl || selectedFileDataUrl) && (
+                        <div className="space-y-3">
+                          {/* Top Pill Selector เมื่อมีรูปภาพมากกว่า 1 ภาพ */}
+                          {selectedImages.length > 1 && (
+                            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
+                              {selectedImages.map((img, idx) => (
+                                <button
+                                  key={img.id}
+                                  type="button"
+                                  onClick={() => setActiveImageIndex(idx)}
+                                  className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                                    activeImageIndex === idx
+                                      ? 'bg-blue-600 text-white shadow-2xs'
+                                      : 'bg-transparent text-slate-600 hover:bg-white/80'
+                                  }`}
+                                >
+                                  <ImageIcon className="w-3 h-3" />
+                                  <span>ภาพที่ {idx + 1}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* ภาพหลักที่เลือกอยู่ */}
+                          <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-900/5 shadow-2xs relative">
+                            <img
+                              src={
+                                selectedImages[activeImageIndex]?.previewUrl ||
+                                previewUrl ||
+                                selectedFileDataUrl ||
+                                ''
+                              }
+                              alt={selectedImages[activeImageIndex]?.name || 'ตัวอย่างผลงานนักเรียน'}
+                              className="mx-auto max-h-64 w-full object-contain p-1.5"
+                            />
+                            <div className="border-t border-slate-200/80 bg-slate-50 px-3 py-2 flex items-center justify-between">
+                              <span className="text-[11px] text-slate-500 font-medium">
+                                {selectedImages.length > 1
+                                  ? `ภาพที่ ${activeImageIndex + 1} จาก ${selectedImages.length} ภาพ`
+                                  : 'ภาพไม่เบลอ ไม่กลับหัว พร้อมส่ง'}
+                              </span>
                               <button
                                 type="button"
                                 onClick={handleOpenFullscreenPreview}
                                 className="text-xs font-bold text-[#3B82F6] hover:text-[#2563EB] flex items-center gap-1 cursor-pointer"
                               >
                                 <ExternalLink className="w-3.5 h-3.5" />
-                                <span>ขยายดูภาพขนาดเต็ม</span>
+                                <span>ขยายดูขนาดเต็ม</span>
                               </button>
-                            )}
+                            </div>
                           </div>
+
+                          {/* แถบ Thumbnail และปุ่มเพิ่มรูปภาพ (เมื่อมี 1-2 ภาพ) */}
+                          {selectedImages.length > 0 && (
+                            <div className="flex items-center gap-2 pt-1 overflow-x-auto pb-1">
+                              {selectedImages.map((img, idx) => (
+                                <div
+                                  key={img.id}
+                                  className={`relative group shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
+                                    activeImageIndex === idx
+                                      ? 'border-blue-500 ring-2 ring-blue-100 shadow-sm'
+                                      : 'border-slate-200 hover:border-slate-300'
+                                  }`}
+                                  onClick={() => setActiveImageIndex(idx)}
+                                >
+                                  <img
+                                    src={img.previewUrl}
+                                    alt={img.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                  <span className="absolute bottom-0 inset-x-0 bg-slate-900/70 text-white text-[9px] font-bold text-center py-0.5">
+                                    {idx + 1}
+                                  </span>
+                                  {!isSubmitting && !isUploadingR2 && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRemoveSingleImage(idx);
+                                      }}
+                                      className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center text-[10px] shadow-sm cursor-pointer"
+                                      title="ลบภาพนี้"
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+
+                              {/* ปุ่มเพิ่มรูปภาพอีก (ถ้ายังไม่ครบ 3 ภาพ) */}
+                              {selectedImages.length < 3 && !isSubmitting && !isUploadingR2 && (
+                                <button
+                                  type="button"
+                                  onClick={() => fileInputRef.current?.click()}
+                                  className="shrink-0 w-16 h-16 rounded-xl border-2 border-dashed border-blue-300 hover:border-blue-500 bg-blue-50/50 hover:bg-blue-50 text-blue-600 flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors"
+                                  title="เพิ่มภาพอีก (สูงสุด 3 ภาพ)"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                  <span className="text-[9px] font-bold">เพิ่มรูป</span>
+                                  <span className="text-[8px] text-blue-400 font-mono">({3 - selectedImages.length})</span>
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -1500,15 +1680,21 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
 
                       {/* แถบสรุปชื่อไฟล์และขนาด */}
                       <div className="flex items-center justify-between text-xs text-slate-600 px-1 pt-1 border-t border-slate-100">
-                        <span className="truncate font-semibold text-[#163A66] max-w-[70%]">{selectedFileName || 'ไฟล์ผลงาน'}</span>
+                        <span className="truncate font-semibold text-[#163A66] max-w-[70%]">
+                          {selectedImages.length > 0
+                            ? `รูปภาพผลงาน (${selectedImages.length} ภาพ)`
+                            : selectedFileName || 'ไฟล์ผลงาน'}
+                        </span>
                         <span className="shrink-0 font-mono text-slate-400 text-[11px]">
-                          {selectedRawFile
+                          {selectedImages.length > 0
+                            ? formatBytes(selectedImages.reduce((sum, img) => sum + img.size, 0))
+                            : selectedRawFile
                             ? formatBytes(selectedRawFile.size)
                             : selectedFileDataUrl
-                              ? selectedFileDataUrl.startsWith('data:')
-                                ? `~${Math.round(selectedFileDataUrl.length / 1365)} KB`
-                                : '☁️ Cloudflare R2'
-                              : ''}
+                            ? selectedFileDataUrl.startsWith('data:')
+                              ? `~${Math.round(selectedFileDataUrl.length / 1365)} KB`
+                              : '☁️ Cloudflare R2'
+                            : ''}
                         </span>
                       </div>
                     </div>
@@ -1520,79 +1706,158 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                       </div>
                       <div>
                         <span className="font-bold text-slate-800 block text-xs sm:text-sm">
-                          📷 ถ่ายภาพ หรือ 📁 คลิกเพื่อเลือกไฟล์ทุกประเภทจากเครื่อง
+                          📷 ถ่ายภาพ หรือ 📁 คลิกเพื่อเลือกไฟล์รูปภาพ (1 - 3 ภาพ) หรือไฟล์ทุกประเภท
                         </span>
                         <span className="text-[11px] text-[#6B7C93] mt-0.5 block">
-                          รองรับรูปภาพ, PDF, Word, Excel, PowerPoint, วิดีโอ (MP4), เสียง (MP3) และไฟล์ ZIP
+                          รองรับรูปภาพ 1-3 ภาพ (บีบอัด WebP อัตโนมัติ), PDF, Word, Excel, PowerPoint, วิดีโอ, เสียง, ZIP
                         </span>
                       </div>
                       <input
                         ref={fileInputRef}
                         type="file"
+                        multiple
                         accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.txt,.csv,.rtf,.md,.json,.zip,.rar,.7z"
                         disabled={isSubmitting || isUploadingR2}
                         className="hidden"
                         onChange={async (e) => {
-                          const f = e.target.files?.[0];
-                          if (!f) return;
+                          const fileList = Array.from(e.target.files || []);
+                          if (fileList.length === 0) return;
                           setFileValidationError(null);
                           setCompressionNotice(null);
 
-                          try {
-                            setIsCompressingImage(true);
+                          const hasAnyImage = fileList.some((f) => f.type.startsWith('image/'));
 
-                            // 1. ถ้านักเรียนเลือกรูปภาพ ให้บีบอัดและแปลงเป็น WebP อัตโนมัติก่อน
-                            const { file: processedFile, originalSize, compressedSize, wasCompressed, dataUrl: compressedDataUrl } =
-                              await compressImageToWebP(f, {
-                                maxWidthOrHeight: 1920,
-                                quality: 0.82,
+                          if (hasAnyImage) {
+                            try {
+                              setIsCompressingImage(true);
+                              const remainingQuota = 3 - selectedImages.length;
+                              if (remainingQuota <= 0) {
+                                setFileValidationError('สามารถแนบรูปภาพได้สูงสุด 3 ภาพเท่านั้น');
+                                return;
+                              }
+
+                              const imageFiles = fileList
+                                .filter((f) => f.type.startsWith('image/'))
+                                .slice(0, remainingQuota);
+
+                              if (fileList.length > remainingQuota) {
+                                setCompressionNotice(
+                                  `⚡ แนบภาพได้สูงสุด 3 ภาพต่อชิ้นงาน (ระบบนำเข้า ${imageFiles.length} ภาพ)`
+                                );
+                              }
+
+                              const newItems: typeof selectedImages = [];
+                              for (let i = 0; i < imageFiles.length; i++) {
+                                const f = imageFiles[i];
+                                const {
+                                  file: processedFile,
+                                  originalSize,
+                                  compressedSize,
+                                  wasCompressed,
+                                } = await compressImageToWebP(f, {
+                                  maxWidthOrHeight: 1920,
+                                  quality: 0.82,
+                                });
+
+                                const validation = validateSubmissionFile(processedFile);
+                                if (!validation.valid) {
+                                  setFileValidationError(validation.error || 'ไฟล์ไม่ถูกต้องตามเกณฑ์');
+                                  continue;
+                                }
+
+                                const cleanName = validation.sanitizedName || processedFile.name;
+                                const previewUrl = URL.createObjectURL(processedFile);
+                                const savedPercent = wasCompressed
+                                  ? Math.max(1, Math.round(((originalSize - compressedSize) / originalSize) * 100))
+                                  : 0;
+
+                                newItems.push({
+                                  id: `img_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`,
+                                  file: processedFile,
+                                  name: cleanName,
+                                  previewUrl,
+                                  size: processedFile.size,
+                                  originalSize,
+                                  compressedSize,
+                                  savedPercent,
+                                });
+                              }
+
+                              if (newItems.length === 0) return;
+
+                              const combined = [...selectedImages, ...newItems].slice(0, 3);
+                              setSelectedImages(combined);
+                              setFileTypeCategory('image');
+                              setSelectedRawFile(combined[0].file);
+                              setSelectedFileName(
+                                combined.length > 1
+                                  ? `รูปภาพผลงาน (${combined.length} ภาพ)`
+                                  : combined[0].name
+                              );
+                              setUploadProgressInfo({
+                                percent: 0,
+                                loadedBytes: 0,
+                                totalBytes: combined.reduce((sum, img) => sum + img.size, 0),
                               });
 
-                            if (wasCompressed) {
-                              const savedPercent = Math.max(1, Math.round(((originalSize - compressedSize) / originalSize) * 100));
-                              setCompressionNotice(
-                                `⚡ บีบอัด WebP ลดขนาดจาก ${formatBytes(originalSize)} เหลือ ${formatBytes(compressedSize)} (ประหยัด ${savedPercent}%)`
-                              );
-                            }
+                              const totalOrig = combined.reduce((sum, img) => sum + (img.originalSize || img.size), 0);
+                              const totalComp = combined.reduce((sum, img) => sum + (img.compressedSize || img.size), 0);
+                              const totalSaved = totalOrig > totalComp
+                                ? Math.round(((totalOrig - totalComp) / totalOrig) * 100)
+                                : 0;
 
-                            // 2. ตรวจสอบไฟล์ที่ผ่านการบีบอัดแล้ว (Client-side File Validation)
-                            const validation = validateSubmissionFile(processedFile);
+                              if (totalSaved > 0) {
+                                setCompressionNotice(
+                                  `⚡ บีบอัด WebP รวม ${combined.length} ภาพ: ลดขนาดจาก ${formatBytes(totalOrig)} เหลือ ${formatBytes(totalComp)} (ประหยัด ${totalSaved}%)`
+                                );
+                              }
+                            } catch {
+                              setFileValidationError('เกิดข้อผิดพลาดในการประมวลผลรูปภาพ');
+                            } finally {
+                              setIsCompressingImage(false);
+                              if (fileInputRef.current) fileInputRef.current.value = '';
+                            }
+                          } else {
+                            // Non-image file handling
+                            const f = fileList[0];
+                            if (!f) return;
+
+                            // Clear any previous images
+                            for (const img of selectedImages) {
+                              if (img.previewUrl) URL.revokeObjectURL(img.previewUrl);
+                            }
+                            setSelectedImages([]);
+
+                            const validation = validateSubmissionFile(f);
                             if (!validation.valid) {
                               setFileValidationError(validation.error || 'ไฟล์ไม่ถูกต้องตามเกณฑ์');
                               handleClearFile();
                               return;
                             }
 
-                            const cleanName = validation.sanitizedName || processedFile.name;
-                            setSelectedRawFile(processedFile);
+                            const cleanName = validation.sanitizedName || f.name;
+                            setSelectedRawFile(f);
                             setSelectedFileName(cleanName);
-                            setUploadProgressInfo({ percent: 0, loadedBytes: 0, totalBytes: processedFile.size });
+                            setUploadProgressInfo({ percent: 0, loadedBytes: 0, totalBytes: f.size });
 
-                            // จัดการ Memory Preview ด้วย URL.createObjectURL(processedFile)
-                            if (previewUrl) {
-                              URL.revokeObjectURL(previewUrl);
-                            }
+                            if (previewUrl) URL.revokeObjectURL(previewUrl);
 
-                            const lowerName = processedFile.name.toLowerCase();
+                            const lowerName = f.name.toLowerCase();
                             const detectedCat = detectFileCategory(lowerName, cleanName);
-                            const isImage = validation.category === 'image' || processedFile.type.startsWith('image/') || detectedCat === 'IMAGE';
-                            const isPdf = processedFile.type === 'application/pdf' || lowerName.endsWith('.pdf') || detectedCat === 'PDF';
-                            const isVideo = processedFile.type.startsWith('video/') || detectedCat === 'VIDEO';
-                            const isAudio = processedFile.type.startsWith('audio/') || detectedCat === 'AUDIO';
+                            const isPdf = f.type === 'application/pdf' || lowerName.endsWith('.pdf') || detectedCat === 'PDF';
+                            const isVideo = f.type.startsWith('video/') || detectedCat === 'VIDEO';
+                            const isAudio = f.type.startsWith('audio/') || detectedCat === 'AUDIO';
                             const isArchive = validation.category === 'archive' || detectedCat === 'ARCHIVE';
 
-                            if (isImage) {
-                              setFileTypeCategory('image');
-                              setPreviewUrl(URL.createObjectURL(processedFile));
-                            } else if (isPdf) {
+                            if (isPdf) {
                               setFileTypeCategory('pdf');
-                              setPreviewUrl(URL.createObjectURL(processedFile));
+                              setPreviewUrl(URL.createObjectURL(f));
                             } else if (isVideo) {
                               setFileTypeCategory('video');
-                              setPreviewUrl(URL.createObjectURL(processedFile));
+                              setPreviewUrl(URL.createObjectURL(f));
                             } else if (isAudio) {
                               setFileTypeCategory('audio');
-                              setPreviewUrl(URL.createObjectURL(processedFile));
+                              setPreviewUrl(URL.createObjectURL(f));
                             } else if (isArchive) {
                               setFileTypeCategory('archive');
                               setPreviewUrl(null);
@@ -1600,25 +1865,6 @@ export const StudentMissionsView: React.FC<StudentMissionsViewProps> = ({ curren
                               setFileTypeCategory('doc');
                               setPreviewUrl(null);
                             }
-
-                            // DataUrl สำรองเฉพาะไฟล์ขนาดไม่เกิน 5 MB เพื่อไม่ให้กินหน่วยความจำเครื่อง
-                            if (compressedDataUrl) {
-                              setSelectedFileDataUrl(compressedDataUrl);
-                            } else if (processedFile.size <= 5 * 1024 * 1024) {
-                              const reader = new FileReader();
-                              reader.onload = (event) => {
-                                const resultStr = event.target?.result as string;
-                                if (resultStr) setSelectedFileDataUrl(resultStr);
-                              };
-                              reader.readAsDataURL(processedFile);
-                            } else {
-                              setSelectedFileDataUrl(null);
-                            }
-                          } catch {
-                            setFileValidationError('เกิดข้อผิดพลาดในการประมวลผลไฟล์');
-                            handleClearFile();
-                          } finally {
-                            setIsCompressingImage(false);
                           }
                         }}
                       />

@@ -217,6 +217,8 @@ export interface GradingQueueItem {
   submittedTimestamp: number; // เพื่อ sort FIFO (asc)
   submissionChannel: SubmissionChannelType;
   filePreviewUrl?: string;
+  fileUrl?: string;
+  fileUrls?: string[];
   fileName?: string;
   externalLinkUrl?: string;
   externalPlatform?: 'CANVA' | 'GOOGLE_DOCS' | 'GOOGLE_DRIVE' | 'FIGMA' | 'YOUTUBE' | 'OTHER';

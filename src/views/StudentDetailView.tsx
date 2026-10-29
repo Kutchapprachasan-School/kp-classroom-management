@@ -67,10 +67,30 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({
     studentGender === 'FEMALE'
       ? '/images/banners/student-avatar-girl.png'
       : '/images/banners/student-avatar.png';
-  const studentAvatarUrl =
-    currentStudent?.avatarUrl ||
-    initialStudent?.avatarUrl ||
-    studentService.getStudentAvatar(targetCode, defaultAvatar);
+
+  const [avatarUrl, setAvatarUrl] = useState<string>(() =>
+    studentService.getStudentAvatar(targetCode, defaultAvatar)
+  );
+
+  useEffect(() => {
+    setAvatarUrl(studentService.getStudentAvatar(targetCode, defaultAvatar));
+  }, [targetCode, defaultAvatar]);
+
+  useEffect(() => {
+    const handleAvatarUpdate = (e: any) => {
+      const updatedCode = e.detail?.studentCode;
+      const targetVariants = [
+        targetCode,
+        targetCode.replace(/^stu-/, ''),
+        `stu-${targetCode.replace(/^stu-/, '')}`,
+      ];
+      if (targetVariants.includes(updatedCode) && e.detail?.avatarUrl) {
+        setAvatarUrl(e.detail.avatarUrl);
+      }
+    };
+    window.addEventListener('kps-student-avatar-updated', handleAvatarUpdate);
+    return () => window.removeEventListener('kps-student-avatar-updated', handleAvatarUpdate);
+  }, [targetCode]);
 
   const resolveCurrentRoom = (): ClassroomRosterItem => {
     if (currentClassroomId) {
@@ -261,7 +281,7 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({
         <div className="flex items-center gap-3.5">
           <div className="relative shrink-0">
             <img
-              src={studentAvatarUrl}
+              src={avatarUrl}
               alt={dynamicProfile.name}
               className="w-12 h-12 rounded-2xl object-cover border-2 border-slate-100 shadow-2xs"
               onError={(e) => {

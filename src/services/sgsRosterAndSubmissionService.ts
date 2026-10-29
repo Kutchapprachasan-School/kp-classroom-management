@@ -478,6 +478,8 @@ export interface StudentWorkSubmission {
   workTitle?: string;
   workAttachmentLabel?: string;
   fileUrl?: string;
+  fileUrls?: string[]; // รองรับผลงานรูปภาพ 1-3 ภาพ
+  fileNames?: string[];
   textContent?: string; // ข้อความคำตอบที่นักเรียนพิมพ์ส่ง
   note?: string;
   teacherFeedback?: string;
@@ -487,6 +489,7 @@ export interface StudentWorkSubmission {
   isResubmission?: boolean;
   // Cloudflare R2 Storage & Lifecycle fields
   r2ObjectKey?: string;
+  r2ObjectKeys?: string[];
   originalSizeKb?: number;
   compressedSizeKb?: number;
   externalLinkUrl?: string;
@@ -1947,6 +1950,7 @@ export const sgsRosterAndSubmissionService = {
       courseCode?: string;
       workTitle?: string;
       fileUrl?: string;
+      fileUrls?: string[];
       externalLinkUrl?: string;
       textContent?: string;
       status: 'PENDING_REVIEW' | 'GRADED' | 'RETURNED_REVISION' | 'RETURNED';
@@ -1986,6 +1990,7 @@ export const sgsRosterAndSubmissionService = {
             score: params.score !== undefined ? params.score : current.score,
             feedback: params.feedback !== undefined ? params.feedback : current.feedback,
             fileUrl: params.fileUrl || current.fileUrl,
+            fileUrls: params.fileUrls || current.fileUrls || (params.fileUrl ? [params.fileUrl] : undefined),
             filePreviewUrl: params.fileUrl || current.filePreviewUrl || current.fileUrl,
             fileName: current.fileName || (params.fileUrl ? decodeURIComponent(params.fileUrl.split('/').pop()?.split('?')[0] || '') : undefined),
             subjectCode: current.subjectCode || params.courseCode || current.courseCode,
@@ -2010,6 +2015,7 @@ export const sgsRosterAndSubmissionService = {
         } else if (queueStatus === 'PENDING_REVIEW' || queueStatus === 'GRADED') {
           const rawUrl = params.fileUrl || '';
           const resolvedFileName = rawUrl ? decodeURIComponent(rawUrl.split('/').pop()?.split('?')[0] || '') : '';
+          const resolvedFileUrls = params.fileUrls || (rawUrl ? [rawUrl] : []);
           queue.push({
             id: canonicalQueueId,
             assignmentId: params.assignmentId,
@@ -2022,6 +2028,7 @@ export const sgsRosterAndSubmissionService = {
             workTitle: params.workTitle || '',
             assignmentTitle: params.workTitle || '',
             fileUrl: rawUrl,
+            fileUrls: resolvedFileUrls,
             filePreviewUrl: rawUrl,
             fileName: resolvedFileName,
             externalLinkUrl: params.externalLinkUrl || '',
@@ -2057,6 +2064,7 @@ export const sgsRosterAndSubmissionService = {
     courseCode?: string;
     workTitle?: string;
     fileUrl?: string;
+    fileUrls?: string[];
     externalLinkUrl?: string;
     textContent?: string;
     status: 'PENDING_REVIEW' | 'GRADED' | 'RETURNED_REVISION' | 'RETURNED';
@@ -3304,7 +3312,9 @@ export const sgsRosterAndSubmissionService = {
     workTitle: string;
     file?: File | Blob | null;
     fileBlob?: File | Blob | null;
+    files?: Array<File | Blob | null>; // รองรับผลงานรูปภาพ 1-3 ภาพ
     fileUrl?: string;
+    fileUrls?: string[];
     fileDataUrl?: string;
     fileName?: string;
     textContent?: string;
@@ -3361,45 +3371,66 @@ export const sgsRosterAndSubmissionService = {
       ((submissions[existingIdx].status as string) === 'RETURNED' ||
         submissions[existingIdx].status === 'RETURNED_REVISION');
 
-    // อัปโหลดไฟล์ขึ้น R2 (หรือเก็บเฉพาะ Metadata URL หากออฟไลน์ เพื่อไม่ให้ localStorage เต็ม 5MB)
-    let resolvedFileUrl = payload.fileUrl || payload.fileDataUrl || '';
-    let resolvedR2Key = existingIdx !== -1 ? submissions[existingIdx].r2ObjectKey : undefined;
-    let fileToUpload = payload.file || payload.fileBlob;
-    if (!fileToUpload && payload.fileDataUrl && payload.fileDataUrl.startsWith('data:')) {
+    // รวบรวมไฟล์ที่ต้องการอัปโหลด (รองรับทั้งไฟล์เดี่ยวและ 1-3 รูปภาพ)
+    const filesToUpload: Array<File | Blob> = [];
+    if (Array.isArray(payload.files) && payload.files.length > 0) {
+      for (const item of payload.files) {
+        if (item) filesToUpload.push(item);
+      }
+    } else if (payload.file || payload.fileBlob) {
+      const single = payload.file || payload.fileBlob;
+      if (single) filesToUpload.push(single);
+    } else if (payload.fileDataUrl && payload.fileDataUrl.startsWith('data:')) {
       try {
-        fileToUpload = r2StorageService.dataUrlToBlob(payload.fileDataUrl).blob;
+        const converted = r2StorageService.dataUrlToBlob(payload.fileDataUrl).blob;
+        if (converted) filesToUpload.push(converted);
       } catch {
         // ignore
       }
     }
-    const term = payload.academicYearTerm || '1/2569';
-    const rawFileObjName =
-      fileToUpload && 'name' in fileToUpload && typeof (fileToUpload as File).name === 'string'
-        ? (fileToUpload as File).name
-        : payload.fileName;
-    const isConvertedWebp = Boolean(fileToUpload && fileToUpload.type === 'image/webp');
-    const cleanFileName = rawFileObjName
-      ? isConvertedWebp
-        ? rawFileObjName.replace(/\.(jpg|jpeg|png|heic|heif|bmp)$/i, '.webp')
-        : rawFileObjName
-      : undefined;
 
-    const hasIncomingFile = Boolean(fileToUpload || payload.fileDataUrl || payload.fileUrl);
+    // จำกัดไฟล์รูปภาพสูงสุด 3 รูปภาพ
+    const cappedFiles = filesToUpload.slice(0, 3);
+    const term = payload.academicYearTerm || '1/2569';
+    const hasIncomingFile = Boolean(
+      cappedFiles.length > 0 ||
+      payload.fileDataUrl ||
+      payload.fileUrl ||
+      (payload.fileUrls && payload.fileUrls.length > 0)
+    );
+
+    let resolvedFileUrl = payload.fileUrl || payload.fileDataUrl || '';
+    let resolvedFileUrls: string[] = payload.fileUrls ? [...payload.fileUrls] : [];
+    let resolvedR2Key = existingIdx !== -1 ? submissions[existingIdx].r2ObjectKey : undefined;
+    let resolvedR2Keys: string[] = existingIdx !== -1 && submissions[existingIdx].r2ObjectKeys ? [...submissions[existingIdx].r2ObjectKeys] : [];
+    const resolvedFileNames: string[] = [];
+
+    // รวบรวมคีย์ไฟล์เดิมใน R2 เพื่อทำความสะอาดเมื่อมีการส่งงานใหม่หรือลบไฟล์
+    const oldR2Keys: string[] = [];
+    if (existingIdx !== -1) {
+      if (submissions[existingIdx].r2ObjectKey) oldR2Keys.push(submissions[existingIdx].r2ObjectKey);
+      if (Array.isArray(submissions[existingIdx].r2ObjectKeys)) {
+        for (const k of submissions[existingIdx].r2ObjectKeys) {
+          if (k && !oldR2Keys.includes(k)) oldR2Keys.push(k);
+        }
+      }
+    }
 
     // กรณีผู้เรียนส่งงานโดยไม่มีไฟล์แนบ (เช่น ลบไฟล์เดิมออกแล้วเปลี่ยนมาตอบข้อความหรือลิงก์อย่างเดียว)
-    if (!hasIncomingFile && existingIdx !== -1 && submissions[existingIdx].r2ObjectKey) {
-      const oldKey = submissions[existingIdx].r2ObjectKey;
-      if (oldKey && r2StorageService.isConfigured()) {
+    if (!hasIncomingFile && oldR2Keys.length > 0 && r2StorageService.isConfigured()) {
+      for (const oldKey of oldR2Keys) {
         r2StorageService.deleteFile(oldKey).catch((delErr) => {
           console.warn('[R2Delete] ลบไฟล์เก่าไม่สำเร็จ:', delErr);
         });
       }
       resolvedR2Key = undefined;
+      resolvedR2Keys = [];
       resolvedFileUrl = '';
+      resolvedFileUrls = [];
       if (typeof localStorage !== 'undefined') {
         try {
           localStorage.removeItem(`kp_sub_file_${payload.assignmentId}_${verifiedStudentCode}`);
-          if (submissions[existingIdx].workAttachmentLabel) {
+          if (submissions[existingIdx]?.workAttachmentLabel) {
             localStorage.removeItem(`kp_sub_file_${submissions[existingIdx].workAttachmentLabel}`);
           }
         } catch {
@@ -3408,54 +3439,99 @@ export const sgsRosterAndSubmissionService = {
       }
     }
 
-    if (fileToUpload && r2StorageService.isConfigured()) {
+    // อัปโหลดไฟล์ 1-3 ไฟล์ขึ้น Cloudflare R2
+    if (cappedFiles.length > 0 && r2StorageService.isConfigured()) {
       try {
         // ลบไฟล์เดิมออกจาก Cloudflare R2 เพื่อแทนที่ด้วยไฟล์ใหม่ (ประหยัดพื้นที่จัดเก็บและลดขยะไฟล์เก่า)
-        if (existingIdx !== -1 && submissions[existingIdx].r2ObjectKey) {
-          const oldKey = submissions[existingIdx].r2ObjectKey;
-          if (oldKey) {
+        if (oldR2Keys.length > 0) {
+          for (const oldKey of oldR2Keys) {
             r2StorageService.deleteFile(oldKey).catch((delErr) => {
               console.warn('[R2Delete] ลบไฟล์เก่าไม่สำเร็จ (อาจไม่มีในระบบ):', delErr);
             });
           }
         }
 
-        const r2Key = r2StorageService.buildSubmissionKey({
-          term,
-          classroom: payload.classroom,
-          assignmentId: payload.assignmentId,
-          studentCode: verifiedStudentCode,
-          fileName: cleanFileName || `work_${verifiedStudentCode}.webp`,
-        });
-        resolvedR2Key = r2Key;
-        const uploadRes = await r2StorageService.uploadFileWithProgress(
-          r2Key,
-          fileToUpload,
-          payload.onProgress
-        );
-        if (uploadRes.success && uploadRes.url) {
-          resolvedFileUrl = uploadRes.url;
-        } else {
-          console.error('[R2Upload] Cloudflare R2 returned error:', uploadRes.error);
-          throw new Error(uploadRes.error || 'การอัปโหลดไฟล์ไปยัง Cloudflare R2 ล้มเหลว กรุณาลองใหม่อีกครั้ง');
+        const uploadedUrls: string[] = [];
+        const uploadedKeys: string[] = [];
+        const totalFiles = cappedFiles.length;
+        const progressByFile = new Array(totalFiles).fill(0);
+
+        for (let idx = 0; idx < totalFiles; idx++) {
+          const currentFile = cappedFiles[idx];
+          const rawName =
+            'name' in currentFile && typeof (currentFile as File).name === 'string'
+              ? (currentFile as File).name
+              : totalFiles > 1
+              ? `image_${idx + 1}.webp`
+              : payload.fileName || `work_${verifiedStudentCode}.webp`;
+          const isWebp = currentFile.type === 'image/webp';
+          const cleanName = isWebp
+            ? rawName.replace(/\.(jpg|jpeg|png|heic|heif|bmp)$/i, '.webp')
+            : rawName;
+          resolvedFileNames.push(cleanName);
+
+          const r2Key = r2StorageService.buildSubmissionKey({
+            term,
+            classroom: payload.classroom,
+            assignmentId: payload.assignmentId,
+            studentCode: verifiedStudentCode,
+            fileName: totalFiles > 1 ? `img${idx + 1}_${cleanName}` : cleanName,
+          });
+
+          const uploadRes = await r2StorageService.uploadFileWithProgress(
+            r2Key,
+            currentFile,
+            payload.onProgress
+              ? (prog) => {
+                  progressByFile[idx] = prog.percent;
+                  const totalPercent = Math.round(
+                    progressByFile.reduce((sum, p) => sum + p, 0) / totalFiles
+                  );
+                  payload.onProgress!({
+                    percent: totalPercent,
+                    loadedBytes: Math.round((prog.loadedBytes / prog.totalBytes) * currentFile.size),
+                    totalBytes: currentFile.size,
+                  });
+                }
+              : undefined
+          );
+
+          if (uploadRes.success && uploadRes.url) {
+            uploadedUrls.push(uploadRes.url);
+            uploadedKeys.push(r2Key);
+          } else {
+            throw new Error(uploadRes.error || `การอัปโหลดไฟล์ที่ ${idx + 1} ไปยัง Cloudflare R2 ล้มเหลว`);
+          }
         }
+
+        resolvedFileUrls = uploadedUrls;
+        resolvedFileUrl = uploadedUrls[0] || '';
+        resolvedR2Keys = uploadedKeys;
+        resolvedR2Key = uploadedKeys[0] || undefined;
       } catch (uploadErr: any) {
         console.error('[R2Upload] อัปโหลดขึ้น R2 ไม่สำเร็จ:', uploadErr);
-        // หากผู้ใช้ Offline จริง ให้บันทึกแคชชั่วคราวในเครื่อง แต่หาก Online ต้องแจ้งข้อผิดพลาดแก่ผู้ใช้
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
           console.warn('[R2Upload] ออฟไลน์: บันทึกแคชชั่วคราวในเครื่อง');
-          if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
-            resolvedFileUrl = URL.createObjectURL(fileToUpload);
-          }
+          resolvedFileUrls = cappedFiles.map((f) =>
+            typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'
+              ? URL.createObjectURL(f)
+              : ''
+          ).filter(Boolean);
+          resolvedFileUrl = resolvedFileUrls[0] || '';
         } else {
           throw new Error(uploadErr.message || 'การอัปโหลดไฟล์ผลงานไปยังเซิร์ฟเวอร์ R2 ขัดข้อง กรุณาลองใหม่อีกครั้ง');
         }
       }
-    } else if (fileToUpload && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
-      resolvedFileUrl = URL.createObjectURL(fileToUpload);
+    } else if (cappedFiles.length > 0 && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+      resolvedFileUrls = cappedFiles.map((f) => URL.createObjectURL(f));
+      resolvedFileUrl = resolvedFileUrls[0] || '';
     }
 
-    // แคชไฟล์ภาพ / preview URL ลง localStorage เพื่อให้ครูเปิดดูออฟไลน์ได้ทันที (เก็บทั้ง Data URL และ R2 URL)
+    if (resolvedFileUrls.length > 0 && !resolvedFileUrl) {
+      resolvedFileUrl = resolvedFileUrls[0];
+    }
+
+    // แคชไฟล์ภาพ / preview URL ลง localStorage เพื่อให้ครูเปิดดูออฟไลน์ได้ทันที
     if ((payload.fileDataUrl || resolvedFileUrl) && typeof localStorage !== 'undefined') {
       try {
         const cleanAsg = String(payload.assignmentId).trim();
@@ -3464,10 +3540,6 @@ export const sgsRosterAndSubmissionService = {
         const cacheUrl = payload.fileDataUrl || (isR2Url ? resolvedFileUrl : '');
         if (cacheUrl && !cacheUrl.startsWith('blob:')) {
           localStorage.setItem(`kp_sub_file_${cleanAsg}_${cleanStu}`, cacheUrl);
-          if (cleanFileName) {
-            localStorage.setItem(`kp_sub_file_${cleanFileName}`, cacheUrl);
-            localStorage.setItem(`kp_sub_file_${cleanStu}_${cleanFileName}`, cacheUrl);
-          }
           if (typeof sessionStorage !== 'undefined') {
             sessionStorage.setItem(`kp_sub_file_${cleanAsg}_${cleanStu}`, cacheUrl);
           }
@@ -3477,18 +3549,25 @@ export const sgsRosterAndSubmissionService = {
       }
     }
 
-    const origKb = payload.originalSizeKb ?? (cleanFileName ? 4250 : 0);
-    const compKb = payload.compressedSizeKb ?? (cleanFileName ? 148 : 0);
+    const origKb = payload.originalSizeKb ?? 0;
+    const compKb = payload.compressedSizeKb ?? 0;
 
-    const hasFile = Boolean(cleanFileName || (hasIncomingFile && (resolvedFileUrl || payload.fileDataUrl)));
+    const hasFile = Boolean(
+      resolvedFileUrls.length > 0 ||
+      resolvedFileUrl ||
+      payload.fileDataUrl ||
+      resolvedFileNames.length > 0
+    );
     const hasLink = Boolean(payload.externalLinkUrl && payload.externalLinkUrl.trim());
     const hasText = Boolean(payload.textContent && payload.textContent.trim());
 
     let attachmentLabel = 'ส่งงานออนไลน์';
-    if (hasFile && hasLink) {
-      attachmentLabel = `☁️ R2: ${cleanFileName || 'รูปภาพ'} + 🔗 ลิงก์แนบ`;
+    if (resolvedFileUrls.length > 1) {
+      attachmentLabel = `☁️ R2: รูปภาพผลงาน (${resolvedFileUrls.length} ภาพ)${compKb > 0 ? ` [บีบอัดรวม ${compKb} KB]` : ''}${hasLink ? ' + 🔗 ลิงก์แนบ' : ''}`;
+    } else if (hasFile && hasLink) {
+      attachmentLabel = `☁️ R2: ${resolvedFileNames[0] || payload.fileName || 'รูปภาพ'} + 🔗 ลิงก์แนบ`;
     } else if (hasFile) {
-      attachmentLabel = `☁️ R2: ${cleanFileName || 'รูปภาพ'} (${compKb > 0 ? `บีบอัดเหลือ ${compKb} KB` : 'ไฟล์แนบ'})`;
+      attachmentLabel = `☁️ R2: ${resolvedFileNames[0] || payload.fileName || 'รูปภาพ'} (${compKb > 0 ? `บีบอัดเหลือ ${compKb} KB` : 'ไฟล์แนบ'})`;
     } else if (hasLink && hasText) {
       attachmentLabel = `🔗 ลิงก์แนบ + 📝 ข้อความตอบกลับ`;
     } else if (hasLink) {
@@ -3513,8 +3592,11 @@ export const sgsRosterAndSubmissionService = {
       classroom: payload.classroom || identity?.student?.classroom || (existingIdx !== -1 ? submissions[existingIdx].classroom : undefined),
       academicYearTerm: payload.academicYearTerm || term,
       fileUrl: hasIncomingFile ? (resolvedFileUrl || payload.fileUrl || payload.fileDataUrl || (existingIdx !== -1 ? submissions[existingIdx].fileUrl : '')) : '',
+      fileUrls: resolvedFileUrls.length > 0 ? resolvedFileUrls : (payload.fileUrls || (resolvedFileUrl ? [resolvedFileUrl] : (existingIdx !== -1 && submissions[existingIdx].fileUrls ? submissions[existingIdx].fileUrls : []))),
+      fileNames: resolvedFileNames.length > 0 ? resolvedFileNames : (existingIdx !== -1 ? submissions[existingIdx].fileNames : undefined),
       fileDataUrl: hasIncomingFile ? (payload.fileDataUrl || (existingIdx !== -1 ? submissions[existingIdx].fileDataUrl : resolvedFileUrl)) : '',
       r2ObjectKey: hasIncomingFile ? resolvedR2Key : undefined,
+      r2ObjectKeys: resolvedR2Keys.length > 0 ? resolvedR2Keys : (existingIdx !== -1 ? submissions[existingIdx].r2ObjectKeys : undefined),
       externalLinkUrl: payload.externalLinkUrl,
       textContent: payload.textContent !== undefined ? payload.textContent : (existingIdx !== -1 ? submissions[existingIdx].textContent : undefined),
       note: payload.note ?? '',
@@ -3547,6 +3629,7 @@ export const sgsRosterAndSubmissionService = {
       courseCode: resolvedCourseCode,
       workTitle: payload.workTitle,
       fileUrl: submissionRecord.fileUrl || payload.fileDataUrl || submissionRecord.fileDataUrl,
+      fileUrls: submissionRecord.fileUrls,
       externalLinkUrl: payload.externalLinkUrl,
       textContent: payload.textContent,
       status: 'PENDING_REVIEW',

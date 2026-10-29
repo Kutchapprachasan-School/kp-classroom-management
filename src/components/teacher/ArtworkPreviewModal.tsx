@@ -15,6 +15,8 @@ import {
   Copy,
   Check,
   Upload,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { sgsRosterAndSubmissionService } from '../../services/sgsRosterAndSubmissionService';
 import { r2StorageService } from '../../services/r2StorageService';
@@ -34,6 +36,8 @@ export interface ArtworkPreviewModalProps {
   seatNo?: number;
   type: 'IMAGE' | 'PDF' | 'LINK' | 'TEXT';
   url?: string;
+  fileUrls?: string[];
+  initialImageIndex?: number;
   externalLinkUrl?: string;
   textContent?: string;
   fileName?: string;
@@ -51,6 +55,8 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
   seatNo = 1,
   type,
   url,
+  fileUrls,
+  initialImageIndex = 0,
   externalLinkUrl,
   textContent,
   fileName,
@@ -67,12 +73,40 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
   const [activeTab, setActiveTab] = useState<'FILE' | 'LINK' | 'TEXT'>('FILE');
   const [officeViewerEngine, setOfficeViewerEngine] = useState<'OFFICE' | 'GOOGLE'>('GOOGLE');
   const [showLinkEmbed, setShowLinkEmbed] = useState<boolean>(true);
+  const [activeImageIndex, setActiveImageIndex] = useState<number>(initialImageIndex || 0);
+
+  useEffect(() => {
+    if (typeof initialImageIndex === 'number') {
+      setActiveImageIndex(initialImageIndex);
+    }
+  }, [initialImageIndex]);
 
   const targetAsgId = assignmentId || (url?.startsWith('asg-') ? url : undefined);
   const targetStuCode = studentCode !== '-' ? studentCode : undefined;
 
+  const imagesList = fileUrls && fileUrls.length > 0 ? fileUrls : url ? [url] : [];
+  const currentImageUrl = imagesList[activeImageIndex] || url;
+
+  // Keyboard navigation for multi-image viewing
+  useEffect(() => {
+    if (!isOpen || imagesList.length <= 1) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : imagesList.length - 1));
+        setZoomLevel(100);
+        setRotation(0);
+      } else if (e.key === 'ArrowRight') {
+        setActiveImageIndex((prev) => (prev < imagesList.length - 1 ? prev + 1 : 0));
+        setZoomLevel(100);
+        setRotation(0);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, imagesList.length]);
+
   const media = resolveSubmissionMedia({
-    url,
+    url: currentImageUrl,
     externalLinkUrl,
     assignmentId: targetAsgId,
     studentCode: targetStuCode,
@@ -362,6 +396,35 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
               >
                 <span>✍️ ข้อความคำตอบ</span>
               </button>
+            )}
+
+            {/* แถบเลือกรูปภาพ 1-3 ภาพ เมื่อผลงานมีหลายภาพ */}
+            {imagesList.length > 1 && activeTab === 'FILE' && (
+              <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-700">
+                <span className="text-[11px] text-slate-400 font-medium px-1">ภาพ:</span>
+                {imagesList.map((_, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setActiveImageIndex(idx);
+                      setZoomLevel(100);
+                      setRotation(0);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                      activeImageIndex === idx
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <ImageIcon className="w-3 h-3" />
+                    <span>ภาพที่ {idx + 1}</span>
+                  </button>
+                ))}
+                <span className="text-[10px] text-teal-300 font-mono px-1">
+                  ({activeImageIndex + 1}/{imagesList.length})
+                </span>
+              </div>
             )}
           </div>
 
@@ -743,18 +806,48 @@ export const ArtworkPreviewModal: React.FC<ArtworkPreviewModalProps> = ({
                     </a>
                   </div>
                 ) : (
-                  <div
-                    className="transition-transform duration-200 origin-center max-w-4xl max-h-[75vh] flex items-center justify-center"
-                    style={{
-                      transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
-                    }}
-                  >
-                    <img
-                      src={effectiveFileUrl}
-                      alt={inferredFileName}
-                      onError={handleImageError}
-                      className="max-w-full max-h-[72vh] object-contain rounded-2xl shadow-2xl border border-slate-700/60 bg-slate-900"
-                    />
+                  <div className="relative max-w-4xl max-h-[75vh] flex items-center justify-center">
+                    <div
+                      className="transition-transform duration-200 origin-center max-w-4xl max-h-[75vh] flex items-center justify-center"
+                      style={{
+                        transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
+                      }}
+                    >
+                      <img
+                        src={effectiveFileUrl}
+                        alt={inferredFileName}
+                        onError={handleImageError}
+                        className="max-w-full max-h-[72vh] object-contain rounded-2xl shadow-2xl border border-slate-700/60 bg-slate-900"
+                      />
+                    </div>
+                    {imagesList.length > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : imagesList.length - 1));
+                            setZoomLevel(100);
+                            setRotation(0);
+                          }}
+                          className="absolute -left-12 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-slate-800/90 hover:bg-slate-700 text-white flex items-center justify-center border border-slate-600 shadow-xl backdrop-blur-xs transition-all hover:scale-105 cursor-pointer z-20"
+                          title="ภาพก่อนหน้า (หรือกดลูกศรซ้ายบนคีย์บอร์ด)"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveImageIndex((prev) => (prev < imagesList.length - 1 ? prev + 1 : 0));
+                            setZoomLevel(100);
+                            setRotation(0);
+                          }}
+                          className="absolute -right-12 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-slate-800/90 hover:bg-slate-700 text-white flex items-center justify-center border border-slate-600 shadow-xl backdrop-blur-xs transition-all hover:scale-105 cursor-pointer z-20"
+                          title="ภาพถัดไป (หรือกดลูกศรขวาบนคีย์บอร์ด)"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 )
               ) : (

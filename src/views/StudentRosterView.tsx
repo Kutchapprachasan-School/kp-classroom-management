@@ -26,7 +26,6 @@ import {
   MoreHorizontal,
   ArrowLeft,
   AlertTriangle,
-  Clock,
   FileSpreadsheet,
   Upload,
   Sparkles,
@@ -88,7 +87,6 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
   // Dropdown open states
   const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
   const [isGenderDropdownOpen, setIsGenderDropdownOpen] = useState(false);
-  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [isGroupDropdownOpen, setIsGroupDropdownOpen] = useState(false);
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
   const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
@@ -173,7 +171,6 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
   // Refs for clicking outside dropdowns
   const classDropdownRef = useRef<HTMLDivElement>(null);
   const genderDropdownRef = useRef<HTMLDivElement>(null);
-  const statusDropdownRef = useRef<HTMLDivElement>(null);
   const groupDropdownRef = useRef<HTMLDivElement>(null);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -186,9 +183,6 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
       }
       if (genderDropdownRef.current && !genderDropdownRef.current.contains(target)) {
         setIsGenderDropdownOpen(false);
-      }
-      if (statusDropdownRef.current && !statusDropdownRef.current.contains(target)) {
-        setIsStatusDropdownOpen(false);
       }
       if (groupDropdownRef.current && !groupDropdownRef.current.contains(target)) {
         setIsGroupDropdownOpen(false);
@@ -265,6 +259,17 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
     window.addEventListener(STUDENT_TRANSFERRED_EVENT, handleTransferred);
     return () => window.removeEventListener(STUDENT_TRANSFERRED_EVENT, handleTransferred);
   }, [loadClassrooms, selectedClass, loadStudents]);
+
+  // Sync when student avatar changes
+  useEffect(() => {
+    const handleAvatarUpdated = () => {
+      if (selectedClass) {
+        loadStudents(selectedClass.id, selectedClass.name || selectedClass.roomNumber);
+      }
+    };
+    window.addEventListener('kps-student-avatar-updated', handleAvatarUpdated);
+    return () => window.removeEventListener('kps-student-avatar-updated', handleAvatarUpdated);
+  }, [selectedClass, loadStudents]);
 
   // Map each student to attendance state: 'NORMAL' (มาเรียนปกติ) | 'ABSENT' (ขาดเรียน) | 'LEAVE' (ลาเรียน) | 'UNCHECKED' (ยังไม่เช็คชื่อ)
   const studentAttendanceMap = useMemo(() => {
@@ -458,19 +463,20 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
   const handleOpenEditStudentModal = (stu: StudentRecord) => {
     setEditingStudent(stu);
 
+    const titlePrefixes = ['ด.ช.', 'ด.ญ.', 'ด.ช', 'ด.ญ', 'นาย', 'นางสาว', 'น.ส.', 'น.ส', 'เด็กชาย', 'เด็กหญิง', 'นาง'];
     // 1. ตรวจสอบข้อมูลจาก structured fields ที่ส่งมาจากฐานข้อมูลก่อน
     let title = stu.title || stu.prefix || '';
-    let firstName = stu.firstName || '';
-    let lastName = stu.lastName || '';
+    let firstName = stu.firstName || (stu as any).first_name || '';
+    let lastName = stu.lastName || (stu as any).last_name || '';
     let gender = stu.gender || 'MALE';
 
-    // 2. หากยังไม่มี ให้ใช้ parseThaiStudentName ถอดจากชื่อเต็มอย่างถูกต้อง
-    if (!title || !firstName) {
-      const parsed = parseThaiStudentName(stu.name || '');
-      if (!title) title = parsed.title;
-      if (!firstName) firstName = parsed.firstName;
-      if (!lastName) lastName = parsed.lastName;
-      if (!stu.gender) gender = parsed.gender;
+    // 2. หาก firstName เป็นคำนำหน้า (ข้อมูลตกช่อง/สลับช่อง) หรือไม่มีชื่อ ให้ใช้ parseThaiStudentName ซ่อมแซมจากชื่อเต็มทันที
+    if (!firstName || titlePrefixes.includes(firstName.trim()) || !title) {
+      const parsed = parseThaiStudentName(`${title} ${firstName} ${lastName}`.trim() || stu.name || '');
+      title = parsed.title;
+      firstName = parsed.firstName;
+      lastName = parsed.lastName;
+      gender = parsed.gender;
     }
 
     setEditStudentForm({
@@ -1143,72 +1149,7 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
               )}
             </div>
 
-            {/* 4. Dropdown สถานะ */}
-            <div className="relative" ref={statusDropdownRef}>
-              <button
-                type="button"
-                onClick={() => setIsStatusDropdownOpen((prev) => !prev)}
-                className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:border-slate-300 rounded-xl font-bold text-slate-700 shadow-2xs transition-colors cursor-pointer"
-              >
-                <span>
-                  {statusFilter === 'ALL'
-                    ? 'สถานะ'
-                    : statusFilter === 'NORMAL'
-                    ? 'ปกติ'
-                    : statusFilter === 'ABSENT'
-                    ? 'ขาดเรียน'
-                    : 'ลาเรียน'}
-                </span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-              </button>
-
-              {isStatusDropdownOpen && (
-                <div className="absolute left-0 top-full mt-1.5 w-40 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-1.5 space-y-1 animate-scale-up">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStatusFilter('ALL');
-                      setIsStatusDropdownOpen(false);
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-slate-50 text-slate-700 font-semibold cursor-pointer"
-                  >
-                    สถานะทั้งหมด
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStatusFilter('NORMAL');
-                      setIsStatusDropdownOpen(false);
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-slate-50 text-emerald-700 font-semibold cursor-pointer"
-                  >
-                    ปกติ
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStatusFilter('ABSENT');
-                      setIsStatusDropdownOpen(false);
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-slate-50 text-rose-700 font-semibold cursor-pointer"
-                  >
-                    ขาดเรียน
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStatusFilter('LEAVE');
-                      setIsStatusDropdownOpen(false);
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-slate-50 text-purple-700 font-semibold cursor-pointer"
-                  >
-                    ลาเรียน
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* 5. Dropdown กลุ่มเรียน */}
+            {/* 4. Dropdown กลุ่มเรียน */}
             <div className="relative" ref={groupDropdownRef}>
               <button
                 type="button"
@@ -1492,20 +1433,18 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
               <th className="py-3.5 px-4">ชื่อ-นามสกุล</th>
               <th className="py-3.5 px-4 w-28">ชั้น/ห้อง</th>
               <th className="py-3.5 px-4 w-20 text-center">เลขที่</th>
-              <th className="py-3.5 px-4 w-32">สถานะ</th>
               <th className="py-3.5 px-4 w-56 text-right rounded-tr-2xl">การดำเนินการ</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {paginatedStudents.length === 0 ? (
               <tr>
-                <td colSpan={isReorderMode ? 8 : 7} className="py-16 text-center text-slate-400">
+                <td colSpan={isReorderMode ? 7 : 6} className="py-16 text-center text-slate-400">
                   {isLoading ? 'กำลังโหลดข้อมูลนักเรียน...' : 'ไม่พบข้อมูลนักเรียนตามเงื่อนไขที่เลือก'}
                 </td>
               </tr>
             ) : (
               paginatedStudents.map((stu, index) => {
-                const attStatus = studentAttendanceMap.get(stu.id) || 'NORMAL';
                 const isSelected = selectedStudentIds.includes(stu.id);
                 const isDropup =
                   paginatedStudents.length >= 4 && index >= paginatedStudents.length - 2;
@@ -1562,11 +1501,17 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
-                          {stu.avatarUrl ? (
+                          {studentService.getStudentAvatar(stu.code || stu.studentCode || stu.id, stu.avatarUrl) ? (
                             <img
-                              src={stu.avatarUrl}
+                              src={studentService.getStudentAvatar(stu.code || stu.studentCode || stu.id, stu.avatarUrl)}
                               alt={stu.name}
                               className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).src =
+                                  stu.gender === 'FEMALE'
+                                    ? '/images/banners/student-avatar-girl.png'
+                                    : '/images/banners/student-avatar.png';
+                              }}
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center bg-blue-50 text-blue-600 font-bold text-xs">
@@ -1610,34 +1555,6 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
                     {/* เลขที่ */}
                     <td className="py-3 px-4 text-center font-bold text-slate-800">
                       {stu.no}
-                    </td>
-
-                    {/* สถานะ */}
-                    <td className="py-3 px-4">
-                      {attStatus === 'NORMAL' && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[11px]">
-                          <User className="w-3 h-3" />
-                          <span>ปกติ</span>
-                        </span>
-                      )}
-                      {attStatus === 'ABSENT' && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 font-bold text-[11px]">
-                          <AlertTriangle className="w-3 h-3" />
-                          <span>ขาดเรียน</span>
-                        </span>
-                      )}
-                      {attStatus === 'LEAVE' && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-bold text-[11px]">
-                          <Clock className="w-3 h-3" />
-                          <span>ลาเรียน</span>
-                        </span>
-                      )}
-                      {attStatus === 'UNCHECKED' && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 text-slate-500 border border-slate-200 font-medium text-[11px]">
-                          <Clock className="w-3 h-3 text-slate-400" />
-                          <span>ยังไม่เช็คชื่อ</span>
-                        </span>
-                      )}
                     </td>
 
                     {/* การดำเนินการ: [👤 โปรไฟล์], [📊 ผลการเรียน], [⋯] */}
@@ -1758,21 +1675,26 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
           </div>
         ) : (
           paginatedStudents.map((stu) => {
-            const attStatus = studentAttendanceMap.get(stu.id) || 'NORMAL';
             return (
               <div
                 key={stu.id}
                 className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs space-y-3 relative"
               >
-                {/* Top: Avatar + Name + Status */}
+                {/* Top: Avatar + Name */}
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
-                      {stu.avatarUrl ? (
+                      {studentService.getStudentAvatar(stu.code || stu.studentCode || stu.id, stu.avatarUrl) ? (
                         <img
-                          src={stu.avatarUrl}
+                          src={studentService.getStudentAvatar(stu.code || stu.studentCode || stu.id, stu.avatarUrl)}
                           alt={stu.name}
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src =
+                              stu.gender === 'FEMALE'
+                                ? '/images/banners/student-avatar-girl.png'
+                                : '/images/banners/student-avatar.png';
+                          }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-blue-50 text-blue-600 font-bold text-sm">
@@ -1789,34 +1711,6 @@ export const StudentRosterView: React.FC<StudentRosterViewProps> = ({
                         {selectedClass?.name || 'ม.3/1'} • เลขที่ {stu.no}
                       </p>
                     </div>
-                  </div>
-
-                  {/* Status Badge */}
-                  <div>
-                    {attStatus === 'NORMAL' && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs">
-                        <User className="w-3 h-3" />
-                        <span>ปกติ</span>
-                      </span>
-                    )}
-                    {attStatus === 'ABSENT' && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 font-bold text-xs">
-                        <AlertTriangle className="w-3 h-3" />
-                        <span>ขาดเรียน</span>
-                      </span>
-                    )}
-                    {attStatus === 'LEAVE' && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-bold text-xs">
-                        <Clock className="w-3 h-3" />
-                        <span>ลาเรียน</span>
-                      </span>
-                    )}
-                    {attStatus === 'UNCHECKED' && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-50 text-slate-500 border border-slate-200 font-medium text-xs">
-                        <Clock className="w-3 h-3 text-slate-400" />
-                        <span>ยังไม่เช็ค</span>
-                      </span>
-                    )}
                   </div>
                 </div>
 

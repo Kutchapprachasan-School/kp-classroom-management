@@ -354,19 +354,20 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
   const handleOpenEditStudent = (stu: StudentRecord) => {
     setEditingStudent(stu);
 
+    const titlePrefixes = ['ด.ช.', 'ด.ญ.', 'ด.ช', 'ด.ญ', 'นาย', 'นางสาว', 'น.ส.', 'น.ส', 'เด็กชาย', 'เด็กหญิง', 'นาง'];
     // 1. ตรวจสอบข้อมูลจาก structured fields ที่ส่งมาจากฐานข้อมูลก่อน
     let title = stu.title || stu.prefix || '';
-    let firstName = stu.firstName || '';
-    let lastName = stu.lastName || '';
+    let firstName = stu.firstName || (stu as any).first_name || '';
+    let lastName = stu.lastName || (stu as any).last_name || '';
     let gender = stu.gender || 'MALE';
 
-    // 2. หากยังไม่มี ให้ใช้ parseThaiStudentName ถอดจากชื่อเต็มอย่างถูกต้อง
-    if (!title || !firstName) {
-      const parsed = parseThaiStudentName(stu.name || '');
-      if (!title) title = parsed.title;
-      if (!firstName) firstName = parsed.firstName;
-      if (!lastName) lastName = parsed.lastName;
-      if (!stu.gender) gender = parsed.gender;
+    // 2. หาก firstName เป็นคำนำหน้า (ข้อมูลตกช่อง/สลับช่อง) หรือไม่มีชื่อ ให้ใช้ parseThaiStudentName ซ่อมแซมจากชื่อเต็มทันที
+    if (!firstName || titlePrefixes.includes(firstName.trim()) || !title) {
+      const parsed = parseThaiStudentName(`${title} ${firstName} ${lastName}`.trim() || stu.name || '');
+      title = parsed.title;
+      firstName = parsed.firstName;
+      lastName = parsed.lastName;
+      gender = parsed.gender;
     }
 
     setEditStudentForm({

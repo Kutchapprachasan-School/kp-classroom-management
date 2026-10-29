@@ -4,8 +4,71 @@ import { attendanceCorrelationService } from './attendanceCorrelationService.ts'
 import { activityAuditLogService } from './activityAuditLogService.ts';
 import { masterDataService, resolveRoomCandidates, CANONICAL_TIMESTAMP_ROOM_MAP } from './masterDataService.ts';
 import { localCacheDb } from './localCacheDb.ts';
+import { cloudDataService } from './cloudDataService.ts';
 
 import { isGrade1SgsStudentCode, getM1SgsStudentInfo } from '../config/m1SgsLookup.ts';
+
+export const STUDENT_AVATAR_MAP_KEY = 'kp_student_avatars_map_v1';
+
+export const normalizeCodeVariants = (code?: string): string[] => {
+  if (!code) return [];
+  const raw = String(code).trim();
+  if (!raw) return [];
+  const stripped = raw.replace(/^stu-/, '').trim();
+  const variants = new Set<string>();
+  variants.add(raw);
+  if (stripped) {
+    variants.add(stripped);
+    variants.add(`stu-${stripped}`);
+  }
+  return Array.from(variants);
+};
+
+export const isDefaultAvatar = (url?: string): boolean => {
+  if (!url) return true;
+  return (
+    url === '/images/banners/student-avatar.png' ||
+    url === '/images/banners/student-avatar-girl.png'
+  );
+};
+
+export const resolveStudentAvatar = (code?: string, gender?: string, explicitAvatar?: string): string => {
+  const variants = normalizeCodeVariants(code);
+  const defaultFallback =
+    gender === 'FEMALE'
+      ? '/images/banners/student-avatar-girl.png'
+      : '/images/banners/student-avatar.png';
+  const fallback =
+    explicitAvatar && !isDefaultAvatar(explicitAvatar)
+      ? explicitAvatar
+      : defaultFallback;
+
+  if (variants.length === 0) return fallback;
+
+  if (typeof localStorage !== 'undefined') {
+    for (const v of variants) {
+      const saved = localStorage.getItem(`kp_student_avatar_${v}`);
+      if (saved) return saved;
+    }
+    try {
+      const mapRaw = localStorage.getItem(STUDENT_AVATAR_MAP_KEY);
+      if (mapRaw) {
+        const map = JSON.parse(mapRaw);
+        for (const v of variants) {
+          if (map[v]) return map[v];
+        }
+      }
+    } catch {
+      // ignore JSON parse error
+    }
+  }
+
+  if (explicitAvatar && !isDefaultAvatar(explicitAvatar)) {
+    return explicitAvatar;
+  }
+
+  return fallback;
+};
 
 export interface StudentRecord {
   id: string;
@@ -367,10 +430,8 @@ const getLocalStudents = (classroomId: string): StudentRecord[] => {
       }
 
       const withAvatars = normalized.map((s) => {
-        if (s.avatarUrl) return s;
-        const sCode = (s.code || s.studentCode || s.id || '').trim();
-        const savedAvatar = typeof localStorage !== 'undefined' ? localStorage.getItem(`kp_student_avatar_${sCode}`) : null;
-        return savedAvatar ? { ...s, avatarUrl: savedAvatar } : s;
+        const custom = resolveStudentAvatar(s.code || s.studentCode || s.id, s.gender, s.avatarUrl);
+        return { ...s, avatarUrl: custom };
       });
       return withAvatars;
     }
@@ -656,48 +717,76 @@ export const studentService = {
     };
   },
 
-  // ดึงรูปโปรไฟล์นักเรียน (รองรับทั้งรูปที่อัปโหลดเองและรูปเริ่มต้น)
+  // ดึงรูปโปรไฟล์นักเรียน (รองรับทั้งรูปที่อัปโหลดเอง รูปบัดดี้ และรูปเริ่มต้น พร้อมซิงค์ข้ามอุปกรณ์)
   getStudentAvatar(code?: string, fallback?: string): string {
-    const cleanCode = String(code || '').trim();
-    if (!cleanCode) return fallback || '/images/banners/student-avatar.png';
-    if (typeof localStorage !== 'undefined') {
-      const saved = localStorage.getItem(`kp_student_avatar_${cleanCode}`);
-      if (saved) return saved;
-    }
-    const found = this.findStudentByCode(cleanCode);
-    if (found?.student?.avatarUrl) return found.student.avatarUrl;
-    return fallback || '/images/banners/student-avatar.png';
+    return resolveStudentAvatar(code, undefined, fallback);
   },
 
-  // อัปเดตรูปภาพโปรไฟล์นักเรียน
+  // อัปเดตรูปภาพโปรไฟล์นักเรียน (ซิงค์ทั้ง Local, Memory Cache, Cloud Store และแจ้งเตือนทุกหน้า)
   updateStudentAvatar(code: string, avatarUrl: string): boolean {
     const cleanCode = String(code || '').trim();
-    if (!cleanCode || !avatarUrl) return false;
+    const variants = normalizeCodeVariants(cleanCode);
+    if (variants.length === 0 || !avatarUrl) return false;
+    const cleanDigits = variants.find((v) => !v.startsWith('stu-')) || variants[0];
 
-    // 1. บันทึกรูปลงคีย์ประจำตัวนักเรียนเดี่ยวเสมอ (จะถูก Cloud Sync ไปยัง Supabase อัตโนมัติและไม่หายเมื่อรีเฟรช)
+    // 1. บันทึกรูปลงคีย์ประจำตัวนักเรียนเดี่ยว (ทั้งแบบมี stu- และไม่มี stu-)
     if (typeof localStorage !== 'undefined') {
       try {
         localStorage.setItem(`kp_student_avatar_${cleanCode}`, avatarUrl);
+        for (const v of variants) {
+          localStorage.setItem(`kp_student_avatar_${v}`, avatarUrl);
+        }
+
+        // บันทึกลง Shared Avatar Map เพื่อให้ครูและเครื่องอื่นดึงภาพนักเรียนได้ในคำขอเดียว
+        let avatarMap: Record<string, string> = {};
+        try {
+          const raw = localStorage.getItem(STUDENT_AVATAR_MAP_KEY);
+          if (raw) avatarMap = JSON.parse(raw);
+        } catch {}
+        for (const v of variants) {
+          avatarMap[v] = avatarUrl;
+        }
+        localStorage.setItem(STUDENT_AVATAR_MAP_KEY, JSON.stringify(avatarMap));
       } catch {
         // ignore quota
       }
     }
 
-    // 2. อัปเดตข้อมูลในบัญชีนักเรียนห้องเรียน (cls_students_<classroomId>) หากมีอยู่ในแคช
-    const found = this.findStudentByCode(cleanCode);
-    if (found) {
-      const { student, classroomId } = found;
-      const list = getLocalStudents(classroomId);
-      const updated = list.map((s) =>
-        s.code === student.code || s.id === student.id
-          ? { ...s, avatarUrl }
-          : s
-      );
-      saveLocalStudents(classroomId, updated);
-      inMemoryStudentCache[classroomId] = updated;
+    // 2. ซิงค์ขึ้น Supabase Cloud Store เบื้องหลังทันที
+    try {
+      cloudDataService.saveCloudKey(`kp_student_avatar_${cleanDigits}`, avatarUrl).catch(() => {});
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem(STUDENT_AVATAR_MAP_KEY);
+        if (raw) {
+          try {
+            cloudDataService.saveCloudKey(STUDENT_AVATAR_MAP_KEY, JSON.parse(raw)).catch(() => {});
+          } catch {}
+        }
+      }
+    } catch {
+      // ignore
     }
 
-    // 3. หากบัญชีที่ล็อกอินอยู่คือผู้ใช้นี้ ให้ปรับปรุง Auth Session (cls_current_auth_user) ทันที
+    // 3. อัปเดตข้อมูลในบัญชีนักเรียนห้องเรียน (cls_students_<classroomId>) ทุกห้องที่พบ
+    for (const v of variants) {
+      const found = this.findStudentByCode(v);
+      if (found) {
+        const { classroomId } = found;
+        const list = getLocalStudents(classroomId);
+        const updated = list.map((s) =>
+          variants.includes(String(s.code || '').trim()) ||
+          variants.includes(String(s.studentCode || '').trim()) ||
+          variants.includes(String(s.id || '').trim())
+            ? { ...s, avatarUrl }
+            : s
+        );
+        saveLocalStudents(classroomId, updated);
+        inMemoryStudentCache[classroomId] = updated;
+        break;
+      }
+    }
+
+    // 4. หากบัญชีที่ล็อกอินอยู่คือผู้ใช้นี้ ให้ปรับปรุง Auth Session (cls_current_auth_user) ทันที
     let updatedAuthUser: any = null;
     if (typeof localStorage !== 'undefined') {
       try {
@@ -705,9 +794,8 @@ export const studentService = {
         if (rawAuth) {
           const authUser = JSON.parse(rawAuth);
           if (
-            authUser?.studentCode === cleanCode ||
-            authUser?.id === cleanCode ||
-            String(authUser?.studentCode).trim() === cleanCode
+            variants.includes(String(authUser?.studentCode || '').trim()) ||
+            variants.includes(String(authUser?.id || '').trim())
           ) {
             authUser.avatarUrl = avatarUrl;
             localStorage.setItem('cls_current_auth_user', JSON.stringify(authUser));
@@ -719,19 +807,26 @@ export const studentService = {
       }
     }
 
-    // 4. ส่ง Event แจ้งเตือนทุก View และ Component ให้แสดงภาพใหม่ทันที
+    // 5. ส่ง Event แจ้งเตือนทุก View และ Component ให้แสดงภาพใหม่ทันที
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('kps-student-avatar-updated', {
-          detail: { studentCode: cleanCode, avatarUrl },
-        })
-      );
+      for (const v of variants) {
+        window.dispatchEvent(
+          new CustomEvent('kps-student-avatar-updated', {
+            detail: { studentCode: v, avatarUrl },
+          })
+        );
+      }
       if (updatedAuthUser) {
         window.dispatchEvent(
           new CustomEvent('kps-auth-changed', {
             detail: { user: updatedAuthUser },
           })
         );
+      }
+      try {
+        window.dispatchEvent(new CustomEvent('kp-sgs-roster-updated'));
+      } catch {
+        // ignore
       }
     }
     return true;

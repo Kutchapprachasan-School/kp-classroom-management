@@ -15,7 +15,7 @@ export function formatFileSizeMB(bytes: number): string {
 }
 
 export interface StudentSubmissionWithPreviewProps {
-  onUploadSuccess?: (url: string) => void;
+  onUploadSuccess?: (url: string, fileUrls?: string[]) => void;
   assignmentId?: string;
   classroom?: string;
   academicYearTerm?: string;

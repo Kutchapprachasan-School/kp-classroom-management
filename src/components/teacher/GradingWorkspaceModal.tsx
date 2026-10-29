@@ -14,6 +14,7 @@ import {
   Upload,
   Copy,
   RotateCcw,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { ArtworkPreviewModal } from './ArtworkPreviewModal';
 import {
@@ -176,9 +177,23 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
     onSaveGrade(currentItem.id, num, feedbackInput);
   };
 
+  const [activeImageIdx, setActiveImageIdx] = useState<number>(0);
+  useEffect(() => {
+    setActiveImageIdx(0);
+  }, [currentIndex]);
+
+  const imagesList =
+    currentItem?.fileUrls && currentItem.fileUrls.length > 0
+      ? currentItem.fileUrls
+      : (currentItem as any)?.fileUrl
+      ? [(currentItem as any).fileUrl]
+      : [];
+
+  const currentImageUrl = imagesList[activeImageIdx] || (currentItem as any)?.fileUrl;
+
   const media = resolveSubmissionMedia({
-    filePreviewUrl: currentItem?.filePreviewUrl,
-    fileUrl: (currentItem as any)?.fileUrl,
+    filePreviewUrl: currentImageUrl || currentItem?.filePreviewUrl,
+    fileUrl: currentImageUrl || (currentItem as any)?.fileUrl,
     externalLinkUrl: currentItem?.externalLinkUrl,
     assignmentId: currentItem?.assignmentId,
     studentCode: currentItem?.studentCode,
@@ -457,25 +472,50 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
 
               {isImage ? (
                 !imgError && effectiveFileUrl ? (
-                  <div className="relative group max-h-[55vh] flex items-center justify-center">
-                    <img
-                      src={effectiveFileUrl}
-                      alt={currentItem.assignmentTitle}
-                      onError={() => setImgError(true)}
-                      style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'center' }}
-                      className="max-h-[55vh] w-auto object-contain rounded-xl transition-transform duration-150 shadow-md cursor-pointer"
-                      onClick={() => setIsPreviewOpen(true)}
-                      title="คลิกเพื่อดูภาพเต็มจอ"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setIsPreviewOpen(true)}
-                      className="absolute bottom-2 right-2 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-900 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg backdrop-blur-xs transition-opacity cursor-pointer"
-                      title="เปิดดูภาพเต็มจอ"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5 text-teal-300" />
-                      <span>เปิดดูเต็มจอ ↗</span>
-                    </button>
+                  <div className="space-y-2 w-full flex flex-col items-center">
+                    {imagesList.length > 1 && (
+                      <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
+                        <span className="text-[11px] font-bold text-slate-600 px-2">ภาพผลงาน:</span>
+                        {imagesList.map((_, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              setActiveImageIdx(idx);
+                              setImgError(false);
+                            }}
+                            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                              activeImageIdx === idx
+                                ? 'bg-blue-600 text-white shadow-2xs'
+                                : 'bg-white text-slate-700 hover:bg-slate-200'
+                            }`}
+                          >
+                            <ImageIcon className="w-3 h-3" />
+                            <span>ภาพที่ {idx + 1}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="relative group max-h-[55vh] flex items-center justify-center">
+                      <img
+                        src={effectiveFileUrl}
+                        alt={currentItem.assignmentTitle}
+                        onError={() => setImgError(true)}
+                        style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'center' }}
+                        className="max-h-[55vh] w-auto object-contain rounded-xl transition-transform duration-150 shadow-md cursor-pointer"
+                        onClick={() => setIsPreviewOpen(true)}
+                        title="คลิกเพื่อดูภาพเต็มจอ"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setIsPreviewOpen(true)}
+                        className="absolute bottom-2 right-2 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-900 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg backdrop-blur-xs transition-opacity cursor-pointer"
+                        title="เปิดดูภาพเต็มจอ"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-teal-300" />
+                        <span>เปิดดูเต็มจอ ↗</span>
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="p-6 sm:p-8 text-center space-y-3 bg-blue-50/50 rounded-2xl w-full max-w-md border border-blue-100">
@@ -1151,6 +1191,8 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
           seatNo={typeof resolvedSeat === 'number' ? resolvedSeat : undefined}
           type={isPdf ? 'PDF' : hasFile ? 'IMAGE' : hasLink ? 'LINK' : 'TEXT'}
           url={effectiveFileUrl || currentItem.externalLinkUrl}
+          fileUrls={imagesList.length > 0 ? imagesList : undefined}
+          initialImageIndex={activeImageIdx}
           externalLinkUrl={currentItem.externalLinkUrl}
           textContent={currentItem.textContent}
           fileName={inferredFileName}
