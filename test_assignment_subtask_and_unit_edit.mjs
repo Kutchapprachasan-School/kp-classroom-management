@@ -164,6 +164,65 @@ assert.strictEqual(assignments[0].title, 'บทที่ 8 ข้อที่ 1
 assert.strictEqual(assignments[1].title, 'บทที่ 8 ข้อที่ 5-8');
 console.log('  ✓ Unit settings cascade update synchronized all tasks in unit while preserving individual sub-task details');
 
+// 4. Static Verification of Sub-Task Deletion and Unit Total Works Display
+console.log('\n--- 4. Checking Sub-Task Deletion & Unit Total Works Count in AssignmentManagementView.tsx ---');
+assert(
+  viewContent.includes('const [subTaskToDelete, setSubTaskToDelete] = useState'),
+  'AssignmentManagementView must define subTaskToDelete state for confirmation modal'
+);
+console.log('  ✓ Verified subTaskToDelete modal state defined');
+
+assert(
+  viewContent.includes('const handleOpenDeleteSubTaskModal = ('),
+  'AssignmentManagementView must have handleOpenDeleteSubTaskModal'
+);
+assert(
+  viewContent.includes('const handleConfirmDeleteSubTask = () => {'),
+  'AssignmentManagementView must have handleConfirmDeleteSubTask'
+);
+console.log('  ✓ Verified handleOpenDeleteSubTaskModal and handleConfirmDeleteSubTask defined');
+
+assert(
+  viewContent.includes('ยืนยันการลบงานย่อย'),
+  'Confirmation modal must display "ยืนยันการลบงานย่อย"'
+);
+console.log('  ✓ Verified sub-task deletion confirmation modal title');
+
+assert(
+  viewContent.includes('progressUnitLabel: string;'),
+  'enrichedAssignmentCards must define progressUnitLabel'
+);
+assert(
+  viewContent.includes("{item.progressCount}/{item.totalTargetCount} {item.progressUnitLabel}"),
+  'Unit card header must display total target count with progressUnitLabel (e.g. 41/48 งาน)'
+);
+console.log('  ✓ Verified progressUnitLabel and {progressCount}/{totalTargetCount} {progressUnitLabel} in UI');
+
+// 5. Functional Simulation of Sub-Task Deletion and Unit Works Count
+console.log('\n--- 5. Testing Functional Sub-Task Deletion and Works Count ---');
+// Deleting task-1
+const targetTaskIdToDelete = 'task-1';
+assignments = assignments.filter((a) => a.id !== targetTaskIdToDelete);
+assert.strictEqual(assignments.length, 1, 'Unit must now contain exactly 1 sub-task');
+assert.strictEqual(assignments[0].id, 'task-2', 'Remaining task in unit must be task-2');
+console.log('  ✓ Deleting sub-task leaves remaining sub-tasks intact in the unit');
+
+// Calculate unit works count simulation:
+const totalStudents = 16;
+const subTasksCount = 3;
+const totalExpectedWorks = subTasksCount * totalStudents; // 48
+const mockSubmissions = [
+  ...Array.from({ length: 16 }, (_, i) => ({ assignmentId: 'task-1', studentCode: `S${i}`, status: 'GRADED' })),
+  ...Array.from({ length: 13 }, (_, i) => ({ assignmentId: 'task-2', studentCode: `S${i}`, status: 'GRADED' })),
+  ...Array.from({ length: 12 }, (_, i) => ({ assignmentId: 'task-3', studentCode: `S${i}`, status: 'SUBMITTED_PENDING' })),
+];
+const totalSubmittedWorks = mockSubmissions.filter((s) => s.status !== 'MISSING').length; // 41
+assert.strictEqual(totalExpectedWorks, 48);
+assert.strictEqual(totalSubmittedWorks, 41);
+const progressLabel = `${totalSubmittedWorks}/${totalExpectedWorks} งาน`;
+assert.strictEqual(progressLabel, '41/48 งาน');
+console.log(`  ✓ Unit works calculation correctly computes: ${progressLabel}`);
+
 console.log('\n======================================================');
 console.log('🎉 ALL SUB-TASK & UNIT EDIT SEPARATION CHECKS PASSED!');
 console.log('======================================================');

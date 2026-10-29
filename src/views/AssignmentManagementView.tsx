@@ -198,6 +198,12 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
   const [formSelectedRooms, setFormSelectedRooms] = useState<string[]>([]);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
+  // Sub-task deletion confirmation modal state
+  const [subTaskToDelete, setSubTaskToDelete] = useState<{
+    task: TermAssignmentConfig;
+    unitTitle?: string;
+  } | null>(null);
+
   // รองรับการสั่งงานรายจุดประสงค์ / รายหน่วย (Auto-division / Unit Score)
   const [formAssignmentMode, setFormAssignmentMode] = useState<'DIRECT' | 'UNIT_BUNDLE'>('DIRECT');
   const [formUnitTitle, setFormUnitTitle] = useState('');
@@ -924,6 +930,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       pendingReviewCount: number;
       displayStatus: 'PENDING_REVIEW' | 'PENDING_SCORE' | 'IN_PROGRESS' | 'GRADED';
       progressCount: number;
+      totalTargetCount: number;
+      progressUnitLabel: string;
       progressPercent: number;
       subTasks: TermAssignmentConfig[];
       rawAssignment?: TermAssignmentConfig;
@@ -995,6 +1003,19 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         (s) => s.status === 'SUBMITTED_PENDING' || (s.status !== 'GRADED' && s.score === null)
       ).length;
 
+      // Count total submitted works across all sub-tasks in this unit (e.g. 41/48 งาน)
+      const totalSubmittedWorks = unitSubs.filter((s) => s.status !== 'MISSING').length;
+      const totalExpectedWorks = u.tasks.length > 0 ? u.tasks.length * totalStudents : totalStudents;
+      const totalTargetCount = Math.max(totalExpectedWorks, totalSubmittedWorks);
+      const progressCount = totalSubmittedWorks;
+      const progressUnitLabel = 'งาน';
+      const progressPercent =
+        totalTargetCount > 0
+          ? Math.min(100, Math.round((progressCount / totalTargetCount) * 100))
+          : progressCount > 0
+          ? 100
+          : 0;
+
       let displayStatus: 'PENDING_REVIEW' | 'PENDING_SCORE' | 'IN_PROGRESS' | 'GRADED' = 'PENDING_SCORE';
       if (pendingReviewCount > 0) {
         displayStatus = 'PENDING_REVIEW';
@@ -1015,14 +1036,6 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
           displayStatus = 'PENDING_SCORE';
         }
       }
-
-      const progressCount = Math.max(fullyGradedStudents, submittedStudents);
-      const progressPercent =
-        totalStudents > 0
-          ? Math.min(100, Math.round((progressCount / totalStudents) * 100))
-          : progressCount > 0
-          ? 100
-          : 0;
 
       const sortedDueDates = u.tasks
         .map((t) => t.dueDate)
@@ -1056,6 +1069,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         pendingReviewCount,
         displayStatus,
         progressCount,
+        totalTargetCount,
+        progressUnitLabel,
         progressPercent,
         subTasks: u.tasks,
         rawAssignment: u.tasks[0],
@@ -1136,6 +1151,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       }
 
       const progressCount = Math.max(gradedCount, submittedCount);
+      const totalTargetCount = totalStudents;
+      const progressUnitLabel = 'คน';
       const progressPercent =
         totalStudents > 0
           ? Math.min(100, Math.round((progressCount / totalStudents) * 100))
@@ -1161,6 +1178,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         pendingReviewCount,
         displayStatus,
         progressCount,
+        totalTargetCount,
+        progressUnitLabel,
         progressPercent,
         subTasks: [assign],
         rawAssignment: assign,
@@ -1302,6 +1321,26 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       refreshTermAssignments();
       showToast(`✓ ลบชิ้นงาน "${item.displayTitle}" เรียบร้อยแล้ว`);
     }
+  };
+
+  const handleOpenDeleteSubTaskModal = (
+    task: TermAssignmentConfig,
+    unitTitle?: string
+  ) => {
+    setSubTaskToDelete({
+      task,
+      unitTitle: unitTitle || task.unitTitle || 'หน่วยการเรียนรู้',
+    });
+  };
+
+  const handleConfirmDeleteSubTask = () => {
+    if (!subTaskToDelete) return;
+    const { task } = subTaskToDelete;
+    sgsRosterAndSubmissionService.deleteTermAssignment(task.id);
+    setQueueItems([...teacherCourseAssignmentService.getGradingQueue()]);
+    refreshTermAssignments();
+    showToast(`✓ ลบงานย่อย "${task.title}" เรียบร้อยแล้ว`);
+    setSubTaskToDelete(null);
   };
 
   const formatDueDateThai = (dateStr?: string) => {
@@ -2361,7 +2400,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                                   : 'ส่งงานแล้ว'}
                               </span>
                               <span className="font-bold text-[#163A66]">
-                                {item.progressCount}/{item.totalStudents} คน
+                                {item.progressCount}/{item.totalTargetCount} {item.progressUnitLabel}
                                 {item.pendingReviewCount > 0 && (
                                   <span className="text-[10px] font-semibold text-rose-500 ml-1">
                                     (รอตรวจ {item.pendingReviewCount})
@@ -2674,6 +2713,15 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                                   >
                                     <Edit3 className="w-3 h-3 text-[#3B82F6]" />
                                     <span>แก้ไขงานย่อย</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenDeleteSubTaskModal(task, item.unitTitle || item.title)}
+                                    className="px-2.5 py-1 rounded-lg font-semibold text-[11px] text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200/80 transition-colors flex items-center gap-1 cursor-pointer"
+                                    title={`ลบงานย่อย "${task.title}"`}
+                                  >
+                                    <Trash2 className="w-3 h-3 text-rose-500" />
+                                    <span>ลบงานย่อย</span>
                                   </button>
                                 </div>
                               </div>
@@ -3908,21 +3956,32 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                                 (ส่ง {formatDueDateThai(t.dueDate)})
                               </span>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleOpenEditSubTaskModal(t, {
-                                  unitTitle: formUnitTitle,
-                                  maxScore: formUnitMaxScore,
-                                  courseCode: formCourseCode,
-                                  scorePart: formScorePart,
-                                })
-                              }
-                              className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-[#3B82F6] bg-white border border-blue-200 hover:bg-blue-50 transition-colors flex items-center gap-1 shrink-0 cursor-pointer"
-                            >
-                              <Edit3 className="w-3 h-3" />
-                              <span>แก้ไขงานย่อย</span>
-                            </button>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleOpenEditSubTaskModal(t, {
+                                    unitTitle: formUnitTitle,
+                                    maxScore: formUnitMaxScore,
+                                    courseCode: formCourseCode,
+                                    scorePart: formScorePart,
+                                  })
+                                }
+                                className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-[#3B82F6] bg-white border border-blue-200 hover:bg-blue-50 transition-colors flex items-center gap-1 cursor-pointer"
+                              >
+                                <Edit3 className="w-3 h-3" />
+                                <span>แก้ไขงานย่อย</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenDeleteSubTaskModal(t, formUnitTitle)}
+                                className="px-2 py-1 rounded-lg text-[11px] font-bold text-rose-600 bg-white border border-rose-200 hover:bg-rose-50 transition-colors flex items-center gap-1 cursor-pointer"
+                                title={`ลบงานย่อย "${t.title}"`}
+                              >
+                                <Trash2 className="w-3 h-3 text-rose-500" />
+                                <span>ลบ</span>
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -5176,6 +5235,67 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                 className="px-4 py-2 rounded-xl bg-[#3B82F6] text-white text-xs font-semibold cursor-pointer"
               >
                 เข้าใจแล้ว
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ====================================================================
+          MODAL: ยืนยันการลบงานย่อย (Delete Sub-Task Confirmation Modal)
+         ==================================================================== */}
+      {subTaskToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-[22px] border border-[#FECACA] max-w-md w-full p-5 sm:p-6 shadow-xl space-y-4 my-auto">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-500 shrink-0">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#163A66]">ยืนยันการลบงานย่อย</h3>
+                  <p className="text-xs text-[#6B7C93]">
+                    {subTaskToDelete.unitTitle || 'หน่วยการเรียนรู้'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSubTaskToDelete(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-rose-50/70 border border-rose-200/80 space-y-2 text-xs text-[#163A66]">
+              <div className="font-semibold text-rose-700 flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                <span>คุณต้องการลบงานย่อยนี้ใช่หรือไม่?</span>
+              </div>
+              <div className="p-2.5 bg-white rounded-lg border border-rose-100 font-bold text-[#163A66] break-words">
+                📝 {subTaskToDelete.task.title}
+              </div>
+              <p className="text-[11px] text-[#6B7C93] leading-relaxed">
+                การลบงานย่อยนี้จะลบไฟล์ที่นักเรียนส่งและคะแนนตรวจออกจากระบบทันที (จะไม่กระทบกับงานย่อยอื่นในหน่วยเดียวกัน)
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setSubTaskToDelete(null)}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-[#163A66] bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteSubTask}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>ยืนยันลบงานย่อย</span>
               </button>
             </div>
           </div>
