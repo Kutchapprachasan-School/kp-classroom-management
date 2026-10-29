@@ -151,19 +151,19 @@
 - **[WRITE:DELETE]** [`src/services/behaviorService.ts:151`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/behaviorService.ts#L151)
 
 #### 🗂️ ตาราง/View: `ClassRoom` (8 จุดเรียกใช้)
-- **[READ:SELECT]** [`src/services/classroomService.ts:276`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L276)
-- **[WRITE:UPDATE]** [`src/services/classroomService.ts:471`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L471)
-- **[READ:SELECT]** [`src/services/classroomService.ts:576`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L576)
-- **[WRITE:UPDATE]** [`src/services/classroomService.ts:582`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L582)
-- **[WRITE:INSERT]** [`src/services/classroomService.ts:591`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L591)
-- **[WRITE:UPDATE]** [`src/services/classroomService.ts:692`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L692)
-- **[WRITE:UPDATE]** [`src/services/classroomService.ts:817`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L817)
+- **[READ:SELECT]** [`src/services/classroomService.ts:323`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L323)
+- **[WRITE:UPDATE]** [`src/services/classroomService.ts:518`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L518)
+- **[READ:SELECT]** [`src/services/classroomService.ts:623`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L623)
+- **[WRITE:UPDATE]** [`src/services/classroomService.ts:629`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L629)
+- **[WRITE:INSERT]** [`src/services/classroomService.ts:638`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L638)
+- **[WRITE:UPDATE]** [`src/services/classroomService.ts:739`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L739)
+- **[WRITE:UPDATE]** [`src/services/classroomService.ts:864`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L864)
 - **[READ:SELECT]** [`src/services/masterDataService.ts:252`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/masterDataService.ts#L252)
 
 #### 🗂️ ตาราง/View: `classrooms` (3 จุดเรียกใช้)
 - **[READ:SELECT]** [`src/services/authService.ts:339`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L339)
-- **[READ:SELECT]** [`src/services/classroomService.ts:202`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L202)
-- **[READ:SELECT]** [`src/services/classroomService.ts:218`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L218)
+- **[READ:SELECT]** [`src/services/classroomService.ts:249`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L249)
+- **[READ:SELECT]** [`src/services/classroomService.ts:265`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L265)
 
 #### 🗂️ ตาราง/View: `kps_cloud_store` (12 จุดเรียกใช้)
 - **[READ:SELECT]** [`src/lib/universalAdapter.ts:293`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/lib/universalAdapter.ts#L293)
@@ -262,7 +262,7 @@
 
 #### 🗂️ ตาราง/View: `User` (2 จุดเรียกใช้)
 - **[READ:SELECT]** [`src/services/authService.ts:98`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/authService.ts#L98)
-- **[READ:SELECT]** [`src/services/classroomService.ts:141`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L141)
+- **[READ:SELECT]** [`src/services/classroomService.ts:188`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts#L188)
 
 #### 🗂️ ตาราง/View: `XpTransaction` (2 จุดเรียกใช้)
 - **[WRITE:INSERT]** [`src/services/behaviorService.ts:195`](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/behaviorService.ts#L195)

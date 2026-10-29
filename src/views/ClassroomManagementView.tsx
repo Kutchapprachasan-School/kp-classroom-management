@@ -111,7 +111,7 @@ export const ClassroomManagementView: React.FC<ClassroomManagementViewProps> = (
     setIsLoading(true);
     try {
       const [clsList, teachers] = await Promise.all([
-        classroomService.getAll(),
+        classroomService.getAll(true),
         classroomService.getTeacherAccounts(),
       ]);
       setClassrooms(clsList);

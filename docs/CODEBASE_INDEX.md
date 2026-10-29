@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 29/10/2569 10:28:41 | รวมทั้งหมด 242 ไฟล์*
+*อัปเดตล่าสุด: 29/10/2569 10:41:36 | รวมทั้งหมด 242 ไฟล์*
 
 ---
 
@@ -202,7 +202,7 @@
 | [src/services/bellScheduleService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/bellScheduleService.ts) | 345 | `SchoolBellScheduleConfig` (L8), `BELL_SCHEDULE_STORAGE_KEY` (L19), `BELL_SCHEDULE_UPDATED_EVENT` (L20), `DEFAULT_BELL_SCHEDULE_CONFIG` (L22), `BellScheduleTimelineItem` (L33), `addMinutesToTimeStr` (L45), `calculateMinutesDifference` (L54), `generateBellScheduleTimeline` (L62), `bellScheduleService` (L344) |
 | [src/services/calendarEventStorageService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/calendarEventStorageService.ts) | 372 | `CALENDAR_EVENTS_STORAGE_KEY` (L19), `MATRIX_STORAGE_KEY` (L20), `MATRIX_SLOTS_UPDATED_EVENT` (L21), `getMatrixStorageKey` (L26), `CalendarLegendColor` (L31), `CalendarEventItem` (L33), `INITIAL_OCTOBER_EVENTS` (L55), `parseThaiDateString` (L57), `convertHolidayToCalendarEvent` (L84), `convertMakeupDayToCalendarEvent` (L105) *(+1 รายการ)* |
 | [src/services/chatBackendService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/chatBackendService.ts) | 268 | `ChatRoomType` (L8), `ChatMessageType` (L9), `ChatRoomSummary` (L11), `ChatAttachmentMeta` (L29), `ChatMessageRecord` (L39), `FetchMessagesResponse` (L53), `SendMessagePayload` (L59), `chatBackendService` (L97) |
-| [src/services/classroomService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts) | 846 | `getDeletedRoomsSet` (L10), `saveDeletedRoomsSet` (L25), `getLocalClassrooms` (L36), `TeacherAccountItem` (L90), `DEFAULT_TEACHER_ACCOUNTS` (L100), `INITIAL_SEED_CLASSROOMS` (L102), `invalidateClassroomCache` (L125), `classroomService` (L132) |
+| [src/services/classroomService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts) | 893 | `getDeletedRoomsSet` (L10), `saveDeletedRoomsSet` (L25), `getLocalClassrooms` (L36), `TeacherAccountItem` (L102), `DEFAULT_TEACHER_ACCOUNTS` (L112), `INITIAL_SEED_CLASSROOMS` (L114), `invalidateClassroomCache` (L172), `classroomService` (L179) |
 | [src/services/cleanSlateService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/cleanSlateService.ts) | 211 | `CleanSlatePurgeResult` (L5), `TRANSACTIONAL_STORAGE_KEYS` (L16), `PRESERVED_INFRASTRUCTURE_KEYS` (L61), `cleanSlateService` (L210) |
 | [src/services/cloudDataService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/cloudDataService.ts) | 1235 | `CloudStoreRecord` (L8), `CloudSyncState` (L14), `cloudDataService` (L707), `FileValidationResult` (L709), `MAX_IMAGE_SIZE_MB` (L717), `MAX_DOC_SIZE_MB` (L718), `MAX_MEDIA_SIZE_MB` (L719), `ALLOWED_IMAGE_EXTENSIONS` (L722), `ALLOWED_DOC_EXTENSIONS` (L735), `ALLOWED_MEDIA_EXTENSIONS` (L762) *(+8 รายการ)* |
 | [src/services/coursesCurriculumService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/coursesCurriculumService.ts) | 871 | `MediaType` (L12), `UnitMediaItem` (L14), `CurriculumUnit` (L28), `CourseCurriculumRecord` (L40), `TrashMediaItem` (L57), `calculatePeriodsPerWeek` (L76), `inferGradeLevelFromCourseCode` (L95), `coursesCurriculumService` (L869) |

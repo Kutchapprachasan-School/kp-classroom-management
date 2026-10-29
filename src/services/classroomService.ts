@@ -41,8 +41,20 @@ export const getLocalClassrooms = (): ClassroomRosterItem[] => {
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed) && parsed.length >= INITIAL_SEED_CLASSROOMS.length) {
           result = parsed;
+        } else if (Array.isArray(parsed) && parsed.length > 0) {
+          // If stored cache is incomplete (e.g. legacy 12 rooms), merge in missing classrooms from authoritative list
+          const existingIds = new Set(parsed.map((p: any) => p.id || p.name));
+          const existingNames = new Set(parsed.map((p: any) => p.name));
+          const merged = [...parsed];
+          INITIAL_SEED_CLASSROOMS.forEach((seed) => {
+            if (!existingIds.has(seed.id) && !existingNames.has(seed.name)) {
+              merged.push(seed);
+            }
+          });
+          result = merged;
+          saveLocalClassrooms(merged);
         } else {
           saveLocalClassrooms(INITIAL_SEED_CLASSROOMS);
         }
@@ -100,18 +112,53 @@ export interface TeacherAccountItem {
 export const DEFAULT_TEACHER_ACCOUNTS: TeacherAccountItem[] = [];
 
 export const INITIAL_SEED_CLASSROOMS: ClassroomRosterItem[] = [
-  { id: 'room-1-1', name: 'ม.1/1', level: 'ม.1', roomNumber: 'ม.1/1', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
-  { id: 'room-1-2', name: 'ม.1/2', level: 'ม.1', roomNumber: 'ม.1/2', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
-  { id: 'room-1-3', name: 'ม.1/3', level: 'ม.1', roomNumber: 'ม.1/3', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
-  { id: 'room-1-4', name: 'ม.1/4', level: 'ม.1', roomNumber: 'ม.1/4', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
-  { id: 'room-1-5', name: 'ม.1/5', level: 'ม.1', roomNumber: 'ม.1/5', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
-  { id: 'room-1-6', name: 'ม.1/6', level: 'ม.1', roomNumber: 'ม.1/6', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
-  { id: 'room-2-1', name: 'ม.2/1', level: 'ม.2', roomNumber: 'ม.2/1', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
-  { id: 'room-3-1', name: 'ม.3/1', level: 'ม.3', roomNumber: 'ม.3/1', adviser: 'นายปัญจพล เกษรัตน์', studentCount: 0 },
-  { id: 'room-3-2', name: 'ม.3/2', level: 'ม.3', roomNumber: 'ม.3/2', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
-  { id: 'room-4-1', name: 'ม.4/1', level: 'ม.4', roomNumber: 'ม.4/1', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
-  { id: 'room-5-1', name: 'ม.5/1', level: 'ม.5', roomNumber: 'ม.5/1', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
-  { id: 'room-6-1', name: 'ม.6/1', level: 'ม.6', roomNumber: 'ม.6/1', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
+  // มัธยมศึกษาปีที่ 1 (7 ห้อง)
+  { id: 'room-1-1', name: 'ม.1/1', level: 'ม.1', roomNumber: 'ม.1/1', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 35 },
+  { id: 'room-1-2', name: 'ม.1/2', level: 'ม.1', roomNumber: 'ม.1/2', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 35 },
+  { id: 'room-1-3', name: 'ม.1/3', level: 'ม.1', roomNumber: 'ม.1/3', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 30 },
+  { id: 'room-1-4', name: 'ม.1/4', level: 'ม.1', roomNumber: 'ม.1/4', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 35 },
+  { id: 'room-1-5', name: 'ม.1/5', level: 'ม.1', roomNumber: 'ม.1/5', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 35 },
+  { id: 'room-1-6', name: 'ม.1/6', level: 'ม.1', roomNumber: 'ม.1/6', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 34 },
+  { id: 'room-1-8', name: 'ม.1/8', level: 'ม.1', roomNumber: 'ม.1/8', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 0 },
+
+  // มัธยมศึกษาปีที่ 2 (6 ห้อง)
+  { id: 'room-2-1', name: 'ม.2/1', level: 'ม.2', roomNumber: 'ม.2/1', adviser: 'นายปัญจพล เกษรัตน์', studentCount: 32 },
+  { id: 'room-2-2', name: 'ม.2/2', level: 'ม.2', roomNumber: 'ม.2/2', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 38 },
+  { id: 'room-2-3', name: 'ม.2/3', level: 'ม.2', roomNumber: 'ม.2/3', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 37 },
+  { id: 'room-2-4', name: 'ม.2/4', level: 'ม.2', roomNumber: 'ม.2/4', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 40 },
+  { id: 'room-2-5', name: 'ม.2/5', level: 'ม.2', roomNumber: 'ม.2/5', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 40 },
+  { id: 'room-2-6', name: 'ม.2/6', level: 'ม.2', roomNumber: 'ม.2/6', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 38 },
+
+  // มัธยมศึกษาปีที่ 3 (6 ห้อง)
+  { id: 'room-3-1', name: 'ม.3/1', level: 'ม.3', roomNumber: 'ม.3/1', adviser: 'นายปัญจพล เกษรัตน์', studentCount: 35 },
+  { id: 'room-3-2', name: 'ม.3/2', level: 'ม.3', roomNumber: 'ม.3/2', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 35 },
+  { id: 'room-3-3', name: 'ม.3/3', level: 'ม.3', roomNumber: 'ม.3/3', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 35 },
+  { id: 'room-3-4', name: 'ม.3/4', level: 'ม.3', roomNumber: 'ม.3/4', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 39 },
+  { id: 'room-3-5', name: 'ม.3/5', level: 'ม.3', roomNumber: 'ม.3/5', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 36 },
+  { id: 'room-3-6', name: 'ม.3/6', level: 'ม.3', roomNumber: 'ม.3/6', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 32 },
+
+  // มัธยมศึกษาปีที่ 4 (5 ห้อง)
+  { id: 'room-4-1', name: 'ม.4/1', level: 'ม.4', roomNumber: 'ม.4/1', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 30 },
+  { id: 'room-4-2', name: 'ม.4/2', level: 'ม.4', roomNumber: 'ม.4/2', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 26 },
+  { id: 'room-4-3', name: 'ม.4/3', level: 'ม.4', roomNumber: 'ม.4/3', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 22 },
+  { id: 'room-4-4', name: 'ม.4/4', level: 'ม.4', roomNumber: 'ม.4/4', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 42 },
+  { id: 'room-4-5', name: 'ม.4/5', level: 'ม.4', roomNumber: 'ม.4/5', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 31 },
+
+  // มัธยมศึกษาปีที่ 5 (6 ห้อง)
+  { id: 'room-5-1', name: 'ม.5/1', level: 'ม.5', roomNumber: 'ม.5/1', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 30 },
+  { id: 'room-5-2', name: 'ม.5/2', level: 'ม.5', roomNumber: 'ม.5/2', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 32 },
+  { id: 'room-5-3', name: 'ม.5/3', level: 'ม.5', roomNumber: 'ม.5/3', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 33 },
+  { id: 'room-5-4', name: 'ม.5/4', level: 'ม.5', roomNumber: 'ม.5/4', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 29 },
+  { id: 'room-5-5', name: 'ม.5/5', level: 'ม.5', roomNumber: 'ม.5/5', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 22 },
+  { id: 'room-5-6', name: 'ม.5/6', level: 'ม.5', roomNumber: 'ม.5/6', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 29 },
+
+  // มัธยมศึกษาปีที่ 6 (6 ห้อง)
+  { id: 'room-6-1', name: 'ม.6/1', level: 'ม.6', roomNumber: 'ม.6/1', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 30 },
+  { id: 'room-6-2', name: 'ม.6/2', level: 'ม.6', roomNumber: 'ม.6/2', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 33 },
+  { id: 'room-6-3', name: 'ม.6/3', level: 'ม.6', roomNumber: 'ม.6/3', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 19 },
+  { id: 'room-6-4', name: 'ม.6/4', level: 'ม.6', roomNumber: 'ม.6/4', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 21 },
+  { id: 'room-6-5', name: 'ม.6/5', level: 'ม.6', roomNumber: 'ม.6/5', adviser: 'ยังไม่ระบุครูที่ปรึกษา', studentCount: 23 },
+  { id: 'room-6-6', name: 'ม.6/6', level: 'ม.6', roomNumber: 'ม.6/6', adviser: 'ครูประจำชั้น', studentCount: 0 },
 ];
 
 const TEACHERS_CACHE_KEY = 'kp_teacher_accounts_cache';
@@ -197,7 +244,7 @@ export const classroomService = {
       try {
         // Lightweight fingerprint check: only fetch count and max(updated_at)
         const storedFp = typeof localStorage !== 'undefined' ? localStorage.getItem(storedFpKey) : null;
-        if (!forceRefresh && localItems.length > 0 && storedFp) {
+        if (!forceRefresh && localItems.length >= 36 && storedFp) {
           const { data: fpData, error: fpErr } = await supabase
             .from('classrooms')
             .select('count(*) as count, max(updated_at) as max_updated_at')
@@ -206,7 +253,7 @@ export const classroomService = {
 
           if (!fpErr && fpData) {
             const currentFp = `${fpData.count}::${fpData.max_updated_at}`;
-            if (storedFp === currentFp) {
+            if (storedFp === currentFp && localItems.length >= Number(fpData.count)) {
               cachedClassrooms = localItems;
               cachedClassroomsTimestamp = Date.now();
               return localItems;

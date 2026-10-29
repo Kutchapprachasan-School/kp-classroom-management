@@ -153,7 +153,7 @@ export const ClassroomsRosterView: React.FC<ClassroomsRosterViewProps> = ({
   const loadClassrooms = useCallback(async () => {
     setIsLoading(true);
     try {
-      const cls = await classroomService.getAll();
+      const cls = await classroomService.getAll(true);
       setAllClassrooms(cls);
       if (cls.length > 0) {
         const currentUser = authService.getCurrentUser();
