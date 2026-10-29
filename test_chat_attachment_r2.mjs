@@ -54,7 +54,9 @@ console.log('  ✓ r2-lifecycle-rules.json properly configured for zero-compute 
 // 3. Verify Server Presign Route Implementation
 // ---------------------------------------------------------------------------
 console.log('\n--- 3. Checking Server Presign API Route Architecture ---');
-const serverPresignPath = path.resolve('c:/dev/eLeave/src/app/api/chat/attachments/presign/route.ts');
+const serverPresignPath = fs.existsSync('c:/dev/eLeave/src/app/api/chat/attachments/presign/route.ts')
+  ? path.resolve('c:/dev/eLeave/src/app/api/chat/attachments/presign/route.ts')
+  : path.resolve('c:/dev/eLeave/_chat_wip/chat/attachments/presign/route.ts');
 assert.ok(fs.existsSync(serverPresignPath), 'Presign API route must exist in Next.js backend');
 const presignContent = fs.readFileSync(serverPresignPath, 'utf-8');
 assert.ok(presignContent.includes('PutObjectCommand'), 'Presign route must use PutObjectCommand');

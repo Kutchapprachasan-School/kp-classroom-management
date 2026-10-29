@@ -2351,17 +2351,30 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                           </div>
 
                           {/* Submission Progress */}
-                          <div className="min-w-[120px] sm:min-w-[140px]">
+                          <div className="min-w-[120px] sm:min-w-[150px]">
                             <div className="text-[11px] text-[#94A3B8] flex items-center justify-between mb-0.5">
-                              <span>ส่งคะแนนแล้ว</span>
+                              <span>
+                                {item.pendingReviewCount > 0
+                                  ? 'ส่งงานแล้ว'
+                                  : item.progressPercent === 100
+                                  ? 'ตรวจครบแล้ว'
+                                  : 'ส่งงานแล้ว'}
+                              </span>
                               <span className="font-bold text-[#163A66]">
                                 {item.progressCount}/{item.totalStudents} คน
+                                {item.pendingReviewCount > 0 && (
+                                  <span className="text-[10px] font-semibold text-rose-500 ml-1">
+                                    (รอตรวจ {item.pendingReviewCount})
+                                  </span>
+                                )}
                               </span>
                             </div>
                             <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                               <div
                                 className={`h-full rounded-full transition-all duration-300 ${
-                                  item.progressPercent === 100
+                                  item.pendingReviewCount > 0
+                                    ? 'bg-[#3B82F6]'
+                                    : item.progressPercent === 100
                                     ? 'bg-emerald-500'
                                     : item.progressPercent > 0
                                     ? 'bg-[#3B82F6]'

@@ -123,7 +123,10 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
   const roomName = matchedRoom
     ? `ชั้น ${matchedRoom.roomNumber || matchedRoom.name}`
     : `ชั้น ${formatClassroomLabel(classroomId)}`;
-  const adviserName = (matchedRoom as any)?.advisorTeacher || (matchedRoom as any)?.homeroomTeacher || 'ครูที่ปรึกษาประจำชั้น';
+  const adviserName =
+    matchedRoom?.adviser && matchedRoom.adviser !== 'ยังไม่ได้กำหนด'
+      ? matchedRoom.adviser
+      : (matchedRoom as any)?.advisorTeacher || (matchedRoom as any)?.homeroomTeacher || 'ยังไม่ได้กำหนดครูที่ปรึกษา';
 
   // Stats
   const disciplineInfo = useMemo(() => {

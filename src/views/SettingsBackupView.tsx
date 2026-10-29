@@ -97,7 +97,7 @@ import { sgsExportService, type SgsSnapshotRecord } from '../services/sgsExportS
 import { r2StorageService } from '../services/r2StorageService';
 import { sgsRosterAndSubmissionService } from '../services/sgsRosterAndSubmissionService';
 import { TEACHER_SUBJECTS_LIST } from '../services/teacherCourseAssignmentService';
-import { classroomService } from '../services/classroomService';
+import { classroomService, type TeacherAccountItem } from '../services/classroomService';
 import { cleanSlateService } from '../services/cleanSlateService';
 import { phoneNotificationService } from '../services/phoneNotificationService';
 import {
@@ -240,24 +240,23 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
     sgsRosterAndSubmissionService.getLocalUnsyncedSubmissionsCount()
   );
 
-  // Classrooms & Advisors
+  // Classrooms & Advisors (ดึงจากฐานข้อมูลจริงตามกฎ Zero-Mock)
   const [classrooms, setClassrooms] = useState<ClassroomRosterItem[]>([]);
-  const AVAILABLE_TEACHERS = useMemo(
-    () => [
-      'ครูภาสภูมิ เรืองปราชญ์',
-      'ครูวิภาดา สมบูรณ์',
-      'ครูเอกชัย มิ่งขวัญ',
-      'ครูชนิกา ทรัพย์สุข',
-      'ครูปิยพล เกษรัตน์',
-      'ครูประภาส เกษมสันต์',
-      'ครูพิมพ์ใจ สิทธิเดช',
-      'ครูสมคิด สุวรรณโชติ',
-      'ครูสมทรง วงศ์ใหญ่',
-      'ครูศิริพร บุญช่วย',
-      'ครูกานดา มณีรัตน์',
-    ],
-    []
-  );
+  const [teacherAccounts, setTeacherAccounts] = useState<TeacherAccountItem[]>([]);
+
+  const availableTeachersList = useMemo(() => {
+    const names = teacherAccounts.map((t) => t.name.trim()).filter(Boolean);
+    // รวบรวมครูที่ปรึกษาเดิมในห้องเรียนเข้ามาร่วมด้วยเพื่อไม่ให้ตกหล่น
+    classrooms.forEach((c) => {
+      if (c.adviser && c.adviser !== 'ยังไม่ได้กำหนด' && !names.includes(c.adviser)) {
+        names.push(c.adviser);
+      }
+      if (c.coAdviser && !names.includes(c.coAdviser)) {
+        names.push(c.coAdviser);
+      }
+    });
+    return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b, 'th'));
+  }, [teacherAccounts, classrooms]);
 
   // Toast
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -393,9 +392,11 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
   useEffect(() => {
     sgsExportService.getSnapshots().then(setSnapshots).catch(() => {});
     classroomService.getAll().then(setClassrooms).catch(() => {});
+    classroomService.getTeacherAccounts().then(setTeacherAccounts).catch(() => {});
 
     const handleClassroomChange = () => {
       classroomService.getAll().then(setClassrooms).catch(() => {});
+      classroomService.getTeacherAccounts().then(setTeacherAccounts).catch(() => {});
       setIsCleanSlate(cleanSlateService.isCleanSlateActive());
     };
     window.addEventListener('kps-data-sync-event', handleClassroomChange);
@@ -1888,7 +1889,10 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
         onSave={async () => {
           try {
             for (const cls of classrooms) {
-              await classroomService.updateAdvisers(cls.id, cls.adviser, cls.coAdviser);
+              await classroomService.update(cls.id, {
+                adviser: cls.adviser || 'ยังไม่ได้กำหนด',
+                coAdviser: cls.coAdviser || undefined,
+              });
             }
             showToast('✓ บันทึกการตั้งค่าครูที่ปรึกษาเรียบร้อยแล้ว');
             setActiveModalKey(null);
@@ -1944,7 +1948,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                         </label>
                         {canEdit ? (
                           <select
-                            value={cls.adviser || ''}
+                            value={cls.adviser || 'ยังไม่ได้กำหนด'}
                             onChange={(e) => {
                               const val = e.target.value;
                               setClassrooms((prev) =>
@@ -1953,7 +1957,8 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                             }}
                             className="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 font-medium text-slate-800 focus:outline-blue-500 cursor-pointer"
                           >
-                            {AVAILABLE_TEACHERS.map((t) => (
+                            <option value="ยังไม่ได้กำหนด">-- ยังไม่ได้กำหนดครูที่ปรึกษา --</option>
+                            {availableTeachersList.map((t) => (
                               <option key={t} value={t}>
                                 {t}
                               </option>
@@ -1961,7 +1966,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                           </select>
                         ) : (
                           <span className="text-xs font-bold text-slate-700 bg-white px-2 py-1 rounded border border-slate-200">
-                            {cls.adviser}
+                            {cls.adviser || 'ยังไม่ได้กำหนด'}
                           </span>
                         )}
                       </div>
@@ -1983,7 +1988,7 @@ export const SettingsBackupView: React.FC<SettingsBackupViewProps> = ({
                             className="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 font-medium text-slate-800 focus:outline-blue-500 cursor-pointer"
                           >
                             <option value="">-- ไม่มีครูร่วม --</option>
-                            {AVAILABLE_TEACHERS.map((t) => (
+                            {availableTeachersList.map((t) => (
                               <option key={t} value={t}>
                                 {t}
                               </option>

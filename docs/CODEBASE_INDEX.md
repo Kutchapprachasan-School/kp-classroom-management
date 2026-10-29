@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 29/10/2569 07:47:43 | รวมทั้งหมด 242 ไฟล์*
+*อัปเดตล่าสุด: 29/10/2569 10:18:51 | รวมทั้งหมด 242 ไฟล์*
 
 ---
 
@@ -14,7 +14,7 @@
 | :--- | :---: | :--- |
 | [src/views/AcademicTermsView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/AcademicTermsView.tsx) | 2081 | `ActivityCategory` (L50), `CalendarLegendColor` (L52), `CalendarEventItem` (L54), `AcademicTermsView` (L282) |
 | [src/views/AdminExecutiveDashboardView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/AdminExecutiveDashboardView.tsx) | 312 | `AdminExecutiveDashboardView` (L39) |
-| [src/views/AssignmentManagementView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/AssignmentManagementView.tsx) | 5345 | `QuickFilterMode` (L68), `AssignmentManagementView` (L83) |
+| [src/views/AssignmentManagementView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/AssignmentManagementView.tsx) | 5358 | `QuickFilterMode` (L68), `AssignmentManagementView` (L83) |
 | [src/views/ClassroomAttendanceView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomAttendanceView.tsx) | 1885 | `ClassroomAttendanceViewProps` (L56), `TeacherCourseOption` (L61), `ClassroomAttendanceView` (L85) |
 | [src/views/ClassroomManagementView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomManagementView.tsx) | 1523 | `ImportPreviewRow` (L51), `ClassroomManagementView` (L63) |
 | [src/views/ClassroomsRosterView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomsRosterView.tsx) | 2163 | `ClassroomsRosterView` (L64) |
@@ -33,7 +33,7 @@
 | [src/views/SchoolLeaveExecutiveDashboardView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/SchoolLeaveExecutiveDashboardView.tsx) | 292 | `SchoolLeaveExecutiveDashboardView` (L43) |
 | [src/views/SchoolPortalView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/SchoolPortalView.tsx) | 722 | `TeacherLoginChannel` (L23), `SchoolPortalView` (L38) |
 | [src/views/ScoreMatrixPrapanView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ScoreMatrixPrapanView.tsx) | 1031 | `ScoreMatrixPrapanView` (L32) |
-| [src/views/SettingsBackupView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/SettingsBackupView.tsx) | 4135 | `SettingsKey` (L123), `SettingsBackupView` (L150) |
+| [src/views/SettingsBackupView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/SettingsBackupView.tsx) | 4140 | `SettingsKey` (L123), `SettingsBackupView` (L150) |
 | [src/views/StudentAffairsCouncilView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentAffairsCouncilView.tsx) | 875 | `StudentAffairsCouncilView` (L38) |
 | [src/views/StudentArenaView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentArenaView.tsx) | 457 | `StudentArenaView` (L47) |
 | [src/views/StudentCouncilAffairsPortalView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/StudentCouncilAffairsPortalView.tsx) | 505 | `StudentCouncilAffairsPortalView` (L28) |
@@ -89,7 +89,7 @@
 | [src/components/student/StudentHomeDashboard.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentHomeDashboard.tsx) | 802 | `StudentHomeDashboard` (L58) |
 | [src/components/student/StudentMobileBottomNav.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentMobileBottomNav.tsx) | 100 | `StudentMobileBottomNav` (L15) |
 | [src/components/student/StudentMobileCareView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentMobileCareView.tsx) | 1250 | `MobileScreenKey` (L33), `StudentMobileCareView` (L100) |
-| [src/components/student/StudentProfileView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentProfileView.tsx) | 738 | `StudentProfileView` (L48) |
+| [src/components/student/StudentProfileView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentProfileView.tsx) | 741 | `StudentProfileView` (L48) |
 | [src/components/student/StudentSidebar.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentSidebar.tsx) | 313 | `StudentTabKey` (L28), `StudentSidebar` (L60) |
 | [src/components/student/StudentSubmissionUploader.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentSubmissionUploader.tsx) | 180 | `formatBytes` (L10), `StudentSubmissionUploaderProps` (L16), `StudentSubmissionUploader` (L22), `ValidatedStudentUploader` (L177) |
 | [src/components/student/StudentSubmissionWithPreview.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentSubmissionWithPreview.tsx) | 388 | `formatFileSizeMB` (L11), `StudentSubmissionWithPreviewProps` (L17), `StudentSubmissionWithPreview` (L24) |

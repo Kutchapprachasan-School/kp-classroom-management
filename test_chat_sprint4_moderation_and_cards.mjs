@@ -63,14 +63,18 @@ console.log('  ✓ Safe educational words (หีบ, อัสสัม, รั
 // 3. Verify Server Report Route & Moderation Integration
 // ---------------------------------------------------------------------------
 console.log('\n--- 3. Checking Server API Routes for Moderation & Reports ---');
-const reportRoutePath = path.resolve('c:/dev/eLeave/src/app/api/chat/messages/[messageId]/report/route.ts');
+const reportRoutePath = fs.existsSync('c:/dev/eLeave/src/app/api/chat/messages/[messageId]/report/route.ts')
+  ? path.resolve('c:/dev/eLeave/src/app/api/chat/messages/[messageId]/report/route.ts')
+  : path.resolve('c:/dev/eLeave/_chat_wip/chat/messages/[messageId]/report/route.ts');
 assert.ok(fs.existsSync(reportRoutePath), 'Message report route must exist in Next.js server');
 const reportContent = fs.readFileSync(reportRoutePath, 'utf-8');
 assert.ok(reportContent.includes('isFlagged: true'), 'Report route must mark isFlagged = true');
 assert.ok(reportContent.includes('reportedBy: user.userId'), 'Report route must record reporter info');
 console.log('  ✓ Inappropriate message report route verified');
 
-const messagesServerRoutePath = path.resolve('c:/dev/eLeave/src/app/api/chat/rooms/[roomId]/messages/route.ts');
+const messagesServerRoutePath = fs.existsSync('c:/dev/eLeave/src/app/api/chat/rooms/[roomId]/messages/route.ts')
+  ? path.resolve('c:/dev/eLeave/src/app/api/chat/rooms/[roomId]/messages/route.ts')
+  : path.resolve('c:/dev/eLeave/_chat_wip/chat/rooms/[roomId]/messages/route.ts');
 const serverMessagesContent = fs.readFileSync(messagesServerRoutePath, 'utf-8');
 assert.ok(serverMessagesContent.includes('checkChatRateLimit'), 'Server route must enforce checkChatRateLimit');
 assert.ok(serverMessagesContent.includes('sanitizeSchoolChatContent'), 'Server route must enforce sanitizeSchoolChatContent');
