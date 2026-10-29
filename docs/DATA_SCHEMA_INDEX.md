@@ -278,11 +278,11 @@
 
 ### 4.3 ฝั่งระบบ SMS (`C:/dev/eLeave/src` — ตารางที่ใช้ร่วมกัน)
 - **`prisma.student`** (1 calls across 1 file-ops):
-  - **[READ:count]** [`eLeave/src/app/actions/dashboard-widgets.ts:391`](file:///C:/dev/eLeave/src/app/actions/dashboard-widgets.ts#L391)
+  - **[READ:count]** [`eLeave/src/app/actions/dashboard-widgets.ts:382`](file:///C:/dev/eLeave/src/app/actions/dashboard-widgets.ts#L382)
 - **`prisma.studentEnrollment`**: *(ยังไม่มีการเรียกใช้โดยตรงใน `eLeave/src` — ต้องระวังหากฝั่งจัดการชั้นเรียนเขียนข้อมูลลงตารางอื่น)*
 - **`prisma.classRoom`** (3 calls across 2 file-ops):
   - **[READ:count]** [`eLeave/src/app/actions/academic-planning.ts:41`](file:///C:/dev/eLeave/src/app/actions/academic-planning.ts#L41)
-  - **[READ:findMany]** [`eLeave/src/app/actions/dashboard-widgets.ts:572`](file:///C:/dev/eLeave/src/app/actions/dashboard-widgets.ts#L572)
+  - **[READ:findMany]** [`eLeave/src/app/actions/dashboard-widgets.ts:632`](file:///C:/dev/eLeave/src/app/actions/dashboard-widgets.ts#L632)
 - **`prisma.attendance`** (19 calls across 9 file-ops):
   - **[WRITE:deleteMany]** [`eLeave/src/app/actions/admin.ts:439`](file:///C:/dev/eLeave/src/app/actions/admin.ts#L439)
   - **[READ:findMany]** [`eLeave/src/app/actions/attendance-stats.ts:16`](file:///C:/dev/eLeave/src/app/actions/attendance-stats.ts#L16)
@@ -292,14 +292,14 @@
   - **[READ:findMany]** [`eLeave/src/app/actions/attendance.ts:732`](file:///C:/dev/eLeave/src/app/actions/attendance.ts#L732)
   - **[WRITE:upsert]** [`eLeave/src/app/actions/attendance.ts:990`](file:///C:/dev/eLeave/src/app/actions/attendance.ts#L990)
   - **[WRITE:delete]** [`eLeave/src/app/actions/attendance.ts:1020`](file:///C:/dev/eLeave/src/app/actions/attendance.ts#L1020)
-  - **[READ:findMany]** [`eLeave/src/app/actions/dashboard-widgets.ts:365`](file:///C:/dev/eLeave/src/app/actions/dashboard-widgets.ts#L365)
+  - **[READ:findMany]** [`eLeave/src/app/actions/dashboard-widgets.ts:356`](file:///C:/dev/eLeave/src/app/actions/dashboard-widgets.ts#L356)
 - **`prisma.studentMorningAttendance`** (1 calls across 1 file-ops):
-  - **[READ:findMany]** [`eLeave/src/app/actions/dashboard-widgets.ts:394`](file:///C:/dev/eLeave/src/app/actions/dashboard-widgets.ts#L394)
+  - **[READ:findMany]** [`eLeave/src/app/actions/dashboard-widgets.ts:385`](file:///C:/dev/eLeave/src/app/actions/dashboard-widgets.ts#L385)
 - **`prisma.studentPeriodAttendance`**: *(ยังไม่มีการเรียกใช้โดยตรงใน `eLeave/src` — ต้องระวังหากฝั่งจัดการชั้นเรียนเขียนข้อมูลลงตารางอื่น)*
 - **`prisma.studentMedicalCertificate`** (1 calls across 1 file-ops):
-  - **[READ:count]** [`eLeave/src/app/actions/dashboard-widgets.ts:406`](file:///C:/dev/eLeave/src/app/actions/dashboard-widgets.ts#L406)
+  - **[READ:count]** [`eLeave/src/app/actions/dashboard-widgets.ts:397`](file:///C:/dev/eLeave/src/app/actions/dashboard-widgets.ts#L397)
 - **`prisma.studentRiskAssessment`** (1 calls across 1 file-ops):
-  - **[READ:count]** [`eLeave/src/app/actions/dashboard-widgets.ts:399`](file:///C:/dev/eLeave/src/app/actions/dashboard-widgets.ts#L399)
+  - **[READ:count]** [`eLeave/src/app/actions/dashboard-widgets.ts:390`](file:///C:/dev/eLeave/src/app/actions/dashboard-widgets.ts#L390)
 - **`prisma.studentHomeVisit`**: *(ยังไม่มีการเรียกใช้โดยตรงใน `eLeave/src` — ต้องระวังหากฝั่งจัดการชั้นเรียนเขียนข้อมูลลงตารางอื่น)*
 - **`prisma.studentSdqEvaluation`**: *(ยังไม่มีการเรียกใช้โดยตรงใน `eLeave/src` — ต้องระวังหากฝั่งจัดการชั้นเรียนเขียนข้อมูลลงตารางอื่น)*
 - **`prisma.behaviorRecord`**: *(ยังไม่มีการเรียกใช้โดยตรงใน `eLeave/src` — ต้องระวังหากฝั่งจัดการชั้นเรียนเขียนข้อมูลลงตารางอื่น)*
@@ -314,22 +314,22 @@
   - **[READ:findMany]** [`eLeave/src/app/actions/workload-policy.ts:186`](file:///C:/dev/eLeave/src/app/actions/workload-policy.ts#L186)
   - **[READ:findUnique]** [`eLeave/src/services/etuCalculator.ts:107`](file:///C:/dev/eLeave/src/services/etuCalculator.ts#L107)
   - **[READ:count]** [`eLeave/src/services/readinessEngine.ts:94`](file:///C:/dev/eLeave/src/services/readinessEngine.ts#L94)
-- **`prisma.user`** (119 calls across 47 file-ops):
+- **`prisma.user`** (127 calls across 52 file-ops):
+  - **[READ:findMany]** [`eLeave/src/actions/planning/project-actions.ts:96`](file:///C:/dev/eLeave/src/actions/planning/project-actions.ts#L96)
+  - **[READ:findUnique]** [`eLeave/src/actions/planning/project-actions.ts:361`](file:///C:/dev/eLeave/src/actions/planning/project-actions.ts#L361)
+  - **[READ:findMany]** [`eLeave/src/actions/planning/settings-actions.ts:35`](file:///C:/dev/eLeave/src/actions/planning/settings-actions.ts#L35)
   - **[READ:findUnique]** [`eLeave/src/app/actions/admin.ts:38`](file:///C:/dev/eLeave/src/app/actions/admin.ts#L38)
   - **[READ:findMany]** [`eLeave/src/app/actions/admin.ts:114`](file:///C:/dev/eLeave/src/app/actions/admin.ts#L114)
   - **[WRITE:update]** [`eLeave/src/app/actions/admin.ts:228`](file:///C:/dev/eLeave/src/app/actions/admin.ts#L228)
   - **[READ:findFirst]** [`eLeave/src/app/actions/admin.ts:319`](file:///C:/dev/eLeave/src/app/actions/admin.ts#L319)
   - **[WRITE:delete]** [`eLeave/src/app/actions/admin.ts:446`](file:///C:/dev/eLeave/src/app/actions/admin.ts#L446)
-  - **[WRITE:create]** [`eLeave/src/app/actions/admin.ts:840`](file:///C:/dev/eLeave/src/app/actions/admin.ts#L840)
+  - **[WRITE:create]** [`eLeave/src/app/actions/admin.ts:859`](file:///C:/dev/eLeave/src/app/actions/admin.ts#L859)
   - **[READ:findMany]** [`eLeave/src/app/actions/archive.ts:50`](file:///C:/dev/eLeave/src/app/actions/archive.ts#L50)
-  - **[READ:findMany]** [`eLeave/src/app/actions/attendance-stats.ts:31`](file:///C:/dev/eLeave/src/app/actions/attendance-stats.ts#L31)
-  - **[READ:findUnique]** [`eLeave/src/app/actions/attendance.ts:198`](file:///C:/dev/eLeave/src/app/actions/attendance.ts#L198)
-  - **[WRITE:update]** [`eLeave/src/app/actions/attendance.ts:584`](file:///C:/dev/eLeave/src/app/actions/attendance.ts#L584)
-  - *...และอีก 37 จุด*
+  - *...และอีก 42 จุด*
 - **`prisma.account`** (5 calls across 4 file-ops):
   - **[WRITE:deleteMany]** [`eLeave/src/app/actions/admin.ts:435`](file:///C:/dev/eLeave/src/app/actions/admin.ts#L435)
-  - **[WRITE:updateMany]** [`eLeave/src/app/actions/admin.ts:785`](file:///C:/dev/eLeave/src/app/actions/admin.ts#L785)
-  - **[WRITE:create]** [`eLeave/src/app/actions/admin.ts:858`](file:///C:/dev/eLeave/src/app/actions/admin.ts#L858)
+  - **[WRITE:updateMany]** [`eLeave/src/app/actions/admin.ts:804`](file:///C:/dev/eLeave/src/app/actions/admin.ts#L804)
+  - **[WRITE:create]** [`eLeave/src/app/actions/admin.ts:877`](file:///C:/dev/eLeave/src/app/actions/admin.ts#L877)
   - **[WRITE:updateMany]** [`eLeave/src/app/actions/user.ts:238`](file:///C:/dev/eLeave/src/app/actions/user.ts#L238)
 
 ---

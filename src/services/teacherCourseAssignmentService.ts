@@ -475,11 +475,11 @@ export const teacherCourseAssignmentService = {
           effectiveAssignmentTitle = `${asg.unitTitle} • ${effectiveAssignmentTitle}`;
         }
 
-        // แก้ไขคะแนนเต็ม: กรณีหน่วยคะแนนรวม (Unit Bundle) ให้ใช้ unitMaxScore แทน maxScore 1 ชิ้น
+        // คะแนนเต็มของชิ้นงาน: ใช้ maxScore ของชิ้นงานนั้นเป็นหลัก ถ้าไม่มีจึงใช้ unitMaxScore หรือ fallback เป็น 10
         const effectiveMaxScore =
-          asg?.unitMaxScore && asg.unitMaxScore > (asg.maxScore || 1)
-            ? asg.unitMaxScore
-            : asg?.maxScore || savedMatch?.maxScore || 10;
+          asg?.maxScore && asg.maxScore > 0
+            ? asg.maxScore
+            : savedMatch?.maxScore || asg?.unitMaxScore || 10;
 
         // แยก Channel
         let channel: SubmissionChannelType = 'IMAGE_UPLOAD';

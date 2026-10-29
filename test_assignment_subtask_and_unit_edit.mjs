@@ -45,11 +45,17 @@ assert(
   viewContent.includes('editScope === \'SUB_TASK\''),
   'Modal must branch cleanly for editScope === SUB_TASK'
 );
+assert(
+  viewContent.includes('maxScore: Math.max(1, Number(formMaxScore) || 10)'),
+  'Sub-task maxScore must directly save formMaxScore without being overwritten by formUnitMaxScore'
+);
 console.log('  ✓ Verified dedicated modal branching for UNIT vs SUB_TASK');
+console.log('  ✓ Verified sub-task maxScore uses formMaxScore directly without unitMaxScore override');
 
-// 2. Static Verification of sgsRosterAndSubmissionService.ts
-console.log('\n--- 2. Checking sgsRosterAndSubmissionService.ts Synchronization ---');
+// 2. Static Verification of sgsRosterAndSubmissionService.ts & teacherCourseAssignmentService.ts
+console.log('\n--- 2. Checking Service Synchronization ---');
 const serviceContent = fs.readFileSync('src/services/sgsRosterAndSubmissionService.ts', 'utf-8');
+const teacherAssignContent = fs.readFileSync('src/services/teacherCourseAssignmentService.ts', 'utf-8');
 
 assert(
   serviceContent.includes('unitKey: updates.unitKey !== undefined ? updates.unitKey : item.unitKey'),
@@ -59,7 +65,12 @@ assert(
   serviceContent.includes('targetClassrooms: updates.targetClassrooms !== undefined ? updates.targetClassrooms : item.targetClassrooms'),
   'sgsRosterAndSubmissionService must cascade targetClassrooms across same unit'
 );
+assert(
+  teacherAssignContent.includes('asg?.maxScore && asg.maxScore > 0'),
+  'teacherCourseAssignmentService must prioritize asg.maxScore for queue items'
+);
 console.log('  ✓ Verified unit cascade synchronization in sgsRosterAndSubmissionService');
+console.log('  ✓ Verified sub-task score prioritization in teacherCourseAssignmentService');
 
 // 3. Functional Simulation Test for Sub-Task vs Unit Updates
 console.log('\n--- 3. Testing Functional Update Logic ---');
@@ -100,6 +111,7 @@ const subTaskUpdates = {
   title: 'บทที่ 8 ข้อที่ 1-4 (ฉบับปรับปรุง)',
   description: 'แก้ไขคำชี้แจงเพิ่มเติม',
   dueDate: '2026-10-30',
+  maxScore: 10, // User edited sub-task score to 10
 };
 assignments = assignments.map(a => {
   if (a.id === 'task-1') {
@@ -111,10 +123,11 @@ assignments = assignments.map(a => {
 assert.strictEqual(assignments[0].title, 'บทที่ 8 ข้อที่ 1-4 (ฉบับปรับปรุง)');
 assert.strictEqual(assignments[0].description, 'แก้ไขคำชี้แจงเพิ่มเติม');
 assert.strictEqual(assignments[0].dueDate, '2026-10-30');
+assert.strictEqual(assignments[0].maxScore, 10, 'Subtask maxScore must be successfully changed to 10');
 // Verify unit metadata on task-2 was unaffected:
 assert.strictEqual(assignments[1].title, 'บทที่ 8 ข้อที่ 5-8');
 assert.strictEqual(assignments[1].unitTitle, 'บทที่ 8');
-console.log('  ✓ Sub-task update updated task-1 cleanly without disturbing other unit tasks');
+console.log('  ✓ Sub-task update updated task-1 maxScore to 10 cleanly without disturbing unit structure');
 
 // Simulation of UNIT update:
 const unitUpdates = {

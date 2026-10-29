@@ -637,10 +637,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     const resolvedGeneratedUnitId =
       formUnitId || `unit-${formUnitTitle.trim().toLowerCase().replace(/\s+/g, '-')}${roomSuffix}`;
 
-    const effectiveTaskMaxScore =
-      formAssignmentMode === 'UNIT_BUNDLE' && formScoringMethod === 'SUBMISSION_COUNT_RATIO'
-        ? Math.max(1, Number(formUnitMaxScore) || 10)
-        : Math.max(1, Number(formMaxScore) || 10);
+    const effectiveTaskMaxScore = Math.max(1, Number(formMaxScore) || 10);
 
     if (editingAssignment) {
       if (editScope === 'UNIT') {
@@ -674,10 +671,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
           title: formTitle.trim(),
           description: formDescription.trim() || undefined,
           attachments: formAttachments,
-          maxScore:
-            formScoringMethod === 'RAW_SCORE_AVERAGE'
-              ? Math.max(1, Number(formMaxScore) || 10)
-              : Math.max(1, Number(formUnitMaxScore) || 10),
+          maxScore: Math.max(1, Number(formMaxScore) || 10),
           dueDate: formDueDate || getBangkokTodayString(),
           targetClassrooms: targetRooms,
         });
@@ -3752,8 +3746,11 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                         type="number"
                         min={1}
                         max={100}
-                        value={formUnitMaxScore}
-                        onChange={(e) => setFormUnitMaxScore(Number(e.target.value) || 10)}
+                        value={formUnitMaxScore === 0 ? '' : formUnitMaxScore}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setFormUnitMaxScore(v === '' ? 0 : Number(v));
+                        }}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-[#163A66]"
                       />
                     </div>
@@ -4200,8 +4197,11 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                         type="number"
                         min={1}
                         max={100}
-                        value={formMaxScore}
-                        onChange={(e) => setFormMaxScore(Number(e.target.value) || 10)}
+                        value={formMaxScore === 0 ? '' : formMaxScore}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setFormMaxScore(v === '' ? 0 : Number(v));
+                        }}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-[#163A66]"
                       />
                       <p className="text-[10px] text-slate-400 mt-0.5">
@@ -4539,8 +4539,11 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                                   type="number"
                                   min={1}
                                   max={100}
-                                  value={formUnitMaxScore}
-                                  onChange={(e) => setFormUnitMaxScore(Number(e.target.value) || 10)}
+                                  value={formUnitMaxScore === 0 ? '' : formUnitMaxScore}
+                                  onChange={(e) => {
+                                    const v = e.target.value;
+                                    setFormUnitMaxScore(v === '' ? 0 : Number(v));
+                                  }}
                                   className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-[#163A66]"
                                 />
                               </div>
@@ -4769,8 +4772,11 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                                 type="number"
                                 min={1}
                                 max={100}
-                                value={formMaxScore}
-                                onChange={(e) => setFormMaxScore(Number(e.target.value) || 10)}
+                                value={formMaxScore === 0 ? '' : formMaxScore}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  setFormMaxScore(v === '' ? 0 : Number(v));
+                                }}
                                 className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-[#163A66]"
                               />
                             </div>
@@ -4853,8 +4859,11 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                             type="number"
                             min={1}
                             max={100}
-                            value={formMaxScore}
-                            onChange={(e) => setFormMaxScore(Number(e.target.value) || 10)}
+                            value={formMaxScore === 0 ? '' : formMaxScore}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setFormMaxScore(v === '' ? 0 : Number(v));
+                            }}
                             className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-[#163A66]"
                           />
                         </div>
