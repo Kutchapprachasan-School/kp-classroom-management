@@ -71,6 +71,7 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
   const [isReturningWork, setIsReturningWork] = useState<boolean>(false);
   const [returnReason, setReturnReason] = useState<string>(RETURN_SUBMISSION_REASONS[0]);
   const [customReturnNote, setCustomReturnNote] = useState<string>('');
+  const [activeImageIdx, setActiveImageIdx] = useState<number>(0);
 
   // Feedback Stickers Catalog State
   const [selectedStrand, setSelectedStrand] = useState<FeedbackStrandId>(() => {
@@ -105,6 +106,7 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
       setZoomLevel(100);
       setImgError(false);
       setLocalOverrideFileUrl(null);
+      setActiveImageIdx(0);
 
       // Auto-detect strand or restore preferred strand for teacher's major subject
       const preferred = getTeacherPreferredStrand();
@@ -176,11 +178,6 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
     if (isNaN(num) || num < 0) return;
     onSaveGrade(currentItem.id, num, feedbackInput);
   };
-
-  const [activeImageIdx, setActiveImageIdx] = useState<number>(0);
-  useEffect(() => {
-    setActiveImageIdx(0);
-  }, [currentIndex]);
 
   const imagesList =
     currentItem?.fileUrls && currentItem.fileUrls.length > 0
