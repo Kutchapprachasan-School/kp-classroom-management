@@ -410,9 +410,11 @@ export const teacherCourseAssignmentService = {
         const foundInService = studentService.findStudentByCode(subCode);
         const studentRoom = stu?.classroom || foundInService?.classroomId || foundInService?.student.classroomId || sub.classroom || '';
 
+        const hasValidSubDate = Boolean(sub.submittedAt && !isNaN(new Date(sub.submittedAt).getTime()));
+        const parsedSubTime = hasValidSubDate ? new Date(sub.submittedAt!).getTime() : 0;
         const subTimestamp =
-          sub.submittedAt && !isNaN(new Date(sub.submittedAt).getTime())
-            ? new Date(sub.submittedAt).getTime()
+          parsedSubTime > 0
+            ? parsedSubTime
             : savedMatch?.submittedTimestamp || (Date.now() - idx * 60000);
 
         // ค้นหาชิ้นงาน: ให้ความสำคัญกับการจับคู่ตรงด้วย assignmentId ก่อนเสมอ
@@ -435,16 +437,23 @@ export const teacherCourseAssignmentService = {
             );
           });
 
+        const isAlreadyGradedInRecord =
+          sub.status === 'GRADED' ||
+          (typeof sub.score === 'number' && sub.score !== null) ||
+          (savedMatch?.status === 'GRADED' && typeof savedMatch?.score === 'number');
+
         // 1. ตรวจสอบการส่งงานใหม่ของนักเรียน (เช่น ส่งใหม่หลังถูกส่งกลับแก้ไข)
+        // ต้องเป็นงานที่ยังไม่ได้ตรวจ หรือมีหลักฐานเวลาส่งใหม่จริง (ISO) หลังจากการตรวจเดิมอย่างน้อย 5 วินาที
+        // ห้ามนำ fallback timestamp (Date.now() - idx * 60000) มา override สถานะที่ตรวจแล้วเด็ดขาด
         const isFreshStudentSubmission =
           sub.status === 'SUBMITTED_PENDING' &&
           sub.score === null &&
-          (!savedMatch || savedMatch.status === 'PENDING_REVIEW' || !savedMatch.gradedTimestamp || subTimestamp > (savedMatch.gradedTimestamp || 0));
+          (!isAlreadyGradedInRecord ||
+            (Boolean(savedMatch?.gradedTimestamp) && parsedSubTime > ((savedMatch?.gradedTimestamp || 0) + 5000)));
 
         // 2. ตรวจสอบสถานะการตรวจคะแนน (GRADED) - ไม่ว่าจะเป็นงานรอบแรกหรืองานซ่อม เมื่อตรวจแล้วต้องเป็น GRADED เสมอ
         const isGraded =
-          !isFreshStudentSubmission &&
-          (sub.status === 'GRADED' || (savedMatch && savedMatch.status === 'GRADED'));
+          !isFreshStudentSubmission && isAlreadyGradedInRecord;
 
         // 3. ตรวจสอบสถานะการส่งกลับแก้ไข (RETURNED) - เมื่อถูกส่งกลับและยังไม่ส่งใหม่ ต้องแสดงในแท็บส่งกลับแก้ไข
         const isReturned =
@@ -777,18 +786,21 @@ export const teacherCourseAssignmentService = {
       }
     }
 
-    // หางานถัดไปที่ยังรอตรวจ (ค้นหาเดินหน้า forward ก่อนเสมอ ไม่วนกลับไปข้อ 1 ที่ข้ามมา)
-    const targetIdx = list.findIndex(
-      (i) =>
-        i.id === queueId ||
-        i.id === `q_${queueId}` ||
-        `${i.assignmentId}_${i.studentCode}` === queueId.replace(/^q_/, '')
-    );
+    // หางานถัดไปที่ยังรอตรวจ (ค้นหาเดินหน้า forward ก่อนเสมอ ไม่วนกลับไปข้อเดิมที่เพิ่งตรวจ)
+    const isSameWorkAsTarget = (it: GradingQueueItem) => {
+      if (it.id === queueId || it.id === `q_${queueId}` || `q_${it.id}` === queueId) return true;
+      if (targetItem && it.assignmentId === targetItem.assignmentId && it.studentCode === targetItem.studentCode) return true;
+      const cleanQ = queueId.replace(/^q_/, '');
+      if (`${it.assignmentId}_${it.studentCode}` === cleanQ) return true;
+      return false;
+    };
+
+    const targetIdx = list.findIndex((i) => isSameWorkAsTarget(i));
     const startIdx = fromIndex !== undefined && fromIndex >= 0 ? fromIndex : targetIdx;
     const forwardList = startIdx >= 0 ? updated.slice(startIdx + 1) : [];
     const nextPending =
-      forwardList.find((it) => it.status === 'PENDING_REVIEW') ||
-      updated.find((it) => it.status === 'PENDING_REVIEW' && it.id !== queueId) ||
+      forwardList.find((it) => it.status === 'PENDING_REVIEW' && !isSameWorkAsTarget(it)) ||
+      updated.find((it) => it.status === 'PENDING_REVIEW' && !isSameWorkAsTarget(it)) ||
       null;
 
     return { updatedQueue: updated, nextPendingItem: nextPending };
@@ -879,7 +891,14 @@ export const teacherCourseAssignmentService = {
       }
     }
 
-    const nextPending = updated.find((it) => it.status === 'PENDING_REVIEW') || null;
+    const isSameWorkAsTarget = (it: GradingQueueItem) => {
+      if (it.id === queueId || it.id === `q_${queueId}` || `q_${it.id}` === queueId) return true;
+      if (targetItem && it.assignmentId === targetItem.assignmentId && it.studentCode === targetItem.studentCode) return true;
+      const cleanQ = queueId.replace(/^q_/, '');
+      if (`${it.assignmentId}_${it.studentCode}` === cleanQ) return true;
+      return false;
+    };
+    const nextPending = updated.find((it) => it.status === 'PENDING_REVIEW' && !isSameWorkAsTarget(it)) || null;
     return { updatedQueue: updated, nextPendingItem: nextPending };
   },
 

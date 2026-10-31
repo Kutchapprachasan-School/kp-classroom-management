@@ -186,22 +186,32 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
       score,
       feedback
     );
+
+    const updatedQueue = teacherCourseAssignmentService.getGradingQueue();
+    setQueueItems(updatedQueue);
+
     showToast(`✓ บันทึกคะแนน (${score} คะแนน) เรียบร้อยแล้ว`);
+
+    const isSameWorkAsCurrent = (i: GradingQueueItem) => {
+      if (i.id === itemId || i.id === `q_${itemId}` || `q_${i.id}` === itemId) return true;
+      if (gradingModalItem && i.assignmentId === gradingModalItem.assignmentId && i.studentCode === gradingModalItem.studentCode) return true;
+      const cleanQ = itemId.replace(/^q_/, '');
+      if (`${i.assignmentId}_${i.studentCode}` === cleanQ) return true;
+      return false;
+    };
 
     if (isCurrentReturned) {
       // หากครูกำลังตรวจงานในกลุ่มที่ส่งกลับไปแก้ไข ให้ไล่ตรวจงานที่ส่งกลับแก้ไขชิ้นถัดไป
-      const updatedQueue = teacherCourseAssignmentService.getGradingQueue();
       const nextReturned = updatedQueue.find(
         (i) =>
           (i.status === 'RETURNED' || (i as any).status === 'RETURNED_REVISION') &&
-          i.id !== itemId &&
-          `${i.assignmentId}_${i.studentCode}` !== itemId.replace(/^q_/, '')
+          !isSameWorkAsCurrent(i)
       );
       if (nextReturned) {
         setGradingModalItem(nextReturned);
         return;
       }
-    } else if (nextPendingItem) {
+    } else if (nextPendingItem && !isSameWorkAsCurrent(nextPendingItem)) {
       setGradingModalItem(nextPendingItem);
       return;
     }
@@ -215,9 +225,20 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
     if (!targetItem) return;
 
     const { nextPendingItem } = teacherCourseAssignmentService.returnSubmission(itemId, reason, note);
+    const updatedQueue = teacherCourseAssignmentService.getGradingQueue();
+    setQueueItems(updatedQueue);
+
     showToast(`✓ ส่งงานกลับให้ ${targetItem.studentName} แก้ไขเรียบร้อยแล้ว (${reason})`);
 
-    if (nextPendingItem) {
+    const isSameWorkAsCurrent = (i: GradingQueueItem) => {
+      if (i.id === itemId || i.id === `q_${itemId}` || `q_${i.id}` === itemId) return true;
+      if (i.assignmentId === targetItem.assignmentId && i.studentCode === targetItem.studentCode) return true;
+      const cleanQ = itemId.replace(/^q_/, '');
+      if (`${i.assignmentId}_${i.studentCode}` === cleanQ) return true;
+      return false;
+    };
+
+    if (nextPendingItem && !isSameWorkAsCurrent(nextPendingItem)) {
       setGradingModalItem(nextPendingItem);
     } else {
       setGradingModalItem(null);

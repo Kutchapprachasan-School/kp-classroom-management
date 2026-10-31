@@ -218,6 +218,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
 
   // สั่งงานเพิ่มในหน่วยย่อย (ไม่ต้องแก้รายละเอียดหน่วย) & รายละเอียดงาน & สื่อการสอน
   const [isAddingToExistingUnit, setIsAddingToExistingUnit] = useState<boolean>(false);
+  const [isChangingSubTaskUnit, setIsChangingSubTaskUnit] = useState<boolean>(false);
   const [formUnitId, setFormUnitId] = useState<string>('');
   const [formDescription, setFormDescription] = useState<string>('');
   const [formAttachments, setFormAttachments] = useState<AssignmentAttachment[]>([]);
@@ -296,17 +297,19 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     return Array.from(map.values());
   }, [termAssignments, formCourseCode]);
 
-  // รายการงานย่อยที่สังกัดหน่วยที่กำลังเลือก/แก้ไขอยู่
+  // รายการงานย่อยที่สังกัดหน่วยที่กำลังเลือก/แก้ไขอยู่ (จับคู่ตาม unitTitle และ courseCode เพื่อไม่ให้ข้อมูลปนกันข้ามหน่วย)
   const currentUnitSubTasks = useMemo(() => {
     if (!formUnitTitle) return [];
+    const cleanFormTitle = formUnitTitle.trim().toLowerCase();
     return termAssignments.filter(
       (a) =>
         a.courseCode === formCourseCode &&
-        (a.unitTitle === formUnitTitle || (formUnitId && a.unitId === formUnitId))
+        Boolean(a.unitTitle && a.unitTitle.trim().toLowerCase() === cleanFormTitle)
     );
-  }, [termAssignments, formCourseCode, formUnitTitle, formUnitId]);
+  }, [termAssignments, formCourseCode, formUnitTitle]);
 
   const handleSelectExistingUnit = (unit: (typeof existingCourseUnitDetails)[0]) => {
+    setFormUnitTab('EXISTING');
     setFormUnitTitle(unit.unitTitle);
     setFormUnitId(unit.unitId);
     setFormUnitMaxScore(unit.unitMaxScore);
@@ -317,6 +320,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     );
     setFormIsDynamicTasks(unit.isDynamicTasks);
     setFormAutoRoundUp(unit.autoRoundUp ?? true);
+    setIsAddingToExistingUnit(true);
   };
 
   // สื่อการสอนและแผนการสอนที่มีอยู่ในระบบ (cls_lesson_plans_v1 & coursesCurriculumService)
@@ -439,7 +443,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     setEditingAssignment(null);
     setEditScope(null);
     setIsAddingToExistingUnit(prefill?.isAddingToExistingUnit ?? false);
-    setFormUnitId(prefill?.unitId || '');
+    setIsChangingSubTaskUnit(false);
+    setFormUnitId(prefill?.isNewUnit ? '' : prefill?.unitId || '');
     setFormDescription('');
     setFormAttachments([]);
     const initialCourse =
@@ -470,6 +475,10 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     if (prefill?.forceUnitMode || prefill?.unitTitle) {
       setFormAssignmentMode('UNIT_BUNDLE');
       setFormUnitTab(prefill?.isNewUnit ? 'NEW' : 'EXISTING');
+      if (prefill?.isNewUnit) {
+        setFormUnitId('');
+        setIsAddingToExistingUnit(false);
+      }
       setFormUnitTitle(prefill.unitTitle || '');
       setFormUnitMaxScore(prefill.unitMaxScore ?? 10);
       setFormScoringMethod(prefill.scoringMethod || 'SUBMISSION_COUNT_RATIO');
@@ -477,8 +486,10 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       setFormTotalTasksInUnit(prefill.totalTasksInUnit && prefill.totalTasksInUnit > 0 ? prefill.totalTasksInUnit : 5);
     } else {
       setFormAssignmentMode('UNIT_BUNDLE');
-      setFormUnitTab('EXISTING');
+      const hasExistingUnits = existingCourseUnitDetails.length > 0;
+      setFormUnitTab(hasExistingUnits ? 'EXISTING' : 'NEW');
       setFormUnitTitle('');
+      setFormUnitId('');
       setFormUnitMaxScore(10);
       setFormScoringMethod('SUBMISSION_COUNT_RATIO');
       setFormIsDynamicTasks(true);
@@ -503,6 +514,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     setEditingAssignment(task);
     setEditScope('SUB_TASK');
     setIsAddingToExistingUnit(false);
+    setIsChangingSubTaskUnit(false);
     setFormUnitId(task.unitId || '');
     setFormDescription(task.description || '');
     setFormAttachments(task.attachments || []);
@@ -640,8 +652,20 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       targetRooms.length === 1 && targetRooms[0] !== 'ALL'
         ? `-${targetRooms[0].replace(/[^a-zA-Z0-9ก-๙]/g, '')}`
         : '';
+    const cleanUnitSlug = formUnitTitle.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9ก-๙-]/g, '');
+    const cleanCourseSlug = effectiveCourseCode.trim().toLowerCase().replace(/[^a-zA-Z0-9ก-๙-]/g, '');
+
+    // ป้องกันกรณี formUnitId ยังคงค้าง ID ของหน่วยเดิม ทั้งที่ผู้ใช้เลือกสร้างหน่วยใหม่ หรือพิมพ์ชื่อหน่วยใหม่
+    const isMismatchedUnitId = Boolean(
+      formUnitId && existingCourseUnitDetails.some(
+        (u) => u.unitId === formUnitId && u.unitTitle.trim().toLowerCase() !== formUnitTitle.trim().toLowerCase()
+      )
+    );
+
     const resolvedGeneratedUnitId =
-      formUnitId || `unit-${formUnitTitle.trim().toLowerCase().replace(/\s+/g, '-')}${roomSuffix}`;
+      formUnitTab === 'NEW' || !formUnitId || isMismatchedUnitId
+        ? `unit-${cleanCourseSlug}-${cleanUnitSlug}${roomSuffix}-${Date.now().toString(36)}`
+        : formUnitId;
 
     const effectiveTaskMaxScore = Math.max(1, Number(formMaxScore) || 10);
 
@@ -667,12 +691,18 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
         setEditingAssignment(null);
         setEditScope(null);
         setIsAddingToExistingUnit(false);
+        setIsChangingSubTaskUnit(false);
         showToast(`✓ บันทึกการตั้งค่าหน่วย "${formUnitTitle.trim()}" เรียบร้อยแล้ว (อัปเดตทุกงานในหน่วย)`);
         return;
       }
 
       if (editScope === 'SUB_TASK') {
-        // อัปเดตเฉพาะงานย่อยนี้ โดยไม่กระทบโครงสร้างของหน่วย
+        // อัปเดตเฉพาะงานย่อยนี้ โดยไม่กระทบโครงสร้างของหน่วยเดิม (หากย้ายหน่วย จะอัปเดตสังกัดหน่วยให้ใหม่)
+        const hasUnitChanged = Boolean(
+          formUnitTitle.trim() &&
+          formUnitTitle.trim().toLowerCase() !== (editingAssignment.unitTitle || '').trim().toLowerCase()
+        );
+
         sgsRosterAndSubmissionService.updateTermAssignment(editingAssignment.id, {
           title: formTitle.trim(),
           description: formDescription.trim() || undefined,
@@ -680,14 +710,28 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
           maxScore: Math.max(1, Number(formMaxScore) || 10),
           dueDate: formDueDate || getBangkokTodayString(),
           targetClassrooms: targetRooms,
-        });
+          ...(hasUnitChanged ? {
+            unitTitle: formUnitTitle.trim(),
+            unitId: resolvedGeneratedUnitId,
+            unitMaxScore: Math.max(1, Number(formUnitMaxScore) || 10),
+            scorePart: formScorePart,
+            scoringMethod: formScoringMethod,
+            totalTasksInUnit: finalTotalTasks,
+            autoRoundUp: formAutoRoundUp,
+          } : {})
+        }, { cascadeToUnit: false });
 
         refreshTermAssignments();
         setIsCreateModalOpen(false);
         setEditingAssignment(null);
         setEditScope(null);
         setIsAddingToExistingUnit(false);
-        showToast(`✓ บันทึกการแก้ไขงานย่อย "${formTitle.trim()}" เรียบร้อยแล้ว`);
+        setIsChangingSubTaskUnit(false);
+        showToast(
+          hasUnitChanged
+            ? `✓ ย้ายงานย่อย "${formTitle.trim()}" ไปยังหน่วย "${formUnitTitle.trim()}" เรียบร้อยแล้ว`
+            : `✓ บันทึกการแก้ไขงานย่อย "${formTitle.trim()}" เรียบร้อยแล้ว`
+        );
         return;
       }
 
@@ -887,10 +931,13 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       );
 
       if (isUnit && assign.unitTitle) {
-        const uKey = assign.unitId || `${assign.courseCode || 'all'}:::${assign.unitTitle}`;
+        const courseKey = (assign.courseCode || 'all').trim().toUpperCase();
+        const cleanTitle = assign.unitTitle.trim();
+        // จัดกลุ่มตาม courseCode และ unitTitle อย่างชัดเจน ป้องกันการ์ดหน่วยคนละชื่อถูกรวมเข้าด้วยกัน
+        const uKey = `${courseKey}:::${cleanTitle.toLowerCase()}`;
         const existing = unitMap.get(uKey) || {
           key: uKey,
-          unitId: assign.unitId || uKey,
+          unitId: assign.unitId || `unit-${courseKey.toLowerCase()}-${cleanTitle.toLowerCase().replace(/\s+/g, '-')}`,
           unitTitle: assign.unitTitle,
           courseCode: assign.courseCode || '',
           courseName: assign.courseName || '',
@@ -1368,7 +1415,10 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     const independent: TermAssignmentConfig[] = [];
 
     matrixAssignments.forEach((asg) => {
-      const uKey = asg.unitId || (asg.scoringMethod && asg.scoringMethod !== 'DIRECT_SCORE' ? asg.unitTitle : undefined);
+      const cleanTitle = asg.unitTitle?.trim();
+      const uKey = cleanTitle
+        ? `${(asg.courseCode || 'all').trim().toUpperCase()}:::${cleanTitle.toLowerCase()}`
+        : asg.unitId;
       if (uKey && asg.scoringMethod && asg.scoringMethod !== 'DIRECT_SCORE') {
         const existing = unitMap.get(uKey) || {
           id: asg.unitId || uKey,
@@ -1577,24 +1627,37 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       feedback
     );
 
+    const updatedQ = teacherCourseAssignmentService.getGradingQueue();
+    setQueueItems(updatedQ);
+
     showToast(
       `✓ บันทึกคะแนน ${targetItem.studentName} (${score}/${targetItem.maxScore} คะแนน) เรียบร้อยแล้ว`
     );
 
-    if (nextPendingItem) {
-      const nextFiltered = filteredSubmissions.find((i) => i.id === nextPendingItem.id);
+    const isSameWorkAsCurrent = (i: GradingQueueItem) => {
+      if (i.id === itemId || i.id === `q_${itemId}` || `q_${it_id_or_clean(i.id)}` === it_id_or_clean(itemId)) return true;
+      if (i.assignmentId === targetItem.assignmentId && i.studentCode === targetItem.studentCode) return true;
+      return false;
+    };
+
+    function it_id_or_clean(idStr: string) {
+      return idStr.replace(/^q_/, '');
+    }
+
+    if (nextPendingItem && !isSameWorkAsCurrent(nextPendingItem)) {
+      const nextFiltered = updatedQ.find((i) => i.id === nextPendingItem.id && i.status === 'PENDING_REVIEW');
       if (nextFiltered) {
         setGradingModalItem(nextFiltered);
         return;
       }
     }
 
-    const currentFilteredIdx = filteredSubmissions.findIndex((i) => i.id === itemId);
+    const currentFilteredIdx = updatedQ.findIndex((i) => isSameWorkAsCurrent(i));
     const forwardInFilter = currentFilteredIdx >= 0
-      ? filteredSubmissions.slice(currentFilteredIdx + 1).find((i) => i.status === 'PENDING_REVIEW')
+      ? updatedQ.slice(currentFilteredIdx + 1).find((i) => i.status === 'PENDING_REVIEW' && !isSameWorkAsCurrent(i))
       : undefined;
-    const nextInFilter = forwardInFilter || filteredSubmissions.find(
-      (i) => i.id !== itemId && i.status === 'PENDING_REVIEW'
+    const nextInFilter = forwardInFilter || updatedQ.find(
+      (i) => !isSameWorkAsCurrent(i) && i.status === 'PENDING_REVIEW'
     );
     if (nextInFilter) {
       setGradingModalItem(nextInFilter);
@@ -1608,7 +1671,7 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
     const targetItem = queueItems.find((i) => i.id === itemId);
     if (!targetItem) return;
 
-    teacherCourseAssignmentService.returnSubmission(itemId, reason, note);
+    const { nextPendingItem } = teacherCourseAssignmentService.returnSubmission(itemId, reason, note);
     sgsRosterAndSubmissionService.returnSubmissionForRevision(
       targetItem.assignmentId,
       targetItem.studentCode,
@@ -1616,20 +1679,36 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       note
     );
 
-    setQueueItems(teacherCourseAssignmentService.getGradingQueue());
+    const updatedQ = teacherCourseAssignmentService.getGradingQueue();
+    setQueueItems(updatedQ);
     showToast(`✓ ส่งงานกลับให้ ${targetItem.studentName} แก้ไขเรียบร้อยแล้ว (${reason})`);
 
-    const currentFilteredIdx = filteredSubmissions.findIndex((i) => i.id === itemId);
+    const isSameWorkAsCurrent = (i: GradingQueueItem) => {
+      if (i.id === itemId || i.id === `q_${itemId}` || `q_${i.id}` === itemId) return true;
+      if (i.assignmentId === targetItem.assignmentId && i.studentCode === targetItem.studentCode) return true;
+      return false;
+    };
+
+    if (nextPendingItem && !isSameWorkAsCurrent(nextPendingItem)) {
+      const nextFiltered = updatedQ.find((i) => i.id === nextPendingItem.id && i.status === 'PENDING_REVIEW');
+      if (nextFiltered) {
+        setGradingModalItem(nextFiltered);
+        return;
+      }
+    }
+
+    const currentFilteredIdx = updatedQ.findIndex((i) => isSameWorkAsCurrent(i));
     const forwardInFilter = currentFilteredIdx >= 0
-      ? filteredSubmissions.slice(currentFilteredIdx + 1).find((i) => i.status === 'PENDING_REVIEW')
+      ? updatedQ.slice(currentFilteredIdx + 1).find((i) => i.status === 'PENDING_REVIEW' && !isSameWorkAsCurrent(i))
       : undefined;
-    const nextInFilter = forwardInFilter || filteredSubmissions.find(
-      (i) => i.id !== itemId && i.status === 'PENDING_REVIEW'
+    const nextInFilter = forwardInFilter || updatedQ.find(
+      (i) => !isSameWorkAsCurrent(i) && i.status === 'PENDING_REVIEW'
     );
     if (nextInFilter) {
       setGradingModalItem(nextInFilter);
     } else {
       setGradingModalItem(null);
+      showToast('🎉 ตรวจครบทุกชิ้นในคิวนี้เรียบร้อยแล้ว!');
     }
   };
 
@@ -4072,28 +4151,69 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                       </div>
                       <div className="flex items-center gap-1.5">
                         {editScope === 'SUB_TASK' && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const matchingCard = enrichedAssignmentCards.find(
-                                (c) => c.isUnitBundle && c.unitTitle === formUnitTitle && c.courseCode === formCourseCode
-                              );
-                              if (matchingCard) {
-                                handleOpenEditUnitModal(matchingCard);
-                              }
-                            }}
-                            className="text-[10px] px-2 py-0.5 rounded-lg bg-white border border-blue-200 text-[#3B82F6] font-bold hover:bg-blue-50 flex items-center gap-1 cursor-pointer transition-colors"
-                            title="สลับไปแก้ไขการตั้งค่าหน่วย"
-                          >
-                            <Edit3 className="w-3 h-3" />
-                            <span>แก้ไขการตั้งค่าหน่วย</span>
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setIsChangingSubTaskUnit((prev) => !prev)}
+                              className="text-[10px] px-2 py-0.5 rounded-lg bg-white border border-blue-200 text-[#3B82F6] font-bold hover:bg-blue-50 flex items-center gap-1 cursor-pointer transition-colors"
+                              title="เปลี่ยนสังกัดหน่วยการเรียนรู้ของงานย่อยนี้"
+                            >
+                              <Layers className="w-3 h-3" />
+                              <span>{isChangingSubTaskUnit ? 'ยกเลิกเปลี่ยนหน่วย' : 'ย้ายสังกัดหน่วย'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const matchingCard = enrichedAssignmentCards.find(
+                                  (c) => c.isUnitBundle && c.unitTitle === formUnitTitle && c.courseCode === formCourseCode
+                                );
+                                if (matchingCard) {
+                                  handleOpenEditUnitModal(matchingCard);
+                                }
+                              }}
+                              className="text-[10px] px-2 py-0.5 rounded-lg bg-white border border-blue-200 text-[#3B82F6] font-bold hover:bg-blue-50 flex items-center gap-1 cursor-pointer transition-colors"
+                              title="สลับไปแก้ไขการตั้งค่าหน่วย"
+                            >
+                              <Edit3 className="w-3 h-3" />
+                              <span>แก้ไขการตั้งค่าหน่วย</span>
+                            </button>
+                          </>
                         )}
                         <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-[#3B82F6] text-white font-bold">
                           {editScope === 'SUB_TASK' ? 'แก้ไขงานย่อย' : 'ผูกเข้าหน่วยนี้'}
                         </span>
                       </div>
                     </div>
+                    {isChangingSubTaskUnit && (
+                      <div className="pt-2 border-t border-blue-200/80 space-y-2 animate-fade-in">
+                        <span className="block text-xs font-bold text-[#163A66]">
+                          เลือกหน่วยที่ต้องการย้ายงานนี้ไปสังกัด:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {existingCourseUnitDetails.map((u) => {
+                            const isCurrent = formUnitTitle === u.unitTitle;
+                            return (
+                              <button
+                                key={u.unitTitle}
+                                type="button"
+                                onClick={() => {
+                                  handleSelectExistingUnit(u);
+                                  setIsChangingSubTaskUnit(false);
+                                }}
+                                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                                  isCurrent
+                                    ? 'bg-[#3B82F6] text-white shadow-xs'
+                                    : 'bg-white border border-slate-200 text-[#163A66] hover:border-blue-300'
+                                }`}
+                              >
+                                <span>{u.unitTitle}</span>
+                                {isCurrent && <Check className="w-3 h-3" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] text-[#6B7C93] pt-1.5 border-t border-blue-200/60">
                       <div>
                         <span className="block text-slate-400">วิชา:</span>
@@ -4484,6 +4604,8 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                               onClick={() => {
                                 setFormUnitTab('NEW');
                                 setFormUnitTitle('');
+                                setFormUnitId('');
+                                setIsAddingToExistingUnit(false);
                               }}
                               className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                 formUnitTab === 'NEW'
@@ -4561,7 +4683,11 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                               <div className="pt-1 flex justify-end">
                                 <button
                                   type="button"
-                                  onClick={() => setFormUnitTab('NEW')}
+                                  onClick={() => {
+                                    setFormUnitTab('NEW');
+                                    setFormUnitId('');
+                                    setIsAddingToExistingUnit(false);
+                                  }}
                                   className="text-[11px] text-[#3B82F6] hover:underline flex items-center gap-1 cursor-pointer"
                                 >
                                   <Edit3 className="w-3 h-3" />
@@ -4581,7 +4707,14 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
                                 type="text"
                                 required={formAssignmentMode === 'UNIT_BUNDLE'}
                                 value={formUnitTitle}
-                                onChange={(e) => setFormUnitTitle(e.target.value)}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setFormUnitTitle(val);
+                                  if (formUnitTab === 'NEW') {
+                                    setFormUnitId('');
+                                    setIsAddingToExistingUnit(false);
+                                  }
+                                }}
                                 placeholder="เช่น บทที่ 8, หน่วยที่ 1 ทัศนธาตุ หรือ จุดประสงค์ที่ 2"
                                 className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-[#163A66] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
                               />

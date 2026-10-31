@@ -132,20 +132,17 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
         setModalFilter('PENDING');
       }
     }
-  }, [isOpen, currentItem?.id]);
+  }, [isOpen, currentItem?.id, currentItem?.status]);
 
   const filteredModalItems = React.useMemo(() => {
     if (modalFilter === 'PENDING') {
-      const p = allItems.filter((i) => i.status === 'PENDING_REVIEW');
-      return p.length > 0 ? p : allItems;
+      return allItems.filter((i) => i.status === 'PENDING_REVIEW');
     }
     if (modalFilter === 'RETURNED') {
-      const r = allItems.filter((i) => i.status === 'RETURNED' || (i as any).status === 'RETURNED_REVISION');
-      return r.length > 0 ? r : allItems;
+      return allItems.filter((i) => i.status === 'RETURNED' || (i as any).status === 'RETURNED_REVISION');
     }
     if (modalFilter === 'GRADED') {
-      const g = allItems.filter((i) => i.status === 'GRADED');
-      return g.length > 0 ? g : allItems;
+      return allItems.filter((i) => i.status === 'GRADED');
     }
     return allItems;
   }, [allItems, modalFilter]);
@@ -338,29 +335,31 @@ export const GradingWorkspaceModal: React.FC<GradingWorkspaceModalProps> = ({
             </div>
 
             {/* Prev / Next queue navigation */}
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-              <button
-                type="button"
-                onClick={handlePrev}
-                disabled={!hasPrev}
-                className="p-1.5 rounded-lg hover:bg-white text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                title="นักเรียนคนก่อนหน้า"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <span className="text-[11px] font-bold text-slate-600 px-1.5 tabular-nums">
-                {currentIndex >= 0 ? currentIndex + 1 : 1} / {filteredModalItems.length}
-              </span>
-              <button
-                type="button"
-                onClick={handleNext}
-                disabled={!hasNext}
-                className="p-1.5 rounded-lg hover:bg-white text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                title="นักเรียนคนถัดไป"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+            {filteredModalItems.length > 0 && (
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={handlePrev}
+                  disabled={!hasPrev}
+                  className="p-1.5 rounded-lg hover:bg-white text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  title="นักเรียนคนก่อนหน้า"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-[11px] font-bold text-slate-600 px-1.5 tabular-nums">
+                  {currentIndex >= 0 ? currentIndex + 1 : 1} / {filteredModalItems.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  disabled={!hasNext}
+                  className="p-1.5 rounded-lg hover:bg-white text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  title="นักเรียนคนถัดไป"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
 
             <button
               type="button"

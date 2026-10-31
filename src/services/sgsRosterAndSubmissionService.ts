@@ -552,6 +552,91 @@ export const INITIAL_TERM_ASSIGNMENTS: TermAssignmentItem[] = [];
 
 export const INITIAL_SUBMISSIONS: StudentWorkSubmission[] = [];
 
+function healCorruptedUnitAssignments(assignments: TermAssignmentItem[]): { assignments: TermAssignmentItem[]; hasChanges: boolean } {
+  if (!Array.isArray(assignments) || assignments.length === 0) {
+    return { assignments, hasChanges: false };
+  }
+
+  // ตรวจจับกรณี unitId ชนกันข้ามหน่วย (เช่น สร้างหน่วยใหม่แต่เผลอใช้ unitId ของหน่วยเดิม)
+  const unitIdToTitles = new Map<string, Map<string, TermAssignmentItem[]>>();
+
+  assignments.forEach((asg) => {
+    if (asg.unitTitle && asg.unitId) {
+      const course = (asg.courseCode || 'all').trim().toUpperCase();
+      const unitKey = `${course}:::${asg.unitId}`;
+      const titleNorm = asg.unitTitle.trim().toLowerCase();
+
+      if (!unitIdToTitles.has(unitKey)) {
+        unitIdToTitles.set(unitKey, new Map());
+      }
+      const titleMap = unitIdToTitles.get(unitKey)!;
+      if (!titleMap.has(titleNorm)) {
+        titleMap.set(titleNorm, []);
+      }
+      titleMap.get(titleNorm)!.push(asg);
+    }
+  });
+
+  let hasChanges = false;
+  const updatedAssignments = [...assignments];
+
+  unitIdToTitles.forEach((titleMap) => {
+    if (titleMap.size > 1) {
+      // มี unitTitle มากกว่า 1 ชื่อที่ใช้ unitId เดียวกัน! ทำการแยกให้อัตโนมัติ
+      const entries = Array.from(titleMap.entries());
+      entries.sort((a, b) => b[1].length - a[1].length); // ชื่อที่มีจำนวนงานมากกว่าได้ใช้ unitId เดิมต่อไป
+
+      for (let i = 1; i < entries.length; i++) {
+        const [_, tasks] = entries[i];
+        const refTask = tasks[0];
+        const cleanCourse = (refTask.courseCode || 'course').trim().toLowerCase().replace(/[^a-zA-Z0-9ก-๙-]/g, '');
+        const cleanTitle = (refTask.unitTitle || '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9ก-๙-]/g, '');
+        const newUnitId = `unit-${cleanCourse}-${cleanTitle}-${Math.random().toString(36).slice(2, 6)}`;
+
+        const oldUnitId = refTask.unitId;
+        tasks.forEach((t) => {
+          const idx = updatedAssignments.findIndex((a) => a.id === t.id);
+          if (idx !== -1) {
+            updatedAssignments[idx] = {
+              ...updatedAssignments[idx],
+              unitId: newUnitId,
+            };
+            hasChanges = true;
+          }
+        });
+
+        // ซิงค์แก้ไข unitId ใน submissions ที่เกี่ยวข้อง
+        try {
+          if (typeof localStorage !== 'undefined') {
+            const rawSubs = localStorage.getItem('kp_work_submissions_v1') || localStorage.getItem('kp_work_submissions_v2');
+            if (rawSubs) {
+              const subsList = JSON.parse(rawSubs);
+              if (Array.isArray(subsList)) {
+                let subsChanged = false;
+                const taskIds = new Set(tasks.map((t) => t.id));
+                const nextSubs = subsList.map((s: any) => {
+                  if (taskIds.has(s.assignmentId) && s.unitId === oldUnitId) {
+                    subsChanged = true;
+                    return { ...s, unitId: newUnitId };
+                  }
+                  return s;
+                });
+                if (subsChanged) {
+                  localStorage.setItem('kp_work_submissions_v1', JSON.stringify(nextSubs));
+                }
+              }
+            }
+          }
+        } catch {
+          // ignore parsing error
+        }
+      }
+    }
+  });
+
+  return { assignments: updatedAssignments, hasChanges };
+}
+
 export const sgsRosterAndSubmissionService = {
   getCourseWeights(courseCode = 'DEFAULT'): CourseScoreWeights {
     const key = courseCode || 'DEFAULT';
@@ -1033,7 +1118,13 @@ export const sgsRosterAndSubmissionService = {
   getTermAssignments(courseCode?: string, classroomIdOrLabel?: string): TermAssignmentItem[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_TERM_ASSIGNMENTS);
-      const allAssignments: TermAssignmentItem[] = raw ? JSON.parse(raw) : [];
+      let allAssignments: TermAssignmentItem[] = raw ? JSON.parse(raw) : [];
+
+      const { assignments: healed, hasChanges } = healCorruptedUnitAssignments(allAssignments);
+      if (hasChanges) {
+        allAssignments = healed;
+        localStorage.setItem(STORAGE_KEY_TERM_ASSIGNMENTS, JSON.stringify(healed));
+      }
 
       return allAssignments.filter((asg: any) => {
         // 1. กรองตามรหัสวิชา (ถ้าระบุมา)
@@ -1149,7 +1240,8 @@ export const sgsRosterAndSubmissionService = {
 
   updateTermAssignment(
     assignmentId: string,
-    updates: Partial<TermAssignmentItem>
+    updates: Partial<TermAssignmentItem>,
+    options?: { cascadeToUnit?: boolean }
   ): TermAssignmentItem[] {
     const list = this.getTermAssignments();
     const targetItem = list.find((i) => i.id === assignmentId);
@@ -1159,9 +1251,13 @@ export const sgsRosterAndSubmissionService = {
     const updated = list.map((item) => {
       const isTarget = item.id === assignmentId;
       const isSameUnit = Boolean(
+        options?.cascadeToUnit !== false &&
         !isTarget &&
-        ((targetUnitId && item.unitId === targetUnitId) ||
-         (targetUnitTitle && item.unitTitle === targetUnitTitle && item.courseCode === targetItem?.courseCode))
+        targetUnitTitle &&
+        item.unitTitle &&
+        item.unitTitle.trim().toLowerCase() === targetUnitTitle.trim().toLowerCase() &&
+        item.courseCode === targetItem?.courseCode &&
+        (!targetUnitId || !item.unitId || item.unitId === targetUnitId)
       );
 
       if (!isTarget && !isSameUnit) return item;
@@ -1569,6 +1665,34 @@ export const sgsRosterAndSubmissionService = {
               r2ObjectKey: orphan.r2ObjectKey,
             });
           }
+        }
+
+        // ตรวจสอบสถานะกับ kp_grading_queue_v2 เพื่อป้องกันรายการที่ตรวจแล้ว (GRADED) เด้งกลับมาเป็นค้างตรวจ
+        try {
+          const queueRaw = localStorage.getItem('kp_grading_queue_v2');
+          if (queueRaw) {
+            const queueItems = JSON.parse(queueRaw);
+            if (Array.isArray(queueItems)) {
+              queueItems.forEach((q: any) => {
+                if (q && q.assignmentId && q.studentCode && q.status === 'GRADED' && typeof q.score === 'number') {
+                  const pKey = `${q.assignmentId}_${String(q.studentCode).trim()}`;
+                  const existing = dedupMap.get(pKey);
+                  if (existing && (existing.status !== 'GRADED' || existing.score === null)) {
+                    dedupMap.set(pKey, {
+                      ...existing,
+                      status: 'GRADED',
+                      score: q.score,
+                      teacherFeedback: q.teacherFeedback || existing.teacherFeedback,
+                      feedback: q.teacherFeedback || existing.feedback,
+                      gradedAt: q.gradedAtText || existing.gradedAt || new Date().toISOString(),
+                    });
+                  }
+                }
+              });
+            }
+          }
+        } catch {
+          // ignore queue cross-check errors
         }
 
         const list = Array.from(dedupMap.values());
@@ -2174,6 +2298,26 @@ export const sgsRosterAndSubmissionService = {
         returnedAt: undefined,
       };
       submissions[targetIdx] = updatedSubmission;
+      // กวาดอัปเดตทุกระเบียนที่มี studentCode และ assignmentId เดียวกันเพื่อป้องกันระเบียนซ้ำค้างสถานะ SUBMITTED_PENDING
+      submissions.forEach((s: any, sIdx: number) => {
+        if (
+          sIdx !== targetIdx &&
+          String(s.studentCode || '').trim() === String(existing.studentCode || '').trim() &&
+          String(s.assignmentId || '').trim() === String(existing.assignmentId || '').trim()
+        ) {
+          submissions[sIdx] = {
+            ...s,
+            score: boundedScore,
+            maxScore: effectiveMaxScore ?? s.maxScore,
+            feedback: feedback || s.feedback || '',
+            teacherFeedback: feedback || s.teacherFeedback || '',
+            status: score === null ? 'MISSING' : 'GRADED',
+            gradedAt: nowIso,
+            returnReason: undefined,
+            returnedAt: undefined,
+          };
+        }
+      });
     } else if (options?.studentCode && options?.assignmentId) {
       // กรณีครูกรอกคะแนนผ่าน Quick Grade ในตาราง ปพ.5 โดยที่นักเรียนไม่ได้กดส่งไฟล์ในระบบ
       const identity = resolveStudentIdentity(
@@ -2468,7 +2612,10 @@ export const sgsRosterAndSubmissionService = {
     const directAssignments: TermAssignmentItem[] = [];
 
     for (const asg of assignments) {
-      const uKey = asg.unitId || (asg.scoringMethod && asg.scoringMethod !== 'DIRECT_SCORE' ? asg.unitTitle : undefined);
+      const cleanTitle = asg.unitTitle?.trim();
+      const uKey = cleanTitle
+        ? `${(asg.courseCode || 'all').trim().toUpperCase()}:::${cleanTitle.toLowerCase()}`
+        : asg.unitId;
       if (uKey && asg.scoringMethod && asg.scoringMethod !== 'DIRECT_SCORE') {
         const group = unitGroups.get(uKey) || [];
         group.push(asg);
