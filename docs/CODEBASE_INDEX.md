@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 31/10/2569 10:27:19 | รวมทั้งหมด 242 ไฟล์*
+*อัปเดตล่าสุด: 31/10/2569 11:02:42 | รวมทั้งหมด 243 ไฟล์*
 
 ---
 
@@ -85,7 +85,7 @@
 | [src/components/student/StudentAnnouncementsView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentAnnouncementsView.tsx) | 369 | `StudentAnnouncementsView` (L32) |
 | [src/components/student/StudentContactTeacherView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentContactTeacherView.tsx) | 166 | `StudentContactTeacherView` (L16) |
 | [src/components/student/StudentCoursesView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentCoursesView.tsx) | 147 | `StudentCoursesView` (L19) |
-| [src/components/student/StudentHeader.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentHeader.tsx) | 374 | `StudentHeader` (L34) |
+| [src/components/student/StudentHeader.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentHeader.tsx) | 397 | `StudentHeader` (L35) |
 | [src/components/student/StudentHomeDashboard.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentHomeDashboard.tsx) | 802 | `StudentHomeDashboard` (L58) |
 | [src/components/student/StudentMobileBottomNav.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentMobileBottomNav.tsx) | 100 | `StudentMobileBottomNav` (L15) |
 | [src/components/student/StudentMobileCareView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/components/student/StudentMobileCareView.tsx) | 1250 | `MobileScreenKey` (L33), `StudentMobileCareView` (L100) |
@@ -254,6 +254,7 @@
 
 | ไฟล์ (File Path) | จำนวนบรรทัด | สัญลักษณ์หลัก & ช่วงบรรทัด (Key Exports & Line Numbers) |
 | :--- | :---: | :--- |
+| [src/config/appVersion.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/config/appVersion.ts) | 124 | `APP_VERSION` (L6), `APP_RELEASE_DATE` (L7), `APP_RELEASE_TITLE` (L8), `APP_VERSION_STORAGE_KEY` (L9), `APP_VERSION_UPDATED_AT_KEY` (L10), `AppVersionInfo` (L12), `getAppVersionInfo` (L23), `initVersionGuard` (L99) |
 | [src/config/feedbackStickersCatalog.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/config/feedbackStickersCatalog.ts) | 584 | `FeedbackStrandId` (L10), `FeedbackStrandCategory` (L21), `FEEDBACK_STRAND_CATALOG` (L32), `STORAGE_KEYS` (L202), `detectFeedbackStrand` (L214), `getCategoryById` (L342), `getTeacherPreferredStrand` (L350), `setTeacherPreferredStrand` (L367), `getCustomFeedbackStickers` (L381), `addCustomFeedbackSticker` (L405) *(+3 รายการ)* |
 | [src/config/gachaStarTable.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/config/gachaStarTable.ts) | 143 | `GachaRarity` (L5), `MAX_BUDDY_STARS` (L13), `BuddyStarTier` (L15), `BUDDY_STAR_TABLE` (L57), 📌 *COMMON* (L58), 📌 *UNCOMMON* (L69), 📌 *RARE* (L80), 📌 *EPIC* (L91), 📌 *LEGENDARY* (L108), 📌 *MYTHIC* (L125) *(+1 รายการ)* |
 | [src/config/m1SgsLookup.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/config/m1SgsLookup.ts) | 1251 | `M1SgsLookupEntry` (L5), `M1_SGS_STUDENT_LOOKUP` (L12), `getM1SgsStudentInfo` (L1239), `isGrade1SgsStudentCode` (L1244) |
@@ -298,5 +299,5 @@
 | [src/lib/supabaseClient.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/lib/supabaseClient.ts) | 2 | *(Internal / Default Export)* |
 | [src/lib/supabase.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/lib/supabase.ts) | 44 | `isSupabaseConfigured` (L19), `supabase` (L30), `logDbOperation` (L39) |
 | [src/lib/universalAdapter.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/lib/universalAdapter.ts) | 575 | `RealtimePayload` (L16), `StorageDriver` (L22), `UniversalAdapterConfig` (L29), `UniversalAdapter` (L43), `getStorageDriver` (L61), `clearMemoryStore` (L87), `getMemoryStore` (L88), `readStorage` (L90), `writeStorage` (L101), `removeStorage` (L110) *(+3 รายการ)* |
-| [src/main.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/main.tsx) | 56 | *(Internal / Default Export)* |
+| [src/main.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/main.tsx) | 71 | *(Internal / Default Export)* |
 

@@ -1,5 +1,5 @@
-// public/sw.js - PWA Service Worker with Native Phone Notification Support
-const _CACHE_NAME = 'kps-cache-v2';
+// public/sw.js - PWA Service Worker with Native Phone Notification Support & Smart Version Invalidation
+const _CACHE_NAME = 'kps-cache-v2.6.0';
 
 self.addEventListener('install', (_event) => {
   self.skipWaiting();

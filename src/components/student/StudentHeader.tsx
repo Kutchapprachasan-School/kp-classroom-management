@@ -5,7 +5,8 @@ import MenuRegular from '@mingcute/react/core-regular/menu';
 import Calendar2Regular from '@mingcute/react/core-regular/calendar-2';
 import SparklesRegular from '@mingcute/react/core-regular/sparkles';
 import Settings3Regular from '@mingcute/react/core-regular/settings-3';
-import { Search, ChevronDown, CheckCircle, Bell, X } from 'lucide-react';
+import { Search, ChevronDown, CheckCircle, Bell, X, RotateCw } from 'lucide-react';
+import { APP_VERSION, performSmartAssetCacheBust } from '../../config/appVersion';
 import { studentBannerService } from '../../services/studentBannerService';
 import { type SchoolUserRole, type SchoolBrandingSettings } from '../../config/schoolRoles';
 import type { SchoolSettingsConfig } from '../../config/schoolSettings';
@@ -46,6 +47,17 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
   onOpenSearch,
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleSmartRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await performSmartAssetCacheBust({ forceReload: true });
+    } catch {
+      window.location.reload();
+    }
+  };
 
   const studentCode = currentUser?.studentCode || 'STD-001';
 
@@ -293,6 +305,17 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                 {unreadCount}
               </span>
             )}
+          </button>
+
+          {/* Smart Version Invalidation & Refresh Button */}
+          <button
+            type="button"
+            onClick={handleSmartRefresh}
+            disabled={isRefreshing}
+            className="w-9 h-9 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-blue-600 flex items-center justify-center transition-colors cursor-pointer border border-slate-200 shadow-2xs group"
+            title={`เวอร์ชัน v${APP_VERSION} • คลิกเพื่อล้างแคชและอัปเดตระบบล่าสุด`}
+          >
+            <RotateCw className={`w-4 h-4 transition-transform group-hover:rotate-180 ${isRefreshing ? 'animate-spin text-blue-600' : ''}`} />
           </button>
 
           {/* Date Chip */}
