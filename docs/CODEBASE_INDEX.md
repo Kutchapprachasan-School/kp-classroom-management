@@ -4,7 +4,7 @@
 > สารบัญนี้ทำหน้าที่เป็น Navigation Map เพื่อให้ AI Assistant และผู้พัฒนาสามารถตรวจสอบตำแหน่งไฟล์, สัญลักษณ์หลัก (Components / Functions / Types), และช่วงบรรทัด (Line Ranges) ได้ทันที **โดยไม่ต้องเปิดดูทั้งไฟล์ (ห้าม Full View)**
 > **ข้อบังคับ**: ทุกครั้งที่มีการเพิ่มไฟล์ใหม่, ลบไฟล์, หรือปรับแก้โครงสร้างหลัก ต้องรัน `node scripts/index_codebase.mjs` เพื่ออัปเดตสารบัญนี้เสมอ
 
-*อัปเดตล่าสุด: 31/10/2569 11:02:42 | รวมทั้งหมด 243 ไฟล์*
+*อัปเดตล่าสุด: 31/10/2569 14:07:09 | รวมทั้งหมด 243 ไฟล์*
 
 ---
 
@@ -14,7 +14,7 @@
 | :--- | :---: | :--- |
 | [src/views/AcademicTermsView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/AcademicTermsView.tsx) | 2081 | `ActivityCategory` (L50), `CalendarLegendColor` (L52), `CalendarEventItem` (L54), `AcademicTermsView` (L282) |
 | [src/views/AdminExecutiveDashboardView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/AdminExecutiveDashboardView.tsx) | 312 | `AdminExecutiveDashboardView` (L39) |
-| [src/views/AssignmentManagementView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/AssignmentManagementView.tsx) | 5612 | `QuickFilterMode` (L68), `AssignmentManagementView` (L83) |
+| [src/views/AssignmentManagementView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/AssignmentManagementView.tsx) | 5628 | `QuickFilterMode` (L68), `AssignmentManagementView` (L83) |
 | [src/views/ClassroomAttendanceView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomAttendanceView.tsx) | 1885 | `ClassroomAttendanceViewProps` (L56), `TeacherCourseOption` (L61), `ClassroomAttendanceView` (L85) |
 | [src/views/ClassroomManagementView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomManagementView.tsx) | 1523 | `ImportPreviewRow` (L51), `ClassroomManagementView` (L63) |
 | [src/views/ClassroomsRosterView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ClassroomsRosterView.tsx) | 2223 | `ClassroomsRosterView` (L64) |
@@ -24,7 +24,7 @@
 | [src/views/ExamManagementView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/ExamManagementView.tsx) | 3270 | `ExtendedExamItem` (L79), `ExamManagementView` (L97) |
 | [src/views/GoldQuestJoinView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/GoldQuestJoinView.tsx) | 496 | `RoomStudent` (L22), `AVATAR_OPTIONS` (L28), `GoldQuestJoinView` (L480) |
 | [src/views/GoldQuestPlayView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/GoldQuestPlayView.tsx) | 10 | `GoldQuestPlayView` (L8) |
-| [src/views/GradingQueueView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/GradingQueueView.tsx) | 630 | `GradingQueueView` (L37) |
+| [src/views/GradingQueueView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/GradingQueueView.tsx) | 644 | `GradingQueueView` (L37) |
 | [src/views/HomeVisitSdqView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/HomeVisitSdqView.tsx) | 1355 | `HomeVisitSdqView` (L27) |
 | [src/views/LessonPlansView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/LessonPlansView.tsx) | 1776 | `UnitStatus` (L33), `EvaluationItem` (L35), `UnitPlanItem` (L42), `CourseFilterOption` (L87), `LessonPlansView` (L96) |
 | [src/views/LiveClassroomView.tsx](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/views/LiveClassroomView.tsx) | 648 | `LiveClassroomViewProps` (L29), `LiveClassroomView` (L33) |
@@ -204,7 +204,7 @@
 | [src/services/chatBackendService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/chatBackendService.ts) | 268 | `ChatRoomType` (L8), `ChatMessageType` (L9), `ChatRoomSummary` (L11), `ChatAttachmentMeta` (L29), `ChatMessageRecord` (L39), `FetchMessagesResponse` (L53), `SendMessagePayload` (L59), `chatBackendService` (L97) |
 | [src/services/classroomService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/classroomService.ts) | 914 | `getDeletedRoomsSet` (L10), `saveDeletedRoomsSet` (L25), `getLocalClassrooms` (L36), `TeacherAccountItem` (L109), `DEFAULT_TEACHER_ACCOUNTS` (L119), `INITIAL_SEED_CLASSROOMS` (L121), `invalidateClassroomCache` (L177), `classroomService` (L184) |
 | [src/services/cleanSlateService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/cleanSlateService.ts) | 211 | `CleanSlatePurgeResult` (L5), `TRANSACTIONAL_STORAGE_KEYS` (L16), `PRESERVED_INFRASTRUCTURE_KEYS` (L61), `cleanSlateService` (L210) |
-| [src/services/cloudDataService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/cloudDataService.ts) | 1235 | `CloudStoreRecord` (L8), `CloudSyncState` (L14), `cloudDataService` (L707), `FileValidationResult` (L709), `MAX_IMAGE_SIZE_MB` (L717), `MAX_DOC_SIZE_MB` (L718), `MAX_MEDIA_SIZE_MB` (L719), `ALLOWED_IMAGE_EXTENSIONS` (L722), `ALLOWED_DOC_EXTENSIONS` (L735), `ALLOWED_MEDIA_EXTENSIONS` (L762) *(+8 รายการ)* |
+| [src/services/cloudDataService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/cloudDataService.ts) | 1286 | `CloudStoreRecord` (L8), `CloudSyncState` (L14), `cloudDataService` (L758), `FileValidationResult` (L760), `MAX_IMAGE_SIZE_MB` (L768), `MAX_DOC_SIZE_MB` (L769), `MAX_MEDIA_SIZE_MB` (L770), `ALLOWED_IMAGE_EXTENSIONS` (L773), `ALLOWED_DOC_EXTENSIONS` (L786), `ALLOWED_MEDIA_EXTENSIONS` (L813) *(+8 รายการ)* |
 | [src/services/coursesCurriculumService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/coursesCurriculumService.ts) | 871 | `MediaType` (L12), `UnitMediaItem` (L14), `CurriculumUnit` (L28), `CourseCurriculumRecord` (L40), `TrashMediaItem` (L57), `calculatePeriodsPerWeek` (L76), `inferGradeLevelFromCourseCode` (L95), `coursesCurriculumService` (L869) |
 | [src/services/gachaAdminService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gachaAdminService.ts) | 383 | `GachaSnapshot` (L14), `GachaAdminAuditLog` (L24), `gachaAdminService` (L83), 📌 *Snapshots & Rollback* (L84), 📌 *Granting Operations* (L155), 📌 *Reset Operations* (L277), 📌 *Audit Logs* (L377) |
 | [src/services/gachaConfigService.ts](file:///C:/dev/09 ระบบจัดการชั้นเรียน/src/services/gachaConfigService.ts) | 245 | `GACHA_CONFIG_STORAGE_KEY` (L9), `GACHA_CONFIG_UPDATED_EVENT` (L10), `RARITY_ORDER` (L12), `GachaAdminConfig` (L21), `DEFAULT_GACHA_CONFIG` (L75), `validateGachaConfig` (L181), `gachaConfigService` (L207) |

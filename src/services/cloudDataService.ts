@@ -278,10 +278,38 @@ class CloudDataService {
               const pKey = `${loc.assignmentId || ''}_${String(loc.studentCode).trim()}`;
               const prev = mergedMap.get(pKey);
               if (prev) {
+                const isPrevGraded = prev.status === 'GRADED' && typeof prev.score === 'number';
+                const isLocGraded = loc.status === 'GRADED' && typeof loc.score === 'number';
+
+                // ป้องกันเครื่องที่ช้ากว่าเขียนทับสถานะ GRADED ด้วย PENDING_REVIEW
+                let resolvedStatus = loc.status;
+                let resolvedScore = loc.score;
+                let resolvedTeacherFeedback = loc.teacherFeedback || loc.feedback;
+                let resolvedGradedTimestamp = loc.gradedTimestamp;
+
+                if (isPrevGraded && !isLocGraded) {
+                  resolvedStatus = 'GRADED';
+                  resolvedScore = prev.score;
+                  resolvedTeacherFeedback = prev.teacherFeedback || prev.feedback || resolvedTeacherFeedback;
+                  resolvedGradedTimestamp = prev.gradedTimestamp || resolvedGradedTimestamp;
+                } else if (isLocGraded && isPrevGraded) {
+                  // ถ้าตรวจแล้วทั้งคู่ ให้ใช้ระเบียนที่มี gradedTimestamp ใหม่กว่า
+                  if ((prev.gradedTimestamp || 0) > (loc.gradedTimestamp || 0)) {
+                    resolvedScore = prev.score;
+                    resolvedTeacherFeedback = prev.teacherFeedback || prev.feedback;
+                    resolvedGradedTimestamp = prev.gradedTimestamp;
+                  }
+                }
+
                 mergedMap.set(pKey, {
                   ...prev,
                   ...loc,
                   id: loc.id || prev.id,
+                  status: resolvedStatus,
+                  score: resolvedScore,
+                  teacherFeedback: resolvedTeacherFeedback,
+                  feedback: resolvedTeacherFeedback,
+                  gradedTimestamp: resolvedGradedTimestamp,
                   classroom: loc.classroom || prev.classroom,
                   studentName: loc.studentName || prev.studentName,
                   courseCode: loc.courseCode || prev.courseCode,
@@ -476,6 +504,13 @@ class CloudDataService {
           this.syncState.syncError = null;
           this.notifyStateChange();
 
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('kps-cloud-synced'));
+            window.dispatchEvent(new CustomEvent('kp-grading-queue-updated'));
+            window.dispatchEvent(new CustomEvent('kp-sgs-roster-updated'));
+            window.dispatchEvent(new CustomEvent('kps-data-sync-event', { detail: { type: 'cloud-synced' } }));
+          }
+
           console.log(`[CloudDataService] Successfully hydrated ${dirtyData.length} changed records from Supabase Cloud!`);
         }
       }
@@ -665,6 +700,22 @@ class CloudDataService {
                       detail: { key, data, timestamp: newRecord.updated_at },
                     })
                   );
+                  if (
+                    key === 'kp_grading_queue_v2' ||
+                    key === 'kp_work_submissions_v2' ||
+                    key === 'kp_work_submissions_v1' ||
+                    key === 'kp_term_assignments_v1' ||
+                    key.includes('assignment') ||
+                    key.includes('submission')
+                  ) {
+                    window.dispatchEvent(new CustomEvent('kp-grading-queue-updated'));
+                    window.dispatchEvent(new CustomEvent('kp-sgs-roster-updated'));
+                    window.dispatchEvent(
+                      new CustomEvent('kps-data-sync-event', {
+                        detail: { type: 'submissions-updated', key },
+                      })
+                    );
+                  }
                 }
               }
             } else if (eventType === 'DELETE') {

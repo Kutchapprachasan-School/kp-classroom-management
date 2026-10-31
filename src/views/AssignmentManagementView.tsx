@@ -1542,13 +1542,29 @@ export const AssignmentManagementView: React.FC<AssignmentManagementViewProps> =
       refreshTermAssignments();
       refreshMatrixStudents();
     };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        handleQueueUpdate();
+      }
+    };
+
     window.addEventListener('kp-grading-queue-updated', handleQueueUpdate);
     window.addEventListener('kp-sgs-roster-updated', handleQueueUpdate);
     window.addEventListener('kps-data-sync-event', handleQueueUpdate);
+    window.addEventListener('kps-cloud-synced', handleQueueUpdate);
+    window.addEventListener('kps-cloud-key-updated', handleQueueUpdate);
+    window.addEventListener('focus', handleQueueUpdate);
+    document.addEventListener('visibilitychange', handleVisibility);
+
     return () => {
       window.removeEventListener('kp-grading-queue-updated', handleQueueUpdate);
       window.removeEventListener('kp-sgs-roster-updated', handleQueueUpdate);
       window.removeEventListener('kps-data-sync-event', handleQueueUpdate);
+      window.removeEventListener('kps-cloud-synced', handleQueueUpdate);
+      window.removeEventListener('kps-cloud-key-updated', handleQueueUpdate);
+      window.removeEventListener('focus', handleQueueUpdate);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [refreshTermAssignments, refreshMatrixStudents]);
 

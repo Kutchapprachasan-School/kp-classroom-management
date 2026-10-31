@@ -72,14 +72,28 @@ export const GradingQueueView: React.FC<GradingQueueViewProps> = ({
   }, []);
 
   useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refreshQueue();
+      }
+    };
+
     window.addEventListener('kp-grading-queue-updated', refreshQueue);
     window.addEventListener('kp-sgs-roster-updated', refreshQueue);
     window.addEventListener('kps-data-sync-event', refreshQueue);
+    window.addEventListener('kps-cloud-synced', refreshQueue);
+    window.addEventListener('kps-cloud-key-updated', refreshQueue);
+    window.addEventListener('focus', refreshQueue);
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       window.removeEventListener('kp-grading-queue-updated', refreshQueue);
       window.removeEventListener('kp-sgs-roster-updated', refreshQueue);
       window.removeEventListener('kps-data-sync-event', refreshQueue);
+      window.removeEventListener('kps-cloud-synced', refreshQueue);
+      window.removeEventListener('kps-cloud-key-updated', refreshQueue);
+      window.removeEventListener('focus', refreshQueue);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [refreshQueue]);
 
